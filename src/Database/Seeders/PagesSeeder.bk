@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Database\Seeders;
+
+use App\Framework\Database\Seeder\Seeder;
+use App\Models\Page;
+
+class PagesSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $pages = [
+            ['title' => 'Home', 'slug' => 'home', 'status' => 'published'],
+            ['title' => 'About', 'slug' => 'about', 'status' => 'published'],
+            ['title' => 'Contact', 'slug' => 'contact', 'status' => 'draft'],
+        ];
+
+        foreach ($pages as $pageData) {
+            Page::create($pageData);
+        }
+    }
+}

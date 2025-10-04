@@ -1,0 +1,19 @@
+<?php
+
+namespace App\Requests;
+
+use App\Framework\Http\FormRequest;
+use App\Framework\Support\Str;
+use App\Repositories\CategoryRepository;
+
+class CreateImageCategoryRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'slug' => 'string|max:255|unique:image_categories,slug',
+            'description' => 'string|max:1000'
+        ];
+    }
+}

@@ -1,0 +1,592 @@
+[2025-09-30 06:56:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 06:56:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-30 06:56:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.13ms"}
+[2025-09-30 06:56:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.27ms"}
+[2025-09-30 06:56:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 06:56:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.79ms"}
+[2025-09-30 06:56:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.35ms"}
+[2025-09-30 06:57:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.87ms"}
+[2025-09-30 06:57:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.89ms"}
+[2025-09-30 06:57:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.74ms"}
+[2025-09-30 06:57:05] DEBUG: Records deleted {"table":"images","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 06:57:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.62ms"}
+[2025-09-30 06:57:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.69ms"}
+[2025-09-30 06:57:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.2ms"}
+[2025-09-30 06:57:07] DEBUG: Records deleted {"table":"images","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 06:57:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.82ms"}
+[2025-09-30 06:57:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.15ms"}
+[2025-09-30 06:57:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.82ms"}
+[2025-09-30 06:57:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.54ms"}
+[2025-09-30 06:57:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.5ms"}
+[2025-09-30 06:57:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.45ms"}
+[2025-09-30 06:57:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-30 06:57:20] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-30 06:57:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-30 06:57:47] DEBUG: Record inserted {"table":"images","insert_id":16,"data_keys":["filename","original_name","file_path","url","mime_type","file_size","width","height","alt_text","caption","description","created_at","updated_at"]}
+[2025-09-30 06:57:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.48ms"}
+[2025-09-30 06:58:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-30 06:58:01] DEBUG: Record inserted {"table":"images","insert_id":17,"data_keys":["filename","original_name","file_path","url","mime_type","file_size","width","height","alt_text","caption","description","created_at","updated_at"]}
+[2025-09-30 06:58:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.66ms"}
+[2025-09-30 06:58:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.71ms"}
+[2025-09-30 06:58:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-30 06:58:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.58ms"}
+[2025-09-30 06:58:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-30 06:58:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.46ms"}
+[2025-09-30 06:58:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.55ms"}
+[2025-09-30 06:58:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.61ms"}
+[2025-09-30 06:58:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-30 06:58:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.78ms"}
+[2025-09-30 06:58:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.91ms"}
+[2025-09-30 06:58:17] DEBUG: Record inserted {"table":"image_usage","insert_id":1,"data_keys":["image_id","usable_type","usable_id","context","created_at","updated_at"]}
+[2025-09-30 06:58:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"3.26ms"}
+[2025-09-30 06:58:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.36ms"}
+[2025-09-30 06:58:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.56ms"}
+[2025-09-30 06:58:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.54ms"}
+[2025-09-30 06:58:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.37ms"}
+[2025-09-30 06:58:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.46ms"}
+[2025-09-30 07:11:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 07:11:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-30 07:11:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.32ms"}
+[2025-09-30 07:11:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.77ms"}
+[2025-09-30 07:11:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.05ms"}
+[2025-09-30 07:11:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.76ms"}
+[2025-09-30 07:24:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.39ms"}
+[2025-09-30 07:24:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.99ms"}
+[2025-09-30 07:24:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-30 07:24:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.9ms"}
+[2025-09-30 07:24:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.84ms"}
+[2025-09-30 07:24:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.18ms"}
+[2025-09-30 07:35:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.58ms"}
+[2025-09-30 07:35:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.07ms"}
+[2025-09-30 07:35:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.13ms"}
+[2025-09-30 07:35:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.61ms"}
+[2025-09-30 07:35:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.47ms"}
+[2025-09-30 07:35:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.52ms"}
+[2025-09-30 08:26:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 08:26:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 08:26:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.12ms"}
+[2025-09-30 08:26:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.59ms"}
+[2025-09-30 08:26:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.56ms"}
+[2025-09-30 08:26:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 08:28:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.27ms"}
+[2025-09-30 08:28:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.77ms"}
+[2025-09-30 08:28:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.41ms"}
+[2025-09-30 08:28:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 08:28:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 08:28:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.07ms"}
+[2025-09-30 08:32:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.61ms"}
+[2025-09-30 08:32:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.03ms"}
+[2025-09-30 08:32:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 08:32:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.77ms"}
+[2025-09-30 08:32:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.57ms"}
+[2025-09-30 08:32:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.32ms"}
+[2025-09-30 08:55:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 08:55:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.98ms"}
+[2025-09-30 08:55:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.79ms"}
+[2025-09-30 08:55:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.62ms"}
+[2025-09-30 08:55:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.54ms"}
+[2025-09-30 08:55:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-30 08:56:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.83ms"}
+[2025-09-30 08:56:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.86ms"}
+[2025-09-30 08:56:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.9ms"}
+[2025-09-30 08:56:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.1ms"}
+[2025-09-30 08:56:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-30 08:56:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-30 09:00:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.27ms"}
+[2025-09-30 09:00:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-30 09:00:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.58ms"}
+[2025-09-30 09:03:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1ms"}
+[2025-09-30 09:03:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 09:03:37] DEBUG: Database transaction started
+[2025-09-30 09:03:37] DEBUG: Records updated {"table":"pages","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_metadata","insert_id":1,"data_keys":["author","visibility","password","page_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_seo","insert_id":1,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_settings","insert_id":1,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Records updated {"table":"page_social","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:03:37] DEBUG: Records deleted {"table":"page_categories","affected_rows":1,"where_conditions":["page_id"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"categories","insert_id":72,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_categories","insert_id":28,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"categories","insert_id":73,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_categories","insert_id":29,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Records deleted {"table":"page_tags","affected_rows":3,"where_conditions":["page_id"]}
+[2025-09-30 09:03:37] DEBUG: Records updated {"table":"tags","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:03:37] DEBUG: Records updated {"table":"tags","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:03:37] DEBUG: Records updated {"table":"tags","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"tags","insert_id":151,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_tags","insert_id":58,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"tags","insert_id":152,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_tags","insert_id":59,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"tags","insert_id":153,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:03:37] DEBUG: Record inserted {"table":"page_tags","insert_id":60,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.74ms"}
+[2025-09-30 09:22:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-30 09:22:11] DEBUG: Database transaction started
+[2025-09-30 09:22:11] DEBUG: Records updated {"table":"pages","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_metadata","insert_id":2,"data_keys":["author","visibility","password","page_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_seo","insert_id":2,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_settings","insert_id":2,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Records updated {"table":"page_social","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:22:11] DEBUG: Records deleted {"table":"page_categories","affected_rows":1,"where_conditions":["page_id"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"categories","insert_id":74,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_categories","insert_id":30,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"categories","insert_id":75,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_categories","insert_id":31,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Records deleted {"table":"page_tags","affected_rows":3,"where_conditions":["page_id"]}
+[2025-09-30 09:22:11] DEBUG: Records updated {"table":"tags","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:22:11] DEBUG: Records updated {"table":"tags","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:22:11] DEBUG: Records updated {"table":"tags","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"tags","insert_id":154,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_tags","insert_id":61,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"tags","insert_id":155,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_tags","insert_id":62,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"tags","insert_id":156,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:22:11] DEBUG: Record inserted {"table":"page_tags","insert_id":63,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:33:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.89ms"}
+[2025-09-30 09:34:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-30 09:34:52] DEBUG: Database transaction started
+[2025-09-30 09:34:52] INFO: Creating new page {"title":"test mike"}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"pages","insert_id":29,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-30 09:34:52] INFO: Page created successfully {"page_id":29}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_metadata","insert_id":3,"data_keys":["author","visibility","password","featured","page_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_seo","insert_id":3,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_settings","insert_id":3,"data_keys":["template","page_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_social","insert_id":8,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Records deleted {"table":"page_categories","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"categories","insert_id":76,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_categories","insert_id":32,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"categories","insert_id":77,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_categories","insert_id":33,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"categories","insert_id":78,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_categories","insert_id":34,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Records deleted {"table":"page_tags","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"tags","insert_id":157,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_tags","insert_id":64,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"tags","insert_id":158,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_tags","insert_id":65,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"tags","insert_id":159,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:34:52] DEBUG: Record inserted {"table":"page_tags","insert_id":66,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:37:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-30 09:37:34] DEBUG: Database transaction started
+[2025-09-30 09:37:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-30 09:37:57] DEBUG: Database transaction started
+[2025-09-30 09:37:57] INFO: Creating new page {"title":"test mike"}
+[2025-09-30 09:37:57] DEBUG: Record inserted {"table":"pages","insert_id":30,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-30 09:37:57] INFO: Page created successfully {"page_id":30}
+[2025-09-30 09:38:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.68ms"}
+[2025-09-30 09:38:36] DEBUG: Database transaction started
+[2025-09-30 09:38:36] INFO: Creating new page {"title":"test mike"}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"pages","insert_id":31,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-30 09:38:36] INFO: Page created successfully {"page_id":31}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_metadata","insert_id":4,"data_keys":["author","visibility","password","featured","page_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_seo","insert_id":4,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_settings","insert_id":4,"data_keys":["template","page_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_social","insert_id":9,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Records deleted {"table":"page_categories","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"categories","insert_id":79,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_categories","insert_id":35,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"categories","insert_id":80,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_categories","insert_id":36,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"categories","insert_id":81,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_categories","insert_id":37,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Records deleted {"table":"page_tags","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"tags","insert_id":160,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_tags","insert_id":67,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"tags","insert_id":161,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_tags","insert_id":68,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"tags","insert_id":162,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:38:36] DEBUG: Record inserted {"table":"page_tags","insert_id":69,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 09:39:06] DEBUG: Database transaction started
+[2025-09-30 09:39:06] INFO: Creating new page {"title":"test mike"}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"pages","insert_id":32,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-30 09:39:06] INFO: Page created successfully {"page_id":32}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_metadata","insert_id":5,"data_keys":["author","visibility","password","featured","page_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_seo","insert_id":5,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_settings","insert_id":5,"data_keys":["template","page_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_social","insert_id":10,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Records deleted {"table":"page_categories","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"categories","insert_id":82,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_categories","insert_id":38,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"categories","insert_id":83,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_categories","insert_id":39,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"categories","insert_id":84,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_categories","insert_id":40,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Records deleted {"table":"page_tags","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"tags","insert_id":163,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_tags","insert_id":70,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"tags","insert_id":164,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_tags","insert_id":71,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"tags","insert_id":165,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"page_tags","insert_id":72,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Database savepoint created {"level":1}
+[2025-09-30 09:39:06] DEBUG: Records deleted {"table":"blocks","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:39:06] DEBUG: Database savepoint created {"level":2}
+[2025-09-30 09:39:06] ERROR: Invalid block data structure {"block_type":"image","page_id":32}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":95,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":96,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] ERROR: Invalid block data structure {"block_type":"text","page_id":32}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":97,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":98,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] ERROR: Invalid block data structure {"block_type":"image","page_id":32}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":99,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":100,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":101,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":102,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":103,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":104,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":105,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":106,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":107,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":108,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":109,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":110,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":111,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":112,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":113,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":114,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Record inserted {"table":"blocks","insert_id":115,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:06] DEBUG: Database savepoint released {"level":2}
+[2025-09-30 09:39:06] DEBUG: Database savepoint released {"level":1}
+[2025-09-30 09:39:06] DEBUG: Database transaction committed
+[2025-09-30 09:39:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-30 09:39:14] DEBUG: Database transaction started
+[2025-09-30 09:39:14] DEBUG: Records updated {"table":"pages","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_metadata","insert_id":6,"data_keys":["author","visibility","password","featured","page_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_seo","insert_id":6,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_settings","insert_id":6,"data_keys":["template","page_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_social","insert_id":11,"data_keys":["page_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Records deleted {"table":"page_categories","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"categories","insert_id":85,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_categories","insert_id":41,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"categories","insert_id":86,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_categories","insert_id":42,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"categories","insert_id":87,"data_keys":["name","slug","is_active","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_categories","insert_id":43,"data_keys":["page_id","category_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Records deleted {"table":"page_tags","affected_rows":0,"where_conditions":["page_id"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"tags","insert_id":166,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_tags","insert_id":73,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"tags","insert_id":167,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_tags","insert_id":74,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"tags","insert_id":168,"data_keys":["name","slug","usage_count","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"page_tags","insert_id":75,"data_keys":["page_id","tag_id","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Database savepoint created {"level":1}
+[2025-09-30 09:39:14] DEBUG: Records deleted {"table":"blocks","affected_rows":4,"where_conditions":["page_id"]}
+[2025-09-30 09:39:14] DEBUG: Database savepoint created {"level":2}
+[2025-09-30 09:39:14] ERROR: Invalid block data structure {"block_type":"image","page_id":2}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":116,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":117,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] ERROR: Invalid block data structure {"block_type":"text","page_id":2}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":118,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":119,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] ERROR: Invalid block data structure {"block_type":"image","page_id":2}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":120,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":121,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":122,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":123,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":124,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":125,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":126,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":127,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":128,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":129,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":130,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":131,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":132,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":133,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":134,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":135,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Record inserted {"table":"blocks","insert_id":136,"data_keys":["page_id","type","data","order","created_at","updated_at"]}
+[2025-09-30 09:39:14] DEBUG: Database savepoint released {"level":2}
+[2025-09-30 09:39:14] DEBUG: Database savepoint released {"level":1}
+[2025-09-30 09:39:14] DEBUG: Database transaction committed
+[2025-09-30 09:40:03] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.78ms"}
+[2025-09-30 09:40:29] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.68ms"}
+[2025-09-30 09:40:29] DEBUG: Record inserted {"table":"migrations","insert_id":28,"data_keys":["migration","batch"]}
+[2025-09-30 09:47:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-30 09:47:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.53ms"}
+[2025-09-30 09:47:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.24ms"}
+[2025-09-30 09:47:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.33ms"}
+[2025-09-30 09:47:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-30 09:47:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-30 11:37:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.12ms"}
+[2025-09-30 11:37:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.2ms"}
+[2025-09-30 11:37:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.43ms"}
+[2025-09-30 11:37:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.04ms"}
+[2025-09-30 11:37:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.25ms"}
+[2025-09-30 11:37:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.39ms"}
+[2025-09-30 12:45:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 12:46:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.98ms"}
+[2025-09-30 12:46:40] DEBUG: Database transaction started
+[2025-09-30 12:46:40] DEBUG: Record inserted {"table":"authors","insert_id":1,"data_keys":["name","slug","email","bio","website","status","created_at","updated_at"]}
+[2025-09-30 12:46:40] DEBUG: Database transaction committed
+[2025-09-30 12:46:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.66ms"}
+[2025-09-30 12:47:39] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.36ms"}
+[2025-09-30 12:48:45] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.39ms"}
+[2025-09-30 12:48:45] DEBUG: Record inserted {"table":"migrations","insert_id":29,"data_keys":["migration","batch"]}
+[2025-09-30 12:49:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-30 12:49:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-30 12:50:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.06ms"}
+[2025-09-30 12:50:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.25ms"}
+[2025-09-30 12:50:36] DEBUG: Database transaction started
+[2025-09-30 12:50:36] DEBUG: Records updated {"table":"authors","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 12:50:36] DEBUG: Database transaction committed
+[2025-09-30 12:50:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.18ms"}
+[2025-09-30 12:50:53] DEBUG: Database transaction started
+[2025-09-30 12:50:53] DEBUG: Records deleted {"table":"authors","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 12:50:53] DEBUG: Database transaction committed
+[2025-09-30 15:51:18] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 15:52:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.88ms"}
+[2025-09-30 15:52:07] DEBUG: Database transaction started
+[2025-09-30 15:52:07] DEBUG: Record inserted {"table":"authors","insert_id":2,"data_keys":["name","slug","email","bio","website","status","created_at","updated_at"]}
+[2025-09-30 15:52:07] DEBUG: Database transaction committed
+[2025-09-30 15:52:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.25ms"}
+[2025-09-30 15:52:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.69ms"}
+[2025-09-30 15:55:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 15:55:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.9ms"}
+[2025-09-30 15:55:52] DEBUG: Database transaction started
+[2025-09-30 15:56:18] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.66ms"}
+[2025-09-30 15:56:18] DEBUG: Database transaction started
+[2025-09-30 15:56:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.14ms"}
+[2025-09-30 15:56:27] DEBUG: Database transaction started
+[2025-09-30 15:56:27] DEBUG: Record inserted {"table":"authors","insert_id":3,"data_keys":["name","slug","email","bio","website","status","avatar","created_at","updated_at"]}
+[2025-09-30 15:56:27] DEBUG: Database transaction committed
+[2025-09-30 15:57:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.02ms"}
+[2025-09-30 15:57:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"9.25ms"}
+[2025-09-30 15:58:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-30 15:58:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.22ms"}
+[2025-09-30 15:58:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.22ms"}
+[2025-09-30 15:59:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.69ms"}
+[2025-09-30 15:59:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.04ms"}
+[2025-09-30 16:00:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.65ms"}
+[2025-09-30 16:00:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.99ms"}
+[2025-09-30 16:01:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.87ms"}
+[2025-09-30 16:01:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.37ms"}
+[2025-09-30 16:01:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.25ms"}
+[2025-09-30 16:01:53] DEBUG: Database transaction started
+[2025-09-30 16:01:53] DEBUG: Records updated {"table":"authors","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 16:01:53] DEBUG: Database transaction committed
+[2025-09-30 16:02:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 16:02:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-30 16:02:14] DEBUG: Database transaction started
+[2025-09-30 16:02:14] DEBUG: Records updated {"table":"authors","affected_rows":1,"where_conditions":["id"]}
+[2025-09-30 16:02:14] DEBUG: Database transaction committed
+[2025-09-30 16:03:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.46ms"}
+[2025-09-30 16:03:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.87ms"}
+[2025-09-30 16:03:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.61ms"}
+[2025-09-30 16:03:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.55ms"}
+[2025-09-30 16:03:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-30 16:03:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.24ms"}
+[2025-09-30 16:03:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-30 16:04:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.61ms"}
+[2025-09-30 16:04:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.05ms"}
+[2025-09-30 16:04:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.1ms"}
+[2025-09-30 16:04:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.69ms"}
+[2025-09-30 16:07:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 16:07:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"3.6ms"}
+[2025-09-30 16:07:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.12ms"}
+[2025-09-30 16:07:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-30 16:07:50] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.89ms"}
+[2025-09-30 16:07:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.61ms"}
+[2025-09-30 16:09:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.86ms"}
+[2025-09-30 16:09:18] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.14ms"}
+[2025-09-30 16:10:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.37ms"}
+[2025-09-30 16:10:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.89ms"}
+[2025-09-30 16:11:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-30 16:11:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 16:11:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.38ms"}
+[2025-09-30 16:11:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.61ms"}
+[2025-09-30 16:12:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.54ms"}
+[2025-09-30 16:12:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.74ms"}
+[2025-09-30 16:12:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.2ms"}
+[2025-09-30 16:12:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-30 16:13:26] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.83ms"}
+[2025-09-30 16:13:26] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.62ms"}
+[2025-09-30 16:13:26] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"3.36ms"}
+[2025-09-30 16:14:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-30 16:14:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 16:14:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-30 16:14:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-30 16:15:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 16:15:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.77ms"}
+[2025-09-30 16:15:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.52ms"}
+[2025-09-30 16:15:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.9ms"}
+[2025-09-30 16:16:20] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.78ms"}
+[2025-09-30 16:16:20] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.85ms"}
+[2025-09-30 16:16:20] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.65ms"}
+[2025-09-30 16:16:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.54ms"}
+[2025-09-30 16:17:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.59ms"}
+[2025-09-30 16:17:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-30 16:17:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.49ms"}
+[2025-09-30 16:17:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.78ms"}
+[2025-09-30 16:17:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-30 16:17:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-30 16:17:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.99ms"}
+[2025-09-30 16:18:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.57ms"}
+[2025-09-30 16:18:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 16:18:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.62ms"}
+[2025-09-30 16:18:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.7ms"}
+[2025-09-30 16:18:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-30 16:18:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-30 16:18:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.49ms"}
+[2025-09-30 16:18:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.63ms"}
+[2025-09-30 16:18:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.69ms"}
+[2025-09-30 16:18:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 16:18:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.58ms"}
+[2025-09-30 16:18:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-30 16:19:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.34ms"}
+[2025-09-30 16:19:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.85ms"}
+[2025-09-30 16:19:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.49ms"}
+[2025-09-30 16:19:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 16:20:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.65ms"}
+[2025-09-30 16:20:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.83ms"}
+[2025-09-30 16:20:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.59ms"}
+[2025-09-30 16:20:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.67ms"}
+[2025-09-30 16:20:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-30 16:20:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-30 16:20:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.59ms"}
+[2025-09-30 16:20:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-30 16:20:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 16:21:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.55ms"}
+[2025-09-30 16:21:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.79ms"}
+[2025-09-30 16:21:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.54ms"}
+[2025-09-30 16:21:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.15ms"}
+[2025-09-30 16:21:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.3ms"}
+[2025-09-30 16:21:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.79ms"}
+[2025-09-30 16:21:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-30 16:22:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.65ms"}
+[2025-09-30 16:22:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 16:22:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-30 16:22:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.8ms"}
+[2025-09-30 16:22:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-30 16:22:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.54ms"}
+[2025-09-30 16:22:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.47ms"}
+[2025-09-30 16:22:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.79ms"}
+[2025-09-30 16:22:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.56ms"}
+[2025-09-30 16:22:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"3.54ms"}
+[2025-09-30 16:22:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.57ms"}
+[2025-09-30 16:22:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-30 16:22:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.89ms"}
+[2025-09-30 16:23:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.46ms"}
+[2025-09-30 16:23:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.83ms"}
+[2025-09-30 16:23:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.78ms"}
+[2025-09-30 16:23:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.68ms"}
+[2025-09-30 16:23:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.76ms"}
+[2025-09-30 16:23:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.23ms"}
+[2025-09-30 16:23:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.88ms"}
+[2025-09-30 16:24:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.48ms"}
+[2025-09-30 16:24:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-30 16:24:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.58ms"}
+[2025-09-30 16:24:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.98ms"}
+[2025-09-30 16:24:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-30 16:24:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.81ms"}
+[2025-09-30 16:24:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.76ms"}
+[2025-09-30 16:24:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 16:24:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-30 16:24:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.85ms"}
+[2025-09-30 16:24:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.56ms"}
+[2025-09-30 16:24:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.83ms"}
+[2025-09-30 16:25:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.59ms"}
+[2025-09-30 16:25:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-30 16:25:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.58ms"}
+[2025-09-30 16:26:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.38ms"}
+[2025-09-30 16:26:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.82ms"}
+[2025-09-30 16:26:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 16:26:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.76ms"}
+[2025-09-30 16:27:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-30 16:27:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-30 16:27:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.59ms"}
+[2025-09-30 16:28:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.1ms"}
+[2025-09-30 16:28:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-30 16:28:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1ms"}
+[2025-09-30 16:28:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 16:28:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.76ms"}
+[2025-09-30 16:28:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-30 16:28:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.99ms"}
+[2025-09-30 16:28:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.8ms"}
+[2025-09-30 16:28:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.72ms"}
+[2025-09-30 16:28:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-30 16:28:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.75ms"}
+[2025-09-30 16:28:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.26ms"}
+[2025-09-30 16:28:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.82ms"}
+[2025-09-30 16:28:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 16:28:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.58ms"}
+[2025-09-30 16:28:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.85ms"}
+[2025-09-30 16:28:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-30 16:28:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-30 16:28:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-30 16:28:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-30 16:30:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.3ms"}
+[2025-09-30 16:30:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-30 16:30:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.66ms"}
+[2025-09-30 16:31:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-30 16:31:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.32ms"}
+[2025-09-30 16:31:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.06ms"}
+[2025-09-30 16:31:29] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.59ms"}
+[2025-09-30 16:31:29] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-30 16:31:29] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.84ms"}
+[2025-09-30 16:31:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.57ms"}
+[2025-09-30 16:31:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.06ms"}
+[2025-09-30 16:31:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.78ms"}
+[2025-09-30 16:31:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.58ms"}
+[2025-09-30 16:31:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-30 16:31:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.78ms"}
+[2025-09-30 16:32:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-30 16:32:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.12ms"}
+[2025-09-30 16:32:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.81ms"}
+[2025-09-30 16:32:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-30 16:32:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.8ms"}
+[2025-09-30 16:32:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.89ms"}
+[2025-09-30 16:32:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-30 16:32:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-30 16:32:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-30 16:33:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.9ms"}
+[2025-09-30 16:33:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.83ms"}
+[2025-09-30 16:33:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.8ms"}
+[2025-09-30 16:34:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-30 16:34:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.03ms"}
+[2025-09-30 16:34:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.66ms"}
+[2025-09-30 16:34:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-30 16:34:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.18ms"}
+[2025-09-30 16:34:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.88ms"}
+[2025-09-30 16:34:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-30 16:34:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.86ms"}
+[2025-09-30 16:34:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 16:35:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.48ms"}
+[2025-09-30 16:35:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-30 16:35:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.78ms"}
+[2025-09-30 16:36:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-30 16:36:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.06ms"}
+[2025-09-30 16:36:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.84ms"}
+[2025-09-30 16:36:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.05ms"}
+[2025-09-30 16:36:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.01ms"}
+[2025-09-30 16:36:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-30 16:37:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-30 16:37:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.85ms"}
+[2025-09-30 16:37:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-30 16:37:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.67ms"}
+[2025-09-30 16:37:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 16:37:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.62ms"}
+[2025-09-30 16:37:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-30 16:37:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-30 16:37:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.63ms"}
+[2025-09-30 16:37:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.01ms"}
+[2025-09-30 16:37:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-30 16:37:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-30 16:37:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.07ms"}
+[2025-09-30 16:37:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.91ms"}
+[2025-09-30 16:37:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.61ms"}
+[2025-09-30 16:37:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-30 16:37:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.66ms"}
+[2025-09-30 16:37:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.13ms"}
+[2025-09-30 16:37:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.98ms"}
+[2025-09-30 16:37:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.31ms"}
+[2025-09-30 16:37:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.64ms"}
+[2025-09-30 16:37:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.34ms"}
+[2025-09-30 16:37:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.65ms"}
+[2025-09-30 16:37:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.65ms"}
+[2025-09-30 16:46:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.48ms"}
+[2025-09-30 16:46:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.44ms"}
+[2025-09-30 16:46:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.39ms"}
+[2025-09-30 16:46:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-30 16:46:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-30 16:46:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}

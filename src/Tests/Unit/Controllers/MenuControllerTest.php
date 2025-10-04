@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Tests\Unit\Controllers;
+
+use App\Controllers\MenuController;
+use App\Framework\Support\Collection;
+use App\Models\Menu;
+use App\Requests\CreateMenuRequest;
+use App\Requests\UpdateMenuRequest;
+use App\Services\MenuService;
+use Mockery;
+use PHPUnit\Framework\TestCase;
+
+class MenuControllerTest extends TestCase
+{
+    private $menuService;
+    private $controller;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->menuService = Mockery::mock(MenuService::class);
+        $this->controller = new MenuController($this->menuService);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
+    public function testIndexReturnsAllMenus()
+    {
+        $menus = collect([
+            ['id' => 1, 'name' => 'Main Menu'],
+            ['id' => 2, 'name' => 'Footer Menu']
+        ]);
+
+        $this->menuService->shouldReceive('getAllMenus')
+            ->once()
+            ->andReturn($menus);
+
+        $response = $this->controller->index();
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testShowReturnsMenuById()
+    {
+        $menu = Mockery::mock(Menu::class);
+        $menu->shouldReceive('toArray')->andReturn(['id' => 1, 'name' => 'Main Menu']);
+
+        $this->menuService->shouldReceive('getMenuById')
+            ->with(1)
+            ->once()
+            ->andReturn($menu);
+
+        $response = $this->controller->show(1);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testShowReturns404WhenMenuNotFound()
+    {
+        $this->menuService->shouldReceive('getMenuById')
+            ->with(999)
+            ->andReturn(null);
+
+        $response = $this->controller->show(999);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testGetMenuBySlugReturnsMenu()
+    {
+        $menu = Mockery::mock(Menu::class);
+        $menu->shouldReceive('toArray')->andReturn(['id' => 1, 'slug' => 'main-menu']);
+
+        $this->menuService->shouldReceive('getMenuBySlug')
+            ->with('main-menu')
+            ->once()
+            ->andReturn($menu);
+
+        $response = $this->controller->getMenuBySlug('main-menu');
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testStoreCreatesMenu()
+    {
+        $request = Mockery::mock(CreateMenuRequest::class);
+        $request->shouldReceive('validated')->andReturn([
+            'name' => 'New Menu',
+            'slug' => 'new-menu'
+        ]);
+
+        $menu = new Menu(['id' => 1, 'name' => 'New Menu']);
+
+        $this->menuService->shouldReceive('createMenu')
+            ->once()
+            ->andReturn($menu);
+
+        $response = $this->controller->store($request);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function testUpdateUpdatesMenu()
+    {
+        $request = Mockery::mock(UpdateMenuRequest::class);
+        $request->shouldReceive('validated')->andReturn(['name' => 'Updated Menu']);
+
+        $menu = Mockery::mock(Menu::class);
+        $menu->shouldReceive('toArray')->andReturn(['id' => 1, 'name' => 'Updated Menu']);
+
+        $this->menuService->shouldReceive('updateMenu')
+            ->with(1, Mockery::any())
+            ->once()
+            ->andReturn($menu);
+
+        $response = $this->controller->update($request, 1);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testDestroyDeletesMenu()
+    {
+        $this->menuService->shouldReceive('deleteMenu')
+            ->with(1)
+            ->once();
+
+        $response = $this->controller->destroy(1);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testHierarchyReturnsMenuStructure()
+    {
+        $hierarchy = [
+            ['id' => 1, 'title' => 'Home', 'children' => []]
+        ];
+
+        $this->menuService->shouldReceive('getMenuHierarchy')
+            ->with(1)
+            ->once()
+            ->andReturn(new Collection($hierarchy));
+
+        $response = $this->controller->hierarchy(1);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+}

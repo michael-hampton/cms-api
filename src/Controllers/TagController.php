@@ -1,0 +1,180 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Exceptions\CannotDeleteException;
+use App\Framework\Exceptions\ValidationException;
+use App\Framework\Http\Request;
+use App\Framework\Http\JsonResponse;
+use App\Framework\Validation\Validator;
+use App\Repositories\TagRepository;
+use App\Requests\CreateTagRequest;
+use App\Requests\UpdateTagRequest;
+use App\Search\SearchCriteriaParser;
+use App\Services\TagService;
+use Exception;
+
+class TagController extends Controller
+{
+    private $tagRepository;
+    private $validator;
+    private TagService $tagService;
+
+    public function __construct(TagRepository $tagRepository, Validator $validator, TagService $tagService)
+    {
+        $this->tagRepository = $tagRepository;
+        $this->validator = $validator;
+        $this->tagService = $tagService;
+        parent::__construct();
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $criteria = SearchCriteriaParser::fromRequest($request);
+            $result = $this->tagRepository->search($criteria);
+
+            return $this->searchResponse($result);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function show($id): JsonResponse
+    {
+        try {
+            $tag = is_numeric($id)
+                ? $this->tagRepository->find((int)$id)
+                : $this->tagRepository->findBySlug($id);
+
+            if (!$tag) {
+                return $this->errorResponse('Tag not found', 404);
+            }
+
+            return $this->jsonResponse(['tag' => $tag->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function store(CreateTagRequest $request): JsonResponse
+    {
+        try {
+            $tag = $this->tagRepository->create($request->validated());
+            return $this->jsonResponse(['tag' => $tag->toArray()], 201);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    public function update(int $id, UpdateTagRequest $request): JsonResponse
+    {
+        try {
+            $tag = $this->tagRepository->update($id, $request->validated());
+            if (!$tag) {
+                return $this->errorResponse('Tag not found', 404);
+            }
+            return $this->jsonResponse(['tag' => $tag->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        try {
+            $reassignToId = $request->input('reassign_to_id');
+            $this->tagService->delete($id, $reassignToId);
+
+            return $this->jsonResponse([
+                'message' => 'Tag deleted successfully'
+            ]);
+        } catch (CannotDeleteException $e) {
+            return $this->jsonResponse([
+                'message' => $e->getMessage(),
+                'pages_count' => $e->getRelatedCount(),
+                'requires_reassignment' => true
+            ], 422);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse([
+                'message' => $e->getMessage()
+            ], 422);
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'message' => 'An error occurred while deleting the tag'
+            ], 500);
+        }
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        try {
+            $query = $request->get('q', '');
+            $limit = min((int)$request->get('limit', 10), 50);
+
+            $tags = $this->tagRepository->searchTags($query, $limit);
+            return $this->jsonResponse(['tags' => $tags->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function popular(): JsonResponse
+    {
+        try {
+            $tags = $this->tagRepository->getPopularTags(30);
+            return $this->jsonResponse(['tags' => $tags->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function featured(): JsonResponse
+    {
+        try {
+            $tags = $this->tagRepository->getFeaturedTags();
+
+            return $this->jsonResponse(['tags' => $tags->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function cloud(): JsonResponse
+    {
+        try {
+            $tags = $this->tagRepository->getTagCloud(100);
+            return $this->jsonResponse(['tags' => $tags->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function cleanup(): JsonResponse
+    {
+        try {
+            $deletedCount = $this->tagRepository->cleanupUnusedTags();
+            return $this->successResponse("Cleaned up {$deletedCount} unused tags");
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function checkDelete(int $id): JsonResponse
+    {
+        try {
+            $result = $this->tagService->checkDeletable($id);
+
+            if ($result['requires_reassignment']) {
+                $alternatives = $this->tagService->getAlternativeTags($id);
+                $result['alternatives'] = $alternatives;
+            }
+
+            return $this->jsonResponse($result);
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'message' => 'Tag not found'
+            ], 404);
+        }
+    }
+}

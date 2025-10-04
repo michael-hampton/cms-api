@@ -1,0 +1,388 @@
+<?php
+
+namespace App\Parsers;
+
+use App\Framework\Validation\Rules\ArrayRule;
+use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\IntegerRule;
+use App\Framework\Validation\Rules\MaxLengthRule;
+use App\Framework\Validation\Rules\MaxRule;
+use App\Framework\Validation\Rules\MinLengthRule;
+use App\Framework\Validation\Rules\MinRule;
+use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\UrlRule;
+
+class PageGridBlockParser extends BaseBlockParser
+{
+    public function getType(): string
+    {
+        return 'page_grid';
+    }
+
+    public function getValidationRules(): array
+    {
+        return [
+            'title' => [
+                new MaxLengthRule(255)
+            ],
+            'subtitle' => [
+                new MaxLengthRule(500)
+            ],
+            'layout' => [
+                new MaxLengthRule(50)
+            ],
+            'columns' => [
+                new IntegerRule(),
+                new MinRule(1),
+                new MaxRule(6)
+            ],
+            'showExcerpt' => [
+                new BooleanRule()
+            ],
+            'showImage' => [
+                new BooleanRule()
+            ],
+            'showFeatures' => [
+                new BooleanRule()
+            ],
+            'showActions' => [
+                new BooleanRule()
+            ],
+            'pages' => [
+                new RequiredRule(),
+                new ArrayRule(),
+                new MinRule(1) // At least one page required
+            ],
+            'pages.*.title' => [
+                new RequiredRule(),
+                new MinLengthRule(2),
+                new MaxLengthRule(255)
+            ],
+            'pages.*.slug' => [
+                new RequiredRule(),
+                new MinLengthRule(2),
+                new MaxLengthRule(255)
+            ],
+            'pages.*.excerpt' => [
+                new MaxLengthRule(500)
+            ],
+            'pages.*.image' => [
+                new ArrayRule()
+            ],
+            'pages.*.image.src' => [
+                new UrlRule(),
+                new MaxLengthRule(500)
+            ],
+            'pages.*.image.alt' => [
+                new MaxLengthRule(255)
+            ],
+            'pages.*.badge' => [
+                new ArrayRule()
+            ],
+            'pages.*.badge.text' => [
+                new MaxLengthRule(50)
+            ],
+            'pages.*.badge.color' => [
+                new MaxLengthRule(20)
+            ],
+            'pages.*.price' => [
+                new MaxLengthRule(50)
+            ],
+            'pages.*.location' => [
+                new MaxLengthRule(255)
+            ],
+            'pages.*.features' => [
+                new ArrayRule()
+            ],
+            'pages.*.features.*' => [
+                new MaxLengthRule(100)
+            ],
+            'pages.*.actions' => [
+                new ArrayRule()
+            ],
+            'pages.*.actions.*.text' => [
+                new RequiredRule(),
+                new MaxLengthRule(100)
+            ],
+            'pages.*.actions.*.url' => [
+                new RequiredRule(),
+                new MaxLengthRule(500)
+            ],
+            'pages.*.actions.*.style' => [
+                new MaxLengthRule(50)
+            ],
+            'pages.*.actions.*.target' => [
+                new MaxLengthRule(20)
+            ]
+        ];
+    }
+
+    public function parse(array $data): array
+    {
+        $pages = $data['pages'] ?? [];
+        $cleanPages = [];
+
+        foreach ($pages as $page) {
+            $cleanPage = [
+                'title' => trim($page['title'] ?? ''),
+                'slug' => trim($page['slug'] ?? ''),
+                'excerpt' => trim($page['excerpt'] ?? ''),
+                'image' => $this->parseImage($page['image'] ?? null),
+                'badge' => $this->parseBadge($page['badge'] ?? null),
+                'price' => trim($page['price'] ?? ''),
+                'location' => trim($page['location'] ?? ''),
+                'features' => $this->parseFeatures($page['features'] ?? []),
+                'actions' => $this->parseActions($page['actions'] ?? []),
+                'url' => $this->buildPageUrl($page['slug'] ?? ''),
+                'word_count' => str_word_count($page['excerpt'] ?? ''),
+            ];
+
+            if (!empty($cleanPage['title']) && !empty($cleanPage['slug'])) {
+                $cleanPages[] = $cleanPage;
+            }
+        }
+
+        return [
+            'title' => trim($data['title'] ?? ''),
+            'subtitle' => trim($data['subtitle'] ?? ''),
+            'layout' => $data['layout'] ?? 'grid',
+            'columns' => (int)($data['columns'] ?? 3),
+            'showExcerpt' => (bool)($data['showExcerpt'] ?? true),
+            'showImage' => (bool)($data['showImage'] ?? true),
+            'showFeatures' => (bool)($data['showFeatures'] ?? true),
+            'showActions' => (bool)($data['showActions'] ?? true),
+            'pages' => $cleanPages,
+            'page_count' => count($cleanPages),
+            'has_images' => $this->hasImages($cleanPages),
+            'has_badges' => $this->hasBadges($cleanPages),
+            'has_prices' => $this->hasPrices($cleanPages),
+            'total_features' => $this->countTotalFeatures($cleanPages),
+            'grid_class' => $this->buildGridClass($data['layout'] ?? 'grid', (int)($data['columns'] ?? 3))
+        ];
+    }
+
+    private function parseImage(?array $image): ?array
+    {
+        if (empty($image) || empty($image['src'])) {
+            return null;
+        }
+
+        return [
+            'src' => trim($image['src']),
+            'alt' => trim($image['alt'] ?? ''),
+            'title' => trim($image['title'] ?? '')
+        ];
+    }
+
+    private function parseBadge(?array $badge): ?array
+    {
+        if (empty($badge) || empty($badge['text'])) {
+            return null;
+        }
+
+        return [
+            'text' => trim($badge['text']),
+            'color' => trim($badge['color'] ?? 'primary'),
+            'background' => trim($badge['background'] ?? '')
+        ];
+    }
+
+    private function parseFeatures(array $features): array
+    {
+        return array_values(array_filter(array_map('trim', $features)));
+    }
+
+    private function parseActions(array $actions): array
+    {
+        $cleanActions = [];
+
+        foreach ($actions as $action) {
+            if (!empty($action['text']) && !empty($action['url'])) {
+                $cleanActions[] = [
+                    'text' => trim($action['text']),
+                    'url' => trim($action['url']),
+                    'style' => trim($action['style'] ?? 'primary'),
+                    'target' => trim($action['target'] ?? '_self'),
+                    'rel' => $this->buildRelAttribute($action)
+                ];
+            }
+        }
+
+        return $cleanActions;
+    }
+
+    private function buildRelAttribute(array $action): string
+    {
+        $rel = [];
+
+        if (($action['target'] ?? '') === '_blank') {
+            $rel[] = 'noopener';
+        }
+
+        if (!empty($action['nofollow'])) {
+            $rel[] = 'nofollow';
+        }
+
+        if (!empty($action['sponsored'])) {
+            $rel[] = 'sponsored';
+        }
+
+        return implode(' ', $rel);
+    }
+
+    private function buildPageUrl(string $slug): string
+    {
+        return '/' . ltrim($slug, '/');
+    }
+
+    private function hasImages(array $pages): bool
+    {
+        foreach ($pages as $page) {
+            if (!empty($page['image'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function hasBadges(array $pages): bool
+    {
+        foreach ($pages as $page) {
+            if (!empty($page['badge'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function hasPrices(array $pages): bool
+    {
+        foreach ($pages as $page) {
+            if (!empty($page['price'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function countTotalFeatures(array $pages): int
+    {
+        $count = 0;
+        foreach ($pages as $page) {
+            $count += count($page['features']);
+        }
+        return $count;
+    }
+
+    private function buildGridClass(string $layout, int $columns): string
+    {
+        $baseClass = "page-grid-{$layout}";
+
+        if ($layout === 'grid') {
+            $baseClass .= " columns-{$columns}";
+        }
+
+        return $baseClass;
+    }
+
+    public function generateHtml(array $parsedData): string
+    {
+        $html = "<div class=\"page-grid-block {$parsedData['grid_class']}\">";
+
+        // Header section
+        if (!empty($parsedData['title']) || !empty($parsedData['subtitle'])) {
+            $html .= "<div class=\"page-grid-header\">";
+
+            if (!empty($parsedData['title'])) {
+                $html .= "<h2 class=\"page-grid-title\">" . htmlspecialchars($parsedData['title']) . "</h2>";
+            }
+
+            if (!empty($parsedData['subtitle'])) {
+                $html .= "<p class=\"page-grid-subtitle\">" . htmlspecialchars($parsedData['subtitle']) . "</p>";
+            }
+
+            $html .= "</div>";
+        }
+
+        // Grid container
+        $html .= "<div class=\"page-grid-container\">";
+
+        foreach ($parsedData['pages'] as $page) {
+            $html .= $this->generatePageCard($page, $parsedData);
+        }
+
+        $html .= "</div>";
+        $html .= "</div>";
+
+        return $html;
+    }
+
+    private function generatePageCard(array $page, array $parsedData): string
+    {
+        $html = "<div class=\"page-card\">";
+
+        // Image section
+        if ($parsedData['showImage'] && !empty($page['image'])) {
+            $html .= "<div class=\"page-image\">";
+            $html .= "<img src=\"" . htmlspecialchars($page['image']['src']) . "\" alt=\"" . htmlspecialchars($page['image']['alt'] ?: $page['title']) . "\">";
+
+            // Badge overlay
+            if (!empty($page['badge'])) {
+                $html .= "<div class=\"page-badge badge-{$page['badge']['color']}\">" . htmlspecialchars($page['badge']['text']) . "</div>";
+            }
+
+            // Price overlay
+            if (!empty($page['price'])) {
+                $html .= "<div class=\"page-price\">" . htmlspecialchars($page['price']) . "</div>";
+            }
+
+            $html .= "</div>";
+        }
+
+        // Content section
+        $html .= "<div class=\"page-content\">";
+
+        // Title
+        $html .= "<h3 class=\"page-title\">";
+        $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
+        $html .= "</h3>";
+
+        // Location
+        if (!empty($page['location'])) {
+            $html .= "<div class=\"page-location\">📍 " . htmlspecialchars($page['location']) . "</div>";
+        }
+
+        // Excerpt
+        if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
+            $html .= "<div class=\"page-excerpt\">" . htmlspecialchars($page['excerpt']) . "</div>";
+        }
+
+        // Features
+        if ($parsedData['showFeatures'] && !empty($page['features'])) {
+            $html .= "<div class=\"page-features\">";
+            foreach ($page['features'] as $feature) {
+                $html .= "<span class=\"page-feature\">" . htmlspecialchars($feature) . "</span>";
+            }
+            $html .= "</div>";
+        }
+
+        // Actions
+        if ($parsedData['showActions'] && !empty($page['actions'])) {
+            $html .= "<div class=\"page-actions\">";
+            foreach ($page['actions'] as $action) {
+                $relAttr = !empty($action['rel']) ? " rel=\"{$action['rel']}\"" : '';
+                $targetAttr = $action['target'] !== '_self' ? " target=\"{$action['target']}\"" : '';
+
+                $html .= "<a href=\"" . htmlspecialchars($action['url']) . "\" class=\"btn btn-{$action['style']}\"{$targetAttr}{$relAttr}>";
+                $html .= htmlspecialchars($action['text']);
+                $html .= "</a>";
+            }
+            $html .= "</div>";
+        }
+
+        $html .= "</div>";
+        $html .= "</div>";
+
+        return $html;
+    }
+}

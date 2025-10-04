@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+
+use App\ApiApplication;
+
+require __DIR__ . '/vendor/autoload.php';
+
+// Boot your app
+$app = new ApiApplication();
+
+// Get the Artisan instance (with commands already registered)
+$artisan = $app->setupArtisan();
+
+// Run Artisan with CLI arguments
+exit($artisan->run($argv));

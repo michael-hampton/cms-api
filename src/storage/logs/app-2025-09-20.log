@@ -1,0 +1,571 @@
+[2025-09-20 10:08:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"11.31ms"}
+[2025-09-20 10:08:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.72ms"}
+[2025-09-20 10:08:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.06ms"}
+[2025-09-20 10:10:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-20 10:10:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.08ms"}
+[2025-09-20 10:10:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.93ms"}
+[2025-09-20 10:10:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-20 10:10:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.65ms"}
+[2025-09-20 10:11:26] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.22ms"}
+[2025-09-20 10:12:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-20 10:12:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 10:12:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.83ms"}
+[2025-09-20 10:13:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.81ms"}
+[2025-09-20 10:15:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-20 10:16:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.03ms"}
+[2025-09-20 10:17:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.6ms"}
+[2025-09-20 10:25:59] ERROR: Database connection failed {"driver":"mysql","host":"db","database":"block_cms","error":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for db failed: nodename nor servname provided, or not known"}
+[2025-09-20 10:26:47] ERROR: Database connection failed {"driver":"mysql","host":"db","database":"block_cms","error":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for db failed: nodename nor servname provided, or not known"}
+[2025-09-20 10:27:31] ERROR: Database connection failed {"driver":"mysql","host":"db","database":"block_cms","error":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for db failed: nodename nor servname provided, or not known"}
+[2025-09-20 10:28:12] ERROR: Database connection failed {"driver":"mysql","host":"db","database":"block_cms","error":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for db failed: nodename nor servname provided, or not known"}
+[2025-09-20 10:31:59] ERROR: Database connection failed {"driver":"mysql","host":"db","database":"block_cms","error":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for db failed: nodename nor servname provided, or not known"}
+[2025-09-20 10:33:56] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.24ms"}
+[2025-09-20 10:34:24] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.31ms"}
+[2025-09-20 10:35:07] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.23ms"}
+[2025-09-20 10:35:48] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.38ms"}
+[2025-09-20 10:37:29] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.47ms"}
+[2025-09-20 10:37:50] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.93ms"}
+[2025-09-20 10:38:52] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.74ms"}
+[2025-09-20 10:39:02] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.79ms"}
+[2025-09-20 10:39:28] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.02ms"}
+[2025-09-20 10:40:06] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.51ms"}
+[2025-09-20 10:40:16] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.13ms"}
+[2025-09-20 10:40:57] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.45ms"}
+[2025-09-20 10:41:14] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.29ms"}
+[2025-09-20 10:44:26] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.33ms"}
+[2025-09-20 10:45:18] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.84ms"}
+[2025-09-20 10:46:19] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"1.93ms"}
+[2025-09-20 10:47:44] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.71ms"}
+[2025-09-20 10:49:58] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.76ms"}
+[2025-09-20 10:51:24] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.42ms"}
+[2025-09-20 10:52:16] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.66ms"}
+[2025-09-20 10:53:03] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.81ms"}
+[2025-09-20 10:53:25] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.86ms"}
+[2025-09-20 10:53:27] DEBUG: Record inserted {"table":"pages","insert_id":12,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 10:53:27] DEBUG: Record inserted {"table":"pages","insert_id":13,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 10:53:27] DEBUG: Record inserted {"table":"pages","insert_id":14,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 10:56:39] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.24ms"}
+[2025-09-20 10:57:10] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.31ms"}
+[2025-09-20 10:58:54] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.86ms"}
+[2025-09-20 10:59:08] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.05ms"}
+[2025-09-20 11:01:55] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.1ms"}
+[2025-09-20 11:02:18] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.44ms"}
+[2025-09-20 11:03:00] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4ms"}
+[2025-09-20 11:05:53] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.94ms"}
+[2025-09-20 11:06:45] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.58ms"}
+[2025-09-20 11:07:37] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"1.58ms"}
+[2025-09-20 11:08:05] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.48ms"}
+[2025-09-20 11:09:11] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.12ms"}
+[2025-09-20 11:09:37] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2ms"}
+[2025-09-20 11:09:49] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.53ms"}
+[2025-09-20 11:10:14] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.87ms"}
+[2025-09-20 11:12:09] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-20 11:19:20] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.71ms"}
+[2025-09-20 11:19:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-20 11:19:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-20 11:20:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.98ms"}
+[2025-09-20 11:20:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.1ms"}
+[2025-09-20 11:20:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.77ms"}
+[2025-09-20 11:21:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.42ms"}
+[2025-09-20 11:21:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.36ms"}
+[2025-09-20 11:21:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-20 11:23:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-20 11:23:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.71ms"}
+[2025-09-20 11:24:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.72ms"}
+[2025-09-20 11:24:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.18ms"}
+[2025-09-20 11:25:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-20 11:26:09] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.72ms"}
+[2025-09-20 11:26:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 11:26:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.51ms"}
+[2025-09-20 11:26:15] DEBUG: Database transaction started
+[2025-09-20 11:26:15] DEBUG: Database transaction committed
+[2025-09-20 11:26:15] ERROR: Failed to commit transaction {"error":"Cannot commit transaction - no active transaction"}
+[2025-09-20 11:26:15] ERROR: Failed to rollback transaction {"error":"SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-2' at line 1"}
+[2025-09-20 11:27:26] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.32ms"}
+[2025-09-20 11:27:26] DEBUG: Database transaction started
+[2025-09-20 11:27:26] DEBUG: Database transaction committed
+[2025-09-20 11:27:26] ERROR: Failed to commit transaction {"error":"Cannot commit transaction - no active transaction"}
+[2025-09-20 11:27:26] ERROR: Failed to rollback transaction {"error":"SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-2' at line 1"}
+[2025-09-20 11:30:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.28ms"}
+[2025-09-20 11:33:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-20 11:33:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.57ms"}
+[2025-09-20 11:33:55] DEBUG: Database transaction started
+[2025-09-20 11:33:55] DEBUG: Database transaction committed
+[2025-09-20 11:33:55] ERROR: Failed to commit transaction {"error":"Cannot commit transaction - no active transaction"}
+[2025-09-20 11:33:55] ERROR: Failed to rollback transaction {"error":"SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-2' at line 1"}
+[2025-09-20 11:34:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.99ms"}
+[2025-09-20 11:34:35] DEBUG: Database transaction started
+[2025-09-20 11:35:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 11:35:04] DEBUG: Database transaction started
+[2025-09-20 11:35:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.98ms"}
+[2025-09-20 11:35:27] DEBUG: Database transaction started
+[2025-09-20 11:35:27] ERROR: Database query failed {"sql":"SELECT `COUNT(*) as count` FROM `pages` WHERE slug = :param_0","params":{"param_0":"test-lexie"},"error":"SQLSTATE[42S22]: Column not found: 1054 Unknown column 'COUNT(*) as count' in 'field list'"}
+[2025-09-20 11:35:27] DEBUG: Database transaction rolled back
+[2025-09-20 11:35:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.8ms"}
+[2025-09-20 11:35:43] DEBUG: Database transaction started
+[2025-09-20 11:35:43] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 11:36:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.07ms"}
+[2025-09-20 11:36:17] DEBUG: Database transaction started
+[2025-09-20 11:36:17] ERROR: Database query failed {"sql":"SELECT `COUNT(*) as count` FROM `pages` WHERE slug = :param_0","params":{"param_0":"test-lexie"},"error":"SQLSTATE[42S22]: Column not found: 1054 Unknown column 'COUNT(*) as count' in 'field list'"}
+[2025-09-20 11:36:17] DEBUG: Database transaction rolled back
+[2025-09-20 11:38:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.36ms"}
+[2025-09-20 11:38:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.58ms"}
+[2025-09-20 11:39:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.78ms"}
+[2025-09-20 11:39:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.67ms"}
+[2025-09-20 11:39:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-20 11:40:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.92ms"}
+[2025-09-20 11:40:17] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.69ms"}
+[2025-09-20 11:40:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.99ms"}
+[2025-09-20 11:41:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.65ms"}
+[2025-09-20 11:41:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.61ms"}
+[2025-09-20 11:41:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-20 11:42:50] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.83ms"}
+[2025-09-20 11:43:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-20 11:44:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 11:45:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.05ms"}
+[2025-09-20 11:47:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.03ms"}
+[2025-09-20 11:47:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.79ms"}
+[2025-09-20 11:48:24] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.91ms"}
+[2025-09-20 11:48:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.72ms"}
+[2025-09-20 11:49:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.83ms"}
+[2025-09-20 11:50:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.3ms"}
+[2025-09-20 11:50:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.72ms"}
+[2025-09-20 11:50:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.28ms"}
+[2025-09-20 11:50:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.94ms"}
+[2025-09-20 11:50:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.66ms"}
+[2025-09-20 11:50:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-20 11:51:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.58ms"}
+[2025-09-20 11:51:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.65ms"}
+[2025-09-20 11:52:29] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.27ms"}
+[2025-09-20 11:53:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.61ms"}
+[2025-09-20 11:53:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.7ms"}
+[2025-09-20 11:54:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.87ms"}
+[2025-09-20 11:54:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-20 11:55:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 11:56:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.67ms"}
+[2025-09-20 11:57:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.7ms"}
+[2025-09-20 11:57:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.28ms"}
+[2025-09-20 11:58:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.44ms"}
+[2025-09-20 11:59:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.01ms"}
+[2025-09-20 11:59:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.76ms"}
+[2025-09-20 12:00:51] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 12:04:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.03ms"}
+[2025-09-20 12:04:16] ERROR: Database query failed {"sql":"SELECT * FROM `pages` WHERE status = :param_0","params":{"param_0":"published"},"error":"SQLSTATE[42S02]: Base table or view not found: 1146 Table 'block_cms.pages' doesn't exist"}
+[2025-09-20 12:04:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-20 12:05:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.68ms"}
+[2025-09-20 12:05:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.79ms"}
+[2025-09-20 12:05:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-20 12:05:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-20 12:05:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.37ms"}
+[2025-09-20 12:06:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.68ms"}
+[2025-09-20 12:07:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.56ms"}
+[2025-09-20 12:07:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.16ms"}
+[2025-09-20 12:07:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-20 12:08:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-20 12:09:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.17ms"}
+[2025-09-20 12:09:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.57ms"}
+[2025-09-20 12:09:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.27ms"}
+[2025-09-20 12:09:36] DEBUG: Record inserted {"table":"migrations","insert_id":1,"data_keys":["migration","batch"]}
+[2025-09-20 12:09:36] DEBUG: Record inserted {"table":"migrations","insert_id":2,"data_keys":["migration","batch"]}
+[2025-09-20 12:10:05] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.91ms"}
+[2025-09-20 12:10:05] DEBUG: Database transaction started
+[2025-09-20 12:10:05] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 12:10:05] DEBUG: Record inserted {"table":"pages","insert_id":1,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 12:10:05] INFO: Page created successfully {"page_id":1}
+[2025-09-20 12:10:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-20 12:10:54] DEBUG: Database transaction started
+[2025-09-20 12:10:54] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 12:10:54] DEBUG: Record inserted {"table":"pages","insert_id":2,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 12:10:54] INFO: Page created successfully {"page_id":2}
+[2025-09-20 12:10:54] DEBUG: Database transaction committed
+[2025-09-20 12:20:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-20 12:20:01] DEBUG: Database transaction started
+[2025-09-20 12:20:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.01ms"}
+[2025-09-20 12:20:32] DEBUG: Database transaction started
+[2025-09-20 12:20:32] DEBUG: Database transaction rolled back
+[2025-09-20 12:20:32] ERROR: Failed to rollback transaction {"error":"Cannot rollback transaction - no active transaction"}
+[2025-09-20 12:20:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-20 12:20:47] DEBUG: Database transaction started
+[2025-09-20 12:20:47] DEBUG: Database transaction rolled back
+[2025-09-20 12:20:47] ERROR: Failed to rollback transaction {"error":"Cannot rollback transaction - no active transaction"}
+[2025-09-20 12:22:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.98ms"}
+[2025-09-20 12:22:42] DEBUG: Database transaction started
+[2025-09-20 12:22:42] DEBUG: Database transaction rolled back
+[2025-09-20 12:22:42] ERROR: Failed to rollback transaction {"error":"Cannot rollback transaction - no active transaction"}
+[2025-09-20 12:23:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.75ms"}
+[2025-09-20 12:23:06] DEBUG: Database transaction started
+[2025-09-20 12:23:06] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:23:06] DEBUG: Database rolled back to savepoint {"level":1}
+[2025-09-20 12:23:06] DEBUG: Database transaction rolled back
+[2025-09-20 12:24:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.82ms"}
+[2025-09-20 12:24:41] DEBUG: Database transaction started
+[2025-09-20 12:24:41] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:27:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-20 12:27:08] DEBUG: Database transaction started
+[2025-09-20 12:27:08] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:30:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.98ms"}
+[2025-09-20 12:30:36] DEBUG: Database transaction started
+[2025-09-20 12:30:36] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:31:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.97ms"}
+[2025-09-20 12:31:22] DEBUG: Database transaction started
+[2025-09-20 12:31:22] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:31:22] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 12:31:22] DEBUG: Database transaction committed
+[2025-09-20 12:32:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.75ms"}
+[2025-09-20 12:32:01] DEBUG: Database transaction started
+[2025-09-20 12:32:01] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:32:01] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 12:32:01] DEBUG: Database transaction committed
+[2025-09-20 12:32:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.68ms"}
+[2025-09-20 12:32:21] DEBUG: Database transaction started
+[2025-09-20 12:32:21] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:32:21] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 12:32:21] DEBUG: Database transaction committed
+[2025-09-20 12:33:25] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.09ms"}
+[2025-09-20 12:33:25] DEBUG: Database transaction started
+[2025-09-20 12:33:25] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:33:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.91ms"}
+[2025-09-20 12:33:48] DEBUG: Database transaction started
+[2025-09-20 12:33:48] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:33:48] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 12:33:48] DEBUG: Database transaction committed
+[2025-09-20 12:34:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.72ms"}
+[2025-09-20 12:34:01] DEBUG: Database transaction started
+[2025-09-20 12:34:01] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:34:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.88ms"}
+[2025-09-20 12:34:28] DEBUG: Database transaction started
+[2025-09-20 12:34:28] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:35:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.25ms"}
+[2025-09-20 12:35:49] DEBUG: Database transaction started
+[2025-09-20 12:35:49] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:35:49] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 12:35:49] DEBUG: Database transaction committed
+[2025-09-20 12:41:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-20 12:41:33] DEBUG: Database transaction started
+[2025-09-20 12:41:33] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:41:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.76ms"}
+[2025-09-20 12:41:53] DEBUG: Database transaction started
+[2025-09-20 12:41:53] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:42:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.25ms"}
+[2025-09-20 12:42:23] DEBUG: Database transaction started
+[2025-09-20 12:42:23] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:42:46] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-20 12:42:46] DEBUG: Database transaction started
+[2025-09-20 12:42:46] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:43:41] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-20 12:43:41] DEBUG: Database transaction started
+[2025-09-20 12:43:41] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:43:53] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.9ms"}
+[2025-09-20 12:43:53] DEBUG: Database transaction started
+[2025-09-20 12:43:53] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:44:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.04ms"}
+[2025-09-20 12:44:01] DEBUG: Database transaction started
+[2025-09-20 12:44:01] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:44:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-20 12:44:59] DEBUG: Database transaction started
+[2025-09-20 12:44:59] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:45:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.1ms"}
+[2025-09-20 12:45:31] DEBUG: Database transaction started
+[2025-09-20 12:45:31] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 12:45:31] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 12:45:31] DEBUG: Database transaction committed
+[2025-09-20 13:24:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.94ms"}
+[2025-09-20 13:28:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 13:33:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.18ms"}
+[2025-09-20 13:35:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.54ms"}
+[2025-09-20 13:35:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.45ms"}
+[2025-09-20 13:35:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.56ms"}
+[2025-09-20 13:35:45] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.8ms"}
+[2025-09-20 13:36:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.79ms"}
+[2025-09-20 13:36:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.7ms"}
+[2025-09-20 13:47:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.28ms"}
+[2025-09-20 13:47:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.03ms"}
+[2025-09-20 13:48:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.43ms"}
+[2025-09-20 13:48:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.95ms"}
+[2025-09-20 13:48:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.36ms"}
+[2025-09-20 13:48:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.65ms"}
+[2025-09-20 13:49:09] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-20 13:49:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 13:49:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.7ms"}
+[2025-09-20 13:49:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.66ms"}
+[2025-09-20 13:49:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.8ms"}
+[2025-09-20 13:50:18] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.6ms"}
+[2025-09-20 13:50:18] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.77ms"}
+[2025-09-20 13:50:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.54ms"}
+[2025-09-20 13:50:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.48ms"}
+[2025-09-20 13:50:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.45ms"}
+[2025-09-20 13:50:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.41ms"}
+[2025-09-20 13:50:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.5ms"}
+[2025-09-20 13:51:01] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.46ms"}
+[2025-09-20 13:51:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.65ms"}
+[2025-09-20 13:52:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.91ms"}
+[2025-09-20 13:52:12] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.68ms"}
+[2025-09-20 13:52:16] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-20 13:52:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.69ms"}
+[2025-09-20 13:52:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.99ms"}
+[2025-09-20 13:53:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.61ms"}
+[2025-09-20 13:53:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.69ms"}
+[2025-09-20 13:53:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.05ms"}
+[2025-09-20 13:53:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.62ms"}
+[2025-09-20 13:53:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.8ms"}
+[2025-09-20 13:54:19] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-20 13:54:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.77ms"}
+[2025-09-20 13:55:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.7ms"}
+[2025-09-20 13:56:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.55ms"}
+[2025-09-20 13:57:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.19ms"}
+[2025-09-20 13:57:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.16ms"}
+[2025-09-20 13:57:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.17ms"}
+[2025-09-20 13:57:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.46ms"}
+[2025-09-20 13:57:54] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.94ms"}
+[2025-09-20 13:58:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.66ms"}
+[2025-09-20 13:58:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.39ms"}
+[2025-09-20 13:58:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.15ms"}
+[2025-09-20 14:00:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.51ms"}
+[2025-09-20 14:00:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.63ms"}
+[2025-09-20 14:00:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.1ms"}
+[2025-09-20 14:00:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.11ms"}
+[2025-09-20 14:02:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.08ms"}
+[2025-09-20 14:02:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.91ms"}
+[2025-09-20 14:03:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 14:03:28] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.26ms"}
+[2025-09-20 14:03:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.55ms"}
+[2025-09-20 14:04:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.75ms"}
+[2025-09-20 14:04:57] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-20 14:06:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.79ms"}
+[2025-09-20 14:06:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.23ms"}
+[2025-09-20 14:07:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.75ms"}
+[2025-09-20 14:09:34] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.59ms"}
+[2025-09-20 14:09:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.77ms"}
+[2025-09-20 14:09:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.86ms"}
+[2025-09-20 14:09:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.16ms"}
+[2025-09-20 14:11:38] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.69ms"}
+[2025-09-20 14:11:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.7ms"}
+[2025-09-20 14:11:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.9ms"}
+[2025-09-20 14:11:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.38ms"}
+[2025-09-20 14:11:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.86ms"}
+[2025-09-20 14:11:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.88ms"}
+[2025-09-20 14:11:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-20 14:14:11] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.57ms"}
+[2025-09-20 14:16:50] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-20 14:17:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.23ms"}
+[2025-09-20 14:17:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 14:17:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.32ms"}
+[2025-09-20 14:17:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-20 14:17:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.55ms"}
+[2025-09-20 14:17:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-20 14:18:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.89ms"}
+[2025-09-20 14:18:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-20 14:18:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.66ms"}
+[2025-09-20 14:18:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.74ms"}
+[2025-09-20 14:18:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.87ms"}
+[2025-09-20 14:18:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"7.47ms"}
+[2025-09-20 14:18:32] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.37ms"}
+[2025-09-20 14:18:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.71ms"}
+[2025-09-20 14:19:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-20 14:20:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.63ms"}
+[2025-09-20 14:21:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 14:23:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-20 14:24:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.39ms"}
+[2025-09-20 14:24:24] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-20 14:24:24] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.91ms"}
+[2025-09-20 14:24:24] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.24ms"}
+[2025-09-20 14:24:24] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.92ms"}
+[2025-09-20 14:24:25] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.41ms"}
+[2025-09-20 14:24:25] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.04ms"}
+[2025-09-20 14:24:25] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.52ms"}
+[2025-09-20 14:24:25] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.83ms"}
+[2025-09-20 14:26:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.75ms"}
+[2025-09-20 14:27:29] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-20 14:28:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.92ms"}
+[2025-09-20 14:28:58] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.78ms"}
+[2025-09-20 14:28:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.7ms"}
+[2025-09-20 14:28:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.22ms"}
+[2025-09-20 14:29:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.07ms"}
+[2025-09-20 14:29:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-20 14:29:00] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.59ms"}
+[2025-09-20 14:29:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.1ms"}
+[2025-09-20 14:29:24] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.84ms"}
+[2025-09-20 14:32:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.88ms"}
+[2025-09-20 14:32:10] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.06ms"}
+[2025-09-20 14:35:04] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.86ms"}
+[2025-09-20 14:35:19] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"1.64ms"}
+[2025-09-20 14:36:26] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.85ms"}
+[2025-09-20 14:37:01] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.12ms"}
+[2025-09-20 14:37:16] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.7ms"}
+[2025-09-20 14:37:41] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"1.97ms"}
+[2025-09-20 14:38:31] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.07ms"}
+[2025-09-20 14:39:16] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.67ms"}
+[2025-09-20 14:39:16] INFO: Creating new page {"title":"Home"}
+[2025-09-20 14:39:16] DEBUG: Record inserted {"table":"pages","insert_id":3,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 14:39:16] INFO: Page created successfully {"page_id":3}
+[2025-09-20 14:39:16] INFO: Creating new page {"title":"About"}
+[2025-09-20 14:39:16] DEBUG: Record inserted {"table":"pages","insert_id":4,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 14:39:16] INFO: Page created successfully {"page_id":4}
+[2025-09-20 14:39:16] INFO: Creating new page {"title":"Contact"}
+[2025-09-20 14:39:16] DEBUG: Record inserted {"table":"pages","insert_id":5,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 14:39:16] INFO: Page created successfully {"page_id":5}
+[2025-09-20 14:44:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-20 14:44:15] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.17ms"}
+[2025-09-20 14:44:29] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.28ms"}
+[2025-09-20 14:44:37] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.47ms"}
+[2025-09-20 14:45:36] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.87ms"}
+[2025-09-20 14:45:43] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.46ms"}
+[2025-09-20 14:46:03] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-20 14:47:23] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.98ms"}
+[2025-09-20 14:47:23] DEBUG: Database transaction started
+[2025-09-20 14:47:23] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 14:47:23] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 14:47:23] DEBUG: Database transaction committed
+[2025-09-20 14:47:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.11ms"}
+[2025-09-20 14:47:35] DEBUG: Database transaction started
+[2025-09-20 14:47:35] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 14:47:35] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 14:47:35] DEBUG: Database transaction committed
+[2025-09-20 14:47:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.05ms"}
+[2025-09-20 14:47:49] DEBUG: Database transaction started
+[2025-09-20 14:48:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.08ms"}
+[2025-09-20 14:48:30] DEBUG: Database transaction started
+[2025-09-20 14:49:13] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.62ms"}
+[2025-09-20 14:49:13] DEBUG: Database transaction started
+[2025-09-20 14:49:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.32ms"}
+[2025-09-20 14:49:42] DEBUG: Database transaction started
+[2025-09-20 14:49:50] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"2.02ms"}
+[2025-09-20 14:49:50] DEBUG: Database transaction started
+[2025-09-20 14:50:14] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-20 14:50:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.53ms"}
+[2025-09-20 14:50:48] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.89ms"}
+[2025-09-20 14:50:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.24ms"}
+[2025-09-20 14:52:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-20 14:53:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.33ms"}
+[2025-09-20 14:53:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.93ms"}
+[2025-09-20 14:53:30] DEBUG: Database transaction started
+[2025-09-20 14:55:26] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.85ms"}
+[2025-09-20 14:55:26] DEBUG: Database transaction started
+[2025-09-20 14:55:27] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.15ms"}
+[2025-09-20 14:55:27] DEBUG: Database transaction started
+[2025-09-20 14:56:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.07ms"}
+[2025-09-20 14:56:18] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.89ms"}
+[2025-09-20 14:58:42] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.94ms"}
+[2025-09-20 14:58:42] DEBUG: Database transaction started
+[2025-09-20 14:59:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-20 14:59:07] DEBUG: Database transaction started
+[2025-09-20 14:59:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.04ms"}
+[2025-09-20 14:59:08] DEBUG: Database transaction started
+[2025-09-20 14:59:25] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.17ms"}
+[2025-09-20 15:01:59] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.46ms"}
+[2025-09-20 15:01:59] DEBUG: Database transaction started
+[2025-09-20 15:02:40] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.73ms"}
+[2025-09-20 15:02:49] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.01ms"}
+[2025-09-20 15:03:39] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.95ms"}
+[2025-09-20 15:03:39] DEBUG: Database transaction started
+[2025-09-20 15:04:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.8ms"}
+[2025-09-20 15:04:02] DEBUG: Database transaction started
+[2025-09-20 15:04:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.02ms"}
+[2025-09-20 15:04:52] DEBUG: Database transaction started
+[2025-09-20 15:05:08] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-20 15:06:07] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.96ms"}
+[2025-09-20 15:06:21] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.15ms"}
+[2025-09-20 15:06:44] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 15:07:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.49ms"}
+[2025-09-20 15:07:04] DEBUG: Database transaction started
+[2025-09-20 15:07:22] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.92ms"}
+[2025-09-20 15:07:22] DEBUG: Database transaction started
+[2025-09-20 15:07:52] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.86ms"}
+[2025-09-20 15:07:52] DEBUG: Database transaction started
+[2025-09-20 15:07:52] ERROR: Database query failed {"sql":"SELECT `COUNT(*) as count` FROM `pages` WHERE slug = :param_0","params":{"param_0":"test-lexie"},"error":"SQLSTATE[42S22]: Column not found: 1054 Unknown column 'COUNT(*) as count' in 'field list'"}
+[2025-09-20 15:07:52] DEBUG: Database transaction rolled back
+[2025-09-20 15:11:02] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.73ms"}
+[2025-09-20 15:11:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.88ms"}
+[2025-09-20 15:11:06] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.04ms"}
+[2025-09-20 15:11:06] DEBUG: Database transaction started
+[2025-09-20 15:11:06] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 15:11:06] DEBUG: Record inserted {"table":"pages","insert_id":6,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:11:06] INFO: Page created successfully {"page_id":6}
+[2025-09-20 15:12:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.82ms"}
+[2025-09-20 15:12:33] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"4.03ms"}
+[2025-09-20 15:12:33] DEBUG: Database transaction started
+[2025-09-20 15:12:33] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 15:12:33] DEBUG: Record inserted {"table":"pages","insert_id":7,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:12:33] INFO: Page created successfully {"page_id":7}
+[2025-09-20 15:12:33] DEBUG: Database savepoint created {"level":1}
+[2025-09-20 15:12:33] DEBUG: Database savepoint released {"level":1}
+[2025-09-20 15:12:33] DEBUG: Database transaction committed
+[2025-09-20 15:15:42] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.95ms"}
+[2025-09-20 15:15:42] DEBUG: Record inserted {"table":"migrations","insert_id":1,"data_keys":["migration","batch"]}
+[2025-09-20 15:15:42] DEBUG: Record inserted {"table":"migrations","insert_id":2,"data_keys":["migration","batch"]}
+[2025-09-20 15:15:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.32ms"}
+[2025-09-20 15:15:55] DEBUG: Database transaction started
+[2025-09-20 15:15:55] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 15:15:55] DEBUG: Record inserted {"table":"pages","insert_id":1,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:15:55] INFO: Page created successfully {"page_id":1}
+[2025-09-20 15:16:31] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.2ms"}
+[2025-09-20 15:16:31] INFO: Creating new page {"title":"test lexie"}
+[2025-09-20 15:16:31] DEBUG: Record inserted {"table":"pages","insert_id":2,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:16:31] INFO: Page created successfully {"page_id":2}
+[2025-09-20 15:55:42] ERROR: Database connection failed {"driver":"mysql","host":"localhost","database":"block_cms","error":"SQLSTATE[HY000] [2002] No such file or directory"}
+[2025-09-20 15:55:42] ERROR: Database connection failed {"driver":"mysql","host":"localhost","database":"block_cms","error":"SQLSTATE[HY000] [2002] No such file or directory"}
+[2025-09-20 15:56:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"9.9ms"}
+[2025-09-20 15:56:35] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"0.6ms"}
+[2025-09-20 15:56:55] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.55ms"}
+[2025-09-20 15:57:47] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.71ms"}
+[2025-09-20 15:57:56] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.68ms"}
+[2025-09-20 15:58:04] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.74ms"}
+[2025-09-20 15:58:20] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.6ms"}
+[2025-09-20 15:58:30] INFO: Database connection established {"driver":"mysql","host":"db","database":"block_cms","connection_time":"1.59ms"}
+[2025-09-20 15:58:50] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.02ms"}
+[2025-09-20 15:58:54] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.44ms"}
+[2025-09-20 15:58:54] INFO: Creating new page {"title":"Home"}
+[2025-09-20 15:58:54] DEBUG: Record inserted {"table":"pages","insert_id":3,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:58:54] INFO: Page created successfully {"page_id":3}
+[2025-09-20 15:58:54] INFO: Creating new page {"title":"About"}
+[2025-09-20 15:58:54] DEBUG: Record inserted {"table":"pages","insert_id":4,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:58:54] INFO: Page created successfully {"page_id":4}
+[2025-09-20 15:58:54] INFO: Creating new page {"title":"Contact"}
+[2025-09-20 15:58:54] DEBUG: Record inserted {"table":"pages","insert_id":5,"data_keys":["title","slug","status","created_at","updated_at"]}
+[2025-09-20 15:58:54] INFO: Page created successfully {"page_id":5}
+[2025-09-20 17:06:04] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"8.92ms"}
+[2025-09-20 17:07:54] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.69ms"}
+[2025-09-20 17:08:26] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.27ms"}
+[2025-09-20 17:08:54] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.61ms"}
+[2025-09-20 17:08:54] ERROR: Database query failed {"sql":"CREATE TABLE `page_metadata` (\n    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,\n    `page_id` BIGINT UNSIGNED NOT NULL,\n    `content_type` VARCHAR(255),\n    `block_category` VARCHAR(255),\n    `author` VARCHAR(255),\n    `publish_date` DATETIME,\n    `expiry_date` DATETIME,\n    `visibility` ENUM('public','private','password') NOT NULL DEFAULT 'public',\n    `password` VARCHAR(255),\n    `featured` TINYINT(1) NOT NULL DEFAULT ,\n    `allow_comments` TINYINT(1) NOT NULL DEFAULT 1,\n    `is_reusable_block` TINYINT(1) NOT NULL DEFAULT ,\n    `block_preview_image` VARCHAR(255),\n    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n    PRIMARY KEY (`id`),\n    INDEX `idx_page_id` (`page_id`),\n    CONSTRAINT `fk_page_id` FOREIGN KEY (`page_id`) REFERENCES `pages`(`id`) ON DELETE CASCADE ON UPDATE RESTRICT\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci","params":[],"error":"SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ',\n    `allow_comments` TINYINT(1) NOT NULL DEFAULT 1,\n    `is_reusable_block` TI' at line 11"}
+[2025-09-20 17:09:54] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.34ms"}
+[2025-09-20 17:10:10] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.29ms"}
+[2025-09-20 17:13:02] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.65ms"}
+[2025-09-20 17:13:10] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.04ms"}
+[2025-09-20 17:13:39] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.62ms"}
+[2025-09-20 17:13:46] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.15ms"}
+[2025-09-20 17:13:57] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.71ms"}
+[2025-09-20 17:14:06] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"10.91ms"}
+[2025-09-20 17:17:09] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.89ms"}
+[2025-09-20 17:17:42] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.75ms"}
+[2025-09-20 17:18:39] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4ms"}
+[2025-09-20 17:21:21] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.86ms"}
+[2025-09-20 17:21:21] DEBUG: Record inserted {"table":"migrations","insert_id":3,"data_keys":["migration","batch"]}
+[2025-09-20 17:22:44] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.79ms"}
+[2025-09-20 17:23:00] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.9ms"}
+[2025-09-20 17:23:00] DEBUG: Record inserted {"table":"migrations","insert_id":4,"data_keys":["migration","batch"]}
+[2025-09-20 17:23:48] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.61ms"}
+[2025-09-20 17:24:17] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.27ms"}
+[2025-09-20 17:24:17] DEBUG: Record inserted {"table":"migrations","insert_id":5,"data_keys":["migration","batch"]}
+[2025-09-20 17:25:30] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.43ms"}
+[2025-09-20 17:25:30] DEBUG: Record inserted {"table":"migrations","insert_id":6,"data_keys":["migration","batch"]}
+[2025-09-20 17:26:23] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.74ms"}
+[2025-09-20 17:26:23] DEBUG: Record inserted {"table":"migrations","insert_id":7,"data_keys":["migration","batch"]}
+[2025-09-20 17:26:59] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.81ms"}
+[2025-09-20 17:26:59] DEBUG: Record inserted {"table":"migrations","insert_id":8,"data_keys":["migration","batch"]}
+[2025-09-20 17:27:58] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.6ms"}
+[2025-09-20 17:27:58] DEBUG: Record inserted {"table":"migrations","insert_id":9,"data_keys":["migration","batch"]}
+[2025-09-20 17:58:46] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.99ms"}
+[2025-09-20 17:58:46] DEBUG: Record inserted {"table":"migrations","insert_id":10,"data_keys":["migration","batch"]}
+[2025-09-20 17:59:26] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.23ms"}
+[2025-09-20 17:59:26] DEBUG: Record inserted {"table":"migrations","insert_id":11,"data_keys":["migration","batch"]}
+[2025-09-20 18:00:10] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.24ms"}
+[2025-09-20 18:00:10] DEBUG: Record inserted {"table":"migrations","insert_id":12,"data_keys":["migration","batch"]}
+[2025-09-20 18:00:59] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.48ms"}
+[2025-09-20 18:00:59] DEBUG: Record inserted {"table":"migrations","insert_id":13,"data_keys":["migration","batch"]}
+[2025-09-20 18:35:13] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"2.13ms"}
+[2025-09-20 18:35:13] DEBUG: Record inserted {"table":"migrations","insert_id":14,"data_keys":["migration","batch"]}
+[2025-09-20 18:36:41] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"3.49ms"}
+[2025-09-20 18:36:41] DEBUG: Record inserted {"table":"migrations","insert_id":15,"data_keys":["migration","batch"]}
+[2025-09-20 18:37:29] INFO: Database connection established {"driver":"mysql","host":"127.0.0.1","database":"block_cms","connection_time":"4.5ms"}
+[2025-09-20 18:37:29] DEBUG: Record inserted {"table":"migrations","insert_id":16,"data_keys":["migration","batch"]}

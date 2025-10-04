@@ -1,0 +1,450 @@
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --secondary: #f59e0b;
+    --accent: #10b981;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --bg: #ffffff;
+    --bg-light: #f9fafb;
+    --border: #e5e7eb;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+}
+
+/* CMS Block Styles */
+.cms-block { margin-bottom: 2rem; }
+.cms-text { font-size: 1rem; line-height: 1.7; color: var(--text); }
+.cms-heading { font-weight: 700; color: var(--text); margin-bottom: 1rem; }
+.cms-heading.h1 { font-size: 2.5rem; }
+.cms-heading.h2 { font-size: 2rem; }
+.cms-heading.h3 { font-size: 1.5rem; }
+
+/* Block-specific styles */
+.note-block {
+    background: var(--bg-light);
+    border-left: 4px solid var(--accent);
+    padding: 1.5rem;
+    border-radius: 0 8px 8px 0;
+    margin: 2rem 0;
+}
+
+.deal-block, .product-block {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 2rem 0;
+    box-shadow: var(--shadow);
+}
+
+.deal-content, .product-content {
+    padding: 1.5rem;
+}
+
+.deal-pricing, .product-pricing {
+    margin: 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.deal-original-price, .product-original-price {
+    text-decoration: line-through;
+    color: var(--text-light);
+    margin-right: 0.5rem;
+}
+
+.deal-sale-price, .product-sale-price {
+    color: var(--accent);
+    font-size: 1.5rem;
+}
+
+.deal-button, .product-button {
+    background: var(--primary);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    margin-top: 1rem;
+    transition: background 0.3s ease;
+}
+
+.deal-button:hover, .product-button:hover {
+    background: var(--primary-dark);
+}
+
+.buying-guide-block {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2rem 0;
+}
+
+.specs-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.specs-list dt {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.specs-list dd {
+    color: var(--text-light);
+}
+
+.info-block {
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin: 2rem 0;
+    border-left: 4px solid;
+}
+
+.info-type-info {
+    background: #eff6ff;
+    border-color: var(--primary);
+}
+
+.info-type-warning {
+    background: #fefce8;
+    border-color: var(--secondary);
+}
+
+.info-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+/* Property-specific styles */
+.property-main {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.property-header {
+    margin-bottom: 2rem;
+}
+
+.property-breadcrumbs {
+    color: var(--text-light);
+    margin-bottom: 1rem;
+}
+
+.property-breadcrumbs a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.property-title-section h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.property-location {
+    color: var(--text-light);
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+}
+
+.property-price-large {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.property-gallery {
+    margin-bottom: 3rem;
+}
+
+.main-image {
+    width: 100%;
+    height: 400px;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.main-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.thumbnail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.thumbnail {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+
+.thumbnail:hover {
+    opacity: 0.8;
+}
+
+.property-content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 3rem;
+}
+
+.property-features-section {
+    margin-bottom: 3rem;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-light);
+    border-radius: 8px;
+}
+
+.feature-icon {
+    font-size: 1.5rem;
+}
+
+.feature-text {
+    font-weight: 600;
+}
+
+.property-sidebar {
+    position: sticky;
+    top: 2rem;
+    height: fit-content;
+}
+
+.contact-agent-card, .property-summary-card, .share-property-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.enquiry-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.enquiry-form input, .enquiry-form textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.enquiry-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.contact-options {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.contact-option {
+    display: block;
+    padding: 0.75rem;
+    background: var(--bg-light);
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+    transition: background 0.3s ease;
+}
+
+.contact-option:hover {
+    background: var(--border);
+}
+
+.property-summary-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.property-summary-list dt {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.property-summary-list dd {
+    color: var(--text-light);
+    margin-left: 0;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.share-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.share-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--text);
+    background: white;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.share-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.related-properties {
+    margin-top: 4rem;
+    padding-top: 3rem;
+    border-top: 1px solid var(--border);
+}
+
+.related-properties h2 {
+    margin-bottom: 2rem;
+}
+
+/* Properties listing styles */
+.properties-main {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.filters-section {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filter-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.filter-group input, .filter-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: end;
+}
+
+.results-info {
+    margin-bottom: 2rem;
+    color: var(--text-light);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 3rem;
+}
+
+.pagination-btn {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text);
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.pagination-btn:hover, .pagination-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .property-content-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-row {
+        grid-template-columns: 1fr;
+    }
+
+    .properties-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .thumbnail-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
