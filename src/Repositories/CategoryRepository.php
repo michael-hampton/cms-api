@@ -6,6 +6,8 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Category;
 use App\Models\Model;
+use App\Models\Page;
+use App\Models\PageCategory;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -108,5 +110,17 @@ class CategoryRepository extends Repository
     public function getAlternatives(int $excludeId): Collection
     {
         return Category::where('id', '!=', $excludeId)->get();
+    }
+
+    public function getPagesByCategoryId(int $categoryId, ?int $limit = null): Collection
+    {
+        $query = PageCategory::where('category_id', $categoryId)
+            ->orderBy('created_at', 'desc');
+
+        if(!empty($limit)) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
     }
 }

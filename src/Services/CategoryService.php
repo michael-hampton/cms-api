@@ -27,7 +27,7 @@ class CategoryService
             throw new \Exception('Category not found');
         }
 
-        $pagesCount = $category->pages()->count();
+        $pagesCount = $this->repository->getPagesByCategoryId($categoryId)->count();
 
         if ($pagesCount > 0) {
             if ($reassignToCategoryId === null) {
@@ -44,8 +44,13 @@ class CategoryService
                 throw new \Exception('Reassignment category not found');
             }
 
-            $this->database->transaction(function () use ($category, $reassignToCategoryId) {
-                $category->pages()->update(['category_id' => $reassignToCategoryId]);
+            $this->database->transaction(function () use ($categoryId, $category, $reassignToCategoryId) {
+                // Get pages and update them individually
+                $pages = $this->repository->getPagesByCategoryId($categoryId);
+                foreach ($pages as $page) {
+                    $page->category_id = $reassignToCategoryId;
+                    $page->save();
+                }
                 $category->delete();
             });
 

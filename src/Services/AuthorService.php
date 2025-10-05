@@ -120,8 +120,13 @@ class AuthorService
                 throw new \Exception('Reassignment author not found');
             }
 
-           $this->database->transaction(function () use ($author, $reassignToAuthorId) {
-                $author->pages()->update(['author_id' => $reassignToAuthorId]);
+            $this->database->transaction(function () use ($authorId, $author, $reassignToAuthorId) {
+                // Get pages and update them individually
+                $pages = $this->authorRepository->getPagesByAuthorId($authorId);
+                foreach ($pages as $page) {
+                    $page->author_id = $reassignToAuthorId;
+                    $page->save();
+                }
                 $author->delete();
             });
 

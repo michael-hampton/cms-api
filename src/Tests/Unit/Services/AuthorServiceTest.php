@@ -328,7 +328,10 @@ class AuthorServiceTest extends TestCase
         $reassignAuthorId = 2;
         $author = Mockery::mock(Author::class);
         $reassignAuthor = Mockery::mock(Author::class);
-        $pages = Mockery::mock();
+
+        // Mock a page that will be reassigned
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->shouldReceive('save')->once();
 
         $this->authorRepository->shouldReceive('find')
             ->with($authorId)
@@ -340,19 +343,11 @@ class AuthorServiceTest extends TestCase
             ->once()
             ->andReturn($reassignAuthor);
 
+        // Called twice: once for count check, once inside transaction
         $this->authorRepository->shouldReceive('getPagesByAuthorId')
             ->with($authorId)
-            ->once()
-            ->andReturn(collect([Mockery::mock(Page::class)]));
-
-        // This is the missing piece:
-        $author->shouldReceive('pages')
-            ->once()
-            ->andReturn($pages);
-
-        $pages->shouldReceive('update')
-            ->with(['author_id' => $reassignAuthorId])
-            ->once();
+            ->twice()
+            ->andReturn(collect([$page]));
 
         $author->shouldReceive('delete')
             ->once()

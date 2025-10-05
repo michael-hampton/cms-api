@@ -227,7 +227,10 @@ class CategoryControllerTest extends TestCase
 
         // Mock category with no pages using method chaining
         $category = Mockery::mock('App\Models\Category');
-        $category->shouldReceive('pages->count')->andReturn(0);
+        $collection = Mockery::mock('App\Framework\Support\Collection');
+
+        $this->categoryRepository->shouldReceive('getPagesByCategoryId')->with(1)->andReturn($collection);
+        $collection->shouldReceive('count')->andReturn(0);
 
         // Mock repository to return the category
         $this->categoryRepository->shouldReceive('find')
@@ -244,7 +247,7 @@ class CategoryControllerTest extends TestCase
         // Mock Request
         $request = Mockery::mock(\App\Framework\Http\Request::class);
         $request->shouldReceive('input')
-            ->with('reassign_to_id')
+            ->with('reassignId')
             ->once()
             ->andReturn(null);
 

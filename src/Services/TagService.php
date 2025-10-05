@@ -27,7 +27,7 @@ class TagService
             throw new \Exception('Tag not found');
         }
 
-        $pagesCount = $tag->pages()->count();
+        $pagesCount = $this->repository->getPagesByTagId($tagId)->count();
 
         if ($pagesCount > 0) {
             if ($reassignToTagId === null) {
@@ -44,16 +44,13 @@ class TagService
                 throw new \Exception('Reassignment tag not found');
             }
 
-            $this->database->transaction(function () use ($tag, $reassignToTagId) {
-                $pages = $tag->pages()->get();
-
+            $this->database->transaction(function () use ($tagId, $tag, $reassignToTagId) {
+                // Get pages and update them individually
+                $pages = $this->repository->getPagesByTagId($tagId);
                 foreach ($pages as $page) {
-                    $page->tags()->detach($tag->id);
-                    if (!$page->tags()->where('tag_id', $reassignToTagId)->exists()) {
-                        $page->tags()->attach($reassignToTagId);
-                    }
+                    $page->tag_id = $reassignToTagId;
+                    $page->save();
                 }
-
                 $tag->delete();
             });
 

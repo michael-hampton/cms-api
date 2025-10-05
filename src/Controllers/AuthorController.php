@@ -105,7 +105,6 @@ class AuthorController extends Controller
     public function destroy(int $id, Request $request): JsonResponse
     {
         try {
-
             $result = $this->authorService->delete($id, $request->get('reassignId'));
 
             if (!$result) {

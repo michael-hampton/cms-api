@@ -5,6 +5,8 @@ namespace App\Repositories;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Model;
+use App\Models\PageCategory;
+use App\Models\PageTag;
 use App\Models\Tag;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -146,5 +148,17 @@ class TagRepository extends Repository
     public function getAlternatives(int $excludeId): Collection
     {
         return Tag::where('id', '!=', $excludeId)->get();
+    }
+
+    public function getPagesByTagId(int $tagId, ?int $limit = null): Collection
+    {
+        $query = PageTag::where('tag_id', $tagId)
+            ->orderBy('created_at', 'desc');
+
+        if(!empty($limit)) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
     }
 }

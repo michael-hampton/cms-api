@@ -41,7 +41,7 @@ abstract class Controller
 
     protected function resourceResponse(array $data, int $statusCode = 200): JsonResponse
     {
-        return JsonResponse::json($data, $statusCode);
+        return JsonResponse::json(array_merge($data, ['success' => true]), $statusCode);
     }
 
     protected function searchResponse(PaginatedResult $result, int $statusCode = 200): JsonResponse

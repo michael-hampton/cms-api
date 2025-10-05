@@ -93,7 +93,7 @@ class CategoryController extends Controller
     public function destroy(Request $request, int $id): JsonResponse
     {
         try {
-            $reassignToId = $request->input('reassign_to_id');
+            $reassignToId = $request->input('reassignId');
             $this->categoryService->delete($id, $reassignToId);
 
             return $this->jsonResponse([

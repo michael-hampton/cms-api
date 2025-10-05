@@ -4,7 +4,9 @@ namespace App\Tests\Unit\Services;
 
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
+use App\Framework\Support\Collection;
 use App\Models\Category;
+use App\Models\PageCategory;
 use App\Repositories\CategoryRepository;
 use App\Services\CategoryService;
 use Mockery;
@@ -35,9 +37,11 @@ class CategoryServiceTest extends TestCase
         $categoryId = 1;
         $category = Mockery::mock(Category::class)->makePartial();
 
-        $category->shouldReceive('pages->count')
-            ->once()
-            ->andReturn(0);
+        $collection = Mockery::mock(Collection::class);
+        $this->categoryRepository->shouldReceive('getPagesByCategoryId')
+            ->with($categoryId)->once()
+            ->andReturn($collection);
+        $collection->shouldReceive('count')->once()->andReturn(0);
 
         $this->categoryRepository->shouldReceive('delete')
             ->with($categoryId)
@@ -59,9 +63,12 @@ class CategoryServiceTest extends TestCase
         $categoryId = 1;
         $category = Mockery::mock(Category::class)->makePartial();
 
-        $category->shouldReceive('pages->count')
+        $collection = Mockery::mock(Collection::class);
+        $this->categoryRepository->shouldReceive('getPagesByCategoryId')
+            ->with($categoryId)
             ->once()
-            ->andReturn(3);
+            ->andReturn($collection);
+        $collection->shouldReceive('count')->once()->andReturn(2);
 
         $this->categoryRepository->shouldReceive('find')
             ->with($categoryId)
@@ -75,21 +82,32 @@ class CategoryServiceTest extends TestCase
 
     public function testItCanDeleteCategoryAndReassignPages()
     {
-        $categoryId = 1;
-        $reassignCategoryId = 2;
-        $category = Mockery::mock(Category::class)->makePartial();
-        $reassignCategory = Mockery::mock(Category::class)->makePartial();
-        $pages = Mockery::mock();
+        $authorId = 1;
+        $reassignAuthorId = 2;
+        $author = Mockery::mock(Category::class);
+        $reassignAuthor = Mockery::mock(Category::class);
 
-        $category->shouldReceive('pages->count')
+        // Mock a page that will be reassigned
+        $page = Mockery::mock(PageCategory::class)->makePartial();
+        $page->shouldReceive('save')->once();
+
+        $this->categoryRepository->shouldReceive('find')
+            ->with($authorId)
             ->once()
-            ->andReturn(3);
+            ->andReturn($author);
 
-        $category->shouldReceive('pages->update')
-            ->with(['category_id' => $reassignCategoryId])
-            ->once();
+        $this->categoryRepository->shouldReceive('find')
+            ->with($reassignAuthorId)
+            ->once()
+            ->andReturn($reassignAuthor);
 
-        $category->shouldReceive('delete')
+        // Called twice: once for count check, once inside transaction
+        $this->categoryRepository->shouldReceive('getPagesByCategoryId')
+            ->with($authorId)
+            ->twice()
+            ->andReturn(collect([$page]));
+
+        $author->shouldReceive('delete')
             ->once()
             ->andReturn(true);
 
@@ -99,17 +117,7 @@ class CategoryServiceTest extends TestCase
                 return $callback();
             });
 
-        $this->categoryRepository->shouldReceive('find')
-            ->with($categoryId)
-            ->once()
-            ->andReturn($category);
-
-        $this->categoryRepository->shouldReceive('find')
-            ->with($reassignCategoryId)
-            ->once()
-            ->andReturn($reassignCategory);
-
-        $result = $this->service->delete($categoryId, $reassignCategoryId);
+        $result = $this->service->delete($authorId, $reassignAuthorId);
 
         $this->assertTrue($result);
     }

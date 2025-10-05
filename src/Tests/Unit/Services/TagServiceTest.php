@@ -5,6 +5,9 @@ namespace App\Tests\Unit\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Models\Category;
+use App\Models\PageCategory;
+use App\Models\PageTag;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
 use App\Services\TagService;
@@ -42,13 +45,9 @@ class TagServiceTest extends TestCase
             ->once()
             ->andReturn($tag);
 
-        $tag->shouldReceive('pages')
-            ->once()
-            ->andReturn($pages);
-
-        $pages->shouldReceive('count')
-            ->once()
-            ->andReturn(0);
+       $collection = Mockery::mock(Collection::class);
+       $this->repository->shouldReceive('getPagesByTagId')->with($tagId)->once()->andReturn($collection);
+       $collection->shouldReceive('count')->once()->andReturn(0);
 
         $tag->shouldReceive('delete')
             ->once()
@@ -70,13 +69,9 @@ class TagServiceTest extends TestCase
             ->once()
             ->andReturn($tag);
 
-        $tag->shouldReceive('pages')
-            ->once()
-            ->andReturn($pages);
-
-        $pages->shouldReceive('count')
-            ->once()
-            ->andReturn(2);
+        $collection = Mockery::mock(Collection::class);
+        $this->repository->shouldReceive('getPagesByTagId')->with($tagId)->once()->andReturn($collection);
+        $collection->shouldReceive('count')->once()->andReturn(1);
 
         $this->expectException(CannotDeleteException::class);
 
@@ -85,37 +80,32 @@ class TagServiceTest extends TestCase
 
     public function testItCanDeleteTagAndReassignPages()
     {
-        $tagId = 1;
-        $reassignTagId = 2;
-        $tag = Mockery::mock(Tag::class)->makePartial();
-        $tag->id = $tagId;
-        $reassignTag = Mockery::mock(Tag::class);
-        $pages = Mockery::mock();
-        $pagesCollection = new Collection();
+        $authorId = 1;
+        $reassignAuthorId = 2;
+        $author = Mockery::mock(Tag::class);
+        $reassignAuthor = Mockery::mock(Tag::class);
+
+        // Mock a page that will be reassigned
+        $page = Mockery::mock(PageTag::class)->makePartial();
+        $page->shouldReceive('save')->once();
 
         $this->repository->shouldReceive('find')
-            ->with($tagId)
+            ->with($authorId)
             ->once()
-            ->andReturn($tag);
+            ->andReturn($author);
 
         $this->repository->shouldReceive('find')
-            ->with($reassignTagId)
+            ->with($reassignAuthorId)
             ->once()
-            ->andReturn($reassignTag);
+            ->andReturn($reassignAuthor);
 
-        $tag->shouldReceive('pages')
+        // Called twice: once for count check, once inside transaction
+        $this->repository->shouldReceive('getPagesByTagId')
+            ->with($authorId)
             ->twice()
-            ->andReturn($pages);
+            ->andReturn(collect([$page]));
 
-        $pages->shouldReceive('count')
-            ->once()
-            ->andReturn(1);
-
-        $pages->shouldReceive('get')
-            ->once()
-            ->andReturn($pagesCollection);
-
-        $tag->shouldReceive('delete')
+        $author->shouldReceive('delete')
             ->once()
             ->andReturn(true);
 
@@ -125,7 +115,7 @@ class TagServiceTest extends TestCase
                 return $callback();
             });
 
-        $result = $this->service->delete($tagId, $reassignTagId);
+        $result = $this->service->delete($authorId, $reassignAuthorId);
 
         $this->assertTrue($result);
     }
