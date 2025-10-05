@@ -7,6 +7,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Validation\Validator;
+use App\Models\Tag;
 use App\Repositories\TagRepository;
 use App\Requests\CreateTagRequest;
 use App\Requests\UpdateTagRequest;
@@ -175,6 +176,43 @@ class TagController extends Controller
             return $this->jsonResponse([
                 'message' => 'Tag not found'
             ], 404);
+        }
+    }
+
+    public function duplicate(int $id, Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $newName = $data['name'] ?? null;
+
+            $success = $this->tagService->duplicateTag($id, $newName);
+
+            if ($success) {
+                // Fetch the newly created tag
+                $tag = Tag::where('name', 'LIKE', '%Copy%')
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                return $this->jsonResponse($tag->toArray(), 201);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to duplicate tag'
+            ], 500);
+
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 404);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to duplicate tag: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

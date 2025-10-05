@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Brand;
+use App\Models\Product;
 
 class BrandControllerTest extends FunctionalTestCase
 {
@@ -171,6 +172,95 @@ class BrandControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Brand::find($source->id));
+    }
+
+    public function testDuplicateBrandSuccessfully(): void
+    {
+        $brand = Brand::create([
+            'name' => 'Nike',
+            'description' => 'Sports brand',
+            'website' => 'https://nike.com',
+            'slug' => 'nike',
+            'status' => 'active'
+        ]);
+
+        $response = $this->postJson("/api/brands/{$brand->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Nike (Copy)', $data['data']['name']);
+        $this->assertEquals('Sports brand', $data['data']['description']);
+        $this->assertNotEquals($brand->slug, $data['data']['slug']);
+    }
+
+    public function testDuplicateBrandWithLogo(): void
+    {
+        $brand = Brand::create([
+            'name' => 'Adidas',
+            'slug' => 'adidas',
+            'logo' => 'logos/adidas.png',
+            'status' => 'active'
+        ]);
+
+        // Create dummy logo file
+        $logoPath = 'uploads/logos/adidas.png';
+        @mkdir(dirname($logoPath), 0755, true);
+        file_put_contents($logoPath, 'dummy logo content');
+
+        $response = $this->postJson("/api/brands/{$brand->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertNotNull($data['data']['logo']);
+        $this->assertNotEquals('logos/adidas.png', $data['data']['logo']);
+
+        // Cleanup
+        @unlink($logoPath);
+        if (isset($data['data']['logo'])) {
+            @unlink('uploads/' . $data['data']['logo']);
+        }
+    }
+
+    public function testDuplicateBrandWithProducts(): void
+    {
+        $brand = Brand::create([
+            'name' => 'Apple',
+            'slug' => 'apple',
+            'status' => 'active'
+        ]);
+
+        // Create products for the brand
+        Product::create([
+            'name' => 'iPhone',
+            'brand_id' => $brand->id,
+            'price' => 999.99,
+            'slug' => 'iphone'
+        ]);
+
+        Product::create([
+            'name' => 'MacBook',
+            'brand_id' => $brand->id,
+            'price' => 1999.99,
+            'slug' => 'macbook'
+        ]);
+
+        $response = $this->postJson("/api/brands/{$brand->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        // Verify brand was duplicated
+        $this->assertEquals('Apple (Copy)', $data['data']['name']);
+
+        // Verify products still belong to original brand
+        $originalBrand = Brand::find($brand->id);
+        $this->assertEquals(2, $originalBrand->products()->count());
+
+        // Verify new brand has no products
+        $newBrand = Brand::find($data['data']['id']);
+        $this->assertEquals(0, $newBrand->products()->count());
     }
 
 //    public function testActiveReturnsOnlyActiveBrands()

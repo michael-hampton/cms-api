@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 
@@ -292,5 +293,111 @@ class ProductControllerTest extends FunctionalTestCase
         }
 
         return collect($products);
+    }
+
+    public function testDuplicateProductSuccessfully(): void
+    {
+        $product = Product::create([
+            'name' => 'iPhone 15',
+            'description' => 'Latest iPhone',
+            'price' => 999.99,
+            'sale_price' => 899.99,
+            'sku' => 'IPH15-001',
+            'slug' => 'iphone-15',
+            'status' => 'active'
+        ]);
+
+        $response = $this->postJson("/api/products/{$product->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('iPhone 15 (Copy)', $data['data']['name']);
+        $this->assertEquals('Latest iPhone', $data['data']['description']);
+        $this->assertEquals(999.99, $data['data']['price']);
+        $this->assertEquals(899.99, $data['data']['sale_price']);
+        $this->assertNotEquals($product->slug, $data['data']['slug']);
+    }
+
+    public function testDuplicateProductWithImage(): void
+    {
+        $product = Product::create([
+            'name' => 'MacBook Pro',
+            'slug' => 'macbook-pro',
+            'price' => 1999.99,
+            'image' => 'products/macbook.jpg',
+            'status' => 'active'
+        ]);
+
+        // Create dummy image
+        $imagePath = 'uploads/products/macbook.jpg';
+        @mkdir(dirname($imagePath), 0755, true);
+        file_put_contents($imagePath, 'dummy image');
+
+        $response = $this->postJson("/api/products/{$product->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertNotNull($data['data']['image']);
+        $this->assertNotEquals('products/macbook.jpg', $data['data']['image']);
+
+        // Cleanup
+        @unlink($imagePath);
+        if (isset($data['data']['image'])) {
+            @unlink('uploads/' . $data['data']['image']);
+        }
+    }
+
+    public function testDuplicateProductWithCustomName(): void
+    {
+        $product = Product::create([
+            'name' => 'AirPods Pro',
+            'slug' => 'airpods-pro',
+            'price' => 249.99,
+            'status' => 'active'
+        ]);
+
+        $response = $this->post("/api/products/{$product->id}/duplicate", [
+            'name' => 'AirPods Pro v2'
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('AirPods Pro v2', $data['data']['name']);
+    }
+
+    public function testDuplicateProductWithBrandAndCategory(): void
+    {
+        $brand = Brand::create([
+            'name' => 'Samsung',
+            'slug' => 'samsung',
+            'status' => 'active'
+        ]);
+
+        $category = Category::create([
+            'name' => 'Smartphones',
+            'slug' => 'smartphones',
+            'status' => 'active'
+        ]);
+
+        $product = Product::create([
+            'name' => 'Galaxy S24',
+            'slug' => 'galaxy-s24',
+            'price' => 899.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'status' => 'active'
+        ]);
+
+        $response = $this->postJson("/api/products/{$product->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        // Verify relationships are maintained
+        $this->assertEquals($brand->id, $data['data']['brand_id']);
+        $this->assertEquals($category->id, $data['data']['category_id']);
     }
 }

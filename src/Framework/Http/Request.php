@@ -17,6 +17,8 @@ class Request implements RequestInterface
         $this->routeParams = $routeParams;
         $this->headers = function_exists('getallheaders') ? getallheaders() : [];
 
+        $this->headers['Content-Type'] = $_SERVER['CONTENT_TYPE'] ?? '';
+
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 
@@ -254,4 +256,7 @@ class Request implements RequestInterface
         return $tmp;
     }
 
+    public function getHeader(string $key): ?string {
+        return $this->headers[$key] ?? null;;
+    }
 }

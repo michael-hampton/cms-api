@@ -193,4 +193,34 @@ class BrandService
             return true;
         });
     }
+
+    public function duplicateBrand(int $brandId, ?string $newName = null): Brand
+    {
+        return $this->database->transaction(function() use ($brandId, $newName) {
+            $originalBrand = $this->brandRepository->find($brandId);
+
+            if (!$originalBrand) {
+                throw new \Exception("Brand not found");
+            }
+
+            $data = [
+                'name' => $newName ?? ($originalBrand->name . ' (Copy)'),
+                'description' => $originalBrand->description,
+                'website' => $originalBrand->website,
+                'status' => 'inactive',
+            ];
+
+            $data['slug'] = Str::slug($data['name'], [$this->brandRepository, 'findBySlug']);
+
+            if ($originalBrand->logo) {
+                try {
+                    $data['logo'] = $this->imageUploadService->duplicate($originalBrand->logo);
+                } catch (\Exception $e) {
+                    $data['logo'] = null;
+                }
+            }
+
+            return $this->brandRepository->create($data);
+        });
+    }
 }

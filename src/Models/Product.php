@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Framework\Database\QueryBuilder;
+
 class Product extends Model
 {
     protected $fillable = [
@@ -15,7 +17,8 @@ class Product extends Model
         'meta_title',
         'meta_description',
         'meta_keywords',
-        'deleted_at'
+        'deleted_at',
+        'slug'
     ];
 
     protected $casts = [
@@ -61,5 +64,10 @@ class Product extends Model
                 ->orWhere('description', 'like', "%{$search}%")
                 ->orWhere('brand', 'like', "%{$search}%");
         });
+    }
+
+    public function scopeBySlug(QueryBuilder $query, string $slug): QueryBuilder
+    {
+        return $query->where('slug', $slug);
     }
 }

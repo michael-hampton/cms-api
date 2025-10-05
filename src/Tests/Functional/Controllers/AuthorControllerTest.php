@@ -314,4 +314,99 @@ class AuthorControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Author not found', $data['data']['message']);
     }
+
+    public function testDuplicateAuthorSuccessfully(): void
+    {
+        // Create original author
+        $author = Author::create([
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'bio' => 'Original author bio',
+            'website' => 'https://johndoe.com',
+            'slug' => 'john-doe',
+            'status' => 'active'
+        ]);
+
+        // Duplicate the author
+        $response = $this->post("/api/authors/duplicate/{$author->id}");
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+
+        // Verify response structure
+        $this->assertArrayHasKey('data', $data);
+        $duplicated = $data['data'];
+
+        // Verify duplicated author data
+        $this->assertEquals('John Doe (Copy)', $duplicated['name']);
+        $this->assertNull($duplicated['email']); // Email should be cleared
+        $this->assertEquals('Original author bio', $duplicated['bio']);
+        $this->assertEquals('https://johndoe.com', $duplicated['website']);
+        $this->assertEquals('inactive', $duplicated['status']);
+        $this->assertNotEquals($author->id, $duplicated['id']);
+        $this->assertNotEquals($author->slug, $duplicated['slug']);
+
+        // Verify both authors exist in database
+        $this->assertEquals(2, Author::count());
+    }
+
+    public function testDuplicateAuthorWithCustomName(): void
+    {
+        $author = Author::create([
+            'name' => 'Jane Smith',
+            'email' => 'jane@example.com',
+            'slug' => 'jane-smith',
+            'status' => 'active'
+        ]);
+
+        $response = $this->post("/api/authors/duplicate/{$author->id}", [
+            'name' => 'Jane Smith - Editor'
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Jane Smith - Editor', $data['data']['name']);
+        $this->assertEquals('jane-smith-editor', $data['data']['slug']);
+    }
+
+    public function testDuplicateAuthorWithAvatar(): void
+    {
+        // Create author with avatar
+        $author = Author::create([
+            'name' => 'Bob Jones',
+            'email' => 'bob@example.com',
+            'slug' => 'bob-jones',
+            'avatar' => 'avatars/bob.jpg',
+            'status' => 'active'
+        ]);
+
+        // Create dummy avatar file
+        $avatarPath = 'uploads/avatars/bob.jpg';
+        @mkdir(dirname($avatarPath), 0755, true);
+        file_put_contents($avatarPath, 'dummy image content');
+
+        $response = $this->post("/api/authors/duplicate/{$author->id}");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        // Verify avatar was duplicated
+        $this->assertNotNull($data['data']['avatar']);
+        $this->assertNotEquals('avatars/bob.jpg', $data['data']['avatar']);
+
+        // Cleanup
+        @unlink($avatarPath);
+        if (isset($data['data']['avatar'])) {
+            @unlink('uploads/' . $data['data']['avatar']);
+        }
+    }
+
+    public function testDuplicateNonExistentAuthor(): void
+    {
+        $response = $this->postJson('/api/duplicate/author/99999');
+
+        $this->assertResponseStatus(404, $response);
+    }
 }

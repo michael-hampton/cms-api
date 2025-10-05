@@ -11,10 +11,11 @@ use App\Models\PageTag;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
 use App\Services\TagService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class TagServiceTest extends TestCase
+class TagServiceTest extends FunctionalTestCase
 {
     protected $repository;
     protected $service;
@@ -23,9 +24,9 @@ class TagServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->database = Mockery::mock(Database::class);
+        $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(TagRepository::class);
-        $this->service = new TagService($this->database, $this->repository);
+        $this->service = new TagService($this->databaseMock, $this->repository);
     }
 
     protected function tearDown(): void
@@ -109,7 +110,7 @@ class TagServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
                 return $callback();
@@ -135,5 +136,66 @@ class TagServiceTest extends TestCase
         $result = $this->service->getAlternativeTags($tagId);
 
         $this->assertCount(1, $result);
+    }
+
+    public function testDuplicateTagSuccessfully(): void
+    {
+        $originalTag = new Tag([
+            'id' => 1,
+            'name' => 'PHP',
+            'description' => 'PHP related',
+            'slug' => 'php'
+        ]);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->repository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalTag);
+
+        $this->repository
+            ->shouldReceive('findBySlug')
+            ->with('php-copy')
+            ->once()
+            ->andReturn(null);
+
+        $newTag = new Tag([
+            'id' => 2,
+            'name' => 'PHP (Copy)',
+            'slug' => 'php-copy'
+        ]);
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($newTag);
+
+        $result = $this->service->duplicateTag(1);
+
+        $this->assertTrue($result);
+    }
+
+    public function testDuplicateTagThrowsExceptionWhenNotFound(): void
+    {
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->repository
+            ->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Tag not found');
+
+        $this->service->duplicateTag(999);
     }
 }

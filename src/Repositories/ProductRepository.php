@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\Product;
+use App\Models\Tag;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -67,6 +68,12 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     {
         return $this->model->onSale()->latest()->get();
     }
+
+    public function findBySlug(string $slug): ?Product
+    {
+        return Product::bySlug($slug)->first();
+    }
+
 
     protected function getModelClass(): string
     {

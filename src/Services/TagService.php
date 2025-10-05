@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Str;
 use App\Repositories\TagRepository;
 
 class TagService
@@ -80,5 +81,37 @@ class TagService
     public function getAlternativeTags(int $tagId): Collection
     {
         return $this->repository->getAlternatives($tagId);
+    }
+
+    public function duplicateTag(int $tagId, ?string $newName = null): bool
+    {
+        return $this->database->transaction(function() use ($tagId, $newName) {
+            $originalTag = $this->repository->find($tagId);
+
+            if (!$originalTag) {
+                throw new \Exception("Tag not found");
+            }
+
+            $data = [
+                'name' => $newName ?? ($originalTag->name . ' (Copy)'),
+                'description' => $originalTag->description,
+                'status' => 'inactive',
+            ];
+
+            $baseName = $data['name'];
+            $slug = Str::slug($baseName);
+            $counter = 1;
+
+            while ($this->repository->findBySlug($slug)) {
+                $slug = Str::slug($baseName . '-' . $counter);
+                $counter++;
+            }
+
+            $data['slug'] = $slug;
+
+            $newTag = $this->repository->create($data);
+
+            return $newTag !== null;
+        });
     }
 }

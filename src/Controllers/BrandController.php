@@ -152,4 +152,29 @@ class BrandController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    public function duplicate(int $id, Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $newName = $data['name'] ?? null;
+
+            $duplicatedBrand = $this->brandService->duplicateBrand($id, $newName);
+
+            return $this->jsonResponse($duplicatedBrand->toArray(), 201);
+
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 404);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to duplicate brand: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

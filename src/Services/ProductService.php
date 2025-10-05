@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Repositories\ProductRepository;
 use Exception;
@@ -153,5 +154,47 @@ class ProductService
         file_put_contents($fullPath, $imageData);
 
         return $filename;
+    }
+
+    public function duplicateProduct(int $productId, ?string $newName = null): Model
+    {
+        $originalProduct = $this->repository->find($productId);
+
+        if (!$originalProduct) {
+            throw new \Exception("Product not found");
+        }
+
+        $data = [
+            'name' => $newName ?? ($originalProduct->name . ' (Copy)'),
+            'description' => $originalProduct->description,
+            'price' => $originalProduct->price,
+            'sale_price' => $originalProduct->sale_price,
+            'brand_id' => $originalProduct->brand_id,
+            'category_id' => $originalProduct->category_id,
+            'status' => 'draft',
+        ];
+
+        // Generate unique slug
+        $baseName = $data['name'];
+        $slug = Str::slug($baseName);
+        $counter = 1;
+
+        while ($this->repository->findBySlug($slug)) {
+            $slug = Str::slug($baseName . '-' . $counter);
+            $counter++;
+        }
+
+        $data['slug'] = $slug;
+
+        // Duplicate image
+        if ($originalProduct->image) {
+            try {
+                $data['image'] = $this->imageUploadService->duplicate($originalProduct->image);
+            } catch (\Exception $e) {
+                $data['image'] = null;
+            }
+        }
+
+        return $this->repository->create($data);
     }
 }

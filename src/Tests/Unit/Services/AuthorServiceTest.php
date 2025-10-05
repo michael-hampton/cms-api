@@ -11,14 +11,15 @@ use App\Models\Page;
 use App\Repositories\AuthorRepository;
 use App\Services\AuthorService;
 use App\Services\ImageUploadService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class AuthorServiceTest extends TestCase
+class AuthorServiceTest extends FunctionalTestCase
 {
     private $authorRepository;
     private $imageUploadService;
-    private $database;
+    private $databaseMock;
     private $service;
 
     protected function setUp(): void
@@ -26,12 +27,12 @@ class AuthorServiceTest extends TestCase
         parent::setUp();
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
-        $this->database = Mockery::mock(Database::class);
+        $this->databaseMock = Mockery::mock(Database::class);
 
         $this->service = new AuthorService(
             $this->authorRepository,
             $this->imageUploadService,
-            $this->database
+            $this->databaseMock
         );
     }
 
@@ -62,7 +63,7 @@ class AuthorServiceTest extends TestCase
 
         $mockedAuthor = Mockery::mock(Author::class);
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -93,7 +94,7 @@ class AuthorServiceTest extends TestCase
         $avatarFile->shouldReceive('isValid')->andReturn(true);
 
         // Mock the database transaction
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -134,7 +135,7 @@ class AuthorServiceTest extends TestCase
         $author->avatar = null;
 
         // Mock database transaction
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -172,7 +173,7 @@ class AuthorServiceTest extends TestCase
         $author = Mockery::mock(Author::class)->makePartial();
 
         // ❌ Remove this — transaction is not called in this case
-        $this->database->shouldNotReceive('transaction');
+        $this->databaseMock->shouldNotReceive('transaction');
 
         $this->authorRepository->shouldReceive('find')
             ->with(1)
@@ -200,7 +201,7 @@ class AuthorServiceTest extends TestCase
         $page->shouldReceive('save')->once();
 
         // Mock database transaction
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -255,7 +256,7 @@ class AuthorServiceTest extends TestCase
     private function createMockAuthor($id, $name)
     {
         // Pass constructor arguments if Author::__construct requires them
-        $author = Mockery::mock(Author::class, [[], $this->database])->makePartial();
+        $author = Mockery::mock(Author::class, [[], $this->databaseMock])->makePartial();
 
         // Set properties directly
         $author->id = $id;
@@ -353,7 +354,7 @@ class AuthorServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
                 return $callback();
@@ -404,5 +405,178 @@ class AuthorServiceTest extends TestCase
         $result = $this->service->getAlternativeAuthors($authorId);
 
         $this->assertCount(2, $result);
+    }
+
+    public function testDuplicateAuthorWithDefaultName(): void
+    {
+        $originalAuthor = new Author([
+            'id' => 1,
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'bio' => 'Author bio',
+            'website' => 'https://example.com',
+            'social_links' => '{"twitter": "@john"}',
+            'avatar' => 'avatars/john.jpg',
+            'status' => 'active',
+            'slug' => 'john-doe'
+        ]);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->authorRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalAuthor);
+
+        $this->authorRepository
+            ->shouldReceive('findBySlug')
+            ->with('john-doe-copy')
+            ->once()
+            ->andReturn(null);
+
+        $this->imageUploadService
+            ->shouldReceive('duplicate')
+            ->with('avatars/john.jpg')
+            ->once()
+            ->andReturn('avatars/john-copy.jpg');
+
+        $newAuthor = new Author([
+            'id' => 2,
+            'name' => 'John Doe (Copy)',
+            'email' => null,
+            'bio' => 'Author bio',
+            'website' => 'https://example.com',
+            'social_links' => '{"twitter": "@john"}',
+            'avatar' => 'avatars/john-copy.jpg',
+            'status' => 'inactive',
+            'slug' => 'john-doe-copy'
+        ]);
+
+        $this->authorRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['name'] === 'John Doe (Copy)'
+                    && $data['email'] === null
+                    && $data['status'] === 'inactive'
+                    && $data['slug'] === 'john-doe-copy';
+            }))
+            ->andReturn($newAuthor);
+
+        $result = $this->service->duplicateAuthor(1);
+
+        $this->assertInstanceOf(Author::class, $result);
+        $this->assertEquals('John Doe (Copy)', $result->name);
+        $this->assertNull($result->email);
+        $this->assertEquals('inactive', $result->status);
+    }
+
+    public function testDuplicateAuthorWithCustomName(): void
+    {
+        $originalAuthor = new Author([
+            'id' => 1,
+            'name' => 'John Doe',
+            'bio' => 'Author bio',
+            'status' => 'active',
+            'slug' => 'john-doe'
+        ]);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->authorRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalAuthor);
+
+        $this->authorRepository
+            ->shouldReceive('findBySlug')
+            ->with('jane-smith')
+            ->once()
+            ->andReturn(null);
+
+        $newAuthor = new Author([
+            'id' => 2,
+            'name' => 'Jane Smith',
+            'slug' => 'jane-smith'
+        ]);
+
+        $this->authorRepository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($newAuthor);
+
+        $result = $this->service->duplicateAuthor(1, 'Jane Smith');
+
+        $this->assertEquals('Jane Smith', $result->name);
+    }
+
+    public function testDuplicateAuthorThrowsExceptionWhenNotFound(): void
+    {
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->authorRepository
+            ->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Author not found');
+
+        $this->service->duplicateAuthor(999);
+    }
+
+    public function testDuplicateAuthorHandlesAvatarDuplicationFailure(): void
+    {
+        $originalAuthor = new Author([
+            'id' => 1,
+            'name' => 'John Doe',
+            'avatar' => 'avatars/john.jpg',
+            'slug' => 'john-doe'
+        ]);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->authorRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalAuthor);
+
+        $this->imageUploadService
+            ->shouldReceive('duplicate')
+            ->once()
+            ->andThrow(new \Exception('File not found'));
+
+        $this->authorRepository
+            ->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
+
+        $this->authorRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['avatar'] === null;
+            }))
+            ->andReturn(new Author(['id' => 2]));
+
+        $result = $this->service->duplicateAuthor(1);
+
+        $this->assertInstanceOf(Author::class, $result);
     }
 }

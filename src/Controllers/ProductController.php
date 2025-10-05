@@ -113,4 +113,29 @@ class ProductController extends Controller
             'message' => 'Product deleted successfully'
         ], 200);
     }
+
+    public function duplicate(int $id, Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $newName = $data['name'] ?? null;
+
+            $duplicatedProduct = $this->productService->duplicateProduct($id, $newName);
+
+            return $this->jsonResponse($duplicatedProduct->toArray(), 201);
+
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 404);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to duplicate product: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

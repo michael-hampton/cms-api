@@ -165,4 +165,31 @@ class AuthorController extends Controller
             ], 404);
         }
     }
+
+    public function duplicate(int $id, Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $newName = $data['name'] ?? null;
+
+            $duplicatedAuthor = $this->authorService->duplicateAuthor($id, $newName);
+
+            return $this->jsonResponse(
+             $duplicatedAuthor->toArray()
+            , 201);
+
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 404);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to duplicate author: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

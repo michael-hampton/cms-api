@@ -2,16 +2,18 @@
 
 namespace App\Tests\Unit\Services;
 
+use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductRepositoryInterface;
 use App\Services\ImageUploadService;
 use App\Services\ProductService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class ProductServiceTest extends TestCase
+class ProductServiceTest extends FunctionalTestCase
 {
     protected $repository;
     protected $imageUploadService;
@@ -22,6 +24,8 @@ class ProductServiceTest extends TestCase
         parent::setUp();
         $this->repository = Mockery::mock(ProductRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
+
+        $this->databaseMock = Mockery::mock(Database::class);
 
         $this->imageUploadService->shouldReceive('setAllowedMimeTypes')->andReturnSelf();
         $this->imageUploadService->shouldReceive('setMaxFileSize')->andReturnSelf();
@@ -267,5 +271,129 @@ class ProductServiceTest extends TestCase
         $result = $this->service->getOnSaleProducts();
 
         $this->assertCount(1, $result);
+    }
+
+    public function testDuplicateProductSuccessfully(): void
+    {
+        $originalProduct = new Product([
+            'id' => 1,
+            'name' => 'iPhone 15',
+            'description' => 'Latest iPhone',
+            'image' => 'products/iphone15.jpg',
+            'price' => 999.99,
+            'sale_price' => 899.99,
+            'brand_id' => 5,
+            'category_id' => 10,
+            'slug' => 'iphone-15'
+        ]);
+
+        $this->repository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalProduct);
+
+        $this->repository
+            ->shouldReceive('findBySlug')
+            ->with('iphone-15-copy')
+            ->once()
+            ->andReturn(null);
+
+        $this->imageUploadService
+            ->shouldReceive('duplicate')
+            ->with('products/iphone15.jpg')
+            ->once()
+            ->andReturn('products/iphone15-copy.jpg');
+
+        $newProduct = new Product([
+            'id' => 2,
+            'name' => 'iPhone 15 (Copy)',
+            'slug' => 'iphone-15-copy',
+        ]);
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['name'] === 'iPhone 15 (Copy)'
+                    && $data['price'] === 999.99;
+            }))
+            ->andReturn($newProduct);
+
+        $result = $this->service->duplicateProduct(1);
+
+        $this->assertInstanceOf(Product::class, $result);
+        $this->assertEquals('iPhone 15 (Copy)', $result->name);
+    }
+
+    public function testDuplicateProductWithoutImage(): void
+    {
+        $originalProduct = new Product([
+            'id' => 1,
+            'name' => 'Product',
+            'image' => null,
+            'slug' => 'product'
+        ]);
+
+        $this->repository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalProduct);
+
+        $this->repository
+            ->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
+
+        $this->imageUploadService
+            ->shouldNotReceive('duplicate');
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn(new Product(['id' => 2]));
+
+        $result = $this->service->duplicateProduct(1);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
+
+    public function testDuplicateProductHandlesImageDuplicationFailure(): void
+    {
+        $originalProduct = new Product([
+            'id' => 1,
+            'name' => 'Product',
+            'image' => 'products/test.jpg',
+            'slug' => 'product'
+        ]);
+
+        $this->repository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalProduct);
+
+        $this->imageUploadService
+            ->shouldReceive('duplicate')
+            ->once()
+            ->andThrow(new \Exception('File error'));
+
+        $this->repository
+            ->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['image'] === null;
+            }))
+            ->andReturn(new Product(['id' => 2]));
+
+        $result = $this->service->duplicateProduct(1);
+
+        $this->assertInstanceOf(Product::class, $result);
     }
 }

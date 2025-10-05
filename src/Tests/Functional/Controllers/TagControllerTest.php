@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Page;
 use App\Models\PageTag;
 use App\Models\Tag;
 
@@ -203,5 +204,59 @@ class TagControllerTest extends FunctionalTestCase
         $this->assertEquals(404, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Tag not found', $data['data']['message']);
+    }
+
+    public function testDuplicateTagSuccessfully(): void
+    {
+        $tag = Tag::create([
+            'name' => 'PHP',
+            'description' => 'PHP programming',
+            'slug' => 'php',
+            'status' => 'active'
+        ]);
+
+        $response = $this->postJson("/api/tags/{$tag->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('PHP (Copy)', $data['data']['name']);
+        $this->assertEquals('PHP programming', $data['data']['description']);
+    }
+
+    public function testDuplicateTagWithPages(): void
+    {
+        $tag = Tag::create([
+            'name' => 'Laravel',
+            'slug' => 'laravel',
+            'status' => 'active'
+        ]);
+
+        // Create pages with this tag
+        $page = Page::create([
+            'title' => 'Laravel Tutorial',
+            'slug' => 'laravel-tutorial',
+            'status' => 'published'
+        ]);
+
+        // Associate tag with page using the pivot table directly
+        PageTag::create([
+            'page_id' => $page->id,
+            'tag_id' => $tag->id,
+        ]);
+
+        $response = $this->postJson("/api/tags/{$tag->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        // Verify original tag still has the page
+        $originalTagPages = PageTag::where('tag_id', $tag->id)->count();
+        $this->assertEquals(1, $originalTagPages);
+
+        // Verify new tag has no pages
+        $newTag = Tag::find($data['data']['id']);
+        $newTagPages = PageTag::where('tag_id', $newTag->id)->count();
+        $this->assertEquals(0, $newTagPages);
     }
 }

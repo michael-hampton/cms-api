@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Str;
 use App\Repositories\CategoryRepository;
 
 class CategoryService
@@ -80,5 +81,39 @@ class CategoryService
     public function getAlternativeCategories(int $categoryId): Collection
     {
         return $this->repository->getAlternatives($categoryId);
+    }
+
+    public function duplicateCategory(int $categoryId, ?string $newName = null): bool
+    {
+        return $this->database->transaction(function() use ($categoryId, $newName) {
+            $originalCategory = $this->repository->find($categoryId);
+
+            if (!$originalCategory) {
+                throw new \Exception("Category not found");
+            }
+
+            $data = [
+                'name' => $newName ?? ($originalCategory->name . ' (Copy)'),
+                'description' => $originalCategory->description,
+                'parent_id' => $originalCategory->parent_id,
+                'status' => 'inactive',
+            ];
+
+            // Generate unique slug
+            $baseName = $data['name'];
+            $slug = Str::slug($baseName);
+            $counter = 1;
+
+            while ($this->repository->findBySlug($slug)) {
+                $slug = Str::slug($baseName . '-' . $counter);
+                $counter++;
+            }
+
+            $data['slug'] = $slug;
+
+            $newCategory = $this->repository->create($data);
+
+            return $newCategory !== null;
+        });
     }
 }

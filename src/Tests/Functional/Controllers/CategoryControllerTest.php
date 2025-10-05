@@ -235,4 +235,73 @@ class CategoryControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Category not found', $data['data']['message']);
     }
+
+    public function testDuplicateCategorySuccessfully(): void
+    {
+        $category = Category::create([
+            'name' => 'Technology',
+            'description' => 'Tech articles',
+            'slug' => 'technology',
+            'status' => 'active'
+        ]);
+
+        $response = $this->postJson("/api/categories/{$category->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Technology (Copy)', $data['data']['name']);
+        $this->assertEquals('Tech articles', $data['data']['description']);
+        $this->assertNotEquals($category->slug, $data['data']['slug']);
+    }
+
+    public function testDuplicateCategoryWithParent(): void
+    {
+        $parent = Category::create([
+            'name' => 'Electronics',
+            'slug' => 'electronics',
+            'status' => 'active'
+        ]);
+
+        $child = Category::create([
+            'name' => 'Smartphones',
+            'slug' => 'smartphones',
+            'parent_id' => $parent->id,
+            'status' => 'active'
+        ]);
+
+        $response = $this->postJson("/api/categories/{$child->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        // Verify parent relationship is maintained
+        $this->assertEquals($parent->id, $data['data']['parent_id']);
+        $this->assertEquals('Smartphones (Copy)', $data['data']['name']);
+    }
+
+    public function testDuplicateCategoryHandlesSlugConflict(): void
+    {
+        // Create original
+        $category1 = Category::create([
+            'name' => 'News',
+            'slug' => 'news',
+            'status' => 'active'
+        ]);
+
+        // Create first duplicate
+        $response1 = $this->postJson("/api/categories/{$category1->id}/duplicate");
+        $this->assertResponseOk($response1);
+        $data1 = json_decode($response1->getContent(), true);
+
+        // Create second duplicate - should handle slug conflict
+        $response2 = $this->postJson("/api/categories/{$category1->id}/duplicate");
+        $this->assertResponseOk($response2);
+        $data2 = json_decode($response2->getContent(), true);
+
+        // Verify slugs are unique
+        $this->assertNotEquals($data1['data']['slug'], $data2['data']['slug']);
+        $this->assertStringContainsString('news-copy', $data1['data']['slug']);
+        $this->assertStringContainsString('news-copy', $data2['data']['slug']);
+    }
 }

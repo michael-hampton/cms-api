@@ -151,4 +151,44 @@ class ImageUploadService
         $this->maxFileSize = $bytes;
         return $this;
     }
+
+    public function duplicate(string $originalPath): string
+    {
+        $fullOriginalPath = $this->getFullPath($originalPath);
+
+        if (!file_exists($fullOriginalPath)) {
+            throw new \Exception("Original file does not exist: {$originalPath}");
+        }
+
+        // Get file info
+        $pathInfo = pathinfo($originalPath);
+        $directory = $pathInfo['dirname'];
+        $filename = $pathInfo['filename'];
+        $extension = $pathInfo['extension'] ?? '';
+
+        // Generate new filename with unique suffix
+        $newFilename = $filename . '-copy-' . uniqid();
+        if ($extension) {
+            $newFilename .= '.' . $extension;
+        }
+
+        $newPath = $directory . '/' . $newFilename;
+        $fullNewPath = $this->getFullPath($newPath);
+
+        // Ensure directory exists
+        $this->ensureDirectoryExists(dirname($fullNewPath));
+
+        // Copy the file
+        if (!copy($fullOriginalPath, $fullNewPath)) {
+            throw new \Exception("Failed to duplicate file: {$originalPath}");
+        }
+
+        return $newPath;
+    }
+
+    private function getFullPath(string $relativePath): string
+    {
+        $uploadPath = rtrim(config('upload.path', 'uploads'), '/');
+        return $uploadPath . '/' . ltrim($relativePath, '/');
+    }
 }

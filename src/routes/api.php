@@ -41,6 +41,8 @@ $router->get('/api/categories/{id}', CategoryController::class, 'show');
 $router->put('/api/categories/{id}', CategoryController::class, 'update');
 $router->delete('/api/categories/{id}', CategoryController::class, 'destroy');
 $router->get('/api/categories/{id}/check-delete', CategoryController::class, 'checkDelete');
+$router->post('/api/categories/{id}/duplicate', CategoryController::class, 'duplicate');
+
 
 // Brands
 $router->get('/api/brands', BrandController::class, 'index');
@@ -52,6 +54,8 @@ $router->get('/api/brands/{id}/check-delete', BrandController::class, 'checkDele
 $router->get('/api/brands/{id}/alternatives', BrandController::class, 'alternatives');
 $router->post('/api/brands/merge', BrandController::class, 'merge');
 $router->get('/api/brands/active', BrandController::class, 'active');
+$router->post('/api/brands/{id}/duplicate', BrandController::class, 'duplicate');
+
 
 
 // Tags API
@@ -65,6 +69,8 @@ $router->post('/api/tags/cleanup', TagController::class, 'cleanup');
 $router->get('/api/featured-tags', TagController::class, 'featured');
 $router->get('/api/popular-tags', TagController::class, 'popular');
 $router->get('/api/tags/{id}/check-delete', TagController::class, 'checkDelete');
+$router->post('/api/tags/{id}/duplicate', TagController::class, 'duplicate');
+
 
 
 // Custom Fields API
@@ -138,6 +144,8 @@ $router->get('/api/authors/{id}', AuthorController::class, 'show');
 $router->put('/api/authors/{id}', AuthorController::class, 'update');
 $router->delete('/api/authors/{id}', AuthorController::class, 'destroy');
 $router->get('/api/authors/{id}/check-delete', AuthorController::class, 'checkDelete');
+$router->post('/api/authors/duplicate/{id}', AuthorController::class, 'duplicate');
+
 
 //products
 $router->get('/api/products', ProductController::class, 'index');
@@ -145,6 +153,8 @@ $router->post('/api/products', ProductController::class, 'store');
 $router->get('/api/products/{id}', ProductController::class, 'show');
 $router->put('/api/products/{id}', ProductController::class, 'update');
 $router->delete('/api/products/{id}', ProductController::class, 'destroy');
+$router->post('/api/products/{id}/duplicate', ProductController::class, 'duplicate');
+
 
 // Author public view route
 $router->get('/authors/{slug}', 'AuthorViewController@show');

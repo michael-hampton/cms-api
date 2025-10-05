@@ -11,14 +11,15 @@ use App\Models\Product;
 use App\Repositories\BrandRepository;
 use App\Services\BrandService;
 use App\Services\ImageUploadService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class BrandServiceTest extends TestCase
+class BrandServiceTest extends FunctionalTestCase
 {
     private $brandRepository;
     private $imageUploadService;
-    private $database;
+    private $databaseMock;
     private $service;
 
     protected function setUp(): void
@@ -26,12 +27,12 @@ class BrandServiceTest extends TestCase
         parent::setUp();
         $this->brandRepository = Mockery::mock(BrandRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
-        $this->database = Mockery::mock(Database::class);
+        $this->databaseMock = Mockery::mock(Database::class);
 
         $this->service = new BrandService(
             $this->brandRepository,
             $this->imageUploadService,
-            $this->database
+            $this->databaseMock
         );
     }
 
@@ -41,7 +42,7 @@ class BrandServiceTest extends TestCase
 
         $mockedBrand = Mockery::mock(Brand::class);
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -69,7 +70,7 @@ class BrandServiceTest extends TestCase
         $logoFile = Mockery::mock(UploadedFile::class);
         $logoFile->shouldReceive('isValid')->andReturn(true);
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -102,7 +103,7 @@ class BrandServiceTest extends TestCase
         $brand->slug = 'old-name';
         $brand->logo = null;
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -207,7 +208,7 @@ class BrandServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -226,7 +227,7 @@ class BrandServiceTest extends TestCase
         $product = Mockery::mock(Product::class)->makePartial();
         $product->shouldReceive('save')->once();
 
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
@@ -299,6 +300,96 @@ class BrandServiceTest extends TestCase
         $result = $this->service->getAlternativeBrands(1);
 
         $this->assertCount(2, $result);
+    }
+
+    public function testDuplicateBrandSuccessfully(): void
+    {
+        $originalBrand = new Brand([
+            'id' => 1,
+            'name' => 'Nike',
+            'description' => 'Sports brand',
+            'website' => 'https://nike.com',
+            'logo' => 'logos/nike.png',
+            'status' => 'active',
+            'slug' => 'nike'
+        ]);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->brandRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalBrand);
+
+        $this->brandRepository
+            ->shouldReceive('findBySlug')
+            ->with('nike-copy')
+            ->once()
+            ->andReturn(null);
+
+        $this->imageUploadService
+            ->shouldReceive('duplicate')
+            ->with('logos/nike.png')
+            ->once()
+            ->andReturn('logos/nike-copy.png');
+
+        $newBrand = new Brand([
+            'id' => 2,
+            'name' => 'Nike (Copy)',
+            'slug' => 'nike-copy',
+            'status' => 'inactive'
+        ]);
+
+        $this->brandRepository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($newBrand);
+
+        $result = $this->service->duplicateBrand(1);
+
+        $this->assertEquals('Nike (Copy)', $result->name);
+    }
+
+    public function testDuplicateBrandWithoutLogo(): void
+    {
+        $originalBrand = new Brand([
+            'id' => 1,
+            'name' => 'Nike',
+            'logo' => null,
+            'slug' => 'nike'
+        ]);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->brandRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($originalBrand);
+
+        $this->brandRepository
+            ->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
+
+        $this->imageUploadService
+            ->shouldNotReceive('duplicate');
+
+        $this->brandRepository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn(new Brand(['id' => 2]));
+
+        $result = $this->service->duplicateBrand(1);
+
+        $this->assertInstanceOf(Brand::class, $result);
     }
 
     protected function tearDown(): void

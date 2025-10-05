@@ -8,6 +8,7 @@ use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\Validator;
+use App\Models\Category;
 use App\Repositories\CategoryRepository;
 use App\Requests\CreateCategoryRequest;
 use App\Requests\UpdateCategoryRequest;
@@ -141,6 +142,44 @@ class CategoryController extends Controller
             return $this->jsonResponse([
                 'message' => 'Category not found'
             ], 404);
+        }
+    }
+
+    public function duplicate(int $id, Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $newName = $data['name'] ?? null;
+
+            $success = $this->categoryService->duplicateCategory($id, $newName);
+
+            if ($success) {
+                // Fetch the newly created category
+                $categories = Category::where('name', 'LIKE', '%Copy%')
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                return $this->jsonResponse($categories->toArray(), 201);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to duplicate category'
+            ], 500);
+
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), 'not found') !== false) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 404);
+            }
+
+            return $this->jsonResponse(
+                [
+                'success' => false,
+                'message' => 'Failed to duplicate category: ' . $e->getMessage()
+            ], 500);
         }
     }
 }
