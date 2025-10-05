@@ -413,6 +413,7 @@ abstract class Model
     {
         $model = new static($attributes);
         $model->save();
+        $model->exists = true;
         return $model;
     }
 

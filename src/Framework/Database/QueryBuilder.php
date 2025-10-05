@@ -868,6 +868,13 @@ class QueryBuilder
                 $quotedColumn = $this->quoteColumn($where['column']);
                 $bindings[$paramKey] = $where['value'];
                 return ["{$quotedColumn} {$where['operator']} :{$paramKey}", $bindings];
+            case 'ColumnComparison':
+                $firstColumn = $this->quoteColumn($where['first']);
+                $secondColumn = $this->quoteColumn($where['second']);
+                $operator = $where['operator'];
+
+                return ["{$firstColumn} {$operator} {$secondColumn}", $bindings];
+
 
             case 'In':
                 $quotedColumn = $this->quoteColumn($where['column']);
@@ -1530,4 +1537,22 @@ class QueryBuilder
 
         return $conditions;
     }
+
+    public function whereColumn(string $first, string $operatorOrSecond, ?string $second = null): self
+    {
+        if ($second === null) {
+            $second = $operatorOrSecond;
+            $operatorOrSecond = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'ColumnComparison',
+            'first' => $first,
+            'operator' => $operatorOrSecond,
+            'second' => $second,
+        ];
+
+        return $this;
+    }
+
 }

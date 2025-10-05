@@ -10,7 +10,7 @@ class Product extends Model
         'price',
         'sale_price',
         'category_id',
-        'brand',
+        'brand_id',
         'image',
         'meta_title',
         'meta_description',
@@ -44,9 +44,9 @@ class Product extends Model
         return $query->where('category_id', $category);
     }
 
-    public function scopeByBrand($query, string $brand)
+    public function scopeByBrand($query, int $brand)
     {
-        return $query->where('brand', $brand);
+        return $query->where('brand_id', $brand);
     }
 
     public function scopeOnSale($query)

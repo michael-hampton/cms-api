@@ -27,7 +27,7 @@ class Category extends Model
         return Category::find($this->parent_id);
     }
 
-    public function children(): array
+    public function children(): Collection
     {
         return $this->hasMany(Category::class, 'parent_id', 'id');
     }

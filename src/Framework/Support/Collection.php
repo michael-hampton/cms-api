@@ -431,4 +431,13 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
         return null;
     }
+
+    public function get(int $index)
+    {
+        if (!isset($this->items[$index])) {
+            throw new \OutOfBoundsException(sprintf('No item found at index %d', $index));
+        }
+
+        return $this->items[$index];
+    }
 }
