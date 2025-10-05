@@ -2,6 +2,7 @@
 // API routes (return arrays -> converted to JSON)
 use App\Controllers\AuthorController;
 use App\Controllers\BlockController;
+use App\Controllers\BrandController;
 use App\Controllers\CategoryController;
 use App\Controllers\CustomFieldDefinitionController;
 use App\Controllers\EstateWebsiteController;
@@ -40,6 +41,18 @@ $router->get('/api/categories/{id}', CategoryController::class, 'show');
 $router->put('/api/categories/{id}', CategoryController::class, 'update');
 $router->delete('/api/categories/{id}', CategoryController::class, 'destroy');
 $router->get('/api/categories/{id}/check-delete', CategoryController::class, 'checkDelete');
+
+// Brands
+$router->get('/api/brands', BrandController::class, 'index');
+$router->post('/api/brands', BrandController::class, 'store');
+$router->get('/api/brands/{id}', BrandController::class, 'show');
+$router->put('/api/brands/{id}', BrandController::class, 'update');
+$router->delete('/api/brands/{id}', BrandController::class, 'destroy');
+$router->get('/api/brands/{id}/check-delete', BrandController::class, 'checkDelete');
+$router->get('/api/brands/{id}/alternatives', BrandController::class, 'alternatives');
+$router->post('/api/brands/merge', BrandController::class, 'merge');
+$router->get('/api/brands/active', BrandController::class, 'active');
+
 
 // Tags API
 $router->get('/api/tags', TagController::class, 'index');

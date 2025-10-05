@@ -5,8 +5,10 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Parsers\BlockRegistry;
 use App\Repositories\PageRepository;
+use App\Resources\PageResource;
 use App\Search\PaginatedResult;
 use App\Search\SearchCriteriaParser;
 use App\Services\PageService;
@@ -29,35 +31,31 @@ class PageController extends Controller
     {
         try {
             $criteria = SearchCriteriaParser::fromRequest($request);
-
             $result = $this->pageRepository->search($criteria);
 
-            return $this->searchResponse($this->formatPageData($result));
+            // Format blocks in the paginated data
+            $formattedData = $result->getData();
+            $formattedData = array_map(function($page) {
+                if (!empty($page['blocks'])) {
+                    $page['blocks'] = array_map(function($block) {
+                        return [
+                            'data' => [...json_decode($block['data'], true), 'type' => $block['type']],
+                            'type' => $block['type'],
+                            'id' => $block['id'],
+                            'order' => $block['order'],
+                        ];
+                    }, $page['blocks']);
+                }
+                return $page;
+            }, $formattedData);
+
+            $result->setData($formattedData);
+
+            $collection = new PaginatedResourceCollection($result, PageResource::class);
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
-    }
-
-    //todo
-    private function formatPageData(PaginatedResult $result): PaginatedResult
-    {
-
-        $pages = $result->getData();
-
-        $pages = collect($pages)->map(function ($page) {
-            return !empty($page['blocks']) ? [...$page, 'blocks' => collect($page['blocks'])->map(function ($block) {
-                return [
-                    'data' => [...json_decode($block['data'], true), ...['type' => $block['type']]],
-                    'type' => $block['type'],
-                    'id' => $block['id'],
-                    'order' => $block['order'],
-                ];
-            })->toArray()] : $page;
-        })->toArray();
-
-       $result->setData($pages);
-
-       return $result;
     }
 
     public function store(Request $request): JsonResponse

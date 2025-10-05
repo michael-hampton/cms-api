@@ -1,0 +1,188 @@
+<?php
+
+namespace App\Tests\Functional\Controllers;
+
+use App\Models\Brand;
+
+class BrandControllerTest extends FunctionalTestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->runMigrations();
+    }
+
+    public function testIndexReturnsBrandsList()
+    {
+        Brand::create(['name' => 'Apple', 'slug' => 'apple']);
+        Brand::create(['name' => 'Nike', 'slug' => 'nike']);
+
+        $response = $this->get('/api/brands');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertCount(2, $data['items']);
+    }
+
+    public function testIndexWithSearchQuery()
+    {
+        Brand::create(['name' => 'Apple Inc', 'slug' => 'apple-inc']);
+        Brand::create(['name' => 'Nike Sports', 'slug' => 'nike-sports']);
+
+        $response = $this->get('/api/brands?q=apple');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('Apple Inc', $data['items'][0]['name']);
+    }
+
+    public function testStoreCreatesNewBrand()
+    {
+        $brandData = [
+            'name' => 'Samsung',
+            'description' => 'Electronics company',
+            'website' => 'https://samsung.com'
+        ];
+
+        $response = $this->post('/api/brands', $brandData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Samsung', $data['data']['brand']['name']);
+        $this->assertEquals('samsung', $data['data']['brand']['slug']);
+    }
+
+    public function testStoreWithLogo()
+    {
+        $files = [
+            'logo' => $this->createUploadedFile('logo.png', 'image/png')
+        ];
+
+        $response = $this->post('/api/brands', ['name' => 'Adidas'], $files);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotNull($data['data']['brand']['logo']);
+    }
+
+    public function testShowReturnsBrandById()
+    {
+        $brand = Brand::create(['name' => 'Puma', 'slug' => 'puma']);
+
+        $response = $this->get("/api/brands/{$brand->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Puma', $data['data']['brand']['name']);
+    }
+
+    public function testShowReturnsBrandBySlug()
+    {
+        Brand::create(['name' => 'Reebok', 'slug' => 'reebok']);
+
+        $response = $this->get('/api/brands/reebok');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Reebok', $data['data']['brand']['name']);
+    }
+
+    public function testShowReturns404ForNonexistent()
+    {
+        $response = $this->get('/api/brands/999');
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testUpdateModifiesExistingBrand()
+    {
+        $brand = Brand::create(['name' => 'Old Brand', 'slug' => 'old-brand']);
+
+        $updateData = [
+            'name' => 'New Brand',
+            'description' => 'Updated description'
+        ];
+
+        $response = $this->put("/api/brands/{$brand->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('New Brand', $data['data']['brand']['name']);
+        $this->assertEquals('new-brand', $data['data']['brand']['slug']);
+    }
+
+    public function testDestroyDeletesBrand()
+    {
+        $brand = Brand::create(['name' => 'Test Brand', 'slug' => 'test-brand']);
+
+        $response = $this->delete("/api/brands/{$brand->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNull(Brand::find($brand->id));
+    }
+
+    public function testDestroyReturns404ForNonexistent()
+    {
+        $response = $this->delete('/api/brands/999');
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testCheckDeletableForBrandWithoutProducts()
+    {
+        $brand = Brand::create(['name' => 'Test Brand', 'slug' => 'test-brand']);
+
+        $response = $this->get("/api/brands/{$brand->id}/check-delete");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['can_delete']);
+        $this->assertEquals(0, $data['data']['products_count']);
+    }
+
+    public function testAlternativesReturnsOtherBrands()
+    {
+        $brand1 = Brand::create(['name' => 'Brand 1', 'slug' => 'brand-1']);
+        Brand::create(['name' => 'Brand 2', 'slug' => 'brand-2']);
+        Brand::create(['name' => 'Brand 3', 'slug' => 'brand-3']);
+
+        $response = $this->get("/api/brands/{$brand1->id}/alternatives");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['data']['brands']['data']);
+    }
+
+    public function testMergeBrands()
+    {
+        $source = Brand::create(['name' => 'Source Brand', 'slug' => 'source-brand']);
+        $target = Brand::create(['name' => 'Target Brand', 'slug' => 'target-brand']);
+
+        $response = $this->post('/api/brands/merge', [
+            'source_brand_id' => $source->id,
+            'target_brand_id' => $target->id
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNull(Brand::find($source->id));
+    }
+
+//    public function testActiveReturnsOnlyActiveBrands()
+//    {
+//        Brand::create(['name' => 'Active Brand', 'slug' => 'active-brand', 'is_active' => true]);
+//        Brand::create(['name' => 'Inactive Brand', 'slug' => 'inactive-brand', 'is_active' => false]);
+//
+//        $response = $this->get('/api/brands/active');
+//
+//        $this->assertEquals(200, $response->getStatusCode());
+//        $data = json_decode($response->getContent(), true);
+//        $this->assertCount(1, $data['data']['brands']);
+//        $this->assertEquals('Active Brand', $data['data']['brands'][0]['name']);
+//    }
+}

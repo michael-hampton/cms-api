@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\MimeType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
@@ -11,6 +12,8 @@ use App\Framework\Validation\Validator;
 use App\Models\Image;
 use App\Models\ImageCategory;
 use App\Repositories\ImageRepository;
+use App\Search\PaginatedResult;
+use App\Search\SearchCriteria;
 use Exception;
 
 class ImageService
@@ -96,22 +99,21 @@ class ImageService
         return $image;
     }
 
-    public function getImages(array $filters = []): array
+    public function getImages(array $filters = []): PaginatedResult
     {
-        $query = $filters['query'] ?? '';
-        $mimeType = $filters['mime_type'] ?? null;
-        $categoryId = $filters['category_id'] ?? null;
-        $page = (int)($filters['page'] ?? 1);
-        $perPage = (int)($filters['per_page'] ?? 20);
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
-
-        // Validate per_page limits
-        $perPage = max(1, min($perPage, 100));
-
-        return $this->imageRepository->searchImages(
-            $query, $mimeType, $categoryId, $page, $perPage, $sortBy, $sortOrder
+        $criteria = new SearchCriteria(
+            filters: array_filter([
+                'mime_type' => $filters['mime_type'] ?? null,
+                'category' => $filters['category_id'] ?? null,
+            ]),
+            sortBy: $filters['sort_by'] ?? 'created_at',
+            sortOrder: $filters['sort_order'] ?? 'desc',
+            page: (int)($filters['page'] ?? 1),
+            perPage: max(1, min((int)($filters['per_page'] ?? 20), 100)),
+            searchQuery: $filters['query'] ?? ''
         );
+
+        return $this->imageRepository->search($criteria);
     }
 
     public function getImage(int $id): ?Image
@@ -277,7 +279,7 @@ class ImageService
             throw new ValidationException("File size exceeds maximum allowed size of {$maxSizeMB}MB");
         }
 
-        if (!in_array($file->getMimeType(), self::ALLOWED_MIME_TYPES)) {
+        if (!in_array($file->getMimeType(), MimeType::allowed())) {
             throw new ValidationException('File type not allowed');
         }
     }
@@ -301,7 +303,12 @@ class ImageService
 
     private function isImage(string $mimeType): bool
     {
-        return strpos($mimeType, 'image/') === 0 && $mimeType !== 'image/svg+xml';
+        try {
+            $mime = MimeType::from($mimeType);
+            return $mime->isRasterImage();
+        } catch (\ValueError) {
+            return false;
+        }
     }
 
     private function generateThumbnails(Image $image, string $originalPath): void

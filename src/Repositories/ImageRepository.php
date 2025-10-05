@@ -42,65 +42,6 @@ class ImageRepository extends Repository
         return Image::active()->orderBy('created_at', 'desc')->get();
     }
 
-    public function searchImages(
-        string $query = '',
-        ?string $mimeType = null,
-        ?int $categoryId = null,
-        int $page = 1,
-        int $perPage = 20,
-        string $sortBy = 'created_at',
-        string $sortOrder = 'desc'
-    ): array {
-        $queryBuilder = Image::active();
-
-        // Search term
-        if (!empty($query)) {
-            $queryBuilder->where(function ($queryBuilder) use ($query) {
-                $query = "%{$query}%";
-                $queryBuilder->where('filename', 'like', $query)
-                    ->orWhere('alt_text', 'like', $query)
-                    ->orWhere('caption', 'like', $query);
-            });
-        }
-
-        // Filter by mime type
-        if ($mimeType) {
-            $queryBuilder->byMimeType($mimeType);
-        }
-
-        // Filter by category
-        if ($categoryId) {
-            $queryBuilder->whereHas('categories', function($q) use ($categoryId) {
-                $q->where('image_categories.id', $categoryId);
-            });
-        }
-
-        // Sorting
-        $allowedSortFields = ['created_at', 'original_name', 'file_size', 'updated_at'];
-        if (!in_array($sortBy, $allowedSortFields)) {
-            $sortBy = 'created_at';
-        }
-
-        $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
-        $queryBuilder->orderBy($sortBy, $sortOrder);
-
-        // Get total count for pagination
-        $totalCount = $queryBuilder->count();
-
-        // Apply pagination
-        $offset = ($page - 1) * $perPage;
-        $images = $queryBuilder->limit($perPage)->offset($offset)->get();
-
-        return [
-            'data' => $images,
-            'total' => $totalCount,
-            'per_page' => $perPage,
-            'current_page' => $page,
-            'total_pages' => ceil($totalCount / $perPage),
-            'has_more' => $page * $perPage < $totalCount
-        ];
-    }
-
     public function getRecentImages(int $limit = 10): Collection
     {
         return Image::active()

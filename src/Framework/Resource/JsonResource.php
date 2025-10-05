@@ -47,4 +47,20 @@ abstract class JsonResource
 
         return $default;
     }
+
+    /**
+     * Get an attribute from the resource (works with both arrays and objects)
+     */
+    protected function getAttribute(string $key, $default = null)
+    {
+        if (is_array($this->resource)) {
+            return $this->resource[$key] ?? $default;
+        }
+
+        if (is_object($this->resource)) {
+            return $this->resource->{$key} ?? $default;
+        }
+
+        return $default;
+    }
 }

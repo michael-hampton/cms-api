@@ -160,4 +160,26 @@ class SearchConfigurationFactory
 
         return $config;
     }
+
+    public static function createBrandConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration();
+
+        // No filters needed for basic brand search
+
+        // Sorts
+        $config->addSort(new SortSpecification('name', 'name'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('updated_at', 'updated_at'))
+            ->addSort(new RelationshipCountSort('products', 'products'));
+
+        // Searchable columns
+        $config->addSearchableColumn('name')
+            ->addSearchableColumn('description');
+
+        // Default sort
+        $config->setDefaultSort('name', 'asc');
+
+        return $config;
+    }
 }

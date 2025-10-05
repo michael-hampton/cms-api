@@ -82,14 +82,14 @@ class BlockParserService
                     $result = $this->parseBlock($pageId, $blockData, $index);
                     $results[] = $result;
                 } catch (ValidationException $e) {
-                    $errors["block_{$index}"] = $e->getValidationResult()->getErrors();
+                    $errors["block_{$index}"] = $e->getErrors();
                 } catch (BlockParserNotFoundException $e) {
                     $errors["block_{$index}"] = ['type' => $e->getMessage()];
                 }
             }
 
             if (!empty($errors)) {
-                throw new ValidationException(new ValidationResult(false, $errors));
+                throw new ValidationException(implode("\n", $errors));;
             }
 
             return $results;
@@ -109,8 +109,8 @@ class BlockParserService
 
         $result = $this->blockRepository->createBlock($pageId, $type, $parsedData, $order);
 
-        if ($type === 'person' && !empty($parsedBlock['data']['email'])) {
-            $this->personService->createOrUpdatePerson($parsedBlock['data']);
+        if ($type === 'person' && !empty($parsedData['data']['email'])) {
+            $this->personService->createOrUpdatePerson($parsedData['data']);
         }
 
         return $result;
@@ -203,10 +203,6 @@ class BlockParserService
         $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
 
         if (!$validationResult->isValid()) {
-            var_dump(get_class($parser));;
-            echo '<pre>';
-            print_r($validationResult->getErrors());
-            die;
             throw new ValidationException($validationResult);
         }
     }
@@ -230,7 +226,7 @@ class BlockParserService
         return [
             'type' => 'validation_error',
             'message' => 'Page validation failed',
-            'errors' => $e->getValidationResult()->getErrors()
+            'errors' => $e->getErrors()
         ];
     }
 
@@ -254,7 +250,7 @@ class BlockParserService
     {
         Logger::error("Page validation failed", [
             'page_index' => $pageIndex,
-            'errors' => $e->getValidationResult()->getErrors()
+            'errors' => $e->getErrors()
         ]);
     }
 

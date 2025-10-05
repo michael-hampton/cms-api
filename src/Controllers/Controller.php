@@ -28,13 +28,19 @@ abstract class Controller
     // API methods return arrays (router will convert to JSON Response)
     protected function jsonResponse(array $data, int $statusCode = 200): JsonResponse
     {
-        $data =  [
+
+        $data = [
             'data' => $this->serializeModels($data),
             'status' => $statusCode,
             'success' => $data['success'] ?? true,
             'timestamp' => date('c')
         ];
 
+        return JsonResponse::json($data, $statusCode);
+    }
+
+    protected function resourceResponse(array $data, int $statusCode = 200): JsonResponse
+    {
         return JsonResponse::json($data, $statusCode);
     }
 

@@ -13,7 +13,7 @@ class TagService
     protected TagRepository $repository;
 
 
-    public function __construct(?Database $database = null, TagRepository $repository)
+    public function __construct(Database $database, TagRepository $repository)
     {
         $this->database = $database ?? Database::getInstance();
         $this->repository = $repository;

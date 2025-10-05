@@ -152,39 +152,137 @@ class ImageServiceTest extends TestCase
         $this->service->uploadImage($file);
     }
 
-    public function testGetImagesAppliesFiltersCorrectly()
+    public function testGetImagesUsesSearchCriteria()
     {
         $filters = [
             'query' => 'test',
             'mime_type' => 'image/jpeg',
-            'page' => 1,
-            'per_page' => 20
+            'category_id' => 5,
+            'page' => 2,
+            'per_page' => 15,
+            'sort_by' => 'file_size',
+            'sort_order' => 'asc'
         ];
 
-        $this->imageRepository->shouldReceive('searchImages')
-            ->with(
-                'test',
-                'image/jpeg',
-                null,
-                1,
-                20,
-                'created_at',
-                'desc'
-            )
+        $paginatedResult = new \App\Search\PaginatedResult(
+            data: [],
+            total: 0,
+            page: 2,
+            perPage: 15
+        );
+
+        $this->imageRepository->shouldReceive('search')
             ->once()
-            ->andReturn([
-                'data' => collect([]),
-                'total' => 0,
-                'per_page' => 20,
-                'current_page' => 1,
-                'total_pages' => 0,
-                'has_more' => false
-            ]);
+            ->with(Mockery::on(function($criteria) use ($filters) {
+                return $criteria instanceof \App\Search\SearchCriteria
+                    && $criteria->getSearchQuery() === $filters['query']
+                    && $criteria->getFilters()['mime_type'] === $filters['mime_type']
+                    && $criteria->getFilters()['category'] === $filters['category_id']
+                    && $criteria->getSortBy() === $filters['sort_by']
+                    && $criteria->getSortOrder() === $filters['sort_order']
+                    && $criteria->getPage() === $filters['page']
+                    && $criteria->getPerPage() === $filters['per_page'];
+            }))
+            ->andReturn($paginatedResult);
 
         $result = $this->service->getImages($filters);
 
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('data', $result);
+        $this->assertInstanceOf(\App\Search\PaginatedResult::class, $result);
+    }
+
+    public function testGetImagesLimitsPerPageTo100()
+    {
+        $filters = ['per_page' => 200]; // Try to request too many
+
+        $paginatedResult = new \App\Search\PaginatedResult(
+            data: [],
+            total: 0,
+            page: 1,
+            perPage: 100
+        );
+
+        $this->imageRepository->shouldReceive('search')
+            ->once()
+            ->with(Mockery::on(function($criteria) {
+                return $criteria->getPerPage() === 100; // Should be clamped
+            }))
+            ->andReturn($paginatedResult);
+
+        $result = $this->service->getImages($filters);
+
+        $this->assertInstanceOf(\App\Search\PaginatedResult::class, $result);
+    }
+
+    public function testGetImagesMinimumPerPageIs1()
+    {
+        $filters = ['per_page' => -5]; // Try to request negative
+
+        $paginatedResult = new \App\Search\PaginatedResult(
+            data: [],
+            total: 0,
+            page: 1,
+            perPage: 1
+        );
+
+        $this->imageRepository->shouldReceive('search')
+            ->once()
+            ->with(Mockery::on(function($criteria) {
+                return $criteria->getPerPage() === 1; // Should be at least 1
+            }))
+            ->andReturn($paginatedResult);
+
+        $result = $this->service->getImages($filters);
+
+        $this->assertInstanceOf(\App\Search\PaginatedResult::class, $result);
+    }
+
+    public function testGetImagesUsesDefaultsWhenNoFilters()
+    {
+        $paginatedResult = new \App\Search\PaginatedResult(
+            data: [],
+            total: 0,
+            page: 1,
+            perPage: 20
+        );
+
+        $this->imageRepository->shouldReceive('search')
+            ->once()
+            ->with(Mockery::on(function($criteria) {
+                return $criteria->getSearchQuery() === ''
+                    && empty(array_filter($criteria->getFilters()))
+                    && $criteria->getSortBy() === 'created_at'
+                    && $criteria->getSortOrder() === 'desc'
+                    && $criteria->getPage() === 1
+                    && $criteria->getPerPage() === 20;
+            }))
+            ->andReturn($paginatedResult);
+
+        $result = $this->service->getImages([]);
+
+        $this->assertInstanceOf(\App\Search\PaginatedResult::class, $result);
+    }
+
+    public function testGetImagesFiltersCategoryCorrectly()
+    {
+        $filters = ['category_id' => 3];
+
+        $paginatedResult = new \App\Search\PaginatedResult(
+            data: [],
+            total: 0,
+            page: 1,
+            perPage: 20
+        );
+
+        $this->imageRepository->shouldReceive('search')
+            ->once()
+            ->with(Mockery::on(function($criteria) {
+                return $criteria->getFilters()['category'] === 3;
+            }))
+            ->andReturn($paginatedResult);
+
+        $result = $this->service->getImages($filters);
+
+        $this->assertInstanceOf(\App\Search\PaginatedResult::class, $result);
     }
 
     public function testDeleteImageThrowsExceptionWhenImageInUse()

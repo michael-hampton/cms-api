@@ -31,7 +31,7 @@ class PageRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Page::with(['categories', 'tags', 'metadata', 'author', 'blocks', 'seo', 'settings', 'social']);
+        $query = Page::with(['categories', 'tags', 'metadata', 'author', 'blocks', 'seo', 'settings', 'social', 'customFields']);
         return $this->searchEngine->search($query, $criteria);
     }
 

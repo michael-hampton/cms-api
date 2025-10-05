@@ -39,9 +39,10 @@ class CategoryServiceTest extends TestCase
             ->once()
             ->andReturn(0);
 
-        $category->shouldReceive('delete')
-            ->once()
-            ->andReturn(true);
+        $this->categoryRepository->shouldReceive('delete')
+            ->with($categoryId)
+            ->andReturn(true)
+            ->once();
 
         $this->categoryRepository->shouldReceive('find')
             ->with($categoryId)

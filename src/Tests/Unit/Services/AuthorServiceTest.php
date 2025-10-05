@@ -60,27 +60,27 @@ class AuthorServiceTest extends TestCase
     {
         $data = ['name' => 'John Doe', 'email' => 'john@example.com'];
 
-        // Mock the repository
         $mockedAuthor = Mockery::mock(Author::class);
-        $this->authorRepository->shouldReceive('create')
-            ->once()
-            ->with(Mockery::subset(['name' => 'John Doe']))
-            ->andReturn($mockedAuthor);
 
-        // Mock the database transaction
         $this->database->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn($callback) => $callback());
 
-        // Mock findBySlug to simulate no slug conflict
+        // Str::slug will call findBySlug internally
         $this->authorRepository->shouldReceive('findBySlug')
+            ->with('john-doe')
             ->once()
             ->andReturn(null);
 
-        // Call the service
+        $this->authorRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($arg) {
+                return $arg['name'] === 'John Doe' && $arg['slug'] === 'john-doe';
+            }))
+            ->andReturn($mockedAuthor);
+
         $result = $this->service->createAuthor($data);
 
-        // Assert the result
         $this->assertInstanceOf(Author::class, $result);
         $this->assertSame($mockedAuthor, $result);
     }

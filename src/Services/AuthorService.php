@@ -6,6 +6,7 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Str;
 use App\Models\Author;
 use App\Models\Page;
 use App\Repositories\AuthorRepository;
@@ -193,17 +194,6 @@ class AuthorService
 
     private function generateSlug(string $name): string
     {
-        $slug = preg_replace('/[^a-z0-9]+/i', '-', $name); // replace non-alphanumerics with -
-        $slug = strtolower(trim($slug, '-'));              // lowercase + trim surrounding dashes
-
-        $originalSlug = $slug;
-        $counter = 1;
-
-        while ($this->authorRepository->findBySlug($slug)) {
-            $slug = $originalSlug . '-' . $counter;
-            $counter++;
-        }
-
-        return $slug;
+        return Str::slug($name, [$this->authorRepository, 'findBySlug']);
     }
 }

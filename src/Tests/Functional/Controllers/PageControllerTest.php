@@ -21,6 +21,7 @@ class PageControllerTest extends FunctionalTestCase
         $response = $this->get('/api/pages');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
+
         $this->assertArrayHasKey('items', $data);
         $this->assertCount(1, $data['items']);
     }

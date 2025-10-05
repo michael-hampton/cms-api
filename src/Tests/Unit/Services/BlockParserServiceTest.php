@@ -172,4 +172,215 @@ class BlockParserServiceTest extends TestCase
 
         $this->assertInstanceOf(Block::class, $result);
     }
+
+    public function testParseBlockValidationFailsWithInvalidData()
+    {
+        $this->expectException(ValidationException::class);
+
+        $blockData = ['type' => 'text', 'content' => ''];
+
+        $parser = Mockery::mock(TextBlockParser::class);
+        $parser->shouldReceive('getValidationRules')->andReturn(['content' => 'required']);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('text')
+            ->andReturn($parser);
+
+        $validationResult = Mockery::mock(ValidationResult::class);
+        $validationResult->shouldReceive('isValid')->andReturn(false);
+        $validationResult->shouldReceive('getErrors')->andReturn(['content' => ['Content is required']]);
+
+        $this->validator->shouldReceive('validate')
+            ->andReturn($validationResult);
+
+        $this->service->parseBlock(1, $blockData, 0);
+    }
+
+    public function testReplacePageBlocksRollsBackOnError()
+    {
+        $blocksData = [
+            ['type' => 'text', 'content' => 'Block 1'],
+            ['type' => 'invalid', 'content' => 'Block 2']
+        ];
+
+        $this->database->shouldReceive('beginTransaction')->atLeast()->once();
+
+        $this->blockRepository->shouldReceive('deletePageBlocks')
+            ->with(1)
+            ->once();
+
+        $parser = Mockery::mock(TextBlockParser::class);
+        $parser->shouldReceive('getValidationRules')->andReturn([]);
+        $parser->shouldReceive('parse')->andReturn(['content' => 'test']);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('text')
+            ->andReturn($parser);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('invalid')
+            ->andReturn(null);
+
+        $validationResult = Mockery::mock(ValidationResult::class);
+        $validationResult->shouldReceive('isValid')->andReturn(true);
+
+        $this->validator->shouldReceive('validate')
+            ->andReturn($validationResult);
+
+        $this->blockRepository->shouldReceive('createBlock')
+            ->once()
+            ->andReturn(Mockery::mock(Block::class));
+
+        $this->database->shouldReceive('rollBack')->atLeast()->once();;
+
+        $this->expectException(ValidationException::class);
+
+        $this->service->replacePageBlocks(1, $blocksData);
+    }
+
+    public function testUpdateBlockThrowsExceptionWhenBlockNotFound()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Block not found');
+
+        $this->blockRepository->shouldReceive('find')
+            ->with(999)
+            ->andReturn(null);
+
+        $this->service->updateBlock(999, ['type' => 'text', 'content' => 'Updated']);
+    }
+
+    public function testUpdateBlockUsesExistingTypeWhenNotProvided()
+    {
+        $block = Mockery::mock(Block::class)->makePartial();
+        $block->type = 'text';
+
+        $this->blockRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($block);
+
+        $parser = Mockery::mock(TextBlockParser::class);
+        $parser->shouldReceive('getValidationRules')->andReturn([]);
+        $parser->shouldReceive('parse')->andReturn(['content' => 'Updated']);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('text')
+            ->andReturn($parser);
+
+        $validationResult = Mockery::mock(ValidationResult::class);
+        $validationResult->shouldReceive('isValid')->andReturn(true);
+
+        $this->validator->shouldReceive('validate')
+            ->andReturn($validationResult);
+
+        $updatedBlock = Mockery::mock(Block::class);
+
+        $this->blockRepository->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function($data) {
+                return $data['type'] === 'text' && isset($data['data']);
+            }))
+            ->andReturn($updatedBlock);
+
+        $result = $this->service->updateBlock(1, ['content' => 'Updated']);
+
+        $this->assertInstanceOf(Block::class, $result);
+    }
+
+    public function testBuildBlockGeneratesHtml()
+    {
+        $blockData = ['type' => 'text', 'content' => 'Hello World'];
+
+        $parser = Mockery::mock(TextBlockParser::class);
+        $parser->shouldReceive('getValidationRules')->andReturn([]);
+        $parser->shouldReceive('parse')->andReturn(['content' => 'Hello World']);
+        $parser->shouldReceive('generateHtml')
+            ->with(['content' => 'Hello World'], 1)
+            ->andReturn('<p>Hello World</p>');
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('text')
+            ->andReturn($parser);
+
+        $validationResult = Mockery::mock(ValidationResult::class);
+        $validationResult->shouldReceive('isValid')->andReturn(true);
+
+        $this->validator->shouldReceive('validate')
+            ->andReturn($validationResult);
+
+        $result = $this->service->buildBlock(1, $blockData, 0);
+
+        $this->assertEquals('<p>Hello World</p>', $result);
+    }
+
+    public function testParsePageBlocksCollectsAllErrors()
+    {
+        $this->expectException(ValidationException::class);
+
+        $blocksData = [
+            ['type' => 'text'], // Missing content
+            ['type' => 'nonexistent', 'content' => 'test'], // Invalid type
+            ['type' => 'text', 'content' => ''] // Invalid content
+        ];
+
+        $this->database->shouldReceive('beginTransaction')->once();
+        $this->database->shouldReceive('rollBack')->once();
+
+        $parser = Mockery::mock(TextBlockParser::class);
+        $parser->shouldReceive('getValidationRules')->andReturn(['content' => 'required']);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('text')
+            ->andReturn($parser);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('nonexistent')
+            ->andReturn(null);
+
+        $validationResult = Mockery::mock(ValidationResult::class);
+        $validationResult->shouldReceive('isValid')->andReturn(false);
+        $validationResult->shouldReceive('getErrors')
+            ->andReturn(['content' => ['Content is required']]);
+
+        $this->validator->shouldReceive('validate')
+            ->andReturn($validationResult);
+
+        $this->service->parsePageBlocks(1, $blocksData);
+    }
+
+    public function testParseMultiplePagesReturnsSuccessAndFailureCounts()
+    {
+        $pagesData = [
+            [
+                'page' => ['title' => 'Page 1', 'slug' => 'page-1'],
+                'blocks' => []
+            ],
+            [
+                'page' => ['title' => 'Page 2', 'slug' => 'page-2'],
+                'blocks' => [['type' => 'invalid']]
+            ]
+        ];
+
+        $this->database->shouldReceive('beginTransaction')->atLeast()->once();;
+        $this->database->shouldReceive('commit')->atLeast()->once();
+        $this->database->shouldReceive('rollBack')->atLeast()->once();
+
+        $page = Mockery::mock(\App\Models\Page::class)->makePartial();
+        $page->id = 1;
+        $page->shouldReceive('toArray')->andReturn(['id' => 1, 'title' => 'Page 1']);
+
+        $this->pageRepository->shouldReceive('create')
+            ->atLeast()->once()
+            ->andReturn($page);
+
+        $this->blockRegistry->shouldReceive('getParser')
+            ->with('invalid')
+            ->andReturn(null);
+
+        $result = $this->service->parseMultiplePages($pagesData);
+
+        $this->assertInstanceOf(\App\DTO\BatchParseResult::class, $result);
+        $this->assertEquals(1, $result->getSuccessCount());
+        $this->assertEquals(1, $result->getFailedCount());
+    }
 }
