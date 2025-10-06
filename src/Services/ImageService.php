@@ -11,6 +11,7 @@ use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\Validator;
 use App\Models\Image;
 use App\Models\ImageCategory;
+use App\Models\Site;
 use App\Repositories\ImageRepository;
 use App\Search\PaginatedResult;
 use App\Search\SearchCriteria;
@@ -263,9 +264,13 @@ class ImageService
         return ImageCategory::where('slug', $slug)->first();
     }
 
-    public function getCategories(): Collection
+    public function getCategories(string $siteName): Collection
     {
-        return ImageCategory::active()->orderBy('name')->get();
+        $site = Site::resolveSite($siteName);
+        return ImageCategory::active()
+            ->where('site_id', $site)
+            ->orderBy('name')
+            ->get();
     }
 
     private function validateUploadedFile(UploadedFile $file): void
@@ -420,5 +425,94 @@ class ImageService
 
         // Sync categories (this will replace existing ones)
         $image->categories()->sync($validIds);
+    }
+
+    /**
+     * Duplicate an existing image
+     *
+     * @throws Exception
+     */
+    public function duplicateImage(int $imageId, array $metadata = []): Image
+    {
+        $originalImage = $this->imageRepository->find($imageId);
+        if (!$originalImage) {
+            throw new Exception('Image not found');
+        }
+
+        // Duplicate the physical file
+        $newFilePath = $this->imageUploadService->duplicate($originalImage->file_path);
+
+        // Create new database record
+        $imageData = [
+            'filename' => basename($newFilePath),
+            'original_name' => $metadata['original_name'] ?? $this->generateCopyName($originalImage->original_name),
+            'file_path' => $newFilePath,
+            'url' => $this->publicPath . '/' . $newFilePath,
+            'mime_type' => $originalImage->mime_type,
+            'file_size' => $originalImage->file_size,
+            'width' => $originalImage->width,
+            'height' => $originalImage->height,
+            'alt_text' => $metadata['alt_text'] ?? $this->generateCopyText($originalImage->alt_text),
+            'caption' => $metadata['caption'] ?? $this->generateCopyText($originalImage->caption),
+            'description' => $metadata['description'] ?? $originalImage->description,
+        ];
+
+        $newImage = $this->imageRepository->create($imageData);
+
+        // Copy thumbnails if they exist
+        if ($_ENV['APP_ENV'] !== 'testing' && $this->isImage($originalImage->mime_type)) {
+            $this->duplicateThumbnails($originalImage, $newImage);
+        }
+
+        // Copy categories if not overridden
+        if (!empty($metadata['categories'])) {
+            $this->imageRepository->syncCategories($newImage, $metadata['categories']);
+        } else {
+            $originalCategories = $this->imageRepository->getCategoriesForImage($originalImage);
+            if ($originalCategories->count() > 0) {
+                $categoryIds = $originalCategories->pluck('id')->toArray();
+                $this->imageRepository->syncCategories($newImage, $categoryIds);
+            }
+        }
+
+        return $newImage;
+    }
+
+    private function generateCopyName(string $originalName): string
+    {
+        $pathInfo = pathinfo($originalName);
+        $basename = $pathInfo['filename'];
+        $extension = isset($pathInfo['extension']) ? '.' . $pathInfo['extension'] : '';
+
+        return $basename . '-copy' . $extension;
+    }
+
+    private function generateCopyText(?string $originalText): ?string
+    {
+        if ($originalText === null) {
+            return null;
+        }
+
+        return $originalText . ' (copy)';
+    }
+
+    private function duplicateThumbnails(Image $originalImage, Image $newImage): void
+    {
+        foreach (array_keys(self::THUMBNAIL_SIZES) as $size) {
+            try {
+                $originalThumbPath = $this->generateThumbnailPath($originalImage->file_path, $size);
+                $newThumbPath = $this->generateThumbnailPath($newImage->file_path, $size);
+
+                $fullOriginalPath = $this->uploadPath . '/' . $originalThumbPath;
+                $fullNewPath = $this->uploadPath . '/' . $newThumbPath;
+
+                if (file_exists($fullOriginalPath)) {
+                    $this->imageUploadService->ensureDirectoryExists(dirname($fullNewPath));
+                    copy($fullOriginalPath, $fullNewPath);
+                }
+            } catch (Exception $e) {
+                error_log("Failed to duplicate {$size} thumbnail: " . $e->getMessage());
+            }
+        }
     }
 }

@@ -20,7 +20,7 @@ class PageTagRepository extends Repository
         return PageTag::class;
     }
 
-    public function syncTags(int $pageId, array $tagNames): void
+    public function syncTags(int $pageId, array $tagNames, int $siteId): void
     {
         // Get existing page tags to update usage counts
         $existingTags = $this->getPageTags($pageId);
@@ -37,7 +37,7 @@ class PageTagRepository extends Repository
         foreach ($tagNames as $tagName) {
             if (!empty(trim($tagName))) {
                 // Find or create tag (this will increment usage count)
-                $tag = $this->tagRepository->findOrCreateByName(trim($tagName));
+                $tag = $this->tagRepository->findOrCreateByName(trim($tagName), $siteId);
 
                 // Create page-tag relationship
                 $this->create([

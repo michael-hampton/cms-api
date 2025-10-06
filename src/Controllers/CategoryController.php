@@ -28,10 +28,10 @@ class CategoryController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);;
 
             $result = $this->categoryRepository->search($criteria);
 

@@ -78,6 +78,10 @@ class CreateCustomFieldDefinitionRequest extends FormRequest
             $this->data['key'] = $this->generateKey($this->data['name']);
         }
 
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+
         // Set defaults
         $this->data['is_active'] = $this->data['is_active'] ?? true;
         $this->data['is_required'] = $this->data['is_required'] ?? false;

@@ -16,4 +16,11 @@ class CreateImageCategoryRequest extends FormRequest
             'description' => 'string|max:1000'
         ];
     }
+
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+    }
 }

@@ -17,7 +17,7 @@ use App\Framework\Container;
 use App\Framework\Http\Router;
 
 // Pages API
-$router->get('/api/pages', PageController::class, 'index');
+$router->get('/api/{siteName}/pages', PageController::class, 'index');
 $router->post('/api/pages', PageController::class, 'store');
 $router->post('/api/pages/bulk-update', PageController::class, 'bulkUpdate');
 $router->get('/api/pages/block-types', PageController::class, 'getAvailableBlockTypes');
@@ -29,13 +29,13 @@ $router->post('/api/pages/{id}/duplicate', PageController::class, 'duplicate');
 $router->get('/api/featured-pages', PageController::class, 'getFeaturedPages');
 
 $router->get('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'getCustomFields');
-$router->get('/api/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;
+$router->get('/api/{siteName}/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;
 $router->put('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'updateCustomFields');;
 
 
 
 // Categories API
-$router->get('/api/categories', CategoryController::class, 'index');
+$router->get('/api/{siteName}/categories', CategoryController::class, 'index');
 $router->post('/api/categories', CategoryController::class, 'store');
 $router->get('/api/categories/{id}', CategoryController::class, 'show');
 $router->put('/api/categories/{id}', CategoryController::class, 'update');
@@ -45,7 +45,7 @@ $router->post('/api/categories/{id}/duplicate', CategoryController::class, 'dupl
 
 
 // Brands
-$router->get('/api/brands', BrandController::class, 'index');
+$router->get('/api/{siteName}/brands', BrandController::class, 'index');
 $router->post('/api/brands', BrandController::class, 'store');
 $router->get('/api/brands/{id}', BrandController::class, 'show');
 $router->put('/api/brands/{id}', BrandController::class, 'update');
@@ -59,7 +59,7 @@ $router->post('/api/brands/{id}/duplicate', BrandController::class, 'duplicate')
 
 
 // Tags API
-$router->get('/api/tags', TagController::class, 'index');
+$router->get('/api/{siteName}/tags', TagController::class, 'index');
 $router->get('/api/tags/cloud', TagController::class, 'cloud');
 $router->post('/api/tags', TagController::class, 'store');
 $router->get('/api/tags/{id}', TagController::class, 'show');
@@ -74,8 +74,8 @@ $router->post('/api/tags/{id}/duplicate', TagController::class, 'duplicate');
 
 
 // Custom Fields API
-$router->get('/api/custom-fields', CustomFieldDefinitionController::class, 'index');
-$router->get('/api/custom-fields/grouped', CustomFieldDefinitionController::class, 'grouped');
+$router->get('/api/{siteName}/custom-fields', CustomFieldDefinitionController::class, 'index');
+$router->get('/api/{siteName}/custom-fields/grouped', CustomFieldDefinitionController::class, 'grouped');
 $router->get('/api/custom-fields/required', CustomFieldDefinitionController::class, 'required');
 $router->get('/api/custom-fields/searchable', CustomFieldDefinitionController::class, 'searchable');
 $router->post('/api/custom-fields', CustomFieldDefinitionController::class, 'store');
@@ -91,7 +91,7 @@ $router->get('/api/blocks/type/{type}', BlockController::class, 'getByType');
 $router->get('/api/search-properties', EstateWebsiteController::class, 'search');
 
 // Menu
-$router->get('/api/menu', MenuController::class, 'index');
+$router->get('/api/{siteName}/menu', MenuController::class, 'index');
 $router->post('/api/menu', MenuController::class, 'store');
 $router->get('/api/menu/{id}', MenuController::class, 'show');
 $router->get('/api/menu/{id}/hierarchy', MenuController::class, 'hierarchy');
@@ -112,11 +112,13 @@ $router->get('/api/search/pages', SearchController::class, 'pages');
 $router->get('/api/search/categories', SearchController::class, 'categories');
 
 // Images
-$router->get('/api/images', ImageController::class, 'index');
+$router->get('/api/{siteName}/images', ImageController::class, 'index');
 $router->post('/api/images', ImageController::class, 'store');
 $router->get('/api/images/{id}', ImageController::class, 'show');
 $router->put('/api/images/{id}', ImageController::class, 'update');
 $router->delete('/api/images/{id}', ImageController::class, 'destroy');
+$router->post('/api/images/{id}/duplicate', ImageController::class, 'duplicate');
+
 
 // Bulk operations
 $router->delete('/api/images/bulk', ImageController::class, 'bulkDestroy');
@@ -132,11 +134,11 @@ $router->post('/api/image-track-usage', ImageController::class, 'trackUsage');
 $router->post('/api/image-remove-usage', ImageController::class, 'removeUsage');
 
 // Category management
-$router->get('/api/image-categories', ImageController::class, 'categories');
+$router->get('/api/{siteName}/image-categories', ImageController::class, 'categories');
 $router->post('/api/image-categories', ImageController::class, 'createCategory');
 
 // Author API Routes
-$router->get('/api/authors', AuthorController::class, 'index');
+$router->get('/api/{siteName}/authors', AuthorController::class, 'index');
 $router->get('/api/authors/active', AuthorController::class, 'getActive');
 $router->post('/api/authors', AuthorController::class, 'store');
 $router->post('/api/authors/merge', AuthorController::class, 'merge');
@@ -148,7 +150,7 @@ $router->post('/api/authors/duplicate/{id}', AuthorController::class, 'duplicate
 
 
 //products
-$router->get('/api/products', ProductController::class, 'index');
+$router->get('/api/{siteName}/products', ProductController::class, 'index');
 $router->post('/api/products', ProductController::class, 'store');
 $router->get('/api/products/{id}', ProductController::class, 'show');
 $router->put('/api/products/{id}', ProductController::class, 'update');

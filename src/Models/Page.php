@@ -14,7 +14,7 @@ class Page extends Model
 
     protected $fillable = [
         'title', 'slug', 'content', 'status', 'meta_title', 'meta_description',
-        'published_at', 'created_at', 'updated_at', 'page_type', 'custom_handler', 'author_id', 'description'
+        'published_at', 'created_at', 'updated_at', 'page_type', 'custom_handler', 'author_id', 'description', 'site_id'
     ];
 
     // Relations that should always be included in serialization
@@ -176,7 +176,7 @@ class Page extends Model
         ]);
     }
 
-    public function syncCustomFields(array $fields): void
+    public function syncCustomFields(array $fields, int $siteId): void
     {
         // Normalize fields: convert scalars to ['default_value' => value]
         $fields = array_map(fn($item) => is_array($item) ? $item : ['default_value' => $item], $fields);
@@ -213,6 +213,7 @@ class Page extends Model
                 ],
                 [
                     'field_value' => $value, // make sure this matches your DB column
+                    'site_id' => $siteId,
                 ]
             );
         }

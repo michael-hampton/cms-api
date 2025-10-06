@@ -38,4 +38,11 @@ class UpdateMenuRequest extends FormRequest
             'layout_config.max_depth.max' => 'Maximum depth cannot exceed 10 levels.',
         ];
     }
+
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+    }
 }

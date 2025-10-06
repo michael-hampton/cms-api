@@ -6,17 +6,11 @@ use App\Models\Menu;
 
 class MenuControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsAllMenus()
     {
         Menu::create(['name' => 'Main Menu', 'slug' => 'main-menu', 'is_active' => true]);
         Menu::create(['name' => 'Footer Menu', 'slug' => 'footer-menu', 'is_active' => true]);
-        $response = $this->get('/api/menu');
+        $response = $this->getForSite('/api/menu');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);

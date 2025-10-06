@@ -40,7 +40,7 @@ class TagRepository extends Repository
         return Tag::bySlug($slug)->first();
     }
 
-    public function findOrCreateByName(string $name): Model
+    public function findOrCreateByName(string $name, int $siteId): Model
     {
         $slug = Str::slug($name, [$this, 'findBySlug']);
         $existing = $this->findBySlug($slug);

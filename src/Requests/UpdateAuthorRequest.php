@@ -39,6 +39,10 @@ class UpdateAuthorRequest extends FormRequest
         if (!empty($this->data['name']) && empty($this->data['slug'])) {
             $this->data['slug'] = Str::slug($this->data['name']);
         }
+
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
     }
 
     public function messages(): array

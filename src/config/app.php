@@ -3,6 +3,7 @@
 // config/app.php
 return [
     'url' => env('APP_URL', 'http://localhost'),
+    'default_site_id' => 1,
     'name' => env('APP_NAME', 'CMS Application'),
     'providers' => [
         \App\Framework\ServiceProvider\AuthServiceProvider::class,

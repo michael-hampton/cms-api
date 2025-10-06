@@ -5,6 +5,8 @@ namespace App\Repositories;
 use App\Framework\Support\Collection;
 use App\Models\CustomFieldDefinition;
 use App\Models\Model;
+use App\Models\PageCustomField;
+use App\Models\Site;
 
 class CustomFieldDefinitionRepository extends Repository
 {
@@ -18,9 +20,9 @@ class CustomFieldDefinitionRepository extends Repository
         return CustomFieldDefinition::byKey($key)->first();
     }
 
-    public function getActive(): Collection
+    public function getActive(int $siteId): Collection
     {
-        return CustomFieldDefinition::active()->get();
+        return CustomFieldDefinition::active()->where('site_id', $siteId)->get();
     }
 
     public function getRequired(): Collection
@@ -33,9 +35,10 @@ class CustomFieldDefinitionRepository extends Repository
         return CustomFieldDefinition::ordered()->where('is_searchable', true)->where('is_active', true)->get();
     }
 
-    public function getGroupedFields(): array
+    public function getGroupedFields(string $siteName): array
     {
-        $fields = $this->getActive();
+        $siteId = Site::resolveSite($siteName);
+        $fields = $this->getActive($siteId);
         $grouped = [];
 
         foreach ($fields as $field) {

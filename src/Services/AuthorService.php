@@ -48,9 +48,9 @@ class AuthorService
         return $author;
     }
 
-    public function createAuthor(array $data, ?UploadedFile $avatarFile = null): Author
+    public function createAuthor(array $data, int $siteId, ?UploadedFile $avatarFile = null): Author
     {
-        return $this->database->transaction(function() use ($data, $avatarFile) {
+        return $this->database->transaction(function() use ($data, $avatarFile, $siteId) {
             // Handle image upload
             if ($avatarFile && $avatarFile->isValid()) {
                 $data['avatar'] = $this->imageUploadService->upload($avatarFile);
@@ -60,6 +60,8 @@ class AuthorService
             if (empty($data['slug'])) {
                 $data['slug'] = $this->generateSlug($data['name']);
             }
+
+            $data['site_id'] = $siteId;
 
             return $this->authorRepository->create($data);
         });

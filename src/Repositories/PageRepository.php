@@ -3,10 +3,17 @@
 namespace App\Repositories;
 
 use App\Framework\Support\Collection;
+use App\Models\Block;
 use App\Models\Model;
 use App\Models\Page;
+use App\Models\PageAccessRole;
 use App\Models\PageCategory;
+use App\Models\PageCustomField;
 use App\Models\PageMetadata;
+use App\Models\PageSeo;
+use App\Models\PageSettings;
+use App\Models\PageSocial;
+use App\Models\PageTag;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -132,4 +139,152 @@ class PageRepository extends Repository
             'seo', 'settings', 'social', 'customFields', 'customFields.customFieldDefinition'
         ])->find($pageId);
     }
+
+    /**
+     * Duplicate blocks from source page to target page
+     */
+    public function duplicateBlocks(int $sourcePageId, int $targetPageId): void
+    {
+        $blocks = Block::where('page_id', $sourcePageId)
+            ->orderBy('order')
+            ->get();
+
+        foreach ($blocks as $block) {
+            Block::create([
+                'page_id' => $targetPageId,
+                'type' => $block->type,  // Changed from $block['type']
+                'data' => $block->data,  // Changed from $block['data']
+                'order' => $block->order  // Changed from $block['order']
+            ]);
+        }
+    }
+
+    /**
+     * Duplicate metadata from source page to target page
+     */
+    public function duplicateMetadata(int $sourcePageId, int $targetPageId): void
+    {
+        $metadata = PageMetadata::where('page_id', $sourcePageId)
+            ->first();
+
+        if ($metadata) {
+            $data = $metadata->toArray();
+            unset($data['id'], $data['page_id']);
+            $data['page_id'] = $targetPageId;
+            PageMetadata::create($data);
+        }
+    }
+
+    /**
+     * Duplicate SEO data from source page to target page
+     */
+    public function duplicateSeo(int $sourcePageId, int $targetPageId): void
+    {
+        $seo = PageSeo::where('page_id', $sourcePageId)
+            ->first();
+
+        if ($seo) {
+            $data = $seo->toArray();
+            unset($data['id'], $data['page_id']);
+            $data['page_id'] = $targetPageId;
+            PageSeo::create($data);
+        }
+    }
+
+    /**
+     * Duplicate settings from source page to target page
+     */
+    public function duplicateSettings(int $sourcePageId, int $targetPageId): void
+    {
+        $settings = PageSettings::where('page_id', $sourcePageId)
+            ->first();
+
+        if ($settings) {
+            $data = $settings->toArray();
+            unset($data['id'], $data['page_id']);
+            $data['page_id'] = $targetPageId;
+            PageSettings::create($data);
+        }
+    }
+
+    /**
+     * Duplicate social data from source page to target page
+     */
+    public function duplicateSocial(int $sourcePageId, int $targetPageId): void
+    {
+        $social = PageSocial::where('page_id', $sourcePageId)
+            ->first();
+
+        if ($social) {
+            $data = $social->toArray();
+            unset($data['id'], $data['page_id']);
+            $data['page_id'] = $targetPageId;
+            PageSocial::create($data);
+        }
+    }
+
+    /**
+     * Duplicate categories from source page to target page
+     */
+    public function duplicateCategories(int $sourcePageId, int $targetPageId): void
+    {
+        $categories = PageCategory::where('page_id', $sourcePageId)
+            ->get();
+
+        foreach ($categories as $category) {
+            PageCategory::create([
+                'page_id' => $targetPageId,
+                'category_id' => $category->category_id  // Changed from $category['category_id']
+            ]);
+        }
+    }
+
+    /**
+     * Duplicate tags from source page to target page
+     */
+    public function duplicateTags(int $sourcePageId, int $targetPageId): void
+    {
+        $tags = PageTag::where('page_id', $sourcePageId)
+            ->get();
+
+        foreach ($tags as $tag) {
+            PageTag::create([
+                'page_id' => $targetPageId,
+                'tag_id' => $tag->tag_id  // Changed from $tag['tag_id']
+            ]);
+        }
+    }
+
+    /**
+     * Duplicate custom fields from source page to target page
+     */
+    public function duplicateCustomFields(int $sourcePageId, int $targetPageId): void
+    {
+        $customFields = PageCustomField::where('page_id', $sourcePageId)
+            ->get();
+
+        foreach ($customFields as $field) {
+            $data = $field->toArray();
+            unset($data['id'], $data['page_id']);
+            $data['page_id'] = $targetPageId;
+            PageCustomField::create($data);
+        }
+    }
+
+    /**
+     * Duplicate access roles from source page to target page
+     */
+    public function duplicateAccessRoles(int $sourcePageId, int $targetPageId): void
+    {
+        $roles = PageAccessRole::where('page_id', $sourcePageId)
+            ->get();
+
+        foreach ($roles as $role) {
+            PageAccessRole::create([
+                'page_id' => $targetPageId,
+                'role_id' => $role->role_id  // Changed from $role['role_id']
+            ]);
+        }
+    }
+
 }

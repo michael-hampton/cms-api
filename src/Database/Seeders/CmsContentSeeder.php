@@ -53,7 +53,8 @@ class CmsContentSeeder extends Seeder
                 'color' => '#007bff',
                 'icon' => '🏠',
                 'is_active' => true,
-                'sort_order' => 1
+                'sort_order' => 1,
+                'site_id' => 1
             ],
             [
                 'name' => 'Luxury Properties',
@@ -63,7 +64,8 @@ class CmsContentSeeder extends Seeder
                 'icon' => '✨',
                 'parent_id' => 1, // Child of Real Estate
                 'is_active' => true,
-                'sort_order' => 1
+                'sort_order' => 1,
+                'site_id' => 1
             ],
             [
                 'name' => 'Investment Properties',
@@ -73,7 +75,8 @@ class CmsContentSeeder extends Seeder
                 'icon' => '💰',
                 'parent_id' => 1,
                 'is_active' => true,
-                'sort_order' => 2
+                'sort_order' => 2,
+                'site_id' => 1
             ],
             [
                 'name' => 'News & Updates',
@@ -82,7 +85,8 @@ class CmsContentSeeder extends Seeder
                 'color' => '#dc3545',
                 'icon' => '📰',
                 'is_active' => true,
-                'sort_order' => 2
+                'sort_order' => 2,
+                'site_id' => 1
             ],
             [
                 'name' => 'Events',
@@ -91,7 +95,8 @@ class CmsContentSeeder extends Seeder
                 'color' => '#6f42c1',
                 'icon' => '🎪',
                 'is_active' => true,
-                'sort_order' => 3
+                'sort_order' => 3,
+                'site_id' => 1
             ],
             [
                 'name' => 'Guides & Resources',
@@ -100,7 +105,8 @@ class CmsContentSeeder extends Seeder
                 'color' => '#20c997',
                 'icon' => '📚',
                 'is_active' => true,
-                'sort_order' => 4
+                'sort_order' => 4,
+                'site_id' => 1
             ]
         ];
 
@@ -128,7 +134,8 @@ class CmsContentSeeder extends Seeder
                 'name' => $tagName,
                 'slug' => strtolower(str_replace(' ', '-', $tagName)),
                 'usage_count' => rand(5, 50),
-                'is_featured' => rand(0, 1) === 1
+                'is_featured' => rand(0, 1) === 1,
+                'site_id' => 1
             ]);
         }
 
@@ -147,7 +154,8 @@ class CmsContentSeeder extends Seeder
                 'status' => 'published',
                 'meta_title' => 'London Property Market Trends 2024 - Premier Properties',
                 'meta_description' => 'Discover the latest trends in London\'s property market for 2024',
-                'published_at' => date('Y-m-d H:i:s', strtotime('-30 days'))
+                'published_at' => date('Y-m-d H:i:s', strtotime('-30 days')),
+                'site_id' => 1
             ],
             [
                 'title' => 'First Time Buyer\'s Guide to London Real Estate',
@@ -157,7 +165,8 @@ class CmsContentSeeder extends Seeder
                 'status' => 'published',
                 'meta_title' => 'First Time Buyer\'s Guide - Premier Properties',
                 'meta_description' => 'Complete guide for first-time property buyers in London',
-                'published_at' => date('Y-m-d H:i:s', strtotime('-20 days'))
+                'published_at' => date('Y-m-d H:i:s', strtotime('-20 days')),
+                'site_id' => 1
             ],
 
             // Event Pages
@@ -169,7 +178,8 @@ class CmsContentSeeder extends Seeder
                 'status' => 'published',
                 'meta_title' => 'Luxury Property Exhibition 2024',
                 'meta_description' => 'Exclusive luxury property exhibition featuring premium listings',
-                'published_at' => date('Y-m-d H:i:s', strtotime('-10 days'))
+                'published_at' => date('Y-m-d H:i:s', strtotime('-10 days')),
+                'site_id' => 1
             ],
             [
                 'title' => 'Property Investment Seminar',
@@ -179,7 +189,8 @@ class CmsContentSeeder extends Seeder
                 'status' => 'published',
                 'meta_title' => 'Property Investment Seminar',
                 'meta_description' => 'Professional seminar on property investment strategies',
-                'published_at' => date('Y-m-d H:i:s', strtotime('-5 days'))
+                'published_at' => date('Y-m-d H:i:s', strtotime('-5 days')),
+                'site_id' => 1
             ],
 
             // Regular Pages
@@ -191,7 +202,8 @@ class CmsContentSeeder extends Seeder
                 'status' => 'published',
                 'meta_title' => 'About Us - Premier Properties',
                 'meta_description' => 'Learn about Premier Properties and our commitment to excellence',
-                'published_at' => date('Y-m-d H:i:s', strtotime('-60 days'))
+                'published_at' => date('Y-m-d H:i:s', strtotime('-60 days')),
+                'site_id' => 1
             ],
             [
                 'title' => 'Contact Us',
@@ -201,7 +213,8 @@ class CmsContentSeeder extends Seeder
                 'status' => 'published',
                 'meta_title' => 'Contact Premier Properties',
                 'meta_description' => 'Contact Premier Properties for all your real estate needs',
-                'published_at' => date('Y-m-d H:i:s', strtotime('-50 days'))
+                'published_at' => date('Y-m-d H:i:s', strtotime('-50 days')),
+                'site_id' => 1
             ]
         ];
 
@@ -371,25 +384,29 @@ class CmsContentSeeder extends Seeder
                 'name' => 'Sarah Johnson',
                 'email' => 'sarah.johnson@email.com',
                 'content' => 'Great analysis! This really helps understand the current market conditions. I\'m particularly interested in the trends for first-time buyers.',
-                'status' => 'approved'
+                'status' => 'approved',
+                'site_id' => 1
             ],
             [
                 'name' => 'Michael Chen',
                 'email' => 'michael.chen@email.com',
                 'content' => 'Thanks for sharing these insights. The data on luxury properties is especially valuable for investors like myself.',
-                'status' => 'approved'
+                'status' => 'approved',
+                'site_id' => 1
             ],
             [
                 'name' => 'Emma Thompson',
                 'email' => 'emma.thompson@email.com',
                 'content' => 'Very informative article. Could you provide more details about the areas showing the highest growth?',
-                'status' => 'approved'
+                'status' => 'approved',
+                'site_id' => 1
             ],
             [
                 'name' => 'David Wilson',
                 'email' => 'david.wilson@email.com',
                 'content' => 'This spam comment should be filtered out.',
-                'status' => 'spam'
+                'status' => 'spam',
+                'site_id' => 1
             ]
         ];
 

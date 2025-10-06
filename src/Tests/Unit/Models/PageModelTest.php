@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageCustomField;
+use App\Models\Site;
 use App\Models\Tag;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
@@ -278,9 +279,11 @@ class PageModelTest extends FunctionalTestCase
             'type' => 'text',
         ]);
 
+        $site = Site::create(['name' => 'Test Site', 'slug' => 'test-site']);;
+
         $page->syncCustomFields([
             $fieldDef->id => ['default_value' => 'Test Value']
-        ]);
+        ], $site->id);
 
         $customFields = PageCustomField::where('page_id', $page->id)->get();
         $this->assertCount(1, $customFields);

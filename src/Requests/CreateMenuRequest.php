@@ -42,5 +42,9 @@ class CreateMenuRequest extends FormRequest
         if (!$this->has('is_active')) {
             $this->data['is_active'] = true;
         }
+
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
     }
 }

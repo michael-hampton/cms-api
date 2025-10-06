@@ -25,6 +25,7 @@ class AuthorServiceTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
         $this->databaseMock = Mockery::mock(Database::class);
@@ -80,7 +81,7 @@ class AuthorServiceTest extends FunctionalTestCase
             }))
             ->andReturn($mockedAuthor);
 
-        $result = $this->service->createAuthor($data);
+        $result = $this->service->createAuthor($data, 1);
 
         $this->assertInstanceOf(Author::class, $result);
         $this->assertSame($mockedAuthor, $result);
@@ -119,7 +120,7 @@ class AuthorServiceTest extends FunctionalTestCase
             ->andReturn($mockedAuthor);
 
         // Call the service
-        $result = $this->service->createAuthor($data, $avatarFile);
+        $result = $this->service->createAuthor($data, 1, $avatarFile);
 
         // Assert returned object
         $this->assertInstanceOf(Author::class, $result);

@@ -6,17 +6,18 @@ use App\ApiApplication;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Migration\MigrationRunner;
+use App\Models\Site;
 use PHPUnit\Framework\TestCase;
 
 abstract class FunctionalTestCase extends TestCase
 {
     protected Database $database;
     protected ApiApplication $app;
+    protected $siteSlug = '';
+    protected int $siteId;
 
     protected function setUp(): void
     {
-        parent::setUp();
-
         $_ENV['APP_ENV'] = 'testing';
         putenv('APP_ENV=testing'); // optional, for functions using getenv()
 
@@ -33,9 +34,41 @@ abstract class FunctionalTestCase extends TestCase
 
         $this->database = Database::getInstance($testConfig);
 
-
         // Create application with test database
         $this->app = new ApiApplication($testConfig, $this->database);
+
+        $this->ensureSiteExists();
+
+    }
+
+    public static function setUpBeforeClass(): void
+    {
+        // Use test database configuration
+        $testConfig = [
+            'driver' => 'mysql',
+            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
+            'port' => getenv('TEST_DB_PORT') ?: '3306',
+            'database' => getenv('TEST_DB_NAME') ?: 'test_db',
+            'username' => getenv('TEST_DB_USER') ?: 'root',
+            'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
+            'charset' => 'utf8mb4',
+        ];
+
+        $database = Database::getInstance($testConfig);
+
+        // Create application with test database
+        new ApiApplication($testConfig, $database);
+
+        $migrationRunner = new MigrationRunner($database, 'migrations');
+        $migrationRunner->run();
+
+    }
+
+    protected function ensureSiteExists() {
+        $sites = Site::all();
+        $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site']);
+        $this->siteSlug = $site->slug;
+        $this->siteId = $site->id;
     }
 
     protected function tearDown(): void
@@ -87,6 +120,40 @@ abstract class FunctionalTestCase extends TestCase
         return $this->makeRequest('GET', $uri, [], $headers);
     }
 
+    protected function getForSite(string $uri, array $headers = []): Response
+    {
+        $siteSlug = $this->siteSlug;
+
+        $parsed = parse_url($uri);
+        $path = $parsed['path'] ?? '';   // path part
+        $query = $parsed['query'] ?? ''; // query string
+
+        // Split path into segments
+        $segments = array_values(array_filter(explode('/', $path))); // remove empty segments
+
+        // Insert site slug as the second segment
+        if (isset($segments[0]) && $segments[0] === 'api') {
+            array_splice($segments, 1, 0, [$siteSlug]);
+        } else {
+            // If no /api prefix, just prepend as first segment
+            array_unshift($segments, $siteSlug);
+        }
+
+        // Rebuild path
+        $fullPath = '/' . implode('/', $segments);
+
+        // Rebuild URI with query string
+        if ($query !== '') {
+            $fullPath .= '?' . $query;
+        }
+
+        echo $fullPath;
+
+        return $this->makeRequest('GET', $fullPath, [], $headers);
+    }
+
+
+
     protected function post(string $uri, array $data = [], array $files = [], array $headers = []): Response
     {
         if (!empty($files)) {
@@ -116,10 +183,11 @@ abstract class FunctionalTestCase extends TestCase
     protected function makeRequest(
         string $method,
         string $uri,
-        array $data = [],
-        array $headers = [],
-        array $files = []
-    ): Response {
+        array  $data = [],
+        array  $headers = [],
+        array  $files = []
+    ): Response
+    {
         $parsedUri = parse_url($uri);
         $path = $parsedUri['path'] ?? $uri;
         $queryData = [];
@@ -127,6 +195,10 @@ abstract class FunctionalTestCase extends TestCase
         if (isset($parsedUri['query'])) {
             parse_str($parsedUri['query'], $queryData);
         }
+
+//        if(!str_contains($uri, 'http')) {
+//            $uri = 'http://localhost:5001' . $uri;
+//        }
 
         $_SERVER['REQUEST_METHOD'] = $method;
         $_SERVER['REQUEST_URI'] = $uri;
@@ -181,8 +253,6 @@ abstract class FunctionalTestCase extends TestCase
             unset($GLOBALS['__test_request_body']);
         }
     }
-
-
 
 
     protected function createUploadedFile(string $filename, string $mimeType): array
@@ -277,4 +347,31 @@ abstract class FunctionalTestCase extends TestCase
     {
         return $this->json('DELETE', $uri, $data);
     }
+
+    /**
+     * Create a temporary file for testing.
+     *
+     * @param string $relativePath Path relative to temp upload dir, e.g. 'test.jpg'
+     * @param string $content File contents
+     * @return string Returns the full filesystem path to the temp file
+     */
+    protected function createTempUploadFile(string $relativePath, string $content = 'dummy content'): string
+    {
+        $uploadDir = realpath(__DIR__ . '/../../../uploads/uploads_test');
+
+        // Remove any leading slash
+        $relativePath = ltrim($relativePath, '/');
+
+        $fullPath = $uploadDir . '/' . $relativePath;
+
+        $dir = dirname($fullPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+
+        file_put_contents($fullPath, $content);
+
+        return $fullPath;
+    }
+
 }

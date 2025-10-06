@@ -7,18 +7,12 @@ use App\Models\PageCategory;
 
 class CategoryControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsCategories()
     {
         Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
         Category::create(['name' => 'Science', 'slug' => 'science', 'is_active' => true]);
 
-        $response = $this->get('/api/categories');
+        $response = $this->getForSite('/api/categories');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -32,7 +26,7 @@ class CategoryControllerTest extends FunctionalTestCase
             Category::create(['name' => "Category $i", 'slug' => "category-$i", 'is_active' => true]);
         }
 
-        $response = $this->get('/api/categories?page=1&per_page=10');
+        $response = $this->getForSite('/api/categories?page=1&per_page=10');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);

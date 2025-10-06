@@ -11,7 +11,7 @@ class Comment extends Model
 
     protected $fillable = [
         'page_id', 'name', 'email', 'content', 'status',
-        'ip_address', 'user_agent', 'parent_id', 'created_at', 'updated_at'
+        'ip_address', 'user_agent', 'parent_id', 'created_at', 'updated_at', 'site_id'
     ];
 
     protected $casts = [

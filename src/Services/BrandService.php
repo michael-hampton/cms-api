@@ -53,9 +53,9 @@ class BrandService
         return $brand;
     }
 
-    public function createBrand(array $data, ?UploadedFile $logoFile = null): Brand
+    public function createBrand(array $data, int $siteId, ?UploadedFile $logoFile = null): Brand
     {
-        return $this->database->transaction(function() use ($data, $logoFile) {
+        return $this->database->transaction(function() use ($data, $logoFile, $siteId) {
             if ($logoFile && $logoFile->isValid()) {
                 $data['logo'] = $this->imageUploadService->upload($logoFile);
             }
@@ -63,6 +63,8 @@ class BrandService
             if (empty($data['slug'])) {
                 $data['slug'] = Str::slug($data['name'], [$this->brandRepository, 'findBySlug']);
             }
+
+            $data['site_id'] = $siteId;
 
             return $this->brandRepository->create($data);
         });

@@ -8,10 +8,11 @@ use App\Models\Menu;
 use App\Requests\CreateMenuRequest;
 use App\Requests\UpdateMenuRequest;
 use App\Services\MenuService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class MenuControllerTest extends TestCase
+class MenuControllerTest extends FunctionalTestCase
 {
     private $menuService;
     private $controller;
@@ -19,6 +20,7 @@ class MenuControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->menuService = Mockery::mock(MenuService::class);
         $this->controller = new MenuController($this->menuService);
     }
@@ -40,7 +42,7 @@ class MenuControllerTest extends TestCase
             ->once()
             ->andReturn($menus);
 
-        $response = $this->controller->index();
+        $response = $this->controller->index($this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }

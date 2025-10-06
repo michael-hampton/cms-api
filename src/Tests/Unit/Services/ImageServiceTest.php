@@ -4,14 +4,18 @@ namespace App\Tests\Unit\Services;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
+use App\Framework\Support\Collection;
 use App\Models\Image;
+use App\Models\ImageCategory;
 use App\Repositories\ImageRepository;
 use App\Services\ImageService;
 use App\Services\ImageUploadService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Exception;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class ImageServiceTest extends TestCase
+class ImageServiceTest extends FunctionalTestCase
 {
     private $imageRepository;
     private $service;
@@ -19,6 +23,7 @@ class ImageServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->imageRepository = Mockery::mock(ImageRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
         $this->service = new ImageService($this->imageRepository, $this->imageUploadService);;
@@ -363,5 +368,245 @@ class ImageServiceTest extends TestCase
 
         $this->assertEquals(1, $results['deleted']);
         $this->assertEquals(1024, $results['freed_space']);
+    }
+
+    public function testDuplicateImageCreatesNewRecord()
+    {
+        $originalImage = Mockery::mock(Image::class)->makePartial();
+        $originalImage->id = 1;
+        $originalImage->file_path = 'images/2025-01-04/original.jpg';
+        $originalImage->original_name = 'original.jpg';
+        $originalImage->mime_type = 'image/jpeg';
+        $originalImage->file_size = 1024;
+        $originalImage->width = 800;
+        $originalImage->height = 600;
+        $originalImage->alt_text = 'Original alt';
+        $originalImage->caption = 'Original caption';
+        $originalImage->description = 'Original description';
+        $originalImage->site_id = $this->siteId;
+
+        $originalImage->shouldReceive('categories->get')
+            ->andReturn(collect([]));
+
+        $newImage = Mockery::mock(Image::class)->makePartial();
+        $newImage->id = 2;
+        $newImage->mime_type = 'image/jpeg';
+        $newImage->file_path = 'images/2025-01-04/original-copy-abc123.jpg';
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($originalImage);
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->once()
+            ->with('images/2025-01-04/original.jpg')
+            ->andReturn('images/2025-01-04/original-copy-abc123.jpg');
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($newImage);
+
+        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+
+        $result = $this->service->duplicateImage(1);
+
+        $this->assertInstanceOf(Image::class, $result);
+        $this->assertEquals(2, $result->id);
+    }
+
+    public function testDuplicateImageCopiesMetadata()
+    {
+        $originalImage = Mockery::mock(Image::class)->makePartial();
+        $originalImage->id = 1;
+        $originalImage->file_path = 'images/test.jpg';
+        $originalImage->original_name = 'test.jpg';
+        $originalImage->mime_type = 'image/jpeg';
+        $originalImage->file_size = 1024;
+        $originalImage->width = 800;
+        $originalImage->height = 600;
+        $originalImage->alt_text = 'Original alt';
+        $originalImage->caption = 'Original caption';
+        $originalImage->description = 'Original description';
+
+        $originalImage->shouldReceive('categories->get')
+            ->andReturn(collect([]));
+
+        $newImage = Mockery::mock(Image::class)->makePartial();
+        $newImage->id = 2;
+        $newImage->mime_type = 'image/jpeg';
+        $newImage->file_path = 'images/test-copy.jpg';
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($originalImage);
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->andReturn('images/test-copy.jpg');
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['alt_text'] === 'Original alt (copy)'
+                    && $data['caption'] === 'Original caption (copy)'
+                    && $data['description'] === 'Original description'
+                    && $data['original_name'] === 'test-copy.jpg';
+            }))
+            ->andReturn($newImage);
+
+        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+
+
+        $result = $this->service->duplicateImage(1);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testDuplicateImageWithCustomMetadata()
+    {
+        $originalImage = Mockery::mock(Image::class)->makePartial();
+        $originalImage->id = 1;
+        $originalImage->file_path = 'images/test.jpg';
+        $originalImage->original_name = 'test.jpg';
+        $originalImage->mime_type = 'image/jpeg';
+        $originalImage->file_size = 1024;
+        $originalImage->width = 800;
+        $originalImage->height = 600;
+        $originalImage->alt_text = 'Original alt';
+
+        $originalImage->shouldReceive('categories->get')
+            ->andReturn(collect([]));
+
+        $newImage = Mockery::mock(Image::class)->makePartial();
+        $newImage->id = 2;
+        $newImage->mime_type = 'image/jpeg';
+        $newImage->file_path = 'images/test-copy.jpg';
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($originalImage);
+
+        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->andReturn('images/test-copy.jpg');
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['alt_text'] === 'Custom alt text';
+            }))
+            ->andReturn($newImage);
+
+        $result = $this->service->duplicateImage(1, [
+            'alt_text' => 'Custom alt text'
+        ]);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testDuplicateImageCopiesCategories()
+    {
+        $category1 = Mockery::mock(ImageCategory::class)->makePartial();
+        $category1->id = 1;
+        $category2 = Mockery::mock(ImageCategory::class)->makePartial();
+        $category2->id = 2;
+
+        $originalImage = Mockery::mock(Image::class)->makePartial();
+        $originalImage->id = 1;
+        $originalImage->file_path = 'images/test.jpg';
+        $originalImage->original_name = 'test.jpg';
+        $originalImage->mime_type = 'image/jpeg';
+        $originalImage->file_size = 1024;
+
+        $categoriesCollection = Mockery::mock(Collection::class, [[$category1, $category2]]);
+
+        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn($categoriesCollection);
+
+
+        $categoriesCollection->shouldReceive('count')->andReturn(2)->once();
+        $categoriesCollection->shouldReceive('pluck')
+            ->with('id')
+            ->andReturn(collect([1, 2]));
+        $categoriesCollection->shouldReceive('toArray')
+            ->andReturn([['id' => 1], ['id' => 2]]);
+
+        $originalImage->shouldReceive('categories->get')
+            ->andReturn($categoriesCollection);
+
+        $newImage = Mockery::mock(Image::class)->makePartial();
+        $newImage->id = 2;
+        $newImage->mime_type = 'image/jpeg';
+        $newImage->file_path = 'images/test-copy.jpg';
+
+        $this->imageRepository->shouldReceive('syncCategories')
+            ->with($newImage, [1,2])
+            ->once();
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($originalImage);
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->andReturn('images/test-copy.jpg');
+
+        $this->imageRepository->shouldReceive('create')
+            ->andReturn($newImage);
+
+        $result = $this->service->duplicateImage(1);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testDuplicateImageThrowsExceptionWhenNotFound()
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Image not found');
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(999)
+            ->andReturn(null);
+
+        $this->service->duplicateImage(999);
+    }
+
+    public function testDuplicateImageSkipsThumbnailsForSvg()
+    {
+        $originalImage = Mockery::mock(Image::class)->makePartial();
+        $originalImage->id = 1;
+        $originalImage->file_path = 'images/test.svg';
+        $originalImage->original_name = 'test.svg';
+        $originalImage->mime_type = 'image/svg+xml';
+        $originalImage->file_size = 512;
+
+        $originalImage->shouldReceive('categories->get')
+            ->andReturn(collect([]));
+
+        $newImage = Mockery::mock(Image::class)->makePartial();
+        $newImage->id = 2;
+        $newImage->mime_type = 'image/svg+xml';
+        $newImage->file_path = 'images/test-copy.svg';
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($originalImage);
+
+        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->once()
+            ->andReturn('images/test-copy.svg');
+
+        // Should NOT call ensureDirectoryExists for SVG thumbnails
+        $this->imageUploadService->shouldNotReceive('ensureDirectoryExists');
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($newImage);
+
+        $result = $this->service->duplicateImage(1);
+
+        $this->assertInstanceOf(Image::class, $result);
     }
 }

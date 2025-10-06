@@ -40,4 +40,11 @@ class CreateProductRequest extends FormRequest
             'brand.required' => 'Brand is required',
         ];
     }
+
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+    }
 }

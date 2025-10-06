@@ -11,10 +11,11 @@ use App\Parsers\BlockRegistry;
 use App\Repositories\PageRepository;
 use App\Search\PaginatedResult;
 use App\Services\PageService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class PageControllerTest extends TestCase
+class PageControllerTest extends FunctionalTestCase
 {
     private $pageService;
     private $blockRegistry;
@@ -23,6 +24,7 @@ class PageControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->pageService = Mockery::mock(PageService::class);
         $this->blockRegistry = Mockery::mock(BlockRegistry::class);
         $this->pageRepository = Mockery::mock(PageRepository::class);
@@ -76,7 +78,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 
@@ -115,7 +117,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);;
 
         $data = json_decode($response->getContent(), true);
 
@@ -140,7 +142,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -163,7 +165,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);;
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -191,7 +193,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -211,7 +213,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -231,7 +233,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -252,7 +254,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -272,7 +274,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -293,7 +295,7 @@ class PageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $content = json_decode($response->getContent(), true);
         $this->assertEquals(3, $content['pagination']['current_page']);
@@ -312,6 +314,8 @@ class PageControllerTest extends TestCase
             'blocks' => []
         ]);
 
+        $request->shouldReceive('get')->with('site_id')->andReturn($this->siteId);
+
         $page = $this->createMockPage(1, 'New Page');
 
         $this->pageService->shouldReceive('createPageWithAllData')
@@ -327,15 +331,17 @@ class PageControllerTest extends TestCase
     {
         $request = Mockery::mock(Request::class);
         $request->shouldReceive('all')->andReturn([
+            'site_id' => $this->siteId,
             'id' => 1,
             'forms' => ['main' => ['title' => 'Updated Page']],
             'blocks' => []
         ]);
 
+        $request->shouldReceive('get')->with('site_id')->andReturn($this->siteId);
+
         $page = $this->createMockPage(1, 'Updated Page');
 
         $this->pageService->shouldReceive('updatePageWithAllData')
-            ->with(1, Mockery::any())
             ->once()
             ->andReturn($page);
 
@@ -430,6 +436,7 @@ class PageControllerTest extends TestCase
         $page->social = null;
         $page->seo = null;
         $page->settings = null;
+        $page->site_id = $this->siteId;
 
         return $page;
     }

@@ -51,4 +51,11 @@ class UpdateTagRequest extends FormRequest
     {
         return $this->tagRepository->find((int)$this->route('id'));
     }
+
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+    }
 }

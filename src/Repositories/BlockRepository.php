@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Framework\Support\Collection;
 use App\Models\Block;
 use Exception;
 
@@ -57,5 +58,18 @@ class BlockRepository extends Repository
             $this->database->rollBack();
             return false;
         }
+    }
+
+    public function getBlocksForPage(int $pageId): Collection {
+        return Block::where('page_id', $pageId)
+            ->orderBy('order')
+            ->get();
+    }
+
+    public function getMaxOrder(): int
+    {
+        $result = $this->database->select ('SELECT MAX(`order`) as max_order FROM blocks');
+
+        return $result->max_order ?? 0;
     }
 }

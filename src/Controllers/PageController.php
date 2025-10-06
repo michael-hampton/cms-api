@@ -27,10 +27,10 @@ class PageController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->pageRepository->search($criteria);
 
             // Format blocks in the paginated data
@@ -65,10 +65,10 @@ class PageController extends Controller
 
             // Determine if this is an update or create based on presence of ID
             if (!empty($requestData['id'])) {
-                $page = $this->pageService->updatePageWithAllData($requestData['id'], $requestData);
+                $page = $this->pageService->updatePageWithAllData($requestData['id'], $requestData, $request->get('site_id'));
                 $statusCode = 200;
             } else {
-                $page = $this->pageService->createPageWithAllData($requestData);
+                $page = $this->pageService->createPageWithAllData($requestData, $request->get('site_id'));
                 $statusCode = 201;
             }
 
@@ -109,7 +109,7 @@ class PageController extends Controller
     {
         try {
             $requestData = $request->all();
-            $page = $this->pageService->updatePageWithAllData($id, $requestData);
+            $page = $this->pageService->updatePageWithAllData($id, $requestData, $request->get('site_id'));
 
             return $this->jsonResponse(['page' => $page->toArray()]);
 
@@ -208,7 +208,7 @@ class PageController extends Controller
             $pageIds = $request->get('page_ids', []);
             $updateData = $request->get('data', []);
 
-            $results = $this->pageService->bulkUpdatePages($pageIds, $updateData);
+            $results = $this->pageService->bulkUpdatePages($pageIds, $updateData, $request->get('site_id'));;
 
             return $this->jsonResponse(['results' => $results]);
         } catch (ValidationException $e) {

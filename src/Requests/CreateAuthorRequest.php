@@ -10,6 +10,7 @@ use App\Repositories\AuthorRepository;
 class CreateAuthorRequest extends FormRequest
 {
     private AuthorRepository $authorRepository;
+
     public function __construct()
     {
         parent::__construct();
@@ -39,6 +40,10 @@ class CreateAuthorRequest extends FormRequest
             $this->data['slug'] = Str::slug($this->data['name']);
         }
 
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+
 //        if (!isset($this->data['status'])) {
 //            $this->data['status'] = 'active';
 //        }
@@ -48,7 +53,7 @@ class CreateAuthorRequest extends FormRequest
     {
         return [
             function ($request) {
-            $authorId = $request->route('id') ?? null;
+                $authorId = $request->route('id') ?? null;
                 // Check for unique email
                 if ($request->has('email')) {
                     $existing = $this->authorRepository->findByEmail($request->get('email'));;
@@ -61,7 +66,7 @@ class CreateAuthorRequest extends FormRequest
                 if ($request->has('slug')) {
                     $existing = $this->authorRepository->findBySlug($request->get('slug'));
                     if ($existing && (!$authorId || $existing->id !== $authorId)) {
-                       throw new ValidationException('Slug already exists');
+                        throw new ValidationException('Slug already exists');
                     }
                 }
             }

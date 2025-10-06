@@ -10,6 +10,7 @@ class Menu extends Model
         'description',
         'layout_config',
         'is_active',
+        'site_id'
     ];
 
     protected $casts = [

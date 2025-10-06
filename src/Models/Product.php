@@ -18,7 +18,8 @@ class Product extends Model
         'meta_description',
         'meta_keywords',
         'deleted_at',
-        'slug'
+        'slug',
+        'site_id'
     ];
 
     protected $casts = [
@@ -62,7 +63,7 @@ class Product extends Model
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%")
-                ->orWhere('brand', 'like', "%{$search}%");
+                ->orWhere('brand_id', 'like', "%{$search}%");
         });
     }
 

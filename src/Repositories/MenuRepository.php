@@ -8,6 +8,7 @@ use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\Model;
 use App\Models\Page;
+use App\Models\Site;
 
 class MenuRepository extends Repository
 {
@@ -28,9 +29,10 @@ class MenuRepository extends Repository
         return $menu->fresh();
     }
 
-    public function getAllMenus(): Collection
+    public function getAllMenus(string $siteName): Collection
     {
-        return Menu::with(['items'])->where('is_active', true)->get();
+        $site = Site::resolveSite($siteName);
+        return Menu::with(['items'])->where('site_id', $site)->where('is_active', true)->get();
     }
 
     public function createMenuItem(array $data): Model

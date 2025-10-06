@@ -22,6 +22,7 @@ class ProductServiceTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->repository = Mockery::mock(ProductRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
 

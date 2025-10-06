@@ -188,7 +188,14 @@ class ImageUploadService
 
     private function getFullPath(string $relativePath): string
     {
+        // Absolute path to project root
+        $projectRoot = realpath(__DIR__ . '/../'); // adjust depending on where this file lives
+
+        // Upload folder inside src/
         $uploadPath = rtrim(config('upload.path', 'uploads'), '/');
-        return $uploadPath . '/' . ltrim($relativePath, '/');
+
+        // Build full path under src/
+        return $projectRoot . '/' . $uploadPath . '/' . ltrim($relativePath, '/');
     }
+
 }

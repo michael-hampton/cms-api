@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Framework\Support\Collection;
 use App\Models\Image;
+use App\Models\ImageCategory;
 use App\Models\Model;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -170,5 +171,18 @@ class ImageRepository extends Repository
         $factor = floor(log($bytes, 1024));
 
         return sprintf("%.1f %s", $bytes / pow(1024, $factor), $units[$factor]);
+    }
+
+    public function syncCategories(Image $image, array $categoryIds): void
+    {
+        $validCategories = ImageCategory::active()->whereIn('id', $categoryIds)->get();
+        $validIds = $validCategories->pluck('id')->toArray();
+
+        $image->categories()->sync($validIds);
+    }
+
+    public function getCategoriesForImage(Image $image): Collection
+    {
+        return $image->categories();
     }
 }

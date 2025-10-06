@@ -62,5 +62,9 @@ class CreateTagRequest extends FormRequest
         if (empty($this->data['slug']) && !empty($this->data['name'])) {
             $this->data['slug'] = Str::slug($this->data['name']);
         }
+
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
     }
 }

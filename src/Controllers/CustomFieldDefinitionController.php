@@ -6,6 +6,8 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Validation\Validator;
+use App\Models\Page;
+use App\Models\Site;
 use App\Repositories\CustomFieldDefinitionRepository;
 use App\Repositories\PageCustomFieldRepository;
 use App\Requests\CreateCustomFieldDefinitionRequest;
@@ -30,20 +32,21 @@ class CustomFieldDefinitionController extends Controller
         parent::__construct();
     }
 
-    public function index(): JsonResponse
+    public function index(string $siteName): JsonResponse
     {
         try {
-            $fields = $this->customFieldDefinitionRepository->getActive();
+            $siteId = Site::resolveSite($siteName);
+            $fields = $this->customFieldDefinitionRepository->getActive($siteId);
             return $this->jsonResponse(['fields' => $fields]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    public function grouped(): JsonResponse
+    public function grouped(string $siteName): JsonResponse
     {
         try {
-            $grouped = $this->customFieldDefinitionRepository->getGroupedFields();
+            $grouped = $this->customFieldDefinitionRepository->getGroupedFields($siteName);
             $result = [];
             foreach ($grouped as $group => $fields) {
                 $result[$group] = array_map(fn($field) => $field->toArray(), $fields);
@@ -137,9 +140,14 @@ class CustomFieldDefinitionController extends Controller
     public function getCustomFields(int $pageId): JsonResponse
     {
         try {
+            $page = Page::where('id', $pageId)->first();
+
+            if(empty($page)){
+                return $this->jsonResponse(['Page not found', [], 500]);
+            }
 
             // Get all active custom field definitions
-            $fieldDefinitions = $this->customFieldDefinitionRepository->getActive();
+            $fieldDefinitions = $this->customFieldDefinitionRepository->getActive($page->site_id);
 
             // Get the page's custom field values
             $pageFields = $this->pageCustomFieldRepository->getPageCustomFields($pageId);
@@ -210,8 +218,9 @@ class CustomFieldDefinitionController extends Controller
     {
         try {
             $fields = $request->input('fields', []);
+            $siteId = $request->input('site_id') ?? config('app.default_site_id');;
 
-            $this->pageCustomFieldRepository->syncCustomFields($pageId, $fields);
+            $this->pageCustomFieldRepository->syncCustomFields($pageId, $fields, $siteId);
 
             return $this->successResponse('Custom fields updated successfully');
         } catch (Exception $e) {

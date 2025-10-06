@@ -170,10 +170,6 @@ class Database
 
             return $stmt;
         } catch (PDOException $e) {
-            echo $sql;
-            var_dump($params);
-            echo $e->getMessage();
-            die('failed');
             Logger::error('Database query failed', [
                 'sql' => $sql,
                 'params' => $params,

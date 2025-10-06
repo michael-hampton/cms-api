@@ -6,22 +6,16 @@ use App\Models\Author;
 
 class AuthorControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsAuthorsList()
     {
         Author::create([
             'name' => 'John Doe',
             'slug' => 'john-doe',
             'email' => 'john@example.com',
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
-        $response = $this->get('/api/authors');
+        $response = $this->getForSite('/api/authors');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -34,7 +28,7 @@ class AuthorControllerTest extends FunctionalTestCase
         Author::create(['name' => 'John Doe', 'slug' => 'john-doe', 'status' => 'active']);
         Author::create(['name' => 'Jane Smith', 'slug' => 'jane-smith', 'status' => 'inactive']);
 
-        $response = $this->get('/api/authors?status=active');
+        $response = $this->getForSite('/api/authors?status=active');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);

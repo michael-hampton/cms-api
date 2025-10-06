@@ -7,18 +7,12 @@ use App\Models\Product;
 
 class BrandControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsBrandsList()
     {
         Brand::create(['name' => 'Apple', 'slug' => 'apple']);
         Brand::create(['name' => 'Nike', 'slug' => 'nike']);
 
-        $response = $this->get('/api/brands');
+        $response = $this->getForSite('/api/brands');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -31,7 +25,7 @@ class BrandControllerTest extends FunctionalTestCase
         Brand::create(['name' => 'Apple Inc', 'slug' => 'apple-inc']);
         Brand::create(['name' => 'Nike Sports', 'slug' => 'nike-sports']);
 
-        $response = $this->get('/api/brands?q=apple');
+        $response = $this->getForSite('/api/brands?q=apple');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -44,7 +38,8 @@ class BrandControllerTest extends FunctionalTestCase
         $brandData = [
             'name' => 'Samsung',
             'description' => 'Electronics company',
-            'website' => 'https://samsung.com'
+            'website' => 'https://samsung.com',
+            'site_id' => $this->siteId
         ];
 
         $response = $this->post('/api/brands', $brandData);
@@ -59,10 +54,10 @@ class BrandControllerTest extends FunctionalTestCase
     public function testStoreWithLogo()
     {
         $files = [
-            'logo' => $this->createUploadedFile('logo.png', 'image/png')
+            'logo' => $this->createUploadedFile('logo.png', 'image/png'),
         ];
 
-        $response = $this->post('/api/brands', ['name' => 'Adidas'], $files);
+        $response = $this->post('/api/brands', ['name' => 'Adidas', 'site_id' => $this->siteId], $files);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);

@@ -15,10 +15,10 @@ class MenuController extends Controller
         parent::__construct();
     }
 
-    public function index(): JsonResponse
+    public function index(string $siteName): JsonResponse
     {
         try {
-            $menus = $this->menuService->getAllMenus();
+            $menus = $this->menuService->getAllMenus($siteName);
             return $this->jsonResponse([
                 'success' => true,
                 'data' => $menus

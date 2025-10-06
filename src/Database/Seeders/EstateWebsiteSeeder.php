@@ -81,7 +81,7 @@ class EstateWebsiteSeeder extends Seeder
         ];
 
         foreach ($tags as $tagName) {
-            $this->tagRepository->findOrCreateByName($tagName);
+            $this->tagRepository->findOrCreateByName($tagName, 1);
         }
     }
 
@@ -108,7 +108,7 @@ class EstateWebsiteSeeder extends Seeder
     private function createCategoriesRecursively(array $categories, ?int $parentId = null): void
     {
         foreach ($categories as $name => $children) {
-            $category = $this->categoryRepository->findOrCreateByName($name);
+            $category = $this->categoryRepository->findOrCreateByName($name, 1);
             if ($parentId) {
                 $category->parent_id = $parentId;
                 $category->save();
@@ -151,7 +151,8 @@ class EstateWebsiteSeeder extends Seeder
                 'is_active' => true,
                 'sort_order' => 10,
                 'is_searchable' => $field['is_searchable'] ?? false,
-                'options' => $field['options'] ?? null
+                'options' => $field['options'] ?? null,
+                'site_id' => 1
             ]);
         }
     }
@@ -164,11 +165,12 @@ class EstateWebsiteSeeder extends Seeder
             'slug' => 'home',
             'status' => 'published',
             'meta_title' => 'Premier Properties - Luxury Real Estate in London',
-            'meta_description' => 'Find your perfect home with Premier Properties. Luxury estates, family homes, and investment properties across London and the Home Counties.'
+            'meta_description' => 'Find your perfect home with Premier Properties. Luxury estates, family homes, and investment properties across London and the Home Counties.',
+            'site_id' => 1
         ]);
 
         // Add featured tag
-        $featuredTag = $this->tagRepository->findOrCreateByName('featured');
+        $featuredTag = $this->tagRepository->findOrCreateByName('featured', 1);
         $page->tags(true)->attach($featuredTag->id);
 
         $blocks = [
@@ -534,7 +536,8 @@ class EstateWebsiteSeeder extends Seeder
             'status' => 'published',
             'custom_handler' => 'App\\Controllers\\EstateWebsiteController@properties',
             'meta_title' => 'About Us - Premier Properties',
-            'meta_description' => 'Learn about Premier Properties - 15 years of excellence in luxury real estate across London and the Home Counties.'
+            'meta_description' => 'Learn about Premier Properties - 15 years of excellence in luxury real estate across London and the Home Counties.',
+            'site_id' => 1
         ]);
     }
 
@@ -546,7 +549,8 @@ class EstateWebsiteSeeder extends Seeder
             'slug' => 'about',
             'status' => 'published',
             'meta_title' => 'About Us - Premier Properties',
-            'meta_description' => 'Learn about Premier Properties - 15 years of excellence in luxury real estate across London and the Home Counties.'
+            'meta_description' => 'Learn about Premier Properties - 15 years of excellence in luxury real estate across London and the Home Counties.',
+            'site_id' => 1
         ]);
 
         $blocks = [
@@ -637,7 +641,8 @@ class EstateWebsiteSeeder extends Seeder
             'slug' => 'contact',
             'status' => 'published',
             'meta_title' => 'Contact Us - Premier Properties',
-            'meta_description' => 'Get in touch with Premier Properties. Visit our London office, call us, or send us a message. We\'re here to help with all your property needs.'
+            'meta_description' => 'Get in touch with Premier Properties. Visit our London office, call us, or send us a message. We\'re here to help with all your property needs.',
+            'site_id' => 1
         ]);
 
         $blocks = [
@@ -849,17 +854,18 @@ class EstateWebsiteSeeder extends Seeder
             'meta_title' => $data['title'] . ' - Premier Properties',
             'meta_description' => $data['description'],
             'page_type' => 'content',
+            'site_id' => 1
         ]);
 
         // Add tags
         foreach ($data['tags'] as $tagName) {
-            $tag = $this->tagRepository->findOrCreateByName($tagName);
+            $tag = $this->tagRepository->findOrCreateByName($tagName, 1);
             $page->tags(true)->attach($tag->id);
         }
 
         // Add categories
         foreach ($data['categories'] as $categoryName) {
-            $category = $this->categoryRepository->findOrCreateByName($categoryName);
+            $category = $this->categoryRepository->findOrCreateByName($categoryName, 1);
             $page->categories(true)->attach($category->id);
         }
 

@@ -28,6 +28,7 @@ class BlockParserServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->blockRegistry = Mockery::mock(BlockRegistry::class);
         $this->validator = Mockery::mock(Validator::class);
         $this->blockRepository = Mockery::mock(BlockRepository::class);
@@ -108,8 +109,6 @@ class BlockParserServiceTest extends TestCase
             ['type' => 'text', 'content' => 'Block 2']
         ];
 
-        $this->database->shouldReceive('beginTransaction');
-
         $this->blockRepository->shouldReceive('deletePageBlocks')
             ->with(1)
             ->once();
@@ -121,6 +120,10 @@ class BlockParserServiceTest extends TestCase
         $this->blockRegistry->shouldReceive('getParser')
             ->andReturn($parser);
 
+        $this->database->shouldReceive('transaction')
+            ->atLeast()->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
         $validationResult = Mockery::mock(ValidationResult::class);
         $validationResult->shouldReceive('isValid')->andReturn(true);
 
@@ -130,8 +133,6 @@ class BlockParserServiceTest extends TestCase
         $this->blockRepository->shouldReceive('createBlock')
             ->twice()
             ->andReturn(Mockery::mock(Block::class));
-
-        $this->database->shouldReceive('commit');
 
         $result = $this->service->replacePageBlocks(1, $blocksData);
 
@@ -203,8 +204,6 @@ class BlockParserServiceTest extends TestCase
             ['type' => 'invalid', 'content' => 'Block 2']
         ];
 
-        $this->database->shouldReceive('beginTransaction')->atLeast()->once();
-
         $this->blockRepository->shouldReceive('deletePageBlocks')
             ->with(1)
             ->once();
@@ -231,7 +230,9 @@ class BlockParserServiceTest extends TestCase
             ->once()
             ->andReturn(Mockery::mock(Block::class));
 
-        $this->database->shouldReceive('rollBack')->atLeast()->once();;
+        $this->database->shouldReceive('transaction')
+            ->atLeast()->once()
+            ->andReturnUsing(fn($callback) => $callback());
 
         $this->expectException(ValidationException::class);
 
@@ -323,9 +324,6 @@ class BlockParserServiceTest extends TestCase
             ['type' => 'text', 'content' => ''] // Invalid content
         ];
 
-        $this->database->shouldReceive('beginTransaction')->once();
-        $this->database->shouldReceive('rollBack')->once();
-
         $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn(['content' => 'required']);
 
@@ -336,6 +334,10 @@ class BlockParserServiceTest extends TestCase
         $this->blockRegistry->shouldReceive('getParser')
             ->with('nonexistent')
             ->andReturn(null);
+
+        $this->database->shouldReceive('transaction')
+            ->atLeast()->once()
+            ->andReturnUsing(fn($callback) => $callback());
 
         $validationResult = Mockery::mock(ValidationResult::class);
         $validationResult->shouldReceive('isValid')->andReturn(false);
@@ -352,18 +354,18 @@ class BlockParserServiceTest extends TestCase
     {
         $pagesData = [
             [
-                'page' => ['title' => 'Page 1', 'slug' => 'page-1'],
+                'page' => ['title' => 'Page 1', 'slug' => 'page-1', 'site_id' => 1],
                 'blocks' => []
             ],
             [
-                'page' => ['title' => 'Page 2', 'slug' => 'page-2'],
+                'page' => ['title' => 'Page 2', 'slug' => 'page-2', 'site_id' => 1],
                 'blocks' => [['type' => 'invalid']]
             ]
         ];
 
-        $this->database->shouldReceive('beginTransaction')->atLeast()->once();;
-        $this->database->shouldReceive('commit')->atLeast()->once();
-        $this->database->shouldReceive('rollBack')->atLeast()->once();
+        $this->database->shouldReceive('transaction')
+            ->atLeast()->once()
+            ->andReturnUsing(fn($callback) => $callback());
 
         $page = Mockery::mock(\App\Models\Page::class)->makePartial();
         $page->id = 1;

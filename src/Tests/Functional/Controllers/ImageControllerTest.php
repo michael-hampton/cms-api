@@ -7,16 +7,10 @@ use App\Models\ImageCategory;
 
 class ImageControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsImagesList()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->get('/api/images');
+        $response = $this->getForSite('/api/images');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('items', $data);
@@ -157,9 +151,9 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testCategoriesReturnsAllCategories()
     {
-        ImageCategory::create(['name' => 'Photos', 'slug' => 'photos']);
-        ImageCategory::create(['name' => 'Graphics', 'slug' => 'graphics']);
-        $response = $this->get('/api/image-categories');
+        ImageCategory::create(['name' => 'Photos', 'slug' => 'photos', 'site_id' => $this->siteId]);;
+        ImageCategory::create(['name' => 'Graphics', 'slug' => 'graphics', 'site_id' => $this->siteId]);;;
+        $response = $this->getForSite('/api/image-categories');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(2, $data['data']['categories']);
@@ -171,5 +165,57 @@ class ImageControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('New Category', $data['data']['category']['name']);
+    }
+
+    public function testDuplicateCreatesNewImage()
+    {
+        $this->createTempUploadFile('test.jpg');
+
+        $original = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => 'uploads_test/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'alt_text' => 'Original'
+        ]);
+
+        $response = $this->post("/api/images/{$original->id}/duplicate", [
+            'alt_text' => 'Duplicated image'
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Duplicated image', $data['data']['image']['alt_text']);
+        $this->assertStringContainsString('duplicated successfully', $data['data']['message']);
+    }
+
+    public function testDuplicateWithoutMetadataGeneratesDefaults()
+    {
+        $this->createTempUploadFile('test.jpg');
+
+        $original = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => 'uploads_test/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'alt_text' => 'Original alt',
+            'caption' => 'Original caption'
+        ]);
+
+        $response = $this->post("/api/images/{$original->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('copy', strtolower($data['data']['image']['alt_text']));
+    }
+
+    public function testDuplicateReturns500WhenImageNotFound()
+    {
+        $response = $this->post('/api/images/999/duplicate');
+        $this->assertEquals(500, $response->getStatusCode());
     }
 }

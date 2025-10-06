@@ -8,17 +8,11 @@ use App\Models\Tag;
 
 class TagControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsTags()
     {
-        Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        Tag::create(['name' => 'JavaScript', 'slug' => 'javascript']);
-        $response = $this->get('/api/tags');
+        Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;
+        Tag::create(['name' => 'JavaScript', 'slug' => 'javascript', 'site_id' => $this->siteId]);;
+        $response = $this->getForSite('/api/tags');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('items', $data);
@@ -212,7 +206,8 @@ class TagControllerTest extends FunctionalTestCase
             'name' => 'PHP',
             'description' => 'PHP programming',
             'slug' => 'php',
-            'status' => 'active'
+            'status' => 'active',
+            'site_id' => $this->siteId,
         ]);
 
         $response = $this->postJson("/api/tags/{$tag->id}/duplicate");

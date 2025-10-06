@@ -10,7 +10,7 @@ class CustomFieldDefinition extends Model
     protected $fillable = [
         'name', 'key', 'type', 'description', 'options', 'validation_rules',
         'default_value', 'is_required', 'is_searchable', 'group_name',
-        'sort_order', 'is_active', 'created_at', 'updated_at', 'placeholder'
+        'sort_order', 'is_active', 'created_at', 'updated_at', 'placeholder', 'site_id'
     ];
 
     public function pageCustomFields(): array

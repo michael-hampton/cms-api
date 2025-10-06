@@ -18,10 +18,10 @@ class BrandController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->brandService->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, BrandResource::class);
@@ -37,7 +37,7 @@ class BrandController extends Controller
             $data = $request->all();
             $logoFile = $request->file('logo');
 
-            $brand = $this->brandService->createBrand($data, $logoFile);
+            $brand = $this->brandService->createBrand($data,$request->get('site_id'), $logoFile);
 
             return $this->jsonResponse([
                 'brand' => BrandResource::make($brand)->toArray()

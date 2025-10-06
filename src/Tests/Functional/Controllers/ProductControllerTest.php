@@ -8,17 +8,11 @@ use App\Models\Product;
 
 class ProductControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexUsesSearchInfrastructure()
     {
         $this->createProduct(3);
 
-        $response = $this->getJson('/api/products');
+        $response = $this->getForSite('/api/products');
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -35,7 +29,7 @@ class ProductControllerTest extends FunctionalTestCase
             'brand' => 'LogiTech'
         ]);
 
-        $response = $this->getJson('/api/products?search=wireless');
+        $response = $this->getForSite('/api/products?search=wireless');
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -54,7 +48,7 @@ class ProductControllerTest extends FunctionalTestCase
             'brand' => 'BrandA'
         ]);
 
-        $response = $this->getJson('/api/products?filter[category_id]=' . $category->id);
+        $response = $this->getForSite('/api/products?filter[category_id]=' . $category->id);
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -65,7 +59,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $this->createProduct(3);
 
-        $response = $this->getJson('/api/products?sort=name&order=asc');
+        $response = $this->getForSite('/api/products?sort=name&order=asc');
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -76,7 +70,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $this->createProduct(15);
 
-        $response = $this->getJson('/api/products?page=1&per_page=10');
+        $response = $this->getForSite('/api/products?page=1&per_page=10');
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());

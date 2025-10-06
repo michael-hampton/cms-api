@@ -8,20 +8,12 @@ use App\Models\PageCustomField;
 
 class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->runMigrations();
-    }
-
     public function testIndexReturnsActiveFields()
     {
-        $this->cleanupDatabase();
-
-        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
-        CustomFieldDefinition::create(['name' => 'Size', 'key' => 'size', 'type' => 'number', 'is_active' => true]);
-        CustomFieldDefinition::create(['name' => 'Inactive', 'key' => 'inactive', 'type' => 'text', 'is_active' => false]);
-        $response = $this->get('/api/custom-fields');
+        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true, 'site_id' => $this->siteId]);
+        CustomFieldDefinition::create(['name' => 'Size', 'key' => 'size', 'type' => 'number', 'is_active' => true, 'site_id' => $this->siteId]);
+        CustomFieldDefinition::create(['name' => 'Inactive', 'key' => 'inactive', 'type' => 'text', 'is_active' => false, 'site_id' => $this->siteId]);
+        $response = $this->getForSite('/api/custom-fields');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -31,11 +23,12 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testGroupedReturnsFieldsByGroup()
     {
-        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'group_name' => 'Product', 'is_active' => true]);
-        CustomFieldDefinition::create(['name' => 'Author', 'key' => 'author', 'type' => 'text', 'group_name' => 'Content', 'is_active' => true]);
-        $response = $this->get('/api/custom-fields/grouped');
+        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'group_name' => 'Product', 'is_active' => true, 'site_id' => $this->siteId]);;
+        CustomFieldDefinition::create(['name' => 'Author', 'key' => 'author', 'type' => 'text', 'group_name' => 'Content', 'is_active' => true, 'site_id' => $this->siteId]);
+        $response = $this->getForSite('/api/custom-fields/grouped');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
+
         $this->assertArrayHasKey('groups', $data['data']);
         $this->assertArrayHasKey('Product', $data['data']['groups']);
         $this->assertArrayHasKey('Content', $data['data']['groups']);
@@ -138,7 +131,8 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
         $page = Page::create([
             'title' => 'Test Page',
             'slug' => 'test-page',
-            'status' => 'draft'
+            'status' => 'draft',
+            'site_id' => $this->siteId
         ]);
 
         // Create custom field definitions
@@ -146,21 +140,24 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
             'name' => 'Color',
             'key' => 'color',
             'type' => 'text',
-            'is_active' => true
+            'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $sizeField = CustomFieldDefinition::create([
             'name' => 'Size',
             'key' => 'size',
             'type' => 'number',
-            'is_active' => true
+            'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $inactiveField = CustomFieldDefinition::create([
             'name' => 'Inactive',
             'key' => 'inactive',
             'type' => 'text',
-            'is_active' => false
+            'is_active' => false,
+            'site_id' => $this->siteId
         ]);
 
         // Set values for some fields
@@ -255,7 +252,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
         ]);
 
         // Make request
-        $response = $this->get("/api/pages/{$page->id}/custom-fields/grouped");
+        $response = $this->getForSite("/api/pages/{$page->id}/custom-fields/grouped");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -286,7 +283,8 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
         $page = Page::create([
             'title' => 'Empty Page',
             'slug' => 'empty-page',
-            'status' => 'draft'
+            'status' => 'draft',
+            'site_id' => $this->siteId
         ]);
 
         // Create custom field definitions but don't set values
@@ -321,7 +319,8 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
         $page = Page::create([
             'title' => 'Test Page',
             'slug' => 'test-page',
-            'status' => 'draft'
+            'status' => 'draft',
+            'site_id' => $this->siteId
         ]);
 
         // Create custom field definitions
@@ -367,7 +366,8 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
         $page = Page::create([
             'title' => 'Test Page',
             'slug' => 'test-page',
-            'status' => 'draft'
+            'status' => 'draft',
+            'site_id' => $this->siteId
         ]);
 
         // Create custom field definition
@@ -404,7 +404,8 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
         $page = Page::create([
             'title' => 'Test Page',
             'slug' => 'test-page',
-            'status' => 'draft'
+            'status' => 'draft',
+            'site_id' => 1
         ]);
 
         // Create different typed fields
@@ -412,21 +413,24 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
             'name' => 'Count',
             'key' => 'count',
             'type' => 'number',
-            'is_active' => true
+            'is_active' => true,
+            'site_id' => 1
         ]);
 
         $boolField = CustomFieldDefinition::create([
             'name' => 'Featured',
             'key' => 'featured',
             'type' => 'boolean',
-            'is_active' => true
+            'is_active' => true,
+            'site_id' => 1
         ]);
 
         $jsonField = CustomFieldDefinition::create([
             'name' => 'Settings',
             'key' => 'settings',
             'type' => 'json',
-            'is_active' => true
+            'is_active' => true,
+            'site_id' => 1
         ]);
 
         // Set values (stored as strings in DB)

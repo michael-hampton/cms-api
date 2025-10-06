@@ -9,7 +9,7 @@ use JsonSerializable;
 
 class Collection implements IteratorAggregate, Countable, JsonSerializable
 {
-    protected $items = [];
+    public $items = [];
 
     public function __construct(array $items = [])
     {

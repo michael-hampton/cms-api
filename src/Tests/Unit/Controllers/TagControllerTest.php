@@ -10,10 +10,11 @@ use App\Models\Tag;
 use App\Repositories\TagRepository;
 use App\Search\PaginatedResult;
 use App\Services\TagService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class TagControllerTest extends TestCase
+class TagControllerTest extends FunctionalTestCase
 {
     private $tagRepository;
     private $validator;
@@ -22,6 +23,7 @@ class TagControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->tagRepository = Mockery::mock(TagRepository::class);
         $this->validator = Mockery::mock(Validator::class);
         $this->tagService = Mockery::mock(TagService::class);
@@ -60,7 +62,7 @@ class TagControllerTest extends TestCase
             ->once()
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 
@@ -100,7 +102,7 @@ class TagControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 
@@ -140,7 +142,7 @@ class TagControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);;
 
         $data = json_decode($response->getContent(), true);
 
@@ -156,7 +158,7 @@ class TagControllerTest extends TestCase
             ->andReturnUsing(function ($key, $default = null) {
                 return match ($key) {
                     'q' => '',
-                    'search' => null,
+                    'search' => ['site' => $this->siteSlug],
                     'sort_by' => null,
                     'sort_order' => 'asc',
                     'page' => 1,
@@ -174,7 +176,7 @@ class TagControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }

@@ -25,6 +25,7 @@ class BrandServiceTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->brandRepository = Mockery::mock(BrandRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
         $this->databaseMock = Mockery::mock(Database::class);
@@ -58,7 +59,7 @@ class BrandServiceTest extends FunctionalTestCase
             }))
             ->andReturn($mockedBrand);
 
-        $result = $this->service->createBrand($data);
+        $result = $this->service->createBrand($data, $this->siteId);
 
         $this->assertInstanceOf(Brand::class, $result);
         $this->assertSame($mockedBrand, $result);
@@ -91,7 +92,7 @@ class BrandServiceTest extends FunctionalTestCase
             ))
             ->andReturn($mockedBrand);
 
-        $result = $this->service->createBrand($data, $logoFile);
+        $result = $this->service->createBrand($data, $this->siteId, $logoFile);
 
         $this->assertInstanceOf(Brand::class, $result);
     }

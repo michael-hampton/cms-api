@@ -26,9 +26,9 @@ class MenuService
         return $this->menuRepository->getMenuById($id);
     }
 
-    public function getAllMenus(): Collection
+    public function getAllMenus(string $siteName): Collection
     {
-        return $this->menuRepository->getAllMenus();
+        return $this->menuRepository->getAllMenus($siteName);
     }
 
     public function createMenu(array $data): Model

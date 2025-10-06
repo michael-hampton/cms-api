@@ -13,10 +13,11 @@ use App\Requests\CreateAuthorRequest;
 use App\Requests\UpdateAuthorRequest;
 use App\Search\PaginatedResult;
 use App\Services\AuthorService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class AuthorControllerTest extends TestCase
+class AuthorControllerTest extends FunctionalTestCase
 {
     private $authorService;
     private $controller;
@@ -24,6 +25,7 @@ class AuthorControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->authorService = Mockery::mock(AuthorService::class);
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->controller = new AuthorController($this->authorService, $this->authorRepository);;
@@ -65,7 +67,7 @@ class AuthorControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);;
 
         $data = json_decode($response->getContent(), true);
 
@@ -105,7 +107,7 @@ class AuthorControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 
@@ -145,7 +147,7 @@ class AuthorControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);;
 
         $data = json_decode($response->getContent(), true);
 
@@ -161,7 +163,7 @@ class AuthorControllerTest extends TestCase
             ->andReturnUsing(function ($key, $default = null) {
                 return match ($key) {
                     'q' => null,
-                    'search' => null,
+                    'search' => ['site' => $this->siteSlug],
                     'sort_by' => null,
                     'sort_order' => 'asc',
                     'page' => 1,
@@ -184,7 +186,7 @@ class AuthorControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 
@@ -198,8 +200,10 @@ class AuthorControllerTest extends TestCase
         $request = Mockery::mock(CreateAuthorRequest::class);
         $request->shouldReceive('validated')->andReturn([
             'name' => 'New Author',
-            'email' => 'author@example.com'
+            'email' => 'author@example.com',
+            'site_id' => 1
         ]);
+        $request->shouldReceive('get')->with('site_id')->andReturn($this->siteId);
         $request->shouldReceive('hasFile')->with('avatar')->andReturn(false);
         $request->shouldReceive('file')->never();
 

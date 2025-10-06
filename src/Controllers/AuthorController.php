@@ -22,10 +22,10 @@ class AuthorController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->authorRepository->search($criteria);
 
             return $this->searchResponse($result);
@@ -41,7 +41,7 @@ class AuthorController extends Controller
 
             $avatarFile = $request->hasFile('avatar') ? $request->file('avatar') : null;
 
-            $author = $this->authorService->createAuthor($data, $avatarFile);
+            $author = $this->authorService->createAuthor($data, $request->get('site_id'), $avatarFile);
 
             return $this->jsonResponse(['author' => $author->toArray()], 201);
 

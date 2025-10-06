@@ -10,10 +10,11 @@ use App\Models\Image;
 use App\Repositories\ImageRepository;
 use App\Search\PaginatedResult;
 use App\Services\ImageService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class ImageControllerTest extends TestCase
+class ImageControllerTest extends FunctionalTestCase
 {
     private $imageService;
     private $controller;
@@ -22,6 +23,7 @@ class ImageControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->imageService = Mockery::mock(ImageService::class);
         $this->imageRepository = Mockery::mock(ImageRepository::class);
         $this->controller = new ImageController($this->imageService, $this->imageRepository);
@@ -64,7 +66,7 @@ class ImageControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);;
 
         $data = json_decode($response->getContent(), true);
 
@@ -85,6 +87,7 @@ class ImageControllerTest extends TestCase
         $request->shouldReceive('get')->with('caption')->andReturn('Caption');
         $request->shouldReceive('get')->with('description')->andReturn('Description');
         $request->shouldReceive('get')->with('categories', [])->andReturn([]);
+        $request->shouldReceive('get')->with('site_id')->andReturn($this->siteId);
 
         $image = Mockery::mock(Image::class);
         $image->shouldReceive('toArrayWithUsage')->andReturn(['id' => 1]);

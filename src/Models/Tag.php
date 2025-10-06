@@ -10,7 +10,7 @@ class Tag extends Model
     protected $table = 'tags';
     protected $fillable = [
         'name', 'slug', 'description', 'color', 'usage_count',
-        'is_featured', 'meta', 'created_at', 'updated_at'
+        'is_featured', 'meta', 'created_at', 'updated_at', 'site_id'
     ];
 
     protected $casts = [

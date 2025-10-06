@@ -9,7 +9,7 @@ class ImageCategory extends Model
     protected $table = 'image_categories';
 
     protected $fillable = [
-        'name', 'slug', 'description', 'is_active', 'created_at', 'updated_at'
+        'name', 'slug', 'description', 'is_active', 'created_at', 'updated_at', 'site_id'
     ];
 
     protected $casts = [
@@ -22,7 +22,7 @@ class ImageCategory extends Model
     {
         return $this->belongsToMany(
             Image::class,
-            'image_categories_pivot',
+            'image_category_pivot',
             'category_id',
             'image_id',
             $relation

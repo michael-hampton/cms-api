@@ -13,7 +13,6 @@ class CategoryService
     private Database $database;
     protected CategoryRepository $repository;
 
-
     public function __construct(Database $database, CategoryRepository $repository)
     {
         $this->database = $database ?? Database::getInstance();

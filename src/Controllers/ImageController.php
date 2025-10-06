@@ -22,10 +22,10 @@ class ImageController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);;
             $result = $this->imageRepository->search($criteria);
 
             return $this->searchResponse($result);
@@ -47,7 +47,8 @@ class ImageController extends Controller
                 'alt_text' => $request->get('alt_text'),
                 'caption' => $request->get('caption'),
                 'description' => $request->get('description'),
-                'categories' => $request->get('categories', [])
+                'categories' => $request->get('categories', []),
+                'site_id' => $request->get('site_id'),
             ];
 
             $image = $this->imageService->uploadImage($file, $metadata);
@@ -265,10 +266,10 @@ class ImageController extends Controller
         }
     }
 
-    public function categories(): JsonResponse
+    public function categories(string $siteName): JsonResponse
     {
         try {
-            $categories = $this->imageService->getCategories();
+            $categories = $this->imageService->getCategories($siteName);
 
             return $this->jsonResponse([
                 'categories' => $categories->toArray()
@@ -310,5 +311,34 @@ class ImageController extends Controller
         $factor = floor(log($bytes, 1024));
 
         return sprintf("%.1f %s", $bytes / pow(1024, $factor), $units[$factor]);
+    }
+
+    public function duplicate(int $id, Request $request): JsonResponse
+    {
+        try {
+            $metadata = [
+                'alt_text' => $request->get('alt_text'),
+                'caption' => $request->get('caption'),
+                'description' => $request->get('description'),
+                'original_name' => $request->get('original_name'),
+                'categories' => $request->get('categories', []),
+                'site_id' => $request->get('site_id'),
+            ];
+
+            // Remove null values
+            $metadata = array_filter($metadata, function($value) {
+                return $value !== null;
+            });
+
+            $newImage = $this->imageService->duplicateImage($id, $metadata);
+
+            return $this->jsonResponse([
+                'image' => $newImage->toArrayWithUsage(),
+                'message' => 'Image duplicated successfully'
+            ], 201);
+
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 }

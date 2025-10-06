@@ -62,6 +62,10 @@ class CreateCategoryRequest extends FormRequest
             $this->data['slug'] = Str::slug($this->data['name']);
         }
 
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+
         if (!isset($this->data['is_active'])) {
             $this->data['is_active'] = true;
         }

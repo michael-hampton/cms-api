@@ -10,7 +10,7 @@ class Category extends Model
     protected $table = 'categories';
     protected $fillable = [
         'name', 'slug', 'description', 'color', 'icon', 'parent_id',
-        'sort_order', 'is_active', 'meta', 'created_at', 'updated_at'
+        'sort_order', 'is_active', 'meta', 'created_at', 'updated_at', 'site_id'
     ];
 
     protected $casts = [

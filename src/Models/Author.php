@@ -10,7 +10,7 @@ class Author extends Model
 
     protected $fillable = [
         'name', 'slug', 'email', 'bio', 'avatar', 'website',
-        'twitter', 'linkedin', 'facebook', 'status'
+        'twitter', 'linkedin', 'facebook', 'status', 'site_id'
     ];
 
     protected $casts = [

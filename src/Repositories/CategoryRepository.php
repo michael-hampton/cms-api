@@ -81,7 +81,7 @@ class CategoryRepository extends Repository
         return $tree;
     }
 
-    public function findOrCreateByName(string $name): Model
+    public function findOrCreateByName(string $name, int $siteId): Model
     {
         $slug = Str::slug($name, [$this, 'findBySlug']);
         $existing = $this->findBySlug($slug);
@@ -93,7 +93,8 @@ class CategoryRepository extends Repository
         return $this->create([
             'name' => $name,
             'slug' => $slug,
-            'is_active' => true
+            'is_active' => true,
+            'site_id' => $siteId
         ]);
     }
 

@@ -135,7 +135,7 @@ class SearchConfigurationFactory
 
         // Filters
         $config->addFilter(new EqualsFilter('category_id', 'category_id'))
-            ->addFilter(new LikeFilter('brand', 'brand'))
+            ->addFilter(new LikeFilter('brand', 'brand_id'))
             ->addFilter(new CustomFilter('on_sale', function($query, $value) {
                 if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
                     $query->whereNotNull('sale_price')
@@ -153,7 +153,7 @@ class SearchConfigurationFactory
         // Searchable columns
         $config->addSearchableColumn('name')
             ->addSearchableColumn('description')
-            ->addSearchableColumn('brand');
+            ->addSearchableColumn('brand_id');
 
         // Default sort
         $config->setDefaultSort('created_at', 'desc');

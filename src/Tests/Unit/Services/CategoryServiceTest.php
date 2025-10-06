@@ -21,10 +21,12 @@ class CategoryServiceTest extends FunctionalTestCase
 
     public function setUp(): void
     {
+        parent::setUp();
+
         $this->categoryRepository = Mockery::mock(CategoryRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->service = new CategoryService($this->databaseMock, $this->categoryRepository);;
-        parent::setUp();
+
     }
 
     protected function tearDown(): void

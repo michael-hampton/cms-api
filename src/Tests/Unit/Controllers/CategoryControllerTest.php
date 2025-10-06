@@ -11,10 +11,11 @@ use App\Requests\CreateCategoryRequest;
 use App\Requests\UpdateCategoryRequest;
 use App\Search\PaginatedResult;
 use App\Services\CategoryService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class CategoryControllerTest extends TestCase
+class CategoryControllerTest extends FunctionalTestCase
 {
     private $categoryRepository;
     private $validator;
@@ -23,6 +24,7 @@ class CategoryControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->categoryRepository = Mockery::mock(CategoryRepository::class);
         $this->validator = Mockery::mock(Validator::class);
         $this->categoryService = Mockery::mock(CategoryService::class);
@@ -68,7 +70,7 @@ class CategoryControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 
@@ -109,7 +111,7 @@ class CategoryControllerTest extends TestCase
             }))
             ->andReturn($result);
 
-        $response = $this->controller->index($request);
+        $response = $this->controller->index($request, $this->siteSlug);
 
         $data = json_decode($response->getContent(), true);
 

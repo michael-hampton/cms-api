@@ -72,7 +72,7 @@ class BlockParserService
 
     public function parsePageBlocks(int $pageId, array $blocks): array
     {
-        return $this->executeInTransaction(function () use ($pageId, $blocks) {
+        return $this->database->transaction(function () use ($pageId, $blocks) {
             $results = [];
             $errors = [];
 
@@ -89,7 +89,7 @@ class BlockParserService
             }
 
             if (!empty($errors)) {
-                throw new ValidationException(implode("\n", $errors));;
+                throw new ValidationException('Block validation failed', $errors);
             }
 
             return $results;
@@ -153,7 +153,7 @@ class BlockParserService
 
     public function replacePageBlocks(int $pageId, array $blocksData): array
     {
-        return $this->executeInTransaction(function () use ($pageId, $blocksData) {
+        return $this->database->transaction(function () use ($pageId, $blocksData) {
             $this->blockRepository->deletePageBlocks($pageId);
             return $this->parsePageBlocks($pageId, $blocksData);
         });
@@ -161,7 +161,7 @@ class BlockParserService
 
     private function parseSinglePage(array $pageData): array
     {
-        return $this->executeInTransaction(function () use ($pageData) {
+        return $this->database->transaction(function () use ($pageData) {
             $pageInfo = $pageData['page'] ?? [];
             $blocksData = $pageData['blocks'] ?? [];
 
@@ -207,19 +207,19 @@ class BlockParserService
         }
     }
 
-    private function executeInTransaction(callable $callback)
-    {
-        $this->database->beginTransaction();
-
-        try {
-            $result = $callback();
-            $this->database->commit();
-            return $result;
-        } catch (Exception $e) {
-            $this->database->rollBack();
-            throw $e;
-        }
-    }
+//    private function executeInTransaction(callable $callback)
+//    {
+//        $this->database->beginTransaction();
+//
+//        try {
+//            $result = $callback();
+//            $this->database->commit();
+//            return $result;
+//        } catch (Exception $e) {
+//            $this->database->rollBack();
+//            throw $e;
+//        }
+//    }
 
     private function formatValidationError(ValidationException $e): array
     {

@@ -26,4 +26,11 @@ class UpdateProductRequest extends FormRequest
             'meta_keywords' => ['string', 'max:500'],
         ];
     }
+
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->data['site_id'])) {
+            $this->data['site_id'] = config('app.default_site_id');
+        }
+    }
 }
