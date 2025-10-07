@@ -34,7 +34,7 @@ class ImageController extends Controller
         }
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, string $siteName): JsonResponse
     {
         try {
             $file = $request->file('image');
@@ -87,7 +87,7 @@ class ImageController extends Controller
         }
     }
 
-    public function update(int $id, UpdateImageRequest $request): JsonResponse
+    public function update(int $id, UpdateImageRequest $request, string $siteName): JsonResponse
     {
         try {
             $metadata = [
@@ -120,7 +120,7 @@ class ImageController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request): JsonResponse
+    public function destroy(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $hardDelete = $request->get('hard_delete', false);
@@ -139,7 +139,7 @@ class ImageController extends Controller
         }
     }
 
-    public function bulkDestroy(Request $request): JsonResponse
+    public function bulkDestroy(Request $request, string $siteName): JsonResponse
     {
         try {
             $imageIds = $request->get('image_ids', []);
@@ -161,7 +161,7 @@ class ImageController extends Controller
         }
     }
 
-    public function recent(Request $request): JsonResponse
+    public function recent(Request $request, string $siteName): JsonResponse
     {
         try {
             $limit = (int)$request->get('limit', 10);
@@ -189,7 +189,7 @@ class ImageController extends Controller
         }
     }
 
-    public function unused(Request $request): JsonResponse
+    public function unused(Request $request, string $siteName): JsonResponse
     {
         try {
             $olderThanDays = $request->get('older_than_days');
@@ -207,7 +207,7 @@ class ImageController extends Controller
         }
     }
 
-    public function cleanup(Request $request): JsonResponse
+    public function cleanup(Request $request, string $siteName): JsonResponse
     {
         try {
             $olderThanDays = (int)$request->get('older_than_days', 30);
@@ -224,7 +224,7 @@ class ImageController extends Controller
         }
     }
 
-    public function trackUsage(Request $request): JsonResponse
+    public function trackUsage(Request $request, string $siteName): JsonResponse
     {
         try {
             $imageId = (int)$request->get('image_id');
@@ -245,7 +245,7 @@ class ImageController extends Controller
         }
     }
 
-    public function removeUsage(Request $request): JsonResponse
+    public function removeUsage(Request $request, string $siteName): JsonResponse
     {
         try {
             $imageId = (int)$request->get('image_id');
@@ -280,7 +280,7 @@ class ImageController extends Controller
         }
     }
 
-    public function createCategory(CreateImageCategoryRequest $request): JsonResponse
+    public function createCategory(CreateImageCategoryRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -313,7 +313,7 @@ class ImageController extends Controller
         return sprintf("%.1f %s", $bytes / pow(1024, $factor), $units[$factor]);
     }
 
-    public function duplicate(int $id, Request $request): JsonResponse
+    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $metadata = [

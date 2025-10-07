@@ -52,7 +52,7 @@ class CategoryControllerTest extends FunctionalTestCase
     {
         $category = Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
 
-        $response = $this->get("/api/categories/{$category->id}");
+        $response = $this->getForSite("/api/categories/{$category->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -63,7 +63,7 @@ class CategoryControllerTest extends FunctionalTestCase
     {
         Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
 
-        $response = $this->get('/api/categories/technology');
+        $response = $this->getForSite('/api/categories/technology');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -86,7 +86,7 @@ class CategoryControllerTest extends FunctionalTestCase
             'is_active' => true
         ];
 
-        $response = $this->post('/api/categories', $categoryData);
+        $response = $this->postForSite('/api/categories', $categoryData);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -96,7 +96,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testStoreAutoGeneratesSlug()
     {
-        $response = $this->post('/api/categories', ['name' => 'My New Category']);
+        $response = $this->postForSite('/api/categories', ['name' => 'My New Category']);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -107,7 +107,7 @@ class CategoryControllerTest extends FunctionalTestCase
     {
         Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
 
-        $response = $this->post('/api/categories', [
+        $response = $this->postForSite('/api/categories', [
             'name' => 'New Tech',
             'slug' => 'technology'
         ]);
@@ -117,7 +117,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesParentExists()
     {
-        $response = $this->post('/api/categories', [
+        $response = $this->postForSite('/api/categories', [
             'name' => 'Child Category',
             'parent_id' => 999
         ]);
@@ -129,7 +129,7 @@ class CategoryControllerTest extends FunctionalTestCase
     {
         $category = Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
 
-        $response = $this->put("/api/categories/{$category->id}", [
+        $response = $this->putForSite("/api/categories/{$category->id}", [
             'name' => 'Updated Technology',
             'description' => 'New description',
             'color' => '#000000'
@@ -142,7 +142,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testUpdateReturns404ForNonexistent()
     {
-        $response = $this->put('/api/categories/999', ['name' => 'Test']);
+        $response = $this->putForSite('/api/categories/999', ['name' => 'Test']);
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -151,7 +151,7 @@ class CategoryControllerTest extends FunctionalTestCase
     {
         $category = Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
 
-        $response = $this->delete("/api/categories/{$category->id}");
+        $response = $this->deleteForSite("/api/categories/{$category->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Category::find($category->id));
@@ -159,7 +159,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDestroyReturns404ForNonexistent()
     {
-        $response = $this->delete('/api/categories/999');
+        $response = $this->deleteForSite('/api/categories/999');
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -174,7 +174,7 @@ class CategoryControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->get("/api/categories/{$category->id}/check-delete");
+        $response = $this->getForSite("/api/categories/{$category->id}/check-delete");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -207,7 +207,7 @@ class CategoryControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->get("/api/categories/{$category->id}/check-delete");
+        $response = $this->getForSite("/api/categories/{$category->id}/check-delete");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -222,7 +222,7 @@ class CategoryControllerTest extends FunctionalTestCase
     public function testCheckDeleteCategoryReturns404WhenAuthorNotFound()
     {
         // Act
-        $response = $this->get('/api/categories/9999/check-delete');
+        $response = $this->getForSite('/api/categories/9999/check-delete');
 
         // Assert
         $this->assertEquals(404, $response->getStatusCode());
@@ -239,7 +239,7 @@ class CategoryControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->postJson("/api/categories/{$category->id}/duplicate");
+        $response = $this->postForSite("/api/categories/{$category->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -264,7 +264,7 @@ class CategoryControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->postJson("/api/categories/{$child->id}/duplicate");
+        $response = $this->postForSite("/api/categories/{$child->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -284,12 +284,12 @@ class CategoryControllerTest extends FunctionalTestCase
         ]);
 
         // Create first duplicate
-        $response1 = $this->postJson("/api/categories/{$category1->id}/duplicate");
+        $response1 = $this->postForSite("/api/categories/{$category1->id}/duplicate");
         $this->assertResponseOk($response1);
         $data1 = json_decode($response1->getContent(), true);
 
         // Create second duplicate - should handle slug conflict
-        $response2 = $this->postJson("/api/categories/{$category1->id}/duplicate");
+        $response2 = $this->postForSite("/api/categories/{$category1->id}/duplicate");
         $this->assertResponseOk($response2);
         $data2 = json_decode($response2->getContent(), true);
 

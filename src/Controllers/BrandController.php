@@ -6,6 +6,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Models\Site;
 use App\Resources\BrandResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\BrandService;
@@ -31,13 +32,14 @@ class BrandController extends Controller
         }
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
             $logoFile = $request->file('logo');
+            $siteId = Site::resolveSite($siteName);
 
-            $brand = $this->brandService->createBrand($data,$request->get('site_id'), $logoFile);
+            $brand = $this->brandService->createBrand($data,$siteId, $logoFile);
 
             return $this->jsonResponse([
                 'brand' => BrandResource::make($brand)->toArray()
@@ -70,7 +72,7 @@ class BrandController extends Controller
         }
     }
 
-    public function update(int $id, Request $request): JsonResponse
+    public function update(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -88,7 +90,7 @@ class BrandController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request): JsonResponse
+    public function destroy(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $reassignToBrandId = $request->get('reassign_to');
@@ -105,7 +107,7 @@ class BrandController extends Controller
         }
     }
 
-    public function checkDelete(int $id): JsonResponse
+    public function checkDelete(int $id, string $siteName): JsonResponse
     {
         try {
             $result = $this->brandService->checkDeletable($id);
@@ -115,7 +117,7 @@ class BrandController extends Controller
         }
     }
 
-    public function alternatives(int $id): JsonResponse
+    public function alternatives(int $id, string $siteName): JsonResponse
     {
         try {
             $brands = $this->brandService->getAlternativeBrands($id);
@@ -127,7 +129,7 @@ class BrandController extends Controller
         }
     }
 
-    public function merge(Request $request): JsonResponse
+    public function merge(Request $request, string $siteName): JsonResponse
     {
         try {
             $sourceBrandId = $request->get('source_brand_id');
@@ -141,7 +143,7 @@ class BrandController extends Controller
         }
     }
 
-    public function active(): JsonResponse
+    public function active(string $siteName): JsonResponse
     {
         try {
             $brands = $this->brandService->getActiveBrands();
@@ -153,7 +155,7 @@ class BrandController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request): JsonResponse
+    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();

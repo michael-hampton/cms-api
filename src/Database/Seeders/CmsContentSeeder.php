@@ -235,7 +235,7 @@ class CmsContentSeeder extends Seeder
                     'type' => 'text',
                     'order' => 1,
                     'data' => [
-                        'content' => '<h2>Market Overview</h2><p>The London property market in 2024 shows resilient growth despite economic uncertainties. Average property prices have increased by 3.2% year-on-year, with prime central London areas leading the recovery.</p>',
+                        'paragraphs' => ['<h2>Market Overview</h2><p>The London property market in 2024 shows resilient growth despite economic uncertainties. Average property prices have increased by 3.2% year-on-year, with prime central London areas leading the recovery.</p>'],
                         'context' => 'main'
                     ]
                 ],

@@ -22,7 +22,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testShowReturnsTagById()
     {
         $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        $response = $this->get("/api/tags/{$tag->id}");
+        $response = $this->getForSite("/api/tags/{$tag->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('PHP', $data['data']['tag']['name']);
@@ -31,7 +31,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testShowReturnsTagBySlug()
     {
         Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        $response = $this->get('/api/tags/php');
+        $response = $this->getForSite('/api/tags/php');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('PHP', $data['data']['tag']['name']);
@@ -46,7 +46,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testStoreCreatesTag()
     {
         $tagData = ['name' => 'PHP', 'description' => 'PHP programming language', 'color' => '#777BB4', 'is_featured' => true];
-        $response = $this->post('/api/tags', $tagData);
+        $response = $this->postForSite('/api/tags', $tagData);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('PHP', $data['data']['tag']['name']);
@@ -55,7 +55,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testStoreAutoGeneratesSlug()
     {
-        $response = $this->post('/api/tags', ['name' => 'My New Tag']);
+        $response = $this->postForSite('/api/tags', ['name' => 'My New Tag']);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('my-new-tag', $data['data']['tag']['slug']);
@@ -64,14 +64,14 @@ class TagControllerTest extends FunctionalTestCase
     public function testStoreValidatesUniqueSlug()
     {
         Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        $response = $this->post('/api/tags', ['name' => 'New PHP', 'slug' => 'php']);
+        $response = $this->postForSite('/api/tags', ['name' => 'New PHP', 'slug' => 'php']);
         $this->assertEquals(422, $response->getStatusCode());
     }
 
     public function testUpdateModifiesTag()
     {
         $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        $response = $this->put("/api/tags/{$tag->id}", ['name' => 'PHP 8', 'description' => 'Updated description', 'is_featured' => true]);
+        $response = $this->putForSite("/api/tags/{$tag->id}", ['name' => 'PHP 8', 'description' => 'Updated description', 'is_featured' => true]);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('PHP 8', $data['data']['tag']['name']);
@@ -79,14 +79,14 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testUpdateReturns404ForNonexistent()
     {
-        $response = $this->put('/api/tags/999', ['name' => 'Test']);
+        $response = $this->putForSite('/api/tags/999', ['name' => 'Test']);
         $this->assertEquals(404, $response->getStatusCode());
     }
 
     public function testDestroyDeletesTag()
     {
         $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        $response = $this->delete("/api/tags/{$tag->id}");
+        $response = $this->deleteForSite("/api/tags/{$tag->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Tag::find($tag->id));
     }
@@ -96,7 +96,7 @@ class TagControllerTest extends FunctionalTestCase
         for ($i = 1; $i <= 40; $i++) {
             Tag::create(['name' => "Tag $i", 'slug' => "tag-$i"]);
         }
-        $response = $this->get('/api/popular-tags');
+        $response = $this->getForSite('/api/popular-tags');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(30, $data['data']['tags']);
@@ -107,7 +107,7 @@ class TagControllerTest extends FunctionalTestCase
         Tag::create(['name' => 'Featured 1', 'slug' => 'featured-1', 'is_featured' => true]);
         Tag::create(['name' => 'Regular', 'slug' => 'regular', 'is_featured' => false]);
         Tag::create(['name' => 'Featured 2', 'slug' => 'featured-2', 'is_featured' => true]);
-        $response = $this->get('/api/featured-tags');
+        $response = $this->getForSite('/api/featured-tags');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -119,7 +119,7 @@ class TagControllerTest extends FunctionalTestCase
         for ($i = 1; $i <= 120; $i++) {
             Tag::create(['name' => "Tag $i", 'slug' => "tag-$i", 'usage_count' => 10]);
         }
-        $response = $this->get('/api/tags/cloud');
+        $response = $this->getForSite('/api/tags/cloud');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
@@ -129,7 +129,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testCleanupRemovesUnusedTags()
     {
         Tag::create(['name' => 'Unused Tag', 'slug' => 'unused']);
-        $response = $this->post('/api/tags/cleanup');
+        $response = $this->postForSite('/api/tags/cleanup');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertStringContainsString('Cleaned up', $data['message']);
@@ -144,7 +144,7 @@ class TagControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->get("/api/tags/{$category->id}/check-delete");
+        $response = $this->getForSite("/api/tags/{$category->id}/check-delete");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -177,7 +177,7 @@ class TagControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->get("/api/tags/{$category->id}/check-delete");
+        $response = $this->getForSite("/api/tags/{$category->id}/check-delete");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -192,7 +192,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testCheckDeleteTagReturns404WhenAuthorNotFound()
     {
         // Act
-        $response = $this->get('/api/tags/9999/check-delete');
+        $response = $this->getForSite('/api/tags/9999/check-delete');
 
         // Assert
         $this->assertEquals(404, $response->getStatusCode());
@@ -210,7 +210,7 @@ class TagControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId,
         ]);
 
-        $response = $this->postJson("/api/tags/{$tag->id}/duplicate");
+        $response = $this->postForSite("/api/tags/{$tag->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -240,7 +240,7 @@ class TagControllerTest extends FunctionalTestCase
             'tag_id' => $tag->id,
         ]);
 
-        $response = $this->postJson("/api/tags/{$tag->id}/duplicate");
+        $response = $this->postForSite("/api/tags/{$tag->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);

@@ -7,6 +7,7 @@ use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Migration\MigrationRunner;
 use App\Models\Site;
+use App\Models\User;
 use PHPUnit\Framework\TestCase;
 
 abstract class FunctionalTestCase extends TestCase
@@ -15,6 +16,8 @@ abstract class FunctionalTestCase extends TestCase
     protected ApiApplication $app;
     protected $siteSlug = '';
     protected int $siteId;
+    protected ?User $authenticatedUser = null;
+    protected ?string $authToken = null;
 
     protected function setUp(): void
     {
@@ -38,6 +41,8 @@ abstract class FunctionalTestCase extends TestCase
         $this->app = new ApiApplication($testConfig, $this->database);
 
         $this->ensureSiteExists();
+
+        $this->actingAs();
 
     }
 
@@ -71,6 +76,83 @@ abstract class FunctionalTestCase extends TestCase
         $this->siteId = $site->id;
     }
 
+    /**
+     * Authenticate as a test user and get token
+     */
+    protected function actingAs(?User $user = null): self
+    {
+        if ($user === null) {
+            // Create or get a test user
+            $user = User::where('email', 'michaelhamptondesign@yahoo.com')->first();
+            if (!$user) {
+                $user = User::create([
+                    'name' => 'Test User',
+                    'email' => 'test@example.com',
+                    'password' => password_hash('password', PASSWORD_DEFAULT),
+                    'site_id' => $this->siteId,
+                ]);
+            } else {
+                $user = new User($user);
+            }
+        }
+
+        $this->authenticatedUser = $user;
+
+        // Generate a test token (you may need to adjust based on your token generation logic)
+        $this->authToken = $this->generateTestToken($user);
+
+        return $this;
+    }
+
+    /**
+     * Generate a test authentication token
+     */
+    protected function generateTestToken(User $user): string
+    {
+        // Option 1: Use your actual token generation logic
+        // return $user->createToken('test-token');
+
+        // Option 2: Create a simple test token
+        // You'll need a tokens table or similar mechanism
+        $rawToken = bin2hex(random_bytes(32));
+        $hashedToken = hash('sha256', $rawToken);
+
+        // Store token in database (adjust based on your auth implementation)
+        $this->database->query(
+            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
+             VALUES (?, ?, ?, ?, NOW(), ?)",
+            ['App\\Models\\User', $user->id, 'test-token', $hashedToken, $this->siteId]
+        );
+
+        return $rawToken;
+    }
+
+    /**
+     * Clear authentication
+     */
+    protected function unauthenticate(): self
+    {
+        $this->authenticatedUser = null;
+        $this->authToken = null;
+        return $this;
+    }
+
+    /**
+     * Get default headers including auth token if set
+     */
+    protected function getDefaultHeaders(array $additionalHeaders = []): array
+    {
+        $headers = $additionalHeaders;
+
+        if ($this->authToken) {
+            $headers['Authorization'] = 'Bearer ' . $this->authToken;
+        }
+
+        $headers['X-Site-Id'] = $this->siteId;
+
+        return $headers;
+    }
+
     protected function tearDown(): void
     {
         $this->cleanupDatabase();
@@ -100,7 +182,7 @@ abstract class FunctionalTestCase extends TestCase
             // Truncate all tables
             foreach ($tables as $table) {
 
-                if ($table === 'migrations') {
+                if ($table === 'migrations' || $table === 'users') {
                     continue;
                 }
 
@@ -117,10 +199,10 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function get(string $uri, array $headers = []): Response
     {
-        return $this->makeRequest('GET', $uri, [], $headers);
+        return $this->makeRequest('GET', $uri, [], $this->getDefaultHeaders($headers));
     }
 
-    protected function getForSite(string $uri, array $headers = []): Response
+    private function generateUrl(string $uri): string
     {
         $siteSlug = $this->siteSlug;
 
@@ -147,19 +229,41 @@ abstract class FunctionalTestCase extends TestCase
             $fullPath .= '?' . $query;
         }
 
-        echo $fullPath;
-
-        return $this->makeRequest('GET', $fullPath, [], $headers);
+        return $fullPath;
     }
 
+    protected function getForSite(string $uri, array $headers = []): Response
+    {
+        return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+    }
 
+    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+        return $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+    }
+
+    protected function putForSite(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+        return $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+    }
+
+    protected function deleteForSite(string $uri, array $headers = []): Response
+    {
+        return $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+    }
 
     protected function post(string $uri, array $data = [], array $files = [], array $headers = []): Response
     {
         if (!empty($files)) {
             $_FILES = $files;
         }
-        return $this->makeRequest('POST', $uri, $data, $headers, $files);
+        return $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders($headers), $files);
     }
 
     protected function put(string $uri, array $data = [], array $files = [], array $headers = []): Response
@@ -167,17 +271,17 @@ abstract class FunctionalTestCase extends TestCase
         if (!empty($files)) {
             $_FILES = $files;
         }
-        return $this->makeRequest('PUT', $uri, $data, $headers, $files);
+        return $this->makeRequest('PUT', $uri, $data, $this->getDefaultHeaders($headers), $files);
     }
 
     protected function patch(string $uri, array $data = [], array $headers = []): Response
     {
-        return $this->makeRequest('PATCH', $uri, $data, $headers);
+        return $this->makeRequest('PATCH', $uri, $data, $this->getDefaultHeaders($headers));
     }
 
     protected function delete(string $uri, array $data = [], array $headers = []): Response
     {
-        return $this->makeRequest('DELETE', $uri, $data, $headers);
+        return $this->makeRequest('DELETE', $uri, $data, $this->getDefaultHeaders($headers));
     }
 
     protected function makeRequest(

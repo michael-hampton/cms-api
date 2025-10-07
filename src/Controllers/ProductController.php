@@ -38,7 +38,7 @@ class ProductController extends Controller
         }
     }
 
-    public function store(CreateProductRequest $request): JsonResponse
+    public function store(CreateProductRequest $request, string $siteName): JsonResponse
     {
         try {
             // Get the image file if uploaded
@@ -72,7 +72,7 @@ class ProductController extends Controller
         return $this->jsonResponse(['product' => $product]);
     }
 
-    public function update(UpdateProductRequest $request, int $id): JsonResponse
+    public function update(UpdateProductRequest $request, int $id, string $siteName): JsonResponse
     {
         try {
             $imageFile = $request->hasFile('image') ? $request->file('image') : null;
@@ -99,7 +99,7 @@ class ProductController extends Controller
         }
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id, string $siteName): JsonResponse
     {
         $deleted = $this->productService->deleteProduct($id);
 
@@ -114,7 +114,7 @@ class ProductController extends Controller
         ], 200);
     }
 
-    public function duplicate(int $id, Request $request): JsonResponse
+    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();

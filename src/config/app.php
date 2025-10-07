@@ -12,6 +12,7 @@ return [
         \App\Framework\ServiceProvider\ParserServiceProvider::class,
         \App\Framework\ServiceProvider\ServiceServiceProvider::class,
         \App\Framework\ServiceProvider\ControllerServiceProvider::class,
+        \App\Framework\ServiceProvider\ScheduleServiceProvider::class,
 
         // Add custom providers here
         // \App\Providers\CustomServiceProvider::class,

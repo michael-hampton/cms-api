@@ -322,7 +322,7 @@ class PageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($page);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(201, $response->getStatusCode());
     }
@@ -345,7 +345,7 @@ class PageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($page);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -396,7 +396,7 @@ class PageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn(true);
 
-        $response = $this->controller->destroy(1);
+        $response = $this->controller->destroy(1, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -414,7 +414,7 @@ class PageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($newPage);
 
-        $response = $this->controller->duplicate(1);
+        $response = $this->controller->duplicate(1, $this->siteSlug);
 
         $this->assertEquals(201, $response->getStatusCode());
     }

@@ -37,7 +37,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testShowReturnsFieldById()
     {
         $field = CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
-        $response = $this->get("/api/custom-fields/{$field->id}");
+        $response = $this->getForSite("/api/custom-fields/{$field->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Color', $data['data']['field']['name']);
@@ -46,7 +46,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testShowReturnsFieldByKey()
     {
         CustomFieldDefinition::create(['name' => 'Color', 'key' => 'product_color', 'type' => 'text', 'is_active' => true]);
-        $response = $this->get('/api/custom-fields/product_color');
+        $response = $this->getForSite('/api/custom-fields/product_color');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Color', $data['data']['field']['name']);
@@ -61,7 +61,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testStoreCreatesField()
     {
         $fieldData = ['name' => 'Product Color', 'key' => 'product_color', 'type' => 'text', 'group' => 'Product', 'required' => true, 'searchable' => true];
-        $response = $this->post('/api/custom-fields', $fieldData);
+        $response = $this->postForSite('/api/custom-fields', $fieldData);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Product Color', $data['data']['field']['name']);
@@ -71,7 +71,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testStoreWithOptions()
     {
         $fieldData = ['name' => 'Size', 'key' => 'size', 'type' => 'select', 'options' => ['small', 'medium', 'large']];
-        $response = $this->post('/api/custom-fields', $fieldData);
+        $response = $this->postForSite('/api/custom-fields', $fieldData);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertNotEmpty($data['data']['field']['options']);
@@ -80,7 +80,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testUpdateModifiesField()
     {
         $field = CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
-        $response = $this->put("/api/custom-fields/{$field->id}", ['name' => 'Updated Color', 'type' => 'text', 'description' => 'New description']);
+        $response = $this->putForSite("/api/custom-fields/{$field->id}", ['name' => 'Updated Color', 'type' => 'text', 'description' => 'New description']);
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -96,16 +96,16 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testDestroyDeletesField()
     {
         $field = CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
-        $response = $this->delete("/api/custom-fields/{$field->id}");
+        $response = $this->deleteForSite("/api/custom-fields/{$field->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(CustomFieldDefinition::find($field->id));
     }
 
     public function testRequiredReturnsOnlyRequiredFields()
     {
-        CustomFieldDefinition::create(['name' => 'Required', 'key' => 'required', 'type' => 'text', 'is_required' => true, 'is_active' => true]);
-        CustomFieldDefinition::create(['name' => 'Optional', 'key' => 'optional', 'type' => 'text', 'is_required' => false, 'is_active' => true]);
-        $response = $this->get('/api/custom-fields/required');
+        CustomFieldDefinition::create(['name' => 'Required', 'key' => 'required', 'type' => 'text', 'is_required' => true, 'is_active' => true, 'site_id' => $this->siteId]);;
+        CustomFieldDefinition::create(['name' => 'Optional', 'key' => 'optional', 'type' => 'text', 'is_required' => false, 'is_active' => true, 'site_id' => $this->siteId]);;;
+        $response = $this->getForSite('/api/custom-fields/required');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
@@ -115,9 +115,9 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testSearchableReturnsOnlySearchableFields()
     {
-        CustomFieldDefinition::create(['name' => 'Searchable', 'key' => 'searchable', 'type' => 'text', 'is_searchable' => true, 'is_active' => true]);
-        CustomFieldDefinition::create(['name' => 'Not Searchable', 'key' => 'not_searchable', 'type' => 'text', 'is_searchable' => false, 'is_active' => true]);
-        $response = $this->get('/api/custom-fields/searchable');
+        CustomFieldDefinition::create(['name' => 'Searchable', 'key' => 'searchable', 'type' => 'text', 'is_searchable' => true, 'is_active' => true, 'site_id' => $this->siteId]);;
+        CustomFieldDefinition::create(['name' => 'Not Searchable', 'key' => 'not_searchable', 'type' => 'text', 'is_searchable' => false, 'is_active' => true, 'site_id' => $this->siteId]);;;
+        $response = $this->getForSite('/api/custom-fields/searchable');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 

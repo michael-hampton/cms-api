@@ -14,14 +14,13 @@ $app = new ApiApplication();
 
 // Allow Angular dev server
 header("Access-Control-Allow-Origin: http://localhost:4200");
-// Allow common methods
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-// Allow common headers
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Site-Id"); // Add X-Site-Id
+header("Access-Control-Allow-Credentials: true"); // Add this for cookies/auth
 
 // If it's a preflight (OPTIONS) request, return immediately
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204); // No Content
+    http_response_code(204);
     exit;
 }
 

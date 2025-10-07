@@ -14,6 +14,8 @@ class Router
 {
     private array $routes = [];
     private Container $container;
+    private array $middleware = [];
+    private array $groupStack = []; // Track nested groups
 
     public function __construct(Container $container)
     {
@@ -21,81 +23,155 @@ class Router
     }
 
     /**
+     * Create a route group with shared attributes
+     */
+    public function group(array $attributes, callable $callback): void
+    {
+        // Push group attributes onto stack
+        $this->groupStack[] = $attributes;
+
+        // Execute the callback to register routes
+        $callback($this);
+
+        // Pop the group off the stack
+        array_pop($this->groupStack);
+    }
+
+    /**
+     * Get merged attributes from group stack
+     */
+    private function mergeGroupAttributes(array $new = []): array
+    {
+        $merged = [
+            'prefix' => '',
+            'middleware' => [],
+        ];
+
+        // Merge all groups in the stack
+        foreach ($this->groupStack as $group) {
+            if (isset($group['prefix'])) {
+                $merged['prefix'] .= '/' . trim($group['prefix'], '/');
+            }
+            if (isset($group['middleware'])) {
+                $merged['middleware'] = array_merge(
+                    $merged['middleware'],
+                    (array) $group['middleware']
+                );
+            }
+        }
+
+        // Merge with new attributes
+        if (isset($new['prefix'])) {
+            $merged['prefix'] .= '/' . trim($new['prefix'], '/');
+        }
+        if (isset($new['middleware'])) {
+            $merged['middleware'] = array_merge(
+                $merged['middleware'],
+                (array) $new['middleware']
+            );
+        }
+
+        $merged['prefix'] = '/' . trim($merged['prefix'], '/');
+
+        return $merged;
+    }
+
+    /**
      * Enhanced GET method - supports both old and new syntax
      */
-    public function get(string $path, $handler, ?string $method = null): void
+    public function get(string $path, $handler, ?string $method = null, array $middleware = []): void
     {
-        $this->addRoute('GET', $path, $handler, $method);
+        $this->addRoute('GET', $path, $handler, $method, $middleware);
     }
 
     /**
      * Enhanced POST method - supports both old and new syntax
      */
-    public function post(string $path, $handler, ?string $method = null): void
+    public function post(string $path, $handler, ?string $method = null, array $middleware = []): void
     {
-        $this->addRoute('POST', $path, $handler, $method);
+        $this->addRoute('POST', $path, $handler, $method, $middleware);
     }
 
     /**
      * Enhanced PUT method - supports both old and new syntax
      */
-    public function put(string $path, $handler, ?string $method = null): void
+    public function put(string $path, $handler, ?string $method = null, array $middleware = []): void
     {
-        $this->addRoute('PUT', $path, $handler, $method);
+        $this->addRoute('PUT', $path, $handler, $method, $middleware);
     }
 
     /**
      * Enhanced DELETE method - supports both old and new syntax
      */
-    public function delete(string $path, $handler, ?string $method = null): void
+    public function delete(string $path, $handler, ?string $method = null, array $middleware = []): void
     {
-        $this->addRoute('DELETE', $path, $handler, $method);
+        $this->addRoute('DELETE', $path, $handler, $method, $middleware);
     }
 
     /**
-     * Add route with flexible handler support
+     * Add route with flexible handler support and group awareness
      */
-    private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null): void
+    private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null, array $middleware = []): void
     {
+        // Get group attributes
+        $groupAttributes = $this->mergeGroupAttributes();
+
+        // Apply prefix
+        $fullPath = $groupAttributes['prefix'] . '/' . ltrim($path, '/');
+        $fullPath = '/' . trim($fullPath, '/');
+
+        // Merge middleware
+        $allMiddleware = array_merge($groupAttributes['middleware'], $middleware);
+
         if (is_array($handler) && count($handler) === 2) {
-            // Laravel-style array: [Controller::class, 'method']
-            $this->routes[$httpMethod][$path] = $handler;
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => $handler,
+                'middleware' => $allMiddleware
+            ];
         } elseif (is_string($handler) && $method !== null) {
-            // Your current style: Controller::class, 'method'
-            $this->routes[$httpMethod][$path] = [$handler, $method];
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => [$handler, $method],
+                'middleware' => $allMiddleware
+            ];
         } elseif (is_callable($handler)) {
-            // Closure
-            $this->routes[$httpMethod][$path] = $handler;
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => $handler,
+                'middleware' => $allMiddleware
+            ];
         } elseif (is_string($handler)) {
-            // String with @ or / separator
-            if (strpos($handler, '@') !== false || strpos($handler, '/') !== false) {
-                $this->routes[$httpMethod][$path] = $handler;
-            } else {
-                // Invokable controller
-                $this->routes[$httpMethod][$path] = $handler;
-            }
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => $handler,
+                'middleware' => $allMiddleware
+            ];
         } else {
-            throw new Exception("Invalid route handler format for {$httpMethod} {$path}");
+            throw new Exception("Invalid route handler format for {$httpMethod} {$fullPath}");
         }
     }
 
     public function dispatch(string $method, string $path, $request = null): Response
     {
+        // Sort routes to prioritize specific paths over parameterized ones
+        $sortedRoutes = $this->getSortedRoutes($method);
+
         // Handle parameterized routes
-        foreach ($this->routes[$method] ?? [] as $routePath => $handler) {
+        foreach ($sortedRoutes as $routePath => $routeData) {
             if ($this->matchRoute($routePath, $path, $params)) {
-                return $this->callAction($handler, $request, $params);
+                // Extract handler and middleware
+                $handler = $routeData['handler'] ?? $routeData;
+                $middleware = $routeData['middleware'] ?? [];
+
+                return $this->runMiddleware($middleware, $request, function($request) use ($handler, $params) {
+                    return $this->callAction($handler, $request, $params);
+                });
             }
         }
 
-        //check if its a dynamic url
+        // Check if it's a dynamic url
         $urlResolver = new DynamicUrlResolver(new Cache());
-
         $urlResult = $urlResolver->resolve($path);
 
         if (!$urlResult) {
-            // No page found, show 404
-            return $this->show404();
+            return $this->show404($method, $path);
         }
 
         if($urlResult->isRedirect()) {
@@ -109,8 +185,64 @@ class Router
             return $this->dispatchToController($urlResult);
         }
 
-        return $this->show404();
+        return $this->show404($method, $path);
+    }
 
+    /**
+     * Get routes sorted by specificity (most specific first)
+     */
+    private function getSortedRoutes(string $method): array
+    {
+        if (!isset($this->routes[$method])) {
+            return [];
+        }
+
+        $routes = $this->routes[$method];
+
+        // Sort routes: static segments > parameters
+        uksort($routes, function($a, $b) {
+            $aSegments = explode('/', trim($a, '/'));
+            $bSegments = explode('/', trim($b, '/'));
+
+            // Compare segment by segment
+            $maxLength = max(count($aSegments), count($bSegments));
+
+            for ($i = 0; $i < $maxLength; $i++) {
+                $aSegment = $aSegments[$i] ?? '';
+                $bSegment = $bSegments[$i] ?? '';
+
+                $aIsParam = preg_match('/^\{.*\}$/', $aSegment);
+                $bIsParam = preg_match('/^\{.*\}$/', $bSegment);
+
+                // Static segments come before parameters
+                if (!$aIsParam && $bIsParam) return -1;
+                if ($aIsParam && !$bIsParam) return 1;
+
+                // If both are same type, continue to next segment
+                if ($aSegment !== $bSegment) {
+                    return strcmp($aSegment, $bSegment);
+                }
+            }
+
+            return 0;
+        });
+
+        return $routes;
+    }
+
+    private function runMiddleware(array $middleware, Request $request, callable $finalHandler): Response
+    {
+        $next = $finalHandler;
+
+        // Build middleware stack in reverse order
+        foreach (array_reverse($middleware) as $middlewareClass) {
+            $next = function($request) use ($middlewareClass, $next) {
+                $middlewareInstance = $this->container->resolve($middlewareClass);
+                return $middlewareInstance->handle($request, $next);
+            };
+        }
+
+        return $next($request);
     }
 
     private function dispatchToController(UrlResolutionResult $result)
@@ -127,7 +259,7 @@ class Router
         );
     }
 
-    private function show404(): Response
+    private function show404(string $method, string $path): Response
     {
         return Response::json(['error' => 'Route not found', 'method' => $method, 'path' => $path], 404);
     }
@@ -225,8 +357,6 @@ class Router
             }
 
             $typeName = $type->getName();
-
-            die('here10');
 
             // Handle FormRequest
             if (class_exists($typeName) && is_subclass_of($typeName, 'App\Framework\Http\FormRequest')) {

@@ -58,7 +58,7 @@ class TagController extends Controller
         }
     }
 
-    public function store(CreateTagRequest $request): JsonResponse
+    public function store(CreateTagRequest $request, string $siteName): JsonResponse
     {
         try {
             $tag = $this->tagRepository->create($request->validated());
@@ -68,7 +68,7 @@ class TagController extends Controller
         }
     }
 
-    public function update(int $id, UpdateTagRequest $request): JsonResponse
+    public function update(int $id, UpdateTagRequest $request, string $siteName): JsonResponse
     {
         try {
             $tag = $this->tagRepository->update($id, $request->validated());
@@ -81,7 +81,7 @@ class TagController extends Controller
         }
     }
 
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, int $id, string $siteName): JsonResponse
     {
         try {
             $reassignToId = $request->input('reassignId');
@@ -161,7 +161,7 @@ class TagController extends Controller
         }
     }
 
-    public function checkDelete(int $id): JsonResponse
+    public function checkDelete(int $id, string $siteName): JsonResponse
     {
         try {
             $result = $this->tagService->checkDeletable($id);
@@ -179,7 +179,7 @@ class TagController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request): JsonResponse
+    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();

@@ -47,7 +47,7 @@ class PageControllerTest extends FunctionalTestCase
             ],
             'blocks' => [['type' => 'text', 'paragraphs' => ['Hello World', 'type' => 'text'], 'order' => 1]]
         ];
-        $response = $this->post('/api/pages', $pageData);
+        $response = $this->postForSite('/api/pages', $pageData);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -71,7 +71,7 @@ class PageControllerTest extends FunctionalTestCase
             ],
             'blocks' => []
         ];
-        $response = $this->post('/api/pages', $pageData);
+        $response = $this->postForSite('/api/pages', $pageData);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
@@ -83,7 +83,7 @@ class PageControllerTest extends FunctionalTestCase
     public function testShowReturnsPageById()
     {
         $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published']);
-        $response = $this->get("/api/pages/{$page->id}");
+        $response = $this->getForSite("/api/pages/{$page->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Test Page', $data['data']['title']);
@@ -92,7 +92,7 @@ class PageControllerTest extends FunctionalTestCase
     public function testShowReturnsPageBySlug()
     {
         Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published']);
-        $response = $this->get('/api/pages/test-page');
+        $response = $this->getForSite('/api/pages/test-page');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Test Page', $data['data']['title']);
@@ -108,7 +108,7 @@ class PageControllerTest extends FunctionalTestCase
     {
         $page = Page::create(['title' => 'Original Title', 'slug' => 'original', 'status' => 'draft', 'site_id' => $this->siteId]);;
         $updateData = ['forms' => ['main' => ['title' => 'Updated Title'], 'meta' => ['slug' => 'updated', 'status' => 'published']], 'site_id' => $this->siteId];
-        $response = $this->put("/api/pages/{$page->id}", $updateData);
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Updated Title', $data['data']['page']['title']);
@@ -126,7 +126,7 @@ class PageControllerTest extends FunctionalTestCase
                 ['type' => 'image', 'url' => 'image.jpg', 'src' => 'test.jpg', 'alt' => 'test', 'order' => 2]
             ]
         ];
-        $response = $this->put("/api/pages/{$page->id}", $updateData);
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(2, $data['data']['page']['blocks']);
@@ -135,7 +135,7 @@ class PageControllerTest extends FunctionalTestCase
     public function testDestroyDeletesPage()
     {
         $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published']);
-        $response = $this->delete("/api/pages/{$page->id}");
+        $response = $this->deleteForSite("/api/pages/{$page->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Page::find($page->id));
@@ -143,7 +143,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDestroyReturns404ForNonexistent()
     {
-        $response = $this->delete('/api/pages/999');
+        $response = $this->deleteForSite('/api/pages/999');
         $this->assertEquals(404, $response->getStatusCode());
     }
 
@@ -151,7 +151,7 @@ class PageControllerTest extends FunctionalTestCase
     {
         $page1 = Page::create(['title' => 'Page 1', 'slug' => 'page-1', 'status' => 'draft']);
         $page2 = Page::create(['title' => 'Page 2', 'slug' => 'page-2', 'status' => 'draft']);
-        $response = $this->post('/api/pages/bulk-update', [
+        $response = $this->postForSite('/api/pages/bulk-update', [
             'site_id' => $this->siteId,
             'page_ids' => [$page1->id, $page2->id],
             'data' => ['forms' => ['meta' => ['status' => 'published']]]
@@ -164,7 +164,7 @@ class PageControllerTest extends FunctionalTestCase
     public function testDuplicatePage()
     {
         $page = Page::create(['title' => 'Original Page', 'slug' => 'original-page', 'status' => 'published']);
-        $response = $this->post("/api/pages/{$page->id}/duplicate");
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
@@ -174,7 +174,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicateReturns404ForNonexistent()
     {
-        $response = $this->post('/api/pages/999/duplicate');
+        $response = $this->postForSite('/api/pages/999/duplicate');
         $this->assertEquals(404, $response->getStatusCode());
     }
 
@@ -186,7 +186,7 @@ class PageControllerTest extends FunctionalTestCase
         PageMetadata::create(['page_id' => $page1->id, 'featured' => true]);
         PageMetadata::create(['page_id' => $page2->id, 'featured' => true]);
 
-        $response = $this->get('/api/featured-pages');
+        $response = $this->getForSite('/api/featured-pages');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('pages', $data['data']);
@@ -255,7 +255,7 @@ class PageControllerTest extends FunctionalTestCase
             'tag_id' => $tag->id
         ]);
 
-        $response = $this->post("/api/pages/{$page->id}/duplicate");
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -326,7 +326,7 @@ class PageControllerTest extends FunctionalTestCase
             'order' => 3
         ]);
 
-        $response = $this->post("/api/pages/{$page->id}/duplicate");
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -355,7 +355,7 @@ class PageControllerTest extends FunctionalTestCase
         PageTag::create(['page_id' => $page->id, 'tag_id' => $tag1->id]);
         PageTag::create(['page_id' => $page->id, 'tag_id' => $tag2->id]);
 
-        $response = $this->post("/api/pages/{$page->id}/duplicate");
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -366,7 +366,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageReturns404ForNonexistent()
     {
-        $response = $this->post('/api/pages/999/duplicate');
+        $response = $this->postForSite('/api/pages/999/duplicate');
         $this->assertEquals(404, $response->getStatusCode());
     }
 }

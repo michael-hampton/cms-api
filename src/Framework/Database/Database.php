@@ -305,6 +305,28 @@ class Database
         }
     }
 
+    /**
+     * Execute a non-SELECT SQL statement (INSERT, UPDATE, DELETE, etc.)
+     *
+     * @param string $sql    The SQL query to execute
+     * @param array  $params Optional associative array of bound parameters
+     *
+     * @return int Number of affected rows
+     */
+    public function exec(string $sql, array $params = []): int
+    {
+        if (empty($params)) {
+            // Direct exec for simple statements (faster)
+            return $this->connection->exec($sql);
+        }
+
+        // Prepared statement for parameterized queries
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->rowCount();
+    }
+
     public function find(string $table, $id, string $primaryKey = 'id'): ?array
     {
         $sql = "SELECT * FROM {$table} WHERE {$primaryKey} = :id LIMIT 1";

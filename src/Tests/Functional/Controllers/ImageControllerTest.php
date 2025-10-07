@@ -23,7 +23,7 @@ class ImageControllerTest extends FunctionalTestCase
         $files = [
             'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
         ];
-        $response = $this->post('/api/images', ['alt_text' => 'Test image', 'caption' => 'Caption'], $files);
+        $response = $this->postForSite('/api/images', ['alt_text' => 'Test image', 'caption' => 'Caption'], $files);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Test image', $data['data']['image']['alt_text']);
@@ -44,14 +44,14 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesFileRequired()
     {
-        $response = $this->post('/api/images', ['alt_text' => 'Test']);
+        $response = $this->postForSite('/api/images', ['alt_text' => 'Test']);
         $this->assertEquals(400, $response->getStatusCode());
     }
 
     public function testShowReturnsImage()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->get("/api/images/{$image->id}");
+        $response = $this->getForSite("/api/images/{$image->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('test.jpg', $data['data']['image']['filename']);
@@ -66,7 +66,7 @@ class ImageControllerTest extends FunctionalTestCase
     public function testUpdateModifiesMetadata()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->put("/api/images/{$image->id}", ['alt_text' => 'Updated alt', 'caption' => 'New caption']);
+        $response = $this->putForSite("/api/images/{$image->id}", ['alt_text' => 'Updated alt', 'caption' => 'New caption']);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Updated alt', $data['data']['image']['alt_text']);
@@ -75,7 +75,7 @@ class ImageControllerTest extends FunctionalTestCase
     public function testDestroyMovesToTrash()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->delete("/api/images/{$image->id}");
+        $response = $this->deleteForSite("/api/images/{$image->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertStringContainsString('trash', $response->getContent());
     }
@@ -83,7 +83,7 @@ class ImageControllerTest extends FunctionalTestCase
     public function testDestroyHardDelete()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->delete("/api/images/{$image->id}?hard_delete=true");
+        $response = $this->deleteForSite("/api/images/{$image->id}?hard_delete=true");
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertStringContainsString('permanently', $response->getContent());
     }
@@ -103,7 +103,7 @@ class ImageControllerTest extends FunctionalTestCase
         for ($i = 1; $i <= 15; $i++) {
             $image = Image::create(['url' => 'test'.$i, 'file_size' => 6, 'filename' => 'test.jpg'.$i, 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
         }
-        $response = $this->get('/api/image-recent?limit=5');
+        $response = $this->getForSite('/api/image-recent?limit=5');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(5, $data['data']['images']);
@@ -138,14 +138,14 @@ class ImageControllerTest extends FunctionalTestCase
     public function testTrackUsage()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->post('/api/image-track-usage', ['image_id' => $image->id, 'usable_type' => 'Page', 'usable_id' => 1, 'context' => 'featured']);
+        $response = $this->postForSite('/api/image-track-usage', ['image_id' => $image->id, 'usable_type' => 'Page', 'usable_id' => 1, 'context' => 'featured']);
         $this->assertEquals(200, $response->getStatusCode());
     }
 
     public function testRemoveUsage()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
-        $response = $this->post('/api/image-remove-usage', ['image_id' => $image->id, 'usable_type' => 'Page', 'usable_id' => 1, 'context' => 'featured']);
+        $response = $this->postForSite('/api/image-remove-usage', ['image_id' => $image->id, 'usable_type' => 'Page', 'usable_id' => 1, 'context' => 'featured']);
         $this->assertEquals(200, $response->getStatusCode());
     }
 
@@ -161,7 +161,7 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testCreateCategory()
     {
-        $response = $this->post('/api/image-categories', ['name' => 'New Category', 'description' => 'Test']);
+        $response = $this->postForSite('/api/image-categories', ['name' => 'New Category', 'description' => 'Test']);
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('New Category', $data['data']['category']['name']);
@@ -181,7 +181,7 @@ class ImageControllerTest extends FunctionalTestCase
             'alt_text' => 'Original'
         ]);
 
-        $response = $this->post("/api/images/{$original->id}/duplicate", [
+        $response = $this->postForSite("/api/images/{$original->id}/duplicate", [
             'alt_text' => 'Duplicated image'
         ]);
 
@@ -206,7 +206,7 @@ class ImageControllerTest extends FunctionalTestCase
             'caption' => 'Original caption'
         ]);
 
-        $response = $this->post("/api/images/{$original->id}/duplicate");
+        $response = $this->postForSite("/api/images/{$original->id}/duplicate");
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -215,7 +215,7 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testDuplicateReturns500WhenImageNotFound()
     {
-        $response = $this->post('/api/images/999/duplicate');
+        $response = $this->postForSite('/api/images/999/duplicate');
         $this->assertEquals(500, $response->getStatusCode());
     }
 }

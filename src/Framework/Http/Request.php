@@ -3,19 +3,35 @@
 namespace App\Framework\Http;
 
 use App\Framework\AuthenticatedUser;
+use App\Models\User;
 
 class Request implements RequestInterface
 {
     protected array $data = [];
     public array $files = [];
     protected array $routeParams = [];
-    protected ?AuthenticatedUser $user = null;
+    public AuthenticatedUser|User|null $user = null;
     private $headers;
 
     public function __construct(array $data = [], array $files = [], array $routeParams = [])
     {
         $this->routeParams = $routeParams;
-        $this->headers = function_exists('getallheaders') ? getallheaders() : [];
+        $this->headers = [];
+
+        if (function_exists('getallheaders')) {
+            $this->headers = getallheaders();
+        } elseif (function_exists('apache_request_headers')) {
+            $this->headers = apache_request_headers();
+        }
+
+        if(empty($headers)) {
+            foreach ($_SERVER as $key => $value) {
+                if (str_starts_with($key, 'HTTP_')) {
+                    $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))));
+                    $this->headers[$name] = $value;
+                }
+            }
+        }
 
         $this->headers['Content-Type'] = $_SERVER['CONTENT_TYPE'] ?? '';
 
@@ -98,12 +114,12 @@ class Request implements RequestInterface
         return $this->routeParams[$key] ?? $default;
     }
 
-    public function user(): ?AuthenticatedUser
+    public function user(): AuthenticatedUser|User|null
     {
         return $this->user;
     }
 
-    public function setUser(?AuthenticatedUser $user): void
+    public function setUser(AuthenticatedUser|User|null $user): void
     {
         $this->user = $user;
     }
@@ -259,4 +275,5 @@ class Request implements RequestInterface
     public function getHeader(string $key): ?string {
         return $this->headers[$key] ?? null;;
     }
+
 }

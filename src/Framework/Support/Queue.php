@@ -15,6 +15,10 @@ class Queue
 
     public static function work(): void
     {
+        echo '<pre>';
+        print_r(self::$jobs);
+        die;
+
         while (!empty(self::$jobs)) {
             $item = array_shift(self::$jobs);
 

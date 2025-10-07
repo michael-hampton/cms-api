@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Models\Site;
 use App\Repositories\AuthorRepository;
 use App\Requests\CreateAuthorRequest;
 use App\Requests\UpdateAuthorRequest;
@@ -34,14 +35,15 @@ class AuthorController extends Controller
         }
     }
 
-    public function store(CreateAuthorRequest $request): JsonResponse
+    public function store(CreateAuthorRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->validated();
+            $siteId = Site::resolveSite($siteName);
 
             $avatarFile = $request->hasFile('avatar') ? $request->file('avatar') : null;
 
-            $author = $this->authorService->createAuthor($data, $request->get('site_id'), $avatarFile);
+            $author = $this->authorService->createAuthor($data, $siteId, $avatarFile);
 
             return $this->jsonResponse(['author' => $author->toArray()], 201);
 
@@ -81,7 +83,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function update(int $id, UpdateAuthorRequest $request): JsonResponse
+    public function update(int $id, UpdateAuthorRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -102,7 +104,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request): JsonResponse
+    public function destroy(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $result = $this->authorService->delete($id, $request->get('reassignId'));
@@ -129,7 +131,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function merge(Request $request): JsonResponse
+    public function merge(Request $request, string $siteName): JsonResponse
     {
         try {
             $sourceId = $request->get('source_author_id');
@@ -148,7 +150,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function checkDelete(int $id): JsonResponse
+    public function checkDelete(int $id, string $siteName): JsonResponse
     {
         try {
             $result = $this->authorService->checkDeletable($id);
@@ -166,7 +168,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request): JsonResponse
+    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();

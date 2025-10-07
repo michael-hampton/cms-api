@@ -13,6 +13,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'slug' => 'john-doe',
             'email' => 'john@example.com',
             'status' => 'active',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite('/api/authors');
@@ -45,9 +46,10 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ];
 
-        $response = $this->post('/api/authors', $authorData);
+        $response = $this->postForSite('/api/authors', $authorData);
 
         $this->assertEquals(201, $response->getStatusCode());
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertArrayHasKey('author', $data['data']);
@@ -65,7 +67,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'avatar' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
         ];
 
-        $response = $this->post('/api/authors', $authorData, $files);
+        $response = $this->postForSite('/api/authors', $authorData, $files);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -74,7 +76,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesRequiredFields()
     {
-        $response = $this->post('/api/authors', []);
+        $response = $this->postForSite('/api/authors', []);
 
         $this->assertEquals(422, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -91,7 +93,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->post('/api/authors', [
+        $response = $this->postForSite('/api/authors', [
             'name' => 'Jane Doe',
             'email' => 'john@example.com'
         ]);
@@ -110,7 +112,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->get("/api/authors/{$author->id}");
+        $response = $this->getForSite("/api/authors/{$author->id}");
 
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -127,7 +129,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->get('/api/authors/john-doe');
+        $response = $this->getForSite('/api/authors/john-doe');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -136,7 +138,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testShowReturns404ForNonexistentAuthor()
     {
-        $response = $this->get('/api/authors/999');
+        $response = $this->getForSite('/api/authors/999');
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -150,7 +152,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->put("/api/authors/{$author->id}", [
+        $response = $this->putForSite("/api/authors/{$author->id}", [
             'name' => 'John Updated',
             'email' => 'john@example.com',
             'bio' => 'Updated bio'
@@ -197,7 +199,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->delete("/api/authors/{$author->id}?reassignId=1");
+        $response = $this->deleteForSite("/api/authors/{$author->id}?reassignId=1");
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Author::find($author->id));
@@ -205,7 +207,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testDestroyReturns404ForNonexistentAuthor()
     {
-        $response = $this->delete('/api/authors/999');
+        $response = $this->deleteForSite('/api/authors/999');
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -215,7 +217,7 @@ class AuthorControllerTest extends FunctionalTestCase
         Author::create(['name' => 'Active Author', 'slug' => 'active', 'status' => 'active']);
         Author::create(['name' => 'Inactive Author', 'slug' => 'inactive', 'status' => 'inactive']);
 
-        $response = $this->get('/api/authors/active');
+        $response = $this->getForSite('/api/authors/active');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -228,7 +230,7 @@ class AuthorControllerTest extends FunctionalTestCase
         $source = Author::create(['name' => 'Source', 'slug' => 'source', 'status' => 'active']);
         $target = Author::create(['name' => 'Target', 'slug' => 'target', 'status' => 'active']);
 
-        $response = $this->post('/api/authors/merge', [
+        $response = $this->postForSite('/api/authors/merge', [
             'source_author_id' => $source->id,
             'target_author_id' => $target->id
         ]);
@@ -239,7 +241,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testMergeValidatesRequiredIds()
     {
-        $response = $this->post('/api/authors/merge', [
+        $response = $this->postForSite('/api/authors/merge', [
             'source_author_id' => 1
         ]);
 
@@ -256,7 +258,7 @@ class AuthorControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->get("/api/authors/{$author->id}/check-delete");
+        $response = $this->getForSite("/api/authors/{$author->id}/check-delete");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -286,7 +288,7 @@ class AuthorControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->get("/api/authors/{$author->id}/check-delete");
+        $response = $this->getForSite("/api/authors/{$author->id}/check-delete");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -301,7 +303,7 @@ class AuthorControllerTest extends FunctionalTestCase
     public function testCheckDeleteReturns404WhenAuthorNotFound()
     {
         // Act
-        $response = $this->get('/api/authors/9999/check-delete');
+        $response = $this->getForSite('/api/authors/9999/check-delete');
 
         // Assert
         $this->assertEquals(404, $response->getStatusCode());
@@ -322,7 +324,7 @@ class AuthorControllerTest extends FunctionalTestCase
         ]);
 
         // Duplicate the author
-        $response = $this->post("/api/authors/duplicate/{$author->id}");
+        $response = $this->postForSite("/api/authors/duplicate/{$author->id}");
 
         $this->assertResponseOk($response);
 
@@ -354,7 +356,7 @@ class AuthorControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->post("/api/authors/duplicate/{$author->id}", [
+        $response = $this->postForSite("/api/authors/duplicate/{$author->id}", [
             'name' => 'Jane Smith - Editor'
         ]);
 
@@ -381,7 +383,7 @@ class AuthorControllerTest extends FunctionalTestCase
         @mkdir(dirname($avatarPath), 0755, true);
         file_put_contents($avatarPath, 'dummy image content');
 
-        $response = $this->post("/api/authors/duplicate/{$author->id}");
+        $response = $this->postForSite("/api/authors/duplicate/{$author->id}");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);

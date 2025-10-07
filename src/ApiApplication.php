@@ -9,6 +9,8 @@ use App\Framework\Console\Commands\MakeModelCommand;
 use App\Framework\Console\Commands\MakeRepositoryCommand;
 use App\Framework\Console\Commands\MigrateCommand;
 use App\Framework\Console\Commands\MigrateRollbackCommand;
+use App\Framework\Console\Commands\QueueWorkCommand;
+use App\Framework\Console\Commands\ScheduleRunCommand;
 use App\Framework\Console\Commands\SeedCommand;
 use App\Framework\Database\Database;
 use App\Framework\Http\Request;
@@ -96,6 +98,8 @@ class ApiApplication
             'make:model' => MakeModelCommand::class,
             'make:repository' => MakeRepositoryCommand::class,
             'db:seed' => SeedCommand::class,
+            'schedule:run' => ScheduleRunCommand::class,
+            'queue:work' => QueueWorkCommand::class,
         ];
 
         foreach ($commands as $name => $commandClass) {

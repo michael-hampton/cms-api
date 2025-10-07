@@ -91,7 +91,7 @@ class ProductControllerTest extends FunctionalTestCase
             'image' => $this->createUploadedFile('product.jpg', 'image/jpeg')
         ];
 
-        $response = $this->post('/api/products', $data, $files);
+        $response = $this->postForSite('/api/products', $data, $files);
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -119,7 +119,7 @@ class ProductControllerTest extends FunctionalTestCase
             'image' => $this->createUploadedFile('new-product.jpg', 'image/jpeg')
         ];
 
-        $response = $this->put("/api/products/{$product->id}", $data, $files);
+        $response = $this->putForSite("/api/products/{$product->id}", $data, $files);
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -139,7 +139,7 @@ class ProductControllerTest extends FunctionalTestCase
             'brand' => 'TestBrand',
         ];
 
-        $response = $this->post('/api/products', $data);
+        $response = $this->postForSite('/api/products', $data);
 
         $data = json_decode($response->getContent(), true);
 
@@ -153,7 +153,7 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testItValidatesRequiredFieldsWhenCreatingProduct()
     {
-        $response = $this->post('/api/products', []);
+        $response = $this->postForSite('/api/products', []);
 
         $data = json_decode($response->getContent(), true);
 
@@ -172,7 +172,7 @@ class ProductControllerTest extends FunctionalTestCase
             'brand' => 'TestBrand',
         ];
 
-        $response = $this->post('/api/products', $data);
+        $response = $this->postForSite('/api/products', $data);
 
         $data = json_decode($response->getContent(), true);
 
@@ -184,7 +184,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $products = $this->createProduct();
 
-        $response = $this->get("/api/products/{$products->first()->id}");
+        $response = $this->getForSite("/api/products/{$products->first()->id}");
 
         $data = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('product', $data['data']);
@@ -194,7 +194,7 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testItReturns404WhenProductNotFound()
     {
-        $response = $this->get('/api/products/9999');
+        $response = $this->getForSite('/api/products/9999');
 
         $data = json_decode($response->getContent(), true);
 
@@ -207,7 +207,7 @@ class ProductControllerTest extends FunctionalTestCase
         $products = $this->createProduct();
         $product = $products->first();
 
-        $response = $this->put("/api/products/{$product->id}", [
+        $response = $this->putForSite("/api/products/{$product->id}", [
             'name' => 'New Name',
             'description' => $product->description,
             'price' => $product->price,
@@ -224,7 +224,7 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testItReturns404WhenUpdatingNonExistentProduct()
     {
-        $response = $this->put('/api/products/9999', [
+        $response = $this->putForSite('/api/products/9999', [
             'name' => 'Test'
         ]);
 
@@ -238,7 +238,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $products = $this->createProduct();
 
-        $response = $this->deleteJson("/api/products/{$products->first()->id}");
+        $response = $this->deleteForSite("/api/products/{$products->first()->id}");
 
         $data = json_decode($response->getContent(), true);
 
@@ -247,7 +247,7 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testItReturns404WhenDeletingNonExistentProduct()
     {
-        $response = $this->deleteJson('/api/products/9999');
+        $response = $this->deleteForSite('/api/products/9999');
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -265,7 +265,7 @@ class ProductControllerTest extends FunctionalTestCase
             'meta_keywords' => 'keyword1, keyword2',
         ];
 
-        $response = $this->post('/api/products', $data);
+        $response = $this->postForSite('/api/products', $data);
 
         $this->assertEquals(201, $response->getStatusCode());
     }
@@ -301,7 +301,7 @@ class ProductControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->postJson("/api/products/{$product->id}/duplicate");
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -328,7 +328,7 @@ class ProductControllerTest extends FunctionalTestCase
         @mkdir(dirname($imagePath), 0755, true);
         file_put_contents($imagePath, 'dummy image');
 
-        $response = $this->postJson("/api/products/{$product->id}/duplicate");
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -352,7 +352,7 @@ class ProductControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->post("/api/products/{$product->id}/duplicate", [
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
             'name' => 'AirPods Pro v2'
         ]);
 
@@ -385,7 +385,7 @@ class ProductControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->postJson("/api/products/{$product->id}/duplicate");
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);

@@ -42,7 +42,7 @@ class BrandControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId
         ];
 
-        $response = $this->post('/api/brands', $brandData);
+        $response = $this->postForSite('/api/brands', $brandData);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -57,7 +57,7 @@ class BrandControllerTest extends FunctionalTestCase
             'logo' => $this->createUploadedFile('logo.png', 'image/png'),
         ];
 
-        $response = $this->post('/api/brands', ['name' => 'Adidas', 'site_id' => $this->siteId], $files);
+        $response = $this->postForSite('/api/brands', ['name' => 'Adidas', 'site_id' => $this->siteId], $files);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -68,7 +68,7 @@ class BrandControllerTest extends FunctionalTestCase
     {
         $brand = Brand::create(['name' => 'Puma', 'slug' => 'puma']);
 
-        $response = $this->get("/api/brands/{$brand->id}");
+        $response = $this->getForSite("/api/brands/{$brand->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -80,7 +80,7 @@ class BrandControllerTest extends FunctionalTestCase
     {
         Brand::create(['name' => 'Reebok', 'slug' => 'reebok']);
 
-        $response = $this->get('/api/brands/reebok');
+        $response = $this->getForSite('/api/brands/reebok');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -103,7 +103,7 @@ class BrandControllerTest extends FunctionalTestCase
             'description' => 'Updated description'
         ];
 
-        $response = $this->put("/api/brands/{$brand->id}", $updateData);
+        $response = $this->putForSite("/api/brands/{$brand->id}", $updateData);
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -116,7 +116,7 @@ class BrandControllerTest extends FunctionalTestCase
     {
         $brand = Brand::create(['name' => 'Test Brand', 'slug' => 'test-brand']);
 
-        $response = $this->delete("/api/brands/{$brand->id}");
+        $response = $this->deleteForSite("/api/brands/{$brand->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Brand::find($brand->id));
@@ -124,7 +124,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testDestroyReturns404ForNonexistent()
     {
-        $response = $this->delete('/api/brands/999');
+        $response = $this->deleteForSite('/api/brands/999');
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -133,7 +133,7 @@ class BrandControllerTest extends FunctionalTestCase
     {
         $brand = Brand::create(['name' => 'Test Brand', 'slug' => 'test-brand']);
 
-        $response = $this->get("/api/brands/{$brand->id}/check-delete");
+        $response = $this->getForSite("/api/brands/{$brand->id}/check-delete");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -147,7 +147,7 @@ class BrandControllerTest extends FunctionalTestCase
         Brand::create(['name' => 'Brand 2', 'slug' => 'brand-2']);
         Brand::create(['name' => 'Brand 3', 'slug' => 'brand-3']);
 
-        $response = $this->get("/api/brands/{$brand1->id}/alternatives");
+        $response = $this->getForSite("/api/brands/{$brand1->id}/alternatives");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -160,7 +160,7 @@ class BrandControllerTest extends FunctionalTestCase
         $source = Brand::create(['name' => 'Source Brand', 'slug' => 'source-brand']);
         $target = Brand::create(['name' => 'Target Brand', 'slug' => 'target-brand']);
 
-        $response = $this->post('/api/brands/merge', [
+        $response = $this->postForSite('/api/brands/merge', [
             'source_brand_id' => $source->id,
             'target_brand_id' => $target->id
         ]);
@@ -179,7 +179,7 @@ class BrandControllerTest extends FunctionalTestCase
             'status' => 'active'
         ]);
 
-        $response = $this->postJson("/api/brands/{$brand->id}/duplicate");
+        $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -203,7 +203,7 @@ class BrandControllerTest extends FunctionalTestCase
         @mkdir(dirname($logoPath), 0755, true);
         file_put_contents($logoPath, 'dummy logo content');
 
-        $response = $this->postJson("/api/brands/{$brand->id}/duplicate");
+        $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -241,7 +241,7 @@ class BrandControllerTest extends FunctionalTestCase
             'slug' => 'macbook'
         ]);
 
-        $response = $this->postJson("/api/brands/{$brand->id}/duplicate");
+        $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);

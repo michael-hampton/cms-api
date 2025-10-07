@@ -102,7 +102,7 @@ class MenuControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($menu);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(201, $response->getStatusCode());
     }
@@ -120,7 +120,7 @@ class MenuControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($menu);
 
-        $response = $this->controller->update($request, 1);
+        $response = $this->controller->update($request, 1, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -131,7 +131,7 @@ class MenuControllerTest extends FunctionalTestCase
             ->with(1)
             ->once();
 
-        $response = $this->controller->destroy(1);
+        $response = $this->controller->destroy(1, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }

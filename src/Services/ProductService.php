@@ -6,6 +6,7 @@ use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Model;
+use App\Models\Product;
 use App\Repositories\ProductRepository;
 use Exception;
 
@@ -133,6 +134,80 @@ class ProductService
     public function getOnSaleProducts(): Collection
     {
         return $this->repository->getOnSale();
+    }
+
+    public function getRelatedProducts(Product $product, int $limit = 8): Collection
+    {
+        return $this->repository->findRelated($product, $limit);
+    }
+
+    public function getRecentlyViewedProducts(int $limit = 6): Collection
+    {
+        $viewedIds = $_SESSION['recently_viewed'] ?? [];
+
+        if (empty($viewedIds)) {
+            return new Collection([]);
+        }
+
+        return $this->repository->getRecentlyViewed(array_slice($viewedIds, 0, $limit), $limit);
+    }
+
+    public function trackView(Product $product): void
+    {
+        if (!isset($_SESSION['recently_viewed'])) {
+            $_SESSION['recently_viewed'] = [];
+        }
+
+        $viewedIds = $_SESSION['recently_viewed'];
+
+        // Remove product if already in list
+        $viewedIds = array_filter($viewedIds, fn($id) => $id !== $product->id);
+
+        // Add to beginning
+        array_unshift($viewedIds, $product->id);
+
+        // Keep only last 20
+        $_SESSION['recently_viewed'] = array_slice($viewedIds, 0, 20);
+
+        // Track in database
+        $this->trackProductView($product);
+    }
+
+    protected function trackProductView(Product $product): void
+    {
+        $sessionId = session_id();
+        $userId = auth()->id();
+        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+
+        // Insert view record (you'll need to create ProductView model)
+        // ProductView::create([
+        //     'product_id' => $product->id,
+        //     'session_id' => $sessionId,
+        //     'user_id' => $userId,
+        //     'ip_address' => $ipAddress,
+        // ]);
+    }
+
+    public function generateStructuredData(Product $product): array
+    {
+        return [
+            '@context' => 'https://schema.org/',
+            '@type' => 'Product',
+            'name' => $product->name,
+            'description' => $product->description,
+            'image' => $product->main_image_url ?? $product->image_url,
+            'brand' => [
+                '@type' => 'Brand',
+                'name' => $product->brand->name ?? 'Unknown'
+            ],
+            'offers' => [
+                '@type' => 'Offer',
+                'price' => $product->sale_price ?? $product->price,
+                'priceCurrency' => 'USD',
+                'availability' => $product->in_stock ? 'InStock' : 'OutOfStock',
+                'url' =>'/products/' . $product->slug
+            ]
+        ];
     }
 
     protected function isBase64Image(string $string): bool

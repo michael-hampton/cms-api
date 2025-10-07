@@ -96,7 +96,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($image);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(201, $response->getStatusCode());
     }
@@ -106,7 +106,7 @@ class ImageControllerTest extends FunctionalTestCase
         $request = Mockery::mock(Request::class);
         $request->shouldReceive('file')->with('image')->andReturn(null);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(400, $response->getStatusCode());
     }
@@ -146,7 +146,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn(true);
 
-        $response = $this->controller->destroy(1, $request);
+        $response = $this->controller->destroy(1, $request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -164,7 +164,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($results);
 
-        $response = $this->controller->bulkDestroy($request);
+        $response = $this->controller->bulkDestroy($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -178,7 +178,7 @@ class ImageControllerTest extends FunctionalTestCase
         $request->shouldReceive('get')
             ->with('hard_delete', false)
             ->andReturn(false);
-        $response = $this->controller->bulkDestroy($request);
+        $response = $this->controller->bulkDestroy($request, $this->siteSlug);
 
         $this->assertEquals(400, $response->getStatusCode());
     }
@@ -195,7 +195,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($images);
 
-        $response = $this->controller->recent($request);
+        $response = $this->controller->recent($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -225,7 +225,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($images);
 
-        $response = $this->controller->unused($request);
+        $response = $this->controller->unused($request, $this->siteSlug);;
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -242,7 +242,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($results);
 
-        $response = $this->controller->cleanup($request);
+        $response = $this->controller->cleanup($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -259,7 +259,7 @@ class ImageControllerTest extends FunctionalTestCase
             ->with(1, 'Page', 10, 'featured')
             ->once();
 
-        $response = $this->controller->trackUsage($request);
+        $response = $this->controller->trackUsage($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -279,7 +279,7 @@ class ImageControllerTest extends FunctionalTestCase
                 return $defaults[$key] ?? null;
             });
 
-        $response = $this->controller->trackUsage($request);
+        $response = $this->controller->trackUsage($request, $this->siteSlug);
 
         $this->assertEquals(400, $response->getStatusCode());
     }

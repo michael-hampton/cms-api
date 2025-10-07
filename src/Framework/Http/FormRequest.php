@@ -22,6 +22,7 @@ use App\Framework\Validation\Rules\UrlRule;
 use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\ValidationRuleInterface;
 use App\Framework\Validation\Validator;
+use App\Models\User;
 use Exception;
 
 abstract class FormRequest extends Request
@@ -29,7 +30,7 @@ abstract class FormRequest extends Request
     protected array $data = [];
     protected array $validatedData = [];
     protected array $errors = [];
-    protected ?AuthenticatedUser $user = null;
+    public AuthenticatedUser|User|null $user = null;
     private bool $validated = false;
     protected array $afterCallbacks = [];
     public Validator $validator;

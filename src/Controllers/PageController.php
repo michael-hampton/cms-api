@@ -58,7 +58,7 @@ class PageController extends Controller
         }
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, string $siteName): JsonResponse
     {
         try {
             $requestData = $request->all();
@@ -105,7 +105,7 @@ class PageController extends Controller
         }
     }
 
-    public function update(int $id, Request $request): JsonResponse
+    public function update(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $requestData = $request->all();
@@ -124,7 +124,7 @@ class PageController extends Controller
         }
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id, string $siteName): JsonResponse
     {
         try {
             $result = $this->pageService->deletePage($id);
@@ -202,7 +202,7 @@ class PageController extends Controller
         }
     }
 
-    public function bulkUpdate(Request $request): JsonResponse
+    public function bulkUpdate(Request $request, string $siteName): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);
@@ -222,7 +222,7 @@ class PageController extends Controller
         }
     }
 
-    public function duplicate(int $id): JsonResponse
+    public function duplicate(int $id, string $siteName): JsonResponse
     {
         try {
             $newPage = $this->pageService->duplicatePage($id);

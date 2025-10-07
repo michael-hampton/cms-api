@@ -79,7 +79,7 @@ class MenuController extends Controller
         }
     }
 
-    public function store(CreateMenuRequest $request): JsonResponse
+    public function store(CreateMenuRequest $request, string $siteName): JsonResponse
     {
         try {
             $menu = $this->menuService->createMenu($request->validated());
@@ -96,7 +96,7 @@ class MenuController extends Controller
         }
     }
 
-    public function update(UpdateMenuRequest $request, int $id): JsonResponse
+    public function update(UpdateMenuRequest $request, int $id, string $siteName): JsonResponse
     {
         try {
             $menu = $this->menuService->updateMenu($id, $request->validated());
@@ -114,7 +114,7 @@ class MenuController extends Controller
         }
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id, string $siteName): JsonResponse
     {
         try {
             $this->menuService->deleteMenu($id);

@@ -190,7 +190,7 @@ class CategoryControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($category);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(201, $response->getStatusCode());
     }
@@ -209,7 +209,7 @@ class CategoryControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($category);
 
-        $response = $this->controller->update(1, $request);
+        $response = $this->controller->update(1, $request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -254,7 +254,7 @@ class CategoryControllerTest extends FunctionalTestCase
             ->andReturn(null);
 
         // Call the controller (using local variable, not $this->controller)
-        $response = $controller->destroy($request, 1);
+        $response = $controller->destroy($request, 1, $this->siteSlug);
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());

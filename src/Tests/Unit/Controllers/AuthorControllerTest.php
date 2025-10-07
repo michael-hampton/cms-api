@@ -218,7 +218,7 @@ class AuthorControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($author);
 
-        $response = $this->controller->store($request);
+        $response = $this->controller->store($request, $this->siteSlug);
 
         $this->assertEquals(201, $response->getStatusCode());
     }
@@ -280,7 +280,7 @@ class AuthorControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn($author);
 
-        $response = $this->controller->update(1, $request);
+        $response = $this->controller->update(1, $request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -295,7 +295,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
         $request->shouldReceive('get')->with('reassignId')->andReturn(1);
 
-        $response = $this->controller->destroy(1, $request);;
+        $response = $this->controller->destroy(1, $request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -311,7 +311,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
         $request->shouldReceive('get')->with('reassignId')->andReturn(1);
 
-        $response = $this->controller->destroy(999, $request);
+        $response = $this->controller->destroy(999, $request, $this->siteSlug);
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -327,7 +327,7 @@ class AuthorControllerTest extends FunctionalTestCase
             ->once()
             ->andReturn(true);
 
-        $response = $this->controller->merge($request);
+        $response = $this->controller->merge($request, $this->siteSlug);
 
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -338,7 +338,7 @@ class AuthorControllerTest extends FunctionalTestCase
         $request->shouldReceive('get')->with('source_author_id')->andReturn(null);
         $request->shouldReceive('get')->with('target_author_id')->andReturn(2);
 
-        $response = $this->controller->merge($request);
+        $response = $this->controller->merge($request, $this->siteSlug);;
 
         $this->assertEquals(400, $response->getStatusCode());
     }

@@ -68,7 +68,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function store(CreateCategoryRequest $request): JsonResponse
+    public function store(CreateCategoryRequest $request, string $siteName): JsonResponse
     {
         try {
             $category = $this->categoryRepository->create($request->validated());
@@ -78,7 +78,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function update(int $id, UpdateCategoryRequest $request): JsonResponse
+    public function update(int $id, UpdateCategoryRequest $request, string $siteName): JsonResponse
     {
         try {
             $category = $this->categoryRepository->update($id, $request->validated());
@@ -91,7 +91,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, int $id, string $siteName): JsonResponse
     {
         try {
             $reassignToId = $request->input('reassignId');
@@ -127,7 +127,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function checkDelete(int $id): JsonResponse
+    public function checkDelete(int $id, string $siteName): JsonResponse
     {
         try {
             $result = $this->categoryService->checkDeletable($id);
@@ -145,7 +145,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request): JsonResponse
+    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();

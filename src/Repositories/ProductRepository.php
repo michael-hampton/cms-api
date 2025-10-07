@@ -79,4 +79,39 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     {
        return Product::class;
     }
+
+    public function findRelated(Product $product, int $limit = 8): Collection
+    {
+        return $this->model
+            ->where('id', '!=', $product->id)
+            ->where('is_active', true)
+            ->where(function($query) use ($product) {
+                $query->where('category_id', $product->category_id)
+                    ->orWhere('brand_id', $product->brand_id);
+            })
+            ->limit($limit)
+            ->latest()
+            ->get();
+    }
+
+    public function findByIds(array $ids): Collection
+    {
+        return $this->model->whereIn('id', $ids)
+            ->where('is_active', true)
+            ->get();
+    }
+
+    public function getRecentlyViewed(array $productIds, int $limit = 6): Collection
+    {
+        if (empty($productIds)) {
+            return new Collection([]);
+        }
+
+        return $this->model
+            ->whereIn('id', $productIds)
+            ->where('is_active', true)
+            ->limit($limit)
+            ->get();
+    }
+
 }

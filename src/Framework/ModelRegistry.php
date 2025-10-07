@@ -3,6 +3,7 @@
 namespace App\Framework;
 
 use App\Framework\Database\Database;
+use App\Models\User;
 
 class ModelRegistry
 {
@@ -27,6 +28,10 @@ class ModelRegistry
         $models = AutoDiscovery::discoverModels();
 
         foreach ($models as $modelClass) {
+            if($modelClass === User::class) {
+                continue;
+            }
+
             $instance = new $modelClass([], $database);
             if (method_exists($instance, 'getTable') && !empty($instance->getTable())) {
                 self::register($instance->getTable(), $modelClass);
