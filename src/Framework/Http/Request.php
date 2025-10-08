@@ -129,6 +129,13 @@ class Request implements RequestInterface
         return array_diff_key($this->data, array_flip($keys));
     }
 
+    public function put(string $key, mixed $value): self
+    {
+        $this->data[$key] = $value;
+
+        return $this;
+    }
+
     public function has(string $key): bool
     {
         return array_key_exists($key, $this->data);

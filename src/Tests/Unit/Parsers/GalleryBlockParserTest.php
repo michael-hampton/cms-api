@@ -1,0 +1,137 @@
+<?php
+
+namespace App\Tests\Unit\Parsers;
+
+use App\Framework\Validation\Rules\ArrayRule;
+use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\UrlRule;
+use App\Parsers\GalleryBlockParser;
+use PHPUnit\Framework\TestCase;
+
+class GalleryBlockParserTest extends TestCase
+{
+    public function testGalleryParserGetType(): void
+    {
+        $parser = new GalleryBlockParser();
+        $this->assertSame('gallery', $parser->getType());
+    }
+
+    public function testGalleryParserGetValidationRules(): void
+    {
+        $parser = new GalleryBlockParser();
+        $rules = $parser->getValidationRules();
+
+        $this->assertArrayHasKey('layout', $rules);
+        $this->assertContainsOnlyInstancesOf(RequiredRule::class, array_filter($rules['layout'], fn($r) => $r instanceof RequiredRule));
+
+        $this->assertArrayHasKey('slides', $rules);
+        $this->assertContainsOnlyInstancesOf(ArrayRule::class, array_filter($rules['slides'], fn($r) => $r instanceof ArrayRule));
+
+        $slideRules = $parser->getSlideValidationRules();
+        $this->assertArrayHasKey('link', $slideRules);
+        $this->assertContainsOnlyInstancesOf(UrlRule::class, array_filter($slideRules['link'], fn($r) => $r instanceof UrlRule));
+        $this->assertContainsOnlyInstancesOf(BooleanRule::class, array_filter($slideRules['noFollow'], fn($r) => $r instanceof BooleanRule));
+    }
+
+    public function testGalleryParserParse(): void
+    {
+        $parser = new GalleryBlockParser();
+        $data = [
+            'layout' => 'grid',
+            'slides' => [
+                [
+                    'title' => '  Slide One ',
+                    'description' => 'Image description.',
+                    'image' => '/img1.jpg',
+                    'link' => 'https://link.com',
+                    'noFollow' => true
+                ],
+                [
+                    'title' => '', // Skipped as it's empty
+                    'description' => '',
+                    'image' => ''
+                ],
+                [
+                    'title' => 'Slide Three',
+                    'image' => '/img3.jpg',
+                    'caption' => 'A great photo'
+                ]
+            ]
+        ];
+        $parsed = $parser->parse($data);
+
+        $this->assertSame('grid', $parsed['layout']);
+        $this->assertCount(2, $parsed['slides']); // Empty slide filtered out
+        $this->assertSame(9, $parsed['total_word_count']); // 'Slide One Image description.' (4) + 'Slide Three A great photo' (4) = 8. Wait, 'Slide Three' (2) + 'A great photo' (3) = 5.
+        // Slide 1: 'Slide One Image description' (4 words). Slide 2 is skipped. Slide 3: 'Slide Three A great photo' (5 words). Total 9 words.
+        // Let's re-run word count: S1: title (2) + desc (2) = 4. S3: title (2) + caption (3) = 5. Total: 9 words.
+        $this->assertSame(9, $parsed['total_word_count']);
+
+        $this->assertTrue($parsed['slides'][0]['noFollow']);
+        $this->assertTrue($parsed['slides'][0]['has_link']);
+        $this->assertStringContainsString('Image description.', $parsed['slides'][0]['formatted_description']);
+    }
+
+    public function testGalleryParserGenerateHtmlCarousel(): void
+    {
+        $parser = new GalleryBlockParser();
+        $parsedData = [
+            'layout' => 'carousel',
+            'slides' => [
+                [
+                    'image' => '/img1.jpg',
+                    'formatted_title' => 'S1 Title',
+                    'formatted_description' => 'S1 Desc',
+                    'title' => 'S1 Title',
+                    'description' => 'S1 Desc'
+                ],
+                [
+                    'image' => '/img2.jpg',
+                    'formatted_title' => 'S2 Title',
+                    'formatted_description' => 'S2 Desc',
+                    'title' => 'S2 Title',
+                    'description' => 'S2 Desc'
+                ]
+            ]
+        ];
+        $html = $parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('<div class="gallery-block gallery-carousel">', $html);
+        $this->assertStringContainsString('<div class="carousel-slide active"', $html); // First slide is active
+        $this->assertStringContainsString('<img src="/img1.jpg"', $html);
+        $this->assertStringContainsString('<button class="carousel-btn carousel-prev"', $html); // Controls exist
+        $this->assertStringContainsString('<script>', $html); // Contains JS logic
+    }
+
+    public function testGalleryParserGenerateHtmlGrid(): void
+    {
+        $parser = new GalleryBlockParser();
+        $parsedData = [
+            'layout' => 'grid',
+            'slides' => [
+                [
+                    'image' => '/img1.jpg',
+                    'formatted_title' => 'S1 Title',
+                    'formatted_description' => 'S1 Desc',
+                    'formatted_caption' => 'S1 Caption',
+                    'has_link' => true,
+                    'link' => 'https://link.com',
+                    'noFollow' => false,
+                    'sponsored' => false,
+                    'openInNewTab' => true,
+                    'title' => 'S1 Title',
+                    'description' => 'S1 Desc',
+                    'caption' => 'S1 Caption'
+                ]
+            ]
+        ];
+        $html = $parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('<div class="gallery-block gallery-grid">', $html);
+        $this->assertStringContainsString('<a href="https://link.com" target="_blank">', $html);
+        $this->assertStringContainsString('<img src="/img1.jpg"', $html);
+        $this->assertStringContainsString('<h3 class="gallery-slide-title">S1 Title</h3>', $html);
+        $this->assertStringContainsString('<div class="gallery-slide-caption">S1 Caption</div>', $html);
+    }
+}

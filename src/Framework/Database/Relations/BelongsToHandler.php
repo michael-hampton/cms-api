@@ -43,7 +43,9 @@ class BelongsToHandler extends RelationshipHandler
             ->where($relationData['owner_key'], $foreignKeyValue)
             ->get();
 
-        return $results->first() ?? null;
+        $result = $results->first() ?? null;
+
+        return $this->ensureModelInstance($result, $relatedModel);
     }
 
     private function extractForeignIds(array $results, string $foreignKey): array
@@ -71,11 +73,12 @@ class BelongsToHandler extends RelationshipHandler
     }
 
     private function mapRelationsToResults(
-        array $results,
+        array      $results,
         Collection $relatedRecords,
-        array $relationData,
-        string $relation
-    ): array {
+        array      $relationData,
+        string     $relation
+    ): array
+    {
         $relatedLookup = $this->createLookupMap($relatedRecords, $relationData['owner_key']);
 
         foreach ($results as &$result) {

@@ -7,6 +7,13 @@ use App\Models\ImageCategory;
 
 class ImageControllerTest extends FunctionalTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $_ENV['APP_ENV'] = 'testing';
+        putenv('APP_ENV=testing');
+    }
+
     public function testIndexReturnsImagesList()
     {
         $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
@@ -24,8 +31,12 @@ class ImageControllerTest extends FunctionalTestCase
             'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
         ];
         $response = $this->postForSite('/api/images', ['alt_text' => 'Test image', 'caption' => 'Caption'], $files);
+
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
+
+
+
         $this->assertEquals('Test image', $data['data']['image']['alt_text']);
     }
 

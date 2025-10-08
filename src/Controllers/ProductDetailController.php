@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
+use App\Repositories\ProductRepository;
 use App\Services\ProductService;
 use App\Services\WishlistService;
 
@@ -10,14 +11,15 @@ class ProductDetailController extends Controller
 {
     public function __construct(
         private readonly ProductService $productService,
-        private readonly WishlistService $wishlistService
+        private readonly WishlistService $wishlistService,
+        private readonly ProductRepository $productRepository
     ) {
         parent::__construct();
     }
 
     public function show(Request $request, string $slug)
     {
-        $product = $this->productService->getProduct($slug);
+        $product = $this->productRepository->findBySlug($slug);
 
         if (!$product) {
             return $this->view('errors.404', [
@@ -32,6 +34,12 @@ class ProductDetailController extends Controller
 
         $user = auth()->user();
         $isInWishlist = $this->wishlistService->isInWishlist($user, $product);
+
+        // Get review data
+        $reviewService = app(ReviewService::class); //todo
+        $reviewData = $reviewService->getProductReviews($product->id, 1, 5); // First 5 reviews
+        $reviewStats = $reviewService->getReviewStatistics($product->id);
+        $canReview = $reviewService->canUserReview($product->id);
 
         return $this->view('products.detail', [
             'product' => $product,

@@ -35,7 +35,7 @@ $hasSidebar = !empty($sidebarBlocks);
                     <div class="page-header">
                         <h1 class="page-title"><?= htmlspecialchars($page->title) ?></h1>
                         <!-- Categories -->
-                        <?php if ($page->categories): ?>
+                        <?php if (!empty($page->categories)): ?>
                             <div class="page-categories">
                                 <span class="categories-label">Categories:</span>
                                 <?php foreach ($page->categories as $index => $category): ?>

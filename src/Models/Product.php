@@ -72,4 +72,26 @@ class Product extends Model
     {
         return $query->where('slug', $slug);
     }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function approvedReviews()
+    {
+        return $this->hasMany(Review::class)->where('is_approved', true);
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        // This will be cached or calculated
+        $avg = $this->approvedReviews()->avg('rating');
+        return $avg ? round((float)$avg, 1) : 0.0;
+    }
+
+    public function getReviewCountAttribute(): int
+    {
+        return $this->approvedReviews()->count();
+    }
 }

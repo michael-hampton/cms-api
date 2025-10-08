@@ -80,4 +80,11 @@ class AuthenticationService
 
         return $accessToken->getTokenableId();
     }
+
+    public function getUserId(): ?int
+    {
+        // Use the framework's global helper to get the authenticated user's ID
+        // The ?? null ensures it's always an int or null
+        return auth()->id() ?? null;
+    }
 }

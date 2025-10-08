@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
+use App\Models\Site;
 use App\Services\WishlistService;
 
 class WishlistController extends Controller
@@ -21,8 +22,11 @@ class WishlistController extends Controller
         ]);
     }
 
-    public function add(Request $request)
+    public function add(Request $request, string $site)
     {
+        $site = Site::resolveSite($site);
+        $request->put('site_id', $site);
+
         $productId = $request->input('product_id');
 
         if (!$productId) {

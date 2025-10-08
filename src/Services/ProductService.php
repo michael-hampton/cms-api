@@ -181,7 +181,7 @@ class ProductService
         $userId = auth()->id();
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
 
-        $this->productViewRepository->trackView($product->id, $userId, $sessionId, $ipAddress);
+        $this->productViewRepository->trackView($product, $userId, $sessionId, $ipAddress);
     }
 
     public function generateStructuredData(Product $product): array

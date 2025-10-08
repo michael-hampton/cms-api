@@ -52,6 +52,13 @@ class AuthenticateWithToken implements MiddlewareInterface
         // Set user on request
         $request->user = $user;
 
+        Auth::login([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => 'user',
+        ]);
+
         return $next($request);
     }
 

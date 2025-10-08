@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
@@ -32,6 +33,13 @@ class AuthController extends Controller
 
             $response = $this->authService->login($loginRequest);
 
+            Auth::login([
+                'id' => $response->userId,
+                'name' => $response->userName,
+                'email' => $response->userEmail,
+                'role' => 'user', // or fetch from user object
+            ]);
+
             return $this->jsonResponse($response->toArray(), 200);
 
         } catch (InvalidCredentialsException $e) {
@@ -56,6 +64,8 @@ class AuthController extends Controller
             $this->authService->logout($token, $siteId);
         }
 
+        Auth::logout();
+
         return $this->jsonResponse([
             'success' => true,
             'message' => 'Successfully logged out',
@@ -69,9 +79,9 @@ class AuthController extends Controller
         return $this->jsonResponse([
             'success' => true,
             'data' => [
-                'id' => $user->getId(),
-                'name' => $user->getName(),
-                'email' => $user->getEmail(),
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
             ],
         ], 200);
     }

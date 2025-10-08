@@ -3,11 +3,13 @@
 namespace App\Framework\Authorization;
 
 use App\Framework\AuthenticatedUser;
+use App\Framework\Session\Session;
 use App\Framework\Support\Event;
+use App\Models\User;
 
 class Auth
 {
-    private static $user = null;
+    public static $user = null;
     private static $guard = 'web';
 
     public static function attempt(array $credentials): bool
@@ -32,17 +34,28 @@ class Auth
     public static function login($user): void
     {
         if (is_array($user)) {
-            $user = new AuthenticatedUser($user);
+            $user = new AuthenticatedUser(
+                $user['id'],
+                $user['name'],
+                $user['email'],
+                $user['role'] ?? 'user'
+            );
             $user->exists = true;
         }
 
         self::$user = $user;
 
-        // Store in session
-        $_SESSION['user_id'] = $user->id;
-        $_SESSION['authenticated'] = true;
+        // Store in session using Session class
+        Session::put('user_id', $user->id);
+        Session::put('user_name', $user->name);
+        Session::put('user_email', $user->email);
+        Session::put('user_role', $user->role);
+        Session::put('authenticated', true);
 
-        Event::fire('user.login', $user);
+        // Regenerate session ID for security
+        Session::regenerate();
+
+        //Event::fire('user.login', $user);
     }
 
     public static function logout(): void
@@ -50,8 +63,17 @@ class Auth
         $user = self::$user;
         self::$user = null;
 
-        // Clear session
-        unset($_SESSION['user_id'], $_SESSION['authenticated']);
+        // Clear session using Session class
+        Session::forgetMultiple([
+            'user_id',
+            'user_name',
+            'user_email',
+            'user_role',
+            'authenticated'
+        ]);
+
+        // Regenerate session ID
+        Session::regenerate();
 
         if ($user) {
             Event::fire('user.logout', $user);
@@ -75,12 +97,18 @@ class Auth
         }
 
         // Try to load from session
-        if (isset($_SESSION['user_id']) && $_SESSION['authenticated'] === true) {
-            $user = AuthenticatedUser::find($_SESSION['user_id']);
-            if ($user) {
-                self::$user = $user;
-                return $user;
-            }
+        if (Session::get('authenticated') === true && Session::has('user_id')) {
+
+            $user = User::where('id', Session::get('user_id'))->first();
+
+            self::$user = new AuthenticatedUser(
+                $user['id'],
+                $user['name'],
+                $user['email'],
+                Session::get('user_role', 'user')
+            );
+            self::$user->exists = true;
+            return self::$user;
         }
 
         return null;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($product->name) ?> - Product Detail</title>
     <meta name="description" content="<?= htmlspecialchars($product->meta_description ?? $product->description) ?>">
-    <link rel="stylesheet" href="/css/product-detail.css">
+    @css('product-detail.css')
     <?php if (isset($structuredData)): ?>
         <script type="application/ld+json">
             <?= json_encode($structuredData) ?>
@@ -229,6 +229,10 @@
 <!-- Toast Notification -->
 <div id="toast" class="toast"></div>
 
-<script src="/js/product-detail.js"></script>
+<script>
+    SITE = 'test-mike'
+</script>
+
+@js('product-detail.js')
 </body>
 </html>

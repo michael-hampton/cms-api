@@ -6,6 +6,8 @@ use App\Controllers\CategoryPageController;
 use App\Controllers\CommentController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
+use App\Controllers\ProductDetailController;
+use App\Controllers\ProductListController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
 use App\Framework\Container;
@@ -55,3 +57,6 @@ $router->post('/comments', CommentController::class, 'store');
 
 $router->get('/authors/{slug}', AuthorViewController::class, 'show');
 $router->get('/tags/{slug}', TagViewController::class, 'show');
+
+$router->get('/shop', ProductListController::class, 'index');
+$router->get('/shop/details/{slug}', ProductDetailController::class, 'show');

@@ -545,7 +545,7 @@ class QueryBuilder
 
     public function avg(string $column): float
     {
-        return $this->aggregate('AVG', $column);
+        return $this->aggregate('AVG', $column) ?? 0;
     }
 
     public function min(string $column)

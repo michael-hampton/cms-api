@@ -6,6 +6,7 @@ use App\ApiApplication;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Migration\MigrationRunner;
+use App\Framework\Session\Session;
 use App\Models\Site;
 use App\Models\User;
 use PHPUnit\Framework\TestCase;

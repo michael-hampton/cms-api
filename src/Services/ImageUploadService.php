@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Framework\FileUpload\FileSystem;
+use App\Framework\FileUpload\FileSystemInterface;
 use App\Framework\Http\UploadedFile;
 use Exception;
 
@@ -10,10 +12,15 @@ class ImageUploadService
     private string $uploadPath;
     private array $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     private int $maxFileSize = 5242880; // 5MB
+    private FileSystemInterface $fileSystem;
 
-    public function __construct(string $uploadPath = 'uploads/authors')
-    {
+
+    public function __construct(
+        string $uploadPath = 'uploads/authors',
+        ?FileSystemInterface $fileSystem = null
+    ) {
         $this->uploadPath = rtrim($uploadPath, '/');
+        $this->fileSystem = $fileSystem ?? new FileSystem();
     }
 
     public function upload(UploadedFile $file, ?string $oldImagePath = null): string
@@ -30,29 +37,21 @@ class ImageUploadService
             throw new Exception('File size exceeds maximum allowed size of 5MB.');
         }
 
-        // Create upload directory if it doesn't exist
         $fullPath = $_SERVER['DOCUMENT_ROOT'] . '/' . $this->uploadPath;
-        if ($_ENV['APP_ENV'] !== 'testing' && !is_dir($fullPath)) {
-            mkdir($fullPath, 0755, true);
+        if (!$this->fileSystem->isDirectory($fullPath)) {
+            $this->fileSystem->makeDirectory($fullPath, 0755, true);
         }
 
-        // Generate unique filename
         $extension = $file->getClientOriginalExtension();
         $filename = uniqid('author_') . '_' . time() . '.' . $extension;
         $destination = $fullPath . '/' . $filename;
 
-        if ($_ENV['APP_ENV'] === 'testing') {
-            return '/' . $this->uploadPath . '/' . $filename;
-        }
-
-        // Move uploaded file
-        if (!$file->moveTo($destination)) {
+        if ($_ENV['APP_ENV'] !== 'testing' && !$file->moveTo($destination)) {
             throw new Exception('Failed to upload file.');
         }
 
-        // Delete old image if exists
-        if ($oldImagePath && file_exists($_SERVER['DOCUMENT_ROOT'] . $oldImagePath)) {
-            unlink($_SERVER['DOCUMENT_ROOT'] . $oldImagePath);
+        if ($oldImagePath && $this->fileSystem->fileExists($_SERVER['DOCUMENT_ROOT'] . $oldImagePath)) {
+            $this->fileSystem->deleteFile($_SERVER['DOCUMENT_ROOT'] . $oldImagePath);
         }
 
         return '/' . $this->uploadPath . '/' . $filename;
@@ -65,6 +64,14 @@ class ImageUploadService
     {
         if (!$file->isValid()) {
             throw new Exception($file->getErrorMessage());
+        }
+
+        if (!in_array($file->getMimeType(), $this->allowedMimeTypes)) {
+            throw new Exception('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
+        }
+
+        if ($file->getSize() > $this->maxFileSize) {
+            throw new Exception('File size exceeds maximum allowed size of 5MB.');
         }
 
         $baseUploadPath = rtrim(config('upload.path', 'uploads'), '/');
@@ -84,11 +91,7 @@ class ImageUploadService
         $destination = $fullPath . '/' . $filename;
         $relativeFilePath = $relativePath . '/' . $filename;
 
-        if ($_ENV['APP_ENV'] === 'testing') {
-            return $relativeFilePath;
-        }
-
-        if (!$file->moveTo($destination)) {
+        if ($_ENV['APP_ENV'] !== 'testing' && !$file->moveTo($destination)) {
             throw new Exception('Failed to upload file.');
         }
 
@@ -98,7 +101,6 @@ class ImageUploadService
 
         return $relativeFilePath;
     }
-
 
     /**
      * Delete a file by its path
@@ -112,8 +114,8 @@ class ImageUploadService
             $fullPath = $baseUploadPath . '/' . $imagePath;
         }
 
-        if (file_exists($fullPath)) {
-            return unlink($fullPath);
+        if ($this->fileSystem->fileExists($fullPath)) {
+            return $this->fileSystem->deleteFile($fullPath);
         }
         return false;
     }
@@ -123,8 +125,8 @@ class ImageUploadService
      */
     public function ensureDirectoryExists(string $directory): void
     {
-        if (!is_dir($directory)) {
-            if (!mkdir($directory, 0755, true)) {
+        if (!$this->fileSystem->isDirectory($directory)) {
+            if (!$this->fileSystem->makeDirectory($directory, 0755, true)) {
                 throw new Exception('Failed to create upload directory');
             }
         }
@@ -156,17 +158,15 @@ class ImageUploadService
     {
         $fullOriginalPath = $this->getFullPath($originalPath);
 
-        if (!file_exists($fullOriginalPath)) {
-            throw new \Exception("Original file does not exist: {$originalPath}");
+        if (!$this->fileSystem->fileExists($fullOriginalPath)) {
+            throw new Exception("Original file does not exist: {$originalPath}");
         }
 
-        // Get file info
-        $pathInfo = pathinfo($originalPath);
+        $pathInfo = $this->fileSystem->pathinfo($originalPath);
         $directory = $pathInfo['dirname'];
         $filename = $pathInfo['filename'];
         $extension = $pathInfo['extension'] ?? '';
 
-        // Generate new filename with unique suffix
         $newFilename = $filename . '-copy-' . uniqid();
         if ($extension) {
             $newFilename .= '.' . $extension;
@@ -175,12 +175,10 @@ class ImageUploadService
         $newPath = $directory . '/' . $newFilename;
         $fullNewPath = $this->getFullPath($newPath);
 
-        // Ensure directory exists
         $this->ensureDirectoryExists(dirname($fullNewPath));
 
-        // Copy the file
-        if (!copy($fullOriginalPath, $fullNewPath)) {
-            throw new \Exception("Failed to duplicate file: {$originalPath}");
+        if (!$this->fileSystem->copy($fullOriginalPath, $fullNewPath)) {
+            throw new Exception("Failed to duplicate file: {$originalPath}");
         }
 
         return $newPath;
@@ -188,13 +186,8 @@ class ImageUploadService
 
     private function getFullPath(string $relativePath): string
     {
-        // Absolute path to project root
-        $projectRoot = realpath(__DIR__ . '/../'); // adjust depending on where this file lives
-
-        // Upload folder inside src/
+        $projectRoot = $this->fileSystem->realpath(__DIR__ . '/../');
         $uploadPath = rtrim(config('upload.path', 'uploads'), '/');
-
-        // Build full path under src/
         return $projectRoot . '/' . $uploadPath . '/' . ltrim($relativePath, '/');
     }
 

@@ -101,7 +101,7 @@
         `;
 
         try {
-            const response = await fetch('/api/cart/add', {
+            const response = await fetch(`/api/${SITE}/cart/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -144,8 +144,8 @@
 
         try {
             const url = state.isInWishlist
-                ? `/api/wishlist/remove/${state.productId}`
-                : '/api/wishlist/add';
+                ? `/api/${SITE}/wishlist/remove/${state.productId}`
+                : `/api/${SITE}/wishlist/add`;
 
             const response = await fetch(url, {
                 method: state.isInWishlist ? 'DELETE' : 'POST',
@@ -196,7 +196,7 @@
         btn.textContent = 'Adding...';
 
         try {
-            const response = await fetch('/api/cart/add', {
+            const response = await fetch(`/api/${SITE}/cart/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -229,13 +229,13 @@
     async function updateCounts() {
         try {
             // Get cart count
-            const cartResponse = await fetch('/api/cart');
+            const cartResponse = await fetch(`/api/${SITE}/cart`);
             const cartData = await cartResponse.json();
             state.cartCount = cartData.count || 0;
             updateCartCount();
 
             // Get wishlist count
-            const wishlistResponse = await fetch('/api/wishlist');
+            const wishlistResponse = await fetch(`/api/${SITE}/wishlist`);
             const wishlistData = await wishlistResponse.json();
             state.wishlistCount = wishlistData.count || 0;
             updateWishlistCount();

@@ -105,16 +105,17 @@ class SimpleTemplateEngine implements ViewEngineInterface
         // @css('file.css')
         $template = preg_replace(
             '/@css\s*\(\s*[\'"](.*?)[\'"]\s*\)/',
-            '<?php echo \'<link rel="stylesheet" href="\' . $this->asset(\'$1\') . \'">\'; ?>',
+            '<?php echo \'<link rel="stylesheet" href="\' . $this->asset(\'$1\', \'css\') . \'">\'; ?>',
             $template
         );
 
         // @js('file.js')
         $template = preg_replace(
             '/@js\s*\(\s*[\'"](.*?)[\'"]\s*\)/',
-            '<?php echo \'<script src="\' . $this->asset(\'$1\') . \'"></script>\'; ?>',
+            '<?php echo \'<script src="\' . $this->asset(\'$1\', \'js\') . \'"></script>\'; ?>',
             $template
         );
+
 
         return $template;
     }

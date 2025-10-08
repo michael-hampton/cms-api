@@ -155,6 +155,7 @@ abstract class Model
 
         // Check if there's a mutator
         $mutatorMethod = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
+
         if (method_exists($this, $mutatorMethod)) {
             $value = $this->$mutatorMethod();
             return $this->castAttribute($key, $value);

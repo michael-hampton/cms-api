@@ -4,6 +4,8 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
+use App\Models\Product;
+use App\Repositories\ProductRepository;
 use App\Search\SearchCriteria;
 use App\Services\ProductService;
 use App\Models\Category;
@@ -12,7 +14,8 @@ use App\Models\Brand;
 class ProductListController extends Controller
 {
     public function __construct(
-        private readonly ProductService $productService
+        private readonly ProductService $productService,
+        private readonly ProductRepository $productRepository,
     ) {
         parent::__construct();
     }
@@ -33,29 +36,31 @@ class ProductListController extends Controller
     public function search(Request $request)
     {
         $criteria = new SearchCriteria(
-            page: $request->input('page', 1),
-            perPage: $request->input('per_page', 12),
-            searchQuery: $request->input('q'),
             filters: [
                 'category_id' => $request->input('category_id'),
                 'brand' => $request->input('brand_id'),
                 'on_sale' => $request->input('on_sale'),
             ],
             sortBy: $request->input('sort_by', 'created_at'),
-            sortOrder: $request->input('sort_order', 'desc')
+            sortOrder: $request->input('sort_order', 'desc'),
+            page: $request->input('page', 1),
+            perPage: $request->input('per_page', 12),
+            searchQuery: $request->input('q')
         );
 
         // Apply price range filter manually if needed
         $minPrice = $request->input('min_price');
         $maxPrice = $request->input('max_price');
 
-        $result = $this->productService->search($criteria);
+        $result = $this->productRepository->search($criteria);
 
         // Filter by price range if provided
-        if ($minPrice !== null || $maxPrice !== null) {
+        if (!empty($minPrice) || !empty($maxPrice)) {
             $data = $result->getData();
+
             $data = array_filter($data, function($product) use ($minPrice, $maxPrice) {
-                $price = $product->sale_price ?? $product->price;
+
+                $price = $product['sale_price'] > 0 ? $product['sale_price'] : $product['price'];
 
                 if ($minPrice !== null && $price < $minPrice) {
                     return false;
@@ -71,7 +76,7 @@ class ProductListController extends Controller
             $result->setData(array_values($data));
         }
 
-        return $this->jsonResponse($result->toArray());
+        return $this->resourceResponse($result->toArray());
     }
 
     protected function getMenu(): array

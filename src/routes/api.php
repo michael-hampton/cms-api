@@ -13,9 +13,12 @@ use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\PageController;
 use App\Controllers\ProductController;
+use App\Controllers\ProductListController;
+use App\Controllers\ReviewController;
 use App\Controllers\SearchController;
 use App\Controllers\SiteController;
 use App\Controllers\TagController;
+use App\Controllers\VideoController;
 use App\Controllers\WishlistController;
 use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Container;
@@ -199,5 +202,20 @@ $router->delete('/api/{site}/wishlist/remove/{productId}', WishlistController::c
 
 
 // Product routes
-$router->get('/api/{site}/products/search', 'ProductListController@search');
+$router->get('/api/{site}/product-list/search', ProductListController::class, 'search');;
+
+//reviews
+$router->get('/api/{site}/products/{productId}/reviews', ReviewController::class, 'index');
+$router->post('/api/{site}/products/{productId}/reviews', ReviewController::class, 'store');
+$router->put('/api/{site}/reviews/{reviewId}', ReviewController::class, 'update');
+$router->delete('/api/{site}/reviews/{reviewId}', ReviewController::class, 'destroy');
+$router->post('/api/{site}/reviews/{reviewId}/helpful', ReviewController::class, 'markHelpful');
+$router->get('/api/{site}/products/{productId}/reviews/statistics', ReviewController::class, 'statistics');
+$router->get('/api/{site}/products/{productId}/reviews/can-review', ReviewController::class, 'canReview');
+
+// Video routes
+$router->get('/api/{site}/videos', VideoController::class, 'index');
+$router->post('/api/{site}/videos', VideoController::class, 'upload');
+$router->get('/api/{site}/videos/{id}', VideoController::class, 'show');
+$router->delete('/api/{site}/videos/{id}', VideoController::class, 'delete');
 

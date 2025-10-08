@@ -148,7 +148,7 @@
         });
 
         try {
-            const response = await fetch(`/api/products/search?${params}`);
+            const response = await fetch(`/api/${SITE}/product-list/search?${params}`);
             const data = await response.json();
 
             if (response.ok) {
@@ -177,7 +177,7 @@
 
         elements.productsGrid.innerHTML = products.map(product => `
             <div class="product-card">
-                <a href="/products/${product.slug}" class="product-image">
+                <a href="/shop/details/${product.slug}" class="product-image">
                     <img src="${product.image_url || '/images/placeholder.jpg'}" 
                          alt="${escapeHtml(product.name)}">
                     ${product.discount_percentage > 0 ? `
@@ -186,7 +186,7 @@
                 </a>
                 <div class="product-content">
                     <h3 class="product-name">
-                        <a href="/products/${product.slug}">${escapeHtml(product.name)}</a>
+                        <a href="/shop/details/${product.slug}">${escapeHtml(product.name)}</a>
                     </h3>
                     <div class="product-price">
                         ${product.sale_price && product.sale_price < product.price ? `
@@ -236,7 +236,8 @@
         btn.textContent = 'Adding...';
 
         try {
-            const response = await fetch('/api/cart/add', {
+
+            const response = await fetch(`/api/${SITE}/cart/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -275,8 +276,8 @@
 
         try {
             const url = isInWishlist
-                ? `/api/wishlist/remove/${productId}`
-                : '/api/wishlist/add';
+                ? `/api/${SITE}/wishlist/remove/${productId}`
+                : `/api/${SITE}/wishlist/add`;
 
             const response = await fetch(url, {
                 method: isInWishlist ? 'DELETE' : 'POST',
@@ -374,13 +375,13 @@
     async function updateCounts() {
         try {
             // Get cart count
-            const cartResponse = await fetch('/api/cart');
+            const cartResponse = await fetch(`/api/${SITE}/cart`);
             const cartData = await cartResponse.json();
             state.cartCount = cartData.count || 0;
             updateCartCount();
 
             // Get wishlist count
-            const wishlistResponse = await fetch('/api/wishlist');
+            const wishlistResponse = await fetch(`/api/${SITE}/wishlist`);
             const wishlistData = await wishlistResponse.json();
             state.wishlistCount = wishlistData.count || 0;
             updateWishlistCount();

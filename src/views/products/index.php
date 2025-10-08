@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shop - All Products</title>
-    <link rel="stylesheet" href="/css/products.css">
+    @css('products.css')
 </head>
 <body>
 <div class="page-wrapper">
@@ -178,6 +178,11 @@
 <!-- Toast Notification -->
 <div id="toast" class="toast"></div>
 
-<script src="/js/products.js"></script>
+<script>
+    SITE = 'test-mike'
+</script>
+
+@js('products.js')
+
 </body>
 </html>
