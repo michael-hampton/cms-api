@@ -1,5 +1,4 @@
 <?php
-// App/Controllers/Api/WishlistController.php
 
 namespace App\Controllers;
 
@@ -10,28 +9,42 @@ class WishlistController extends Controller
 {
     public function __construct(
         private readonly WishlistService $wishlistService
-    )
-    {
+    ) {
         parent::__construct();
     }
 
     public function index()
     {
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'items' => $this->wishlistService->getItems(),
             'count' => $this->wishlistService->getCount(),
         ]);
     }
-}
 
-//    public function add(Request $request)
-//    {
-//        $productId = $request->input('product_id');
-//
-//        if (!$productId) {
-//            return $this->jsonResponse(['success' => false, 'message' => 'Product ID required'], 400);
-//        }
-//
-//        $result = $this->wishlistService->addItem($productId);
-//
-//        return response()->json(array_merge($result
+    public function add(Request $request)
+    {
+        $productId = $request->input('product_id');
+
+        if (!$productId) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Product ID required'
+            ], 400);
+        }
+
+        $result = $this->wishlistService->addItem($productId);
+
+        return $this->resourceResponse(array_merge($result, [
+            'count' => $this->wishlistService->getCount(),
+        ]));
+    }
+
+    public function remove(int $productId)
+    {
+        $result = $this->wishlistService->removeItem($productId);
+
+        return $this->resourceResponse(array_merge($result, [
+            'count' => $this->wishlistService->getCount(),
+        ]));
+    }
+}

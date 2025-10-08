@@ -1,9 +1,8 @@
 <?php
 // App/Controllers/Api/CartController.php
 
-namespace App\Controllers\Api;
+namespace App\Controllers;
 
-use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Services\CartService;
 
@@ -17,7 +16,7 @@ class CartController extends Controller
 
     public function index()
     {
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'items' => $this->cartService->getItems(),
             'total' => $this->cartService->getTotal(),
             'count' => $this->cartService->getCount(),
@@ -31,12 +30,12 @@ class CartController extends Controller
         $options = $request->input('options', []);
 
         if (!$productId) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Product ID required'], 400);
+            return $this->resourceResponse(['success' => false, 'message' => 'Product ID required'], 400);
         }
 
         $result = $this->cartService->addItem($productId, $quantity, $options);
 
-        return $this->jsonResponse(array_merge($result, [
+        return $this->resourceResponse(array_merge($result, [
             'count' => $this->cartService->getCount(),
             'total' => $this->cartService->getTotal(),
         ]));
@@ -47,12 +46,12 @@ class CartController extends Controller
         $quantity = $request->input('quantity');
 
         if ($quantity === null) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Quantity required'], 400);
+            return $this->resourceResponse(['success' => false, 'message' => 'Quantity required'], 400);
         }
 
         $result = $this->cartService->updateQuantity($id, $quantity);
 
-        return $this->jsonResponse(array_merge($result, [
+        return $this->resourceResponse(array_merge($result, [
             'count' => $this->cartService->getCount(),
             'total' => $this->cartService->getTotal(),
         ]));
@@ -62,7 +61,7 @@ class CartController extends Controller
     {
         $result = $this->cartService->removeItem($id);
 
-        return $this->jsonResponse(array_merge($result, [
+        return $this->resourceResponse(array_merge($result, [
             'count' => $this->cartService->getCount(),
             'total' => $this->cartService->getTotal(),
         ]));
@@ -72,7 +71,7 @@ class CartController extends Controller
     {
         $this->cartService->clear();
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'success' => true,
             'message' => 'Cart cleared',
             'count' => 0,

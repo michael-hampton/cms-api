@@ -1,20 +1,17 @@
 <?php
-// App/Services/WishlistService.php
 
 namespace App\Services;
 
-use App\Models\Wishlist;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
+use App\Repositories\WishlistRepository;
 
 class WishlistService
 {
-    protected ProductRepository $productRepository;
-
-    public function __construct(ProductRepository $productRepository)
-    {
-        $this->productRepository = $productRepository;
-    }
+    public function __construct(
+        private readonly WishlistRepository $wishlistRepository,
+        private readonly ProductRepository $productRepository
+    ) {}
 
     protected function getSessionId(): string
     {
@@ -27,17 +24,9 @@ class WishlistService
     public function getItems(): array
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $query = Wishlist::query();
-
-        if ($userId) {
-            $query->where('user_id', $userId);
-        } else {
-            $query->where('session_id', $sessionId);
-        }
-
-        $items = $query->with('product')->get();
+        $items = $this->wishlistRepository->findBySessionOrUser($userId, $sessionId);
 
         return $items->map(function($item) {
             $product = $item->product;
@@ -45,8 +34,11 @@ class WishlistService
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'product_name' => $product->name ?? 'Unknown',
+                'product_slug' => $product->slug ?? '',
                 'product_image' => $product->image_url ?? '',
                 'price' => $product->sale_price ?? $product->price,
+                'original_price' => $product->price ?? 0,
+                'discount_percentage' => $product->discount_percentage ?? 0,
                 'in_stock' => $product->in_stock ?? false,
             ];
         })->toArray();
@@ -61,27 +53,19 @@ class WishlistService
         }
 
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $exists = Wishlist::query()
-            ->where('product_id', $productId)
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->exists();
+        $exists = $this->wishlistRepository->existsByProduct($productId, $userId, $sessionId);
 
         if ($exists) {
             return ['success' => false, 'message' => 'Product already in wishlist'];
         }
 
-        Wishlist::create([
+        $this->wishlistRepository->create([
             'session_id' => $sessionId,
             'user_id' => $userId,
             'product_id' => $productId,
+            'site_id' => $product->site_id,
         ]);
 
         return ['success' => true, 'message' => 'Product added to wishlist'];
@@ -90,18 +74,9 @@ class WishlistService
     public function removeItem(int $productId): array
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $deleted = Wishlist::query()
-            ->where('product_id', $productId)
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->delete();
+        $deleted = $this->wishlistRepository->deleteByProduct($productId, $userId, $sessionId);
 
         if ($deleted) {
             return ['success' => true, 'message' => 'Item removed from wishlist'];
@@ -113,33 +88,23 @@ class WishlistService
     public function isInWishlist($user, Product $product): bool
     {
         $sessionId = $this->getSessionId();
-        $userId = $user ? $user->id : null;
+        $userId = $this->getUserId();
 
-        return Wishlist::query()
-            ->where('product_id', $product->id)
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->exists();
+        return $this->wishlistRepository->existsByProduct($product->id, $userId, $sessionId);
     }
 
     public function getCount(): int
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        return Wishlist::query()
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->count();
+        return $this->wishlistRepository->getCountBySessionOrUser($userId, $sessionId);
+    }
+
+    protected function getUserId(): ?int
+    {
+        $authId = auth()->id();
+        // Return null for guest users (don't use default value of 1)
+        return $authId ?: null;
     }
 }

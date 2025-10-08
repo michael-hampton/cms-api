@@ -19,7 +19,8 @@ class Product extends Model
         'meta_keywords',
         'deleted_at',
         'slug',
-        'site_id'
+        'site_id',
+        'is_active'
     ];
 
     protected $casts = [

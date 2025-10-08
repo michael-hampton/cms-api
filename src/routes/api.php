@@ -4,6 +4,7 @@ use App\Controllers\AuthController;
 use App\Controllers\AuthorController;
 use App\Controllers\BlockController;
 use App\Controllers\BrandController;
+use App\Controllers\CartController;
 use App\Controllers\CategoryController;
 use App\Controllers\CustomFieldDefinitionController;
 use App\Controllers\EstateWebsiteController;
@@ -15,6 +16,7 @@ use App\Controllers\ProductController;
 use App\Controllers\SearchController;
 use App\Controllers\SiteController;
 use App\Controllers\TagController;
+use App\Controllers\WishlistController;
 use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Container;
 use App\Framework\Http\Router;
@@ -184,4 +186,18 @@ $router->get('/authors/{slug}', 'AuthorViewController@show');
 //Auth
 $router->post('/api/{siteName}/auth/login', AuthController::class, 'login');
 $router->get('/api/sites', SiteController::class, 'index');
+
+$router->get('/api/{site}/cart', CartController::class, 'index');
+$router->post('/api/{site}/cart/add', CartController::class, 'add');
+$router->put('/api/{site}/cart/update/{id}', CartController::class, 'update');
+$router->delete('/api/{site}/cart/remove/{id}', CartController::class, 'remove');
+$router->post('/api/{site}/cart/clear', CartController::class, 'clear');
+
+$router->get('/api/{site}/wishlist', WishlistController::class, 'index');
+$router->post('/api/{site}/wishlist/add', WishlistController::class, 'add');
+$router->delete('/api/{site}/wishlist/remove/{productId}', WishlistController::class, 'remove');
+
+
+// Product routes
+$router->get('/api/{site}/products/search', 'ProductListController@search');
 

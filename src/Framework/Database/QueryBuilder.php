@@ -540,7 +540,7 @@ class QueryBuilder
     // Aggregate functions
     public function sum(string $column): float
     {
-        return $this->aggregate('SUM', $column);
+        return $this->aggregate('SUM', $column) ?? 0;
     }
 
     public function avg(string $column): float

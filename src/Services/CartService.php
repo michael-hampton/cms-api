@@ -1,20 +1,16 @@
 <?php
-// App/Services/CartService.php
 
 namespace App\Services;
 
-use App\Models\CartItem;
-use App\Models\Product;
+use App\Repositories\CartRepository;
 use App\Repositories\ProductRepository;
 
 class CartService
 {
-    protected ProductRepository $productRepository;
-
-    public function __construct(ProductRepository $productRepository)
-    {
-        $this->productRepository = $productRepository;
-    }
+    public function __construct(
+        private readonly CartRepository $cartRepository,
+        private readonly ProductRepository $productRepository
+    ) {}
 
     protected function getSessionId(): string
     {
@@ -27,27 +23,21 @@ class CartService
     public function getItems(): array
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $query = CartItem::query();
-
-        if ($userId) {
-            $query->where('user_id', $userId);
-        } else {
-            $query->where('session_id', $sessionId);
-        }
-
-        $items = $query->with('product')->get();
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
 
         return $items->map(function($item) {
+            $product = $item->product;
             return [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
-                'product_name' => $item->product->name ?? 'Unknown',
-                'product_image' => $item->product->image_url ?? '',
+                'product_name' => $product->name ?? 'Unknown',
+                'product_slug' => $product->slug ?? '',
+                'product_image' => $product->image_url ?? '',
                 'price' => $item->price,
                 'quantity' => $item->quantity,
-                'subtotal' => $item->price * $item->quantity,
+                'subtotal' => $item->subtotal,
                 'options' => $item->options,
             ];
         })->toArray();
@@ -66,18 +56,11 @@ class CartService
         }
 
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $existingItem = CartItem::query()
-            ->where('product_id', $productId)
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->first();
+        $price = $product->sale_price > 0 ? $product->sale_price : $product->price;
+
+        $existingItem = $this->cartRepository->findItemByProduct($productId, $userId, $sessionId);
 
         if ($existingItem) {
             $newQuantity = $existingItem->quantity + $quantity;
@@ -86,15 +69,20 @@ class CartService
                 return ['success' => false, 'message' => 'Cannot add more items. Stock limit reached.'];
             }
 
-            $existingItem->update(['quantity' => $newQuantity]);
+            $existingItem->update([
+                'quantity' => $newQuantity,
+                'subtotal' => $price * $newQuantity
+            ]);
         } else {
-            CartItem::create([
+            $this->cartRepository->create([
                 'session_id' => $sessionId,
                 'user_id' => $userId,
                 'product_id' => $productId,
                 'quantity' => $quantity,
                 'price' => $product->sale_price ?? $product->price,
+                'subtotal' => $price * $quantity,
                 'options' => json_encode($options),
+                'site_id' => $product->site_id,
             ]);
         }
 
@@ -108,18 +96,9 @@ class CartService
         }
 
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $cartItem = CartItem::query()
-            ->where('id', $cartItemId)
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->first();
+        $cartItem = $this->cartRepository->findById($cartItemId, $userId, $sessionId);
 
         if (!$cartItem) {
             return ['success' => false, 'message' => 'Cart item not found'];
@@ -131,7 +110,10 @@ class CartService
             return ['success' => false, 'message' => 'Insufficient stock'];
         }
 
-        $cartItem->update(['quantity' => $quantity]);
+        $this->cartRepository->update($cartItemId, [
+            'quantity' => $quantity,
+            'subtotal' => $cartItem->price * $quantity
+        ]);
 
         return ['success' => true, 'message' => 'Cart updated'];
     }
@@ -139,61 +121,46 @@ class CartService
     public function removeItem(int $cartItemId): array
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        $deleted = CartItem::query()
-            ->where('id', $cartItemId)
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->delete();
+        $cartItem = $this->cartRepository->findById($cartItemId, $userId, $sessionId);
 
-        if ($deleted) {
-            return ['success' => true, 'message' => 'Item removed from cart'];
+        if (!$cartItem) {
+            return ['success' => false, 'message' => 'Cart item not found'];
         }
 
-        return ['success' => false, 'message' => 'Cart item not found'];
+        $this->cartRepository->delete($cartItemId);
+
+        return ['success' => true, 'message' => 'Item removed from cart'];
     }
 
     public function clear(): void
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        CartItem::query()
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->delete();
+        $this->cartRepository->deleteBySessionOrUser($userId, $sessionId);
     }
 
     public function getTotal(): float
     {
         $items = $this->getItems();
+
         return array_sum(array_column($items, 'subtotal'));
     }
 
     public function getCount(): int
     {
         $sessionId = $this->getSessionId();
-        $userId = auth()->id();
+        $userId = $this->getUserId();
 
-        return CartItem::query()
-            ->where(function($query) use ($userId, $sessionId) {
-                if ($userId) {
-                    $query->where('user_id', $userId);
-                } else {
-                    $query->where('session_id', $sessionId);
-                }
-            })
-            ->sum('quantity');
+        return $this->cartRepository->getCountBySessionOrUser($userId, $sessionId);
+    }
+
+    protected function getUserId(): ?int
+    {
+        $authId = auth()->id();
+        // Return null for guest users (don't use default value of 1)
+        return $authId ?: null;
     }
 }

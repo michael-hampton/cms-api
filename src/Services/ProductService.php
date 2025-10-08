@@ -8,6 +8,7 @@ use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
+use App\Repositories\ProductViewRepository;
 use Exception;
 
 class ProductService
@@ -17,7 +18,8 @@ class ProductService
 
     public function __construct(
         ProductRepository $repository,
-        ImageUploadService $imageUploadService
+        ImageUploadService $imageUploadService,
+        private readonly ProductViewRepository $productViewRepository
     ) {
         $this->repository = $repository;
         $this->imageUploadService = $imageUploadService;
@@ -179,13 +181,7 @@ class ProductService
         $userId = auth()->id();
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
 
-        // Insert view record (you'll need to create ProductView model)
-        // ProductView::create([
-        //     'product_id' => $product->id,
-        //     'session_id' => $sessionId,
-        //     'user_id' => $userId,
-        //     'ip_address' => $ipAddress,
-        // ]);
+        $this->productViewRepository->trackView($product->id, $userId, $sessionId, $ipAddress);
     }
 
     public function generateStructuredData(Product $product): array
