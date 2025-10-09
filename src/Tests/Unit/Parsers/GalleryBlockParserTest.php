@@ -2,14 +2,17 @@
 
 namespace App\Tests\Unit\Parsers;
 
+use App\Enums\GalleryLayout;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
+use App\Framework\Validation\Validator;
 use App\Parsers\GalleryBlockParser;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use PHPUnit\Framework\TestCase;
 
-class GalleryBlockParserTest extends TestCase
+class GalleryBlockParserTest extends FunctionalTestCase
 {
     public function testGalleryParserGetType(): void
     {
@@ -133,5 +136,169 @@ class GalleryBlockParserTest extends TestCase
         $this->assertStringContainsString('<img src="/img1.jpg"', $html);
         $this->assertStringContainsString('<h3 class="gallery-slide-title">S1 Title</h3>', $html);
         $this->assertStringContainsString('<div class="gallery-slide-caption">S1 Caption</div>', $html);
+    }
+
+    public function testGalleryBlockParserParsesSlides()
+    {
+        $parser = new GalleryBlockParser();
+        $data = [
+            'layout' => 'carousel',
+            'slides' => [
+                [
+                    'title' => 'Slide 1',
+                    'description' => 'Description 1',
+                    'image' => 'slide1.jpg',
+                    'alt' => 'Slide 1 alt'
+                ],
+                [
+                    'title' => 'Slide 2',
+                    'description' => 'Description 2',
+                    'image' => 'slide2.jpg',
+                    'alt' => 'Slide 2 alt'
+                ]
+            ]
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertEquals('carousel', $result['layout']);
+        $this->assertEquals(2, $result['slide_count']);
+        $this->assertCount(2, $result['slides']);
+    }
+
+    public function testGalleryBlockParserGeneratesCarousel()
+    {
+        $parser = new GalleryBlockParser();
+        $parsed = [
+            'layout' => 'carousel',
+            'slides' => [
+                [
+                    'title' => 'Slide 1',
+                    'description' => 'Desc',
+                    'image' => 'slide1.jpg',
+                    'formatted_title' => 'Slide 1',
+                    'formatted_description' => 'Desc',
+                    'word_count' => 3
+                ]
+            ],
+            'slide_count' => 1
+        ];
+
+        $html = $parser->generateHtml($parsed);
+
+        $this->assertStringContainsString('gallery-carousel', $html);
+        $this->assertStringContainsString('carousel-slides', $html);
+        $this->assertStringContainsString('<script>', $html);
+    }
+
+    public function testGalleryBlockParserRequiredFields()
+    {
+        $parser = new GalleryBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            // Missing required fields: layout, slides
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testGalleryBlockParserInvalidLayout()
+    {
+        $parser = new GalleryBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'layout' => 'invalid_layout',
+            'slides' => []
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testGalleryBlockParserValidLayouts()
+    {
+        $parser = new GalleryBlockParser();
+
+        foreach (GalleryLayout::cases() as $layout) {
+            $data = [
+                'layout' => $layout->value,
+                'slides' => [
+                    ['title' => 'Slide 1', 'image' => 'img.jpg', 'alt' => 'Alt']
+                ]
+            ];
+
+            $result = $parser->parse($data);
+            $this->assertEquals($layout->value, $result['layout']);
+        }
+    }
+
+    public function testGalleryBlockParserSlidesArray()
+    {
+        $parser = new GalleryBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'layout' => 'carousel',
+            'slides' => 'not_an_array'
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testGalleryBlockParserSlideValidation()
+    {
+        $parser = new GalleryBlockParser();
+        $validator = new Validator();
+
+        $slideRules = $parser->getSlideValidationRules();
+
+        // Test slide with missing required title
+        $slideData = [
+            'description' => 'Description'
+        ];
+
+        $result = $validator->validate($slideData, $slideRules);
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testGalleryBlockParserSlideTitleMaxLength()
+    {
+        $parser = new GalleryBlockParser();
+        $validator = new Validator();
+
+        $slideRules = $parser->getSlideValidationRules();
+
+        $slideData = [
+            'title' => str_repeat('a', 256)
+        ];
+
+        $result = $validator->validate($slideData, $slideRules);
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testGalleryBlockParserSlideDescriptionMaxLength()
+    {
+        $parser = new GalleryBlockParser();
+        $validator = new Validator();
+
+        $slideRules = $parser->getSlideValidationRules();
+
+        $slideData = [
+            'title' => 'Title',
+            'description' => str_repeat('a', 1001)
+        ];
+
+        $result = $validator->validate($slideData, $slideRules);
+        $this->assertFalse($result->isValid());
     }
 }

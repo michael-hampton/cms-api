@@ -2,11 +2,14 @@
 
 namespace App\Tests\Unit\Parsers;
 
+use App\Enums\InfoType;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Validator;
 use App\Parsers\InfoBlockParser;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use PHPUnit\Framework\TestCase;
 
-class InfoBlockParserTest extends TestCase
+class InfoBlockParserTest extends FunctionalTestCase
 {
     public function testInfoParserGetType(): void
     {
@@ -55,5 +58,68 @@ class InfoBlockParserTest extends TestCase
         $this->assertStringContainsString('<span class="info-icon">💡</span>', $html);
         $this->assertStringContainsString('<span class="info-type">Tip</span>', $html);
         $this->assertStringContainsString('Use this shortcut.', $html);
+    }
+
+    public function testInfoBlockParserRequiredFields()
+    {
+        $parser = new InfoBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            // Missing required fields: infoType, description
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testInfoBlockParserInvalidInfoType()
+    {
+        $parser = new InfoBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'infoType' => 'invalid_type',
+            'description' => 'Description'
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testInfoBlockParserValidInfoTypes()
+    {
+        $parser = new InfoBlockParser();
+
+        foreach (InfoType::cases() as $infoType) {
+            $data = [
+                'infoType' => $infoType->value,
+                'description' => 'Description'
+            ];
+
+            $result = $parser->parse($data);
+            $this->assertEquals($infoType->value, $result['infoType']);
+            $this->assertEquals($infoType->getIcon(), $result['icon']);
+        }
+    }
+
+    public function testInfoBlockParserDescriptionMaxLength()
+    {
+        $parser = new InfoBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'infoType' => 'info',
+            'description' => str_repeat('a', 2001)
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
     }
 }

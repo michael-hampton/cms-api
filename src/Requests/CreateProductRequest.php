@@ -3,6 +3,7 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
+use App\Framework\Support\Str;
 
 class CreateProductRequest extends FormRequest
 {
@@ -45,6 +46,10 @@ class CreateProductRequest extends FormRequest
     {
         if (empty($this->data['site_id'])) {
             $this->data['site_id'] = config('app.default_site_id');
+        }
+
+        if (empty($this->data['slug']) && !empty($this->data['name'])) {
+            $this->data['slug'] = Str::slug($this->data['name']);
         }
     }
 }

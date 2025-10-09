@@ -21,6 +21,7 @@ class MaxRule extends BaseValidationRule
         }
 
         $max = $this->parameters[0];
+
         return is_numeric($value) && $value <= $max;
     }
 

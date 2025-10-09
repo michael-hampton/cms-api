@@ -2,8 +2,10 @@
 
 namespace App\Parsers;
 
+use App\Enums\Currency;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
@@ -51,7 +53,7 @@ class DealBlockParser extends BaseBlockParser
             ],
             'currency' => [
                 new RequiredRule(),
-                new MaxLengthRule(10)
+                new EnumRule(Currency::class)
             ],
             'price' => [
                 new RequiredRule(),

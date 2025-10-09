@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Framework\Http\Request;
 use App\Repositories\ProductRepository;
 use App\Services\ProductService;
+use App\Services\ReviewService;
 use App\Services\WishlistService;
 
 class ProductDetailController extends Controller
@@ -36,7 +37,7 @@ class ProductDetailController extends Controller
         $isInWishlist = $this->wishlistService->isInWishlist($user, $product);
 
         // Get review data
-        $reviewService = app(ReviewService::class); //todo
+        $reviewService = app(ReviewService::class);
         $reviewData = $reviewService->getProductReviews($product->id, 1, 5); // First 5 reviews
         $reviewStats = $reviewService->getReviewStatistics($product->id);
         $canReview = $reviewService->canUserReview($product->id);
@@ -47,6 +48,9 @@ class ProductDetailController extends Controller
             'recentlyViewed' => $recentlyViewed,
             'isInWishlist' => $isInWishlist,
             'structuredData' => $this->productService->generateStructuredData($product),
+            'reviewStats' => $reviewStats,
+            'canReview' => ['can_review' => true],
+            'reviewData' => $reviewData,
             'menu' => $this->getMenu(),
         ]);
     }

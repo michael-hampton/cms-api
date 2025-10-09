@@ -16,10 +16,18 @@ class Router
     private Container $container;
     private array $middleware = [];
     private array $groupStack = []; // Track nested groups
+    private array $globalMiddleware = [];
+
 
     public function __construct(Container $container)
     {
         $this->container = $container;
+    }
+
+    public function middleware(array $middleware): self
+    {
+        $this->globalMiddleware = array_merge($this->globalMiddleware, $middleware);
+        return $this;
     }
 
     /**
@@ -158,9 +166,9 @@ class Router
             if ($this->matchRoute($routePath, $path, $params)) {
                 // Extract handler and middleware
                 $handler = $routeData['handler'] ?? $routeData;
-                $middleware = $routeData['middleware'] ?? [];
+                $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
 
-                return $this->runMiddleware($middleware, $request, function($request) use ($handler, $params) {
+                return $this->runMiddleware($middlewareStack, $request, function($request) use ($handler, $params) {
                     return $this->callAction($handler, $request, $params);
                 });
             }

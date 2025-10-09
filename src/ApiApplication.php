@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Events\DatabaseEventSubscriber;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -16,12 +17,12 @@ use App\Framework\Database\Database;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Http\Router;
+use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Routing\RouteLoader;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
-use App\Events\DatabaseEventSubscriber;
 use Exception;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -39,6 +40,9 @@ class ApiApplication
 
         // Create router and register it as singleton in container
         $this->router = new Router($this->container);
+
+        $this->registerMiddleware();
+
         $this->container->instance(Router::class, $this->router);
 
         // Create route loader using container
@@ -50,6 +54,13 @@ class ApiApplication
         // Setup other services
         $this->setupArtisan();
         $this->registerObservers();
+    }
+
+    private function registerMiddleware()
+    {
+        $this->router->middleware([
+            SessionMiddleware::class
+        ]);
     }
 
     /**

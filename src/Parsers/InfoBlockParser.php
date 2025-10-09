@@ -2,6 +2,8 @@
 
 namespace App\Parsers;
 
+use App\Enums\InfoType;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Validation\Custom\InfoTypeRule;
@@ -18,7 +20,7 @@ class InfoBlockParser extends BaseBlockParser
         return [
             'infoType' => [
                 new RequiredRule(),
-                new MaxLengthRule(50)
+                new EnumRule(InfoType::class)
             ],
             'description' => [
                 new RequiredRule(),

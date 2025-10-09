@@ -7,6 +7,7 @@ use App\Framework\Http\UploadedFile;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductRepositoryInterface;
+use App\Repositories\ProductViewRepository;
 use App\Services\ImageUploadService;
 use App\Services\ProductService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -25,13 +26,14 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository = Mockery::mock(ProductRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
+        $productViewRepository = Mockery::mock(ProductViewRepository::class);
 
         $this->databaseMock = Mockery::mock(Database::class);
 
         $this->imageUploadService->shouldReceive('setAllowedMimeTypes')->andReturnSelf();
         $this->imageUploadService->shouldReceive('setMaxFileSize')->andReturnSelf();
 
-        $this->service = new ProductService($this->repository, $this->imageUploadService);
+        $this->service = new ProductService($this->repository, $this->imageUploadService, $productViewRepository);
     }
 
     protected function tearDown(): void

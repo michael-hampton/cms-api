@@ -328,6 +328,12 @@ abstract class Model
     {
         $primaryKeyValue = $this->getAttribute($this->primaryKey);
         if (!$primaryKeyValue) {
+
+            echo '<pre>';
+            print_r($this);
+            die;
+
+            die('no primary key');
             return false;
         }
 
@@ -388,7 +394,17 @@ abstract class Model
     public static function find(int $id): ?self
     {
         $instance = new static();
-        return $instance->newQuery()->find($id);
+        $result = $instance->newQuery()->find($id);
+
+        if (!$result) {
+            return null;
+        }
+
+        if (!$result instanceof Model) {
+            return $instance->hydrateFromArray($result);
+        }
+
+        return $result;
     }
 
     public static function findOrFail($id)
@@ -601,7 +617,7 @@ abstract class Model
     protected function isRelationshipMethod(string $method): bool
     {
         return method_exists($this, $method);
-            //&& $this->methodReturnsRelationshipHandler($method);
+        //&& $this->methodReturnsRelationshipHandler($method);
     }
 
     protected function methodReturnsRelationshipHandler(string $method): bool
@@ -1161,16 +1177,18 @@ abstract class Model
         return $this->table;
     }
 
-    public function setExists(bool $exists): void
+    public function setExists(bool $exists): self
     {
         $this->exists = $exists;
+
+        return $this;
     }
 
     /**
      * Update an existing record matching the attributes, or create a new one.
      *
-     * @param array $attributes  Key-value pairs to match existing record
-     * @param array $values      Key-value pairs to update or set
+     * @param array $attributes Key-value pairs to match existing record
+     * @param array $values Key-value pairs to update or set
      * @return static            The model instance
      */
     public static function updateOrCreate(array $attributes, array $values)

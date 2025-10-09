@@ -2,7 +2,10 @@
 
 namespace App\Parsers;
 
+use App\Enums\Alignment;
+use App\Enums\ImageLayout;
 use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
@@ -45,7 +48,10 @@ class ImageBlockParser extends BaseBlockParser
                new BooleanRule()
             ],
             'layout' => [
-                new ImageLayoutRule()
+                new EnumRule(ImageLayout::class)
+            ],
+            'alignment' => [
+                new EnumRule(Alignment::class)
             ]
         ];
     }
@@ -86,8 +92,15 @@ class ImageBlockParser extends BaseBlockParser
             'accessibility_score' => $this->calculateAccessibilityScore($alt, $caption),
             'link_attributes' => $this->buildLinkAttributes($noFollow, $sponsored, $openInNewTab),
             'layout_css_class' => $this->getLayoutCssClass($layout),
-            'is_responsive_layout' => $this->isResponsiveLayout($layout)
+            'is_responsive_layout' => $this->isResponsiveLayout($layout),
+            'alignment' => $data['alignment'] ?? 'fullscreen',
+            'alignment_css_class' => $this->getAlignmentCssClass($data['alignment'] ?? 'fullscreen')
         ];
+    }
+
+    private function getAlignmentCssClass(string $alignment): string
+    {
+        return 'image-align-' . $alignment;
     }
 
     private function parseBooleanValue($value): bool
@@ -271,8 +284,9 @@ class ImageBlockParser extends BaseBlockParser
         $alt = htmlspecialchars($parsedData['alt'], ENT_QUOTES, 'UTF-8');
         $caption = $parsedData['formatted_caption'];
         $layoutClass = $parsedData['layout_css_class'];
+        $alignmentClass = $parsedData['alignment_css_class'];
 
-        $html = "<div class=\"image-block {$layoutClass}\">";
+        $html = "<div class=\"image-block {$layoutClass} {$alignmentClass}\">";
 
         if (!empty($parsedData['linkUrl'])) {
             $linkUrl = htmlspecialchars($parsedData['linkUrl'], ENT_QUOTES, 'UTF-8');

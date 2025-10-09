@@ -64,11 +64,10 @@ class VideoControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $this->assertArrayHasKey('data', $data);
-        $this->assertArrayHasKey('items', $data['data']);
-        $this->assertArrayHasKey('pagination', $data['data']);
-        $this->assertCount(2, $data['data']['items']);
-        $this->assertEquals(2, $data['data']['pagination']['total']);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertArrayHasKey('pagination', $data);
+        $this->assertCount(2, $data['items']);
+        $this->assertEquals(2, $data['pagination']['total']);
     }
 
     public function testIndexWithQueryParameter()
@@ -107,8 +106,8 @@ class VideoControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertCount(1, $data['data']['items']);
-        $this->assertEquals('Searchable Title', $data['data']['items'][0]['title']);
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('Searchable Title', $data['items'][0]['title']);
     }
 
     public function testIndexWithPaginationParameters()
@@ -135,12 +134,12 @@ class VideoControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertCount(10, $data['data']['items']);
-        $this->assertEquals(25, $data['data']['pagination']['total']);
-        $this->assertEquals(2, $data['data']['pagination']['page']);
-        $this->assertEquals(10, $data['data']['pagination']['per_page']);
-        $this->assertEquals(3, $data['data']['pagination']['total_pages']);
-        $this->assertTrue($data['data']['pagination']['has_more']);
+        $this->assertCount(10, $data['items']);
+        $this->assertEquals(25, $data['pagination']['total']);
+        $this->assertEquals(2, $data['pagination']['page']);
+        $this->assertEquals(10, $data['pagination']['per_page']);
+        $this->assertEquals(3, $data['pagination']['total_pages']);
+        $this->assertTrue($data['pagination']['has_more']);
     }
 
     public function testUploadVideoSuccessfully()

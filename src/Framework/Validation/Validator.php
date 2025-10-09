@@ -5,6 +5,7 @@ namespace App\Framework\Validation;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Validation\Rules\BetweenRule;
+use App\Framework\Validation\Rules\ConfirmedRule;
 use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\InRule;
@@ -17,6 +18,7 @@ use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RegexRule;
 use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\UniqueRule;
 use App\Framework\Validation\Rules\UrlRule;
 use Exception;
@@ -36,15 +38,19 @@ class Validator
 
     public function validate(array $data, array $rules): ValidationResult
     {
+        $failedFields = [];
+        $this->errors = new Collection([]);
+
         foreach ($rules as $field => $fieldRules) {
             $fieldErrors = $this->validateField($field, $data, $fieldRules);
 
             if (!empty($fieldErrors)) {
                 $this->errors = $this->errors->merge($fieldErrors);
+                $failedFields[] = $field;
             }
         }
 
-        return new ValidationResult($this->errors->isEmpty(), $this->errors->all());
+        return new ValidationResult($this->errors->isEmpty(), $this->errors->all(), $failedFields);
     }
 
     private function validateField(string $field, array $data, $rules): array
@@ -67,6 +73,10 @@ class Validator
         foreach ($rules as $rule) {
             if (is_string($rule)) {
                 $rule = $this->parseStringRule($rule);
+            }
+
+            if ($rule instanceof ConfirmedRule) {
+                $rule->setField($field);
             }
 
             // Skip validation for non-required empty fields, except for required rule itself
@@ -236,6 +246,8 @@ class Validator
             'min_length_rule' => MinLengthRule::class,
             'max_length_rule' => MaxLengthRule::class,
             'date_rule' => DateRule::class,
+            'sometimes' => SometimesRule::class,  // ADD THIS
+            'confirmed' => ConfirmedRule::class,
         ];
 
         if (!isset($ruleMap[$ruleName])) {

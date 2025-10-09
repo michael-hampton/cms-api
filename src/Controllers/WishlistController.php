@@ -25,6 +25,7 @@ class WishlistController extends Controller
     public function add(Request $request, string $site)
     {
         $site = Site::resolveSite($site);
+
         $request->put('site_id', $site);
 
         $productId = $request->input('product_id');

@@ -3,6 +3,8 @@
 // HeadingBlockParser.php
 namespace App\Parsers;
 
+use App\Enums\HeadingLevel;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Validation\Custom\HeadingLevelRule;
@@ -26,7 +28,7 @@ class HeadingBlockParser extends BaseBlockParser
             ],
             'level' => [
                 new RequiredRule(),
-                new HeadingLevelRule()
+                new EnumRule(HeadingLevel::class)
             ]
         ];
     }
@@ -35,16 +37,32 @@ class HeadingBlockParser extends BaseBlockParser
     {
         $text = trim($data['text'] ?? '');
         $subtitle = trim($data['subtitle'] ?? '');
+        $levelEnum = $this->getLevel($data);
 
         return [
             'text' => $text,
             'subtitle' => $subtitle,
-            'level' => (int)($data['level'] ?? 2),
+            'level' => $levelEnum->getLevel(),
             'word_count' => str_word_count($text . ' ' . $subtitle),
             'formatted_text' => htmlspecialchars($text),
             'formatted_subtitle' => htmlspecialchars($subtitle),
             'has_subtitle' => !empty($subtitle)
         ];
+    }
+
+    private function getLevel(array $data): HeadingLevel
+    {
+        $levelInput = $data['level'] ?? 2; // default to 2
+
+        if (is_int($levelInput)) {
+            $levelValue = 'h' . $levelInput; // 3 -> 'h3'
+        } elseif (is_string($levelInput) && preg_match('/^h[1-6]$/', $levelInput)) {
+            $levelValue = $levelInput;
+        } else {
+            $levelValue = 'h2'; // fallback default
+        }
+
+        return HeadingLevel::from($levelValue);
     }
 
     public function generateHtml(array $parsedData): string

@@ -47,14 +47,7 @@ class ReviewService
 
         return [
             'reviews' => $reviews->toArray(),
-            'pagination' => [
-                'current_page' => $paginatedReviews['current_page'],
-                'last_page' => $paginatedReviews['last_page'],
-                'per_page' => $paginatedReviews['per_page'],
-                'total' => $paginatedReviews['total'],
-                'from' => $paginatedReviews['from'],
-                'to' => $paginatedReviews['to'],
-            ],
+            'pagination' => $paginatedReviews['pagination'],
             'average_rating' => $this->reviewRepository->getAverageRating($productId),
             'total_reviews' => $this->reviewRepository->getTotalReviewCount($productId),
             'rating_breakdown' => $this->reviewRepository->getRatingBreakdown($productId),

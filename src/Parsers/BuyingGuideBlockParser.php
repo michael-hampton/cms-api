@@ -39,6 +39,9 @@ class BuyingGuideBlockParser extends BaseBlockParser
             ],
             'showReviewPanel' => [
                 new BooleanRule()
+            ],
+            'image' => [
+                new ArrayRule()
             ]
         ];
     }
@@ -69,13 +72,21 @@ class BuyingGuideBlockParser extends BaseBlockParser
             'sponsored' => (bool)($data['sponsored'] ?? false),
             'openInNewTab' => (bool)($data['openInNewTab'] ?? false),
             'has_specs' => !empty($specs),
-            'has_pros_cons' => !empty($data['pros']) || !empty($data['cons'])
+            'has_pros_cons' => !empty($data['pros']) || !empty($data['cons']),
+            'image' => $data['image'] ?? null,
+            'has_image' => !empty($data['image'])
         ];
     }
 
     public function generateHtml(array $parsedData): string
     {
         $html = "<div class=\"buying-guide-block\">";
+
+        if ($parsedData['has_image']) {
+            $html .= "<div class=\"buying-guide-image\">";
+            $html .= "<img src=\"{$parsedData['image']}\" alt=\"{$parsedData['title']}\" class=\"guide-img\">";
+            $html .= "</div>";
+        }
 
         $html .= "<div class=\"buying-guide-header\">";
         $html .= "<h3 class=\"buying-guide-title\">{$parsedData['title']}</h3>";

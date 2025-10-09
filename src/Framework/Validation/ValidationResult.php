@@ -4,13 +4,17 @@ namespace App\Framework\Validation;
 
 class ValidationResult
 {
-    private $isValid;
-    private $errors;
+    private bool $isValid;
+    private array $errors;
+    private array $failedFields;
 
-    public function __construct(bool $isValid, array $errors = [])
+
+    public function __construct(bool $isValid, array $errors = [], array $failedFields = [])
     {
         $this->isValid = $isValid;
         $this->errors = $errors;
+        $this->failedFields = $failedFields;
+
     }
 
     public function isValid(): bool
@@ -50,5 +54,10 @@ class ValidationResult
             $this->isValid && $other->isValid(),
             array_merge($this->errors, $other->getErrors())
         );
+    }
+
+    public function getFailedFields(): array
+    {
+        return $this->failedFields;
     }
 }

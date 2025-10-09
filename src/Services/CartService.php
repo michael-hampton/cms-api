@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Framework\Session\Session;
 use App\Repositories\CartRepository;
 use App\Repositories\ProductRepository;
 
@@ -14,10 +15,10 @@ class CartService
 
     protected function getSessionId(): string
     {
-        if (!isset($_SESSION['cart_session_id'])) {
-            $_SESSION['cart_session_id'] = uniqid('cart_', true);
+        if (empty(Session::get('cart_session_id'))) {
+            Session::put('cart_session_id', uniqid('cart_', true));
         }
-        return $_SESSION['cart_session_id'];
+        return Session::get('cart_session_id');
     }
 
     public function getItems(): array

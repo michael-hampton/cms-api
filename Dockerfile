@@ -9,5 +9,8 @@ RUN a2enmod rewrite
 # Allow .htaccess overrides
 RUN sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
-# Copy source code (optional if you have ./src mounted)
+# Copy custom PHP config for large uploads
+COPY ./uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
+# Optional: copy source code if you don’t mount it as a volume
 # COPY ./src /var/www/html/

@@ -6,6 +6,7 @@ services:
     container_name: php_app
     volumes:
       - ./src:/var/www/html
+      - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
     ports:
     - "5001:80"
     depends_on:

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Framework\Session\Session;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Repositories\WishlistRepository;
@@ -15,10 +16,10 @@ class WishlistService
 
     protected function getSessionId(): string
     {
-        if (!isset($_SESSION['wishlist_session_id'])) {
-            $_SESSION['wishlist_session_id'] = uniqid('wishlist_', true);
+        if (empty(Session::get('wishlist_session_id'))) {
+            Session::put('wishlist_session_id', uniqid('cart_', true));
         }
-        return $_SESSION['wishlist_session_id'];
+        return Session::get('wishlist_session_id');
     }
 
     public function getItems(): array

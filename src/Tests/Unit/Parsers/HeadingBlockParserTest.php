@@ -2,12 +2,15 @@
 
 namespace App\Tests\Unit\Parsers;
 
+use App\Enums\HeadingLevel;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Validator;
 use App\Parsers\HeadingBlockParser;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Validation\Custom\HeadingLevelRule;
 use PHPUnit\Framework\TestCase;
 
-class HeadingBlockParserTest extends TestCase
+class HeadingBlockParserTest extends FunctionalTestCase
 {
     public function testHeadingParserGetType(): void
     {
@@ -68,5 +71,85 @@ class HeadingBlockParserTest extends TestCase
         $parsedData['has_subtitle'] = false;
         $htmlNoSubtitle = $parser->generateHtml($parsedData);
         $this->assertStringNotContainsString('<div class="heading-subtitle">', $htmlNoSubtitle);
+    }
+
+    public function testHeadingBlockParserRequiredFields()
+    {
+        $parser = new HeadingBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            // Missing required fields: text, level
+            'subtitle' => 'Subtitle'
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testHeadingBlockParserTextMaxLength()
+    {
+        $parser = new HeadingBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'text' => str_repeat('a', 256),
+            'level' => 2
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testHeadingBlockParserSubtitleMaxLength()
+    {
+        $parser = new HeadingBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'text' => 'Heading',
+            'subtitle' => str_repeat('a', 501),
+            'level' => 2
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testHeadingBlockParserInvalidLevel()
+    {
+        $parser = new HeadingBlockParser();
+        $validator = new Validator();
+
+        $data = [
+            'text' => 'Heading',
+            'level' => 'invalid_level'
+        ];
+
+        $rules = $parser->getValidationRules();
+        $result = $validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+    }
+
+    public function testHeadingBlockParserValidLevels()
+    {
+        $parser = new HeadingBlockParser();
+
+        foreach (HeadingLevel::cases() as $level) {
+            $data = [
+                'text' => 'Heading',
+                'level' => $level->value
+            ];
+
+            $result = $parser->parse($data);
+            $this->assertEquals($level->getLevel(), $result['level']);
+        }
     }
 }

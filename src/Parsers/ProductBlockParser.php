@@ -2,8 +2,12 @@
 
 namespace App\Parsers;
 
+use App\Enums\Currency;
+use App\Enums\DisplayAs;
+use App\Enums\Layout;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
@@ -35,7 +39,7 @@ class ProductBlockParser extends BaseBlockParser
                 new BooleanRule()
             ],
             'displayAs' => [
-                new MaxLengthRule(50)
+                new EnumRule(DisplayAs::class)
             ],
             'linkText' => [
                 new MaxLengthRule(100)
@@ -57,7 +61,7 @@ class ProductBlockParser extends BaseBlockParser
                 new MaxLengthRule(255)
             ],
             'currency' => [
-                new MaxLengthRule(10)
+                new EnumRule(Currency::class)
             ],
             'price' => [
                 new RequiredRule(),
@@ -68,7 +72,7 @@ class ProductBlockParser extends BaseBlockParser
                 new SalePriceValidatorRule()
             ],
             'layout' => [
-                new MaxLengthRule(50)
+                new EnumRule(Layout::class)
             ],
             'description' => [
                 new MaxLengthRule(1000)

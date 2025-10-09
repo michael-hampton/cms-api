@@ -28,7 +28,7 @@ class VideoController extends Controller
 
         $result = $this->videoService->getVideos($filters);
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'items' => $result->getData(),
             'pagination' => [
                 'total' => $result->getTotal(),

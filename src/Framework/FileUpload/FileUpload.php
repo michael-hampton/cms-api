@@ -16,7 +16,7 @@ class FileUpload
     {
         $this->file = $file;
         $this->uploadPath = rtrim($uploadPath, '/');
-        $this->allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'];
+        $this->allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mpg'];
         $this->maxSize = 5 * 1024 * 1024; // 5MB
     }
 
@@ -45,6 +45,8 @@ class FileUpload
         }
 
         $extension = strtolower(pathinfo($this->file['name'], PATHINFO_EXTENSION));
+        echo $extension;
+        die;
         if (!in_array($extension, $this->allowedExtensions)) {
             $errors[] = "File type not allowed. Allowed types: " . implode(', ', $this->allowedExtensions);
         }

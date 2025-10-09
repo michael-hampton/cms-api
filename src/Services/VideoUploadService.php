@@ -12,7 +12,7 @@ use Exception;
 class VideoUploadService
 {
     private string $uploadPath;
-    private array $allowedMimeTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
+    private array $allowedMimeTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/mpeg'];
     private int $maxFileSize = 104857600; // 100MB
     private int $thumbnailCount = 5;
     private FileSystemInterface $fileSystem;
@@ -100,63 +100,75 @@ class VideoUploadService
 
     public function getVideoMetadata(string $filePath): array
     {
-        $metadata = [
-            'duration' => 0,
-            'width' => null,
-            'height' => null,
-            'bitrate' => null,
-            'codec' => null
-        ];
+        try {
+            $metadata = [
+                'duration' => 0,
+                'width' => null,
+                'height' => null,
+                'bitrate' => null,
+                'codec' => null
+            ];
 
-        if ($this->commandExecutor->commandExists('ffprobe')) {
-            return $this->getMetadataWithFFprobe($filePath);
+            if ($this->commandExecutor->commandExists('ffprobe')) {
+                return $this->getMetadataWithFFprobe($filePath);
+            }
+
+            if (class_exists('getID3')) {
+                return $this->getMetadataWithGetID3($filePath);
+            }
+
+            return $metadata;
+        } catch (Exception $e) {
+            //silently fail
         }
 
-        if (class_exists('getID3')) {
-            return $this->getMetadataWithGetID3($filePath);
-        }
-
-        return $metadata;
+        return [];
     }
 
     protected function getMetadataWithFFprobe(string $filePath): array
     {
-        $command = sprintf(
-            'ffprobe -v quiet -print_format json -show_format -show_streams %s',
-            escapeshellarg($filePath)
-        );
+        try {
+            $command = sprintf(
+                'ffprobe -v quiet -print_format json -show_format -show_streams %s',
+                escapeshellarg($filePath)
+            );
 
-        $output = shell_exec($command);
-        if (!$output) {
-            return ['duration' => 0, 'width' => null, 'height' => null];
-        }
+            $output = shell_exec($command);
+            if (!$output) {
+                return ['duration' => 0, 'width' => null, 'height' => null];
+            }
 
-        $data = json_decode($output, true);
+            $data = json_decode($output, true);
 
-        $duration = (float)($data['format']['duration'] ?? 0);
-        $width = null;
-        $height = null;
-        $bitrate = (int)($data['format']['bit_rate'] ?? 0);
-        $codec = null;
+            $duration = (float)($data['format']['duration'] ?? 0);
+            $width = null;
+            $height = null;
+            $bitrate = (int)($data['format']['bit_rate'] ?? 0);
+            $codec = null;
 
-        if (isset($data['streams'])) {
-            foreach ($data['streams'] as $stream) {
-                if ($stream['codec_type'] === 'video') {
-                    $width = (int)($stream['width'] ?? 0);
-                    $height = (int)($stream['height'] ?? 0);
-                    $codec = $stream['codec_name'] ?? null;
-                    break;
+            if (isset($data['streams'])) {
+                foreach ($data['streams'] as $stream) {
+                    if ($stream['codec_type'] === 'video') {
+                        $width = (int)($stream['width'] ?? 0);
+                        $height = (int)($stream['height'] ?? 0);
+                        $codec = $stream['codec_name'] ?? null;
+                        break;
+                    }
                 }
             }
+
+            return [
+                'duration' => $duration,
+                'width' => $width,
+                'height' => $height,
+                'bitrate' => $bitrate,
+                'codec' => $codec
+            ];
+        } catch (Exception $e) {
+            //silently fail
         }
 
-        return [
-            'duration' => $duration,
-            'width' => $width,
-            'height' => $height,
-            'bitrate' => $bitrate,
-            'codec' => $codec
-        ];
+        return [];
     }
 
     protected function getMetadataWithGetID3(string $filePath): array

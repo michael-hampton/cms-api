@@ -465,12 +465,14 @@ class QueryBuilder
 
         return [
             'data' => $data,
-            'current_page' => $page,
-            'per_page' => $perPage,
-            'total' => (int)$total,
-            'last_page' => (int)ceil($total / $perPage),
-            'from' => $offset + 1,
-            'to' => min($offset + $perPage, $total)
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => (int)$total,
+                'last_page' => (int)ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total)
+            ]
         ];
     }
 

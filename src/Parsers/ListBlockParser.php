@@ -3,7 +3,10 @@
 // ListBlockParser.php
 namespace App\Parsers;
 
+use App\Enums\ListType;
+use App\Enums\SchemaType;
 use App\Framework\Validation\Rules\ArrayRule;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
@@ -20,13 +23,13 @@ class ListBlockParser extends BaseBlockParser
         return [
             'listType' => [
                 new RequiredRule(),
-                new MaxLengthRule(10)
+                new EnumRule(ListType::class)
             ],
             'startIndex' => [
                 new IntegerRule()
             ],
             'schemaType' => [
-                new MaxLengthRule(50)
+                new EnumRule(SchemaType::class)
             ],
             'items' => [
                 new RequiredRule(),

@@ -77,9 +77,6 @@ class ReviewServiceTest extends TestCase
         return $mock;
     }
 
-    // Assuming the following placeholder class exists in your test file setup:
-// use Illuminate\Support\Collection;
-
     public function testGetProductReviewsSuccess()
     {
         $productId = 1;

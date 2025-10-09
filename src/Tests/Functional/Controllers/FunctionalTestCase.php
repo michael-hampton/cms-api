@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers;
 use App\ApiApplication;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
+use App\Framework\Http\TestResponse;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
 use App\Models\Site;
@@ -243,7 +244,13 @@ abstract class FunctionalTestCase extends TestCase
         if (!empty($files)) {
             $_FILES = $files;
         }
-        return $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
     }
 
     protected function putForSite(string $uri, array $data = [], array $files = [], array $headers = []): Response
@@ -251,12 +258,24 @@ abstract class FunctionalTestCase extends TestCase
         if (!empty($files)) {
             $_FILES = $files;
         }
-        return $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
     }
 
     protected function deleteForSite(string $uri, array $headers = []): Response
     {
-        return $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
     }
 
     protected function post(string $uri, array $data = [], array $files = [], array $headers = []): Response

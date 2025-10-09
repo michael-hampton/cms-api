@@ -17,7 +17,8 @@ class VideoService
     private const ALLOWED_MIME_TYPES = [
         'video/mp4',
         'video/quicktime',
-        'video/x-msvideo'
+        'video/x-msvideo',
+        'video/mpeg'
     ];
 
     private VideoRepository $videoRepository;

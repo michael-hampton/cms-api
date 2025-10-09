@@ -18,6 +18,7 @@ use App\Controllers\ReviewController;
 use App\Controllers\SearchController;
 use App\Controllers\SiteController;
 use App\Controllers\TagController;
+use App\Controllers\UserController;
 use App\Controllers\VideoController;
 use App\Controllers\WishlistController;
 use App\Framework\Authorization\AuthenticateWithToken;
@@ -137,6 +138,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/products/{id}', ProductController::class, 'update');
         $router->delete('/products/{id}', ProductController::class, 'destroy');
         $router->post('/products/{id}/duplicate', ProductController::class, 'duplicate');
+
+        $router->get('/users', UserController::class, 'index');
+        $router->post('/users', UserController::class, 'store');
+        $router->get('/users/{id}', UserController::class, 'show');
+        $router->put('/users/{id}', UserController::class, 'update');
+        $router->delete('/users/{id}', UserController::class, 'destroy');
 
     });
 });

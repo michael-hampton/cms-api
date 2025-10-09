@@ -8,6 +8,7 @@ use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\ConfirmedRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\ExistsRule;
 use App\Framework\Validation\Rules\InRule;
@@ -16,6 +17,7 @@ use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\StringRule;
 use App\Framework\Validation\Rules\UniqueRule;
 use App\Framework\Validation\Rules\UrlRule;
@@ -184,19 +186,20 @@ abstract class FormRequest extends Request
     protected function performValidation(): void
     {
         $rules = $this->convertPipeRulesToValidationRules($this->rules());
+        $data = $this->all();
 
-        $result = $this->validator->validate($this->all(), $rules);
+        $result = $this->validator->validate($data, $rules);
 
         if (!$result->isValid()) {
             throw new ValidationException('Validation failed', $result->getErrors());
         }
 
-        // Store validated data
-        foreach (array_keys($this->rules()) as $field) {
-            if ($this->has($field)) {
-                $this->validatedData[$field] = $this->input($field);
-            }
-        }
+        // Include all input fields except the ones that failed validation
+        $failed = $result->getFailedFields();
+        $validated = array_diff_key($data, array_flip($failed));
+
+        // Assign all valid data (including non-rule fields)
+        $this->validatedData = $validated;
 
         // Run after validation callbacks
         foreach ($this->after() as $callback) {
@@ -285,7 +288,9 @@ abstract class FormRequest extends Request
             'in' => InRule::class,
             'url' => UrlRule::class,
             'array' => ArrayRule::class,
-            'numeric' => NumericRule::class
+            'numeric' => NumericRule::class,
+            'confirmed' => ConfirmedRule::class,
+            'sometimes' => SometimesRule::class
             // Add other mappings as needed
         ];
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Framework\Authorization\Auth;
+use App\Framework\Container;
 use App\Framework\Support\Collection;
 
 if (!function_exists('auth')) {
@@ -14,6 +15,27 @@ if (!function_exists('collect')) {
     function collect($items = []): Collection
     {
         return new Collection($items);
+    }
+}
+
+if (!function_exists('app')) {
+    /**
+     * Resolve an instance from the container.
+     *
+     * @template T
+     * @param class-string<T>|null $abstract
+     * @param array $parameters
+     * @return ($abstract is null ? Container : T)
+     */
+    function app(?string $abstract = null, array $parameters = []): mixed
+    {
+        $container = Container::getInstance();
+
+        if ($abstract === null) {
+            return $container;
+        }
+
+        return $container->resolve($abstract, $parameters);
     }
 }
 

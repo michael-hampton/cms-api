@@ -2,8 +2,10 @@
 
 namespace App\Parsers;
 
+use App\Enums\GalleryLayout;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
@@ -20,7 +22,7 @@ class GalleryBlockParser extends BaseBlockParser
         return [
             'layout' => [
                 new RequiredRule(),
-                new MaxLengthRule(50)
+                new EnumRule(GalleryLayout::class)
             ],
             'slides' => [
                 new RequiredRule(),

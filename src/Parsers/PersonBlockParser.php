@@ -2,8 +2,10 @@
 
 namespace App\Parsers;
 
+use App\Enums\DisplayType;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EmailRule;
+use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
@@ -59,7 +61,10 @@ class PersonBlockParser extends BaseBlockParser
             ],
             'youtube' => [
                 new SocialMediaUrlRule()
-            ]
+            ],
+            'displayType' => [
+                new EnumRule(DisplayType::class)
+            ],
         ];
     }
 

@@ -292,7 +292,7 @@ class VideoUploadServiceTest extends TestCase
 
     public function testSettersAndGetters()
     {
-        $this->assertEquals(['video/mp4', 'video/quicktime', 'video/x-msvideo'], $this->service->getAllowedMimeTypes());
+        $this->assertEquals(['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/mpeg'], $this->service->getAllowedMimeTypes());
 
         $this->service->setAllowedMimeTypes(['video/mp4']);
         $this->assertEquals(['video/mp4'], $this->service->getAllowedMimeTypes());

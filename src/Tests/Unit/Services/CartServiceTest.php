@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services;
 
+use App\Framework\Authorization\Auth;
 use App\Models\CartItem;
 use App\Models\Product;
 use App\Repositories\CartRepository;

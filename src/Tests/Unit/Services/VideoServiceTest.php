@@ -82,7 +82,7 @@ class VideoServiceTest extends TestCase
             'filename' => 'unique_filename.mp4',
             'original_name' => 'test_video.mp4',
             'file_path' => 'videos/2025-10-08/unique_filename.mp4',
-            'url' => '/uploads/videos/2025-10-08/unique_filename.mp4',
+            'url' => 'http://localhost/uploads/videos/2025-10-08/unique_filename.mp4',
             'mime_type' => 'video/mp4',
             'file_size' => 10485760,
             'duration' => 120.5,
