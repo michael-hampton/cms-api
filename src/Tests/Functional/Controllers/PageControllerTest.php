@@ -57,8 +57,8 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testStoreWithAllFormData()
     {
-        $category = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true]);
-        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        $category = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true, 'site_id' => $this->siteId]);;
+        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;;
         $pageData = [
             'site_id' => $this->siteId,
             'forms' => [
@@ -72,6 +72,7 @@ class PageControllerTest extends FunctionalTestCase
             'blocks' => []
         ];
         $response = $this->postForSite('/api/pages', $pageData);
+
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
@@ -91,7 +92,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testShowReturnsPageBySlug()
     {
-        Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published']);
+        Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published', 'site_id' => $this->siteId]);;
         $response = $this->getForSite('/api/pages/test-page');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -134,7 +135,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesPage()
     {
-        $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published']);
+        $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published', 'site_id' => $this->siteId]);
         $response = $this->deleteForSite("/api/pages/{$page->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -163,7 +164,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePage()
     {
-        $page = Page::create(['title' => 'Original Page', 'slug' => 'original-page', 'status' => 'published']);
+        $page = Page::create(['title' => 'Original Page', 'slug' => 'original-page', 'status' => 'published', 'site_id' => $this->siteId]);
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -202,7 +203,8 @@ class PageControllerTest extends FunctionalTestCase
             'slug' => 'original-page',
             'status' => 'published',
             'meta_title' => 'Original Meta',
-            'meta_description' => 'Original Description'
+            'meta_description' => 'Original Description',
+            'site_id' => $this->siteId
         ]);
 
         // Create metadata
@@ -302,7 +304,8 @@ class PageControllerTest extends FunctionalTestCase
         $page = Page::create([
             'title' => 'Page with Blocks',
             'slug' => 'page-with-blocks',
-            'status' => 'published'
+            'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         Block::create([
@@ -339,15 +342,16 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageWithMultipleCategoriesAndTags()
     {
-        $cat1 = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true]);
-        $cat2 = Category::create(['name' => 'News', 'slug' => 'news', 'is_active' => true]);
-        $tag1 = Tag::create(['name' => 'PHP', 'slug' => 'php']);
-        $tag2 = Tag::create(['name' => 'Testing', 'slug' => 'testing']);
+        $cat1 = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true, 'site_id' => $this->siteId]);;
+        $cat2 = Category::create(['name' => 'News', 'slug' => 'news', 'is_active' => true, 'site_id' => $this->siteId]);;;
+        $tag1 = Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;;;
+        $tag2 = Tag::create(['name' => 'Testing', 'slug' => 'testing', 'site_id' => $this->siteId]);
 
         $page = Page::create([
             'title' => 'Multi Category Page',
             'slug' => 'multi-category',
-            'status' => 'published'
+            'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         PageCategory::create(['page_id' => $page->id, 'category_id' => $cat1->id]);

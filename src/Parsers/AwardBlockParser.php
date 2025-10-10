@@ -35,7 +35,7 @@ class AwardBlockParser extends BaseBlockParser
                 new MaxLengthRule(500)
             ],
             'alt' => [
-                new RequiredRule(),
+//                new RequiredRule(),
                 new MaxLengthRule(255)
             ],
             'winner' => [

@@ -61,6 +61,18 @@ class TestimonialBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
+        $isCarousel = $parsedData['layout'] === 'carousel';
+
+        if ($isCarousel) {
+            return $this->generateCarouselHtml($parsedData);
+        }
+
+       return $this->generateBlockHtml($parsedData);
+
+    }
+
+    public function generateBlockHtml(array $parsedData): string
+    {
         $html = "<section class=\"testimonials-block\">";
         $html .= "<div class=\"container\">";
 
@@ -91,6 +103,68 @@ class TestimonialBlockParser extends BaseBlockParser
         $html .= "</div>";
         $html .= "</div>";
         $html .= "</section>";
+
+        return $html;
+    }
+
+    private function generateCarouselHtml(array $parsedData): string
+    {
+        $layoutClass = 'testimonial-carousel';
+
+        $html = "<div class=\"testimonial-block\">";
+
+        $html .= "<div class=\"{$layoutClass}\">";
+
+        // Navigation
+        $html .= "<div class=\"testimonial-nav prev\">";
+        $html .= "<button class=\"testimonial-nav-btn\" onclick=\"scrollTestimonials(this, 'prev')\" aria-label=\"Previous\">&larr;</button>";
+        $html .= "</div>";
+
+        $html .= "<div class=\"testimonial-nav next\">";
+        $html .= "<button class=\"testimonial-nav-btn\" onclick=\"scrollTestimonials(this, 'next')\" aria-label=\"Next\">&rarr;</button>";
+        $html .= "</div>";
+
+        $html .= "<div class=\"testimonial-carousel-wrapper\">";
+        $html .= "<div class=\"testimonial-carousel-track\" data-testimonial-track>";
+
+        foreach ($parsedData['testimonials'] as $testimonial) {
+            $html .= "<div class=\"testimonial-item\">";
+
+            if (!empty($testimonial['image'])) {
+                $html .= "<div class=\"testimonial-image\">";
+                $html .= "<img src=\"{$testimonial['image']}\" alt=\"{$testimonial['formatted_author']}\">";
+                $html .= "</div>";
+            }
+
+            $html .= "<div class=\"testimonial-content\">";
+            $html .= "<p class=\"testimonial-text\">{$testimonial['formatted_text']}</p>";
+            $html .= "<div class=\"testimonial-rating\">{$testimonial['rating']}</div>";
+            $html .= "<p class=\"testimonial-author\">{$testimonial['formatted_author']}</p>";
+
+            if (!empty($testimonial['role'])) {
+                $html .= "<p class=\"testimonial-role\">{$testimonial['formatted_role']}</p>";
+            }
+
+            $html .= "</div>";
+            $html .= "</div>";
+        }
+
+        $html .= "</div>"; // testimonial-carousel-track
+        $html .= "</div>"; // testimonial-carousel-wrapper
+
+        // Indicators
+        $testimonialCount = count($parsedData['testimonials']);
+        if ($testimonialCount > 1) {
+            $html .= "<div class=\"testimonial-indicators\">";
+            for ($i = 0; $i < $testimonialCount; $i++) {
+                $activeClass = $i === 0 ? ' active' : '';
+                $html .= "<button class=\"testimonial-indicator{$activeClass}\" onclick=\"scrollTestimonialsToIndex(this, {$i})\" aria-label=\"Go to testimonial " . ($i + 1) . "\"></button>";
+            }
+            $html .= "</div>";
+        }
+
+        $html .= "</div>"; // testimonial-carousel or testimonial-grid
+        $html .= "</div>"; // testimonial-block
 
         return $html;
     }

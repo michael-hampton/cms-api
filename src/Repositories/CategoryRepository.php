@@ -37,12 +37,14 @@ class CategoryRepository extends Repository
 
     public function findBySlug(string $slug): ?Category
     {
-        return Category::bySlug($slug)->first();
+        $query = Category::bySlug($slug);
+        return $this->applySiteFilter($query)->first();
     }
 
     public function getActive(): Collection
     {
-        return Category::active()->get();
+        $query = Category::active();
+        return $this->applySiteFilter($query)->get();
     }
 
     public function getRootCategories(): array

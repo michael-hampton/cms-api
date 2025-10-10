@@ -87,4 +87,9 @@ class AuthenticationService
         // The ?? null ensures it's always an int or null
         return auth()->id() ?? null;
     }
+
+    public function check(): bool
+    {
+        return auth()->check();
+    }
 }

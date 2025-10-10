@@ -37,7 +37,8 @@ class TagRepository extends Repository
 
     public function findBySlug(string $slug): ?Tag
     {
-        return Tag::bySlug($slug)->first();
+        $query = Tag::bySlug($slug);
+        return $this->applySiteFilter($query)->first();
     }
 
     public function findOrCreateByName(string $name, int $siteId): Model
@@ -65,7 +66,7 @@ class TagRepository extends Repository
             $query->where('name', 'LIKE', "%{$searchQuery}%");
         }
 
-        return $query->get();
+        return $this->applySiteFilter($query)->get();
     }
 
     public function getFeaturedTags(): Collection

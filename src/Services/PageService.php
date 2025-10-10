@@ -39,7 +39,8 @@ class PageService
         private PageCustomFieldRepository $customFieldRepository,
         private PageTagRepository         $tagRepository,
         private AccessRoleRepository      $accessRoleRepository,
-        private Database                  $database
+        private Database                  $database,
+        private PageHistoryService        $historyService
     )
     {
     }
@@ -66,13 +67,37 @@ class PageService
 
             $mainData['site_id'] = $siteId;
 
+            $oldPageData = null;
+            if ($pageId) {
+                $existingPage = $this->pageRepository->getCompletePageData($pageId);
+                if ($existingPage) {
+                    $oldPageData = [
+                        'title' => $existingPage->title,
+                        'slug' => $existingPage->slug,
+                        'status' => $existingPage->status,
+                        'meta_title' => $existingPage->meta_title,
+                        'meta_description' => $existingPage->meta_description,
+                        'blocks' => $existingPage->blocks ? $existingPage->blocks->toArray() : []
+                    ];
+                }
+            }
+
             if ($pageId) {
                 $page = $this->pageRepository->update($pageId, $mainData);
                 if (!$page) {
                     throw new Exception("Page not found");
                 }
+
+                if ($oldPageData) {
+                    $newPageData = array_merge($oldPageData, $mainData);
+                    if (!empty($requestData['blocks'])) {
+                        $newPageData['blocks'] = $requestData['blocks'];
+                    }
+                    $this->historyService->logPageUpdated($page->id, $oldPageData, $newPageData);
+                }
             } else {
                 $page = $this->pageRepository->create($mainData);
+                $this->historyService->logPageCreated($page);
             }
 
             $this->processAllFormsData($page->id, $requestData, $siteId);
@@ -100,6 +125,12 @@ class PageService
     public function deletePage(int $pageId): bool
     {
         return $this->database->transaction(function () use ($pageId) {
+            $page = $this->pageRepository->find($pageId);
+
+            if ($page) {
+                $this->historyService->logPageDeleted($pageId, $page->toArray());
+            }
+
             $this->blockRepository->deletePageBlocks($pageId);
             return $this->pageRepository->delete($pageId);
         });
@@ -115,7 +146,7 @@ class PageService
         }
 
         $processors = [
-            'meta' => [$this, 'processMetadataForm'],
+           'meta' => [$this, 'processMetadataForm'],
             'seo' => [$this, 'processSeoForm'],
             'settings' => [$this, 'processSettingsForm'],
             'social' => [$this, 'processSocialForm'],
@@ -446,8 +477,6 @@ class PageService
         }
     }
 
-    // Business logic methods
-
     /**
      * Duplicate a page with all its relations
      */
@@ -458,19 +487,22 @@ class PageService
             return null;
         }
 
-        return $this->database->transaction(function () use ($originalPage) {
+        return $this->database->transaction(function () use ($originalPage, $pageId) {
             $pageData = [
                 'title' => $originalPage->title . ' (Copy)',
                 'slug' => $originalPage->slug . '-copy-' . time(),
                 'status' => 'draft',
                 'meta_title' => $originalPage->meta_title,
-                'meta_description' => $originalPage->meta_description
+                'meta_description' => $originalPage->meta_description,
+                'site_id' => $originalPage->site_id
             ];
 
             $newPage = $this->pageRepository->create($pageData);
 
             // Duplicate all relations using repository methods
             $this->duplicatePageRelations($originalPage->id, $newPage->id);
+
+            $this->historyService->logPageDuplicated($pageId, $newPage->id);
 
             return $this->getCompletePageData($newPage->id);
         });
@@ -799,5 +831,48 @@ class PageService
         if (!empty($updates)) {
             $this->pageRepository->update($targetPage->id, $updates);
         }
+    }
+
+    public function publishPage(int $pageId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new Exception("Page not found");
+        }
+
+        if ($page->status === 'published') {
+            throw new Exception("Page is already published");
+        }
+
+        $page = $this->pageRepository->update($pageId, [
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->historyService->logPagePublished($pageId);
+
+        return $page;
+    }
+
+    public function unpublishPage(int $pageId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new Exception("Page not found");
+        }
+
+        if ($page->status !== 'published') {
+            throw new Exception("Page is not published");
+        }
+
+        $page = $this->pageRepository->update($pageId, [
+            'status' => 'draft'
+        ]);
+
+        $this->historyService->logPageUnpublished($pageId);
+
+        return $page;
     }
 }

@@ -34,16 +34,16 @@ class EstateWebsiteSeeder extends Seeder
 
     public function run(): void
     {
-        $this->createTags();
-        $this->createCategories();
-        $this->createCustomFields();
-        $this->createHomepage();
-        $this->createAboutPage();
-        $this->createContactPage();
-        $this->createPropertyPages();
-        $this->createPropertiesPage();
-        $this->addSearchFields();
-        $this->generateRelatedPageBlocks();;
+//        $this->createTags();
+//        $this->createCategories();
+//        $this->createCustomFields();
+//        $this->createHomepage();
+//        $this->createAboutPage();
+//        $this->createContactPage();
+//        $this->createPropertyPages();
+//        $this->createPropertiesPage();
+//        $this->addSearchFields();
+//        $this->generateRelatedPageBlocks();;
     }
 
     private function addSearchFields()

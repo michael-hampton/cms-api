@@ -2,6 +2,7 @@
 
 namespace App\Parsers;
 
+use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\IntegerRule;
@@ -125,8 +126,10 @@ class PageGridBlockParser extends BaseBlockParser
         foreach ($pages as $page) {
             $cleanPage = [
                 'title' => trim($page['title'] ?? ''),
+                'formatted_title' => htmlspecialchars($page['title'] ?? ''),
                 'slug' => trim($page['slug'] ?? ''),
                 'excerpt' => trim($page['excerpt'] ?? ''),
+                'formatted_excerpt' => htmlspecialchars($page['excerpt'] ?? ''),
                 'image' => $this->parseImage($page['image'] ?? null),
                 'badge' => $this->parseBadge($page['badge'] ?? null),
                 'price' => trim($page['price'] ?? ''),
@@ -232,6 +235,12 @@ class PageGridBlockParser extends BaseBlockParser
 
     private function buildPageUrl(string $slug): string
     {
+        $site = SiteContext::get();
+
+        if ($site) {
+            return $site->getUrl() . '/' . ltrim($slug, '/');
+        }
+
         return '/' . ltrim($slug, '/');
     }
 
@@ -287,6 +296,15 @@ class PageGridBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
+        if ($parsedData['layout'] === 'carousel') {
+            return $this->generateCarouselHtml($parsedData);
+        }
+
+        return $this->generateBlock($parsedData);
+    }
+
+    public function generateBlock(array $parsedData): string
+    {
         $html = "<div class=\"page-grid-block {$parsedData['grid_class']}\">";
 
         // Header section
@@ -313,6 +331,101 @@ class PageGridBlockParser extends BaseBlockParser
 
         $html .= "</div>";
         $html .= "</div>";
+
+        return $html;
+    }
+
+    public function generateCarouselHtml(array $parsedData): string
+    {
+        $html = "<div class=\"page-grid-block\">";
+
+        if (!empty($parsedData['title'])) {
+            $html .= "<h2 class=\"page-grid-title\">{$parsedData['formatted_title']}</h2>";
+        }
+
+        if (!empty($parsedData['subtitle'])) {
+            $html .= "<p class=\"page-grid-subtitle\">{$parsedData['formatted_subtitle']}</p>";
+        }
+
+        $showCarousel = false;
+        $class = $showCarousel ? 'page-grid-carousel' : 'page-grid-carousel';
+
+        // Carousel wrapper
+        $html .= "<div class=\"{$class}\">";
+
+        if ($showCarousel) {
+            // Navigation buttons
+            $html .= "<div class=\"page-grid-nav prev\">";
+            $html .= "<button class=\"page-grid-nav-btn\" onclick=\"scrollPageGrid(this, 'prev')\" aria-label=\"Previous\">&larr;</button>";
+            $html .= "</div>";
+
+            $html .= "<div class=\"page-grid-nav next\">";
+            $html .= "<button class=\"page-grid-nav-btn\" onclick=\"scrollPageGrid(this, 'next')\" aria-label=\"Next\">&rarr;</button>";
+            $html .= "</div>";
+        }
+
+
+        // Grid container
+        $html .= "<div class=\"page-grid\" data-page-grid>";
+
+        foreach ($parsedData['pages'] as $page) {
+            $html .= "<div class=\"page-card\">";
+
+            if ($parsedData['showImage'] && !empty($page['image'])) {
+                $html .= "<div class=\"page-card-image\">";
+                $html .= "<img src=\"{$page['image']['src']}\" alt=\"{$page['image']['alt']}\">";
+
+                if (!empty($page['badge'])) {
+                    $badgeColor = $page['badge']['color'] ?? 'primary';
+                    $html .= "<span class=\"page-card-badge badge-{$badgeColor}\">{$page['badge']['text']}</span>";
+                }
+
+                $html .= "</div>";
+            }
+
+            $html .= "<div class=\"page-card-content\">";
+            $html .= "<h3 class=\"page-card-title\">{$page['formatted_title']}</h3>";
+
+            if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
+                $html .= "<p class=\"page-card-excerpt\">{$page['formatted_excerpt']}</p>";
+            }
+
+            if ($parsedData['showFeatures'] && !empty($page['features'])) {
+                $html .= "<div class=\"page-card-features\">";
+                foreach ($page['features'] as $feature) {
+                    $html .= "<span class=\"page-card-feature\">" . htmlspecialchars($feature) . "</span>";
+                }
+                $html .= "</div>";
+            }
+
+            if ($parsedData['showActions'] && !empty($page['actions'])) {
+                $html .= "<div class=\"page-card-actions\">";
+                foreach ($page['actions'] as $action) {
+                    $style = $action['style'] ?? 'primary';
+                    $html .= "<a href=\"{$action['url']}\" class=\"page-card-action style-{$style}\">{$action['text']}</a>";
+                }
+                $html .= "</div>";
+            }
+
+            $html .= "</div>"; // page-card-content
+            $html .= "</div>"; // page-card
+        }
+
+        $html .= "</div>"; // page-grid
+
+        // Indicators
+        $pageCount = count($parsedData['pages']);
+        if ($pageCount > 1 && $showCarousel) {
+            $html .= "<div class=\"page-grid-indicators\">";
+            for ($i = 0; $i < $pageCount; $i++) {
+                $activeClass = $i === 0 ? ' active' : '';
+                $html .= "<button class=\"page-grid-indicator{$activeClass}\" onclick=\"scrollPageGridToIndex(this, {$i})\" aria-label=\"Go to item " . ($i + 1) . "\"></button>";
+            }
+            $html .= "</div>";
+        }
+
+        $html .= "</div>"; // page-grid-carousel
+        $html .= "</div>"; // page-grid-block
 
         return $html;
     }

@@ -4,6 +4,7 @@ namespace App\Framework\Http;
 
 use App\Framework\Container;
 use App\Framework\Support\Cache;
+use App\Framework\Support\SiteContext;
 use App\Services\Url\DynamicUrlResolver;
 use App\Services\Url\UrlResolutionResult;
 use Exception;
@@ -63,7 +64,7 @@ class Router
             if (isset($group['middleware'])) {
                 $merged['middleware'] = array_merge(
                     $merged['middleware'],
-                    (array) $group['middleware']
+                    (array)$group['middleware']
                 );
             }
         }
@@ -75,7 +76,7 @@ class Router
         if (isset($new['middleware'])) {
             $merged['middleware'] = array_merge(
                 $merged['middleware'],
-                (array) $new['middleware']
+                (array)$new['middleware']
             );
         }
 
@@ -168,30 +169,35 @@ class Router
                 $handler = $routeData['handler'] ?? $routeData;
                 $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
 
-                return $this->runMiddleware($middlewareStack, $request, function($request) use ($handler, $params) {
+                return $this->runMiddleware($middlewareStack, $request, function ($request) use ($handler, $params) {
                     return $this->callAction($handler, $request, $params);
                 });
             }
         }
 
-        // Check if it's a dynamic url
-        $urlResolver = new DynamicUrlResolver(new Cache());
-        $urlResult = $urlResolver->resolve($path);
+        return $this->runMiddleware($this->globalMiddleware, $request, function ($request) use ($path, $method) {
 
-        if (!$urlResult) {
+            // Check if it's a dynamic url
+            $urlResolver = new DynamicUrlResolver(new Cache());
+            $urlResult = $urlResolver->resolve($path);
+
+            if (!$urlResult) {
+                return $this->show404($method, $path);
+            }
+
+            if ($urlResult->isRedirect()) {
+                $urlResolver->executeRedirect($urlResult);
+                exit;
+            }
+
+            $controllerResolver = new ControllerResolver();
+
+            if ($controllerResolver->shouldUseController($urlResult->page)) {
+                return $this->dispatchToController($urlResult);
+            }
+
             return $this->show404($method, $path);
-        }
-
-        if($urlResult->isRedirect()) {
-            $urlResolver->executeRedirect($urlResult);
-            exit;
-        }
-
-        $controllerResolver = new ControllerResolver();
-
-        if ($controllerResolver->shouldUseController($urlResult->page)) {
-            return $this->dispatchToController($urlResult);
-        }
+        });
 
         return $this->show404($method, $path);
     }
@@ -208,7 +214,7 @@ class Router
         $routes = $this->routes[$method];
 
         // Sort routes: static segments > parameters
-        uksort($routes, function($a, $b) {
+        uksort($routes, function ($a, $b) {
             $aSegments = explode('/', trim($a, '/'));
             $bSegments = explode('/', trim($b, '/'));
 
@@ -244,7 +250,7 @@ class Router
 
         // Build middleware stack in reverse order
         foreach (array_reverse($middleware) as $middlewareClass) {
-            $next = function($request) use ($middlewareClass, $next) {
+            $next = function ($request) use ($middlewareClass, $next) {
                 $middlewareInstance = $this->container->resolve($middlewareClass);
                 return $middlewareInstance->handle($request, $next);
             };
@@ -284,14 +290,12 @@ class Router
                 [$controller, $method] = explode('/', $action, 2);
                 $controllerInstance = $this->container->resolve($controller);
                 return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
-            }
-            // Handle ControllerClass@method format (Laravel legacy)
+            } // Handle ControllerClass@method format (Laravel legacy)
             elseif (strpos($action, '@') !== false) {
                 [$controller, $method] = explode('@', $action);
                 $controllerInstance = $this->container->resolve($controller);
                 return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
-            }
-            // Handle invokable controllers (ControllerClass without method)
+            } // Handle invokable controllers (ControllerClass without method)
             else {
                 $controllerInstance = $this->container->resolve($action);
                 return $this->callInvokableController($controllerInstance, $request);
@@ -488,9 +492,9 @@ class Router
             return $value;
         }
 
-        return match($type->getName()) {
-            'int' => (int) $value,
-            'float' => (float) $value,
+        return match ($type->getName()) {
+            'int' => (int)$value,
+            'float' => (float)$value,
             'bool' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
             'array' => explode(',', $value),
             default => $value

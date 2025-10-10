@@ -2,8 +2,10 @@
 
 namespace App\Controllers;
 
+use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
+use App\Models\Site;
 use App\Repositories\CommentRepository;
 use App\Services\BlockParserService;
 use App\Services\EstateWebsiteService;
@@ -21,7 +23,13 @@ class ContentController extends Controller
 
     public function show(Page $page, UrlResolutionResult $urlResolutionResult)
     {
-        $menu = Menu::where('is_active', true)->with(['items'])->first();
+        // Get site-specific menu
+        $siteId = SiteContext::getId();
+
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', $siteId)
+            ->with(['items'])
+            ->first();
 
         // Load page relationships
         $page->load([
@@ -32,7 +40,8 @@ class ContentController extends Controller
         $data = [
             'menu' => $menu,
             'page' => $page,
-            'blockParserService' => $this->blockParserService
+            'blockParserService' => $this->blockParserService,
+            'site' => SiteContext::get()
         ];
 
         // Load comments for blog pages
@@ -40,6 +49,23 @@ class ContentController extends Controller
             $data['comments'] = $this->commentRepository->getPageComments($page->id, 'approved');
         }
 
-        return $this->view('estate/page', $data);
+        // Use site-specific theme if available
+        $theme = SiteContext::getTheme();
+        $viewPath = "{$theme}/page";
+
+        // Fallback to default theme if theme view doesn't exist
+        if (!$this->viewExists($viewPath)) {
+            $viewPath = "estate/page";
+        }
+
+        return $this->view($viewPath, $data);
+    }
+
+    public function sites() {
+        $sites = Site::active()->get();
+
+        return $this->view('estate/sites', [
+            'sites' => $sites
+        ]);
     }
 }

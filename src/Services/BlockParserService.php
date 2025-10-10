@@ -123,6 +123,10 @@ class BlockParserService
         $type = $blockData['type'];
         $parser = $this->getParser($type);
 
+        if(method_exists($parser, 'beforeValidation')) {
+            $blockData = $parser->beforeValidation($blockData);
+        }
+
         $this->validateBlockData($blockData, $parser);
 
         $parsedData = $parser->parse($blockData);

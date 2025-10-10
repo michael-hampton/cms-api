@@ -44,12 +44,14 @@ class PageRepository extends Repository
 
     public function findBySlug(string $slug): ?Model
     {
-        return Page::where('slug', $slug)->first();
+        $query = Page::where('slug', $slug);
+        return $this->applySiteFilter($query)->first();
     }
 
     public function getPublishedPages(): array
     {
-        return Page::published()->orderBy('created_at', 'desc')->get();
+        $query = Page::published()->orderBy('created_at', 'desc');
+        return $this->applySiteFilter($query)->get();
     }
 
     /**
@@ -95,8 +97,6 @@ class PageRepository extends Repository
             ->where('category_id', $categoryId)
             ->orderBy('created_at', 'desc');
 
-
-
         if ($limit) {
             $query->limit($limit);
         }
@@ -105,6 +105,9 @@ class PageRepository extends Repository
 
         return $categories->map(function($item) {
             return $item->page;
+        })->filter(function($page) {
+            // Filter by current site
+            return $page && $page->site_id === $this->siteId;
         });
     }
 
@@ -128,7 +131,11 @@ class PageRepository extends Repository
         $results = $query->get();
 
         return $results->filter(function($item) {
-            return $item->page->status == 'published';
+            return $item->page
+                && $item->page->status == 'published'
+                && $item->page->site_id === $this->siteId;
+        })->map(function($item) {
+            return $item->page;
         });
     }
 

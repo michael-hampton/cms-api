@@ -1,5 +1,6 @@
 @include('estate/header', ['menu' => $menu])
 
+
 <?php
 // views/estate/page.php (enhanced page template)
 $title = $page->title ?? 'Premier Properties';

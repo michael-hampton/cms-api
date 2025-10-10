@@ -7,13 +7,21 @@ use App\Enums\HeadingLevel;
 use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
-use App\Validation\Custom\HeadingLevelRule;
 
 class HeadingBlockParser extends BaseBlockParser
 {
     public function getType(): string
     {
         return 'heading';
+    }
+
+    public function beforeValidation(array $data): array
+    {
+        if (is_int($data['level'])) {
+            $data['level'] = 'h' . $data['level'];
+        }
+
+        return $data;
     }
 
     public function getValidationRules(): array

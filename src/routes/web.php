@@ -4,6 +4,7 @@ use App\Controllers\AuthorViewController;
 use App\Controllers\BlockController;
 use App\Controllers\CategoryPageController;
 use App\Controllers\CommentController;
+use App\Controllers\ContentController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
 use App\Controllers\ProductDetailController;
@@ -60,3 +61,4 @@ $router->get('/tags/{slug}', TagViewController::class, 'show');
 
 $router->get('/shop', ProductListController::class, 'index');
 $router->get('/shop/details/{slug}', ProductDetailController::class, 'show');
+$router->get('/sites', ContentController::class, 'sites');

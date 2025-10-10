@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Models\Model;
 use App\Models\Video;
 use App\Repositories\VideoRepository;
 use App\Search\PaginatedResult;
@@ -39,7 +40,7 @@ class VideoService
     /**
      * Upload video file
      */
-    public function uploadVideo(UploadedFile $file, array $metadata = []): Video
+    public function uploadVideo(UploadedFile $file, array $metadata = []): Model
     {
         // Validate file
         $this->validateUploadedFile($file);

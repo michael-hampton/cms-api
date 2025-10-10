@@ -26,8 +26,8 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchCriteria()
     {
-        Author::create(['name' => 'John Doe', 'slug' => 'john-doe', 'status' => 'active']);
-        Author::create(['name' => 'Jane Smith', 'slug' => 'jane-smith', 'status' => 'inactive']);
+        Author::create(['name' => 'John Doe', 'slug' => 'john-doe', 'status' => 'active', 'site_id' => $this->siteId]);
+        Author::create(['name' => 'Jane Smith', 'slug' => 'jane-smith', 'status' => 'inactive', 'site_id' => $this->siteId]);
 
         $response = $this->getForSite('/api/authors?status=active');
 
@@ -90,7 +90,8 @@ class AuthorControllerTest extends FunctionalTestCase
             'name' => 'John Doe',
             'slug' => 'john-doe',
             'email' => 'john@example.com',
-            'status' => 'active'
+            'status' => 'active',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite('/api/authors', [
@@ -126,7 +127,8 @@ class AuthorControllerTest extends FunctionalTestCase
             'name' => 'John Doe',
             'slug' => 'john-doe',
             'email' => 'john@example.com',
-            'status' => 'active'
+            'status' => 'active',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite('/api/authors/john-doe');

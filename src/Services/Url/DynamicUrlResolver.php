@@ -3,6 +3,7 @@
 namespace App\Services\Url;
 
 use App\Framework\Support\Cache;
+use App\Framework\Support\SiteContext;
 use App\Models\Page;
 
 class DynamicUrlResolver implements UrlResolverInterface
@@ -22,7 +23,7 @@ class DynamicUrlResolver implements UrlResolverInterface
 
     public function resolve(string $path): ?UrlResolutionResult
     {
-        $path = $this->normalizePath(ltrim($path, '/'));;
+        $path = $this->normalizePath(ltrim($path, '/'));
 
         $page = $this->findPageBySlug($path);
 
@@ -40,15 +41,23 @@ class DynamicUrlResolver implements UrlResolverInterface
 
     private function findPageBySlug(string $slug): ?Page
     {
-        $cacheKey = 'page_slug_' . md5($slug);
+        $cacheKey = 'page_slug_' . md5($slug . '_' . SiteContext::getId());
+
+        $siteSlug = SiteContext::get()->slug;
+
+        // remove site slug from url
+        $slug = str_replace($siteSlug, '', $slug);
+        $slug = trim($slug, '/');
 
         return $this->cache->remember($cacheKey, $this->config['cache_duration'], function () use ($slug) {
+            $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
+                ->where('slug', $slug);
 
-            $query = Page::with(['seo', 'blocks', 'categories', 'tags'])->where('slug', $slug);
-
-//            if (!$this->config['case_sensitive']) {
-//                $query->whereRaw('LOWER(slug) = LOWER(?)', [$slug]);
-//            }
+            // Filter by current site
+            $siteId = SiteContext::getId();
+            if ($siteId) {
+                $query->where('site_id', $siteId);
+            }
 
             return $query->first();
         });
@@ -57,9 +66,7 @@ class DynamicUrlResolver implements UrlResolverInterface
     private function createPageResult(Page $page, string $requestedPath): UrlResolutionResult
     {
         $canonicalUrl = $this->getCanonicalUrl($page);
-        $currentUrl = $this->config['base_url'] . $requestedPath;
-
-        echo $canonicalUrl . ' ' . $currentUrl;
+        $currentUrl = $this->config['base_url'] . '/' . $requestedPath;
 
         // Check for canonical redirect
         if ($canonicalUrl && $canonicalUrl !== $currentUrl) {
@@ -121,7 +128,7 @@ class DynamicUrlResolver implements UrlResolverInterface
         if ($page->seo?->canonical_url) {
             return $this->isAbsoluteUrl($page->seo->canonical_url)
                 ? $page->seo->canonical_url
-                : $this->config['base_url'] . '/' . ltrim($page->seo->canonical_url, '/');
+                : SiteContext::url(ltrim($page->seo->canonical_url, '/'));
         }
 
         $canonicalPath = ltrim($page->slug, '/');
@@ -132,7 +139,7 @@ class DynamicUrlResolver implements UrlResolverInterface
             $canonicalPath = rtrim($canonicalPath, '/');
         }
 
-        return $this->config['base_url'] . $canonicalPath;
+        return SiteContext::url($canonicalPath);
     }
 
     private function checkTrailingSlash(string $path): ?UrlResolutionResult

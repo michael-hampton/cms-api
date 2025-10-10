@@ -20,6 +20,7 @@ class CategoryControllerTest extends FunctionalTestCase
     private $categoryRepository;
     private $validator;
     private $controller;
+    private $categoryService;
 
     protected function setUp(): void
     {

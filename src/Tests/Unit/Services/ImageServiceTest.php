@@ -19,6 +19,7 @@ class ImageServiceTest extends FunctionalTestCase
 {
     private $imageRepository;
     private $service;
+    private $imageUploadService;
 
     protected function setUp(): void
     {

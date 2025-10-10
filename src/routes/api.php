@@ -12,6 +12,7 @@ use App\Controllers\ImageController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\PageController;
+use App\Controllers\PageHistoryController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
 use App\Controllers\ReviewController;
@@ -22,12 +23,10 @@ use App\Controllers\UserController;
 use App\Controllers\VideoController;
 use App\Controllers\WishlistController;
 use App\Framework\Authorization\AuthenticateWithToken;
-use App\Framework\Container;
-use App\Framework\Http\Router;
 
-$router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function($router) {
+$router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
     // Pages API
-    $router->group(['prefix' => '{siteName}'], function($router) {
+    $router->group(['prefix' => '{siteName}'], function ($router) {
         $router->get('/pages', PageController::class, 'index');
         $router->post('/pages', PageController::class, 'store', [AuthenticateWithToken::class]);
         $router->post('/pages/bulk-update', PageController::class, 'bulkUpdate', [AuthenticateWithToken::class]);
@@ -145,6 +144,35 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/users/{id}', UserController::class, 'update');
         $router->delete('/users/{id}', UserController::class, 'destroy');
 
+
+        // Page History routes
+        $router->get('/pages/{pageId}/history', PageHistoryController::class, 'index');
+        $router->get('/history/{id}',  PageHistoryController::class, 'show');
+        $router->get('/history/recent',  PageHistoryController::class, 'recent');
+        $router->get('/users/{userId}/history',  PageHistoryController::class, 'userHistory');
+        $router->post('/history/{historyId}/restore',  PageHistoryController::class, 'restore');
+
+
+//        Route::prefix('page-grids')->group(function () {
+//            Route::get('/', [PageGridController::class, 'index']);
+//            Route::post('/', [PageGridController::class, 'store']);
+//            Route::get('/slug/{slug}', [PageGridController::class, 'showBySlug']);
+//            Route::get('/{id}', [PageGridController::class, 'show']);
+//            Route::put('/{id}', [PageGridController::class, 'update']);
+//            Route::delete('/{id}', [PageGridController::class, 'destroy']);
+//
+//            // Additional actions
+//            Route::post('/{id}/restore', [PageGridController::class, 'restore']);
+//            Route::delete('/{id}/force', [PageGridController::class, 'forceDestroy']);
+//            Route::post('/{id}/duplicate', [PageGridController::class, 'duplicate']);
+//            Route::post('/{id}/toggle-active', [PageGridController::class, 'toggleActive']);
+//
+//            // Page management within grid
+//            Route::post('/{id}/pages', [PageGridController::class, 'addPage']);
+//            Route::delete('/{id}/pages/{pageIndex}', [PageGridController::class, 'removePage']);
+//            Route::put('/{id}/pages/{pageIndex}', [PageGridController::class, 'updatePage']);
+//            Route::post('/{id}/pages/reorder', [PageGridController::class, 'reorderPages']);
+
     });
 });
 
@@ -154,25 +182,12 @@ $router->get('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionControlle
 $router->put('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'updateCustomFields');;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 // Blocks API
 $router->get('/api/blocks/{id}', BlockController::class, 'show');
 $router->put('/api/blocks/{id}', BlockController::class, 'update');
 $router->delete('/api/blocks/{id}', BlockController::class, 'destroy');
 $router->get('/api/blocks/type/{type}', BlockController::class, 'getByType');
 $router->get('/api/search-properties', EstateWebsiteController::class, 'search');
-
 
 
 // Menu items
@@ -186,8 +201,6 @@ $router->post('/api/menu-items/reorder', MenuItemController::class, 'reorder');
 // Search
 $router->get('/api/search/pages', SearchController::class, 'pages');
 $router->get('/api/search/categories', SearchController::class, 'categories');
-
-
 
 
 // Author public view route

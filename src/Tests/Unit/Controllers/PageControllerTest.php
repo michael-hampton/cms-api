@@ -20,6 +20,7 @@ class PageControllerTest extends FunctionalTestCase
     private $pageService;
     private $blockRegistry;
     private $controller;
+    private $pageRepository;
 
     protected function setUp(): void
     {

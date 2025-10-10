@@ -19,7 +19,7 @@ class TagControllerTest extends FunctionalTestCase
     private $tagRepository;
     private $validator;
     private $controller;
-
+    private $tagService;
     protected function setUp(): void
     {
         parent::setUp();

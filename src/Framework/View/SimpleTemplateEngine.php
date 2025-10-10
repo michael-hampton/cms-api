@@ -105,14 +105,14 @@ class SimpleTemplateEngine implements ViewEngineInterface
         // @css('file.css')
         $template = preg_replace(
             '/@css\s*\(\s*[\'"](.*?)[\'"]\s*\)/',
-            '<?php echo \'<link rel="stylesheet" href="\' . $this->asset(\'$1\', \'css\') . \'">\'; ?>',
+            '<?php echo \'<link rel="stylesheet" href="\' . asset(\'$1\', \'css\') . \'">\'; ?>',
             $template
         );
 
         // @js('file.js')
         $template = preg_replace(
             '/@js\s*\(\s*[\'"](.*?)[\'"]\s*\)/',
-            '<?php echo \'<script src="\' . $this->asset(\'$1\', \'js\') . \'"></script>\'; ?>',
+            '<?php echo \'<script src="\' . asset(\'$1\', \'js\') . \'"></script>\'; ?>',
             $template
         );
 
@@ -242,29 +242,6 @@ class SimpleTemplateEngine implements ViewEngineInterface
     public function partial(string $template, array $data = []): string
     {
         return $this->render($template, $data);
-    }
-
-    function asset(string $path, string $type = 'css'): string
-    {
-        // Determine folder based on type
-        $folder = match ($type) {
-            'css' => 'css',
-            'js' => 'js',
-            default => '',
-        };
-
-        // Build URL
-        $url = '/public/' . ($folder ? $folder . '/' : '') . ltrim($path, '/');
-
-        // Build filesystem path for cache-busting
-        $file = __DIR__ . '/../../public/' . ($folder ? $folder . '/' : '') . ltrim($path, '/');
-
-        // Add cache-busting if file exists
-        if (file_exists($file)) {
-            $url .= '?v=' . filemtime($file);
-        }
-
-        return $url;
     }
 
     function public_path(string $path = ''): string

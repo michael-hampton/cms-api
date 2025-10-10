@@ -30,7 +30,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testShowReturnsTagBySlug()
     {
-        Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;;
         $response = $this->getForSite('/api/tags/php');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -63,7 +63,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesUniqueSlug()
     {
-        Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;
         $response = $this->postForSite('/api/tags', ['name' => 'New PHP', 'slug' => 'php']);
         $this->assertEquals(422, $response->getStatusCode());
     }
@@ -94,7 +94,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testPopularReturnsTopTags()
     {
         for ($i = 1; $i <= 40; $i++) {
-            Tag::create(['name' => "Tag $i", 'slug' => "tag-$i"]);
+            Tag::create(['name' => "Tag $i", 'slug' => "tag-$i", 'site_id' => $this->siteId]);;
         }
         $response = $this->getForSite('/api/popular-tags');
         $this->assertEquals(200, $response->getStatusCode());
@@ -117,7 +117,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testCloudReturnsTagCloud()
     {
         for ($i = 1; $i <= 120; $i++) {
-            Tag::create(['name' => "Tag $i", 'slug' => "tag-$i", 'usage_count' => 10]);
+            Tag::create(['name' => "Tag $i", 'slug' => "tag-$i", 'usage_count' => 10, 'site_id' => $this->siteId]);;
         }
         $response = $this->getForSite('/api/tags/cloud');
         $this->assertEquals(200, $response->getStatusCode());

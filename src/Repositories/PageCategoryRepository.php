@@ -12,6 +12,7 @@ class PageCategoryRepository extends Repository
     {
         parent::__construct();
         $this->categoryRepository = new CategoryRepository();
+        $this->withoutSiteFilter();
     }
 
     protected function getModelClass(): string

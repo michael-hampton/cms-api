@@ -7,6 +7,12 @@ use App\Models\PageMetadata;
 
 class PageMetadataRepository extends Repository
 {
+    public function __construct()
+    {
+        $this->withoutSiteFilter();
+        parent::__construct();
+    }
+
     protected function getModelClass(): string
     {
         return PageMetadata::class;

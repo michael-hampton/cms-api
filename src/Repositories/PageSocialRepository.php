@@ -7,6 +7,11 @@ use App\Models\PageSocial;
 
 class PageSocialRepository extends Repository
 {
+    public function __construct()
+    {
+        $this->withoutSiteFilter();
+        parent::__construct();
+    }
     protected function getModelClass(): string
     {
         return PageSocial::class;

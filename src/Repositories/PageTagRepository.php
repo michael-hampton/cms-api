@@ -12,6 +12,7 @@ class PageTagRepository extends Repository
     public function __construct()
     {
         parent::__construct();
+        $this->withoutSiteFilter();
         $this->tagRepository = new TagRepository();
     }
 

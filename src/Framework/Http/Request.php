@@ -3,15 +3,23 @@
 namespace App\Framework\Http;
 
 use App\Framework\AuthenticatedUser;
+use App\Models\Site;
 use App\Models\User;
 
 class Request implements RequestInterface
 {
     protected array $data = [];
     public array $files = [];
+    private ?Site $site = null;
+    private string $originalPath;
     protected array $routeParams = [];
     public AuthenticatedUser|User|null $user = null;
     private $headers;
+    private string $path;
+    /**
+     * @var \App\Framework\Support\Collection|bool|\DateTime|float|int|mixed|string|null
+     */
+    private int $siteId;
 
     public function __construct(array $data = [], array $files = [], array $routeParams = [])
     {
@@ -283,4 +291,108 @@ class Request implements RequestInterface
         return $this->headers[$key] ?? null;;
     }
 
+    public function setSite(Site $site): void
+    {
+        $this->site = $site;
+        $this->siteId = $site->id;
+    }
+
+    public function getSite(): ?Site
+    {
+        return $this->site;
+    }
+
+    public function setSiteId(int $siteId): void
+    {
+        $this->siteId = $siteId;
+    }
+
+    public function getSiteId(): ?int
+    {
+        return $this->siteId;
+    }
+
+    public function getHost(): string
+    {
+        return $_SERVER['HTTP_HOST'] ?? 'localhost';
+    }
+
+    public function getPath(): string
+    {
+        if (isset($this->path)) {
+            return $this->path;
+        }
+        return parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    }
+
+    public function setPath(string $path): void
+    {
+        if (!isset($this->originalPath)) {
+            $this->originalPath = $this->getPath();
+        }
+        $this->path = $path;
+    }
+
+    public function getOriginalPath(): string
+    {
+        return $this->originalPath ?? $this->getPath();
+    }
+
+    public function getFullUrl(): string
+    {
+        $protocol = $this->isSecure() ? 'https' : 'http';
+        $host = $this->getHost();
+        $uri = $_SERVER['REQUEST_URI'] ?? '/';
+        return "{$protocol}://{$host}{$uri}";
+    }
+
+    public function isSecure(): bool
+    {
+        return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ($_SERVER['SERVER_PORT'] ?? 80) == 443;
+    }
+
+    public function getScheme(): string
+    {
+        return $this->isSecure() ? 'https' : 'http';
+    }
+
+    private static function isLocalhost(string $host): bool
+    {
+        $host = strtok($host, ':');
+        return in_array($host, ['localhost', '127.0.0.1', '::1']);
+    }
+
+    /**
+     * Get a boolean value from the request input.
+     *
+     * @param string $key The input key name
+     * @param bool $default The default value if key is missing
+     * @return bool
+     */
+    public function boolean(string $key, bool $default = false): bool
+    {
+        $value = $this->input($key, $default);
+
+        // Common truthy values (true, "true", "1", 1, "on", "yes")
+        $truthy = [true, 'true', 1, '1', 'on', 'yes', 'y'];
+        $falsy  = [false, 'false', 0, '0', 'off', 'no', 'n'];
+
+        if (in_array($value, $truthy, true)) {
+            return true;
+        }
+
+        if (in_array($value, $falsy, true)) {
+            return false;
+        }
+
+        return (bool) $default;
+    }
+
+    protected function merge(array $data): void
+    {
+        foreach ($data as $key => $value) {
+            $this->data[$key] = $value;
+        }
+    }
 }

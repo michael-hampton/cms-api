@@ -96,6 +96,7 @@ class CategoryService
                 'description' => $originalCategory->description,
                 'parent_id' => $originalCategory->parent_id,
                 'status' => 'inactive',
+                'site_id' => $originalCategory->site_id
             ];
 
             // Generate unique slug

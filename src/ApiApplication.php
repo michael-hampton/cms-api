@@ -18,6 +18,7 @@ use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\SessionMiddleware;
+use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Routing\RouteLoader;
 use App\Models\Block;
 use App\Models\Page;
@@ -59,6 +60,7 @@ class ApiApplication
     private function registerMiddleware()
     {
         $this->router->middleware([
+            SiteDetectionMiddleware::class,
             SessionMiddleware::class
         ]);
     }

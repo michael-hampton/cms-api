@@ -61,7 +61,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testShowReturnsCategoryBySlug()
     {
-        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
+        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true, 'site_id' => $this->siteId]);;
 
         $response = $this->getForSite('/api/categories/technology');
 
@@ -105,7 +105,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesUniqueSlug()
     {
-        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
+        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true, 'site_id' => $this->siteId]);;
 
         $response = $this->postForSite('/api/categories', [
             'name' => 'New Tech',
@@ -280,7 +280,8 @@ class CategoryControllerTest extends FunctionalTestCase
         $category1 = Category::create([
             'name' => 'News',
             'slug' => 'news',
-            'status' => 'active'
+            'status' => 'active',
+            'site_id' => $this->siteId
         ]);
 
         // Create first duplicate

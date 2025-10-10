@@ -12,6 +12,8 @@ abstract class Controller
 {
     protected $viewRenderer;
 
+    protected string $viewPath = __DIR__ . '/../views/';
+
     public function __construct()
     {
         $this->viewRenderer = Container::getInstance()->resolve(ViewRenderer::class);
@@ -107,5 +109,22 @@ abstract class Controller
     protected function redirectResponse(string $url): Response
     {
         return Response::redirect($url);
+    }
+
+    /**
+     * Checks if a view file exists.
+     *
+     * @param string $viewName  View name like 'users/show' or 'home'
+     * @param string $extension Optional file extension (default: 'php')
+     */
+    protected function viewExists(string $viewName, string $extension = 'php'): bool
+    {
+        // Normalize view name to path (e.g. 'users/show' → 'users/show.php')
+        $path = rtrim($this->viewPath, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR
+            . str_replace(['.', '/'], DIRECTORY_SEPARATOR, $viewName)
+            . '.' . ltrim($extension, '.');
+
+        return file_exists($path) && is_readable($path);
     }
 }

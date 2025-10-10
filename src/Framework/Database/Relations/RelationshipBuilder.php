@@ -2,6 +2,8 @@
 
 namespace App\Framework\Database\Relations;
 
+use App\Framework\Database\Database;
+
 trait RelationshipBuilder
 {
     private function hasOne(
@@ -44,7 +46,7 @@ trait RelationshipBuilder
             'local_key' => $localKey ?: 'id'
         ];
 
-        $handler = new HasManyHandler($this->database, $relationData, $returnRelation);
+        $handler = new HasManyHandler(Database::getInstance(), $relationData, $returnRelation);
         $handler->setContext($this, $relationData);
 
         if ($returnRelation) {

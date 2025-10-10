@@ -15,6 +15,7 @@ class PageCustomFieldRepository extends Repository
     {
         parent::__construct();
         $this->customFieldDefinitionRepository = new CustomFieldDefinitionRepository();
+        $this->withoutSiteFilter();
     }
 
     protected function getModelClass(): string

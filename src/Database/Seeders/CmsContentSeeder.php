@@ -19,28 +19,28 @@ class CmsContentSeeder extends Seeder
     public function run(): void
     {
         // Create Categories
-        $categories = $this->createCategories();
-
-        // Create Tags
-        $tags = $this->createTags();
-
-        // Create Pages with different types
-        $pages = $this->createPages();
-
-        // Create Blocks for pages
-        $this->createBlocks($pages);
-
-        // Create Social Media settings for pages
-        $this->createSocialSettings($pages);
-
-        // Create Comments for blog pages
-        $this->createComments($pages);
-
-        // Create Event Signups
-        $this->createEventSignups();
-
-        // Associate pages with categories and tags
-        $this->associatePageRelations($pages, $categories, $tags);
+//        $categories = $this->createCategories();
+//
+//        // Create Tags
+//        $tags = $this->createTags();
+//
+//        // Create Pages with different types
+//        $pages = $this->createPages();
+//
+//        // Create Blocks for pages
+//        $this->createBlocks($pages);
+//
+//        // Create Social Media settings for pages
+//        $this->createSocialSettings($pages);
+//
+//        // Create Comments for blog pages
+//        $this->createComments($pages);
+//
+//        // Create Event Signups
+//        $this->createEventSignups();
+//
+//        // Associate pages with categories and tags
+//        $this->associatePageRelations($pages, $categories, $tags);
     }
 
     private function createCategories(): array
