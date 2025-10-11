@@ -8,7 +8,7 @@ class SearchCriteriaParser
 {
     private const FILTER_PARAMS = [
         'status', 'visibility', 'page_type', 'author',
-        'featured', 'category', 'tag', 'parent', 'template'
+        'featured', 'category', 'tag', 'parent', 'template', 'role', 'is_active'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria
@@ -44,7 +44,7 @@ class SearchCriteriaParser
             sortBy: $searchParams['sort_by'] ?? $searchParams['sortBy'] ?? null,
             sortOrder: strtolower($searchParams['sort_order'] ?? $searchParams['sortOrder'] ?? 'asc'),
             page: max(1, (int)($searchParams['page'] ?? 1)),
-            perPage: min(100, max(1, (int)($searchParams['per_page'] ?? $searchParams['perPage'] ?? 20))),
+            perPage: min(1000, max(1, (int)($searchParams['per_page'] ?? $searchParams['perPage'] ?? 1000))),
             searchQuery: $searchParams['query'] ?? $searchParams['q'] ?? null
         );
     }
@@ -64,10 +64,6 @@ class SearchCriteriaParser
 
         $siteId =  Site::resolveSite($siteName);
 
-        if(empty($siteId)) {
-            die('Site not found for ' . $siteName);
-        }
-
         $filters['site_id'] = $siteId;
 
         return new SearchCriteria(
@@ -75,7 +71,7 @@ class SearchCriteriaParser
             sortBy: $request->get('sort_by'),
             sortOrder: strtolower($request->get('sort_order', 'asc')),
             page: max(1, (int)$request->get('page', 1)),
-            perPage: min(100, max(1, (int)$request->get('per_page', 20))),
+            perPage: min(1000, max(1, (int)$request->get('per_page', 1000))),
             searchQuery: $request->get('q') ?: $request->get('search')
         );
     }

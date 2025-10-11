@@ -40,18 +40,18 @@ class ImageControllerTest extends FunctionalTestCase
         $this->assertEquals('Test image', $data['data']['image']['alt_text']);
     }
 
-//    public function testStoreWithCategories()
-//    {
-//        $category = ImageCategory::create(['name' => 'Photos', 'slug' => 'photos']);
-//
-//        $files = [
-//            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
-//        ];
-//
-//        $response = $this->post('/api/images', ['alt_text' => 'Test', 'categories' => [$category->id]], $files);
-//
-//        $this->assertEquals(201, $response->getStatusCode());
-//    }
+    public function testStoreWithCategories()
+    {
+        $category = ImageCategory::create(['name' => 'Photos', 'slug' => 'photos']);
+
+        $files = [
+            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
+        ];
+
+        $response = $this->postForSite('/api/images', ['alt_text' => 'Test', 'categories' => [$category->id]], $files);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
 
     public function testStoreValidatesFileRequired()
     {

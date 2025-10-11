@@ -113,7 +113,7 @@ class BoxoutBlockParser extends BaseBlockParser
 
         if ($parsedData['has_image']) {
             $html .= "<div class=\"note-image\">";
-            $html .= "<img src=\"{$parsedData['image']}\" alt=\"{$parsedData['formatted_title']}\" class=\"note-img\">";
+            $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['formatted_title']}\" class=\"note-img\">";
             $html .= "</div>";
         }
 

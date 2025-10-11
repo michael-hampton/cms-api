@@ -144,7 +144,7 @@ class PageGridServiceTest extends FunctionalTestCase
         $this->repositoryMock
             ->shouldReceive('find')
             ->with(1)
-            ->once()
+            ->twice()
             ->andReturn($existingGrid);
 
         $this->repositoryMock

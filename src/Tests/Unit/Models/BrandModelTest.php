@@ -44,6 +44,7 @@ class BrandModelTest extends FunctionalTestCase
             'sale_price' => 90,
             'category_id' => 1,
             'brand_id' => $brand->id,
+            'site_id' => 1,
         ]);
 
         Product::create([
@@ -52,6 +53,7 @@ class BrandModelTest extends FunctionalTestCase
             'sale_price' => 180,
             'category_id' => 1,
             'brand_id' => $brand->id,
+            'site_id' => 1,
         ]);
 
         $products = $brand->products();

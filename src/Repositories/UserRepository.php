@@ -3,6 +3,10 @@
 namespace App\Repositories;
 
 use App\Models\User;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class UserRepository extends Repository implements UserRepositoryInterface
 {
@@ -16,6 +20,16 @@ class UserRepository extends Repository implements UserRepositoryInterface
         if (empty($user)) return null;
 
         return new User($user);
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $configuration = SearchConfigurationFactory::createUserConfiguration();
+        $engine = new SearchEngine($configuration);
+
+        $query = User::query();
+
+        return $engine->search($query, $criteria);
     }
 
     public function findById(int $id, int $siteId): ?User

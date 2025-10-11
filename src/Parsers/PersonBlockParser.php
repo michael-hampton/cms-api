@@ -190,7 +190,7 @@ class PersonBlockParser extends BaseBlockParser
 
         if ($parsedData['image']) {
             $html .= "<div class=\"person-image\">";
-            $html .= "<img src=\"{$parsedData['image']}\" alt=\"{$parsedData['formatted_name']}\">";
+            $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['formatted_name']}\">";
             $html .= "</div>";
         }
 

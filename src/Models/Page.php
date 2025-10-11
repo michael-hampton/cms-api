@@ -14,7 +14,7 @@ class Page extends Model
 
     protected $fillable = [
         'title', 'slug', 'content', 'status', 'meta_title', 'meta_description',
-        'published_at', 'created_at', 'updated_at', 'page_type', 'custom_handler', 'author_id', 'description', 'site_id'
+        'published_at', 'created_at', 'updated_at', 'page_type', 'custom_handler', 'author_id', 'description', 'site_id', 'deleted_at'
     ];
 
     // Relations that should always be included in serialization

@@ -74,19 +74,19 @@ class ContactFormBlockParser extends BaseBlockParser
 
     public function generateDefaultHtml(array $parsedData): string
     {
-        $html = "<section class=\"contact\" style='margin-top: 20px'>";
+        $html = "<section class=\"contact\">";
         $html .= "<div class=\"contact-container\">";
 
         // Contact Info Side
         $html .= "<div class=\"contact-info\">";
         $html .= "<h3>Contact Information</h3>";
-        $html .= "<p style=\"margin-bottom: 2rem;\">We're here to help with all your property needs. Reach out to us through any of the following channels.</p>";
+        $html .= "<p>We're here to help with all your cooking questions. Reach out to us through any of the following channels.</p>";
 
         $html .= "<div class=\"contact-item\">";
         $html .= "<div class=\"contact-icon\">📍</div>";
         $html .= "<div>";
-        $html .= "<h4>Visit Our Office</h4>";
-        $html .= "<p>123 Premium Street<br>London, SW1A 1AA</p>";
+        $html .= "<h4>Visit Our Studio</h4>";
+        $html .= "<p>123 Culinary Lane<br>London, SW1A 1AA</p>";
         $html .= "</div>";
         $html .= "</div>";
 
@@ -102,7 +102,7 @@ class ContactFormBlockParser extends BaseBlockParser
         $html .= "<div class=\"contact-icon\">✉️</div>";
         $html .= "<div>";
         $html .= "<h4>Email Us</h4>";
-        $html .= "<p>info@premierproperties.co.uk<br>sales@premierproperties.co.uk</p>";
+        $html .= "<p>hello@tastetable.com<br>recipes@tastetable.com</p>";
         $html .= "</div>";
         $html .= "</div>";
 
@@ -118,16 +118,21 @@ class ContactFormBlockParser extends BaseBlockParser
         // Contact Form Side
         $html .= "<div class=\"contact-form\">";
         $html .= "<h3>{$parsedData['formatted_title']}</h3>";
+
+        if (!empty($parsedData['subtitle'])) {
+            $html .= "<p>{$parsedData['formatted_subtitle']}</p>";
+        }
+
         $html .= "<form method=\"POST\" action=\"/contact\">";
 
         if ($parsedData['showName']) {
             $required = $parsedData['requireName'] ? 'required' : '';
             $html .= "<div class=\"form-row\">";
             $html .= "<div class=\"form-group\">";
-            $html .= "<input type=\"text\" name=\"first_name\" placeholder=\"First Name\" {$required}>";
+            $html .= "<input type=\"text\" name=\"first_name\" class=\"form-input\" placeholder=\"First Name\" {$required}>";
             $html .= "</div>";
             $html .= "<div class=\"form-group\">";
-            $html .= "<input type=\"text\" name=\"last_name\" placeholder=\"Last Name\" {$required}>";
+            $html .= "<input type=\"text\" name=\"last_name\" class=\"form-input\" placeholder=\"Last Name\" {$required}>";
             $html .= "</div>";
             $html .= "</div>";
         }
@@ -137,13 +142,13 @@ class ContactFormBlockParser extends BaseBlockParser
             if ($parsedData['showEmail']) {
                 $required = $parsedData['requireEmail'] ? 'required' : '';
                 $html .= "<div class=\"form-group\">";
-                $html .= "<input type=\"email\" name=\"email\" placeholder=\"Email Address\" {$required}>";
+                $html .= "<input type=\"email\" name=\"email\" class=\"form-input\" placeholder=\"Email Address\" {$required}>";
                 $html .= "</div>";
             }
             if ($parsedData['showPhone']) {
                 $required = $parsedData['requirePhone'] ? 'required' : '';
                 $html .= "<div class=\"form-group\">";
-                $html .= "<input type=\"tel\" name=\"phone\" placeholder=\"Phone Number\" {$required}>";
+                $html .= "<input type=\"tel\" name=\"phone\" class=\"form-input\" placeholder=\"Phone Number\" {$required}>";
                 $html .= "</div>";
             }
             $html .= "</div>";
@@ -152,22 +157,21 @@ class ContactFormBlockParser extends BaseBlockParser
         if ($parsedData['showSubject']) {
             $required = $parsedData['requireSubject'] ? 'required' : '';
             $html .= "<div class=\"form-group\">";
-            $html .= "<select name=\"service\" {$required}>";
-            $html .= "<option value=\"\">Select Service</option>";
-            $html .= "<option value=\"buying\">Property Buying</option>";
-            $html .= "<option value=\"selling\">Property Selling</option>";
-            $html .= "<option value=\"renting\">Property Renting</option>";
-            $html .= "<option value=\"investment\">Investment Advisory</option>";
-            $html .= "<option value=\"valuation\">Property Valuation</option>";
-            $html .= "<option value=\"other\">Other Inquiry</option>";
+            $html .= "<select name=\"subject\" class=\"form-select\" {$required}>";
+            $html .= "<option value=\"\">Select Subject</option>";
+            $html .= "<option value=\"recipe\">Recipe Question</option>";
+            $html .= "<option value=\"product\">Product Inquiry</option>";
+            $html .= "<option value=\"event\">Cooking Class</option>";
+            $html .= "<option value=\"other\">Other</option>";
             $html .= "</select>";
             $html .= "</div>";
         }
 
+
         if ($parsedData['showMessage']) {
             $required = $parsedData['requireMessage'] ? 'required' : '';
             $html .= "<div class=\"form-group\">";
-            $html .= "<textarea name=\"message\" placeholder=\"Tell us about your property needs...\" {$required}></textarea>";
+            $html .= "<textarea name=\"message\" class=\"form-textarea\" placeholder=\"Your message...\" {$required}></textarea>";
             $html .= "</div>";
         }
 

@@ -143,7 +143,7 @@ class GalleryBlockParser extends BaseBlockParser
 
                 if (!empty($slide['image'])) {
                     $html .= "<div class=\"slide-image\">";
-                    $html .= "<img src=\"{$slide['image']}\" alt=\"{$slide['formatted_title']}\" class=\"carousel-image\">";
+                    $html .= "<img src=\"{$slide['image']['src']}\" alt=\"{$slide['formatted_title']}\" class=\"carousel-image\">";
                     $html .= "</div>";
                 }
 
@@ -259,7 +259,7 @@ class GalleryBlockParser extends BaseBlockParser
                     $html .= "<a href=\"{$slide['link']}\"{$linkAttrs}>";
                 }
 
-                $html .= "<img src=\"{$slide['image']}\" alt=\"{$slide['formatted_title']}\" class=\"gallery-image\">";
+                $html .= "<img src=\"{$slide['image']['src']}\" alt=\"{$slide['formatted_title']}\" class=\"gallery-image\">";
 
                 if ($slide['has_link']) {
                     $html .= "</a>";

@@ -7,12 +7,19 @@ use App\Framework\Support\Hash;
 use App\Models\Model;
 use App\Models\User;
 use App\Repositories\UserRepository;
+use App\Search\PaginatedResult;
+use App\Search\SearchCriteria;
 
 class UserService
 {
     public function __construct(
         protected UserRepository $userRepository
     ) {
+    }
+
+    public function searchUsers(SearchCriteria $criteria): PaginatedResult
+    {
+        return $this->userRepository->search($criteria);
     }
 
     public function getAllUsers(int $perPage = 15): array

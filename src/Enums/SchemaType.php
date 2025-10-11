@@ -7,6 +7,7 @@ enum SchemaType: string
     case NONE = 'none';
     case STEPS = 'steps';
     case INGREDIENTS = 'ingredients';
+    case ITEM_LIST = 'itemList';
 
     public static function values(): array
     {

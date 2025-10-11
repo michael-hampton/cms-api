@@ -84,8 +84,9 @@ abstract class FunctionalTestCase extends TestCase
     protected function actingAs(?User $user = null): self
     {
         if ($user === null) {
+
             // Create or get a test user
-            $user = User::where('email', 'michaelhamptondesign@yahoo.com')->first();
+            $user = User::where('email', 'test@example.com')->first();
             if (!$user) {
                 $user = User::create([
                     'name' => 'Test User',
@@ -184,7 +185,7 @@ abstract class FunctionalTestCase extends TestCase
             // Truncate all tables
             foreach ($tables as $table) {
 
-                if ($table === 'migrations' || $table === 'users') {
+                if ($table === 'migrations') {
                     continue;
                 }
 

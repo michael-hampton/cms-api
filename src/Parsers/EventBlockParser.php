@@ -113,7 +113,7 @@ class EventBlockParser extends BaseBlockParser
 
         if (!empty($parsedData['image'])) {
             $html .= "<div class=\"event-image\">";
-            $html .= "<img src=\"{$parsedData['image']}\" alt=\"{$parsedData['title']}\" class=\"event-img\">";
+            $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['title']}\" class=\"event-img\">";
             $html .= "</div>";
         }
 

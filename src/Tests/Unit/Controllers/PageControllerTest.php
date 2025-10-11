@@ -263,7 +263,7 @@ class PageControllerTest extends FunctionalTestCase
     public function testIndexAppliesSearchQuery()
     {
         $request = $this->createMockRequest([
-            'q' => 'test search'
+            'q' => 'test search',
         ]);
 
         $result = new PaginatedResult([], 0, 1, 20);
@@ -474,7 +474,7 @@ class PageControllerTest extends FunctionalTestCase
             } elseif ($key === 'page') {
                 $request->shouldReceive('get')->with($key, 1)->andReturn($value);
             } elseif ($key === 'per_page') {
-                $request->shouldReceive('get')->with($key, 20)->andReturn($value);
+                $request->shouldReceive('get')->with($key, 1000)->andReturn($value);
             } else {
                 $request->shouldReceive('get')->with($key)->andReturn($value);
             }

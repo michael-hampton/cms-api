@@ -173,6 +173,10 @@ class ReviewControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite("/api/products/{$this->productId}/reviews", ['rating' => 5]);
 
+        echo '<pre>';
+        print_r($response->getContent());
+        die;
+
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertStringContainsString('logged in', $data['message']);

@@ -147,7 +147,7 @@ class PageGridService
             $pageGrid->addPage($pageData);
             $pageGrid->save();
 
-            return $pageGrid->fresh();
+            return $pageGrid;
         });
     }
 
@@ -167,7 +167,7 @@ class PageGridService
 
             $pageGrid->save();
 
-            return $pageGrid->fresh();
+            return $pageGrid;
         });
     }
 
@@ -215,7 +215,7 @@ class PageGridService
             $pageGrid->is_active = !$pageGrid->is_active;
             $pageGrid->save();
 
-            return $pageGrid->fresh();
+            return $pageGrid;
         });
     }
 

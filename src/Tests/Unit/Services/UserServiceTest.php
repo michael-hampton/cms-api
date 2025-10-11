@@ -6,6 +6,8 @@ use App\Framework\Support\Hash;
 use App\Models\User;
 use App\Repositories\UserRepository;
 use App\Repositories\UserRepositoryInterface;
+use App\Search\PaginatedResult;
+use App\Search\SearchCriteria;
 use App\Services\UserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -22,6 +24,33 @@ class UserServiceTest extends FunctionalTestCase
 
         $this->repository = Mockery::mock(UserRepository::class);
         $this->service = new UserService($this->repository);
+    }
+
+    public function testSearchUsersReturnsResults(): void
+    {
+        $criteria = new SearchCriteria(
+            filters: ['role' => 'admin'],
+            page: 1,
+            perPage: 10
+        );
+
+        $paginatedResult = new PaginatedResult(
+            [['id' => 1, 'name' => 'Admin User', 'role' => 'admin']],
+            1,
+            1,
+            10
+        );
+
+        $this->repository
+            ->shouldReceive('search')
+            ->once()
+            ->with(Mockery::type(SearchCriteria::class))
+            ->andReturn($paginatedResult);
+
+        $result = $this->service->searchUsers($criteria);
+
+        $this->assertInstanceOf(PaginatedResult::class, $result);
+        $this->assertEquals(1, $result->getTotal());
     }
 
     public function testGetUserByIdReturnsUser(): void

@@ -464,30 +464,30 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals('unpublished', $history->action);
     }
 
-//    public function testDestroyCreatesDeleteHistoryEntry()
-//    {
-//        $page = Page::create([
-//            'title' => 'Test Page',
-//            'slug' => 'test-page',
-//            'status' => 'published',
-//            'site_id' => $this->siteId
-//        ]);
-//
-//        $pageId = $page->id;
-//
-//        $response = $this->deleteForSite("/api/pages/{$page->id}");
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $this->assertNull(Page::find($pageId));
-//
-//        // Verify delete history entry exists (even though page is deleted)
-//        $history = PageHistory::where('page_id', $pageId)
-//            ->where('action', 'deleted')
-//            ->first();
-//
-//        $this->assertNotNull($history);
-//        $this->assertEquals('deleted', $history->action);
-//    }
+    public function testDestroyCreatesDeleteHistoryEntry()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $pageId = $page->id;
+
+        $response = $this->deleteForSite("/api/pages/{$page->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNull(Page::find($pageId));
+
+        // Verify delete history entry exists (even though page is deleted)
+        $history = PageHistory::where('page_id', $pageId)
+            ->where('action', 'deleted')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('deleted', $history->action);
+    }
 
     public function testDuplicateCreatesHistoryEntries()
     {

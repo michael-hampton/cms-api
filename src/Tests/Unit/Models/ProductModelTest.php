@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Framework\Support\Collection;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
@@ -15,6 +16,19 @@ class ProductModelTest extends FunctionalTestCase
         $this->runMigrations();
         $this->createBrand();
         $this->createCategory();
+
+        $this->product = new Product([
+            'name' => 'Test Product',
+            'description' => 'Test description',
+            'price' => 100.00,
+            'sale_price' => 80.00,
+            'category_id' => 1,
+            'brand_id' => 1,
+            'image' => 'product.jpg',
+            'slug' => 'test-product',
+            'site_id' => 1,
+            'is_active' => true
+        ]);
     }
 
     public function testCreateProduct()
@@ -289,5 +303,17 @@ class ProductModelTest extends FunctionalTestCase
             Brand::create(['name' => 1, 'slug' => 'techcorp']);
         }
 
+    }
+
+    public function testReviewsRelationReturnsCorrectType()
+    {
+        $relation = $this->product->reviews();
+        $this->assertInstanceOf(Collection::class, $relation);
+    }
+
+    public function testApprovedReviewsRelationReturnsCorrectType()
+    {
+        $relation = $this->product->approvedReviews();
+        $this->assertInstanceOf(Collection::class, $relation);
     }
 }

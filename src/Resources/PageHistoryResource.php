@@ -28,16 +28,16 @@ class PageHistoryResource
             'changes' => $this->history->changes,
             'snapshot' => $this->history->snapshot,
             'ip_address' => $this->history->ip_address,
-            'created_at' => $this->history->created_at,
+            'created_at' => $this->history->created_at->format('Y-m-d H:i:s'),
             'user' => null,
             'page' => null
         ];
 
         if ($this->history->relationLoaded('user') && $this->history->user) {
             $data['user'] = [
-                'id' => $this->history->user->id,
-                'name' => $this->history->user->name,
-                'email' => $this->history->user->email
+                'id' => $this->history->user['id'],
+                'name' => $this->history->user['name'],
+                'email' => $this->history->user['email']
             ];
         }
 

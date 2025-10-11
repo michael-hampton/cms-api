@@ -423,8 +423,9 @@ class ImageService
         $validCategories = ImageCategory::active()->whereIn('id', $categoryIds)->get();
         $validIds = $validCategories->pluck('id')->toArray();
 
-        // Sync categories (this will replace existing ones)
-        $image->categories()->sync($validIds);
+        // Use the repository to sync categories instead of calling on the model
+        // This ensures we're working with the relationship properly
+        $this->imageRepository->syncCategories($image, $validIds);
     }
 
     /**

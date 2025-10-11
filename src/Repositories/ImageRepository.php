@@ -173,12 +173,13 @@ class ImageRepository extends Repository
         return sprintf("%.1f %s", $bytes / pow(1024, $factor), $units[$factor]);
     }
 
-    public function syncCategories(Image $image, array $categoryIds): void
+    public function syncCategories(Image $image, array $categoryIds): array
     {
-        $validCategories = ImageCategory::active()->whereIn('id', $categoryIds)->get();
-        $validIds = $validCategories->pluck('id')->toArray();
+        // Get the relationship handler by calling categories with relation=true
+        $relationHandler = $image->categories(true);
 
-        $image->categories()->sync($validIds);
+        // Now we can call sync on the RelationBuilder
+        return $relationHandler->sync($categoryIds);
     }
 
     public function getCategoriesForImage(Image $image): Collection

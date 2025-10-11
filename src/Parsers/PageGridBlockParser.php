@@ -235,6 +235,7 @@ class PageGridBlockParser extends BaseBlockParser
 
     private function buildPageUrl(string $slug): string
     {
+
         $site = SiteContext::get();
 
         if ($site) {
@@ -369,11 +370,13 @@ class PageGridBlockParser extends BaseBlockParser
         $html .= "<div class=\"page-grid\" data-page-grid>";
 
         foreach ($parsedData['pages'] as $page) {
+            $url = $this->buildPageUrl($page['slug']);
+
             $html .= "<div class=\"page-card\">";
 
             if ($parsedData['showImage'] && !empty($page['image'])) {
                 $html .= "<div class=\"page-card-image\">";
-                $html .= "<img src=\"{$page['image']['src']}\" alt=\"{$page['image']['alt']}\">";
+                $html .= $this->addLink("<img src=\"{$page['image']['src']}\" alt=\"{$page['image']['alt']}\">", $page['slug']);;
 
                 if (!empty($page['badge'])) {
                     $badgeColor = $page['badge']['color'] ?? 'primary';
@@ -384,10 +387,11 @@ class PageGridBlockParser extends BaseBlockParser
             }
 
             $html .= "<div class=\"page-card-content\">";
-            $html .= "<h3 class=\"page-card-title\">{$page['formatted_title']}</h3>";
+
+            $html .= $this->addLink("<h3 class=\"page-card-title\">{$page['formatted_title']}</h3>", $page['slug']);
 
             if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
-                $html .= "<p class=\"page-card-excerpt\">{$page['formatted_excerpt']}</p>";
+                $html .= $this->addLink("<p class=\"page-card-excerpt\">{$page['formatted_excerpt']}</p>", $page['slug']);
             }
 
             if ($parsedData['showFeatures'] && !empty($page['features'])) {
@@ -408,6 +412,11 @@ class PageGridBlockParser extends BaseBlockParser
             }
 
             $html .= "</div>"; // page-card-content
+
+            if(!empty($url)) {
+                $html .= "</a>";
+            }
+
             $html .= "</div>"; // page-card
         }
 
@@ -426,6 +435,17 @@ class PageGridBlockParser extends BaseBlockParser
 
         $html .= "</div>"; // page-grid-carousel
         $html .= "</div>"; // page-grid-block
+
+        return $html;
+    }
+
+    private function addLink(string $html, string $slug) {
+        $original = $html;
+        $url = $this->buildPageUrl($slug);
+
+        if(!empty($url)) {
+            $html = "<a href=\"{$url}\">{$original}</a>";
+        }
 
         return $html;
     }

@@ -161,6 +161,31 @@ class SearchConfigurationFactory
         return $config;
     }
 
+    public static function createUserConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration();
+
+        // Filters
+        $config->addFilter(new EqualsFilter('role', 'role'))
+            ->addFilter(new BooleanFilter('is_active', 'is_active'));
+
+        // Sorts
+        $config->addSort(new SortSpecification('name', 'name'))
+            ->addSort(new SortSpecification('email', 'email'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('updated_at', 'updated_at'))
+            ->addSort(new SortSpecification('role', 'role'));
+
+        // Searchable columns
+        $config->addSearchableColumn('name')
+            ->addSearchableColumn('email');
+
+        // Default sort
+        $config->setDefaultSort('name', 'asc');
+
+        return $config;
+    }
+
     public static function createBrandConfiguration(): SearchConfiguration
     {
         $config = new SearchConfiguration();

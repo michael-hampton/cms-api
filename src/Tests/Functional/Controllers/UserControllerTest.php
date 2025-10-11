@@ -27,12 +27,149 @@ class UserControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $this->assertArrayHasKey('data', $data);
+        $this->assertArrayHasKey('items', $data);
         $this->assertArrayHasKey('pagination', $data);
-        $this->assertCount(15, $data['data']); // Default per_page is 15
-        $this->assertEquals(1, $data['pagination']['current_page']);
-        $this->assertEquals(15, $data['pagination']['per_page']);
     }
+
+    public function testIndexWithSearchQuery(): void
+    {
+        User::create([
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'user',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        User::create([
+            'name' => 'Jane Smith',
+            'email' => 'jane@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'admin',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->getForSite('/api/users?q=John');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('John Doe', $data['items'][0]['name']);
+    }
+
+    public function testIndexWithRoleFilter(): void
+    {
+        User::create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'admin',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        User::create([
+            'name' => 'Regular User',
+            'email' => 'user@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'user',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->getForSite('/api/users?role=admin');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('admin', $data['items'][0]['role']);
+    }
+
+    public function testIndexWithIsActiveFilter(): void
+    {
+        User::create([
+            'name' => 'Active User',
+            'email' => 'active@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'user',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        User::create([
+            'name' => 'Inactive User',
+            'email' => 'inactive@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'user',
+            'is_active' => false,
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->getForSite('/api/users?is_active=true');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        foreach ($data['data'] as $user) {
+            $this->assertTrue((bool)$user['is_active']);
+        }
+    }
+
+    public function testIndexWithSorting(): void
+    {
+        User::create([
+            'name' => 'Zoe',
+            'email' => 'zoe@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'user',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        User::create([
+            'name' => 'Alice',
+            'email' => 'alice@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'role' => 'user',
+            'is_active' => true,
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->getForSite('/api/users?sort_by=name&sort_order=asc');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Alice', $data['items'][0]['name']);
+    }
+
+    public function testIndexWithPagination(): void
+    {
+        for ($i = 1; $i <= 25; $i++) {
+            User::create([
+                'name' => "User $i",
+                'email' => "user$i@example.com",
+                'password' => password_hash('password', PASSWORD_DEFAULT),
+                'role' => 'user',
+                'is_active' => true,
+                'site_id' => $this->siteId,
+            ]);
+        }
+
+        $response = $this->getForSite('/api/users?page=2&per_page=10');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(2, $data['pagination']['current_page']);
+        $this->assertEquals(10, $data['pagination']['per_page']);
+        $this->assertCount(10, $data['items']);
+    }
+
 
     public function testShowReturnsSingleUser(): void
     {

@@ -44,9 +44,9 @@ class ProductBlockParser extends BaseBlockParser
             'linkText' => [
                 new MaxLengthRule(100)
             ],
-//            'image' => [
-//                new ArrayRule()
-//            ],
+            'image' => [
+                new ArrayRule()
+            ],
             'name' => [
                 new RequiredRule(),
                 new MinLengthRule(2),
@@ -133,7 +133,7 @@ class ProductBlockParser extends BaseBlockParser
 
         if (!empty($parsedData['image'])) {
             $html .= "<div class=\"product-image\">";
-            $html .= "<img src=\"{$parsedData['image']}\" alt=\"{$parsedData['name']}\" class=\"product-img\">";
+            $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['name']}\" class=\"product-img\">";
             $html .= "</div>";
         }
 

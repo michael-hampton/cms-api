@@ -33,6 +33,11 @@ abstract class Repository
         return $this->model::find($id);
     }
 
+    public function findWithTrashed(int $id): ?Model
+    {
+        return $this->model::withTrashed()->find($id);
+    }
+
     /**
      * Apply site filter to query if site_id is set
      */

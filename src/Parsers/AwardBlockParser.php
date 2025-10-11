@@ -35,7 +35,7 @@ class AwardBlockParser extends BaseBlockParser
                 new MaxLengthRule(500)
             ],
             'alt' => [
-//                new RequiredRule(),
+               // new RequiredRule(),
                 new MaxLengthRule(255)
             ],
             'winner' => [
@@ -80,7 +80,7 @@ class AwardBlockParser extends BaseBlockParser
 
         if (!empty($parsedData['image'])) {
             $html .= "<div class=\"award-image\">";
-            $html .= "<img src=\"{$parsedData['image']}\" alt=\"{$parsedData['alt']}\" class=\"award-img\">";
+            $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['alt']}\" class=\"award-img\">";
             $html .= "</div>";
         }
 

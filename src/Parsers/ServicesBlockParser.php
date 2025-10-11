@@ -76,7 +76,7 @@ class ServicesBlockParser extends BaseBlockParser
 
             if ($service['image']) {
                 $html .= "<div class=\"service-image\">";
-                $html .= "<img src=\"{$service['image']}\" alt=\"{$service['formatted_title']}\">";
+                $html .= "<img src=\"{$service['image']['src']}\" alt=\"{$service['formatted_title']}\">";
                 $html .= "</div>";
             } else {
                 $html .= "<div class=\"service-icon\">{$service['icon']}</div>";

@@ -28,6 +28,7 @@ class PageHistoryService
         $page = $this->pageRepository->find($pageId);
 
         if (!$page) {
+            die('no');
             throw new \Exception("Page not found");
         }
 

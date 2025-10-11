@@ -39,15 +39,15 @@ class HomeGardenSeeder extends Seeder
 
     public function run(): void
     {
-        $this->createSite();
-        $this->createMenu();
-        $this->createTags();
-        $this->createCategories();
-        $this->createCustomFields();
-        $this->createHomepage();
-        $this->createArticles();
-        $this->createAboutPage();
-        $this->createContactPage();
+//        $this->createSite();
+//        $this->createMenu();
+//        $this->createTags();
+//        $this->createCategories();
+//        $this->createCustomFields();
+//        $this->createHomepage();
+//        $this->createArticles();
+//        $this->createAboutPage();
+//        $this->createContactPage();
     }
 
     private function createSite(): void

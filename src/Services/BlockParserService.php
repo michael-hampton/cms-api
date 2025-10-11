@@ -7,7 +7,6 @@ use App\Framework\Database\Database;
 use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\Logger;
-use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\Validator;
 use App\Models\Block;
 use App\Parsers\BlockRegistry;
@@ -103,6 +102,10 @@ class BlockParserService
         $type = $blockData['type'];
         $parser = $this->getParser($type);
 
+        if (method_exists($parser, 'beforeValidation')) {
+            $blockData = $parser->beforeValidation($blockData);
+        }
+
         $this->validateBlockData($blockData, $parser);
 
         $parsedData = $parser->parse($blockData);
@@ -123,7 +126,7 @@ class BlockParserService
         $type = $blockData['type'];
         $parser = $this->getParser($type);
 
-        if(method_exists($parser, 'beforeValidation')) {
+        if (method_exists($parser, 'beforeValidation')) {
             $blockData = $parser->beforeValidation($blockData);
         }
 

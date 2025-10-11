@@ -7,7 +7,9 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Requests\StoreUserRequest;
 use App\Requests\UpdateUserRequest;
+use App\Search\SearchCriteriaParser;
 use App\Services\UserService;
+use Exception;
 
 class UserController extends Controller
 {
@@ -16,11 +18,16 @@ class UserController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
-        $users = $this->userService->getAllUsers($request->get('per_page', 15));
+        try {
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $result = $this->userService->searchUsers($criteria);
 
-        return $this->resourceResponse($users);
+            return $this->searchResponse($result);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 
     public function show(int $id): JsonResponse
