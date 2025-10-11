@@ -94,7 +94,7 @@ abstract class Model
 
     protected function castAttribute(string $key, $value)
     {
-        if (!isset($this->casts[$key]) || empty($value)) {
+        if (!isset($this->casts[$key]) || $value === null) {
             return $value;
         }
 
@@ -111,13 +111,17 @@ abstract class Model
             case 'boolean':
                 return (bool)$value;
             case 'array':
-                return is_string($value) ? json_decode($value, true) : $value;
             case 'json':
-                return is_string($value) ? json_decode($value, true) : $value;
+                // IMPORTANT: Handle both string and array inputs
+                if (is_string($value)) {
+                    $decoded = json_decode($value, true);
+                    return $decoded === null ? [] : $decoded;
+                }
+                return is_array($value) ? $value : [];
             case 'date':
-                return new DateTime($value);
+            case 'datetime':
             case 'timestamp':
-                return new DateTime($value);
+                return $value instanceof \DateTime ? $value : new \DateTime($value);
             default:
                 return $value;
         }
@@ -172,6 +176,14 @@ abstract class Model
         if (method_exists($this, $accessorMethod)) {
             $this->$accessorMethod($value);
             return;
+        }
+
+        // Handle array/json casting - convert arrays to JSON strings for storage
+        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['array', 'json'])) {
+            if (is_array($value)) {
+                $this->attributes[$key] = json_encode($value);
+                return;
+            }
         }
 
         $this->attributes[$key] = $value;
@@ -328,12 +340,6 @@ abstract class Model
     {
         $primaryKeyValue = $this->getAttribute($this->primaryKey);
         if (!$primaryKeyValue) {
-
-            echo '<pre>';
-            print_r($this);
-            die;
-
-            die('no primary key');
             return false;
         }
 

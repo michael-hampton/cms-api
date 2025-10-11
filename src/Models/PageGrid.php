@@ -20,6 +20,7 @@ class PageGrid extends Model
         'is_active',
         'created_by',
         'updated_by',
+        'deleted_at'
     ];
 
     protected $casts = [
@@ -37,6 +38,8 @@ class PageGrid extends Model
     protected $hidden = [
         'deleted_at',
     ];
+
+    protected $table = 'page_grids';
 
     protected static function boot()
     {
@@ -122,6 +125,9 @@ class PageGrid extends Model
             $pages[$index] = array_merge($pages[$index], $pageData);
             $this->pages = $pages;
         }
+
+        // REMOVED: $this->pages = json_encode($this->pages ?? []);
+        // The casting system handles JSON encoding automatically
     }
 
     public function reorderPages(array $order): void

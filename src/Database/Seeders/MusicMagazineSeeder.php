@@ -38,15 +38,15 @@ class MusicMagazineSeeder extends Seeder
 
     public function run(): void
     {
-        $this->createSite();
-        $this->createMenu();
-        $this->createTags();
-        $this->createCategories();
-        $this->createCustomFields();
-        $this->createHomepage();
-        $this->createAboutPage();
-        $this->createContactPage();
-        $this->createArticles();
+//        $this->createSite();
+//        $this->createMenu();
+//        $this->createTags();
+//        $this->createCategories();
+//        $this->createCustomFields();
+//        $this->createHomepage();
+//        $this->createAboutPage();
+//        $this->createContactPage();
+//        $this->createArticles();
     }
 
     private function createSite(): void

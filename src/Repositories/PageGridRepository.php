@@ -72,4 +72,41 @@ class PageGridRepository extends Repository
 
         return $query->exists();
     }
+
+    public function paginate(
+        int $perPage = 15,
+        int $page = 1,
+        ?string $search = null,
+        ?string $layout = null,
+        ?bool $isActive = null,
+        string $sortBy = 'created_at',
+        string $sortOrder = 'desc'
+    ): array
+    {
+        $query = $this->model->query();
+
+        // Apply search filter
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'LIKE', "%{$search}%")
+                    ->orWhere('subtitle', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // Apply layout filter
+        if ($layout) {
+            $query->where('layout', $layout);
+        }
+
+        // Apply is_active filter
+        if ($isActive !== null) {
+            $query->where('is_active', $isActive);
+        }
+
+        // Apply sorting
+        $query->orderBy($sortBy, $sortOrder);
+
+        // Use parent paginate or implement pagination
+        return $query->paginate($perPage, $page);
+    }
 }

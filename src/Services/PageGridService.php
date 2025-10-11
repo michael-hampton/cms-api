@@ -18,7 +18,7 @@ class PageGridService
     public function __construct(
         private AuthenticationService $authenticationService,
         private PageGridRepository $repository,
-        ?Database                    $database = null
+        ?Database $database = null
     )
     {
         $this->database = $database ?? Database::getInstance();
@@ -40,7 +40,12 @@ class PageGridService
     {
         return $this->repository->paginate(
             $perPage,
+            1,
             $search,
+            $layout,
+            $isActive,
+            $sortBy,
+            $sortOrder
         );
     }
 
@@ -65,6 +70,11 @@ class PageGridService
             // Set creator
             if ($this->authenticationService->check()) {
                 $data['created_by'] = $this->authenticationService->getUserId();
+            }
+
+            // FIXED: Initialize pages as empty array instead of null
+            if (!isset($data['pages']) || empty($data['pages'])) {
+                $data['pages'] = [];
             }
 
             return $this->repository->create($data);
@@ -92,7 +102,8 @@ class PageGridService
 
             $this->repository->update($id, $data);
 
-            return $pageGrid;
+            // FIXED: Return fresh model instance to get updated data
+            return $this->repository->find($id);
         });
     }
 
@@ -117,7 +128,7 @@ class PageGridService
             $duplicate = $this->repository->duplicate($id);
 
             if ($duplicate && $this->authenticationService->check()) {
-                $duplicate->update(['created_by' => $this->authenticationService->getUserId()]);;
+                $duplicate->update(['created_by' => $this->authenticationService->getUserId()]);
             }
 
             return $duplicate;
@@ -136,8 +147,7 @@ class PageGridService
             $pageGrid->addPage($pageData);
             $pageGrid->save();
 
-            return $pageGrid;
-
+            return $pageGrid->fresh();
         });
     }
 
@@ -151,10 +161,13 @@ class PageGridService
             }
 
             $pageGrid->removePage($pageIndex);
+
+            // REMOVED: Manual JSON encoding - let casting handle it
+            // $pageGrid->pages = is_array($pageGrid->pages) ? json_encode($pageGrid->pages ?? []) : $pageGrid->pages;
+
             $pageGrid->save();
 
-
-            return $pageGrid;
+            return $pageGrid->fresh();
         });
     }
 
@@ -170,14 +183,13 @@ class PageGridService
             $pageGrid->updatePage($pageIndex, $pageData);
             $pageGrid->save();
 
-            return $pageGrid;
+            return $pageGrid->fresh();
         });
     }
 
     public function reorderPagesInGrid(int $id, array $order): PageGrid
     {
         return $this->database->transaction(function () use ($id, $order) {
-            //try {
             $pageGrid = $this->repository->find($id);
 
             if (!$pageGrid) {
@@ -187,7 +199,7 @@ class PageGridService
             $pageGrid->reorderPages($order);
             $pageGrid->save();
 
-            return $pageGrid;
+            return $pageGrid->fresh();
         });
     }
 
@@ -203,7 +215,7 @@ class PageGridService
             $pageGrid->is_active = !$pageGrid->is_active;
             $pageGrid->save();
 
-            return $pageGrid;
+            return $pageGrid->fresh();
         });
     }
 
@@ -220,6 +232,4 @@ class PageGridService
 
         return $slug;
     }
-
-
 }

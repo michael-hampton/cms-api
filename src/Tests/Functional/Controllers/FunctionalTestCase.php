@@ -208,31 +208,68 @@ abstract class FunctionalTestCase extends TestCase
     {
         $siteSlug = $this->siteSlug;
 
+        // Parse URL (works for both absolute and relative URIs)
         $parsed = parse_url($uri);
-        $path = $parsed['path'] ?? '';   // path part
-        $query = $parsed['query'] ?? ''; // query string
 
-        // Split path into segments
-        $segments = array_values(array_filter(explode('/', $path))); // remove empty segments
+        // path fallback: if parse_url returned nothing for path (rare), treat whole uri as path
+        $path = $parsed['path'] ?? $uri;
+        $query = $parsed['query'] ?? '';
+        $fragment = $parsed['fragment'] ?? '';
 
-        // Insert site slug as the second segment
+        // Split into segments but only drop empty strings (preserve "0")
+        $rawSegments = explode('/', trim($path, '/'));
+        $segments = array_values(array_filter($rawSegments, function ($seg) {
+            return $seg !== '';
+        }));
+
+        // Insert site slug after 'api' or prepend
         if (isset($segments[0]) && $segments[0] === 'api') {
             array_splice($segments, 1, 0, [$siteSlug]);
         } else {
-            // If no /api prefix, just prepend as first segment
             array_unshift($segments, $siteSlug);
         }
 
-        // Rebuild path
-        $fullPath = '/' . implode('/', $segments);
+        $newPath = '/' . implode('/', $segments);
 
-        // Rebuild URI with query string
-        if ($query !== '') {
-            $fullPath .= '?' . $query;
+        // Rebuild full URL if original had a scheme/host, otherwise return path-based result
+        if (isset($parsed['scheme']) || isset($parsed['host'])) {
+            $result = '';
+
+            if (isset($parsed['scheme'])) {
+                $result .= $parsed['scheme'] . '://';
+            }
+
+            if (isset($parsed['user'])) {
+                $result .= $parsed['user'];
+                if (isset($parsed['pass'])) {
+                    $result .= ':' . $parsed['pass'];
+                }
+                $result .= '@';
+            }
+
+            $result .= $parsed['host'] ?? '';
+
+            if (isset($parsed['port'])) {
+                $result .= ':' . $parsed['port'];
+            }
+
+            $result .= $newPath;
+        } else {
+            // relative path
+            $result = $newPath;
         }
 
-        return $fullPath;
+        if ($query !== '') {
+            $result .= '?' . $query;
+        }
+        if ($fragment !== '') {
+            $result .= '#' . $fragment;
+        }
+
+        return $result;
     }
+
+
 
     protected function getForSite(string $uri, array $headers = []): Response
     {

@@ -44,9 +44,9 @@ class ProductBlockParser extends BaseBlockParser
             'linkText' => [
                 new MaxLengthRule(100)
             ],
-            'image' => [
-                new ArrayRule()
-            ],
+//            'image' => [
+//                new ArrayRule()
+//            ],
             'name' => [
                 new RequiredRule(),
                 new MinLengthRule(2),

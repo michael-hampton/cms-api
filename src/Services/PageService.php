@@ -67,10 +67,15 @@ class PageService
 
             $mainData['site_id'] = $siteId;
 
+            // Store old data for comparison
             $oldPageData = null;
+            $wasPublished = false;
+            $isNowPublished = false;
+
             if ($pageId) {
                 $existingPage = $this->pageRepository->getCompletePageData($pageId);
                 if ($existingPage) {
+                    $wasPublished = $existingPage->status === 'published';
                     $oldPageData = [
                         'title' => $existingPage->title,
                         'slug' => $existingPage->slug,
@@ -82,13 +87,26 @@ class PageService
                 }
             }
 
+            // Check if status is being changed to published
+            $isNowPublished = isset($mainData['status']) && $mainData['status'] === 'published';
+
+            // Set published_at timestamp when publishing
+            if ($isNowPublished && !$wasPublished) {
+                $mainData['published_at'] = date('Y-m-d H:i:s');
+            }
+
             if ($pageId) {
                 $page = $this->pageRepository->update($pageId, $mainData);
                 if (!$page) {
                     throw new Exception("Page not found");
                 }
 
-                if ($oldPageData) {
+                // Log different types of updates
+                if ($isNowPublished && !$wasPublished) {
+                    $this->historyService->logPagePublished($page->id);
+                } elseif (!$isNowPublished && $wasPublished) {
+                    $this->historyService->logPageUnpublished($page->id);
+                } elseif ($oldPageData) {
                     $newPageData = array_merge($oldPageData, $mainData);
                     if (!empty($requestData['blocks'])) {
                         $newPageData['blocks'] = $requestData['blocks'];

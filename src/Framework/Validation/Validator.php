@@ -18,6 +18,7 @@ use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RegexRule;
 use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\RequiredWithRule;
 use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\UniqueRule;
 use App\Framework\Validation\Rules\UrlRule;
@@ -231,12 +232,14 @@ class Validator
         $ruleMap = [
             'required' => RequiredRule::class,
             'required_if' => RequiredIfRule::class,
+            'required_with' => RequiredWithRule::class,
             'unique' => UniqueRule::class,
             'max' => MaxLengthRule::class,
             'min' => MinLengthRule::class,
             'email' => EmailRule::class,
             'url' => UrlRule::class,
             'numeric' => NumericRule::class,
+            'nullable' => NumericRule::class,
             'integer' => IntegerRule::class,
             'in' => InRule::class,
             'between' => BetweenRule::class,

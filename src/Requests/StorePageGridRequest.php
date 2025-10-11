@@ -8,15 +8,15 @@ class StorePageGridRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // Adjust based on your authorization logic
+        return true;
     }
 
     public function rules(): array
     {
         return [
-            'title' => ['nullable', 'string', 'max:255'],
+            'title' => ['required', 'string', 'max:255'],
             'subtitle' => ['nullable', 'string', 'max:500'],
-            'slug' => ['nullable', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255', 'unique:page_grids,slug'],
             'layout' => ['required', 'string', 'in:grid,list,masonry'],
             'columns' => ['required', 'integer', 'min:1', 'max:6'],
             'show_excerpt' => ['boolean'],
@@ -54,10 +54,13 @@ class StorePageGridRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'title.required' => 'The title field is required.',
             'title.max' => 'The title cannot exceed 255 characters.',
             'subtitle.max' => 'The subtitle cannot exceed 500 characters.',
             'slug.unique' => 'This slug is already in use.',
+            'layout.required' => 'The layout field is required.',
             'layout.in' => 'The layout must be one of: grid, list, or masonry.',
+            'columns.required' => 'The columns field is required.',
             'columns.min' => 'Columns must be at least 1.',
             'columns.max' => 'Columns cannot exceed 6.',
             'pages.*.title.required' => 'Each page must have a title.',

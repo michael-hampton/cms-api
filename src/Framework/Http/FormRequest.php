@@ -15,8 +15,10 @@ use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
+use App\Framework\Validation\Rules\NullableRule;
 use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\RequiredWithRule;
 use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\StringRule;
 use App\Framework\Validation\Rules\UniqueRule;
@@ -277,10 +279,12 @@ abstract class FormRequest extends Request
     {
         $ruleMap = [
             'required' => RequiredRule::class,
+            'required_with' => RequiredWithRule::class, // ADD THIS LINE
             'string' => StringRule::class, // You'll need this
             'integer' => IntegerRule::class,
             'boolean' => BooleanRule::class, // You'll need this
             'max' => MaxLengthRule::class,
+            'nullable' => NullableRule::class,
             'min' => MinLengthRule::class,
             'email' => EmailRule::class,
             'exists' => ExistsRule::class, // You'll need this

@@ -207,6 +207,10 @@ class BlockParserService
         $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
 
         if (!$validationResult->isValid()) {
+            echo $blockData['type'];
+            echo '<pre>';
+            print_r($validationResult->getErrors());
+            die;
             throw new ValidationException($validationResult);
         }
     }

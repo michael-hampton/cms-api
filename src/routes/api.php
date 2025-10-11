@@ -12,6 +12,7 @@ use App\Controllers\ImageController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\PageController;
+use App\Controllers\PageGridController;
 use App\Controllers\PageHistoryController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
@@ -153,25 +154,23 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/history/{historyId}/restore',  PageHistoryController::class, 'restore');
 
 
-//        Route::prefix('page-grids')->group(function () {
-//            Route::get('/', [PageGridController::class, 'index']);
-//            Route::post('/', [PageGridController::class, 'store']);
-//            Route::get('/slug/{slug}', [PageGridController::class, 'showBySlug']);
-//            Route::get('/{id}', [PageGridController::class, 'show']);
-//            Route::put('/{id}', [PageGridController::class, 'update']);
-//            Route::delete('/{id}', [PageGridController::class, 'destroy']);
-//
-//            // Additional actions
-//            Route::post('/{id}/restore', [PageGridController::class, 'restore']);
-//            Route::delete('/{id}/force', [PageGridController::class, 'forceDestroy']);
-//            Route::post('/{id}/duplicate', [PageGridController::class, 'duplicate']);
-//            Route::post('/{id}/toggle-active', [PageGridController::class, 'toggleActive']);
-//
-//            // Page management within grid
-//            Route::post('/{id}/pages', [PageGridController::class, 'addPage']);
-//            Route::delete('/{id}/pages/{pageIndex}', [PageGridController::class, 'removePage']);
-//            Route::put('/{id}/pages/{pageIndex}', [PageGridController::class, 'updatePage']);
-//            Route::post('/{id}/pages/reorder', [PageGridController::class, 'reorderPages']);
+        $router->get('/page-grids', PageGridController::class, 'index');
+        $router->post('/page-grids', PageGridController::class, 'store');
+        $router->get('/page-grids/slug/{slug}', PageGridController::class, 'showBySlug');
+        $router->get('/page-grids/{id}', PageGridController::class, 'show');
+        $router->put('/page-grids/{id}', PageGridController::class, 'update');
+        $router->delete('/page-grids/{id}', PageGridController::class, 'destroy');
+
+        $router->post('/page-grids/{id}/restore', PageGridController::class, 'restore');
+        $router->delete('/page-grids/{id}/force', PageGridController::class, 'forceDestroy');
+        $router->post('/page-grids/{id}/duplicate', PageGridController::class, 'duplicate');
+        $router->post('/page-grids/{id}/toggle-active', PageGridController::class, 'toggleActive');
+
+        $router->post('/page-grids/{id}/pages', PageGridController::class, 'addPage');
+        $router->delete('/page-grids/{id}/pages/{pageIndex}', PageGridController::class, 'removePage');
+        $router->put('/page-grids/{id}/pages/{pageIndex}', PageGridController::class, 'updatePage');
+        $router->post('/page-grids/{id}/pages/reorder', PageGridController::class, 'reorderPages');
+
 
     });
 });

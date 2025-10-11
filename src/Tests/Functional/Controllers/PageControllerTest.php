@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\PageCategory;
+use App\Models\PageHistory;
 use App\Models\PageMetadata;
 use App\Models\PageSeo;
 use App\Models\PageSettings;
@@ -372,5 +373,144 @@ class PageControllerTest extends FunctionalTestCase
     {
         $response = $this->postForSite('/api/pages/999/duplicate');
         $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testStoreCreatesHistoryEntry()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'draft', 'author' => 1],
+                'seo' => ['meta_title' => 'Page Title', 'meta_description' => 'Description']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageId = $data['data']['page']['id'];
+
+        // Verify history entry was created
+        $history = PageHistory::where('page_id', $pageId)
+            ->where('action', 'created')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('created', $history->action);
+    }
+
+    public function testUpdateToPublishedCreatesPublishHistoryEntry()
+    {
+        $page = Page::create([
+            'title' => 'Draft Page',
+            'slug' => 'draft-page',
+            'status' => 'draft',
+            'site_id' => $this->siteId
+        ]);
+
+        $updateData = [
+            'forms' => [
+                'main' => ['title' => 'Draft Page'],
+                'meta' => ['slug' => 'draft-page', 'status' => 'published']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify publish history entry was created
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'published')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('published', $history->action);
+    }
+
+    public function testUpdateToDraftCreatesUnpublishHistoryEntry()
+    {
+        $page = Page::create([
+            'title' => 'Published Page',
+            'slug' => 'published-page',
+            'status' => 'published',
+            'site_id' => $this->siteId,
+            'published_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $updateData = [
+            'forms' => [
+                'main' => ['title' => 'Published Page'],
+                'meta' => ['slug' => 'published-page', 'status' => 'draft']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify unpublish history entry was created
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'unpublished')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('unpublished', $history->action);
+    }
+
+//    public function testDestroyCreatesDeleteHistoryEntry()
+//    {
+//        $page = Page::create([
+//            'title' => 'Test Page',
+//            'slug' => 'test-page',
+//            'status' => 'published',
+//            'site_id' => $this->siteId
+//        ]);
+//
+//        $pageId = $page->id;
+//
+//        $response = $this->deleteForSite("/api/pages/{$page->id}");
+//
+//        $this->assertEquals(200, $response->getStatusCode());
+//        $this->assertNull(Page::find($pageId));
+//
+//        // Verify delete history entry exists (even though page is deleted)
+//        $history = PageHistory::where('page_id', $pageId)
+//            ->where('action', 'deleted')
+//            ->first();
+//
+//        $this->assertNotNull($history);
+//        $this->assertEquals('deleted', $history->action);
+//    }
+
+    public function testDuplicateCreatesHistoryEntries()
+    {
+        $page = Page::create([
+            'title' => 'Original Page',
+            'slug' => 'original-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $newPageId = $data['data']['page']['id'];
+
+        // Verify duplication history entry was created for the new page
+        $history = PageHistory::where('page_id', $newPageId)
+            ->where('action', 'duplicated')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('duplicated', $history->action);
     }
 }
