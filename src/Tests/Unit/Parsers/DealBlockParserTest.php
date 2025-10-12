@@ -47,7 +47,7 @@ class DealBlockParserTest extends FunctionalTestCase
             'salePrice' => 75,
             'currency' => '£',
             'link' => 'https://example.com',
-            'image' => 'product.jpg',
+            'image' => ['src' => 'product.jpg'],
             'showDealButton' => true,
             'has_savings' => true,
             'savings' => 25,

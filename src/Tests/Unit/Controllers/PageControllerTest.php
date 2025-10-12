@@ -130,7 +130,8 @@ class PageControllerTest extends FunctionalTestCase
     public function testIndexAppliesMultipleStatusFilters()
     {
         $request = $this->createMockRequest([
-            'status' => 'published,draft'
+            'status' => 'published,draft',
+            'site_id' => '1'
         ]);
 
         $result = new PaginatedResult([], 0, 1, 20);
@@ -284,7 +285,8 @@ class PageControllerTest extends FunctionalTestCase
     {
         $request = $this->createMockRequest([
             'page' => 3,
-            'per_page' => 50
+            'per_page' => 50,
+            'site_id' => '1'
         ]);
 
         $result = new PaginatedResult([], 150, 3, 50);
@@ -459,11 +461,14 @@ class PageControllerTest extends FunctionalTestCase
             'category_id' => null,
             'page_type' => null,
             'sort_by' => null,
+            'role' => null,
+            'is_active' => null,
             'sort_order' => 'asc',
             'page' => 1,
             'per_page' => 20,
             'q' => null,
-            'search' => null
+            'search' => null,
+            'site_id' => 1
         ];
 
         $mergedParams = array_merge($defaultParams, $params);

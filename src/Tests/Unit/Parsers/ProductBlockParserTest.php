@@ -71,7 +71,7 @@ class ProductBlockParserTest extends FunctionalTestCase
             'openInNewTab' => true,
             'displayAs' => 'button',
             'linkText' => 'Get Yours',
-            'image' => '/prod.jpg',
+            'image' => ['src' => '/prod.jpg'],
             'name' => 'The Gadget',
             'brand' => 'Acme',
             'productName' => 'The Gadget',

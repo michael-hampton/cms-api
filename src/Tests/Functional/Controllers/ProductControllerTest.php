@@ -26,7 +26,8 @@ class ProductControllerTest extends FunctionalTestCase
             'name' => 'Wireless Mouse',
             'description' => 'test',
             'price' => 29.99,
-            'brand' => 'LogiTech'
+            'brand' => 'LogiTech',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite('/api/products?search=wireless');
@@ -283,6 +284,7 @@ class ProductControllerTest extends FunctionalTestCase
                 'sale_price' => 10.99,
                 'category_id' => $data['category'] ?? null,
                 'brand' => $data['brand'] ?? 'test',
+                'site_id' => $this->siteId,
             ]);
         }
 

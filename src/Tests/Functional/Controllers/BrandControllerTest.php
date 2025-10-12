@@ -9,8 +9,8 @@ class BrandControllerTest extends FunctionalTestCase
 {
     public function testIndexReturnsBrandsList()
     {
-        Brand::create(['name' => 'Apple', 'slug' => 'apple']);
-        Brand::create(['name' => 'Nike', 'slug' => 'nike']);
+        Brand::create(['name' => 'Apple', 'slug' => 'apple', 'site_id' => $this->siteId]);;
+        Brand::create(['name' => 'Nike', 'slug' => 'nike', 'site_id' => $this->siteId]);;;
 
         $response = $this->getForSite('/api/brands');
 
@@ -22,8 +22,8 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchQuery()
     {
-        Brand::create(['name' => 'Apple Inc', 'slug' => 'apple-inc']);
-        Brand::create(['name' => 'Nike Sports', 'slug' => 'nike-sports']);
+        Brand::create(['name' => 'Apple Inc', 'slug' => 'apple-inc', 'site_id' => $this->siteId]);
+        Brand::create(['name' => 'Nike Sports', 'slug' => 'nike-sports', 'site_id' => $this->siteId]);
 
         $response = $this->getForSite('/api/brands?q=apple');
 

@@ -503,8 +503,15 @@ abstract class Model
     {
         $attributes = $this->getDatabaseAttributes();
 
+        // Apply visibility rules
+        $attributes = $this->getVisibleAttributes($attributes);
+
         // Automatically include loaded relations
         foreach ($this->eagerLoaded as $relation => $data) {
+            if (!$this->shouldIncludeRelation($relation)) {
+                continue;
+            }
+
             if ($data instanceof Collection) {
                 $attributes[$relation] = $data->toArray();
             } elseif ($data instanceof Model) {
@@ -519,6 +526,96 @@ abstract class Model
         }
 
         return $attributes;
+    }
+
+    /**
+     * Get only the visible attributes based on hidden/visible configuration
+     */
+    protected function getVisibleAttributes(array $attributes): array
+    {
+        // If visible is set, only return those attributes
+        if (!empty($this->visible)) {
+            return array_intersect_key(
+                $attributes,
+                array_flip($this->visible)
+            );
+        }
+
+        // Otherwise, exclude hidden attributes
+        if (!empty($this->hidden)) {
+            return array_diff_key(
+                $attributes,
+                array_flip($this->hidden)
+            );
+        }
+
+        return $attributes;
+    }
+
+    protected function shouldIncludeRelation(string $key): bool
+    {
+        // Always include if it's in the alwaysInclude array
+        if (in_array($key, $this->alwaysInclude)) {
+            return true;
+        }
+
+        // Don't include if it's hidden and not in visible
+        if (!empty($this->visible)) {
+            return in_array($key, $this->visible);
+        }
+
+        if (in_array($key, $this->hidden)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Make an attribute visible (override hidden)
+     */
+    public function makeVisible($attributes): self
+    {
+        $attributes = is_array($attributes) ? $attributes : func_get_args();
+
+        $this->hidden = array_diff($this->hidden, $attributes);
+
+        if (!empty($this->visible)) {
+            $this->visible = array_unique(array_merge($this->visible, $attributes));
+        }
+
+        return $this;
+    }
+
+    /**
+     * Make an attribute hidden
+     */
+    public function makeHidden($attributes): self
+    {
+        $this->hidden = array_merge(
+            $this->hidden,
+            is_array($attributes) ? $attributes : func_get_args()
+        );
+
+        return $this;
+    }
+
+    /**
+     * Set the visible attributes for the model
+     */
+    public function setVisible(array $visible): self
+    {
+        $this->visible = $visible;
+        return $this;
+    }
+
+    /**
+     * Set the hidden attributes for the model
+     */
+    public function setHidden(array $hidden): self
+    {
+        $this->hidden = $hidden;
+        return $this;
     }
 
     /**
@@ -573,26 +670,6 @@ abstract class Model
         $model->original = $model->attributes;
         $model->fireModelEvent('retrieved');
         return $model;
-    }
-
-    // Override serialization methods from trait to respect model configuration
-    protected function shouldIncludeRelation(string $key): bool
-    {
-        // Always include if it's in the alwaysInclude array
-        if (in_array($key, $this->alwaysInclude)) {
-            return true;
-        }
-
-        // Don't include if it's hidden and not in visible
-        if (!empty($this->visible)) {
-            return in_array($key, $this->visible);
-        }
-
-        if (in_array($key, $this->hidden)) {
-            return false;
-        }
-
-        return true;
     }
 
     protected function getAttributesForSerialization(): array

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Framework\Authorization\Auth;
 use App\Models\Product;
 
 class CartControllerTest extends FunctionalTestCase
@@ -32,6 +33,8 @@ class CartControllerTest extends FunctionalTestCase
 
     public function testAddItemToCartSuccessfully()
     {
+        Auth::$user = null;
+
         $product = Product::create([
             'name' => 'Test Product',
             'slug' => 'test-product',

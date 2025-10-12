@@ -131,6 +131,10 @@ class BoxoutBlockParser extends BaseBlockParser
             }
             $html .= "<a href=\"{$parsedData['linkUrl']}\"{$linkAttrs} class=\"note-link\">";
             $html .= $parsedData['linkText'];
+            // ADD SPONSORED BADGE
+            if ($parsedData['sponsored']) {
+                $html .= "<span class=\"sponsored-badge\">Sponsored</span>";
+            }
             $html .= "</a>";
         }
 

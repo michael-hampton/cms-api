@@ -17,7 +17,7 @@ class HeadingBlockParser extends BaseBlockParser
 
     public function beforeValidation(array $data): array
     {
-        if (is_int($data['level'])) {
+        if (!empty($data['level']) && is_int($data['level'])) {
             $data['level'] = 'h' . $data['level'];
         }
 

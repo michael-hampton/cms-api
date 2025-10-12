@@ -457,7 +457,14 @@ class PageGridBlockParser extends BaseBlockParser
         // Image section
         if ($parsedData['showImage'] && !empty($page['image'])) {
             $html .= "<div class=\"page-image\">";
-            $html .= "<img src=\"" . htmlspecialchars($page['image']['src']) . "\" alt=\"" . htmlspecialchars($page['image']['alt'] ?: $page['title']) . "\">";
+
+            $altText = htmlspecialchars($page['image']['alt'] ?: $page['title']);
+            $titleText = htmlspecialchars($page['image']['title'] ?: $page['title']);
+
+            $html .= "<img src=\"" . htmlspecialchars($page['image']['src']) . "\" ";
+            $html .= "alt=\"{$altText}\" ";
+            $html .= "title=\"{$titleText}\" ";
+            $html .= "loading=\"lazy\">";
 
             // Badge overlay
             if (!empty($page['badge'])) {

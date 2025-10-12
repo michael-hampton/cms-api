@@ -107,18 +107,18 @@ class UserTest extends FunctionalTestCase
         $this->assertEquals(5, $this->user->site_id);
     }
 
-//    public function testPasswordIsHiddenFromArray()
-//    {
-//        $array = $this->user->toArray();
-//        $this->assertArrayNotHasKey('password', $array);
-//    }
-//
-//    public function testRememberTokenIsHiddenFromArray()
-//    {
-//        $this->user->remember_token = 'secret_token_123';
-//        $array = $this->user->toArray();
-//        $this->assertArrayNotHasKey('remember_token', $array);
-//    }
+    public function testPasswordIsHiddenFromArray()
+    {
+        $array = $this->user->toArray();
+        $this->assertArrayNotHasKey('password', $array);
+    }
+
+    public function testRememberTokenIsHiddenFromArray()
+    {
+        $this->user->remember_token = 'secret_token_123';
+        $array = $this->user->toArray();
+        $this->assertArrayNotHasKey('remember_token', $array);
+    }
 
     public function testIsActiveCastsToBoolean()
     {

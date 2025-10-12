@@ -277,12 +277,31 @@ abstract class FunctionalTestCase extends TestCase
         return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
     }
 
+    protected function getForSiteUnauthenticated(string $uri, array $headers = []): Response
+    {
+        return $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
+    }
+
     protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = []): Response
     {
         if (!empty($files)) {
             $_FILES = $files;
         }
         $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    protected function postForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $headers, $files);
 
         return new TestResponse(
             $response->getContent(),
@@ -305,9 +324,34 @@ abstract class FunctionalTestCase extends TestCase
         );
     }
 
+    protected function putForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $headers, $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
     protected function deleteForSite(string $uri, array $headers = []): Response
     {
         $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    protected function deleteForSiteUnauthenticated(string $uri, array $headers = []): Response
+    {
+        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $headers);
 
         return new TestResponse(
             $response->getContent(),

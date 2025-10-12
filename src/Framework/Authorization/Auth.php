@@ -107,6 +107,10 @@ class Auth
         if (Session::get('authenticated') === true && Session::has('user_id')) {
             $user = User::where('id', Session::get('user_id'))->first();
 
+            if (empty($user)) {
+                return null;
+            }
+
             self::$user = new AuthenticatedUser(
                 $user['id'],
                 $user['name'],

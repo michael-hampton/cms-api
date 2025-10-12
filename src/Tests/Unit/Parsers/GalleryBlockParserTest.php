@@ -83,14 +83,14 @@ class GalleryBlockParserTest extends FunctionalTestCase
             'layout' => 'carousel',
             'slides' => [
                 [
-                    'image' => '/img1.jpg',
+                    'image' => ['src' => '/img1.jpg'],
                     'formatted_title' => 'S1 Title',
                     'formatted_description' => 'S1 Desc',
                     'title' => 'S1 Title',
                     'description' => 'S1 Desc'
                 ],
                 [
-                    'image' => '/img2.jpg',
+                    'image' => ['src' => '/img2.jpg'],
                     'formatted_title' => 'S2 Title',
                     'formatted_description' => 'S2 Desc',
                     'title' => 'S2 Title',
@@ -114,7 +114,7 @@ class GalleryBlockParserTest extends FunctionalTestCase
             'layout' => 'grid',
             'slides' => [
                 [
-                    'image' => '/img1.jpg',
+                    'image' => ['src' => '/img1.jpg'],
                     'formatted_title' => 'S1 Title',
                     'formatted_description' => 'S1 Desc',
                     'formatted_caption' => 'S1 Caption',
@@ -175,7 +175,7 @@ class GalleryBlockParserTest extends FunctionalTestCase
                 [
                     'title' => 'Slide 1',
                     'description' => 'Desc',
-                    'image' => 'slide1.jpg',
+                    'image' => ['src' => 'slide1.jpg'],
                     'formatted_title' => 'Slide 1',
                     'formatted_description' => 'Desc',
                     'word_count' => 3

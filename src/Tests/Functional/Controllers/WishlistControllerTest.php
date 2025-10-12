@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Framework\Authorization\Auth;
 use App\Models\Product;
 
 class WishlistControllerTest extends FunctionalTestCase
@@ -27,6 +28,8 @@ class WishlistControllerTest extends FunctionalTestCase
 
     public function testAddItemToWishlistSuccessfully()
     {
+        Auth::$user = null;
+
         $product = Product::create([
             'name' => 'Test Product',
             'slug' => 'test-product',

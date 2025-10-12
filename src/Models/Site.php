@@ -16,6 +16,17 @@ class Site extends Model
         'favicon',
         'is_active',
         'is_default',
+        'contact_email',
+        'contact_phone',
+        'contact_address_line1',
+        'contact_address_line2',
+        'contact_city',
+        'contact_postcode',
+        'contact_country',
+        'facebook_url',
+        'instagram_url',
+        'twitter_url',
+        'linkedin_url',
         'settings'
     ];
 
@@ -168,5 +179,26 @@ class Site extends Model
     public function scopeDefault($query)
     {
         return $query->where('is_default', 1);
+    }
+
+    public function getContactInfo(): array
+    {
+        return [
+            'email' => $this->contact_email,
+            'phone' => $this->contact_phone,
+            'address' => [
+                'line1' => $this->contact_address_line1,
+                'line2' => $this->contact_address_line2,
+                'city' => $this->contact_city,
+                'postcode' => $this->contact_postcode,
+                'country' => $this->contact_country
+            ],
+            'social' => [
+                'facebook' => $this->facebook_url,
+                'instagram' => $this->instagram_url,
+                'twitter' => $this->twitter_url,
+                'linkedin' => $this->linkedin_url
+            ]
+        ];
     }
 }

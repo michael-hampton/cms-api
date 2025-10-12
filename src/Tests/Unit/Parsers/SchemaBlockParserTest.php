@@ -78,7 +78,7 @@ class SchemaBlockParserTest extends TestCase
             'schemaType' => 'how-to',
             'title' => 'Test How To',
             'formatted_description' => 'A brief guide.',
-            'image' => '/test.jpg'
+            'image' => ['src' => '/test.jpg']
         ];
         $html = $parser->generateHtml($parsedData);
 

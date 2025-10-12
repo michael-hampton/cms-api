@@ -26,6 +26,8 @@ class SearchConfigurationFactory
             ->addFilter(new RelationshipFilter('category', 'categories', 'id'))
             ->addFilter(new RelationshipFilter('tag', 'tags', 'id'));
 
+        self::applyMandatoryFilters($config);
+
         // Sorts
         $config->addSort(new SortSpecification('title', 'title'))
             ->addSort(new SortSpecification('date_created', 'created_at'))
@@ -48,6 +50,8 @@ class SearchConfigurationFactory
 
         // Filters
         $config->addFilter(new EqualsFilter('parent', 'parent_id'));
+
+        self::applyMandatoryFilters($config);
 
         // Sorts
         $config->addSort(new SortSpecification('name', 'name'))
@@ -73,6 +77,8 @@ class SearchConfigurationFactory
             ->addSort(new SortSpecification('date', 'created_at'))
             ->addSort(new SortSpecification('usage', 'usage_count'));
 
+        self::applyMandatoryFilters($config);
+
         // Searchable columns
         $config->addSearchableColumn('name')
             ->addSearchableColumn('slug');
@@ -91,6 +97,8 @@ class SearchConfigurationFactory
         $config->addSort(new SortSpecification('name', 'name'))
             ->addSort(new SortSpecification('date', 'created_at'))
             ->addSort(new SortSpecification('email', 'email'));
+
+        self::applyMandatoryFilters($config);
 
         // Searchable columns
         $config->addSearchableColumn('name')
@@ -111,6 +119,8 @@ class SearchConfigurationFactory
         $config->addFilter(new LikeFilter('query', 'filename'))
             ->addFilter(new EqualsFilter('mime_type', 'mime_type'))
             ->addFilter(new EqualsFilter('category_id', 'category_id'));
+
+        self::applyMandatoryFilters($config);
 
         // Sorts
         $config->addSort(new SortSpecification('created_at', 'created_at'))
@@ -143,6 +153,8 @@ class SearchConfigurationFactory
                 }
                 return $query;
             }));
+
+        self::applyMandatoryFilters($config);
 
         // Sorts
         $config->addSort(new SortSpecification('name', 'name'))
@@ -198,6 +210,8 @@ class SearchConfigurationFactory
             ->addSort(new SortSpecification('updated_at', 'updated_at'))
             ->addSort(new RelationshipCountSort('products', 'products'));
 
+        self::applyMandatoryFilters($config);
+
         // Searchable columns
         $config->addSearchableColumn('name')
             ->addSearchableColumn('description');
@@ -206,5 +220,11 @@ class SearchConfigurationFactory
         $config->setDefaultSort('name', 'asc');
 
         return $config;
+    }
+
+    private static function applyMandatoryFilters(SearchConfiguration $config): void
+    {
+        // Example: add a filter that applies to all configs
+        $config->addFilter(new EqualsFilter('site_id', 'site_id'));
     }
 }

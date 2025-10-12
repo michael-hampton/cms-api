@@ -2,6 +2,8 @@
 
 namespace App\Parsers;
 
+use App\Framework\Support\SiteContext;
+use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
@@ -32,12 +34,19 @@ class ContactFormBlockParser extends BaseBlockParser
             'requireEmail' => [new BooleanRule()],
             'requirePhone' => [new BooleanRule()],
             'requireSubject' => [new BooleanRule()],
-            'requireMessage' => [new BooleanRule()]
+            'requireMessage' => [new BooleanRule()],
+            'override_email' => [new EmailRule()],
+            'override_phone' => [new MaxLengthRule(50)],
+            'override_address' => [new ArrayRule()],
+            'override_social' => [new ArrayRule()]
         ];
     }
 
     public function parse(array $data): array
     {
+        $site = SiteContext::get();
+        $contactInfo = $site ? $site->getContactInfo() : $this->getDefaultContactInfo();
+
         return [
             'title' => trim($data['title'] ?? ''),
             'subtitle' => trim($data['subtitle'] ?? ''),
@@ -58,6 +67,12 @@ class ContactFormBlockParser extends BaseBlockParser
             'formatted_title' => htmlspecialchars($data['title'] ?? ''),
             'formatted_subtitle' => htmlspecialchars($data['subtitle'] ?? ''),
             'context' => $data['context'] ?? 'default',
+            'contact_info' => [
+                'email' => $data['override_email'] ?? $contactInfo['email'],
+                'phone' => $data['override_phone'] ?? $contactInfo['phone'],
+                'address' => $data['override_address'] ?? $contactInfo['address'],
+                'social' => $data['override_social'] ?? $contactInfo['social']
+            ]
         ];
     }
 
@@ -74,6 +89,8 @@ class ContactFormBlockParser extends BaseBlockParser
 
     public function generateDefaultHtml(array $parsedData): string
     {
+        $contactInfo = $parsedData['contact_info'];
+
         $html = "<section class=\"contact\">";
         $html .= "<div class=\"contact-container\">";
 
@@ -86,7 +103,11 @@ class ContactFormBlockParser extends BaseBlockParser
         $html .= "<div class=\"contact-icon\">📍</div>";
         $html .= "<div>";
         $html .= "<h4>Visit Our Studio</h4>";
-        $html .= "<p>123 Culinary Lane<br>London, SW1A 1AA</p>";
+        $html .= "<p>{$contactInfo['address']['line1']}<br>";
+        if (!empty($contactInfo['address']['line2'])) {
+            $html .= "{$contactInfo['address']['line2']}<br>";
+        }
+        $html .= "{$contactInfo['address']['city']}, {$contactInfo['address']['postcode']}</p>";
         $html .= "</div>";
         $html .= "</div>";
 
@@ -94,7 +115,7 @@ class ContactFormBlockParser extends BaseBlockParser
         $html .= "<div class=\"contact-icon\">📞</div>";
         $html .= "<div>";
         $html .= "<h4>Call Us</h4>";
-        $html .= "<p>+44 20 7123 4567<br>Mon-Fri: 9AM-6PM</p>";
+        $html .= "<p>{$contactInfo['phone']}<br>Mon-Fri: 9AM-6PM</p>";
         $html .= "</div>";
         $html .= "</div>";
 
@@ -102,15 +123,23 @@ class ContactFormBlockParser extends BaseBlockParser
         $html .= "<div class=\"contact-icon\">✉️</div>";
         $html .= "<div>";
         $html .= "<h4>Email Us</h4>";
-        $html .= "<p>hello@tastetable.com<br>recipes@tastetable.com</p>";
+        $html .= "<p>{$contactInfo['email']}</p>";
         $html .= "</div>";
         $html .= "</div>";
 
         $html .= "<div class=\"social-links\">";
-        $html .= "<a href=\"#\" class=\"social-link\">📘</a>";
-        $html .= "<a href=\"#\" class=\"social-link\">📷</a>";
-        $html .= "<a href=\"#\" class=\"social-link\">🐦</a>";
-        $html .= "<a href=\"#\" class=\"social-link\">💼</a>";
+        if (!empty($contactInfo['social']['facebook'])) {
+            $html .= "<a href=\"{$contactInfo['social']['facebook']}\" class=\"social-link\">📘</a>";
+        }
+        if (!empty($contactInfo['social']['instagram'])) {
+            $html .= "<a href=\"{$contactInfo['social']['instagram']}\" class=\"social-link\">📷</a>";
+        }
+        if (!empty($contactInfo['social']['twitter'])) {
+            $html .= "<a href=\"{$contactInfo['social']['twitter']}\" class=\"social-link\">🐦</a>";
+        }
+        if (!empty($contactInfo['social']['linkedin'])) {
+            $html .= "<a href=\"{$contactInfo['social']['linkedin']}\" class=\"social-link\">💼</a>";
+        }
         $html .= "</div>";
 
         $html .= "</div>";
@@ -235,5 +264,26 @@ class ContactFormBlockParser extends BaseBlockParser
         $html .= "</div>";
 
         return $html;
+    }
+
+    private function getDefaultContactInfo(): array
+    {
+        return [
+            'email' => 'hello@example.com',
+            'phone' => '+44 20 7123 4567',
+            'address' => [
+                'line1' => '123 Example Street',
+                'line2' => '',
+                'city' => 'London',
+                'postcode' => 'SW1A 1AA',
+                'country' => 'UK'
+            ],
+            'social' => [
+                'facebook' => '#',
+                'instagram' => '#',
+                'twitter' => '#',
+                'linkedin' => '#'
+            ]
+        ];
     }
 }

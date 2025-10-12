@@ -119,7 +119,7 @@ class BlockParserService
         return $result;
     }
 
-    public function buildBlock(int $pageId, array $blockData, int $order): string
+    public function buildBlock(int $pageId, array $blockData, int $order, bool $isPreviewMode = false): string
     {
         $this->validateBlockType($blockData);
 
@@ -130,7 +130,9 @@ class BlockParserService
             $blockData = $parser->beforeValidation($blockData);
         }
 
-        $this->validateBlockData($blockData, $parser);
+        if (!$isPreviewMode) {
+            $this->validateBlockData($blockData, $parser);
+        }
 
         $parsedData = $parser->parse($blockData);
 
@@ -210,10 +212,6 @@ class BlockParserService
         $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
 
         if (!$validationResult->isValid()) {
-            echo $blockData['type'];
-            echo '<pre>';
-            print_r($validationResult->getErrors());
-            die;
             throw new ValidationException($validationResult);
         }
     }

@@ -65,7 +65,7 @@ class BoxoutBlockParserTest extends FunctionalTestCase
         $parsedData = [
             'formatted_title' => 'Title',
             'formatted_paragraphs' => ['P1'],
-            'image' => '/img.jpg',
+            'image' => ['src' => '/img.jpg'],
             'has_image' => true
         ];
         $html = $parser->generateHtml($parsedData);

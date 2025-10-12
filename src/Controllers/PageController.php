@@ -33,6 +33,7 @@ class PageController extends Controller
     {
         try {
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+
             $result = $this->pageRepository->search($criteria);
 
             // Format blocks in the paginated data

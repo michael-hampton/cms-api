@@ -9,8 +9,8 @@ class CategoryControllerTest extends FunctionalTestCase
 {
     public function testIndexReturnsCategories()
     {
-        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
-        Category::create(['name' => 'Science', 'slug' => 'science', 'is_active' => true]);
+        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true, 'site_id' => $this->siteId]);;
+        Category::create(['name' => 'Science', 'slug' => 'science', 'is_active' => true, 'site_id' => $this->siteId]);;;
 
         $response = $this->getForSite('/api/categories');
 
@@ -23,7 +23,7 @@ class CategoryControllerTest extends FunctionalTestCase
     public function testIndexWithPagination()
     {
         for ($i = 1; $i <= 15; $i++) {
-            Category::create(['name' => "Category $i", 'slug' => "category-$i", 'is_active' => true]);
+            Category::create(['name' => "Category $i", 'slug' => "category-$i", 'is_active' => true, 'site_id' => $this->siteId]);;;
         }
 
         $response = $this->getForSite('/api/categories?page=1&per_page=10');

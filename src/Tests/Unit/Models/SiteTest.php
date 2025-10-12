@@ -415,4 +415,62 @@ class SiteTest extends FunctionalTestCase
         $result = $this->site->matchesDomain('blog.example.com');
         $this->assertIsBool($result);
     }
+
+    public function testGetContactInfo(): void
+    {
+        $site = new Site([
+            'contact_email' => 'test@example.com',
+            'contact_phone' => '+44 20 1234 5678',
+            'contact_address_line1' => '123 Test Street',
+            'contact_address_line2' => 'Suite 100',
+            'contact_city' => 'London',
+            'contact_postcode' => 'SW1A 1AA',
+            'contact_country' => 'UK',
+            'facebook_url' => 'https://facebook.com/test',
+            'instagram_url' => 'https://instagram.com/test',
+            'twitter_url' => 'https://twitter.com/test',
+            'linkedin_url' => 'https://linkedin.com/test'
+        ]);
+
+        $contactInfo = $site->getContactInfo();
+
+        $this->assertEquals('test@example.com', $contactInfo['email']);
+        $this->assertEquals('+44 20 1234 5678', $contactInfo['phone']);
+        $this->assertEquals('123 Test Street', $contactInfo['address']['line1']);
+        $this->assertEquals('Suite 100', $contactInfo['address']['line2']);
+        $this->assertEquals('London', $contactInfo['address']['city']);
+        $this->assertEquals('SW1A 1AA', $contactInfo['address']['postcode']);
+        $this->assertEquals('UK', $contactInfo['address']['country']);
+        $this->assertEquals('https://facebook.com/test', $contactInfo['social']['facebook']);
+        $this->assertEquals('https://instagram.com/test', $contactInfo['social']['instagram']);
+        $this->assertEquals('https://twitter.com/test', $contactInfo['social']['twitter']);
+        $this->assertEquals('https://linkedin.com/test', $contactInfo['social']['linkedin']);
+    }
+
+    public function testGetContactInfoWithNullValues(): void
+    {
+        $site = new Site([
+            'contact_email' => null,
+            'contact_phone' => null
+        ]);
+
+        $contactInfo = $site->getContactInfo();
+
+        $this->assertNull($contactInfo['email']);
+        $this->assertNull($contactInfo['phone']);
+        $this->assertNull($contactInfo['address']['line1']);
+    }
+
+    public function testJsonCasting(): void
+    {
+        $settings = ['theme' => 'dark', 'language' => 'en'];
+
+        $site = new Site([
+            'settings' => $settings
+        ]);
+
+        $this->assertIsArray($site->settings);
+        $this->assertEquals('dark', $site->settings['theme']);
+        $this->assertEquals('en', $site->settings['language']);
+    }
 }

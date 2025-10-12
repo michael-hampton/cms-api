@@ -29,8 +29,8 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchCriteria()
     {
-        Page::create(['title' => 'Published Page', 'slug' => 'published', 'status' => 'published']);
-        Page::create(['title' => 'Draft Page', 'slug' => 'draft', 'status' => 'draft']);
+        Page::create(['title' => 'Published Page', 'slug' => 'published', 'status' => 'published', 'site_id' => $this->siteId]);
+        Page::create(['title' => 'Draft Page', 'slug' => 'draft', 'status' => 'draft', 'site_id' => $this->siteId]);;
         $response = $this->getForSite('/api/pages?status=published');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);

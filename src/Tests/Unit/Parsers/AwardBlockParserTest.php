@@ -66,7 +66,7 @@ class AwardBlockParserTest extends FunctionalTestCase
         $parsedData = [
             'subcategory' => 'Best Value',
             'productName' => 'Item X',
-            'image' => '/award.png',
+            'image' => ['src' => '/award.png'],
             'alt' => 'Item X Award',
             'winner' => true,
             'strapline' => 'Amazing Value',

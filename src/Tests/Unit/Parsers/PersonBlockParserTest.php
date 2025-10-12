@@ -43,7 +43,7 @@ class PersonBlockParserTest extends FunctionalTestCase
             'name' => 'Jane Smith',
             'role' => 'Designer',
             'bio' => 'Creative designer',
-            'image' => 'jane.jpg',
+            'image' => ['src' => 'jane.jpg'],
             'email' => 'jane@example.com',
             'phone' => '123456',
             'formatted_name' => 'Jane Smith',

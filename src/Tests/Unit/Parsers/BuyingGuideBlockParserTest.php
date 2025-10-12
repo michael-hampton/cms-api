@@ -58,7 +58,7 @@ class BuyingGuideBlockParserTest extends FunctionalTestCase
             'subtitle' => 'Subtitle',
             'url' => 'https://example.com',
             'linkText' => 'Buy Now',
-            'image' => 'guide.jpg',
+            'image' => ['src' => 'guide.jpg'],
             'has_image' => true,
             'specs' => [['text' => 'Size', 'value' => 'Large']],
             'pros' => ['Good'],

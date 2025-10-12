@@ -150,9 +150,14 @@ class SiteContext
     /**
      * Set the current site
      */
-    public static function set(Site $site): void
+    public static function set(?Site $site): void
     {
         self::$currentSite = $site;
+
+        if(empty($site)) {
+            return;
+        }
+
         self::$resolved = true;
         self::loadSiteConfig($site);
     }

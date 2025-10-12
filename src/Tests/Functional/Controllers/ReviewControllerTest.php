@@ -12,6 +12,7 @@ class ReviewControllerTest extends FunctionalTestCase
 {
     private int $productId;
     private int $otherProductId;
+    private $user;
 
     protected function setUp(): void
     {
@@ -171,11 +172,7 @@ class ReviewControllerTest extends FunctionalTestCase
     {
        $this->clearUser();
 
-        $response = $this->postForSite("/api/products/{$this->productId}/reviews", ['rating' => 5]);
-
-        echo '<pre>';
-        print_r($response->getContent());
-        die;
+        $response = $this->postForSiteUnauthenticated("/api/products/{$this->productId}/reviews", ['rating' => 5]);
 
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -206,7 +203,7 @@ class ReviewControllerTest extends FunctionalTestCase
         ];
 
         // Act
-        $response = $this->putForSite("/api/reviews/{$review->id}", $updateData);
+        $response = $this->putForSiteUnauthenticated("/api/reviews/{$review->id}", $updateData);
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -275,7 +272,7 @@ class ReviewControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->deleteForSite("/api/reviews/{$review->id}");
+        $response = $this->deleteForSiteUnauthenticated("/api/reviews/{$review->id}");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -297,7 +294,7 @@ class ReviewControllerTest extends FunctionalTestCase
         ]);
 
         $this->clearUser();
-        $response = $this->deleteForSite("/api/reviews/{$review->id}");
+        $response = $this->deleteForSiteUnauthenticated("/api/reviews/{$review->id}");
 
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -410,7 +407,7 @@ class ReviewControllerTest extends FunctionalTestCase
         ]);
 
         // Act
-        $response = $this->getForSite("/api/products/{$this->productId}/reviews/can-review");
+        $response = $this->getForSiteUnauthenticated("/api/products/{$this->productId}/reviews/can-review");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode());
@@ -425,7 +422,7 @@ class ReviewControllerTest extends FunctionalTestCase
         $this->clearUser();
 
         // Act
-        $response = $this->getForSite("/api/products/{$this->productId}/reviews/can-review");
+        $response = $this->getForSiteUnauthenticated("/api/products/{$this->productId}/reviews/can-review");
 
         // Assert
         $this->assertEquals(200, $response->getStatusCode()); // Status 200 is used even for false outcome

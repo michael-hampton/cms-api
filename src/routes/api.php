@@ -14,6 +14,7 @@ use App\Controllers\MenuItemController;
 use App\Controllers\PageController;
 use App\Controllers\PageGridController;
 use App\Controllers\PageHistoryController;
+use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
 use App\Controllers\ReviewController;
@@ -237,4 +238,7 @@ $router->get('/api/{site}/videos', VideoController::class, 'index');
 $router->post('/api/{site}/videos', VideoController::class, 'upload');
 $router->get('/api/{site}/videos/{id}', VideoController::class, 'show');
 $router->delete('/api/{site}/videos/{id}', VideoController::class, 'delete');
+
+$router->post('/api/preview', [PreviewController::class, 'preview']);
+
 

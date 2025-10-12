@@ -16,7 +16,16 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testIndexReturnsImagesList()
     {
-        $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 6,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'site_id' => $this->siteId
+        ]);;
         $response = $this->getForSite('/api/images');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
