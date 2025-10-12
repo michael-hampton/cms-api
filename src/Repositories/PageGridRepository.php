@@ -5,12 +5,17 @@ namespace App\Repositories;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PageGrid;
+use App\Models\PageGridHistory;
 
 class PageGridRepository extends Repository
 {
     public function findBySlug(string $slug): ?PageGrid
     {
-        return $this->model->with(['creator', 'updater'])->where('slug', $slug)->first();
+        return $this->model
+            ->whereNull('deleted_at')
+            ->where('slug', $slug)
+            ->with(['creator', 'updater'])
+            ->first();
     }
 
     public function restore(int $id): bool
@@ -37,7 +42,11 @@ class PageGridRepository extends Repository
 
     public function getActive(): Collection
     {
-        return $this->model->active()->with(['creator', 'updater'])->get();
+        return $this->model
+            ->whereNull('deleted_at')
+            ->where('is_active', true)
+            ->with(['creator', 'updater'])
+            ->get();
     }
 
     public function duplicate(int $id): ?Model
@@ -85,6 +94,8 @@ class PageGridRepository extends Repository
     {
         $query = $this->model->query();
 
+        $query->whereNull('deleted_at');
+
         // Apply search filter
         if ($search) {
             $query->where(function($q) use ($search) {
@@ -108,5 +119,24 @@ class PageGridRepository extends Repository
 
         // Use parent paginate or implement pagination
         return $query->paginate($perPage, $page);
+    }
+
+    public function logHistory(int $pageGridId, string $action, ?int $userId = null, array $changes = []): void
+    {
+        PageGridHistory::create([
+            'page_grid_id' => $pageGridId,
+            'user_id' => $userId,
+            'action' => $action,
+            'changes' => json_encode($changes),
+        ]);
+    }
+
+    public function getHistory(int $pageGridId): Collection
+    {
+        $this->withoutSiteFilter();
+
+        return PageGridHistory::where('page_grid_id', $pageGridId)
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 }

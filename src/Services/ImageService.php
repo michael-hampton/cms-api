@@ -74,6 +74,7 @@ class ImageService
         $imageData = [
             'filename' => basename($relativePath),
             'original_name' => $file->getClientOriginalName(),
+            'name' => $metadata['name'] ?? $file->getClientOriginalName(),
             'file_path' => $relativePath,
             'url' => $this->publicPath . '/' . $relativePath,
             'mime_type' => $file->getMimeType(),
@@ -86,6 +87,10 @@ class ImageService
         ];
 
         $image = $this->imageRepository->create($imageData);
+
+        if (!empty($metadata['tags'])) {
+            $this->imageRepository->syncTags($image, $metadata['tags']);
+        }
 
         // Generate thumbnails for images
         if ($_ENV['APP_ENV'] !== 'testing' && $this->isImage($image->mime_type)) {
@@ -125,16 +130,21 @@ class ImageService
     public function updateImageMetadata(int $imageId, array $metadata): Image
     {
         $image = $this->imageRepository->find($imageId);
+
         if (!$image) {
             throw new Exception('Image not found');
         }
 
         // Update image
-        $image->updateMetadata($metadata);
+        $this->imageRepository->update($imageId, $metadata);
 
         // Update categories if provided
         if (!empty($metadata['categories'])) {
             $this->assignCategoriesToImage($image, $metadata['categories']);
+        }
+
+        if (!empty($metadata['tags'])) {
+            $this->imageRepository->syncTags($image, $metadata['tags']);
         }
 
         return $image;
@@ -447,6 +457,7 @@ class ImageService
         $imageData = [
             'filename' => basename($newFilePath),
             'original_name' => $metadata['original_name'] ?? $this->generateCopyName($originalImage->original_name),
+            'name' => $metadata['name'] ?? ($originalImage->name ? $originalImage->name . ' (copy)' : basename($newFilePath)),
             'file_path' => $newFilePath,
             'url' => $this->publicPath . '/' . $newFilePath,
             'mime_type' => $originalImage->mime_type,
@@ -459,6 +470,18 @@ class ImageService
         ];
 
         $newImage = $this->imageRepository->create($imageData);
+
+        if (!isset($metadata['tags'])) {
+            $originalTags = $this->imageRepository->getTagsForImage($originalImage);
+            if ($originalTags->count() > 0) {
+                $tagIds = $originalTags->map(function ($tag) {
+                    return $tag->tag_id;
+                })->toArray();
+                $this->imageRepository->syncTags($newImage, $tagIds);
+            }
+        } else {
+            $this->imageRepository->syncTags($newImage, $metadata['tags']);
+        }
 
         // Copy thumbnails if they exist
         if ($_ENV['APP_ENV'] !== 'testing' && $this->isImage($originalImage->mime_type)) {

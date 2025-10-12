@@ -258,6 +258,98 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(4, $updated->columns);
     }
 
+    public function test_can_create_page_grid_with_dates()
+    {
+        $data = [
+            'title' => 'Seasonal Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'start_date' => '2025-01-01 00:00:00',
+            'end_date' => '2025-12-31 23:59:59',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->postForSite('/api/page-grids', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertEquals($data['start_date'], $responseData['data']['start_date']);
+        $this->assertEquals($data['end_date'], $responseData['data']['end_date']);
+    }
+
+    public function test_cannot_create_page_grid_with_invalid_dates()
+    {
+        $data = [
+            'title' => 'Invalid Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'start_date' => '2025-12-31 00:00:00',
+            'end_date' => '2025-01-01 00:00:00', // End before start
+        ];
+
+        $response = $this->postForSite('/api/page-grids', $data);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_can_get_page_grid_history()
+    {
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true,
+            'pages' => [],
+            'site_id' => $this->siteId
+        ]);
+
+        // Update it to create history
+        $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'title' => 'Updated Grid'
+        ]);
+
+        $response = $this->getForSite("/api/page-grids/{$pageGrid->id}/history");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('success', $data);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertGreaterThan(0, count($data['data']));
+    }
+
+    public function test_history_tracks_page_grid_updates()
+    {
+        $pageGrid = PageGrid::create([
+            'title' => 'Original Title',
+            'slug' => 'original-title',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true,
+            'pages' => [],
+            'site_id' => $this->siteId
+        ]);
+
+        $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'title' => 'New Title',
+            'columns' => 4
+        ]);
+
+        $response = $this->getForSite("/api/page-grids/{$pageGrid->id}/history");
+
+        $data = json_decode($response->getContent(), true);
+
+        $latestHistory = $data['data'][0];
+
+        $this->assertEquals('updated', $latestHistory['action']);
+
+        $changes = json_decode($latestHistory['changes'], true);
+        $this->assertArrayHasKey('changes', $changes);
+        $this->assertEquals('Original Title', $changes['changes']['title']['old']);
+        $this->assertEquals('New Title', $changes['changes']['title']['new']);
+    }
+
     public function test_can_delete_page_grid()
     {
         $pageGrid = PageGrid::create([
@@ -345,7 +437,7 @@ class PageGridControllerTest extends FunctionalTestCase
             'layout' => 'grid',
             'columns' => 3,
             'is_active' => true,
-            'pages' => [], // FIXED
+            'pages' => [],
             'site_id' => $this->siteId
         ]);
 
@@ -362,6 +454,13 @@ class PageGridControllerTest extends FunctionalTestCase
         // Verify in database
         $duplicate = PageGrid::where('slug', 'original-grid-copy')->first();
         $this->assertNotNull($duplicate);
+
+        // Verify history was created for the duplicate
+        $historyResponse = $this->getForSite("/api/page-grids/{$duplicate->id}/history");
+        $historyData = json_decode($historyResponse->getContent(), true);
+
+        $this->assertGreaterThan(0, count($historyData['data']));
+        $this->assertEquals('created', $historyData['data'][0]['action']);
     }
 
     public function test_can_toggle_active_status()

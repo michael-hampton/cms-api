@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Framework\Database\Database;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 
@@ -12,7 +13,7 @@ class Image extends Model
     protected $fillable = [
         'filename', 'original_name', 'file_path', 'url', 'mime_type',
         'file_size', 'width', 'height', 'alt_text', 'caption',
-        'description', 'is_active', 'created_at', 'updated_at', 'site_id'
+        'description', 'is_active', 'created_at', 'updated_at', 'site_id', 'name'
     ];
 
     protected $casts = [
@@ -151,7 +152,7 @@ class Image extends Model
 
     public function updateMetadata(array $metadata): bool
     {
-        $allowedFields = ['alt_text', 'caption', 'description'];
+        $allowedFields = ['alt_text', 'caption', 'description', 'name'];
         $updateData = array_intersect_key($metadata, array_flip($allowedFields));
 
         if (empty($updateData)) {
@@ -198,5 +199,30 @@ class Image extends Model
         $data['is_image'] = $this->is_image;
 
         return $data;
+    }
+
+    public function tags(bool $relation = false)
+    {
+       return $this->hasMany(ImageTag::class, 'image_id', 'id', $relation);
+    }
+
+    public function syncTags(array $tagIds): void
+    {
+        ImageTag::where('image_id', $this->id)
+            ->delete();
+
+        if (empty($tagIds)) {
+            return;
+        }
+
+        // Prepare rows for bulk insert
+        $rows = array_map(fn($tagId) => [
+            'image_id'   => $this->id,
+            'tag_id'     => $tagId,
+            'created_at' => date('Y-m-d H:i:s'),
+        ], $tagIds);
+
+        // Insert all at once
+        ImageTag::query()->insertMany($rows);
     }
 }

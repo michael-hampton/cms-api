@@ -26,18 +26,7 @@ class SearchController extends Controller
                 'status' => 'published'
             ]);
 
-            $pages = $pages->map(function ($page) {
-                return [
-                    'id' => $page->id,
-                    'title' => $page->title,
-                    'slug' => $page->slug ?? '',
-                    'status' => $page->status ?? 'draft',
-                    'page_type' => $page->page_type ?? '',
-                    'type' => 'page'
-                ];
-            });
-
-            return $this->jsonResponse($pages->toArray());
+            return $this->jsonResponse($pages->items);
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,

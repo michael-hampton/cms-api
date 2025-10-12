@@ -82,12 +82,14 @@ class ImageControllerTest extends FunctionalTestCase
         $request = Mockery::mock(Request::class);
         $file = Mockery::mock(UploadedFile::class);
 
+        $request->shouldReceive('get')->with('name')->andReturn('Test Image');
         $request->shouldReceive('file')->with('image')->andReturn($file);
         $request->shouldReceive('get')->with('alt_text')->andReturn('Alt text');
         $request->shouldReceive('get')->with('caption')->andReturn('Caption');
         $request->shouldReceive('get')->with('description')->andReturn('Description');
         $request->shouldReceive('get')->with('categories', [])->andReturn([]);
         $request->shouldReceive('get')->with('site_id')->andReturn($this->siteId);
+        $request->shouldReceive('get')->with('tags', [])->andReturn([]);
 
         $image = Mockery::mock(Image::class);
         $image->shouldReceive('toArrayWithUsage')->andReturn(['id' => 1]);

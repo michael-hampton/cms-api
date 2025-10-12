@@ -29,6 +29,8 @@ use App\Framework\Authorization\AuthenticateWithToken;
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
     // Pages API
     $router->group(['prefix' => '{siteName}'], function ($router) {
+        $router->get('/contact-info', SiteController::class, 'getContactInfo');
+
         $router->get('/pages', PageController::class, 'index');
         $router->post('/pages', PageController::class, 'store', [AuthenticateWithToken::class]);
         $router->post('/pages/bulk-update', PageController::class, 'bulkUpdate', [AuthenticateWithToken::class]);
@@ -161,6 +163,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/page-grids/{id}', PageGridController::class, 'show');
         $router->put('/page-grids/{id}', PageGridController::class, 'update');
         $router->delete('/page-grids/{id}', PageGridController::class, 'destroy');
+        $router->get('/page-grids/{id}/history', [PageGridController::class, 'history']);
 
         $router->post('/page-grids/{id}/restore', PageGridController::class, 'restore');
         $router->delete('/page-grids/{id}/force', PageGridController::class, 'forceDestroy');

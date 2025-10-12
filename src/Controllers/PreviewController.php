@@ -37,14 +37,14 @@ class PreviewController extends Controller
 
             $page = $this->pageRepository->find($pageId);
 
-            if (empty($blocks)) {
-                $blocks = $page->blocks->toArray();
-            }
-
             if (!$page) {
                 return $this->jsonResponse([
                     'error' => 'Page not found'
                 ], 404);
+            }
+
+            if (empty($blocks)) {
+                $blocks = $page->blocks->toArray();
             }
 
             $html = $this->buildPreviewHtml($page, $blocks);
@@ -72,12 +72,16 @@ class PreviewController extends Controller
 
         foreach ($blocks as $index => $blockData) {
             try {
+
+                $blockData = isset($blockData['data']) ? array_merge(json_decode($blockData['data'], true), ['type' => $blockData['type']]) : $blockData;
+
                 $blockHtml = $this->blockParserService->buildBlock(
                     $page->id,
                     $blockData,
                     $index,
                     true
                 );
+
                 $blocksHtml .= $blockHtml;
             } catch (\Exception $e) {
                 // Include error in preview

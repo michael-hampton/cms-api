@@ -238,4 +238,104 @@ class ImageControllerTest extends FunctionalTestCase
         $response = $this->postForSite('/api/images/999/duplicate');
         $this->assertEquals(500, $response->getStatusCode());
     }
+
+    public function testStoreWithName()
+    {
+        $files = [
+            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
+        ];
+
+        $response = $this->postForSite('/api/images', [
+            'name' => 'My Custom Name',
+            'alt_text' => 'Test image'
+        ], $files);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('My Custom Name', $data['data']['image']['name']);
+    }
+
+    public function testStoreWithTags()
+    {
+        $tag1 = \App\Models\Tag::create(['name' => 'Photo', 'slug' => 'photo', 'site_id' => $this->siteId]);
+        $tag2 = \App\Models\Tag::create(['name' => 'Portrait', 'slug' => 'portrait', 'site_id' => $this->siteId]);
+
+        $files = [
+            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
+        ];
+
+        $response = $this->postForSite('/api/images', [
+            'alt_text' => 'Test',
+            'tags' => [$tag1->id, $tag2->id]
+        ], $files);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $imageId = $data['data']['image']['id'];
+
+        // Verify tags were assigned
+        $image = Image::find($imageId);
+
+        $this->assertCount(2, $image->tags());
+    }
+
+    public function testUpdateWithNameAndTags()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 6,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'name' => 'Old Name',
+            'site_id' => $this->siteId
+        ]);
+
+        $tag = \App\Models\Tag::create(['name' => 'Updated', 'slug' => 'updated', 'site_id' => $this->siteId]);
+
+        $response = $this->putForSite("/api/images/{$image->id}", [
+            'name' => 'New Name',
+            'tags' => [$tag->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('New Name', $data['data']['image']['name']);
+
+        $updatedImage = Image::find($image->id);
+        $this->assertCount(1, $updatedImage->tags());
+    }
+
+    public function testDuplicateCopiesNameAndTags()
+    {
+        $this->createTempUploadFile('test.jpg');
+
+        $tag = \App\Models\Tag::create(['name' => 'Original', 'slug' => 'original', 'site_id' => $this->siteId]);
+
+        $original = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => 'uploads_test/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'name' => 'Original Name',
+            'site_id' => $this->siteId
+        ]);
+
+        $original->syncTags([$tag->id]);
+
+        $response = $this->postForSite("/api/images/{$original->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('copy', strtolower($data['data']['image']['name']));
+
+        $duplicateId = $data['data']['image']['id'];
+        $duplicate = Image::find($duplicateId);
+        $this->assertCount(1, $duplicate->tags());
+    }
 }

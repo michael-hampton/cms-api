@@ -44,11 +44,13 @@ class ImageController extends Controller
             }
 
             $metadata = [
+                'name' => $request->get('name'),
                 'alt_text' => $request->get('alt_text'),
                 'caption' => $request->get('caption'),
                 'description' => $request->get('description'),
                 'categories' => $request->get('categories', []),
                 'site_id' => $request->get('site_id'),
+                'tags' => $request->get('tags', [])
             ];
 
             $image = $this->imageService->uploadImage($file, $metadata);
@@ -91,10 +93,12 @@ class ImageController extends Controller
     {
         try {
             $metadata = [
+                'name' => $request->get('name'),
                 'alt_text' => $request->get('alt_text'),
                 'caption' => $request->get('caption'),
                 'description' => $request->get('description'),
-                'categories' => $request->get('categories', [])
+                'categories' => $request->get('categories', []),
+                'tags' => $request->get('tags')
             ];
 
             // Remove null values
@@ -317,12 +321,14 @@ class ImageController extends Controller
     {
         try {
             $metadata = [
+                'name' => $request->get('name'),
                 'alt_text' => $request->get('alt_text'),
                 'caption' => $request->get('caption'),
                 'description' => $request->get('description'),
                 'original_name' => $request->get('original_name'),
                 'categories' => $request->get('categories', []),
                 'site_id' => $request->get('site_id'),
+                'tags' => $request->get('tags')
             ];
 
             // Remove null values

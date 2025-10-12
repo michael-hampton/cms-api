@@ -77,7 +77,17 @@ class PageGridService
                 $data['pages'] = [];
             }
 
-            return $this->repository->create($data);
+            if (!empty($data['start_date']) && !empty($data['end_date'])) {
+                if (strtotime($data['start_date']) > strtotime($data['end_date'])) {
+                    throw new \Exception('Start date must be before end date');
+                }
+            }
+
+            $pageGrid = $this->repository->create($data);
+
+            $this->logHistory($pageGrid->id, 'created', ['data' => $data]);
+
+            return $pageGrid;
         });
     }
 
@@ -90,6 +100,8 @@ class PageGridService
                 throw new \Exception('Page grid not found');
             }
 
+            $changes = $this->detectChanges($pageGrid, $data);
+
             // Update slug if title changed and slug not provided
             if (isset($data['title']) && !isset($data['slug']) && $data['title'] !== $pageGrid->title) {
                 $data['slug'] = $this->generateUniqueSlug($data['title'], $id);
@@ -100,11 +112,49 @@ class PageGridService
                 $data['updated_by'] = $this->authenticationService->getUserId();
             }
 
+            if (!empty($data['start_date']) && !empty($data['end_date'])) {
+                if (strtotime($data['start_date']) > strtotime($data['end_date'])) {
+                    throw new \Exception('Start date must be before end date');
+                }
+            }
+
             $this->repository->update($id, $data);
 
-            // FIXED: Return fresh model instance to get updated data
+            if (!empty($changes)) {
+                $this->logHistory($id, 'updated', ['changes' => $changes]);
+            }
+
             return $this->repository->find($id);
         });
+    }
+
+    private function logHistory(int $pageGridId, string $action, array $changes = []): void
+    {
+        $userId = $this->authenticationService->check() ? $this->authenticationService->getUserId() : null;
+
+        $this->repository->logHistory($pageGridId, $action, $userId, $changes);
+    }
+
+    private function detectChanges($pageGrid, array $newData): array
+    {
+        $changes = [];
+        $fields = ['title', 'subtitle', 'layout', 'columns', 'is_active', 'start_date', 'end_date', 'pages'];
+
+        foreach ($fields as $field) {
+            if (isset($newData[$field]) && $pageGrid->$field != $newData[$field]) {
+                $changes[$field] = [
+                    'old' => $pageGrid->$field,
+                    'new' => $newData[$field]
+                ];
+            }
+        }
+
+        return $changes;
+    }
+
+    public function getHistory(int $pageGridId): Collection
+    {
+       return $this->repository->getHistory($pageGridId);
     }
 
     public function deletePageGrid(int $id): bool
@@ -125,10 +175,25 @@ class PageGridService
     public function duplicatePageGrid(int $id): ?PageGrid
     {
         return $this->database->transaction(function () use ($id) {
+            $original = $this->repository->find($id);
+
+            if (!$original) {
+                throw new \Exception('Page grid not found');
+            }
+
             $duplicate = $this->repository->duplicate($id);
 
-            if ($duplicate && $this->authenticationService->check()) {
-                $duplicate->update(['created_by' => $this->authenticationService->getUserId()]);
+            if ($duplicate) {
+                // Set creator if authenticated
+                if ($this->authenticationService->check()) {
+                    $duplicate->update(['created_by' => $this->authenticationService->getUserId()]);
+                }
+
+                // Log history for the duplicate
+                $this->logHistory($duplicate->id, 'created', [
+                    'data' => $duplicate->toArray(),
+                    'duplicated_from' => $original->id
+                ]);
             }
 
             return $duplicate;

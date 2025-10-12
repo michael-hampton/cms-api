@@ -392,4 +392,18 @@ class PageGridController extends Controller
             ], 500);
         }
     }
+
+    public function history(Request $request, int $id): JsonResponse
+    {
+        try {
+            $history = $this->pageGridService->getHistory($id);
+
+            return $this->jsonResponse($history->toArray());
+        } catch (\Exception $e) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

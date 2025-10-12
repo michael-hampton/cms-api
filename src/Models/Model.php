@@ -1216,7 +1216,7 @@ abstract class Model
     public static function query(): QueryBuilder
     {
         $instance = new static();
-        return (new QueryBuilder($instance->table, $instance->relationManager, $instance->database));
+        return $instance->newQuery();
     }
 
     public function newQuery(): QueryBuilder

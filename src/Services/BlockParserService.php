@@ -216,20 +216,6 @@ class BlockParserService
         }
     }
 
-//    private function executeInTransaction(callable $callback)
-//    {
-//        $this->database->beginTransaction();
-//
-//        try {
-//            $result = $callback();
-//            $this->database->commit();
-//            return $result;
-//        } catch (Exception $e) {
-//            $this->database->rollBack();
-//            throw $e;
-//        }
-//    }
-
     private function formatValidationError(ValidationException $e): array
     {
         return [

@@ -91,9 +91,16 @@ class PageGridServiceTest extends FunctionalTestCase
 
         $this->repositoryMock->expects('slugExists')->with('test-grid', null)->once()->andReturn(false);
 
-        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->authenticationService->shouldReceive('check')->andReturn(true);
 
-        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'test-grid']));
+        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'test-grid', 'id' => 1]));
+
+        $this->authenticationService->shouldReceive('getUserId')->andReturn(1);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->with(1, 'created', 1, Mockery::type('array'))
+            ->andReturn(true);
 
         $this->repositoryMock
             ->shouldReceive('create')
@@ -127,7 +134,12 @@ class PageGridServiceTest extends FunctionalTestCase
             ->with(Mockery::on(function ($arg) use ($user) {
                 return $arg['created_by'] === $user->id;
             }))
-            ->andReturn(new PageGrid($data));
+            ->andReturn(new PageGrid(array_merge($data, ['id' => 1])));;
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->with(1, 'created', $user->id, Mockery::type('array'))
+            ->andReturn(true);
 
         $result = $this->service->createPageGrid($data);
 
@@ -194,6 +206,12 @@ class PageGridServiceTest extends FunctionalTestCase
         $duplicate = new PageGrid(['id' => 2, 'title' => 'Original (Copy)']);
 
         $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($original);
+
+        $this->repositoryMock
             ->shouldReceive('duplicate')
             ->with(1)
             ->once()
@@ -201,10 +219,62 @@ class PageGridServiceTest extends FunctionalTestCase
 
         $this->authenticationService->shouldReceive('check')->andReturn(false);
 
+        // Expect history to be logged
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->with(2, 'created', null, Mockery::on(function($arg) {
+                return isset($arg['data']) && isset($arg['duplicated_from']) && $arg['duplicated_from'] === 1;
+            }))
+            ->andReturn(true);
+
         $result = $this->service->duplicatePageGrid(1);
 
         $this->assertInstanceOf(PageGrid::class, $result);
         $this->assertEquals('Original (Copy)', $result->title);
+    }
+
+    public function testDuplicatePageGridWithAuthenticatedUser()
+    {
+        $user = $this->createUser();
+        $original = new PageGrid(['id' => 1, 'title' => 'Original']);
+        $duplicate = Mockery::mock(PageGrid::class)->makePartial();
+        $duplicate->id = 2;
+        $duplicate->title = 'Original (Copy)';
+
+        $this->authenticationService->shouldReceive('check')->andReturn(true);
+        $this->authenticationService->shouldReceive('getUserId')->andReturn($user->id);
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($original);
+
+        $this->repositoryMock
+            ->shouldReceive('duplicate')
+            ->with(1)
+            ->once()
+            ->andReturn($duplicate);
+
+        $duplicate->shouldReceive('update')
+            ->with(['created_by' => $user->id])
+            ->once()
+            ->andReturn(true);
+
+        $duplicate->shouldReceive('toArray')
+            ->once()
+            ->andReturn(['id' => 2, 'title' => 'Original (Copy)']);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->with(2, 'created', $user->id, Mockery::on(function($arg) {
+                return isset($arg['data']) && isset($arg['duplicated_from']) && $arg['duplicated_from'] === 1;
+            }))
+            ->andReturn(true);
+
+        $result = $this->service->duplicatePageGrid(1);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
     }
 
     public function testAddPageToGrid()
@@ -272,6 +342,56 @@ class PageGridServiceTest extends FunctionalTestCase
         $result = $this->service->toggleActive(1);
 
         $this->assertFalse($result->is_active);
+    }
+
+    public function testCreatePageGridWithDates()
+    {
+        $data = [
+            'title' => 'Seasonal Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'start_date' => '2025-01-01 00:00:00',
+            'end_date' => '2025-12-31 23:59:59'
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->with(1, 'created', null, Mockery::type('array'))
+            ->andReturn(true);
+
+        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'seasonal-grid', 'id' => 1]));
+
+        $this->repositoryMock
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertEquals('2025-01-01 00:00:00', $result->start_date->format('Y-m-d H:i:s'));
+        $this->assertEquals('2025-12-31 23:59:59', $result->end_date->format('Y-m-d H:i:s'));;
+    }
+
+    public function testCreatePageGridRejectsInvalidDates()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Start date must be before end date');
+
+        $data = [
+            'title' => 'Invalid Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'start_date' => '2025-12-31 00:00:00',
+            'end_date' => '2025-01-01 00:00:00'
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $this->service->createPageGrid($data);
     }
 
     private function createUser()

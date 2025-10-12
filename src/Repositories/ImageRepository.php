@@ -186,4 +186,14 @@ class ImageRepository extends Repository
     {
         return $image->categories();
     }
+
+    public function syncTags(Image $image, array $tagIds): void
+    {
+        $image->syncTags($tagIds);
+    }
+
+    public function getTagsForImage(Image $image): Collection
+    {
+        return $image->tags();
+    }
 }

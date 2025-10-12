@@ -7,6 +7,8 @@ use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
 use App\Models\Image;
 use App\Models\ImageCategory;
+use App\Models\ImageTag;
+use App\Models\Tag;
 use App\Repositories\ImageRepository;
 use App\Services\ImageService;
 use App\Services\ImageUploadService;
@@ -407,7 +409,12 @@ class ImageServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($newImage);
 
-        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+        $this->imageRepository->shouldReceive('getCategoriesForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
+        $this->imageRepository->shouldReceive('getTagsForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
         $result = $this->service->duplicateImage(1);
 
@@ -454,7 +461,13 @@ class ImageServiceTest extends FunctionalTestCase
             }))
             ->andReturn($newImage);
 
-        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+        $this->imageRepository->shouldReceive('getCategoriesForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
+
+        $this->imageRepository->shouldReceive('getTagsForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
 
         $result = $this->service->duplicateImage(1);
@@ -486,8 +499,13 @@ class ImageServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($originalImage);
 
-        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+        $this->imageRepository->shouldReceive('getCategoriesForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
+        $this->imageRepository->shouldReceive('getTagsForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
         $this->imageUploadService->shouldReceive('duplicate')
             ->andReturn('images/test-copy.jpg');
@@ -522,8 +540,13 @@ class ImageServiceTest extends FunctionalTestCase
 
         $categoriesCollection = Mockery::mock(Collection::class, [[$category1, $category2]]);
 
-        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn($categoriesCollection);
+        $this->imageRepository->shouldReceive('getCategoriesForImage')
+            ->with($originalImage)
+            ->andReturn($categoriesCollection);
 
+        $this->imageRepository->shouldReceive('getTagsForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
         $categoriesCollection->shouldReceive('count')->andReturn(2)->once();
         $categoriesCollection->shouldReceive('pluck')
@@ -592,8 +615,13 @@ class ImageServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($originalImage);
 
-        $this->imageRepository->shouldReceive('getCategoriesForImage')->with($originalImage)->andReturn(collect([]));
+        $this->imageRepository->shouldReceive('getCategoriesForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
+        $this->imageRepository->shouldReceive('getTagsForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
 
         $this->imageUploadService->shouldReceive('duplicate')
             ->once()
@@ -605,6 +633,123 @@ class ImageServiceTest extends FunctionalTestCase
         $this->imageRepository->shouldReceive('create')
             ->once()
             ->andReturn($newImage);
+
+        $result = $this->service->duplicateImage(1);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testUploadImageWithName()
+    {
+        $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('isValid')->andReturn(true);
+        $file->shouldReceive('getSize')->andReturn(1024);
+        $file->shouldReceive('getMimeType')->andReturn('image/jpeg');
+        $file->shouldReceive('getClientOriginalName')->andReturn('test.jpg');
+
+        $this->imageUploadService->shouldReceive('uploadToPath')
+            ->once()
+            ->andReturn('images/2025-01-04/test.jpg');
+
+        $image = Mockery::mock(Image::class)->makePartial();
+        $image->id = 1;
+        $image->mime_type = 'image/jpeg';
+        $image->file_path = 'images/2025-01-04/test.jpg';
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['name'] === 'Custom Name';
+            }))
+            ->andReturn($image);
+
+        $this->imageRepository->shouldReceive('syncTags')
+            ->once()
+            ->with($image, [1, 2]);
+
+        $result = $this->service->uploadImage($file, [
+            'name' => 'Custom Name',
+            'tags' => [1, 2]
+        ]);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testUpdateMetadataWithNameAndTags()
+    {
+        $image = Mockery::mock(Image::class)->makePartial();
+        $image->id = 1;
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($image);
+
+        $updateData = [
+            'name' => 'Updated Name',
+            'tags' => [3, 4]
+        ];
+
+        $this->imageRepository->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function($data) {
+                return $data['name'] === 'Updated Name';
+            }));
+
+        $this->imageRepository->shouldReceive('syncTags')
+            ->once()
+            ->with($image, [3, 4]);
+
+        $result = $this->service->updateImageMetadata(1, $updateData);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testDuplicateImageCopiesNameAndTags()
+    {
+        $tag1 = new ImageTag(['tag_id' => 1, 'name' => 'Tag 1']);
+        $tag2 = new ImageTag(['tag_id' => 2, 'name' => 'Tag 2']);
+
+        $originalImage = Mockery::mock(Image::class)->makePartial();
+        $originalImage->id = 1;
+        $originalImage->file_path = 'images/test.jpg';
+        $originalImage->original_name = 'test.jpg';
+        $originalImage->name = 'Original Name';
+        $originalImage->mime_type = 'image/jpeg';
+        $originalImage->file_size = 1024;
+
+        $tagsCollection = collect([$tag1, $tag2]);
+
+        $this->imageRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($originalImage);
+
+        $this->imageRepository->shouldReceive('getTagsForImage')
+            ->with($originalImage)
+            ->andReturn($tagsCollection);
+
+        $this->imageRepository->shouldReceive('getCategoriesForImage')
+            ->with($originalImage)
+            ->andReturn(collect([]));
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->andReturn('images/test-copy.jpg');
+
+        $newImage = Mockery::mock(Image::class)->makePartial();
+        $newImage->id = 2;
+        $newImage->mime_type = 'image/jpeg';
+        $newImage->file_path = 'images/test-copy.jpg';
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['name'] === 'Original Name (copy)';
+            }))
+            ->andReturn($newImage);
+
+        $this->imageRepository->shouldReceive('syncTags')
+            ->once()
+            ->with($newImage, [1, 2]);
 
         $result = $this->service->duplicateImage(1);
 
