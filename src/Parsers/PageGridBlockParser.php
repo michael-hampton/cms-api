@@ -23,6 +23,9 @@ class PageGridBlockParser extends BaseBlockParser
     public function getValidationRules(): array
     {
         return [
+            'pages.*.meta' => [
+                new ArrayRule()
+            ],
             'title' => [
                 new MaxLengthRule(255)
             ],
@@ -126,6 +129,7 @@ class PageGridBlockParser extends BaseBlockParser
         foreach ($pages as $page) {
             $cleanPage = [
                 'title' => trim($page['title'] ?? ''),
+                'meta' => $this->parseMeta($page['meta'] ?? null),
                 'formatted_title' => htmlspecialchars($page['title'] ?? ''),
                 'slug' => trim($page['slug'] ?? ''),
                 'excerpt' => trim($page['excerpt'] ?? ''),
@@ -162,6 +166,33 @@ class PageGridBlockParser extends BaseBlockParser
             'total_features' => $this->countTotalFeatures($cleanPages),
             'grid_class' => $this->buildGridClass($data['layout'] ?? 'grid', (int)($data['columns'] ?? 3))
         ];
+    }
+
+    private function parseMeta(?array $meta): ?array
+    {
+        if (empty($meta)) {
+            return null;
+        }
+
+        $cleanMeta = [];
+
+        if (!empty($meta['date'])) {
+            $cleanMeta['date'] = trim($meta['date']);
+        }
+
+        if (!empty($meta['author'])) {
+            $cleanMeta['author'] = trim($meta['author']);
+        }
+
+        if (!empty($meta['category'])) {
+            $cleanMeta['category'] = trim($meta['category']);
+        }
+
+        if (!empty($meta['readTime'])) {
+            $cleanMeta['readTime'] = trim($meta['readTime']);
+        }
+
+        return !empty($cleanMeta) ? $cleanMeta : null;
     }
 
     private function parseImage(?array $image): ?array
@@ -344,6 +375,28 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "<h2 class=\"page-grid-title\">{$parsedData['formatted_title']}</h2>";
         }
 
+        if (!empty($page['meta'])) {
+            $html .= "<div class=\"page-card-meta\">";
+
+            if (!empty($page['meta']['date'])) {
+                $html .= "<span class=\"page-card-meta-item\">" . htmlspecialchars($page['meta']['date']) . "</span>";
+            }
+
+            if (!empty($page['meta']['author'])) {
+                $html .= "<span class=\"page-card-meta-item\">" . htmlspecialchars($page['meta']['author']) . "</span>";
+            }
+
+            if (!empty($page['meta']['category'])) {
+                $html .= "<span class=\"page-card-meta-item\">" . htmlspecialchars($page['meta']['category']) . "</span>";
+            }
+
+            if (!empty($page['meta']['readTime'])) {
+                $html .= "<span class=\"page-card-meta-item\">" . htmlspecialchars($page['meta']['readTime']) . "</span>";
+            }
+
+            $html .= "</div>";
+        }
+
         if (!empty($parsedData['subtitle'])) {
             $html .= "<p class=\"page-grid-subtitle\">{$parsedData['formatted_subtitle']}</p>";
         }
@@ -486,6 +539,29 @@ class PageGridBlockParser extends BaseBlockParser
         $html .= "<h3 class=\"page-title\">";
         $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
         $html .= "</h3>";
+
+        // Meta information
+        if (!empty($page['meta'])) {
+            $html .= "<div class=\"page-meta\">";
+
+            if (!empty($page['meta']['date'])) {
+                $html .= "<span class=\"page-meta-item page-meta-date\">📅 " . htmlspecialchars($page['meta']['date']) . "</span>";
+            }
+
+            if (!empty($page['meta']['author'])) {
+                $html .= "<span class=\"page-meta-item page-meta-author\">✍️ " . htmlspecialchars($page['meta']['author']) . "</span>";
+            }
+
+            if (!empty($page['meta']['category'])) {
+                $html .= "<span class=\"page-meta-item page-meta-category\">🏷️ " . htmlspecialchars($page['meta']['category']) . "</span>";
+            }
+
+            if (!empty($page['meta']['readTime'])) {
+                $html .= "<span class=\"page-meta-item page-meta-read-time\">⏱️ " . htmlspecialchars($page['meta']['readTime']) . "</span>";
+            }
+
+            $html .= "</div>";
+        }
 
         // Location
         if (!empty($page['location'])) {

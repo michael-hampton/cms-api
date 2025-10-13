@@ -3,6 +3,7 @@
 
 namespace App\Parsers;
 
+use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
@@ -38,7 +39,7 @@ class EventBlockParser extends BaseBlockParser
             'organizerEmail' => [new EmailRule()],
             'organizerPhone' => [new MaxLengthRule(20)],
             'category' => [new MaxLengthRule(100)],
-            'image' => [new UrlRule()],
+            'image' => [new ArrayRule()],
             'showSignupForm' => [new BooleanRule()],
             'featured' => [new BooleanRule()]
         ];

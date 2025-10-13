@@ -175,6 +175,31 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/page-grids/{id}/pages/{pageIndex}', PageGridController::class, 'updatePage');
         $router->post('/page-grids/{id}/pages/reorder', PageGridController::class, 'reorderPages');
 
+        $router->get('/sites', [SiteController::class, 'index']);
+        $router->get('/sites/current', [SiteController::class, 'getCurrent']);
+        $router->get('/sites/{id}', [SiteController::class, 'show']);
+        $router->post('/sites', [SiteController::class, 'create']);
+        $router->put('/sites/{id}', [SiteController::class, 'update']);
+        $router->put('/sites/current', [SiteController::class, 'updateCurrent']);
+        $router->delete('/sites/{id}', [SiteController::class, 'delete']);
+
+// Contact Info Routes
+        $router->get('/sites/contact', [SiteController::class, 'getContactInfo']);
+        $router->put('/sites/contact', [SiteController::class, 'updateContactInfo']);
+
+// Social Media Routes
+        $router->put('/sites/social', [SiteController::class, 'updateSocialMedia']);
+
+// Branding Routes
+        $router->post('/sites/logo', [SiteController::class, 'uploadLogo']);
+        $router->post('/sites/favicon', [SiteController::class, 'uploadFavicon']);
+
+// Settings Routes
+        $router->put('/sites/settings', [SiteController::class, 'updateSettings']);
+
+// Status Routes
+        $router->put('/sites/{id}/status', [SiteController::class, 'toggleStatus']);
+
 
     });
 });
@@ -243,5 +268,6 @@ $router->get('/api/{site}/videos/{id}', VideoController::class, 'show');
 $router->delete('/api/{site}/videos/{id}', VideoController::class, 'delete');
 
 $router->post('/api/preview', [PreviewController::class, 'preview']);
+
 
 

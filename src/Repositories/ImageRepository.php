@@ -24,7 +24,7 @@ class ImageRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Image::active();
+        $query = Image::active()->with(['tags', 'tags.tag']);
         return $this->searchEngine->search($query, $criteria);
     }
 

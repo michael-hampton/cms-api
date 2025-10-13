@@ -85,10 +85,19 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesMetadata()
     {
-        $image = Image::create(['url' => 'test', 'file_size' => 6, 'filename' => 'test.jpg', 'file_path' => '/uploads/test.jpg', 'size' => 1024, 'mime_type' => 'image/jpeg', 'original_name' => 'test.jpg']);;
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 6,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg'
+        ]);;
         $response = $this->putForSite("/api/images/{$image->id}", ['alt_text' => 'Updated alt', 'caption' => 'New caption']);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
+
         $this->assertEquals('Updated alt', $data['data']['image']['alt_text']);
     }
 

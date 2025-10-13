@@ -13,7 +13,7 @@ class Image extends Model
     protected $fillable = [
         'filename', 'original_name', 'file_path', 'url', 'mime_type',
         'file_size', 'width', 'height', 'alt_text', 'caption',
-        'description', 'is_active', 'created_at', 'updated_at', 'site_id', 'name'
+        'description', 'is_active', 'created_at', 'updated_at', 'site_id', 'name', 'credit'
     ];
 
     protected $casts = [

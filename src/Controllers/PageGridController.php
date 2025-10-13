@@ -41,7 +41,10 @@ class PageGridController extends Controller
 
             return $this->resourceResponse([
                 'success' => true,
-                'data' => $pageGrids['data'] ?? $pageGrids, // Handle both formats
+                'data' => $pageGrids['data']->map(fn($item) => [
+                    ...$item->toArray(),
+                    'pages' => $item->pages ?? [],
+                ]), // Handle both formats
                 'pagination' => $pageGrids['pagination'] ?? null,
             ]);
         } catch (\Exception $e) {

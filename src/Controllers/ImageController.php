@@ -45,6 +45,7 @@ class ImageController extends Controller
 
             $metadata = [
                 'name' => $request->get('name'),
+                'credit' => $request->get('credit'),
                 'alt_text' => $request->get('alt_text'),
                 'caption' => $request->get('caption'),
                 'description' => $request->get('description'),
@@ -94,11 +95,13 @@ class ImageController extends Controller
         try {
             $metadata = [
                 'name' => $request->get('name'),
+                'credit' => $request->get('credit'),
                 'alt_text' => $request->get('alt_text'),
                 'caption' => $request->get('caption'),
                 'description' => $request->get('description'),
                 'categories' => $request->get('categories', []),
-                'tags' => $request->get('tags')
+                'site_id' => $request->get('site_id'),
+                'tags' => $request->get('tags', [])
             ];
 
             // Remove null values

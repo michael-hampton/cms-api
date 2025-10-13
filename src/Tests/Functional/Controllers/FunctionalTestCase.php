@@ -73,7 +73,7 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function ensureSiteExists() {
         $sites = Site::all();
-        $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site']);
+        $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
         $this->siteSlug = $site->slug;
         $this->siteId = $site->id;
     }

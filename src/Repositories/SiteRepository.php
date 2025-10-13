@@ -42,4 +42,59 @@ class SiteRepository
     {
         return $this->update($id, $contactData);
     }
+
+    public function create(array $data): Site
+    {
+        $site = new Site($data);
+        $site->save();
+        return $site;
+    }
+
+    public function delete(int $id): bool
+    {
+        $site = $this->find($id);
+
+        if (!$site) {
+            throw new \Exception("Site not found");
+        }
+
+        return $site->delete();
+    }
+
+    public function findAll(): array
+    {
+        return Site::all()->toArray();
+    }
+
+    public function findActive(): array
+    {
+        return Site::active()->get()->toArray();
+    }
+
+    public function findDefault(): ?Site
+    {
+        return Site::default()->first();
+    }
+
+    public function existsByDomain(string $domain, ?int $excludeId = null): bool
+    {
+        $query = Site::where('domain', $domain);
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
+    public function existsBySlug(string $slug, ?int $excludeId = null): bool
+    {
+        $query = Site::where('slug', $slug);
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
 }

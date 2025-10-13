@@ -11,6 +11,7 @@ use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\Validator;
 use App\Models\Image;
 use App\Models\ImageCategory;
+use App\Models\Model;
 use App\Models\Site;
 use App\Repositories\ImageRepository;
 use App\Search\PaginatedResult;
@@ -75,6 +76,7 @@ class ImageService
             'filename' => basename($relativePath),
             'original_name' => $file->getClientOriginalName(),
             'name' => $metadata['name'] ?? $file->getClientOriginalName(),
+            'credit' => $metadata['credit'] ?? null,
             'file_path' => $relativePath,
             'url' => $this->publicPath . '/' . $relativePath,
             'mime_type' => $file->getMimeType(),
@@ -127,7 +129,7 @@ class ImageService
         return $this->imageRepository->find($id);
     }
 
-    public function updateImageMetadata(int $imageId, array $metadata): Image
+    public function updateImageMetadata(int $imageId, array $metadata): Model
     {
         $image = $this->imageRepository->find($imageId);
 
@@ -147,7 +149,7 @@ class ImageService
             $this->imageRepository->syncTags($image, $metadata['tags']);
         }
 
-        return $image;
+        return $image->fresh();
     }
 
     public function deleteImage(int $imageId, bool $hardDelete = false): bool

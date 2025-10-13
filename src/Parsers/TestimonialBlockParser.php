@@ -132,7 +132,7 @@ class TestimonialBlockParser extends BaseBlockParser
 
             if (!empty($testimonial['image'])) {
                 $html .= "<div class=\"testimonial-image\">";
-                $html .= "<img src=\"{$testimonial['image']}\" alt=\"{$testimonial['formatted_author']}\">";
+                $html .= "<img src=\"{$testimonial['image']['src']}\" alt=\"{$testimonial['formatted_author']}\">";
                 $html .= "</div>";
             }
 
