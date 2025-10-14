@@ -67,6 +67,10 @@ class ImageServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($image);
 
+        $this->imageRepository->shouldReceive('syncTags')
+            ->once()
+            ->with($image, []);
+
         $result = $this->service->uploadImage($file);
 
         $this->assertInstanceOf(Image::class, $result);
@@ -92,6 +96,10 @@ class ImageServiceTest extends FunctionalTestCase
 
         // Should NOT call ensureDirectoryExists for SVG
         $this->imageUploadService->shouldNotReceive('ensureDirectoryExists');
+
+        $this->imageRepository->shouldReceive('syncTags')
+            ->once()
+            ->with($image, []);
 
         $this->imageRepository->shouldReceive('create')
             ->once()
@@ -700,6 +708,8 @@ class ImageServiceTest extends FunctionalTestCase
             ->once()
             ->with($image, [3, 4]);
 
+        $image->expects('fresh')->once()->andReturn($image);
+
         $result = $this->service->updateImageMetadata(1, $updateData);
 
         $this->assertInstanceOf(Image::class, $result);
@@ -754,5 +764,55 @@ class ImageServiceTest extends FunctionalTestCase
         $result = $this->service->duplicateImage(1);
 
         $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testUploadImageWithImageRights()
+    {
+        $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('isValid')->andReturn(true);
+        $file->shouldReceive('getSize')->andReturn(1024);
+        $file->shouldReceive('getMimeType')->andReturn('image/jpeg');
+        $file->shouldReceive('getClientOriginalName')->andReturn('test.jpg');
+
+        $this->imageUploadService->shouldReceive('uploadToPath')
+            ->once()
+            ->andReturn('images/2025-01-04/test.jpg');
+
+        $image = Mockery::mock(Image::class)->makePartial();
+        $image->id = 1;
+        $image->mime_type = 'image/jpeg';
+        $image->file_path = 'images/2025-01-04/test.jpg';
+
+        $this->imageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['image_rights'] === 'royalty_free';
+            }))
+            ->andReturn($image);
+
+        $this->imageRepository->shouldReceive('syncTags')
+            ->once();
+
+        $result = $this->service->uploadImage($file, [
+            'image_rights' => 'royalty_free',
+            'tags' => []
+        ]);
+
+        $this->assertInstanceOf(Image::class, $result);
+    }
+
+    public function testUploadImageWithInvalidImageRights()
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid image rights');
+
+        $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('isValid')->andReturn(true);
+        $file->shouldReceive('getSize')->andReturn(1024);
+        $file->shouldReceive('getMimeType')->andReturn('image/jpeg');
+
+        $this->service->uploadImage($file, [
+            'image_rights' => 'invalid_rights'
+        ]);
     }
 }

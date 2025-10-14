@@ -718,6 +718,47 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals('Zebra', $data['data'][2]['title']);
     }
 
+    public function test_can_create_page_grid_with_use_hero()
+    {
+        $data = [
+            'title' => 'Hero Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'use_hero' => true,
+        ];
+
+        $response = $this->postForSite('/api/page-grids', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertTrue($responseData['data']['use_hero']);
+    }
+
+    public function test_can_update_use_hero_flag()
+    {
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true,
+            'pages' => [],
+            'use_hero' => false,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'use_hero' => true
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals(1, $data['data']['use_hero']);
+
+        $updated = PageGrid::find($pageGrid->id);
+        $this->assertTrue($updated->use_hero);
+    }
+
     protected function createPageGrid(int $count = 1, array $data = [])
     {
         for ($i = 1; $i <= $count; $i++) {

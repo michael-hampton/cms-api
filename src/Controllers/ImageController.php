@@ -51,7 +51,8 @@ class ImageController extends Controller
                 'description' => $request->get('description'),
                 'categories' => $request->get('categories', []),
                 'site_id' => $request->get('site_id'),
-                'tags' => $request->get('tags', [])
+                'tags' => $request->get('tags', []),
+                'image_rights' => $request->get('image_rights'),
             ];
 
             $image = $this->imageService->uploadImage($file, $metadata);
@@ -101,7 +102,8 @@ class ImageController extends Controller
                 'description' => $request->get('description'),
                 'categories' => $request->get('categories', []),
                 'site_id' => $request->get('site_id'),
-                'tags' => $request->get('tags', [])
+                'tags' => $request->get('tags', []),
+                'image_rights' => $request->get('image_rights'),
             ];
 
             // Remove null values

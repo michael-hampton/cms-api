@@ -347,4 +347,153 @@ class ImageControllerTest extends FunctionalTestCase
         $duplicate = Image::find($duplicateId);
         $this->assertCount(1, $duplicate->tags());
     }
+
+    public function testIndexFiltersImagesByTags()
+    {
+        $tag1 = \App\Models\Tag::create(['name' => 'Landscape', 'slug' => 'landscape', 'site_id' => $this->siteId]);
+        $tag2 = \App\Models\Tag::create(['name' => 'Portrait', 'slug' => 'portrait', 'site_id' => $this->siteId]);
+
+        $image1 = Image::create([
+            'url' => 'test1',
+            'file_size' => 1024,
+            'filename' => 'landscape.jpg',
+            'file_path' => '/uploads/landscape.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'landscape.jpg',
+            'site_id' => $this->siteId
+        ]);
+        $image1->syncTags([$tag1->id]);
+
+        $image2 = Image::create([
+            'url' => 'test2',
+            'file_size' => 1024,
+            'filename' => 'portrait.jpg',
+            'file_path' => '/uploads/portrait.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'portrait.jpg',
+            'site_id' => $this->siteId
+        ]);
+        $image2->syncTags([$tag2->id]);
+
+        // Test filtering by single tag
+        $response = $this->getForSite("/api/images?tags={$tag1->id}");
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(2, $data['items']);
+        $this->assertEquals('landscape.jpg', $data['items'][0]['filename']);
+
+        // Test filtering by multiple tags
+        $response = $this->getForSite("/api/images?tags={$tag1->id},{$tag2->id}");
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(2, $data['items']);
+    }
+
+    public function testIndexSearchesImagesByName()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'name' => 'My Custom Image Name',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite('/api/images?q=Custom');
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('My Custom Image Name', $data['items'][0]['name']);
+    }
+
+    public function testIndexSearchesImagesByCredit()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'credit' => 'John Photographer',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite('/api/images?q=Photographer');
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('John Photographer', $data['items'][0]['credit']);
+    }
+
+    public function testStoreWithCredit()
+    {
+        $files = [
+            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
+        ];
+
+        $response = $this->postForSite('/api/images', [
+            'alt_text' => 'Test image',
+            'credit' => 'Jane Doe Photography'
+        ], $files);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Jane Doe Photography', $data['data']['image']['credit']);
+    }
+
+    public function testStoreWithImageRights()
+    {
+        $files = [
+            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
+        ];
+
+        $response = $this->postForSite('/api/images', [
+            'alt_text' => 'Test image',
+            'image_rights' => 'royalty_free'
+        ], $files);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('royalty_free', $data['data']['image']['image_rights']);
+    }
+
+    public function testStoreWithInvalidImageRights()
+    {
+        $files = [
+            'image' => $this->createUploadedFile('avatar.jpg', 'image/jpeg')
+        ];
+
+        $response = $this->postForSite('/api/images', [
+            'alt_text' => 'Test image',
+            'image_rights' => 'invalid_rights'
+        ], $files);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testUpdateWithImageRights()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 6,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->putForSite("/api/images/{$image->id}", [
+            'image_rights' => 'attribution_required'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('attribution_required', $data['data']['image']['image_rights']);
+    }
 }

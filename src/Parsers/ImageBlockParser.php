@@ -4,12 +4,14 @@ namespace App\Parsers;
 
 use App\Enums\Alignment;
 use App\Enums\ImageLayout;
+use App\Enums\ImageRights;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
+use App\Models\Image;
 use App\Validation\Custom\AltTextLengthRule;
 use App\Validation\Custom\ImageLayoutRule;
 use App\Validation\Custom\ImageSourceRule;
@@ -67,22 +69,32 @@ class ImageBlockParser extends BaseBlockParser
         $openInNewTab = $this->parseBooleanValue($data['openInNewTab'] ?? false);
         $layout = $data['layout'] ?? 'full';
 
+        $imageData = $this->getImageData($data['image_id'] ?? null);
+
+        $credit = trim($imageData['credit'] ?? '');
+        $imageRights = $imageData['image_rights'] ?? null;
+
         $imageInfo = $this->extractImageInfo($src);
 
         return [
             'src' => $src,
             'caption' => $caption,
             'alt' => $alt,
+            'credit' => $credit,
+            'image_rights' => $imageRights,
+            'should_display_credit' => $this->shouldDisplayCredit($imageRights, $credit),
             'linkUrl' => $linkUrl,
             'noFollow' => $noFollow,
             'sponsored' => $sponsored,
             'openInNewTab' => $openInNewTab,
             'layout' => $layout,
             'has_caption' => !empty($caption),
+            'has_credit' => !empty($credit),
             'has_link' => !empty($linkUrl),
             'is_external_link' => $this->isExternalLink($linkUrl),
             'formatted_caption' => htmlspecialchars($caption, ENT_QUOTES, 'UTF-8'),
             'formatted_alt' => htmlspecialchars($alt, ENT_QUOTES, 'UTF-8'),
+            'formatted_credit' => htmlspecialchars($credit, ENT_QUOTES, 'UTF-8'),
             'image_type' => $imageInfo['type'],
             'image_extension' => $imageInfo['extension'],
             'is_saved_image' => $this->isSavedImage($src),
@@ -283,6 +295,8 @@ class ImageBlockParser extends BaseBlockParser
         $src = htmlspecialchars($parsedData['src'], ENT_QUOTES, 'UTF-8');
         $alt = htmlspecialchars($parsedData['alt'], ENT_QUOTES, 'UTF-8');
         $caption = $parsedData['formatted_caption'];
+        $credit = $parsedData['formatted_credit'] ?? '';
+        $shouldDisplayCredit = $parsedData['should_display_credit'] ?? false;
         $layoutClass = $parsedData['layout_css_class'];
         $alignmentClass = $parsedData['alignment_css_class'];
 
@@ -307,8 +321,49 @@ class ImageBlockParser extends BaseBlockParser
             $html .= "<figcaption>{$caption}</figcaption>";
         }
 
+        // Only display credit if required by image rights
+        if ($shouldDisplayCredit && !empty($credit)) {
+            $html .= "<div class=\"image-credit\"><small>📷 {$credit}</small></div>";
+        }
+
         $html .= "</div>";
 
         return $html;
+    }
+
+    private function getImageData(?int $imageId): array
+    {
+        if (!$imageId) {
+            return [];
+        }
+
+        $image = Image::find($imageId);
+        if (!$image) {
+            return [];
+        }
+
+        return [
+            'credit' => $image->credit,
+            'image_rights' => $image->image_rights,
+        ];
+    }
+
+    private function shouldDisplayCredit(?string $imageRights, string $credit): bool
+    {
+        // Always display credit if it exists and attribution is required
+        if (empty($credit)) {
+            return false;
+        }
+
+        if (empty($imageRights)) {
+            return !empty($credit); // Display if credit exists but no rights specified
+        }
+
+        try {
+            $rights = ImageRights::from($imageRights);
+            return $rights->requiresAttribution();
+        } catch (\ValueError $e) {
+            return !empty($credit); // Fallback to showing credit if invalid rights
+        }
     }
 }

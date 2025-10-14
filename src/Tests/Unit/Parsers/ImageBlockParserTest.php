@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Parsers;
 use App\Enums\Alignment;
 use App\Enums\ImageLayout;
 use App\Framework\Validation\Validator;
+use App\Models\Image;
 use App\Parsers\ImageBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use PHPUnit\Framework\TestCase;
@@ -217,5 +218,139 @@ class ImageBlockParserTest extends FunctionalTestCase
         $result = $validator->validate($data, $rules);
 
         $this->assertFalse($result->isValid());
+    }
+
+    public function testImageBlockParserDisplaysCreditForAttributionRequired()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'credit' => 'John Photographer',
+            'image_rights' => 'attribution_required',
+            'site_id' => $this->siteId
+        ]);
+
+        $parser = new ImageBlockParser();
+        $data = [
+            'src' => 'test.jpg',
+            'alt' => 'Alt text',
+            'image_id' => $image->id
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertTrue($result['should_display_credit']);
+        $this->assertEquals('John Photographer', $result['credit']);
+        $this->assertEquals('attribution_required', $result['image_rights']);
+    }
+
+    public function testImageBlockParserHidesCreditForRoyaltyFree()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'credit' => 'Stock Photo',
+            'image_rights' => 'royalty_free',
+            'site_id' => $this->siteId
+        ]);
+
+        $parser = new ImageBlockParser();
+        $data = [
+            'src' => 'test.jpg',
+            'alt' => 'Alt text',
+            'image_id' => $image->id
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertFalse($result['should_display_credit']);
+    }
+
+    public function testImageBlockParserDisplaysCreditForCreativeCommons()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'credit' => 'CC Attribution',
+            'image_rights' => 'creative_commons',
+            'site_id' => $this->siteId
+        ]);
+
+        $parser = new ImageBlockParser();
+        $data = [
+            'src' => 'test.jpg',
+            'alt' => 'Alt text',
+            'image_id' => $image->id
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertTrue($result['should_display_credit']);
+    }
+
+    public function testImageBlockParserHtmlIncludesCreditWhenRequired()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'credit' => 'Required Credit',
+            'image_rights' => 'attribution_required',
+            'site_id' => $this->siteId
+        ]);
+
+        $parser = new ImageBlockParser();
+        $parsed = $parser->parse([
+            'src' => 'image.jpg',
+            'alt' => 'Alt text',
+            'image_id' => $image->id
+        ]);
+
+        $html = $parser->generateHtml($parsed);
+
+        $this->assertStringContainsString('image-credit', $html);
+        $this->assertStringContainsString('Required Credit', $html);
+    }
+
+    public function testImageBlockParserHtmlExcludesCreditWhenNotRequired()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 1024,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'credit' => 'Optional Credit',
+            'image_rights' => 'all_rights_reserved',
+            'site_id' => $this->siteId
+        ]);
+
+        $parser = new ImageBlockParser();
+        $parsed = $parser->parse([
+            'src' => 'image.jpg',
+            'alt' => 'Alt text',
+            'image_id' => $image->id
+        ]);
+
+        $html = $parser->generateHtml($parsed);
+
+        $this->assertStringNotContainsString('image-credit', $html);
+        $this->assertStringNotContainsString('Optional Credit', $html);
     }
 }

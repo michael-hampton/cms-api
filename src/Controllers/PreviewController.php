@@ -123,7 +123,6 @@ class PreviewController extends Controller
              <style>
                 {$css}
              </style>
-            <link rel="stylesheet" href="/css/preview.css">
             <style>
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;

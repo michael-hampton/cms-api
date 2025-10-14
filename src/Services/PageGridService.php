@@ -83,6 +83,10 @@ class PageGridService
                 }
             }
 
+            if (!isset($data['use_hero'])) {
+                $data['use_hero'] = true;
+            }
+
             $pageGrid = $this->repository->create($data);
 
             $this->logHistory($pageGrid->id, 'created', ['data' => $data]);
@@ -138,7 +142,7 @@ class PageGridService
     private function detectChanges($pageGrid, array $newData): array
     {
         $changes = [];
-        $fields = ['title', 'subtitle', 'layout', 'columns', 'is_active', 'start_date', 'end_date', 'pages'];
+        $fields = ['title', 'subtitle', 'layout', 'columns', 'is_active', 'start_date', 'end_date', 'pages', 'use_hero'];
 
         foreach ($fields as $field) {
             if (isset($newData[$field]) && $pageGrid->$field != $newData[$field]) {

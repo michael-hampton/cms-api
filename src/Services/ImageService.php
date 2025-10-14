@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ImageRights;
 use App\Enums\MimeType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
@@ -60,6 +61,15 @@ class ImageService
         // Validate file
         $this->validateUploadedFile($file);
 
+        // Validate image_rights if provided
+        if (!empty($metadata['image_rights'])) {
+            try {
+                ImageRights::from($metadata['image_rights']);
+            } catch (\ValueError $e) {
+                throw new ValidationException('Invalid image rights value');
+            }
+        }
+
         // Use ImageUploadService to handle the upload
         $relativePath = $this->imageUploadService->uploadToPath(
             $file,
@@ -77,6 +87,7 @@ class ImageService
             'original_name' => $file->getClientOriginalName(),
             'name' => $metadata['name'] ?? $file->getClientOriginalName(),
             'credit' => $metadata['credit'] ?? null,
+            'image_rights' => $metadata['image_rights'] ?? null,
             'file_path' => $relativePath,
             'url' => $this->publicPath . '/' . $relativePath,
             'mime_type' => $file->getMimeType(),
@@ -90,9 +101,7 @@ class ImageService
 
         $image = $this->imageRepository->create($imageData);
 
-        if (!empty($metadata['tags'])) {
-            $this->imageRepository->syncTags($image, $metadata['tags']);
-        }
+        $this->imageRepository->syncTags($image, $metadata['tags'] ?? []);
 
         // Generate thumbnails for images
         if ($_ENV['APP_ENV'] !== 'testing' && $this->isImage($image->mime_type)) {
@@ -135,6 +144,15 @@ class ImageService
 
         if (!$image) {
             throw new Exception('Image not found');
+        }
+
+        // Validate image_rights if provided
+        if (!empty($metadata['image_rights'])) {
+            try {
+                ImageRights::from($metadata['image_rights']);
+            } catch (\ValueError $e) {
+                throw new ValidationException('Invalid image rights value');
+            }
         }
 
         // Update image

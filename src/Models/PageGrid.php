@@ -24,7 +24,8 @@ class PageGrid extends Model
         'created_at',
         'updated_at',
         'start_date',
-        'end_date'
+        'end_date',
+        'use_hero'
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class PageGrid extends Model
         'deleted_at' => 'datetime',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'use_hero' => 'boolean'
     ];
 
     protected $dates = ['created_at', 'updated_at', 'deleted_at', 'start_date', 'end_date'];

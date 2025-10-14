@@ -118,7 +118,19 @@ class SearchConfigurationFactory
         // Filters
         $config->addFilter(new LikeFilter('query', 'filename'))
             ->addFilter(new EqualsFilter('mime_type', 'mime_type'))
-            ->addFilter(new EqualsFilter('category_id', 'category_id'));
+            ->addFilter(new EqualsFilter('category_id', 'category_id'))
+            ->addFilter(new CustomFilter('tags', function($query, $value) {
+                // Value can be comma-separated tag IDs
+                $tagIds = is_array($value) ? $value : explode(',', $value);
+                $tagIds = array_filter(array_map('intval', $tagIds));
+
+                if (!empty($tagIds)) {
+                    $query->whereHas('tags', function($q) use ($tagIds) {
+                        $q->whereIn('tag_id', $tagIds);
+                    });
+                }
+                return $query;
+            }));;
 
         self::applyMandatoryFilters($config);
 
@@ -131,7 +143,9 @@ class SearchConfigurationFactory
         // Searchable columns
         $config->addSearchableColumn('filename')
             ->addSearchableColumn('alt_text')
-            ->addSearchableColumn('caption');
+            ->addSearchableColumn('caption')
+            ->addSearchableColumn('name')
+            ->addSearchableColumn('credit');
 
         // Default sort
         $config->setDefaultSort('created_at', 'desc');
