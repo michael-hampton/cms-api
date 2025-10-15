@@ -450,7 +450,7 @@ class Database
 
     public function __destruct()
     {
-        $this->close();
+        //$this->close();
     }
 
     public function close(): void

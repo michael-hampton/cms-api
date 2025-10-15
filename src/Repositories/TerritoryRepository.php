@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
+use App\Models\Model;
+use App\Models\Page;
+use App\Models\Territory;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
+
+class TerritoryRepository extends Repository
+{
+    private SearchEngine $searchEngine;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $config = SearchConfigurationFactory::createTerritoryConfiguration();
+        $this->searchEngine = new SearchEngine($config);
+    }
+
+    protected function getModelClass(): string
+    {
+        return Territory::class;
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $query = Territory::with(['regionSet']);
+        return $this->searchEngine->search($query, $criteria);
+    }
+
+    public function findWithRelations(int $id): ?Model
+    {
+        return Territory::with(['regionSet'])->find($id);
+    }
+
+    public function getByRegionSet(int $regionSetId): Collection
+    {
+        $query = Territory::ordered()->where('region_set_id', $regionSetId);;
+        return $this->applySiteFilter($query)->get();
+    }
+
+    public function getActive(): Collection
+    {
+        $query = Territory::ordered()->where('is_active', true);
+        return $this->applySiteFilter($query)->get();
+    }
+
+    public function findByCode(string $code): ?Model
+    {
+        $query = Territory::where('code', $code);
+        return $this->applySiteFilter($query)->first();
+    }
+
+    public function checkDeletable(int $territoryId): array
+    {
+        $territory = $this->find($territoryId);
+
+        if (!$territory) {
+            throw new \Exception('Territory not found');
+        }
+
+        $pageCount = $territory->getPageCount();
+
+        return [
+            'can_delete' => $pageCount === 0,
+            'page_count' => $pageCount,
+            'requires_reassignment' => $pageCount > 0
+        ];
+    }
+
+    public function getAlternativesInRegionSet(int $territoryId, int $regionSetId): Collection
+    {
+        $query = Territory::ordered()->where('id', '!=', $territoryId)
+             ->where(function($q) use ($regionSetId) {
+                 $q->whereNull('region_set_id')
+                     ->orWhere('region_set_id', $regionSetId);
+             });
+        return $this->applySiteFilter($query)->get();
+    }
+
+    public function reorderTerritories(array $orderedIds): bool
+    {
+        $this->database->beginTransaction();
+
+        try {
+            foreach ($orderedIds as $index => $id) {
+                $territory = $this->find($id);
+                if ($territory) {
+                    $territory->sort_order = $index;
+                    $territory->save();
+                }
+            }
+
+            $this->database->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->database->rollBack();
+            throw $e;
+        }
+    }
+
+    public function bulkUpdateRegionSet(array $territoryIds, int $newRegionSetId): bool
+    {
+        $this->database->beginTransaction();
+
+        try {
+            foreach ($territoryIds as $id) {
+                $territory = $this->find($id);
+                if ($territory) {
+                    $territory->region_set_id = $newRegionSetId;
+                    $territory->save();
+                }
+            }
+
+            $this->database->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->database->rollBack();
+            throw $e;
+        }
+    }
+
+    public function searchAvailablePages(int $territoryId, string $query, int $perPage = 20, int $page = 1): array
+    {
+        $territory = $this->find($territoryId);
+        if (!$territory) {
+            return [];
+        }
+
+        return Page::where(function($q) use ($territoryId) {
+                $q->whereNull('territory_id')
+                    ->orWhere('territory_id', $territoryId);
+            })
+            ->where('title', 'LIKE', "%{$query}%")
+            ->where('site_id', SiteContext::getId())
+            ->orderBy('title')
+            ->paginate($perPage, $page);
+    }
+
+    public function getPagesByTerritory(int $territoryId, int $perPage = 20, int $page = 1): array
+    {
+        return Page::where('territory_id', $territoryId)
+            ->orderBy('title')
+            ->paginate($perPage, $page);
+    }
+}

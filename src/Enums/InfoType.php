@@ -11,6 +11,7 @@ enum InfoType: string
     case INGREDIENTS = 'ingredients';
     case RECIPE = 'recipe';
     case INSTRUCTIONS = 'instructions';
+    case UPDATE = 'update';
 
     public static function values(): array
     {

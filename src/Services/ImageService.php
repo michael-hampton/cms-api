@@ -7,6 +7,7 @@ use App\Enums\MimeType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\Validator;
@@ -97,6 +98,7 @@ class ImageService
             'alt_text' => $metadata['alt_text'] ?? null,
             'caption' => $metadata['caption'] ?? null,
             'description' => $metadata['description'] ?? null,
+            'site_id' => SiteContext::getId()
         ];
 
         $image = $this->imageRepository->create($imageData);

@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
+use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageMetadata;
 use App\Models\PageSeo;
@@ -59,6 +60,7 @@ class PageService
 
         return $this->database->transaction(function () use ($requestData, $siteId) {
             $pageId = $requestData['id'] ?? null;
+
             $mainData = $this->extractMainPageData($requestData);
 
             if (!empty($mainData['title']) && empty($mainData['slug'])) {
@@ -67,24 +69,23 @@ class PageService
 
             $mainData['site_id'] = $siteId;
 
+            $existingPage = !empty($pageId) ? $this->pageRepository->getCompletePageData($pageId) : [];
+
             // Store old data for comparison
             $oldPageData = null;
             $wasPublished = false;
             $isNowPublished = false;
 
-            if ($pageId) {
-                $existingPage = $this->pageRepository->getCompletePageData($pageId);
-                if ($existingPage) {
-                    $wasPublished = $existingPage->status === 'published';
-                    $oldPageData = [
-                        'title' => $existingPage->title,
-                        'slug' => $existingPage->slug,
-                        'status' => $existingPage->status,
-                        'meta_title' => $existingPage->meta_title,
-                        'meta_description' => $existingPage->meta_description,
-                        'blocks' => $existingPage->blocks ? $existingPage->blocks->toArray() : []
-                    ];
-                }
+            if (!empty($existingPage)) {
+                $wasPublished = $existingPage->status === 'published';
+                $oldPageData = [
+                    'title' => $existingPage->title,
+                    'slug' => $existingPage->slug,
+                    'status' => $existingPage->status,
+                    'meta_title' => $existingPage->meta_title,
+                    'meta_description' => $existingPage->meta_description,
+                    'blocks' => $existingPage->blocks ? $existingPage->blocks->toArray() : []
+                ];
             }
 
             // Check if status is being changed to published
@@ -95,7 +96,7 @@ class PageService
                 $mainData['published_at'] = date('Y-m-d H:i:s');
             }
 
-            if ($pageId) {
+            if (!empty($existingPage)) {
                 $page = $this->pageRepository->update($pageId, $mainData);
                 if (!$page) {
                     throw new Exception("Page not found");
@@ -130,13 +131,11 @@ class PageService
 
     public function createPageWithAllData(array $requestData, int $siteId): Page
     {
-        unset($requestData['id']);
         return $this->createOrUpdatePageWithAllData($requestData, $siteId);
     }
 
     public function updatePageWithAllData(int $pageId, array $requestData, int $siteId): Page
     {
-        $requestData['id'] = $pageId;
         return $this->createOrUpdatePageWithAllData($requestData, $siteId);
     }
 
@@ -164,7 +163,7 @@ class PageService
         }
 
         $processors = [
-           'meta' => [$this, 'processMetadataForm'],
+            'meta' => [$this, 'processMetadataForm'],
             'seo' => [$this, 'processSeoForm'],
             'settings' => [$this, 'processSettingsForm'],
             'social' => [$this, 'processSocialForm'],
@@ -192,6 +191,10 @@ class PageService
             $mainData['title'] = $requestData['forms']['main']['title'];
         }
 
+        if (!empty($requestData['forms']['main']['subtitle'])) {
+            $mainData['subtitle'] = $requestData['forms']['main']['subtitle'];
+        }
+
         // Extract from forms.meta
         if (!empty($requestData['forms']['meta'])) {
             $meta = $requestData['forms']['meta'];
@@ -216,6 +219,9 @@ class PageService
             }
         }
 
+        $mainData['status'] = $requestData['status'] ?? 'draft';
+
+
         return $mainData;
     }
 
@@ -236,6 +242,12 @@ class PageService
         ];
 
         $data = $this->mapFormData($metaForm, $mapping);
+        $isCompletelyEmpty = count(array_filter($data, fn($v) => !empty($v))) === 0;
+
+        if ($isCompletelyEmpty) {
+            return;
+        }
+
         $this->metadataRepository->createOrUpdate($pageId, $data);
     }
 
@@ -243,6 +255,8 @@ class PageService
     {
         $mapping = [
             'meta_keywords' => 'meta_keywords',
+            'meta_title' => 'meta_title',
+            'meta_description' => 'meta_description',
             'canonical_url' => 'canonical_url',
             'no_index' => fn($value) => (bool)$value,
             'no_follow' => fn($value) => (bool)$value,
@@ -254,6 +268,12 @@ class PageService
         ];
 
         $data = $this->mapFormData($seoForm, $mapping);
+        $isCompletelyEmpty = count(array_filter($data, fn($v) => !empty($v))) === 0;
+
+        if ($isCompletelyEmpty) {
+            return;
+        }
+
         $this->seoRepository->createOrUpdate($pageId, $data);
     }
 
@@ -312,6 +332,12 @@ class PageService
         ];
 
         $data = $this->mapFormData($socialForm, $mapping);
+        $isCompletelyEmpty = count(array_filter($data, fn($v) => !empty($v))) === 0;
+
+        if ($isCompletelyEmpty) {
+            return;
+        }
+
         $this->socialRepository->createOrUpdate($pageId, $data);
     }
 
@@ -389,19 +415,36 @@ class PageService
             $this->tagRepository->syncTags($pageId, $tagsForm['tags'], $siteId);
         }
 
-        // Handle custom fields - convert from [{key, value, type}] to expected format
-        if (isset($tagsForm['customFields']) && is_array($tagsForm['customFields'])) {
-            $customFields = array_map(function ($field) {
+        $customFieldsData = $tagsForm['customFields'] ?? $tagsForm['custom_fields'] ?? [];
+
+        if (!empty($customFieldsData) && is_array($customFieldsData)) {
+
+            $customFieldsDefinitions = $this->customFieldRepository->getCustomFieldsByKeys(collect($customFieldsData)->pluck('key')->toArray());;
+
+            $customFields = array_map(function ($field) use ($customFieldsDefinitions) {
+                // Get the field definition to retrieve the ID
+                $fieldDef = $customFieldsDefinitions->where('key', $field['key'])->first();
+
                 return [
+                    'custom_field_definition_id' => $fieldDef ? $fieldDef->id : null,
                     'name' => $field['key'] ?? '',
                     'key' => $field['key'] ?? '',
                     'value' => $field['value'] ?? '',
                     'type' => $field['type'] ?? 'text',
                     'options' => $field['options'] ?? null
                 ];
-            }, $tagsForm['customFields']);
+            }, $customFieldsData);
 
-            $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
+            // Filter out any fields without a valid definition ID
+            $customFields = array_filter($customFields, function($field) {
+                return !empty($field['custom_field_definition_id']);
+            });
+
+           $customFields = collect($customFields)->keyBy('custom_field_definition_id')->toArray();
+
+            if (!empty($customFields)) {
+                $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
+            }
         }
     }
 

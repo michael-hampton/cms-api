@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Block;
+use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageCustomField;
 use App\Models\PageHistory;
@@ -236,6 +237,7 @@ class PageServiceTest extends FunctionalTestCase
     public function testCreatePageWithAllDataCreatesPageAndAllRelations()
     {
         $requestData = [
+            'id' => 1,
             'forms' => [
                 'main' => ['title' => 'Test Page'],
                 'meta' => ['slug' => 'test-page', 'status' => 'draft', 'author' => 1],
@@ -257,9 +259,24 @@ class PageServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->pageHistory->shouldReceive('logPageCreated')->once()->with($newPage);
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn(null);
 
-        $this->pageRepository->shouldReceive('create')->with(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'draft', 'meta_title' => 'SEO Title', 'meta_description' => 'SEO Desc', 'site_id' => $this->siteId])->once()->andReturn($newPage);
+        $this->pageHistory->shouldReceive('logPageCreated')
+            ->once()
+            ->with($newPage);
+
+        $this->pageRepository->shouldReceive('create')
+            ->with([
+                'title' => 'Test Page',
+                'slug' => 'test-page',
+                'status' => 'draft',
+                'meta_title' => 'SEO Title',
+                'meta_description' => 'SEO Desc',
+                'site_id' => $this->siteId
+            ])->once()->andReturn($newPage);
 
         // Mock all the repository calls
         $this->metadataRepository->shouldReceive('createOrUpdate')
@@ -304,9 +321,11 @@ class PageServiceTest extends FunctionalTestCase
     public function testUpdatePageWithAllDataUpdatesExistingPage()
     {
         $requestData = [
+            'id' => 1,
+            'status' => 'published',
             'forms' => [
                 'main' => ['title' => 'Updated Page'],
-                'meta' => ['slug' => 'updated-page', 'status' => 'published']
+                'meta' => ['slug' => 'updated-page', 'status' => 'published', 'allow_comments' => true]
             ]
         ];
 
@@ -549,8 +568,17 @@ class PageServiceTest extends FunctionalTestCase
             ]
         ];
 
-        $this->categoryRepository->shouldReceive('syncCategories')->once()->with($pageId, [1, 2], $this->siteId);
-        $this->tagRepository->shouldReceive('syncTags')->once()->with($pageId, [3, 4], $this->siteId);
+        $customField = Mockery::mock(CustomFieldDefinition::class)->makePartial();
+        $customField->key = 'color';
+        $customField->id = 1;
+
+        $this->categoryRepository->shouldReceive('syncCategories')
+            ->once()
+            ->with($pageId, [1, 2], $this->siteId);
+        $this->tagRepository->shouldReceive('syncTags')
+            ->once()
+            ->with($pageId, [3, 4], $this->siteId);
+        $this->customFieldRepository->shouldReceive('getCustomFieldsByKeys')->with(['color'])->once()->andReturn(collect([$customField]));
         $this->customFieldRepository->shouldReceive('syncCustomFields')->once();
 
         $reflection = new \ReflectionClass($this->service);

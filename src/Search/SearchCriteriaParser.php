@@ -8,7 +8,7 @@ class SearchCriteriaParser
 {
     private const FILTER_PARAMS = [
         'status', 'visibility', 'page_type', 'author',
-        'featured', 'category', 'tag', 'parent', 'template', 'role', 'is_active', 'site_id'
+        'featured', 'category', 'tag', 'parent', 'template', 'role', 'is_active', 'site_id', 'region_set_id', 'territory_id'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

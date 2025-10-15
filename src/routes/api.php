@@ -17,10 +17,12 @@ use App\Controllers\PageHistoryController;
 use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
+use App\Controllers\RegionSetController;
 use App\Controllers\ReviewController;
 use App\Controllers\SearchController;
 use App\Controllers\SiteController;
 use App\Controllers\TagController;
+use App\Controllers\TerritoryController;
 use App\Controllers\UserController;
 use App\Controllers\VideoController;
 use App\Controllers\WishlistController;
@@ -200,8 +202,44 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 // Status Routes
         $router->put('/sites/{id}/status', [SiteController::class, 'toggleStatus']);
 
+        // Region Sets
+        $router->get('/region-sets', [RegionSetController::class, 'index']);
+        $router->post('/region-sets', [RegionSetController::class, 'store']);
+        $router->get('/region-sets/active', [RegionSetController::class, 'getActive']);
+        $router->post('/region-sets/reorder', [RegionSetController::class, 'reorder']);
+        $router->get('/region-sets/{id}', [RegionSetController::class, 'show']);
+        $router->put('/region-sets/{id}', [RegionSetController::class, 'update']);
+        $router->delete('/region-sets/{id}', [RegionSetController::class, 'destroy']);
+        $router->get('/region-sets/{id}/check-deletable', [RegionSetController::class, 'checkDeletable']);
+        $router->get('/region-sets/{id}/alternatives', [RegionSetController::class, 'getAlternatives']);
+        $router->post('/region-sets/{id}/duplicate', [RegionSetController::class, 'duplicate']);
 
+// Territories
+        $router->get('/territories', [TerritoryController::class, 'index']);
+        $router->post('/territories', [TerritoryController::class, 'store']);
+        $router->get('/territories/active', [TerritoryController::class, 'getActive']);
+        $router->post('/territories/reorder', [TerritoryController::class, 'reorder']);
+        $router->post('/territories/bulk-update-region-set', [TerritoryController::class, 'bulkUpdateRegionSet']);
+        $router->get('/territories/by-region-set/{regionSetId}', [TerritoryController::class, 'getByRegionSet']);
+        $router->get('/territories/{id}', [TerritoryController::class, 'show']);
+        $router->put('/territories/{id}', [TerritoryController::class, 'update']);
+        $router->delete('/territories/{id}', [TerritoryController::class, 'destroy']);
+        $router->get('/territories/{id}/check-deletable', [TerritoryController::class, 'checkDeletable']);
+        $router->get('/territories/{id}/alternatives', [TerritoryController::class, 'getAlternatives']);
+
+        $router->get('/region-sets/{id}/pages', [RegionSetController::class, 'getPages']);
+        $router->get('/region-sets/{id}/search-pages', [RegionSetController::class, 'searchAvailablePages']);
+        $router->post('/region-sets/{id}/assign-pages', [RegionSetController::class, 'assignPages']);
+        $router->post('/region-sets/{id}/unassign-pages', [RegionSetController::class, 'unassignPages']);
+
+// Territory Pages
+        $router->get('/territories/{id}/pages', [TerritoryController::class, 'getPages']);
+        $router->get('/territories/{id}/search-pages', [TerritoryController::class, 'searchAvailablePages']);
+        $router->post('/territories/{id}/assign-pages', [TerritoryController::class, 'assignPages']);
+        $router->post('/territories/{id}/unassign-pages', [TerritoryController::class, 'unassignPages']);
     });
+
+    $router->post('/sites', [SiteController::class, 'create']);
 });
 
 

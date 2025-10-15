@@ -102,6 +102,7 @@ class DealBlockParser extends BaseBlockParser
             'starBlock' => (bool)($data['starBlock'] ?? false),
             'savings' => $savings,
             'savings_percent' => $savingsPercent,
+            'savingMode' => $data['savingMode'] ?? 'percent',
             'has_savings' => $savings > 0,
             'formatted_description' => nl2br(htmlspecialchars($data['description'] ?? '')),
             'link_attributes' => $this->buildLinkAttributes(

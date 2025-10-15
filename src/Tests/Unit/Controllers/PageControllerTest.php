@@ -468,7 +468,9 @@ class PageControllerTest extends FunctionalTestCase
             'per_page' => 20,
             'q' => null,
             'search' => null,
-            'site_id' => 1
+            'site_id' => 1,
+            'region_set_id' => null,
+            'territory_id' => null
         ];
 
         $mergedParams = array_merge($defaultParams, $params);

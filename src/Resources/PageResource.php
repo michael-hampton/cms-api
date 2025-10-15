@@ -11,6 +11,7 @@ class PageResource extends JsonResource
         return [
             'id' => $this->getAttribute('id'),
             'title' => $this->getAttribute('title'),
+            'subtitle' => $this->getAttribute('subtitle'),
             'slug' => $this->getAttribute('slug'),
             'status' => $this->getAttribute('status'),
             'author_id' => $this->getAttribute('author_id'),
@@ -21,8 +22,8 @@ class PageResource extends JsonResource
             'tags' => $this->whenLoaded('tags'),
             'metadata' => $this->whenLoaded('metadata'),
             'seo' => $this->whenLoaded('seo'),
-            'social' => $this->whenLoaded('seo'),
-            'settings' => $this->whenLoaded('seo'),
+            'social' => $this->whenLoaded('social'),
+            'settings' => $this->whenLoaded('settings'),
             'customFields' => $this->whenLoaded('customFields'),
             'author' => $this->whenLoaded('author'),
         ];

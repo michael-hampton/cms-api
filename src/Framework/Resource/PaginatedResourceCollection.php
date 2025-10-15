@@ -14,9 +14,9 @@ class PaginatedResourceCollection
 
     public function toArray(): array
     {
-        $items = collect($this->result->getData())->map(function ($item) {
+        $items = !empty($this->result->getData()) ? collect($this->result->getData())->map(function ($item) {
             return (new $this->resourceClass($item))->toArray();
-        })->toArray();
+        })->toArray() : [];
 
         return [
             'items' => $items,

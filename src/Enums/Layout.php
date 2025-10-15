@@ -11,6 +11,7 @@ enum Layout: string
     case CAROUSEL = 'carousel';
     case MASONRY = 'masonry';
     case SLIDER = 'slider';
+    case HERO = 'hero';
 
     public static function values(): array
     {

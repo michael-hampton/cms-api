@@ -83,14 +83,22 @@ class SiteContext
      */
     private static function resolveByPath(string $path): ?Site
     {
-        // Extract first path segment: /site-slug/page -> site-slug
-        $segments = array_filter(explode('/', $path));
+        $segments = array_values(array_filter(explode('/', $path)));
 
         if (empty($segments)) {
             return null;
         }
 
-        $siteSlug = reset($segments);
+        // Skip "api" prefix if present
+        if ($segments[0] === 'api') {
+            array_shift($segments);
+        }
+
+        $siteSlug = $segments[0] ?? null;
+
+        if (!$siteSlug) {
+            return null;
+        }
 
         return Site::where('slug', $siteSlug)
             ->where('is_active', 1)

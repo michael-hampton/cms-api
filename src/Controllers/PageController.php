@@ -35,9 +35,9 @@ class PageController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
 
             $result = $this->pageRepository->search($criteria);
-
             // Format blocks in the paginated data
             $formattedData = $result->getData();
+
             $formattedData = array_map(function($page) {
                 if (!empty($page['blocks'])) {
                     $page['blocks'] = array_map(function($block) {
@@ -55,6 +55,7 @@ class PageController extends Controller
             $result->setData($formattedData);
 
             $collection = new PaginatedResourceCollection($result, PageResource::class);
+
             return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

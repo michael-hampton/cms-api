@@ -19,6 +19,8 @@ class SearchConfigurationFactory
         // Filters
         $config->addFilter(new InFilter('status', 'status'))
             ->addFilter(new RelationshipExistsFilter('content_type', 'metadata', 'content_type'))
+            ->addFilter(new EqualsFilter('region_set_id', 'region_set_id'))
+            ->addFilter(new EqualsFilter('territory_id', 'territory_id'))
             ->addFilter(new InFilter('template', 'page_type'))
             ->addFilter(new InFilter('author', 'author_id'))
             ->addFilter(new RelationshipExistsFilter('featured', 'metadata', 'featured'))
@@ -233,6 +235,42 @@ class SearchConfigurationFactory
         // Default sort
         $config->setDefaultSort('name', 'asc');
 
+        return $config;
+    }
+
+    public static function createRegionSetConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration();
+        $config->addFilter(new EqualsFilter('site_id', 'site_id'));
+        $config->addFilter(new EqualsFilter('is_active', 'is_active'));
+        $config->addSort(new SortSpecification('name', 'name'));
+        $config->addSort(new SortSpecification('slug', 'slug'));
+        $config->addSort(new SortSpecification('is_active', 'is_active'));
+        $config->addSort(new SortSpecification('sort_order', 'sort_order'));
+        $config->addSort(new SortSpecification('created_at', 'created_at'));
+        $config->addSort(new SortSpecification('updated_at', 'updated_at'));
+        $config->addSearchableColumn('name');
+        $config->addSearchableColumn('slug');
+        $config->addSearchableColumn('description');
+        $config->setDefaultSort('sort_order', 'asc');
+        return $config;
+    }
+
+    public static function createTerritoryConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration();
+        $config->addFilter(new EqualsFilter('site_id', 'site_id'));
+        $config->addFilter(new EqualsFilter('is_active', 'is_active'));
+        $config->addFilter(new EqualsFilter('region_set_id', 'region_set_id'));
+        $config->addSort(new SortSpecification('name', 'name'));
+        $config->addSort(new SortSpecification('code', 'code'));
+        $config->addSort(new SortSpecification('is_active', 'is_active'));
+        $config->addSort(new SortSpecification('sort_order', 'sort_order'));
+        $config->addSort(new SortSpecification('created_at', 'created_at'));
+        $config->addSort(new SortSpecification('updated_at', 'updated_at'));
+        $config->addSearchableColumn('name');
+        $config->addSearchableColumn('code');
+        $config->setDefaultSort('sort_order', 'asc');
         return $config;
     }
 

@@ -108,8 +108,8 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesExistingPage()
     {
-        $page = Page::create(['title' => 'Original Title', 'slug' => 'original', 'status' => 'draft', 'site_id' => $this->siteId]);;
-        $updateData = ['forms' => ['main' => ['title' => 'Updated Title'], 'meta' => ['slug' => 'updated', 'status' => 'published']], 'site_id' => $this->siteId];
+        $page = Page::create(['title' => 'Original Title', 'slug' => 'original', 'status' => 'published', 'site_id' => $this->siteId]);;
+        $updateData = ['status' => 'published', 'forms' => ['main' => ['title' => 'Updated Title'], 'meta' => ['slug' => 'updated']], 'site_id' => $this->siteId];
         $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -146,6 +146,7 @@ class PageControllerTest extends FunctionalTestCase
     public function testDestroyReturns404ForNonexistent()
     {
         $response = $this->deleteForSite('/api/pages/999');
+
         $this->assertEquals(404, $response->getStatusCode());
     }
 
@@ -413,6 +414,8 @@ class PageControllerTest extends FunctionalTestCase
         ]);
 
         $updateData = [
+            'id' => $page->id,
+            'status' => 'published',
             'forms' => [
                 'main' => ['title' => 'Draft Page'],
                 'meta' => ['slug' => 'draft-page', 'status' => 'published']
@@ -444,6 +447,7 @@ class PageControllerTest extends FunctionalTestCase
         ]);
 
         $updateData = [
+            'id' => $page->id,
             'forms' => [
                 'main' => ['title' => 'Published Page'],
                 'meta' => ['slug' => 'published-page', 'status' => 'draft']
