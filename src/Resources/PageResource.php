@@ -25,7 +25,12 @@ class PageResource extends JsonResource
             'social' => $this->whenLoaded('social'),
             'settings' => $this->whenLoaded('settings'),
             'customFields' => $this->whenLoaded('customFields'),
-            'author' => $this->whenLoaded('author'),
+            'authors' => $this->whenLoaded('authors'),
+            'pageAuthors' => $this->whenLoaded('pageAuthors'),
+            'primaryAuthors' => $this->whenLoaded('primaryAuthors'),
+            'contributors' => $this->whenLoaded('contributors'),
+            'regionSets' => $this->whenLoaded('regionSets'),
+            'territories' => $this->whenLoaded('territories'),
         ];
     }
 }

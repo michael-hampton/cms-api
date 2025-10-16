@@ -33,6 +33,7 @@ enum InfoType: string
             self::INGREDIENTS => '🥗',
             self::RECIPE => '👨‍🍳',
             self::INSTRUCTIONS => '📋',
+            self::UPDATE => '📝',
         };
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Page;
+use App\Models\PageRegionSet;
 use App\Models\RegionSet;
 use App\Models\Territory;
 
@@ -475,12 +476,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
 
-        // Verify pages were assigned
-        $page1 = $page1->fresh();
-        $page2 = $page2->fresh();
-
-        $this->assertEquals($regionSet->id, $page1->region_set_id);
-        $this->assertEquals($regionSet->id, $page2->region_set_id);
+        // Verify assignments in pivot table
+        $assignments = PageRegionSet::where('region_set_id', $regionSet->id)->get();
+        $this->assertCount(2, $assignments);
     }
 
     public function testUnassignPagesFromRegionSet()
@@ -495,6 +493,11 @@ class RegionSetControllerTest extends FunctionalTestCase
             'title' => 'European Page',
             'slug' => 'european-page',
             'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageRegionSet::create([
+            'page_id' => $page->id,
             'region_set_id' => $regionSet->id,
             'site_id' => $this->siteId
         ]);
@@ -505,9 +508,11 @@ class RegionSetControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
 
-        // Verify page was unassigned
-        $page = $page->fresh();
-        $this->assertNull($page->region_set_id);
+        // Verify unassignment
+        $assignment = PageRegionSet::where('page_id', $page->id)
+            ->where('region_set_id', $regionSet->id)
+            ->first();
+        $this->assertNull($assignment);
     }
 
     public function testAssignPagesWithEmptyArrayReturnsError()

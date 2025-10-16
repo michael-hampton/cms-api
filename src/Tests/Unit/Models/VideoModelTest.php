@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Models;
 use App\Models\Video;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class VideoTest extends FunctionalTestCase
+class VideoModelTest extends FunctionalTestCase
 {
     protected Video $video;
 

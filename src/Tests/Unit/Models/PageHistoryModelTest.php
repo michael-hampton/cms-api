@@ -9,7 +9,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class PageHistoryTest extends FunctionalTestCase
+class PageHistoryModelTest extends FunctionalTestCase
 {
     protected PageHistory $pageHistory;
 

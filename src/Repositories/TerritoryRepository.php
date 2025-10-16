@@ -6,6 +6,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Model;
 use App\Models\Page;
+use App\Models\PageTerritory;
 use App\Models\Territory;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -128,19 +129,20 @@ class TerritoryRepository extends Repository
 
     public function searchAvailablePages(int $territoryId, string $query, int $perPage = 20, int $page = 1): array
     {
-        $territory = $this->find($territoryId);
-        if (!$territory) {
-            return [];
-        }
+        $pageTerritories = PageTerritory::where('territory_id', '!=', $territoryId)->get();
+        $excludedIds = $pageTerritories->pluck('page_id')
+            ->toArray();
 
-        return Page::where(function($q) use ($territoryId) {
-                $q->whereNull('territory_id')
-                    ->orWhere('territory_id', $territoryId);
+        $queryBuilder = Page::query()
+            ->when(!empty($excludedIds), function ($query) use ($excludedIds) {
+                // Only apply whereNotIn if we have IDs to exclude
+                $query->whereNotIn('id', $excludedIds);
             })
             ->where('title', 'LIKE', "%{$query}%")
             ->where('site_id', SiteContext::getId())
-            ->orderBy('title')
-            ->paginate($perPage, $page);
+            ->orderBy('title');
+
+        return $queryBuilder->paginate($perPage, $page);
     }
 
     public function getPagesByTerritory(int $territoryId, int $perPage = 20, int $page = 1): array

@@ -7,13 +7,16 @@ use App\Models\Block;
 use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageAccessRole;
+use App\Models\PageAuthor;
 use App\Models\PageCategory;
 use App\Models\PageCustomField;
 use App\Models\PageMetadata;
+use App\Models\PageRegionSet;
 use App\Models\PageSeo;
 use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Models\PageTag;
+use App\Models\PageTerritory;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -48,7 +51,12 @@ class PageRepository extends Repository
             'settings',
             'social',
             'customFields',
-            'customFields.customFieldDefinition'
+            'customFields.customFieldDefinition',
+            'authors',
+            'pageAuthors',
+            'pageAuthors.author',
+            'regionSets',
+            'territories'
         ]);;
         return $this->searchEngine->search($query, $criteria);
     }
@@ -154,7 +162,9 @@ class PageRepository extends Repository
     {
         return Page::with([
             'blocks', 'categories', 'tags', 'metadata',
-            'seo', 'settings', 'social', 'customFields', 'customFields.customFieldDefinition'
+            'seo', 'settings', 'social', 'customFields',
+            'customFields.customFieldDefinition',
+            'authors', 'pageAuthors', 'pageAuthors.author', 'regionSets', 'territories'
         ])->find($pageId);
     }
 
@@ -301,6 +311,48 @@ class PageRepository extends Repository
             PageAccessRole::create([
                 'page_id' => $targetPageId,
                 'role_id' => $role->role_id  // Changed from $role['role_id']
+            ]);
+        }
+    }
+
+    public function duplicatePageAuthors(int $sourcePageId, int $targetPageId): void
+    {
+        $authors = PageAuthor::where('page_id', $sourcePageId)
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($authors as $author) {
+            PageAuthor::create([
+                'page_id' => $targetPageId,
+                'author_id' => $author->author_id,
+                'role' => $author->role,
+                'sort_order' => $author->sort_order
+            ]);
+        }
+    }
+
+    public function duplicateRegionSets(int $sourcePageId, int $targetPageId): void
+    {
+        $regionSets = PageRegionSet::where('page_id', $sourcePageId)->get();
+
+        foreach ($regionSets as $regionSet) {
+            PageRegionSet::create([
+                'page_id' => $targetPageId,
+                'region_set_id' => $regionSet->region_set_id,
+                'site_id' => $regionSet->site_id
+            ]);
+        }
+    }
+
+    public function duplicateTerritories(int $sourcePageId, int $targetPageId): void
+    {
+        $territories = PageTerritory::where('page_id', $sourcePageId)->get();
+
+        foreach ($territories as $territory) {
+            PageTerritory::create([
+                'page_id' => $targetPageId,
+                'territory_id' => $territory->territory_id,
+                'site_id' => $territory->site_id
             ]);
         }
     }

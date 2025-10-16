@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Models;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class UserTest extends FunctionalTestCase
+class UserModelTest extends FunctionalTestCase
 {
     protected User $user;
 

@@ -33,10 +33,19 @@ class Page extends Model
         'subtitle'
     ];
 
-    // Relations that should always be included in serialization
     protected $alwaysInclude = [
-        'blocks', 'categories', 'tags', 'metadata', 'seo',
-        'settings', 'social', 'customFields'
+        'blocks',
+        'categories',
+        'tags',
+        'metadata',
+        'seo',
+        'settings',
+        'social',
+        'customFields',
+        'authors',
+        'pageAuthors',
+        'regionSets',
+        'territories'
     ];
 
     // You can hide sensitive attributes
@@ -238,6 +247,77 @@ class Page extends Model
         $this->fireModelEvent('syncedCustomFields');
     }
 
+    public function pageAuthors($relation = false)
+    {
+        return $this->hasMany(PageAuthor::class, 'page_id', 'id', $relation)
+            ->orderBy('sort_order');
+    }
+
+    public function authors($relation = false)
+    {
+        return $this->belongsToMany(
+            Author::class,
+            'page_authors',
+            'page_id',
+            'author_id',
+            $relation
+        )->withPivot('role', 'sort_order')
+            ->orderBy('page_authors.sort_order');
+    }
+
+    public function primaryAuthors($relation = false)
+    {
+        return $this->belongsToMany(
+            Author::class,
+            'page_authors',
+            'page_id',
+            'author_id',
+            $relation
+        )->wherePivot('role', 'primary')
+            ->withPivot('sort_order')
+            ->orderBy('page_authors.sort_order');
+    }
+
+    public function contributors($relation = false)
+    {
+        return $this->belongsToMany(
+            Author::class,
+            'page_authors',
+            'page_id',
+            'author_id',
+            $relation
+        )->wherePivot('role', 'contributor')
+            ->withPivot('sort_order')
+            ->orderBy('page_authors.sort_order');
+    }
+
+// Helper method to get primary author (for backward compatibility)
+    public function getPrimaryAuthor()
+    {
+        return $this->primaryAuthors()->first();
+    }
+
+    public function regionSets(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            RegionSet::class,
+            'page_region_sets',
+            'page_id',
+            'region_set_id',
+            $relation
+        );
+    }
+
+    public function territories(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            Territory::class,
+            'page_territories',
+            'page_id',
+            'territory_id',
+            $relation
+        );
+    }
 
 
 }

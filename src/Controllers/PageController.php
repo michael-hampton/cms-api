@@ -7,6 +7,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
+use App\Models\Page;
 use App\Models\PageHistory;
 use App\Parsers\BlockRegistry;
 use App\Repositories\PageRepository;
@@ -33,7 +34,6 @@ class PageController extends Controller
     {
         try {
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
-
             $result = $this->pageRepository->search($criteria);
             // Format blocks in the paginated data
             $formattedData = $result->getData();

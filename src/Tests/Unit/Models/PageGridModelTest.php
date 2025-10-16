@@ -6,7 +6,7 @@ use App\Models\PageGrid;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class PageGridTest extends FunctionalTestCase
+class PageGridModelTest extends FunctionalTestCase
 {
     protected PageGrid $pageGrid;
 

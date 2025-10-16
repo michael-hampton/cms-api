@@ -4,6 +4,7 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\Model;
 use App\Models\Page;
+use App\Models\PageTerritory;
 use App\Models\RegionSet;
 use App\Models\Territory;
 
@@ -500,7 +501,6 @@ class TerritoryControllerTest extends FunctionalTestCase
             'title' => 'Regional Page 1',
             'slug' => 'regional-page-1',
             'status' => 'published',
-            'region_set_id' => $this->regionSet->id,
             'site_id' => $this->siteId
         ]);
 
@@ -508,7 +508,6 @@ class TerritoryControllerTest extends FunctionalTestCase
             'title' => 'Regional Page 2',
             'slug' => 'regional-page-2',
             'status' => 'published',
-            'region_set_id' => $this->regionSet->id,
             'site_id' => $this->siteId
         ]);
 
@@ -518,12 +517,9 @@ class TerritoryControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
 
-        // Verify pages were assigned
-        $page1 = $page1->fresh();
-        $page2 = $page2->fresh();
-
-        $this->assertEquals($territory->id, $page1->territory_id);
-        $this->assertEquals($territory->id, $page2->territory_id);
+        // Verify assignments
+        $assignments = PageTerritory::where('territory_id', $territory->id)->get();
+        $this->assertCount(2, $assignments);
     }
 
     public function testUnassignPagesFromTerritory()
@@ -539,7 +535,11 @@ class TerritoryControllerTest extends FunctionalTestCase
             'title' => 'UK Page',
             'slug' => 'uk-page',
             'status' => 'published',
-            'region_set_id' => $this->regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
             'territory_id' => $territory->id,
             'site_id' => $this->siteId
         ]);
@@ -550,44 +550,10 @@ class TerritoryControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
 
-        // Verify page was unassigned
-        $page = $page->fresh();
-        $this->assertNull($page->territory_id);
+        // Verify unassignment
+        $assignment = PageTerritory::where('page_id', $page->id)
+            ->where('territory_id', $territory->id)
+            ->first();
+        $this->assertNull($assignment);
     }
-
-//    public function testAssignPagesOnlyWorksForPagesInSameRegionSet()
-//    {
-//        $territory = Territory::create([
-//            'name' => 'United Kingdom',
-//            'code' => 'GB',
-//            'region_set_id' => $this->regionSet->id,
-//            'site_id' => $this->siteId
-//        ]);
-//
-//        $otherRegionSet = RegionSet::create([
-//            'name' => 'Asia',
-//            'slug' => 'asia',
-//            'site_id' => $this->siteId
-//        ]);
-//
-//        $page = Page::create([
-//            'title' => 'Asian Page',
-//            'slug' => 'asian-page',
-//            'status' => 'published',
-//            'region_set_id' => $otherRegionSet->id,
-//            'site_id' => $this->siteId
-//        ]);
-//
-//        $response = $this->postForSite("/api/territories/{$territory->id}/assign-pages", [
-//            'page_ids' => [$page->id]
-//        ]);
-//
-//        // This should succeed but the page shouldn't be assigned
-//        // because it's from a different region set
-//        $this->assertResponseOk($response);
-//
-//        $page = $page->fresh();
-//
-//        $this->assertNotEquals($territory->id, $page->territory_id);
-//    }
 }

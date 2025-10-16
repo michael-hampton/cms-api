@@ -8,6 +8,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Page;
 use App\Models\RegionSet;
+use App\Repositories\PageRegionSetRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\RegionSetRepository;
 use App\Repositories\TerritoryRepository;
@@ -22,7 +23,8 @@ class RegionSetService
         Database $database,
         RegionSetRepository $repository,
         TerritoryRepository $territoryRepository,
-        private readonly PageRepository $pageRepository
+        private readonly PageRepository $pageRepository,
+        private readonly PageRegionSetRepository $pageRegionSetRepository
     ) {
         $this->database = $database ?? Database::getInstance();
         $this->repository = $repository;
@@ -234,17 +236,10 @@ class RegionSetService
         return $slug;
     }
 
-    public function assignPages(int $regionSetId, array $pageIds): bool
+    public function assignPages(int $regionSetId, array $pageIds, int $siteId): bool
     {
-        return $this->database->transaction(function () use ($regionSetId, $pageIds) {
-            foreach ($pageIds as $pageId) {
-                $page = $this->pageRepository->find($pageId);
-
-                if ($page) {
-                    $page->region_set_id = $regionSetId;
-                    $page->save();
-                }
-            }
+        return $this->database->transaction(function () use ($regionSetId, $pageIds, $siteId) {
+            $this->pageRegionSetRepository->assignPages($regionSetId, $pageIds, $siteId);
             return true;
         });
     }
@@ -252,14 +247,7 @@ class RegionSetService
     public function unassignPages(int $regionSetId, array $pageIds): bool
     {
         return $this->database->transaction(function () use ($regionSetId, $pageIds) {
-            foreach ($pageIds as $pageId) {
-                $page = $this->pageRepository->find($pageId);
-                if ($page && $page->region_set_id == $regionSetId) {
-                    $page->region_set_id = null;
-                    $page->territory_id = null;
-                    $page->save();
-                }
-            }
+            $this->pageRegionSetRepository->unassignPages($regionSetId, $pageIds);
             return true;
         });
     }

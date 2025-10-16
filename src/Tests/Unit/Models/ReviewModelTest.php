@@ -6,7 +6,7 @@ use App\Models\Review;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class ReviewTest extends FunctionalTestCase
+class ReviewModelTest extends FunctionalTestCase
 {
     protected Review $review;
 

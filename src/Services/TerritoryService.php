@@ -9,6 +9,7 @@ use App\Framework\Support\Str;
 use App\Models\Page;
 use App\Models\Territory;
 use App\Repositories\PageRepository;
+use App\Repositories\PageTerritoryRepository;
 use App\Repositories\TerritoryRepository;
 
 class TerritoryService
@@ -19,7 +20,8 @@ class TerritoryService
     public function __construct(
         Database $database,
         TerritoryRepository $repository,
-        private PageRepository $pageRepository
+        private PageRepository $pageRepository,
+        private PageTerritoryRepository $pageTerritoryRepository
     )
     {
         $this->database = $database ?? Database::getInstance();
@@ -112,16 +114,10 @@ class TerritoryService
         return $this->repository->bulkUpdateRegionSet($territoryIds, $newRegionSetId);
     }
 
-    public function assignPages(int $territoryId, array $pageIds): bool
+    public function assignPages(int $territoryId, array $pageIds, int $siteId): bool
     {
-        return $this->database->transaction(function () use ($territoryId, $pageIds) {
-            foreach ($pageIds as $pageId) {
-                $page = $this->pageRepository->find($pageId);
-                if ($page) {
-                    $page->territory_id = $territoryId;
-                    $page->save();
-                }
-            }
+        return $this->database->transaction(function () use ($territoryId, $pageIds, $siteId) {
+            $this->pageTerritoryRepository->assignPages($territoryId, $pageIds, $siteId);
             return true;
         });
     }
@@ -129,13 +125,7 @@ class TerritoryService
     public function unassignPages(int $territoryId, array $pageIds): bool
     {
         return $this->database->transaction(function () use ($territoryId, $pageIds) {
-            foreach ($pageIds as $pageId) {
-                $page = $this->pageRepository->find($pageId);
-                if ($page && $page->territory_id == $territoryId) {
-                    $page->territory_id = null;
-                    $page->save();
-                }
-            }
+            $this->pageTerritoryRepository->unassignPages($territoryId, $pageIds);
             return true;
         });
     }

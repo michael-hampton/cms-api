@@ -8,6 +8,13 @@ use App\Models\Model;
 
 class BelongsToManyHandler extends RelationshipHandler implements PivotOperationsInterface
 {
+    protected array $pivotColumns = [];
+    public function withPivot(array $columns): self
+    {
+        $this->pivotColumns = array_merge($this->pivotColumns, $columns);
+        return $this;
+    }
+
     public function loadForResults(array $results, array $relationData, string $relation): array
     {
         $parentIds = $this->extractParentIds($results);
@@ -148,7 +155,8 @@ class BelongsToManyHandler extends RelationshipHandler implements PivotOperation
 
         $records = $relatedQuery->whereIn('id', $relatedIds)->get();
 
-        return $this->indexRecordsById($records);
+        // Index records and attach pivot data
+        return $this->indexRecordsWithPivot($records, $pivotRecords, $relationData);
     }
 
     private function extractUniqueRelatedIds(Collection $pivotRecords, array $relationData): array
@@ -255,5 +263,42 @@ class BelongsToManyHandler extends RelationshipHandler implements PivotOperation
             }
         }
         return $attached;
+    }
+
+    private function indexRecordsWithPivot(Collection $records, Collection $pivotRecords, array $relationData): array
+    {
+        $indexed = [];
+        $pivotMap = [];
+
+        // Create a map of related_id => pivot data
+        foreach ($pivotRecords as $pivot) {
+            $relatedId = $this->extractValue($pivot, $relationData['related_key']);
+            $pivotMap[$relatedId][] = $pivot;
+        }
+
+        foreach ($records as $record) {
+            $recordId = $this->extractId($record);
+
+            // Attach pivot data if we have columns specified
+            if (!empty($this->pivotColumns) && isset($pivotMap[$recordId])) {
+                $pivotData = [];
+                foreach ($this->pivotColumns as $column) {
+                    if (isset($pivotMap[$recordId][0][$column])) {
+                        $pivotData[$column] = $pivotMap[$recordId][0][$column];
+                    }
+                }
+
+                // Set pivot data on the model
+                if ($record instanceof Model) {
+                    $record->setAttribute('pivot', $pivotData);
+                } elseif (is_array($record)) {
+                    $record['pivot'] = $pivotData;
+                }
+            }
+
+            $indexed[$recordId] = $record;
+        }
+
+        return $indexed;
     }
 }

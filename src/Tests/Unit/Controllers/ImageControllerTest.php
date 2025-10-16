@@ -84,6 +84,7 @@ class ImageControllerTest extends FunctionalTestCase
 
         $request->shouldReceive('get')->with('name')->andReturn('Test Image');
         $request->shouldReceive('get')->with('credit')->andReturn('Test Credit');
+        $request->shouldReceive('get')->with('image_rights')->andReturn('');
         $request->shouldReceive('file')->with('image')->andReturn($file);
         $request->shouldReceive('get')->with('alt_text')->andReturn('Alt text');
         $request->shouldReceive('get')->with('caption')->andReturn('Caption');

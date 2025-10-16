@@ -51,7 +51,8 @@ class InfoBlockParser extends BaseBlockParser
             'note' => '📝',
             'ingredients' => '🥗',
             'recipe' => '👨‍🍳',
-            'instructions' => '📋'
+            'instructions' => '📋',
+            'update' => '📝',
         ];
 
         return $icons[$infoType] ?? 'ℹ️';

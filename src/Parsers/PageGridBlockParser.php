@@ -181,7 +181,15 @@ class PageGridBlockParser extends BaseBlockParser
         }
 
         if (!empty($meta['author'])) {
-            $cleanMeta['author'] = trim($meta['author']);
+            if (is_array($meta['author'])) {
+                $cleanMeta['authors'] = array_map('trim', $meta['author']);
+            } else {
+                $cleanMeta['author'] = trim($meta['author']);
+            }
+        }
+
+        if (!empty($meta['authors']) && is_array($meta['authors'])) {
+            $cleanMeta['authors'] = array_map('trim', $meta['authors']);
         }
 
         if (!empty($meta['category'])) {
@@ -548,7 +556,10 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "<span class=\"page-meta-item page-meta-date\">📅 " . htmlspecialchars($page['meta']['date']) . "</span>";
             }
 
-            if (!empty($page['meta']['author'])) {
+            if (!empty($page['meta']['authors']) && is_array($page['meta']['authors'])) {
+                $authorNames = array_map('htmlspecialchars', $page['meta']['authors']);
+                $html .= "<span class=\"page-meta-item page-meta-authors\">✍️ " . implode(', ', $authorNames) . "</span>";
+            } elseif (!empty($page['meta']['author'])) {
                 $html .= "<span class=\"page-meta-item page-meta-author\">✍️ " . htmlspecialchars($page['meta']['author']) . "</span>";
             }
 

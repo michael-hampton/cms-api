@@ -6,6 +6,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Model;
 use App\Models\Page;
+use App\Models\PageRegionSet;
 use App\Models\RegionSet;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -111,14 +112,21 @@ class RegionSetRepository extends Repository
 
     public function searchAvailablePages(int $regionSetId, string $query, int $perPage = 20, int $page = 1): array
     {
-        $queryBuilder = Page::where(function($q) use ($regionSetId) {
-            $q->whereNull('region_set_id')
-                ->orWhere('region_set_id', $regionSetId);
-        })
+        // Step 1: Get all page IDs assigned to *other* region sets
+        $pageRegionSets = PageRegionSet::where('region_set_id', '!=', $regionSetId)->get();
+        $excludedIds = $pageRegionSets->pluck('page_id')
+            ->toArray();
+
+        // Step 2: Build main query
+        $queryBuilder = Page::query()
+            ->when(!empty($excludedIds), function ($query) use ($excludedIds) {
+                $query->whereNotIn('id', $excludedIds);
+            })
             ->where('title', 'LIKE', "%{$query}%")
             ->where('site_id', SiteContext::getId())
             ->orderBy('title');
 
+        // Step 3: Paginate results
         return $queryBuilder->paginate($perPage, $page);
     }
 

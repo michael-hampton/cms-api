@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\Wishlist;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class WishlistTest extends FunctionalTestCase
+class WishlistModelTest extends FunctionalTestCase
 {
     protected Wishlist $wishlist;
 

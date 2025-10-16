@@ -6,7 +6,7 @@ use App\Framework\Support\Collection;
 use App\Models\Site;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class SiteTest extends FunctionalTestCase
+class SiteModelTest extends FunctionalTestCase
 {
     protected Site $site;
 

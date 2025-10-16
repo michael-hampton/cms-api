@@ -34,7 +34,8 @@ class ContentController extends Controller
         // Load page relationships
         $page->load([
             'blocks', 'categories', 'tags', 'metadata',
-            'seo', 'settings', 'social', 'customFields', 'author'
+            'seo', 'settings', 'social', 'customFields',
+            'authors', 'pageAuthors', 'pageAuthors.author'  // Add these
         ]);
 
         $data = [

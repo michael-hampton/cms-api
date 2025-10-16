@@ -2,17 +2,23 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Author;
 use App\Models\Block;
 use App\Models\Category;
 use App\Models\Page;
+use App\Models\PageAuthor;
 use App\Models\PageCategory;
 use App\Models\PageHistory;
 use App\Models\PageMetadata;
+use App\Models\PageRegionSet;
 use App\Models\PageSeo;
 use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Models\PageTag;
+use App\Models\PageTerritory;
+use App\Models\RegionSet;
 use App\Models\Tag;
+use App\Models\Territory;
 
 class PageControllerTest extends FunctionalTestCase
 {
@@ -516,5 +522,207 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertNotNull($history);
         $this->assertEquals('duplicated', $history->action);
+    }
+
+    public function testStoreWithMultipleAuthors()
+    {
+        $author1 = $this->createAuthor();
+        $author2 = $this->createAuthor();
+        $author3 = $this->createAuthor();
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Multi-Author Page', 'authors' => [1, 2]],
+                'meta' => [
+                    'slug' => 'multi-author',
+                    'status' => 'draft',$author3->id,
+                    'authors' => [$author1->id, $author2->id],
+                    'contributors' => [$author3->id]
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Multi-Author Page', $data['data']['page']['title']);
+        $this->assertCount(3, $data['data']['page']['authors']);
+    }
+
+    public function testStoreWithMultipleRegionSetsAndTerritories()
+    {
+        $regionSet1 = RegionSet::create([
+            'name' => 'North America',
+            'slug' => 'north-america',
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $regionSet2 = RegionSet::create([
+            'name' => 'Europe',
+            'slug' => 'europe',
+            'is_active' => true,
+            'sort_order' => 2,
+            'site_id' => $this->siteId
+        ]);
+
+        $territory1 = Territory::create([
+            'name' => 'USA',
+            'code' => 'US',
+            'region_set_id' => $regionSet1->id,
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $territory2 = Territory::create([
+            'name' => 'UK',
+            'code' => 'GB',
+            'region_set_id' => $regionSet2->id,
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Regional Page'],
+                'meta' => [
+                    'slug' => 'regional-page',
+                    'status' => 'draft',
+                    'region_sets' => [$regionSet1->id, $regionSet2->id],
+                    'territories' => [$territory1->id, $territory2->id]
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Regional Page', $data['data']['page']['title']);
+        $this->assertCount(2, $data['data']['page']['regionSets']);
+        $this->assertCount(2, $data['data']['page']['territories']);
+    }
+
+    public function testDuplicatePageClonesRegionSetsAndTerritories()
+    {
+        $regionSet = RegionSet::create([
+            'name' => 'Test Region',
+            'slug' => 'test-region',
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $territory = Territory::create([
+            'name' => 'Test Territory',
+            'code' => 'TT',
+            'region_set_id' => $regionSet->id,
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $page = Page::create([
+            'title' => 'Original Page',
+            'slug' => 'original-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageRegionSet::create([
+            'page_id' => $page->id,
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $territory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['data']['page']['regionSets']);
+        $this->assertCount(1, $data['data']['page']['territories']);
+        $this->assertEquals($regionSet->id, $data['data']['page']['regionSets'][0]['id']);
+        $this->assertEquals($territory->id, $data['data']['page']['territories'][0]['id']);
+    }
+
+    public function testDuplicatePageClonesAuthorsAndContributors()
+    {
+        $page = Page::create([
+            'title' => 'Original Page',
+            'slug' => 'original-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $author1 = $this->createAuthor();
+        $author2 = $this->createAuthor();
+        $author3 = $this->createAuthor();
+
+        // Create authors
+        PageAuthor::create([
+            'page_id' => $page->id,
+            'author_id' => $author1->id,
+            'role' => 'primary',
+            'sort_order' => 0
+        ]);
+
+        PageAuthor::create([
+            'page_id' => $page->id,
+            'author_id' => $author2->id,
+            'role' => 'primary',
+            'sort_order' => 1
+        ]);
+
+        PageAuthor::create([
+            'page_id' => $page->id,
+            'author_id' => $author3->id,
+            'role' => 'contributor',
+            'sort_order' => 0
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $duplicatedPageId = $data['data']['page']['id'];
+
+        // Verify authors were duplicated
+        $primaryAuthors = PageAuthor::where('page_id', $duplicatedPageId)
+            ->where('role', 'primary')
+            ->get();
+        $this->assertCount(2, $primaryAuthors);
+
+        // Verify contributors were duplicated
+        $contributors = PageAuthor::where('page_id', $duplicatedPageId)
+            ->where('role', 'contributor')
+            ->get();
+        $this->assertCount(1, $contributors);
+    }
+
+    private function createAuthor()
+    {
+        return Author::create([
+            'name' => '<NAME>',
+            'email' => '<EMAIL>',
+            'slug' => 'test-author-'.date('YmdHis'),
+            'status' => 'active',
+        ]);
     }
 }

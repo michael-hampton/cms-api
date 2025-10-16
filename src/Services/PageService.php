@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
-use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageMetadata;
 use App\Models\PageSeo;
@@ -14,20 +14,25 @@ use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Repositories\AccessRoleRepository;
 use App\Repositories\BlockRepository;
+use App\Repositories\PageAuthorRepository;
 use App\Repositories\PageCategoryRepository;
 use App\Repositories\PageCustomFieldRepository;
 use App\Repositories\PageMetadataRepository;
+use App\Repositories\PageRegionSetRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\PageSeoRepository;
 use App\Repositories\PageSettingsRepository;
 use App\Repositories\PageSocialRepository;
 use App\Repositories\PageTagRepository;
+use App\Repositories\PageTerritoryRepository;
 use App\Requests\PageFormValidationRules;
 use DateTime;
 use Exception;
 
 class PageService
 {
+    private ?int $siteId;
+
     public function __construct(
         private PageRepository            $pageRepository,
         private BlockRepository           $blockRepository,
@@ -41,9 +46,14 @@ class PageService
         private PageTagRepository         $tagRepository,
         private AccessRoleRepository      $accessRoleRepository,
         private Database                  $database,
-        private PageHistoryService        $historyService
+        private PageHistoryService        $historyService,
+        private PageAuthorRepository $pageAuthorRepository,
+        private PageRegionSetRepository   $pageRegionSetRepository,
+        private PageTerritoryRepository   $pageTerritoryRepository,
+        ?int $siteId = null
     )
     {
+        $this->siteId = $siteId ?? SiteContext::getId();
     }
 
     /**
@@ -227,6 +237,12 @@ class PageService
 
     private function processMetadataForm(int $pageId, array $metaForm): void
     {
+        // Extract authors and contributors before processing
+        $authors = $metaForm['authors'] ?? [];
+        $contributors = $metaForm['contributors'] ?? [];
+        $regionSets = $metaForm['region_sets'] ?? [];
+        $territories = $metaForm['territories'] ?? [];
+
         $mapping = [
             'content_type' => 'content_type',
             'block_category' => 'block_category',
@@ -244,11 +260,28 @@ class PageService
         $data = $this->mapFormData($metaForm, $mapping);
         $isCompletelyEmpty = count(array_filter($data, fn($v) => !empty($v))) === 0;
 
-        if ($isCompletelyEmpty) {
-            return;
+        if (!$isCompletelyEmpty) {
+            $this->metadataRepository->createOrUpdate($pageId, $data);
         }
 
-        $this->metadataRepository->createOrUpdate($pageId, $data);
+        // Sync authors and contributors
+        if (!empty($authors)) {
+            $this->pageAuthorRepository->syncAuthors($pageId, $authors, 'primary', $this->siteId);
+        }
+
+        if (!empty($contributors)) {
+            $this->pageAuthorRepository->syncAuthors($pageId, $contributors, 'contributor', $this->siteId);
+        }
+
+        // Sync region sets
+        if (!empty($regionSets)) {
+            $this->pageRegionSetRepository->syncRegionSets($pageId, $regionSets, $this->siteId);
+        }
+
+        // Sync territories
+        if (!empty($territories)) {
+            $this->pageTerritoryRepository->syncTerritories($pageId, $territories, $this->siteId);
+        }
     }
 
     private function processSeoForm(int $pageId, array $seoForm): void
@@ -585,6 +618,9 @@ class PageService
             'tags' => 'duplicateTags',
             'customFields' => 'duplicateCustomFields',
             'accessRoles' => 'duplicateAccessRoles',
+            'pageAuthors' => 'duplicatePageAuthors',
+            'regionSets' => 'duplicateRegionSets',
+            'territories' => 'duplicateTerritories',
         ];
 
         $errors = [];
@@ -735,7 +771,7 @@ class PageService
     private function mergePageRelations(int $sourcePageId, int $targetPageId, string $strategy): void
     {
         // Many-to-many relations can be appended
-        $appendableRelations = ['categories', 'tags', 'accessRoles'];
+        $appendableRelations = ['categories', 'tags', 'accessRoles', 'regionSets', 'territories', 'pageAuthors', 'customFields'];;
 
         foreach ($appendableRelations as $relation) {
             $method = 'duplicate' . ucfirst($relation);

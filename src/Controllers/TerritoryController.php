@@ -6,6 +6,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Repositories\PageRepository;
 use App\Repositories\TerritoryRepository;
 use App\Resources\PageResource;
@@ -181,7 +182,7 @@ class TerritoryController extends Controller
                 return $this->errorResponse('No pages provided', 400);
             }
 
-            $this->service->assignPages($id, $pageIds);
+            $this->service->assignPages($id, $pageIds, SiteContext::getId());
 
             return $this->successResponse("Successfully assigned " . count($pageIds) . " page(s)");
         } catch (Exception $e) {

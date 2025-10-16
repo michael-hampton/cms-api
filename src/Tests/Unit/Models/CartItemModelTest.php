@@ -7,7 +7,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class CartItemTest extends FunctionalTestCase
+class CartItemModelTest extends FunctionalTestCase
 {
     protected CartItem $cartItem;
 

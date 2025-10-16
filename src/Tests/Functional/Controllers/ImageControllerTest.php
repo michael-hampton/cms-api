@@ -472,7 +472,7 @@ class ImageControllerTest extends FunctionalTestCase
             'image_rights' => 'invalid_rights'
         ], $files);
 
-        $this->assertEquals(400, $response->getStatusCode());
+        $this->assertEquals(422, $response->getStatusCode());
     }
 
     public function testUpdateWithImageRights()

@@ -14,6 +14,9 @@ class RelationBuilder implements RelationBuilderInterface
     protected Model $parent;
     protected array $relationData;
 
+    protected array $pivotWheres = [];
+    protected array $pivotColumns = [];
+
     public function __construct(
         RelationshipHandler $handler,
         Model $parent,
@@ -682,6 +685,140 @@ class RelationBuilder implements RelationBuilderInterface
             'bindings' => $bindings,
             'relation_type' => $this->relationData['type']
         ]);
+        return $this;
+    }
+
+    /**
+     * Specify which pivot columns to include in the results
+     */
+    public function withPivot(...$columns): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "withPivot() is only available for belongsToMany relationships"
+            );
+        }
+
+        $columns = is_array($columns[0]) ? $columns[0] : $columns;
+        $this->pivotColumns = array_merge($this->pivotColumns, $columns);
+
+        // Pass to handler if it supports it
+        if (method_exists($this->handler, 'withPivot')) {
+            $this->handler->withPivot($columns);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Add a where clause on the pivot table
+     */
+    public function wherePivot(string $column, $operator = null, $value = null): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "wherePivot() is only available for belongsToMany relationships"
+            );
+        }
+
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $pivotTable = $this->relationData['pivot_table'];
+        $this->query->where("{$pivotTable}.{$column}", $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add an OR where clause on the pivot table
+     */
+    public function orWherePivot(string $column, $operator = null, $value = null): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "orWherePivot() is only available for belongsToMany relationships"
+            );
+        }
+
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $pivotTable = $this->relationData['pivot_table'];
+        $this->query->orWhere("{$pivotTable}.{$column}", $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add a whereIn clause on the pivot table
+     */
+    public function wherePivotIn(string $column, array $values): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "wherePivotIn() is only available for belongsToMany relationships"
+            );
+        }
+
+        $pivotTable = $this->relationData['pivot_table'];
+        $this->query->whereIn("{$pivotTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
+     * Add a whereNotIn clause on the pivot table
+     */
+    public function wherePivotNotIn(string $column, array $values): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "wherePivotNotIn() is only available for belongsToMany relationships"
+            );
+        }
+
+        $pivotTable = $this->relationData['pivot_table'];
+        $this->query->whereNotIn("{$pivotTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
+     * Add a whereNull clause on the pivot table
+     */
+    public function wherePivotNull(string $column): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "wherePivotNull() is only available for belongsToMany relationships"
+            );
+        }
+
+        $pivotTable = $this->relationData['pivot_table'];
+        $this->query->whereNull("{$pivotTable}.{$column}");
+
+        return $this;
+    }
+
+    /**
+     * Add a whereNotNull clause on the pivot table
+     */
+    public function wherePivotNotNull(string $column): self
+    {
+        if ($this->relationData['type'] !== 'belongsToMany') {
+            throw new BadMethodCallException(
+                "wherePivotNotNull() is only available for belongsToMany relationships"
+            );
+        }
+
+        $pivotTable = $this->relationData['pivot_table'];
+        $this->query->whereNotNull("{$pivotTable}.{$column}");
+
         return $this;
     }
 }
