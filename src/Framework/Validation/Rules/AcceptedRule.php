@@ -3,7 +3,7 @@
 namespace App\Framework\Validation\Rules;
 
 
-class Accepted extends BaseValidationRule
+class AcceptedRule extends BaseValidationRule
 {
     public function __construct()
     {

@@ -9,7 +9,8 @@ use App\Framework\Validation\Rules\ConfirmedRule;
 use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\InRule;
-use App\Framework\Validation\Rules\Accepted;
+use App\Framework\Validation\Rules\AcceptedRule;
+use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinLengthRule;
@@ -22,6 +23,7 @@ use App\Framework\Validation\Rules\RequiredWithRule;
 use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\UniqueRule;
 use App\Framework\Validation\Rules\UrlRule;
+use Cassandra\Inet;
 use Exception;
 
 class Validator
@@ -240,7 +242,7 @@ class Validator
             'url' => UrlRule::class,
             'numeric' => NumericRule::class,
             'nullable' => NumericRule::class,
-            'integer' => Accepted::class,
+            'integer' => IntegerRule::class,
             'in' => InRule::class,
             'between' => BetweenRule::class,
             'regex' => RegexRule::class,
@@ -251,6 +253,7 @@ class Validator
             'date_rule' => DateRule::class,
             'sometimes' => SometimesRule::class,  // ADD THIS
             'confirmed' => ConfirmedRule::class,
+            'accepted' => AcceptedRule::class,
         ];
 
         if (!isset($ruleMap[$ruleName])) {

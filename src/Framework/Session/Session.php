@@ -19,8 +19,6 @@ class Session
             throw new \RuntimeException('Cannot start session - headers already sent');
         }
 
-        echo session_id();
-
         session_start();
         self::$started = true;
     }
