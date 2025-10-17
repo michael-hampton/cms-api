@@ -132,7 +132,11 @@ class CategoryServiceTest extends FunctionalTestCase
             'name' => 'Technology',
             'description' => 'Tech articles',
             'parent_id' => null,
-            'slug' => 'technology'
+            'slug' => 'technology',
+            'seo_title' => 'Tech SEO Title',
+            'seo_description' => 'Tech SEO Description',
+            'no_index' => false,
+            'canonical_url' => 'https://example.com/tech'
         ]);
 
         $this->databaseMock
@@ -164,7 +168,11 @@ class CategoryServiceTest extends FunctionalTestCase
             ->with(Mockery::on(function($data) {
                 return $data['name'] === 'Technology (Copy)'
                     && $data['slug'] === 'technology-copy'
-                    && $data['status'] === 'inactive';
+                    && $data['status'] === 'inactive'
+                    && $data['seo_title'] === 'Tech SEO Title'
+                    && $data['seo_description'] === 'Tech SEO Description'
+                    && $data['no_index'] === false
+                    && $data['canonical_url'] === null;
             }))
             ->andReturn($newCategory);
 

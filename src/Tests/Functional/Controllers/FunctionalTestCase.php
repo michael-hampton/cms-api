@@ -301,6 +301,7 @@ abstract class FunctionalTestCase extends TestCase
         if (!empty($files)) {
             $_FILES = $files;
         }
+
         $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $headers, $files);
 
         return new TestResponse(

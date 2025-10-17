@@ -18,7 +18,7 @@ class AuthController extends Controller
         parent::__construct();
     }
 
-    public function login(\App\Requests\LoginRequest $request): JsonResponse
+    public function login(\App\Requests\MemberRegistrationRequest $request): JsonResponse
     {
         $validated = $request->validated();
 

@@ -258,6 +258,30 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertEquals(0, $newBrand->products()->count());
     }
 
+    public function testDuplicateBrandWithSeoFields(): void
+    {
+        $brand = Brand::create([
+            'name' => 'Nike',
+            'slug' => 'nike',
+            'status' => 'active',
+            'seo_title' => 'Nike SEO Title',
+            'seo_description' => 'Nike SEO Description',
+            'no_index' => false,
+            'canonical_url' => 'https://example.com/nike'
+        ]);
+
+        $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Nike (Copy)', $data['data']['name']);
+        $this->assertEquals('Nike SEO Title', $data['data']['seo_title']);
+        $this->assertEquals('Nike SEO Description', $data['data']['seo_description']);
+        $this->assertEquals(0, $data['data']['no_index']);
+        $this->assertNull($data['data']['canonical_url']);
+    }
+
 //    public function testActiveReturnsOnlyActiveBrands()
 //    {
 //        Brand::create(['name' => 'Active Brand', 'slug' => 'active-brand', 'is_active' => true]);

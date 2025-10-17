@@ -312,7 +312,11 @@ class BrandServiceTest extends FunctionalTestCase
             'website' => 'https://nike.com',
             'logo' => 'logos/nike.png',
             'status' => 'active',
-            'slug' => 'nike'
+            'slug' => 'nike',
+            'seo_title' => 'Nike SEO Title',
+            'seo_description' => 'Nike SEO Description',
+            'no_index' => false,
+            'canonical_url' => 'https://example.com/nike'
         ]);
 
         $this->databaseMock
@@ -342,11 +346,26 @@ class BrandServiceTest extends FunctionalTestCase
             'id' => 2,
             'name' => 'Nike (Copy)',
             'slug' => 'nike-copy',
-            'status' => 'inactive'
+            'status' => 'inactive',
+            'seo_title' => 'Nike SEO Title',
+            'seo_description' => 'Nike SEO Description',
+            'no_index' => false,
+            'canonical_url' => null
         ]);
 
         $this->brandRepository
             ->shouldReceive('create')
+            ->with([
+                'name' => 'Nike (Copy)',
+                'description' => 'Sports brand',
+                'website' => 'https://nike.com',
+                'status' => 'inactive',
+                'seo_title' => 'Nike SEO Title',
+                'seo_description' => 'Nike SEO Description',
+                'no_index' => false,
+                'canonical_url' => NULL,
+                'slug' => 'nike-copy',
+                'logo' => 'logos/nike-copy.png'])
             ->once()
             ->andReturn($newBrand);
 

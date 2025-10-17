@@ -241,4 +241,27 @@ class PageController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    public function cloneToSite(int $id, string $siteName, Request $request): JsonResponse
+    {
+        try {
+            $targetSiteId = $request->get('target_site_id');
+
+            if (!$targetSiteId) {
+                return $this->errorResponse('target_site_id is required', 422);
+            }
+
+            $newTitle = $request->get('title', null);
+
+            $newPage = $this->pageService->clonePageToSite($id, $targetSiteId, $newTitle);
+
+            if (!$newPage) {
+                return $this->errorResponse('Page not found', 404);
+            }
+
+            return $this->jsonResponse(['page' => $newPage->toArrayWithRelations()], 201);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        }
+    }
 }

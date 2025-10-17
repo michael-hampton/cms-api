@@ -17,6 +17,7 @@ use App\Models\PageSocial;
 use App\Models\PageTag;
 use App\Models\PageTerritory;
 use App\Models\RegionSet;
+use App\Models\Site;
 use App\Models\Tag;
 use App\Models\Territory;
 
@@ -723,6 +724,559 @@ class PageControllerTest extends FunctionalTestCase
             'email' => '<EMAIL>',
             'slug' => 'test-author-'.date('YmdHis'),
             'status' => 'active',
+        ]);
+    }
+
+    public function testCloneToSiteCreatesPageInDifferentSite()
+    {
+        $sourcePage = Page::create([
+            'title' => 'Source Page',
+            'slug' => 'source-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals($targetSiteId, $data['data']['page']['site_id']);
+        $this->assertEquals('draft', $data['data']['page']['status']);
+    }
+
+    public function testCloneToSiteWithCustomTitle()
+    {
+        $sourcePage = Page::create([
+            'title' => 'Original Title',
+            'slug' => 'original',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId,
+            'title' => 'Custom Title'
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Custom Title', $data['data']['page']['title']);
+    }
+
+    public function testCloneToSiteClonesAllRelations()
+    {
+        $category = Category::create([
+            'name' => 'Tech',
+            'slug' => 'tech',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $tag = Tag::create([
+            'name' => 'PHP',
+            'slug' => 'php',
+            'site_id' => $this->siteId
+        ]);
+
+        $author = $this->createAuthor();
+
+        $sourcePage = Page::create([
+            'title' => 'Complete Page',
+            'slug' => 'complete-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        // Add metadata
+        PageMetadata::create([
+            'page_id' => $sourcePage->id,
+            'content_type' => 'article',
+            'featured' => true
+        ]);
+
+        // Add SEO
+        PageSeo::create([
+            'page_id' => $sourcePage->id,
+            'meta_keywords' => 'test, keywords'
+        ]);
+
+        // Add settings
+        PageSettings::create([
+            'page_id' => $sourcePage->id,
+            'template' => 'custom'
+        ]);
+
+        // Add social
+        PageSocial::create([
+            'page_id' => $sourcePage->id,
+            'enable_sharing' => true
+        ]);
+
+        // Add blocks
+        Block::create([
+            'page_id' => $sourcePage->id,
+            'type' => 'text',
+            'data' => json_encode(['content' => 'Test']),
+            'order' => 1
+        ]);
+
+        // Add category and tag
+        PageCategory::create([
+            'page_id' => $sourcePage->id,
+            'category_id' => $category->id
+        ]);
+
+        PageTag::create([
+            'page_id' => $sourcePage->id,
+            'tag_id' => $tag->id
+        ]);
+
+        // Add author
+        PageAuthor::create([
+            'page_id' => $sourcePage->id,
+            'author_id' => $author->id,
+            'role' => 'primary',
+            'sort_order' => 0
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $clonedPage = $data['data']['page'];
+
+        // Verify all relations were cloned
+        $this->assertNotNull($clonedPage['metadata']);
+        $this->assertEquals('article', $clonedPage['metadata']['content_type']);
+
+        $this->assertNotNull($clonedPage['seo']);
+        $this->assertEquals('test, keywords', $clonedPage['seo']['meta_keywords']);
+
+        $this->assertNotNull($clonedPage['settings']);
+        $this->assertEquals('custom', $clonedPage['settings']['template']);
+
+        $this->assertNotNull($clonedPage['social']);
+        $this->assertEquals(1, $clonedPage['social']['enable_sharing']);
+
+        $this->assertCount(1, $clonedPage['blocks']);
+        $this->assertEquals('text', $clonedPage['blocks'][0]['type']);
+
+        $this->assertCount(1, $clonedPage['categories']);
+        $this->assertCount(1, $clonedPage['tags']);
+        $this->assertCount(1, $clonedPage['authors']);
+    }
+
+    public function testCloneToSiteReusesExistingCategory()
+    {
+        // Create category in source site
+        $sourceCategory = Category::create([
+            'name' => 'Tech',
+            'slug' => 'tech',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $sourcePage = Page::create([
+            'title' => 'Source Page',
+            'slug' => 'source-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageCategory::create([
+            'page_id' => $sourcePage->id,
+            'category_id' => $sourceCategory->id
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        // Create category with same slug in target site
+        $targetCategory = Category::create([
+            'name' => 'Tech',
+            'slug' => 'tech',
+            'is_active' => true,
+            'site_id' => $targetSiteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify the existing category was reused
+        $this->assertCount(1, $data['data']['page']['categories']);
+        $this->assertEquals($targetCategory->id, $data['data']['page']['categories'][0]['id']);
+
+        // Verify no duplicate category was created
+        $categoryCount = Category::where('slug', 'tech')
+            ->where('site_id', $targetSiteId)
+            ->count();
+        $this->assertEquals(1, $categoryCount);
+    }
+
+    public function testCloneToSiteReusesExistingTag()
+    {
+        $sourceTag = Tag::create([
+            'name' => 'PHP',
+            'slug' => 'php',
+            'site_id' => $this->siteId
+        ]);
+
+        $sourcePage = Page::create([
+            'title' => 'Source Page',
+            'slug' => 'source-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageTag::create([
+            'page_id' => $sourcePage->id,
+            'tag_id' => $sourceTag->id
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        // Create tag with same slug in target site
+        $targetTag = Tag::create([
+            'name' => 'PHP',
+            'slug' => 'php',
+            'site_id' => $targetSiteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify the existing tag was reused
+        $this->assertCount(1, $data['data']['page']['tags']);
+        $this->assertEquals($targetTag->id, $data['data']['page']['tags'][0]['id']);
+
+        // Verify no duplicate tag was created
+        $tagCount = Tag::where('slug', 'php')
+            ->where('site_id', $targetSiteId)
+            ->count();
+        $this->assertEquals(1, $tagCount);
+    }
+
+    public function testCloneToSiteReusesExistingAuthor()
+    {
+        $sourceAuthor = $this->createAuthor();
+
+        $sourcePage = Page::create([
+            'title' => 'Source Page',
+            'slug' => 'source-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageAuthor::create([
+            'page_id' => $sourcePage->id,
+            'author_id' => $sourceAuthor->id,
+            'role' => 'primary',
+            'sort_order' => 0
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        // Create author with same slug in target site
+        $targetAuthor = Author::create([
+            'name' => $sourceAuthor->name,
+            'email' => 'different@example.com',
+            'slug' => $sourceAuthor->slug,
+            'status' => 'active',
+            'site_id' => $targetSiteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify the existing author was reused
+        $this->assertCount(1, $data['data']['page']['authors']);
+        $this->assertEquals($targetAuthor->id, $data['data']['page']['authors'][0]['id']);
+
+        // Verify no duplicate author was created
+        $authorCount = Author::where('slug', $sourceAuthor->slug)
+            ->where('site_id', $targetSiteId)
+            ->count();
+        $this->assertEquals(1, $authorCount);
+    }
+
+    public function testCloneToSiteGeneratesUniqueSlug()
+    {
+        $sourcePage = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        // Create page with same slug in target site
+        Page::create([
+            'title' => 'Existing Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'site_id' => $targetSiteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify a unique slug was generated
+        $this->assertNotEquals('test-page', $data['data']['page']['slug']);
+        $this->assertStringStartsWith('test-page-', $data['data']['page']['slug']);
+    }
+
+    public function testCloneToSiteWithRegionSetsAndTerritories()
+    {
+        $regionSet = RegionSet::create([
+            'name' => 'North America',
+            'slug' => 'north-america',
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $territory = Territory::create([
+            'name' => 'USA',
+            'code' => 'US',
+            'region_set_id' => $regionSet->id,
+            'is_active' => true,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $sourcePage = Page::create([
+            'title' => 'Regional Page',
+            'slug' => 'regional-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageRegionSet::create([
+            'page_id' => $sourcePage->id,
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $sourcePage->id,
+            'territory_id' => $territory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['data']['page']['regionSets']);
+        $this->assertCount(1, $data['data']['page']['territories']);
+    }
+
+    public function testCloneToSiteReturns404ForNonexistentPage()
+    {
+        $response = $this->postForSite('/api/pages/999/clone-to-site', [
+            'target_site_id' => $this->siteId + 1
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testCloneToSiteReturns422WithoutTargetSiteId()
+    {
+        $sourcePage = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", []);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('target_site_id is required', $data['error']);
+    }
+
+    public function testCloneToSiteCreatesHistoryEntry()
+    {
+        $sourcePage = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $clonedPageId = $data['data']['page']['id'];
+
+        // Verify history entry was created
+        $history = PageHistory::where('page_id', $clonedPageId)
+            ->where('action', 'cloned_to_site')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('cloned_to_site', $history->action);
+
+        $this->assertEquals($sourcePage->id, $history->changes['source_page_id']);
+        $this->assertEquals($targetSiteId, $history->changes['target_site_id']);
+    }
+
+    public function testCloneToSiteHandlesMultipleBlocks()
+    {
+        $sourcePage = Page::create([
+            'title' => 'Multi Block Page',
+            'slug' => 'multi-block',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        Block::create([
+            'page_id' => $sourcePage->id,
+            'type' => 'text',
+            'data' => json_encode(['content' => 'Block 1']),
+            'order' => 1
+        ]);
+
+        Block::create([
+            'page_id' => $sourcePage->id,
+            'type' => 'image',
+            'data' => json_encode(['url' => 'image.jpg', 'alt' => 'Test']),
+            'order' => 2
+        ]);
+
+        Block::create([
+            'page_id' => $sourcePage->id,
+            'type' => 'text',
+            'data' => json_encode(['content' => 'Block 3']),
+            'order' => 3
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(3, $data['data']['page']['blocks']);
+        $this->assertEquals('text', $data['data']['page']['blocks'][0]['type']);
+        $this->assertEquals('image', $data['data']['page']['blocks'][1]['type']);
+        $this->assertEquals('text', $data['data']['page']['blocks'][2]['type']);
+    }
+
+    public function testCloneToSiteWithMultipleCategoriesAndTags()
+    {
+        $cat1 = Category::create([
+            'name' => 'Tech',
+            'slug' => 'tech',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $cat2 = Category::create([
+            'name' => 'News',
+            'slug' => 'news',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $tag1 = Tag::create([
+            'name' => 'PHP',
+            'slug' => 'php',
+            'site_id' => $this->siteId
+        ]);
+
+        $tag2 = Tag::create([
+            'name' => 'Testing',
+            'slug' => 'testing',
+            'site_id' => $this->siteId
+        ]);
+
+        $sourcePage = Page::create([
+            'title' => 'Multi Taxonomy Page',
+            'slug' => 'multi-taxonomy',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageCategory::create(['page_id' => $sourcePage->id, 'category_id' => $cat1->id]);
+        PageCategory::create(['page_id' => $sourcePage->id, 'category_id' => $cat2->id]);
+        PageTag::create(['page_id' => $sourcePage->id, 'tag_id' => $tag1->id]);
+        PageTag::create(['page_id' => $sourcePage->id, 'tag_id' => $tag2->id]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['data']['page']['categories']);
+        $this->assertCount(2, $data['data']['page']['tags']);
+    }
+
+    private function createSite() {
+        return Site::create([
+            'name' => 'Test Site 2',
+            'slug' => 'test-site-2',
+            'is_active' => true,
+            'is_default' => false,
         ]);
     }
 }

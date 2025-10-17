@@ -37,13 +37,22 @@ class Logger
 
     private static function log(string $level, string $message, array $context = []): void
     {
-//        $logPath = self::$logPath ?: 'logs';
-//        $filename = $logPath . '/' . self::$defaultChannel . '-' . date('Y-m-d') . '.log';
-//
-//        $timestamp = date('Y-m-d H:i:s');
-//        $contextStr = !empty($context) ? ' ' . json_encode($context) : '';
-//        $logEntry = "[{$timestamp}] {$level}: {$message}{$contextStr}" . PHP_EOL;
-//
-//        file_put_contents($filename, $logEntry, FILE_APPEND | LOCK_EX);
+        $logPath = self::$logPath ?: __DIR__ . '/../../logs'; // absolute path is safer
+        $filename = $logPath . '/' . self::$defaultChannel . '-' . date('Y-m-d') . '.log';
+
+        // Ensure log directory exists
+        if (!is_dir($logPath) && !mkdir($logPath, 0777, true) && !is_dir($logPath)) {
+            // Failed to create directory — fallback to stderr to avoid warnings
+            error_log("Logger error: failed to create log directory {$logPath}");
+            return;
+        }
+
+        $timestamp = date('Y-m-d H:i:s');
+        $contextStr = !empty($context) ? ' ' . json_encode($context) : '';
+        $logEntry = "[{$timestamp}] {$level}: {$message}{$contextStr}" . PHP_EOL;
+
+        // Write safely, suppress any PHP warning if file is temporarily unavailable
+        @file_put_contents($filename, $logEntry, FILE_APPEND | LOCK_EX);
     }
+
 }

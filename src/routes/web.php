@@ -7,12 +7,15 @@ use App\Controllers\CommentController;
 use App\Controllers\ContentController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
+use App\Controllers\MemberAuthController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
 use App\Framework\Container;
 use App\Framework\Http\Router;
+use App\Framework\Middleware\CheckPageMemberAccess;
+use App\Framework\Middleware\RequireMemberAuth;
 
 /*
 |--------------------------------------------------------------------------
@@ -62,3 +65,29 @@ $router->get('/tags/{slug}', TagViewController::class, 'show');
 $router->get('/shop', ProductListController::class, 'index');
 $router->get('/shop/details/{slug}', ProductDetailController::class, 'show');
 $router->get('/sites', ContentController::class, 'sites');
+
+$router->get('/member/register', [MemberAuthController::class, 'showRegisterForm']);
+$router->post('/member/register', [MemberAuthController::class, 'register']);
+$router->get('/member/login', [MemberAuthController::class, 'showLoginForm']);
+$router->post('/member/login', [MemberAuthController::class, 'login']);
+$router->post('/member/logout', [MemberAuthController::class, 'logout']);
+
+// Email verification routes
+$router->get('/member/verify-email-sent', [MemberAuthController::class, 'showVerifyEmailSent']);
+$router->get('/verify-email', [MemberAuthController::class, 'verifyEmail']);
+
+// Password reset routes
+$router->get('/member/forgot-password', [MemberAuthController::class, 'showForgotPasswordForm']);
+$router->post('/member/forgot-password', [MemberAuthController::class, 'sendPasswordResetEmail']);
+$router->get('/member/reset-password', [MemberAuthController::class, 'showResetPasswordForm']);
+$router->post('/member/reset-password', [MemberAuthController::class, 'resetPassword']);
+
+// Protected member routes
+$router->group(['middleware' => [RequireMemberAuth::class]], function($router) {
+    $router->get('/member/dashboard', [MemberAuthController::class, 'dashboard']);
+    // Add other member-only routes here
+});
+
+// Apply page member access check to content routes
+$router->get('/{slug}', [ContentController::class, 'show'])
+    ->middleware([CheckPageMemberAccess::class]);

@@ -96,6 +96,10 @@ class TagService
                 'name' => $newName ?? ($originalTag->name . ' (Copy)'),
                 'description' => $originalTag->description,
                 'status' => 'inactive',
+                'seo_title' => $originalTag->seo_title,
+                'seo_description' => $originalTag->seo_description,
+                'no_index' => $originalTag->no_index ?? false,
+                'canonical_url' => null, // Don't copy canonical URL
             ];
 
             $baseName = $data['name'];

@@ -12,7 +12,7 @@ use App\Framework\Validation\Rules\ConfirmedRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\ExistsRule;
 use App\Framework\Validation\Rules\InRule;
-use App\Framework\Validation\Rules\IntegerRule;
+use App\Framework\Validation\Rules\Accepted;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\NullableRule;
@@ -57,6 +57,7 @@ abstract class FormRequest extends Request
         );
 
         $formRequest->setUser($request->user());
+
         return $formRequest;
     }
 
@@ -281,9 +282,10 @@ abstract class FormRequest extends Request
             'required' => RequiredRule::class,
             'required_with' => RequiredWithRule::class, // ADD THIS LINE
             'string' => StringRule::class, // You'll need this
-            'integer' => IntegerRule::class,
+            'integer' => Accepted::class,
             'boolean' => BooleanRule::class, // You'll need this
             'max' => MaxLengthRule::class,
+            'accepted' => Accepted::class,
             'nullable' => NullableRule::class,
             'min' => MinLengthRule::class,
             'email' => EmailRule::class,

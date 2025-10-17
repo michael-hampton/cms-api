@@ -2,6 +2,7 @@
 
 use App\Framework\Authorization\Auth;
 use App\Framework\Container;
+use App\Framework\Session\Session;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 
@@ -9,6 +10,49 @@ if (!function_exists('auth')) {
     function auth(): Auth
     {
         return new Auth();
+    }
+}
+
+if (!function_exists('message')) {
+    function message(): ?string
+    {
+        return Session::getFlash('message');
+    }
+}
+
+if (!function_exists('old')) {
+    function old(?string $key = null, $default = null)
+    {
+        $oldInput = Session::getFlash('old_input', []);
+
+        if ($key === null) {
+            return $oldInput;
+        }
+
+        return $oldInput[$key] ?? $default;
+    }
+}
+
+if (!function_exists('error')) {
+    function error(string $key): ?string
+    {
+        $errors = errors();
+        return isset($errors[$key]) ? (is_array($errors[$key]) ? $errors[$key][0] : $errors[$key]) : null;
+    }
+}
+
+if (!function_exists('errors')) {
+    function errors(): array
+    {
+        return Session::getFlash('errors', []);
+    }
+}
+
+if (!function_exists('hasError')) {
+    function hasError(string $key): bool
+    {
+        $errors = errors();
+        return isset($errors[$key]);
     }
 }
 
@@ -20,7 +64,8 @@ if (!function_exists('collect')) {
 }
 
 if (!function_exists('getallheaders')) {
-    function getallheaders() {
+    function getallheaders()
+    {
         $headers = [];
         foreach ($_SERVER as $name => $value) {
             if (str_starts_with($name, 'HTTP_')) {
@@ -142,7 +187,7 @@ if (!function_exists('site')) {
     }
 }
 
-if(!function_exists('asset')) {
+if (!function_exists('asset')) {
     function asset(string $path, string $type = 'css'): string
     {
         // Determine folder based on type
@@ -195,3 +240,37 @@ if (!function_exists('site_css')) {
         return SiteContext::css();
     }
 }
+
+if (!function_exists('accessDenied')) {
+    function accessDenied(string $message): string
+    {
+        $html = <<<HTML
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Member Access Required</title>
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; }
+                .message { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; }
+                .actions { margin-top: 20px; }
+                a { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px; }
+                a:hover { background: #0056b3; }
+            </style>
+        </head>
+        <body>
+            <div class="message">
+                <h2>🔒 Member Access Required</h2>
+                <p>{$message}</p>
+                <div class="actions">
+                    <a href="/member/login">Login</a>
+                    <a href="/member/register">Sign Up</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        HTML;
+
+        return $html;
+    }
+}
+

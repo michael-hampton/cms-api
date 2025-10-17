@@ -3,6 +3,7 @@
 namespace App\Framework\Http;
 
 use App\Framework\AuthenticatedUser;
+use App\Framework\Session\Session;
 use App\Models\Site;
 use App\Models\User;
 
@@ -13,6 +14,7 @@ class Request implements RequestInterface
     private ?Site $site = null;
     private string $originalPath;
     protected array $routeParams = [];
+    private array $attributes = [];
     public AuthenticatedUser|User|null $user = null;
     private $headers;
     private string $path;
@@ -394,5 +396,182 @@ class Request implements RequestInterface
         foreach ($data as $key => $value) {
             $this->data[$key] = $value;
         }
+    }
+
+    /**
+     * Get the URI for the request
+     */
+    public function getUri(): string
+    {
+        return $_SERVER['REQUEST_URI'] ?? '/';
+    }
+
+    /**
+     * Get query string parameters
+     */
+    public function query(?string $key = null, $default = null)
+    {
+        if ($key === null) {
+            return $_GET;
+        }
+        return $_GET[$key] ?? $default;
+    }
+
+    /**
+     * Get the session instance
+     */
+    public function session(): Session
+    {
+        return new Session();
+    }
+
+    /**
+     * Set an attribute on the request
+     */
+    public function setAttribute(string $key, $value): self
+    {
+        $this->attributes[$key] = $value;
+        return $this;
+    }
+
+    /**
+     * Get an attribute from the request
+     */
+    public function getAttribute(string $key, $default = null)
+    {
+        return $this->attributes[$key] ?? $default;
+    }
+
+    /**
+     * Check if request has an attribute
+     */
+    public function hasAttribute(string $key): bool
+    {
+        return array_key_exists($key, $this->attributes);
+    }
+
+    /**
+     * Validate the request data
+     */
+//    public function validate(array $rules): array
+//    {
+//        $errors = [];
+//        $validated = [];
+//
+//        foreach ($rules as $field => $ruleSet) {
+//            $rules = is_string($ruleSet) ? explode('|', $ruleSet) : $ruleSet;
+//            $value = $this->input($field);
+//
+//            foreach ($rules as $rule) {
+//                $ruleName = $rule;
+//                $parameter = null;
+//
+//                if (strpos($rule, ':') !== false) {
+//                    [$ruleName, $parameter] = explode(':', $rule, 2);
+//                }
+//
+//                $error = $this->validateRule($field, $value, $ruleName, $parameter);
+//
+//                if ($error) {
+//                    $errors[$field] = $error;
+//                    break;
+//                }
+//            }
+//
+//            if (!isset($errors[$field])) {
+//                $validated[$field] = $value;
+//            }
+//        }
+//
+//        if (!empty($errors)) {
+//            // Store errors in session for retrieval
+//            Session::flash('errors', $errors);
+//            Session::flash('old_input', $this->all());
+//        }
+//
+//        return $validated;
+//    }
+//
+//    /**
+//     * Validate a single rule
+//     */
+//    protected function validateRule(string $field, $value, string $rule, $parameter = null): ?string
+//    {
+//        switch ($rule) {
+//            case 'required':
+//                if (empty($value) && $value !== '0' && $value !== 0) {
+//                    return "The {$field} field is required.";
+//                }
+//                break;
+//
+//            case 'email':
+//                if ($value && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+//                    return "The {$field} must be a valid email address.";
+//                }
+//                break;
+//
+//            case 'min':
+//                if (strlen($value) < $parameter) {
+//                    return "The {$field} must be at least {$parameter} characters.";
+//                }
+//                break;
+//
+//            case 'max':
+//                if (strlen($value) > $parameter) {
+//                    return "The {$field} may not be greater than {$parameter} characters.";
+//                }
+//                break;
+//
+//            case 'confirmed':
+//                $confirmField = $field . '_confirmation';
+//                if ($value !== $this->input($confirmField)) {
+//                    return "The {$field} confirmation does not match.";
+//                }
+//                break;
+//
+//            case 'accepted':
+//                if (!in_array($value, ['yes', 'on', '1', 1, true, 'true'], true)) {
+//                    return "The {$field} must be accepted.";
+//                }
+//                break;
+//
+//            case 'boolean':
+//                if (!is_bool($value) && !in_array($value, [0, 1, '0', '1', true, false], true)) {
+//                    return "The {$field} must be true or false.";
+//                }
+//                break;
+//
+//            case 'array':
+//                if (!is_array($value)) {
+//                    return "The {$field} must be an array.";
+//                }
+//                break;
+//
+//            case 'string':
+//                if (!is_string($value)) {
+//                    return "The {$field} must be a string.";
+//                }
+//                break;
+//
+//            case 'nullable':
+//                // Nullable allows null values, so no error
+//                break;
+//        }
+//
+//        return null;
+//    }
+
+    /**
+     * Get old input value (for form repopulation after validation errors)
+     */
+    public function old(string $key, $default = null)
+    {
+        $oldInput = Session::getFlash('old_input', []);
+        return $oldInput[$key] ?? $default;
+    }
+
+    public function getHeaders(): false|array
+    {
+        return $this->headers;
     }
 }

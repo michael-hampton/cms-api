@@ -9,14 +9,29 @@ class Category extends Model
 {
     protected $table = 'categories';
     protected $fillable = [
-        'name', 'slug', 'description', 'color', 'icon', 'parent_id',
-        'sort_order', 'is_active', 'meta', 'created_at', 'updated_at', 'site_id'
+        'name',
+        'slug',
+        'description',
+        'color',
+        'icon',
+        'parent_id',
+        'sort_order',
+        'is_active',
+        'meta',
+        'created_at',
+        'updated_at',
+        'site_id',
+        'seo_title',
+        'seo_description',
+        'no_index',
+        'canonical_url'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'sort_order' => 'integer',
-        'meta' => 'json'
+        'meta' => 'json',
+        'no_index' => 'boolean'
     ];
 
     public function parent(): ?Model

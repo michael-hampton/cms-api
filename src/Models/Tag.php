@@ -9,14 +9,27 @@ class Tag extends Model
 {
     protected $table = 'tags';
     protected $fillable = [
-        'name', 'slug', 'description', 'color', 'usage_count',
-        'is_featured', 'meta', 'created_at', 'updated_at', 'site_id'
+        'name',
+        'slug',
+        'description',
+        'color',
+        'usage_count',
+        'is_featured',
+        'meta',
+        'created_at',
+        'updated_at',
+        'site_id',
+        'seo_title',
+        'seo_description',
+        'no_index',
+        'canonical_url'
     ];
 
     protected $casts = [
         'usage_count' => 'integer',
         'is_featured' => 'boolean',
-        'meta' => 'json'
+        'meta' => 'json',
+        'no_index' => 'boolean'
     ];
 
     public static function boot()

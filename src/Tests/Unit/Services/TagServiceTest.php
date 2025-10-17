@@ -144,7 +144,11 @@ class TagServiceTest extends FunctionalTestCase
             'id' => 1,
             'name' => 'PHP',
             'description' => 'PHP related',
-            'slug' => 'php'
+            'slug' => 'php',
+            'seo_title' => 'PHP SEO Title',
+            'seo_description' => 'PHP SEO Description',
+            'no_index' => true,
+            'canonical_url' => 'https://example.com/php'
         ]);
 
         $this->databaseMock
@@ -167,12 +171,26 @@ class TagServiceTest extends FunctionalTestCase
         $newTag = new Tag([
             'id' => 2,
             'name' => 'PHP (Copy)',
-            'slug' => 'php-copy'
+            'slug' => 'php-copy',
+            'seo_title' => 'PHP SEO Title',
+            'seo_description' => 'PHP SEO Description',
+            'no_index' => true,
+            'canonical_url' => null
         ]);
 
         $this->repository
             ->shouldReceive('create')
             ->once()
+            ->with([
+                'name' => 'PHP (Copy)',
+                'description' => 'PHP related',
+                'status' => 'inactive',
+                'seo_title' => 'PHP SEO Title',
+                'seo_description' => 'PHP SEO Description',
+                'no_index' => true,
+                'canonical_url' => NULL,
+                'slug' => 'php-copy'
+            ])
             ->andReturn($newTag);
 
         $result = $this->service->duplicateTag(1);

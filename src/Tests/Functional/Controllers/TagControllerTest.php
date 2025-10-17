@@ -254,4 +254,29 @@ class TagControllerTest extends FunctionalTestCase
         $newTagPages = PageTag::where('tag_id', $newTag->id)->count();
         $this->assertEquals(0, $newTagPages);
     }
+
+    public function testDuplicateTagWithSeoFields(): void
+    {
+        $tag = Tag::create([
+            'name' => 'PHP',
+            'slug' => 'php',
+            'status' => 'active',
+            'seo_title' => 'PHP SEO Title',
+            'seo_description' => 'PHP SEO Description',
+            'no_index' => true,
+            'canonical_url' => 'https://example.com/php',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->postForSite("/api/tags/{$tag->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('PHP (Copy)', $data['data']['name']);
+        $this->assertEquals('PHP SEO Title', $data['data']['seo_title']);
+        $this->assertEquals('PHP SEO Description', $data['data']['seo_description']);
+        $this->assertEquals(1, $data['data']['no_index']);
+        $this->assertNull($data['data']['canonical_url']);
+    }
 }

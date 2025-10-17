@@ -236,7 +236,7 @@ class CategoryControllerTest extends FunctionalTestCase
             'name' => 'Technology',
             'description' => 'Tech articles',
             'slug' => 'technology',
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
         $response = $this->postForSite("/api/categories/{$category->id}/duplicate");
@@ -298,5 +298,29 @@ class CategoryControllerTest extends FunctionalTestCase
         $this->assertNotEquals($data1['data']['slug'], $data2['data']['slug']);
         $this->assertStringContainsString('news-copy', $data1['data']['slug']);
         $this->assertStringContainsString('news-copy', $data2['data']['slug']);
+    }
+
+    public function testDuplicateCategoryWithSeoFields(): void
+    {
+        $category = Category::create([
+            'name' => 'Technology',
+            'slug' => 'technology',
+            'status' => 'active',
+            'seo_title' => 'Tech SEO Title',
+            'seo_description' => 'Tech SEO Description',
+            'no_index' => false,
+            'canonical_url' => 'https://example.com/tech'
+        ]);
+
+        $response = $this->postForSite("/api/categories/{$category->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Technology (Copy)', $data['data']['name']);
+        $this->assertEquals('Tech SEO Title', $data['data']['seo_title']);
+        $this->assertEquals('Tech SEO Description', $data['data']['seo_description']);
+        $this->assertEquals(0, $data['data']['no_index']);
+        $this->assertNull($data['data']['canonical_url']);
     }
 }

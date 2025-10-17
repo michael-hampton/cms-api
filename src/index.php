@@ -46,7 +46,7 @@ try {
     echo '<pre>';
     print_r(debug_backtrace());;
     echo $e->getMessage();
-    die('here error');
+    die('here5 error');
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Framework\Authorization\AuthenticatedMember;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Database\Relations\BelongsToManyHandler;
 use App\Framework\Database\Relations\HasManyHandler;
@@ -260,7 +261,7 @@ class Page extends Model
             'page_authors',
             'page_id',
             'author_id',
-            $relation
+            true
         )->withPivot('role', 'sort_order')
             ->orderBy('page_authors.sort_order');
     }
@@ -272,7 +273,7 @@ class Page extends Model
             'page_authors',
             'page_id',
             'author_id',
-            $relation
+            true
         )->wherePivot('role', 'primary')
             ->withPivot('sort_order')
             ->orderBy('page_authors.sort_order');
@@ -285,7 +286,7 @@ class Page extends Model
             'page_authors',
             'page_id',
             'author_id',
-            $relation
+            true
         )->wherePivot('role', 'contributor')
             ->withPivot('sort_order')
             ->orderBy('page_authors.sort_order');
@@ -319,5 +320,39 @@ class Page extends Model
         );
     }
 
+// Add to App/Models/Page.php
 
+    public function requiresMemberLogin(): bool
+    {
+        return (bool) ($this->requires_member_login ?? false);
+    }
+
+    public function getAllowedMemberRoles(): ?array
+    {
+        if (!$this->allowed_member_roles) {
+            return null;
+        }
+
+        $roles = json_decode($this->allowed_member_roles, true);
+        return is_array($roles) ? $roles : null;
+    }
+
+    public function canBeAccessedBy(?AuthenticatedMember $member): bool
+    {
+        if (!$this->requiresMemberLogin()) {
+            return true;
+        }
+
+        if (!$member) {
+            return false;
+        }
+
+        $allowedRoles = $this->getAllowedMemberRoles();
+
+        if (!$allowedRoles) {
+            return true; // Any authenticated member
+        }
+
+        return $member->hasAnyRole($allowedRoles);
+    }
 }

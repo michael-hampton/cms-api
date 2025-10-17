@@ -1940,4 +1940,286 @@ class PageServiceTest extends FunctionalTestCase
 
         $this->service->duplicatePage(1);
     }
+
+    public function testClonePageToSiteCreatesPageInTargetSite()
+    {
+        $sourcePage = $this->createMockPage(1, 'Source Page');
+        $sourcePage->site_id = 1;
+        $newPage = $this->createMockPage(2, 'Source Page');
+        $newPage->site_id = 2;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($sourcePage);
+
+        $this->pageRepository->shouldReceive('slugExistsInSite')
+            ->with('test', 2)
+            ->once()
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->pageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['site_id'] === 2
+                    && $data['status'] === 'draft'
+                    && $data['slug'] === 'test';
+            }))
+            ->andReturn($newPage);
+
+        $this->pageHistory->shouldReceive('logPageClonedToSite')
+            ->once()
+            ->with(1, 2, 2);
+
+        // Mock all clone methods
+        $this->setupCloneToSiteExpectations(1, 2, 2);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(2)
+            ->once()
+            ->andReturn($newPage);
+
+        $result = $this->service->clonePageToSite(1, 2);
+
+        $this->assertSame($newPage, $result);
+        $this->assertEquals(2, $result->site_id);
+    }
+
+    public function testClonePageToSiteThrowsExceptionWhenSameSite()
+    {
+        $sourcePage = $this->createMockPage(1, 'Source Page');
+        $sourcePage->site_id = 1;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($sourcePage);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage("Source and target site cannot be the same");
+
+        $this->service->clonePageToSite(1, 1);
+    }
+
+    public function testClonePageToSiteGeneratesUniqueSlug()
+    {
+        $sourcePage = $this->createMockPage(1, 'Test Page');
+        $sourcePage->slug = 'test-page';
+        $sourcePage->site_id = 1;
+        $newPage = $this->createMockPage(2, 'Test Page');
+        $newPage->site_id = 2;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($sourcePage);
+
+        // First slug exists, second one doesn't
+        $this->pageRepository->shouldReceive('slugExistsInSite')
+            ->with('test-page', 2)
+            ->once()
+            ->andReturn(true);
+
+        $this->pageRepository->shouldReceive('slugExistsInSite')
+            ->with('test-page-1', 2)
+            ->once()
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->pageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['slug'] === 'test-page-1';
+            }))
+            ->andReturn($newPage);
+
+        $this->pageHistory->shouldReceive('logPageClonedToSite')
+            ->once()
+            ->with(1, 2, 2);
+
+        $this->setupCloneToSiteExpectations(1, 2, 2);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(2)
+            ->once()
+            ->andReturn($newPage);
+
+        $result = $this->service->clonePageToSite(1, 2);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testClonePageToSiteWithCustomTitle()
+    {
+        $sourcePage = $this->createMockPage(1, 'Original Title');
+        $sourcePage->site_id = 1;
+        $newPage = $this->createMockPage(2, 'Custom Title');
+        $newPage->site_id = 2;
+        $newPage->title = 'Custom Title';
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($sourcePage);
+
+        $this->pageRepository->shouldReceive('slugExistsInSite')
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->pageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['title'] === 'Custom Title';
+            }))
+            ->andReturn($newPage);
+
+        $this->pageHistory->shouldReceive('logPageClonedToSite')
+            ->once();
+
+        $this->setupCloneToSiteExpectations(1, 2, 2);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(2)
+            ->once()
+            ->andReturn($newPage);
+
+        $result = $this->service->clonePageToSite(1, 2, 'Custom Title');
+
+        $this->assertEquals('Custom Title', $result->title);
+    }
+
+    public function testClonePageToSiteClonesAllRelations()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $sourcePage->site_id = 1;
+        $newPage = $this->createMockPage(2);
+        $newPage->site_id = 2;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($sourcePage);
+
+        $this->pageRepository->shouldReceive('slugExistsInSite')
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->pageRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($newPage);
+
+        $this->pageHistory->shouldReceive('logPageClonedToSite')
+            ->once()
+            ->with(1, 2, 2);
+
+        // Verify all clone methods are called with correct parameters
+        $this->pageRepository->shouldReceive('duplicateBlocks')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateMetadata')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateSeo')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateSettings')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateSocial')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateCategoriesToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateTagsToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateCustomFieldsToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicatePageAuthorsToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateRegionSetsToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')->with(1, 2, 2)->once();
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(2)
+            ->once()
+            ->andReturn($newPage);
+
+        $result = $this->service->clonePageToSite(1, 2);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testClonePageToSiteContinuesOnPartialFailure()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $sourcePage->site_id = 1;
+        $newPage = $this->createMockPage(2);
+        $newPage->site_id = 2;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($sourcePage);
+
+        $this->pageRepository->shouldReceive('slugExistsInSite')
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->pageRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($newPage);
+
+        $this->pageHistory->shouldReceive('logPageClonedToSite')
+            ->once();
+
+        // Some succeed
+        $this->pageRepository->shouldReceive('duplicateBlocks')->once();
+        $this->pageRepository->shouldReceive('duplicateMetadata')->once();
+
+        // This one fails
+        $this->pageRepository->shouldReceive('duplicateCategoriesToSite')
+            ->andThrow(new \Exception('Categories clone failed'));
+
+        // Rest continue
+        $this->pageRepository->shouldReceive('duplicateSeo')->once();
+        $this->pageRepository->shouldReceive('duplicateSettings')->once();
+        $this->pageRepository->shouldReceive('duplicateSocial')->once();
+        $this->pageRepository->shouldReceive('duplicateTagsToSite')->once();
+        $this->pageRepository->shouldReceive('duplicateCustomFieldsToSite')->once();
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->once();
+        $this->pageRepository->shouldReceive('duplicatePageAuthorsToSite')->once();
+        $this->pageRepository->shouldReceive('duplicateRegionSetsToSite')->once();
+        $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')->once();
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(2)
+            ->once()
+            ->andReturn($newPage);
+
+        // Should not throw - partial cloning is allowed
+        $result = $this->service->clonePageToSite(1, 2);
+
+        $this->assertNotNull($result);
+    }
+
+
+    private function setupCloneToSiteExpectations(int $sourcePageId, int $targetPageId, int $targetSiteId): void
+    {
+        $this->pageRepository->shouldReceive('duplicateBlocks')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateMetadata')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateSeo')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateSettings')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateSocial')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateCategoriesToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateTagsToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateCustomFieldsToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicatePageAuthorsToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateRegionSetsToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+    }
+
 }

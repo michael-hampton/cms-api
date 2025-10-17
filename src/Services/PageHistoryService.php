@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\Collection;
+use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageHistory;
 use App\Repositories\PageHistoryRepository;
@@ -28,7 +29,6 @@ class PageHistoryService
         $page = $this->pageRepository->find($pageId);
 
         if (!$page) {
-            die('no');
             throw new \Exception("Page not found");
         }
 
@@ -267,5 +267,26 @@ class PageHistoryService
     public function cleanupOldHistory(int $days = 90): int
     {
         return $this->historyRepository->deleteOlderThan($days);
+    }
+
+    public function logPageClonedToSite(int $sourcePageId, int $targetPageId, int $targetSiteId): Model
+    {
+        $userId = Auth::id();
+        $request = $_SERVER;
+
+        return PageHistory::create([
+            'page_id' => $targetPageId,
+            'user_id' => $userId,
+            'site_id' => $targetSiteId,
+            'action' => 'cloned_to_site',
+            'description' => 'Clone To Site',
+            'changes' => json_encode([
+                'source_page_id' => $sourcePageId,
+                'target_site_id' => $targetSiteId
+            ]),
+            'ip_address' => $request['REMOTE_ADDR'] ?? null,
+            'user_agent' => $request['HTTP_USER_AGENT'] ?? null,
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
     }
 }

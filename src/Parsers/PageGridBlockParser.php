@@ -5,7 +5,7 @@ namespace App\Parsers;
 use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
-use App\Framework\Validation\Rules\IntegerRule;
+use App\Framework\Validation\Rules\Accepted;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinLengthRule;
@@ -36,7 +36,6 @@ class PageGridBlockParser extends BaseBlockParser
                 new MaxLengthRule(50)
             ],
             'columns' => [
-                new IntegerRule(),
                 new MinRule(1),
                 new MaxRule(6)
             ],

@@ -4,7 +4,9 @@ namespace App\Controllers;
 
 use App\Framework\Container;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\RedirectResponse;
 use App\Framework\Http\Response;
+use App\Framework\Session\Session;
 use App\Framework\View\ViewRenderer;
 use App\Search\PaginatedResult;
 
@@ -126,5 +128,23 @@ abstract class Controller
             . '.' . ltrim($extension, '.');
 
         return file_exists($path) && is_readable($path);
+    }
+
+    /**
+     * Create a redirect response
+     */
+    protected function redirect(string $url): RedirectResponse
+    {
+        return new RedirectResponse($url);
+    }
+
+    /**
+     * Redirect back to the previous URL
+     */
+    protected function back(): RedirectResponse
+    {
+        $previousUrl = Session::previousUrl() ?? '/';
+
+        return new RedirectResponse($previousUrl);
     }
 }

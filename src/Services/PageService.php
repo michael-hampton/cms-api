@@ -47,10 +47,10 @@ class PageService
         private AccessRoleRepository      $accessRoleRepository,
         private Database                  $database,
         private PageHistoryService        $historyService,
-        private PageAuthorRepository $pageAuthorRepository,
+        private PageAuthorRepository      $pageAuthorRepository,
         private PageRegionSetRepository   $pageRegionSetRepository,
         private PageTerritoryRepository   $pageTerritoryRepository,
-        ?int $siteId = null
+        ?int                              $siteId = null
     )
     {
         $this->siteId = $siteId ?? SiteContext::getId();
@@ -469,11 +469,11 @@ class PageService
             }, $customFieldsData);
 
             // Filter out any fields without a valid definition ID
-            $customFields = array_filter($customFields, function($field) {
+            $customFields = array_filter($customFields, function ($field) {
                 return !empty($field['custom_field_definition_id']);
             });
 
-           $customFields = collect($customFields)->keyBy('custom_field_definition_id')->toArray();
+            $customFields = collect($customFields)->keyBy('custom_field_definition_id')->toArray();
 
             if (!empty($customFields)) {
                 $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
@@ -971,5 +971,110 @@ class PageService
         $this->historyService->logPageUnpublished($pageId);
 
         return $page;
+    }
+
+    /**
+     * Clone page to a different site
+     *
+     * @param int $pageId Source page ID
+     * @param int $targetSiteId Target site ID
+     * @param string|null $newTitle Optional new title
+     * @return Page The cloned page in the target site
+     * @throws Exception
+     */
+    public function clonePageToSite(int $pageId, int $targetSiteId, ?string $newTitle = null): Page
+    {
+        $sourcePage = $this->getCompletePageData($pageId);
+        if (!$sourcePage) {
+            throw new \Exception("Source page not found");
+        }
+
+        if ($sourcePage->site_id === $targetSiteId) {
+            throw new \Exception("Source and target site cannot be the same");
+        }
+
+        return $this->database->transaction(function () use ($sourcePage, $targetSiteId, $newTitle) {
+            $pageData = [
+                'title' => $newTitle ?? ($sourcePage->title . ' (Copy)'),
+                'slug' => $this->generateUniqueSlug($sourcePage->slug, $targetSiteId),
+                'status' => 'draft',
+                'meta_title' => $sourcePage->meta_title,
+                'meta_description' => $sourcePage->meta_description,
+                'subtitle' => $sourcePage->subtitle,
+                'site_id' => $targetSiteId
+            ];
+
+            $newPage = $this->pageRepository->create($pageData);
+
+            // Clone all relations to the new site
+            $this->clonePageRelationsToSite($sourcePage->id, $newPage->id, $targetSiteId);
+
+            $this->historyService->logPageClonedToSite($sourcePage->id, $newPage->id, $targetSiteId);
+
+            return $this->getCompletePageData($newPage->id);
+        });
+    }
+
+    /**
+     * Generate a unique slug for the target site
+     */
+    private function generateUniqueSlug(string $baseSlug, int $targetSiteId): string
+    {
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while ($this->pageRepository->slugExistsInSite($slug, $targetSiteId)) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Duplicate all relations from source to target page
+     * This method orchestrates the duplication of all page relations
+     */
+    private function clonePageRelationsToSite(int $sourcePageId, int $targetPageId, int $targetSiteId): void
+    {
+        $relations = [
+            'blocks' => 'duplicateBlocks',
+            'metadata' => 'duplicateMetadata',
+            'seo' => 'duplicateSeo',
+            'settings' => 'duplicateSettings',
+            'social' => 'duplicateSocial',
+            'categories' => 'duplicateCategoriesToSite',
+            'tags' => 'duplicateTagsToSite',
+            'customFields' => 'duplicateCustomFieldsToSite',
+            'accessRoles' => 'duplicateAccessRoles',
+            'pageAuthors' => 'duplicatePageAuthorsToSite',
+            'regionSets' => 'duplicateRegionSetsToSite',
+            'territories' => 'duplicateTerritoriesToSite',
+        ];
+
+        $errors = [];
+
+        foreach ($relations as $relationType => $method) {
+            try {
+                $this->pageRepository->$method($sourcePageId, $targetPageId, $targetSiteId);
+            } catch (\Exception $e) {
+                // Log the error but continue with other relations
+                error_log(sprintf(
+                    'Failed to clone %s for page %d to site %d: %s',
+                    $relationType,
+                    $sourcePageId,
+                    $targetPageId,
+                    $e->getMessage()
+                ));
+
+                $errors[$relationType] = $e->getMessage();
+            }
+        }
+
+        // If critical relations failed, you might want to throw
+        // For now, we'll allow partial duplication to succeed
+        if (!empty($errors) && count($errors) === count($relations)) {
+            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($errors));
+        }
     }
 }

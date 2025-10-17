@@ -210,6 +210,10 @@ class BrandService
                 'description' => $originalBrand->description,
                 'website' => $originalBrand->website,
                 'status' => 'inactive',
+                'seo_title' => $originalBrand->seo_title,
+                'seo_description' => $originalBrand->seo_description,
+                'no_index' => $originalBrand->no_index ?? false,
+                'canonical_url' => null, // Don't copy canonical URL
             ];
 
             $data['slug'] = Str::slug($data['name'], [$this->brandRepository, 'findBySlug']);

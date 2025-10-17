@@ -147,15 +147,12 @@ class ApiApplication
             'timestamp' => date('c')
         ];
 
-        echo $e->getMessage();
-        die('here error');
-
         // In development, include stack trace
         if (config('app.debug', false)) {
             $data['trace'] = $e->getTraceAsString();
         }
 
-        return Response::json($data, 500);
+        return Response::json($data, 302);
     }
 
     /**

@@ -96,7 +96,11 @@ class CategoryService
                 'description' => $originalCategory->description,
                 'parent_id' => $originalCategory->parent_id,
                 'status' => 'inactive',
-                'site_id' => $originalCategory->site_id
+                'site_id' => $originalCategory->site_id,
+                'seo_title' => $originalCategory->seo_title,
+                'seo_description' => $originalCategory->seo_description,
+                'no_index' => $originalCategory->no_index ?? false,
+                'canonical_url' => null, // Don't copy canonical URL
             ];
 
             // Generate unique slug

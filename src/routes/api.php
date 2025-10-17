@@ -42,6 +42,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/pages/{id}', PageController::class, 'destroy');
         $router->get('/block-types', PageController::class, 'getAvailableBlockTypes');
         $router->post('/pages/{id}/duplicate', PageController::class, 'duplicate');
+        $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
 
         $router->get('/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;

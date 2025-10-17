@@ -13,13 +13,18 @@ class Brand extends Model
         'logo',
         'website',
         'is_active',
-        'site_id'
+        'site_id',
+        'seo_title',
+        'seo_description',
+        'no_index',
+        'canonical_url'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'no_index' => 'boolean'
     ];
 
     public function products()

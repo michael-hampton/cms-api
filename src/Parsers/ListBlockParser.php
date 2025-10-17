@@ -7,7 +7,7 @@ use App\Enums\ListType;
 use App\Enums\SchemaType;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\EnumRule;
-use App\Framework\Validation\Rules\IntegerRule;
+use App\Framework\Validation\Rules\Accepted;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 
@@ -26,7 +26,7 @@ class ListBlockParser extends BaseBlockParser
                 new EnumRule(ListType::class)
             ],
             'startIndex' => [
-                new IntegerRule()
+                new Accepted()
             ],
             'schemaType' => [
                 new EnumRule(SchemaType::class)

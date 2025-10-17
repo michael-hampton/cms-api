@@ -3,8 +3,8 @@
 namespace App\Framework\Http;
 
 use App\Framework\Container;
+use App\Framework\Session\Session;
 use App\Framework\Support\Cache;
-use App\Framework\Support\SiteContext;
 use App\Services\Url\DynamicUrlResolver;
 use App\Services\Url\UrlResolutionResult;
 use Exception;
@@ -88,33 +88,41 @@ class Router
     /**
      * Enhanced GET method - supports both old and new syntax
      */
-    public function get(string $path, $handler, ?string $method = null, array $middleware = []): void
+    public function get(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('GET', $path, $handler, $method, $middleware);
+
+        return $this;
     }
 
     /**
      * Enhanced POST method - supports both old and new syntax
      */
-    public function post(string $path, $handler, ?string $method = null, array $middleware = []): void
+    public function post(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('POST', $path, $handler, $method, $middleware);
+
+        return $this;
     }
 
     /**
      * Enhanced PUT method - supports both old and new syntax
      */
-    public function put(string $path, $handler, ?string $method = null, array $middleware = []): void
+    public function put(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('PUT', $path, $handler, $method, $middleware);
+
+        return $this;
     }
 
     /**
      * Enhanced DELETE method - supports both old and new syntax
      */
-    public function delete(string $path, $handler, ?string $method = null, array $middleware = []): void
+    public function delete(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('DELETE', $path, $handler, $method, $middleware);
+
+        return $this;
     }
 
     /**
@@ -169,6 +177,8 @@ class Router
                 $handler = $routeData['handler'] ?? $routeData;
                 $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
 
+                Session::setPreviousUrl($routePath);
+
                 return $this->runMiddleware($middlewareStack, $request, function ($request) use ($handler, $params) {
                     return $this->callAction($handler, $request, $params);
                 });
@@ -193,7 +203,7 @@ class Router
             $controllerResolver = new ControllerResolver();
 
             if ($controllerResolver->shouldUseController($urlResult->page)) {
-                return $this->dispatchToController($urlResult);
+                return $this->dispatchToController($urlResult, $request);
             }
 
             return $this->show404($method, $path);
@@ -259,8 +269,9 @@ class Router
         return $next($request);
     }
 
-    private function dispatchToController(UrlResolutionResult $result)
+    private function dispatchToController(UrlResolutionResult $result, ?Request $request = null)
     {
+        $request->setAttribute('page', $result->page);
         $controllerResolver = new ControllerResolver();
 
         $controllerAction = $controllerResolver->resolve($result->page);
@@ -269,7 +280,8 @@ class Router
         return $controllerDispatcher->dispatch(
             $controllerAction,
             $result->page,
-            $result
+            $result,
+            $request
         );
     }
 
@@ -480,7 +492,15 @@ class Router
             }
         }
 
-        return $method->invokeArgs($controller, $arguments);
+        $response = $method->invokeArgs($controller, $arguments);
+
+        if ($response instanceof RedirectResponse) {
+            // Send it and stop dispatch
+            $response->send();
+            return $response;
+        }
+
+        return $response;
     }
 
     /**
