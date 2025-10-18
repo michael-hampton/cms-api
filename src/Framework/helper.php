@@ -2,6 +2,8 @@
 
 use App\Framework\Authorization\Auth;
 use App\Framework\Container;
+use App\Framework\Http\Router;
+use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
@@ -187,6 +189,21 @@ if (!function_exists('site')) {
     }
 }
 
+if (!function_exists('csrf_field')) {
+    function csrf_field(): string
+    {
+        $token = Csrf::getToken();
+        return '<input type="hidden" name="_token" value="' . htmlspecialchars($token) . '">';
+    }
+}
+
+if (!function_exists('csrf_token')) {
+    function csrf_token(): string
+    {
+        return Csrf::getToken();
+    }
+}
+
 if (!function_exists('asset')) {
     function asset(string $path, string $type = 'css'): string
     {
@@ -271,6 +288,21 @@ if (!function_exists('accessDenied')) {
         HTML;
 
         return $html;
+    }
+
+    if (!function_exists('route')) {
+        function route(string $name, array $params = []): string
+        {
+            $router = Container::getInstance()->resolve(Router::class);
+            return $router->route($name, $params);
+        }
+    }
+
+    if (!function_exists('method_field')) {
+        function method_field(string $method): string
+        {
+            return '<input type="hidden" name="_method" value="' . strtoupper($method) . '">';
+        }
     }
 }
 

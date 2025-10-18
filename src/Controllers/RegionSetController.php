@@ -167,14 +167,18 @@ class RegionSetController extends Controller
                 return $this->errorResponse('Region set not found', 404);
             }
 
+            // Add region_set filter to the request
+            $request->merge(['region_set_id' => $id]);
+
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
-            $criteria->addFilter('region_set_id', $id);
 
             $result = $this->pageRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, PageResource::class);
             return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
+            echo $e->getMessage();
+            die;
             return $this->errorResponse($e->getMessage(), 500);
         }
     }

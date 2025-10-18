@@ -391,7 +391,7 @@ class Request implements RequestInterface
         return (bool) $default;
     }
 
-    protected function merge(array $data): void
+    public function merge(array $data): void
     {
         foreach ($data as $key => $value) {
             $this->data[$key] = $value;

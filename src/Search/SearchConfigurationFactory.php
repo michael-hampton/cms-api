@@ -19,10 +19,10 @@ class SearchConfigurationFactory
         // Filters
         $config->addFilter(new InFilter('status', 'status'))
             ->addFilter(new RelationshipExistsFilter('content_type', 'metadata', 'content_type'))
-            ->addFilter(new EqualsFilter('region_set_id', 'region_set_id'))
-            ->addFilter(new EqualsFilter('territory_id', 'territory_id'))
+            ->addFilter(new RelationshipFilter('region_set_id', 'regionSets', 'id'))
+            ->addFilter(new RelationshipFilter('territory_id', 'territories', 'id'))
             ->addFilter(new InFilter('template', 'page_type'))
-            ->addFilter(new InFilter('author', 'author_id'))
+            ->addFilter(new RelationshipFilter('author', 'pageAuthors', 'author_id'))
             ->addFilter(new RelationshipExistsFilter('featured', 'metadata', 'featured'))
             ->addFilter(new RelationshipExistsFilter('visibility', 'metadata', 'visibility'))
             ->addFilter(new RelationshipFilter('category', 'categories', 'id'))

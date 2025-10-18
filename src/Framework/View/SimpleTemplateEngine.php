@@ -81,6 +81,10 @@ class SimpleTemplateEngine implements ViewEngineInterface
         $template = $this->compileIncludes($template, $data);
         $template = $this->compileAssets($template);
 
+        $template = str_replace('@csrf', '<?php echo csrf_field(); ?>', $template);
+        $template = preg_replace('/@method\([\'"](.+?)[\'"]\)/', '<?php echo method_field(\'$1\'); ?>', $template);
+
+
         // Handle sections and layouts
         $template = $this->compileSections($template);         // Collect sections
         $template = $this->compileExtends($template, $data);   // Apply parent layout

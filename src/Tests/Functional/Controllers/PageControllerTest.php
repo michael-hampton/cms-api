@@ -1271,6 +1271,107 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['data']['page']['tags']);
     }
 
+    public function testIndexFiltersByAuthor()
+    {
+        $author1 = Author::create([
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'slug' => 'john-doe',
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $author2 = Author::create([
+            'name' => 'Jane Smith',
+            'email' => 'jane@example.com',
+            'slug' => 'jane-smith',
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $page1 = Page::create([
+            'title' => 'Page by John',
+            'slug' => 'page-by-john',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = Page::create([
+            'title' => 'Page by Jane',
+            'slug' => 'page-by-jane',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageAuthor::create([
+            'page_id' => $page1->id,
+            'author_id' => $author1->id,
+            'role' => 'primary',
+            'sort_order' => 0,
+            'site_id' => $this->siteId
+        ]);
+
+        PageAuthor::create([
+            'page_id' => $page2->id,
+            'author_id' => $author2->id,
+            'role' => 'primary',
+            'sort_order' => 0,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite("/api/pages?author={$author1->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('items', $data);
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('Page by John', $data['items'][0]['title']);
+    }
+
+    public function testIndexFiltersByMultipleAuthors()
+    {
+        $author1 = Author::create([
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'slug' => 'john-doe',
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $author2 = Author::create([
+            'name' => 'Jane Smith',
+            'email' => 'jane@example.com',
+            'slug' => 'jane-smith',
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $author3 = Author::create([
+            'name' => 'Bob Johnson',
+            'email' => 'bob@example.com',
+            'slug' => 'bob-johnson',
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $page1 = Page::create(['title' => 'Page 1', 'slug' => 'page-1', 'status' => 'published', 'site_id' => $this->siteId]);
+        $page2 = Page::create(['title' => 'Page 2', 'slug' => 'page-2', 'status' => 'published', 'site_id' => $this->siteId]);
+        $page3 = Page::create(['title' => 'Page 3', 'slug' => 'page-3', 'status' => 'published', 'site_id' => $this->siteId]);
+
+        PageAuthor::create(['page_id' => $page1->id, 'author_id' => $author1->id, 'role' => 'primary', 'sort_order' => 0, 'site_id' => $this->siteId]);
+        PageAuthor::create(['page_id' => $page2->id, 'author_id' => $author2->id, 'role' => 'primary', 'sort_order' => 0, 'site_id' => $this->siteId]);
+        PageAuthor::create(['page_id' => $page3->id, 'author_id' => $author3->id, 'role' => 'primary', 'sort_order' => 0, 'site_id' => $this->siteId]);
+
+        $response = $this->getForSite("/api/pages?author={$author1->id},{$author2->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['items']);
+    }
+
+
     private function createSite() {
         return Site::create([
             'name' => 'Test Site 2',

@@ -63,11 +63,6 @@ class RedirectResponse extends Response
      */
     public function send(): void
     {
-//        if (getenv('APP_ENV') === 'test') {
-//            // Skip sending headers/output during functional tests
-//            return;
-//        }
-
         if (!headers_sent()) {
             foreach ($this->getHeaders() as $name => $value) {
                 // Handle both string and array headers (e.g. multiple Set-Cookie)

@@ -5,6 +5,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Models\Member;
 use App\Models\MemberRole;
+use App\Requests\ChangePasswordRequest;
 use App\Requests\LoginRequest;
 use App\Requests\ResetPasswordRequest;
 use App\Requests\MemberRegistrationRequest;
@@ -158,6 +159,43 @@ class MemberAuthController extends Controller
         }
 
         return $this->view('member/reset-password', ['token' => $token]);
+    }
+
+    public function showChangePasswordForm()
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
+        return $this->view('member/change-password', [
+            'member' => MemberAuth::member()
+        ]);
+    }
+
+    public function changePassword(ChangePasswordRequest $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
+        $member = MemberAuth::getMember();
+
+        $validated = $request->validated();
+
+        // Verify current password
+        if (!password_verify($validated['current_password'], $member->password)) {
+            return $this->back()->withErrors([
+                'current_password' => 'Current password is incorrect'
+            ]);
+        }
+
+        // Update to new password
+        $member->update([
+            'password' => password_hash($validated['new_password'], PASSWORD_DEFAULT)
+        ]);
+
+        return $this->redirect('/member/dashboard')
+            ->with('message', 'Password changed successfully');
     }
 
     public function resetPassword(ResetPasswordRequest $request)

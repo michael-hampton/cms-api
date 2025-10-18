@@ -67,9 +67,7 @@ $router->get('/shop/details/{slug}', ProductDetailController::class, 'show');
 $router->get('/sites', ContentController::class, 'sites');
 
 $router->get('/member/register', [MemberAuthController::class, 'showRegisterForm']);
-$router->post('/member/register', [MemberAuthController::class, 'register']);
 $router->get('/member/login', [MemberAuthController::class, 'showLoginForm']);
-$router->post('/member/login', [MemberAuthController::class, 'login']);
 $router->post('/member/logout', [MemberAuthController::class, 'logout']);
 
 // Email verification routes
@@ -77,16 +75,40 @@ $router->get('/member/verify-email-sent', [MemberAuthController::class, 'showVer
 $router->get('/verify-email', [MemberAuthController::class, 'verifyEmail']);
 
 // Password reset routes
-$router->get('/member/forgot-password', [MemberAuthController::class, 'showForgotPasswordForm']);
-$router->post('/member/forgot-password', [MemberAuthController::class, 'sendPasswordResetEmail']);
-$router->get('/member/reset-password', [MemberAuthController::class, 'showResetPasswordForm']);
-$router->post('/member/reset-password', [MemberAuthController::class, 'resetPassword']);
+$router->get('/member/forgot-password', [MemberAuthController::class, 'showForgotPasswordForm'])
+    ->name('member.forgot-password');
+
+$router->get('/member/reset-password', [MemberAuthController::class, 'showResetPasswordForm'])
+    ->name('member.reset-password');
+
+
+
+$router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::class]], function($router) {
+    $router->post('/member/forgot-password', [MemberAuthController::class, 'sendPasswordResetEmail'])
+        ->name('member.forgot-password.send');
+
+    $router->post('/member/reset-password', [MemberAuthController::class, 'resetPassword'])
+        ->name('member.reset-password.update');
+
+    $router->post('/member/login', [MemberAuthController::class, 'login'])
+        ->name('member.login.submit');
+
+    $router->post('/member/register', [MemberAuthController::class, 'register'])
+        ->name('member.register');
+
+    $router->post('/member/change-password', [MemberAuthController::class, 'changePassword'])
+        ->name('member.change-password.update');
+});
 
 // Protected member routes
 $router->group(['middleware' => [RequireMemberAuth::class]], function($router) {
     $router->get('/member/dashboard', [MemberAuthController::class, 'dashboard']);
-    // Add other member-only routes here
+
+    $router->get('/member/change-password', [MemberAuthController::class, 'showChangePasswordForm'])
+        ->name('member.change-password');
 });
+
+
 
 // Apply page member access check to content routes
 $router->get('/{slug}', [ContentController::class, 'show'])

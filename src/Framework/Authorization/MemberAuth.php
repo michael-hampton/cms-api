@@ -114,6 +114,12 @@ class MemberAuth
         return !self::check();
     }
 
+    public static function getMember(): ?Member
+    {
+        $memberId = Session::get('member_id');
+        return Member::find($memberId);
+    }
+
     public static function member(): ?AuthenticatedMember
     {
         if (self::$member !== null) {
@@ -121,8 +127,8 @@ class MemberAuth
         }
 
         if (Session::get('member_authenticated') === true && Session::has('member_id')) {
-            $memberId = Session::get('member_id');
-            $member = Member::find($memberId);
+
+            $member = self::getMember();
 
             if (!$member || !$member->isActive()) {
                 self::logout();

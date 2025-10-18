@@ -427,42 +427,6 @@ class TerritoryControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['data']['territories']);
     }
 
-    // tests/Functional/Controllers/TerritoryControllerTest.php - Add these test methods
-
-    public function testGetPagesForTerritory()
-    {
-        $territory = Territory::create([
-            'name' => 'United Kingdom',
-            'code' => 'GB',
-            'region_set_id' => $this->regionSet->id,
-            'site_id' => $this->siteId
-        ]);
-
-        Page::create([
-            'title' => 'UK Page 1',
-            'slug' => 'uk-page-1',
-            'status' => 'published',
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
-
-        Page::create([
-            'title' => 'UK Page 2',
-            'slug' => 'uk-page-2',
-            'status' => 'published',
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
-
-        $response = $this->getForSite("/api/territories/{$territory->id}/pages");
-
-        $this->assertResponseOk($response);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertArrayHasKey('items', $data);
-        $this->assertCount(2, $data['items']);
-    }
-
     public function testSearchAvailablePagesForTerritory()
     {
         $territory = Territory::create([
@@ -555,5 +519,50 @@ class TerritoryControllerTest extends FunctionalTestCase
             ->where('territory_id', $territory->id)
             ->first();
         $this->assertNull($assignment);
+    }
+
+    public function testGetPagesForTerritory()
+    {
+        $territory = Territory::create([
+            'name' => 'United Kingdom',
+            'code' => 'GB',
+            'region_set_id' => $this->regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $page1 = Page::create([
+            'title' => 'UK Page 1',
+            'slug' => 'uk-page-1',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = Page::create([
+            'title' => 'UK Page 2',
+            'slug' => 'uk-page-2',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        // Create pivot table entries
+        PageTerritory::create([
+            'page_id' => $page1->id,
+            'territory_id' => $territory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page2->id,
+            'territory_id' => $territory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite("/api/territories/{$territory->id}/pages");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('items', $data);
+        $this->assertCount(2, $data['items']);
     }
 }

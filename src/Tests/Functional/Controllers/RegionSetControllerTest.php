@@ -381,42 +381,6 @@ class RegionSetControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('region_sets', $data['data']);
         $this->assertCount(2, $data['data']['region_sets']);
     }
-
-    // tests/Functional/Controllers/RegionSetControllerTest.php - Add these test methods
-
-    public function testGetPagesForRegionSet()
-    {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        Page::create([
-            'title' => 'European Page 1',
-            'slug' => 'european-page-1',
-            'status' => 'published',
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
-
-        Page::create([
-            'title' => 'European Page 2',
-            'slug' => 'european-page-2',
-            'status' => 'published',
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
-
-        $response = $this->getForSite("/api/region-sets/{$regionSet->id}/pages");
-
-        $this->assertResponseOk($response);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertArrayHasKey('items', $data);
-        $this->assertCount(2, $data['items']);
-    }
-
     public function testSearchAvailablePagesForRegionSet()
     {
         $regionSet = RegionSet::create([
@@ -528,5 +492,62 @@ class RegionSetControllerTest extends FunctionalTestCase
         ]);
 
         $this->assertResponseStatus(400, $response);
+    }
+
+    public function testGetPagesForRegionSet()
+    {
+        $regionSet = RegionSet::create([
+            'name' => 'Europe',
+            'slug' => 'europe-' . time(),
+            'site_id' => $this->siteId
+        ]);
+
+        $page1 = Page::create([
+            'title' => 'European Page 1',
+            'slug' => 'european-page-1',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = Page::create([
+            'title' => 'European Page 2',
+            'slug' => 'european-page-2',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $page3 = Page::create([
+            'title' => 'Non-European Page',
+            'slug' => 'non-european-page',
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        // Create pivot table entries for pages 1 and 2 only
+        PageRegionSet::create([
+            'page_id' => $page1->id,
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageRegionSet::create([
+            'page_id' => $page2->id,
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite("/api/region-sets/{$regionSet->id}/pages");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('items', $data);
+        $this->assertCount(2, $data['items']); // Should only return 2 pages
+
+        // Verify the correct pages are returned
+        $titles = array_column($data['items'], 'title');
+        $this->assertContains('European Page 1', $titles);
+        $this->assertContains('European Page 2', $titles);
+        $this->assertNotContains('Non-European Page', $titles);
     }
 }

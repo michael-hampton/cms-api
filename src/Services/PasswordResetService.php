@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Services;
 
-use App\Models\Member;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 
 class PasswordResetService
 {
@@ -32,24 +33,25 @@ class PasswordResetService
         mail($member->email, $subject, $body, $this->getEmailHeaders());
     }
 
-    public function validateToken(string $token): ?Member
+    public function validateToken(string $token, ?int $siteId = null): ?Member
     {
+        $siteId = $siteId ?? SiteContext::getId();
         $hashedToken = hash('sha256', $token);
 
-        return Member::findByPasswordResetToken($hashedToken, SiteContext::getId());
+        return Member::findByPasswordResetToken($hashedToken, $siteId);
     }
 
-    public function resetPassword(string $token, string $newPassword): bool
+    public function resetPassword(string $token, string $newPassword, ?int $siteId = null): bool
     {
-        $member = $this->validateToken($token);
+        $member = $this->validateToken($token, $siteId);;
 
         if (!$member) {
             return false;
         }
 
-        $member =  Member::where('id', $member->id)->first();
+        $member = Member::where('id', $member->id)->first();
 
-       $member->update([
+        $member->update([
             'password' => password_hash($newPassword, PASSWORD_DEFAULT),
             'password_reset_token' => null,
             'password_reset_expires_at' => null

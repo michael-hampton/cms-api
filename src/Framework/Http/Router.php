@@ -18,7 +18,9 @@ class Router
     private array $middleware = [];
     private array $groupStack = []; // Track nested groups
     private array $globalMiddleware = [];
-
+    private array $namedRoutes = [];
+    private string $lastHttpMethod;
+    private string $lastPath;
 
     public function __construct(Container $container)
     {
@@ -128,7 +130,7 @@ class Router
     /**
      * Add route with flexible handler support and group awareness
      */
-    private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null, array $middleware = []): void
+    private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null, array $middleware = [], ?string $name = null): void
     {
         // Get group attributes
         $groupAttributes = $this->mergeGroupAttributes();
@@ -139,6 +141,13 @@ class Router
 
         // Merge middleware
         $allMiddleware = array_merge($groupAttributes['middleware'], $middleware);
+
+        if ($name !== null) {
+            $this->namedRoutes[$name] = [
+                'path' => $fullPath,
+                'method' => $httpMethod
+            ];
+        }
 
         if (is_array($handler) && count($handler) === 2) {
             $this->routes[$httpMethod][$fullPath] = [
@@ -163,6 +172,10 @@ class Router
         } else {
             throw new Exception("Invalid route handler format for {$httpMethod} {$fullPath}");
         }
+
+        // Track the last added route
+        $this->lastHttpMethod = $httpMethod;
+        $this->lastPath = $fullPath;
     }
 
     public function dispatch(string $method, string $path, $request = null): Response
@@ -554,5 +567,40 @@ class Router
     public function getRoutes(): array
     {
         return $this->routes;
+    }
+
+    public function name(string $name): self
+    {
+        if ($this->lastHttpMethod === null || $this->lastPath === null) {
+            throw new Exception("No route to name. Call name() immediately after defining a route.");
+        }
+
+        $this->namedRoutes[$name] = [
+            'path' => $this->lastPath,
+            'method' => $this->lastHttpMethod
+        ];
+
+        return $this;
+    }
+
+    public function route(string $name, array $params = []): string
+    {
+        if (!isset($this->namedRoutes[$name])) {
+            throw new Exception("Route '{$name}' not found");
+        }
+
+        $path = $this->namedRoutes[$name]['path'];
+
+        // Replace route parameters with actual values
+        foreach ($params as $key => $value) {
+            $path = str_replace('{' . $key . '}', $value, $path);
+        }
+
+        return $path;
+    }
+
+    public function getNamedRoutes(): array
+    {
+        return $this->namedRoutes;
     }
 }

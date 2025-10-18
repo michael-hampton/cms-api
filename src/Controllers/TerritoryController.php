@@ -226,14 +226,16 @@ class TerritoryController extends Controller
     public function getPages(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $regionSet = $this->repository->find($id);
+            $territory = $this->repository->find($id);
 
-            if (!$regionSet) {
-                return $this->errorResponse('Region set not found', 404);
+            if (!$territory) {
+                return $this->errorResponse('Territory not found', 404);
             }
 
+            // Add territory filter to the request
+            $request->merge(['territory_id' => $id]);
+
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
-            $criteria->addFilter('territory_id', $id);
 
             $result = $this->pageRepository->search($criteria);
 

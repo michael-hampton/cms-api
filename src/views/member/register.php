@@ -193,6 +193,7 @@
     <?php endif; ?>
 
     <form method="POST" action="/member/register">
+        @csrf
         <div class="form-group">
             <label for="first_name">
                 First Name <span class="required">*</span>
