@@ -440,4 +440,24 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
         return $this->items[$index];
     }
+
+    public function mapWithKeys(callable $callback)
+    {
+        $result = [];
+
+        foreach ($this->items as $key => $value) {
+            $assoc = $callback($value, $key);
+
+            if (!is_array($assoc)) {
+                throw new \UnexpectedValueException("Callback must return an associative array.");
+            }
+
+            foreach ($assoc as $mapKey => $mapValue) {
+                $result[$mapKey] = $mapValue;
+            }
+        }
+
+        return new static($result);
+    }
+
 }

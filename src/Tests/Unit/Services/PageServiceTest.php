@@ -2222,4 +2222,205 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')->with($sourcePageId, $targetPageId, $targetSiteId)->once();
     }
 
+    public function testCreatePageWithListingData()
+    {
+        $requestData = [
+            'id' => 1,
+            'hero_type' => 'image',
+            'hero_image_id' => 7,
+            'forms' => [
+                'main' => [
+                    'title' => 'Test Page',
+                    'heroType' => 'image',
+                    'heroImageId' => 7,
+                    'heroVideoUrl' => ''
+                ],
+                'meta' => ['slug' => 'test-page', 'status' => 'draft'],
+                'listing' => [
+                    'synopsis' => 'Test synopsis',
+                    'listingTitle' => 'Listing Title',
+                    'dekLabel' => 'Label',
+                    'imageId' => 10,
+                    'useAsHero' => false
+                ],
+                'cropOverrides' => [
+                    'homepage-card' => [
+                        'imageId' => 10,
+                        'imageUrl' => 'http://example.com/image.jpg',
+                        'source' => 'listing',
+                        'ratio' => '1:1'
+                    ]
+                ]
+            ],
+            'resolved_images' => [
+                'homepage-card' => [
+                    'image_id' => 10,
+                    'image_url' => 'http://example.com/image.jpg',
+                    'source' => 'listing-override',
+                    'ratio' => '1:1',
+                    'is_auto_adjusted' => false
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $newPage = $this->createMockPage(1, 'Test Page');
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn(null);
+
+        $this->pageHistory->shouldReceive('logPageCreated')
+            ->once()
+            ->with($newPage);
+
+        $this->pageRepository->shouldReceive('create')
+            ->with(Mockery::on(function($data) {
+                return $data['title'] === 'Test Page'
+                    && $data['listing_synopsis'] === 'Test synopsis'
+                    && $data['listing_title'] === 'Listing Title'
+                    && $data['listing_label'] === 'Label'
+                    && $data['listing_image_id'] === 10
+                    && $data['listing_use_as_hero'] === false
+                    && $data['hero_type'] === 'image'
+                    && $data['hero_image_id'] === 7
+                    && !empty($data['crop_overrides'])
+                    && !empty($data['resolved_images']);
+            }))
+            ->once()
+            ->andReturn($newPage);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($newPage);
+
+        $result = $this->service->createPageWithAllData($requestData, $this->siteId);
+
+        $this->assertSame($newPage, $result);
+    }
+
+    public function testUpdatePageWithListingData()
+    {
+        $requestData = [
+            'id' => 1,
+            'status' => 'published',
+            'hero_type' => 'video',
+            'hero_video_url' => 'http://example.com/video.mp4',
+            'forms' => [
+                'main' => [
+                    'title' => 'Updated Page',
+                    'heroType' => 'video',
+                    'heroImageId' => null,
+                    'heroVideoUrl' => 'http://example.com/video.mp4'
+                ],
+                'meta' => ['slug' => 'updated-page', 'status' => 'published'],
+                'listing' => [
+                    'synopsis' => 'Updated synopsis',
+                    'listingTitle' => 'Updated Listing',
+                    'dekLabel' => 'Updated Label',
+                    'imageId' => 15,
+                    'useAsHero' => true
+                ],
+                'cropOverrides' => []
+            ]
+        ];
+
+        $existingPage = $this->createMockPage(1, 'Updated Page');
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->pageHistory->shouldReceive('logPageUpdated')
+            ->once()
+            ->with(1, Mockery::type('array'), Mockery::type('array'));
+
+        $this->pageRepository->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function($data) {
+                return $data['title'] === 'Updated Page'
+                    && $data['listing_synopsis'] === 'Updated synopsis'
+                    && $data['hero_type'] === 'video'
+                    && $data['hero_video_url'] === 'http://example.com/video.mp4';
+            }))
+            ->andReturn($existingPage);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->twice()
+            ->andReturn($existingPage);
+
+        $result = $this->service->updatePageWithAllData(1, $requestData, $this->siteId);
+
+        $this->assertSame($existingPage, $result);
+    }
+
+    public function testBuildReplaceUpdatesReturnsAllFields()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $sourcePage->listing_synopsis = 'Synopsis';
+        $sourcePage->listing_title = 'Title';
+        $sourcePage->hero_type = 'image';
+        $sourcePage->crop_overrides = ['test' => 'data'];
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildReplaceUpdates');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $sourcePage);
+
+        $this->assertEquals('Synopsis', $result['listing_synopsis']);
+        $this->assertEquals('Title', $result['listing_title']);
+        $this->assertEquals('image', $result['hero_type']);
+        $this->assertArrayHasKey('crop_overrides', $result);
+    }
+
+    public function testBuildAppendUpdatesOnlyFillsEmptyFields()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $sourcePage->listing_synopsis = 'New Synopsis';
+        $sourcePage->listing_title = 'New Title';
+
+        $targetPage = $this->createMockPage(2);
+        $targetPage->listing_synopsis = 'Existing Synopsis';
+        $targetPage->listing_title = '';
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAppendUpdates');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $sourcePage, $targetPage);
+
+        $this->assertArrayNotHasKey('listing_synopsis', $result); // Target has value
+        $this->assertEquals('New Title', $result['listing_title']); // Target is empty
+    }
+
+    public function testMergeJsonFieldsCombinesArrays()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $sourcePage->crop_overrides = json_encode(['homepage-card' => ['imageId' => 5]]);
+
+        $targetPage = $this->createMockPage(2);
+        $targetPage->crop_overrides = json_encode(['listing-card' => ['imageId' => 10]]);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('mergeJsonFields');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $sourcePage, $targetPage);
+
+        $overrides = json_decode($result['crop_overrides'], true);
+        $this->assertArrayHasKey('homepage-card', $overrides);
+        $this->assertArrayHasKey('listing-card', $overrides);
+    }
 }

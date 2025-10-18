@@ -194,43 +194,52 @@ class PageService
 
     private function extractMainPageData(array $requestData): array
     {
-        $mainData = [];
+        $mainData = ['status' => $requestData['status'] ?? 'draft'];
 
-        // Extract from forms.main
-        if (!empty($requestData['forms']['main']['title'])) {
-            $mainData['title'] = $requestData['forms']['main']['title'];
-        }
+        // Define field mappings for cleaner extraction
+        $fieldMappings = [
+            'forms.main.title' => 'title',
+            'forms.main.subtitle' => 'subtitle',
+            'hero_type' => 'hero_type',
+            'hero_image_id' => 'hero_image_id',
+            'hero_video_url' => 'hero_video_url',
+            'forms.meta.slug' => 'slug',
+            'forms.meta.status' => 'status',
+            'forms.seo.meta_title' => 'meta_title',
+            'forms.seo.meta_description' => 'meta_description',
+            'forms.listing.synopsis' => 'listing_synopsis',
+            'forms.listing.listingTitle' => 'listing_title',
+            'forms.listing.dekLabel' => 'listing_label',
+            'forms.listing.imageId' => 'listing_image_id',
+            'forms.listing.useAsHero' => 'listing_use_as_hero',
+        ];
 
-        if (!empty($requestData['forms']['main']['subtitle'])) {
-            $mainData['subtitle'] = $requestData['forms']['main']['subtitle'];
-        }
-
-        // Extract from forms.meta
-        if (!empty($requestData['forms']['meta'])) {
-            $meta = $requestData['forms']['meta'];
-
-            if (isset($meta['slug'])) {
-                $mainData['slug'] = $meta['slug'];
-            }
-            if (isset($meta['status'])) {
-                $mainData['status'] = strtolower($meta['status']);
-            }
-        }
-
-        // Extract from forms.seo (these go to main pages table too)
-        if (!empty($requestData['forms']['seo'])) {
-            $seo = $requestData['forms']['seo'];
-
-            if (isset($seo['meta_title'])) {
-                $mainData['meta_title'] = $seo['meta_title'];
-            }
-            if (isset($seo['meta_description'])) {
-                $mainData['meta_description'] = $seo['meta_description'];
+        foreach ($fieldMappings as $path => $field) {
+            $value = $this->getNestedValue($requestData, $path);
+            if ($value !== null) {
+                if ($field === 'status') {
+                    $mainData[$field] = strtolower($value);
+                } elseif ($field === 'listing_use_as_hero') {
+                    $mainData[$field] = (bool)$value;
+                } else {
+                    $mainData[$field] = $value;
+                }
             }
         }
 
-        $mainData['status'] = $requestData['status'] ?? 'draft';
+        // Handle JSON fields
+        if (!empty($requestData['forms']['cropOverrides'])) {
+            $mainData['crop_overrides'] = json_encode($requestData['forms']['cropOverrides']);
+        }
 
+        if (!empty($requestData['resolved_images'])) {
+            $mainData['resolved_images'] = json_encode($requestData['resolved_images']);
+        }
+
+        // Auto-generate slug if title exists but slug doesn't
+        if (!empty($mainData['title']) && empty($mainData['slug'])) {
+            $mainData['slug'] = Str::slug($mainData['title']);
+        }
 
         return $mainData;
     }
@@ -588,7 +597,17 @@ class PageService
                 'status' => 'draft',
                 'meta_title' => $originalPage->meta_title,
                 'meta_description' => $originalPage->meta_description,
-                'site_id' => $originalPage->site_id
+                'site_id' => $originalPage->site_id,
+                'listing_synopsis' => $originalPage->listing_synopsis,
+                'listing_title' => $originalPage->listing_title,
+                'listing_label' => $originalPage->listing_label,
+                'listing_image_id' => $originalPage->listing_image_id,
+                'listing_use_as_hero' => $originalPage->listing_use_as_hero,
+                'hero_type' => $originalPage->hero_type,
+                'hero_image_id' => $originalPage->hero_image_id,
+                'hero_video_url' => $originalPage->hero_video_url,
+                'crop_overrides' => $originalPage->crop_overrides,
+                'resolved_images' => $originalPage->resolved_images,
             ];
 
             $newPage = $this->pageRepository->create($pageData);
@@ -771,7 +790,15 @@ class PageService
     private function mergePageRelations(int $sourcePageId, int $targetPageId, string $strategy): void
     {
         // Many-to-many relations can be appended
-        $appendableRelations = ['categories', 'tags', 'accessRoles', 'regionSets', 'territories', 'pageAuthors', 'customFields'];;
+        $appendableRelations = [
+            'categories',
+            'tags',
+            'accessRoles',
+            'regionSets',
+            'territories',
+            'pageAuthors',
+            'customFields'
+        ];;
 
         foreach ($appendableRelations as $relation) {
             $method = 'duplicate' . ucfirst($relation);
@@ -798,6 +825,117 @@ class PageService
 
         // Custom fields - merge or append
         $this->mergeCustomFields($sourcePageId, $targetPageId);
+
+        // Merge listing and hero data based on strategy
+        $this->mergeListingAndHeroData($sourcePageId, $targetPageId, $strategy);
+    }
+
+    /**
+     * Merge listing and hero data from source to target based on strategy
+     */
+    private function mergeListingAndHeroData(int $sourcePageId, int $targetPageId, string $strategy): void
+    {
+        $sourcePage = $this->pageRepository->find($sourcePageId);
+        $targetPage = $this->pageRepository->find($targetPageId);
+
+        if (!$sourcePage || !$targetPage) {
+            return;
+        }
+
+        $updates = match($strategy) {
+            'replace' => $this->buildReplaceUpdates($sourcePage),
+            'append' => $this->buildAppendUpdates($sourcePage, $targetPage),
+            default => []
+        };
+
+        if (!empty($updates)) {
+            $this->pageRepository->update($targetPageId, $updates);
+        }
+    }
+
+    /**
+     * Build updates for replace strategy - copy all fields from source
+     */
+    private function buildReplaceUpdates(Page $sourcePage): array
+    {
+        $fields = [
+            'listing_synopsis',
+            'listing_title',
+            'listing_label',
+            'listing_image_id',
+            'listing_use_as_hero',
+            'hero_type',
+            'hero_image_id',
+            'hero_video_url',
+            'crop_overrides',
+            'resolved_images',
+        ];
+
+        return collect($fields)
+            ->mapWithKeys(fn($field) => [$field => $sourcePage->$field])
+            ->all();
+    }
+
+    /**
+     * Build updates for append strategy - only fill empty fields
+     */
+    private function buildAppendUpdates(Page $sourcePage, Page $targetPage): array
+    {
+        $updates = [];
+
+        // Simple scalar fields - only update if target is empty
+        $scalarFields = [
+            //'listing_synopsis',
+            'listing_title',
+            'listing_label',
+            'listing_image_id',
+            'hero_type',
+            'hero_image_id',
+            'hero_video_url',
+        ];
+
+        foreach ($scalarFields as $field) {
+            if (in_array($targetPage->$field, ['', null, 0]) && $sourcePage->$field !== '') {
+                $updates[$field] = $sourcePage->$field;
+            }
+        }
+
+        // JSON fields - merge intelligently
+        $updates = array_merge($updates, $this->mergeJsonFields($sourcePage, $targetPage));
+
+        return $updates;
+    }
+
+    /**
+     * Merge JSON fields intelligently, combining arrays
+     */
+    private function mergeJsonFields(Page $sourcePage, Page $targetPage): array
+    {
+        $updates = [];
+
+        // Crop overrides - target takes precedence over source
+        if (is_array($sourcePage->crop_overrides)) {
+            $sourceOverrides = [...$sourcePage->crop_overrides] ?? [];
+            $targetOverrides = [...$targetPage->crop_overrides] ?? [];
+            $merged = array_merge($sourceOverrides, $targetOverrides);
+
+            if (!empty($merged)) {
+                $updates['crop_overrides'] = json_encode($merged);
+            }
+        }
+
+        // Resolved images - target takes precedence over source
+        if (is_array($sourcePage->resolved_images)) {
+            $sourceImages = [...$sourcePage->resolved_images] ?? [];
+            $targetImages = [...$targetPage->resolved_images] ?? [];
+            $merged = array_merge($sourceImages, $targetImages);
+
+            if (!empty($merged)) {
+                $updates['resolved_images'] = json_encode($merged);
+            }
+        }
+
+        return $updates;
     }
 
     /**
@@ -1001,7 +1139,17 @@ class PageService
                 'meta_title' => $sourcePage->meta_title,
                 'meta_description' => $sourcePage->meta_description,
                 'subtitle' => $sourcePage->subtitle,
-                'site_id' => $targetSiteId
+                'site_id' => $targetSiteId,
+                'listing_synopsis' => $sourcePage->listing_synopsis,
+                'listing_title' => $sourcePage->listing_title,
+                'listing_dek_label' => $sourcePage->listing_dek_label,
+                'listing_image_id' => $sourcePage->listing_image_id,
+                'listing_use_as_hero' => $sourcePage->listing_use_as_hero,
+                'hero_type' => $sourcePage->hero_type,
+                'hero_image_id' => $sourcePage->hero_image_id,
+                'hero_video_url' => $sourcePage->hero_video_url,
+                'crop_overrides' => $sourcePage->crop_overrides,
+                'resolved_images' => $sourcePage->resolved_images,
             ];
 
             $newPage = $this->pageRepository->create($pageData);

@@ -17,6 +17,23 @@ class PageResource extends JsonResource
             'author_id' => $this->getAttribute('author_id'),
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),
+
+            // Hero fields
+            'hero_type' => $this->getAttribute('hero_type'),
+            'hero_image_id' => $this->getAttribute('hero_image_id'),
+            'hero_video_url' => $this->getAttribute('hero_video_url'),
+
+            // Listing fields
+            'listing_synopsis' => $this->getAttribute('listing_synopsis'),
+            'listing_title' => $this->getAttribute('listing_title'),
+            'listing_dek_label' => $this->getAttribute('listing_dek_label'),
+            'listing_image_id' => $this->getAttribute('listing_image_id'),
+            'listing_use_as_hero' => $this->getAttribute('listing_use_as_hero'),
+
+            // JSON fields
+            'crop_overrides' => $this->getAttribute('crop_overrides'),
+            'resolved_images' => $this->getAttribute('resolved_images'),
+
             'blocks' => $this->getAttribute('blocks', []),
             'categories' => $this->whenLoaded('categories'),
             'tags' => $this->whenLoaded('tags'),

@@ -302,4 +302,54 @@ class PageModelTest extends FunctionalTestCase
 
         $this->assertEquals($date, $page->getPublishedAtAttribute());
     }
+
+    public function testPageHasListingAttributes()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'draft',
+            'listing_synopsis' => 'Test synopsis',
+            'listing_title' => 'Listing Title',
+            'listing_label' => 'Label',
+            'listing_image_id' => 10,
+            'listing_use_as_hero' => true,
+            'hero_type' => 'image',
+            'hero_image_id' => 7,
+            'hero_video_url' => '',
+            'crop_overrides' => json_encode(['homepage-card' => ['imageId' => 10]]),
+            'resolved_images' => json_encode(['homepage-card' => ['image_id' => 10]])
+        ]);
+
+        $this->assertEquals('Test synopsis', $page->listing_synopsis);
+        $this->assertEquals('Listing Title', $page->listing_title);
+        $this->assertEquals('Label', $page->listing_label);
+        $this->assertEquals(10, $page->listing_image_id);
+        $this->assertTrue($page->listing_use_as_hero);
+        $this->assertEquals('image', $page->hero_type);
+        $this->assertEquals(7, $page->hero_image_id);
+        $this->assertIsArray($page->crop_overrides);
+        $this->assertIsArray($page->resolved_images);
+    }
+
+    public function testPageCastsJsonFields()
+    {
+        $cropOverrides = ['homepage-card' => ['imageId' => 10, 'ratio' => '1:1']];
+        $resolvedImages = ['homepage-card' => ['image_id' => 10]];
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'draft',
+            'crop_overrides' => $cropOverrides,
+            'resolved_images' => $resolvedImages
+        ]);
+
+        $fresh = Page::find($page->id);
+
+        $this->assertIsArray($fresh->crop_overrides);
+        $this->assertIsArray($fresh->resolved_images);
+        $this->assertEquals($cropOverrides, $fresh->crop_overrides);
+        $this->assertEquals($resolvedImages, $fresh->resolved_images);
+    }
 }

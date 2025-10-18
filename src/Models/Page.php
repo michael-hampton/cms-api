@@ -31,7 +31,17 @@ class Page extends Model
         'deleted_at',
         'territory_id',
         'region_set_id',
-        'subtitle'
+        'subtitle',
+        'listing_synopsis',
+        'listing_title',
+        'listing_label',
+        'listing_image_id',
+        'listing_use_as_hero',
+        'hero_type',
+        'hero_image_id',
+        'hero_video_url',
+        'crop_overrides',
+        'resolved_images',
     ];
 
     protected $alwaysInclude = [
@@ -59,7 +69,10 @@ class Page extends Model
     protected $casts = [
         'published_at' => 'date',
         'created_at' => 'date',
-        'updated_at' => 'date'
+        'updated_at' => 'date',
+        'crop_overrides' => 'json',
+        'resolved_images' => 'json',
+        'listing_use_as_hero' => 'boolean',
     ];
 
     public function blocks(bool $relation = false)

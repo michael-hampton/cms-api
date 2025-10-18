@@ -489,4 +489,129 @@ class PageControllerTest extends FunctionalTestCase
 
         return $request;
     }
+
+    public function testStoreWithListingData()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'hero_type' => 'image',
+            'hero_image_id' => 7,
+            'forms' => [
+                'main' => [
+                    'title' => 'Page with Listing',
+                ],
+                'meta' => ['slug' => 'page-with-listing', 'status' => 'draft'],
+                'listing' => [
+                    'synopsis' => 'Test synopsis',
+                    'listingTitle' => 'Listing Title',
+                    'dekLabel' => 'Label',
+                    'imageId' => 10,
+                    'useAsHero' => false
+                ],
+                'cropOverrides' => [
+                    'homepage-card' => [
+                        'imageId' => 10,
+                        'imageUrl' => 'http://example.com/image.jpg',
+                        'source' => 'listing',
+                        'ratio' => '1:1'
+                    ]
+                ]
+            ],
+            'resolved_images' => [
+                'homepage-card' => [
+                    'image_id' => 10,
+                    'image_url' => 'http://example.com/image.jpg',
+                    'source' => 'listing-override'
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Page with Listing', $data['data']['page']['title']);
+        $this->assertEquals('Test synopsis', $data['data']['page']['listing_synopsis']);
+        $this->assertEquals('Listing Title', $data['data']['page']['listing_title']);
+        $this->assertEquals('Label', $data['data']['page']['listing_label']);
+        $this->assertEquals(10, $data['data']['page']['listing_image_id']);
+        $this->assertEquals(false, $data['data']['page']['listing_use_as_hero']);
+        $this->assertEquals('image', $data['data']['page']['hero_type']);
+        $this->assertEquals(7, $data['data']['page']['hero_image_id']);
+        $this->assertNotEmpty($data['data']['page']['crop_overrides']);
+        $this->assertNotEmpty($data['data']['page']['resolved_images']);
+    }
+
+    public function testShowReturnsListingData()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'site_id' => $this->siteId,
+            'listing_synopsis' => 'Synopsis',
+            'listing_title' => 'Listing Title',
+            'listing_label' => 'Label',
+            'listing_image_id' => 10,
+            'listing_use_as_hero' => true,
+            'hero_type' => 'image',
+            'hero_image_id' => 7,
+            'crop_overrides' => json_encode(['homepage-card' => ['imageId' => 10]]),
+            'resolved_images' => json_encode(['homepage-card' => ['image_id' => 10]])
+        ]);
+
+        $response = $this->getForSite("/api/pages/{$page->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Synopsis', $data['data']['listing_synopsis']);
+        $this->assertEquals('Listing Title', $data['data']['listing_title']);
+        $this->assertEquals('Label', $data['data']['listing_label']);
+        $this->assertEquals(10, $data['data']['listing_image_id']);
+        $this->assertEquals(1, $data['data']['listing_use_as_hero']);
+        $this->assertEquals('image', $data['data']['hero_type']);
+        $this->assertIsString($data['data']['crop_overrides']);
+        $this->assertIsString($data['data']['resolved_images']);
+    }
+
+    public function testDuplicatePageCopiesListingData()
+    {
+        $page = Page::create([
+            'title' => 'Original Page',
+            'slug' => 'original-page',
+            'status' => 'published',
+            'site_id' => $this->siteId,
+            'listing_synopsis' => 'Original synopsis',
+            'listing_title' => 'Original Listing',
+            'listing_label' => 'Original Label',
+            'listing_image_id' => 10,
+            'listing_use_as_hero' => true,
+            'hero_type' => 'video',
+            'hero_video_url' => 'http://example.com/video.mp4',
+            'crop_overrides' => json_encode(['homepage-card' => ['imageId' => 10]]),
+            'resolved_images' => json_encode(['homepage-card' => ['image_id' => 10]])
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $duplicatedPage = $data['data']['page'];
+
+        $page = Page::find($duplicatedPage['id']);
+
+        $this->assertEquals('Original synopsis', $duplicatedPage['listing_synopsis']);
+        $this->assertEquals('Original Listing', $duplicatedPage['listing_title']);
+        $this->assertEquals('Original Label', $duplicatedPage['listing_label']);
+        $this->assertEquals(10, $duplicatedPage['listing_image_id']);
+        $this->assertEquals(1, $duplicatedPage['listing_use_as_hero']);
+        $this->assertEquals('video', $duplicatedPage['hero_type']);
+        $this->assertEquals('http://example.com/video.mp4', $duplicatedPage['hero_video_url']);
+        $this->assertNotEmpty($duplicatedPage['crop_overrides']);
+        $this->assertNotEmpty($duplicatedPage['resolved_images']);
+    }
 }
