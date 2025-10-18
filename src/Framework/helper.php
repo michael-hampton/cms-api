@@ -304,5 +304,32 @@ if (!function_exists('accessDenied')) {
             return '<input type="hidden" name="_method" value="' . strtoupper($method) . '">';
         }
     }
+
+    if (!function_exists('now_datetime')) {
+        /**
+         * Return the current DateTime instance
+         *
+         * @param string|null $timezone Optional timezone, e.g., 'UTC' or 'America/New_York'
+         * @return \DateTime
+         */
+        function now_datetime(?string $timezone = null): \DateTime
+        {
+            if ($timezone) {
+                return new \DateTime('now', new \DateTimeZone($timezone));
+            }
+
+            return new \DateTime('now');
+        }
+    }
+
+    /**
+     * Return the current date-time as a formatted string
+     */
+    if (!function_exists('now')) {
+        function now(string $format = 'Y-m-d H:i:s', ?string $timezone = null): string
+        {
+            return now_datetime($timezone)->format($format);
+        }
+    }
 }
 

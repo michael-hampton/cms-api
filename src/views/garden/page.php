@@ -164,54 +164,9 @@ $hasSidebar = !empty($sidebarBlocks);
                 <a href="/" class="btn btn-primary">Go Home</a>
             </div>
         <?php endif; ?>
+
+        @include('authors')
     </div>
-
-    <?php if ($page->author_id): ?>
-        <?php
-        $author = \App\Models\Author::find($page->author_id);
-        if ($author):
-            ?>
-            <section class="author-bio-section" style="margin-top: 3rem; padding: 2rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
-                <div style="display: flex; gap: 2rem; align-items: start;">
-                    <?php if ($author->avatar): ?>
-                        <div style="flex-shrink: 0;">
-                            <img
-                                    src="<?= htmlspecialchars($author->avatar) ?>"
-                                    alt="<?= htmlspecialchars($author->name) ?>"
-                                    style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
-                            >
-                        </div>
-                    <?php endif; ?>
-
-                    <div style="flex: 1;">
-                        <h3 style="margin: 0 0 0.5rem; font-size: 1.5rem;">
-                            About <?= htmlspecialchars($author->name) ?>
-                        </h3>
-
-                        <?php if ($author->bio): ?>
-                            <p style="color: #666; line-height: 1.6; margin: 0.5rem 0 1rem;">
-                                <?php
-                                // Truncate bio to 200 characters
-                                $bio = $author->bio;
-                                $truncated = strlen($bio) > 200 ? substr($bio, 0, 200) . '...' : $bio;
-                                echo htmlspecialchars($truncated);
-                                ?>
-                            </p>
-                        <?php endif; ?>
-
-                        <a
-                                href="/authors/<?= htmlspecialchars($author->slug) ?>"
-                                style="display: inline-block; padding: 0.5rem 1.5rem; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; transition: background 0.2s;"
-                                onmouseover="this.style.background='#0056b3'"
-                                onmouseout="this.style.background='#007bff'"
-                        >
-                            View Full Profile →
-                        </a>
-                    </div>
-                </div>
-            </section>
-        <?php endif; ?>
-    <?php endif; ?>
 </main>
 
 @include('garden/footer');

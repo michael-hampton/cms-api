@@ -65,7 +65,6 @@ class PageController extends Controller
     public function store(Request $request, string $siteName): JsonResponse
     {
         try {
-
             $requestData = $request->all();
 
             // Determine if this is an update or create based on presence of ID

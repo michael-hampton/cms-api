@@ -254,7 +254,7 @@ class Page extends Model
             ->orderBy('sort_order');
     }
 
-    public function authors($relation = false)
+    public function authors($relation = true)
     {
         return $this->belongsToMany(
             Author::class,
@@ -263,7 +263,7 @@ class Page extends Model
             'author_id',
             true
         )->withPivot('role', 'sort_order')
-            ->orderBy('page_authors.sort_order');
+            ->orderBy('page_authors.sort_order')->get();
     }
 
     public function primaryAuthors($relation = false)

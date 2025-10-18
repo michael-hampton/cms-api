@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Models\PageTag;
+use App\Models\Tag;
 use App\Repositories\TagRepository;
 use Exception;
 
@@ -21,7 +22,7 @@ class TagViewController extends Controller
     public function show(string $slug)
     {
         try {
-            $tag = $this->tagRepository->findBySlug($slug);
+            $tag = Tag::where('slug', $slug)->first();
 
             if (!$tag) {
                return $this->notFound();
@@ -41,14 +42,7 @@ class TagViewController extends Controller
                 ->paginate($perPage, $currentPage);
 
             $pages = $paginationData['data'];
-            $pagination = [
-                'current_page' => $paginationData['current_page'],
-                'per_page' => $paginationData['per_page'],
-                'total' => $paginationData['total'],
-                'last_page' => $paginationData['last_page'],
-                'from' => $paginationData['from'],
-                'to' => $paginationData['to']
-            ];
+            $pagination = $paginationData['pagination'];
 
             // Render the tag view
             return $this->view('estate/tag', ['pages' => $pages, 'tag' => $tag, 'pagination' => $pagination]);;;

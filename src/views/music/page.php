@@ -75,46 +75,6 @@ $hasSidebar = !empty($sidebarBlocks);
                         <?php endforeach; ?>
                     </div>
 
-                    <!-- Author Bio -->
-                    <?php if ($page->author_id): ?>
-                        <?php
-                        $author = \App\Models\Author::find($page->author_id);
-                        if ($author):
-                            ?>
-                            <section class="author-bio">
-                                <div class="author-bio-content">
-                                    <?php if ($author->avatar): ?>
-                                        <div class="author-avatar">
-                                            <img src="<?= htmlspecialchars($author->avatar) ?>"
-                                                 alt="<?= htmlspecialchars($author->name) ?>">
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <div class="author-info">
-                                        <h3 class="author-name">
-                                            About <?= htmlspecialchars($author->name) ?>
-                                        </h3>
-
-                                        <?php if ($author->bio): ?>
-                                            <p class="author-bio-text">
-                                                <?php
-                                                $bio = $author->bio;
-                                                $truncated = strlen($bio) > 200 ? substr($bio, 0, 200) . '...' : $bio;
-                                                echo htmlspecialchars($truncated);
-                                                ?>
-                                            </p>
-                                        <?php endif; ?>
-
-                                        <a href="/authors/<?= htmlspecialchars($author->slug) ?>"
-                                           class="author-link">
-                                            View Full Profile →
-                                        </a>
-                                    </div>
-                                </div>
-                            </section>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
                     <!-- Blog Comments -->
                     <?php if ($page->page_type === 'blog'): ?>
                         <section class="comments-section">
@@ -261,6 +221,8 @@ $hasSidebar = !empty($sidebarBlocks);
                 </a>
             </div>
         <?php endif; ?>
+
+        @include('authors')
     </div>
 </main>
 

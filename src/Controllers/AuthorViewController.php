@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use App\Framework\Support\SiteContext;
+use App\Models\Author;
 use App\Models\Page;
 use App\Services\AuthorService;
 use Exception;
@@ -19,7 +21,7 @@ class AuthorViewController extends Controller
     public function show(string $slug)
     {
         try {
-            $author = $this->authorService->getAuthorBySlug($slug);
+            $author = Author::where('slug', $slug)->first();
 
             if (!$author) {
                 // Return 404 view or redirect
@@ -33,20 +35,16 @@ class AuthorViewController extends Controller
             $perPage = 12;
 
             // Get paginated pages for this author
-            $paginationData = Page::where('author_id', $author->id)
-                ->where('status', 'Published')
+            $paginationData = Page::whereHas('authors', function($query) use ($author) {
+                $query->where('authors.id', $author->id);
+            })
+                ->where('status', 'published')
+                ->with(['author'])
                 ->orderBy('published_at', 'desc')
                 ->paginate($perPage, $currentPage);
 
             $pages = $paginationData['data'];
-            $pagination = [
-                'current_page' => $paginationData['current_page'],
-                'per_page' => $paginationData['per_page'],
-                'total' => $paginationData['total'],
-                'last_page' => $paginationData['last_page'],
-                'from' => $paginationData['from'],
-                'to' => $paginationData['to']
-            ];
+            $pagination = $paginationData['pagination'];
 
             // Render the author view
             return $this->view('estate/author', ['author' => $author, 'pages' => $pages, 'pagination' => $pagination]);;
