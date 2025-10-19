@@ -40,6 +40,7 @@ class MenuRepository extends Repository
         if (!isset($data['sort_order'])) {
             $maxOrder = MenuItem::where('menu_id', $data['menu_id'])
                 ->where('parent_id', $data['parent_id'] ?? null)
+                ->where('column_group', $data['column_group'] ?? 0)
                 ->max('sort_order');
             $data['sort_order'] = ($maxOrder ?? 0) + 1;
         }
@@ -101,6 +102,17 @@ class MenuRepository extends Repository
                 $this->loadChildrenRecursively($query);
             }])
             ->orderBy('sort_order')
+            ->get();
+    }
+
+    public function getMenusByType(string $type, string $siteName): Collection
+    {
+        $site = Site::resolveSite($siteName);
+
+        return Menu::with(['items'])
+            ->where('site_id', $site)
+            ->where('menu_type', $type)
+            ->where('is_active', true)
             ->get();
     }
 }

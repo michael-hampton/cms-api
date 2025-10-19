@@ -396,4 +396,46 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertEquals($brand->id, $data['data']['brand_id']);
         $this->assertEquals($category->id, $data['data']['category_id']);
     }
+
+    public function testItCanCreateProductWithAllRelations()
+    {
+        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
+        $brand = Brand::create(['name' => 'Apple', 'slug' => 'apple']);
+
+        $data = [
+            'name' => 'Complete Product',
+            'description' => 'Full featured product',
+            'price' => 99.99,
+            'sale_price' => 79.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'images' => [
+                ['url' => 'image1.jpg', 'alt' => 'Image 1', 'is_primary' => true, 'sort_order' => 0],
+                ['url' => 'image2.jpg', 'alt' => 'Image 2', 'is_primary' => false, 'sort_order' => 1],
+            ],
+            'merchants' => [
+                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
+            ],
+            'variants' => [
+                ['sku' => 'VAR-001', 'attributes' => ['color' => 'Red'], 'price_modifier' => 0, 'is_active' => true],
+            ],
+            'specifications' => [
+                ['category' => 'Technical', 'key' => 'Weight', 'value' => '1kg', 'sort_order' => 0],
+            ],
+        ];
+
+        $response = $this->postForSite('/api/products', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $responseData = json_decode($response->getContent(), true);
+        $productId = $responseData['data']['product']['id'];
+
+        // Verify relationships were created
+        $product = Product::with(['images', 'merchants', 'variants', 'specifications'])->find($productId);
+        $this->assertCount(2, $product->images);
+        $this->assertCount(1, $product->merchants);
+        $this->assertCount(1, $product->variants);
+        $this->assertCount(1, $product->specifications);
+    }
 }

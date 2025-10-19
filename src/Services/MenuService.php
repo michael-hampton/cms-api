@@ -48,6 +48,8 @@ class MenuService
             $data['slug'] = $this->ensureUniqueSlug($data['slug'], $menu->id);
         }
 
+        unset($data['items']);
+
         $data['layout_config'] = !empty($data['layout_config']) ? json_encode($data['layout_config']) : null;
 
         return $this->menuRepository->updateMenu($menu, $data);

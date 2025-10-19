@@ -6,6 +6,7 @@ use App\Controllers\BlockController;
 use App\Controllers\BrandController;
 use App\Controllers\CartController;
 use App\Controllers\CategoryController;
+use App\Controllers\CommentController;
 use App\Controllers\CustomFieldDefinitionController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
@@ -25,6 +26,7 @@ use App\Controllers\TagController;
 use App\Controllers\TerritoryController;
 use App\Controllers\UserController;
 use App\Controllers\VideoController;
+use App\Controllers\VoucherController;
 use App\Controllers\WishlistController;
 use App\Framework\Authorization\AuthenticateWithToken;
 
@@ -154,10 +156,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         // Page History routes
         $router->get('/pages/{pageId}/history', PageHistoryController::class, 'index');
-        $router->get('/history/{id}',  PageHistoryController::class, 'show');
-        $router->get('/history/recent',  PageHistoryController::class, 'recent');
-        $router->get('/users/{userId}/history',  PageHistoryController::class, 'userHistory');
-        $router->post('/history/{historyId}/restore',  PageHistoryController::class, 'restore');
+        $router->get('/history/{id}', PageHistoryController::class, 'show');
+        $router->get('/history/recent', PageHistoryController::class, 'recent');
+        $router->get('/users/{userId}/history', PageHistoryController::class, 'userHistory');
+        $router->post('/history/{historyId}/restore', PageHistoryController::class, 'restore');
 
 
         $router->get('/page-grids', PageGridController::class, 'index');
@@ -238,6 +240,22 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/territories/{id}/search-pages', [TerritoryController::class, 'searchAvailablePages']);
         $router->post('/territories/{id}/assign-pages', [TerritoryController::class, 'assignPages']);
         $router->post('/territories/{id}/unassign-pages', [TerritoryController::class, 'unassignPages']);
+
+        // Search
+        $router->get('/search/pages', SearchController::class, 'pages');
+        $router->get('/search/categories', SearchController::class, 'categories');
+
+        $router->get('/vouchers', VoucherController::class, 'index');
+        $router->post('/vouchers', VoucherController::class, 'store');
+        $router->get('/vouchers/active', VoucherController::class, 'active');
+        $router->get('/vouchers/{id}', VoucherController::class, 'show');
+        $router->put('/vouchers/{id}', VoucherController::class, 'update');
+        $router->delete('/vouchers/{id}', VoucherController::class, 'destroy');
+        $router->get('/vouchers/{id}/check-delete', VoucherController::class, 'checkDelete');
+        $router->get('/vouchers/{id}/alternatives', VoucherController::class, 'alternatives');
+        $router->post('/vouchers/{id}/duplicate', VoucherController::class, 'duplicate');
+        $router->post('/vouchers/validate', VoucherController::class, 'validate');
+        $router->post('/vouchers/{id}/apply', VoucherController::class, 'apply');
     });
 
     $router->post('/sites', [SiteController::class, 'create']);
@@ -264,10 +282,6 @@ $router->get('/api/menu-items/{id}', MenuItemController::class, 'show');
 $router->put('/api/menu-items/{id}', MenuItemController::class, 'update');
 $router->delete('/api/menu-items/{id}', MenuItemController::class, 'destroy');
 $router->post('/api/menu-items/reorder', MenuItemController::class, 'reorder');
-
-// Search
-$router->get('/api/search/pages', SearchController::class, 'pages');
-$router->get('/api/search/categories', SearchController::class, 'categories');
 
 
 // Author public view route
@@ -307,6 +321,12 @@ $router->get('/api/{site}/videos/{id}', VideoController::class, 'show');
 $router->delete('/api/{site}/videos/{id}', VideoController::class, 'delete');
 
 $router->post('/api/preview', [PreviewController::class, 'preview']);
+
+//comments
+$router->post('/comments', [CommentController::class, 'store']);
+$router->put('/comments/{commentId}/moderate', [CommentController::class, 'moderate']);
+$router->get('/pages/{pageId}/comments', [CommentController::class, 'index']);
+$router->delete('/comments/{commentId}', [CommentController::class, 'destroy']);
 
 
 

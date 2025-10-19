@@ -243,6 +243,7 @@ class Validator
             'numeric' => NumericRule::class,
             'nullable' => NumericRule::class,
             'integer' => IntegerRule::class,
+            'date' => DateRule::class,
             'in' => InRule::class,
             'between' => BetweenRule::class,
             'regex' => RegexRule::class,

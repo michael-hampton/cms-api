@@ -1,4 +1,4 @@
-@include('estate/header', ['menu' => $menu])
+@include('header', ['menu' => $menu])
 
 
 <?php
@@ -66,52 +66,7 @@ $hasSidebar = !empty($sidebarBlocks);
                         <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
                     <?php endforeach; ?>
 
-                    <!-- Blog Comments Section -->
-                    <?php if ($page->page_type === 'blog'): ?>
-                        <div class="comments-section">
-                            <h3>Comments</h3>
-                            <div id="comments-container">
-                                <?php if (isset($comments) && !empty($comments)): ?>
-                                    <?php foreach ($comments as $comment): ?>
-                                        <div class="comment" data-comment-id="<?= $comment->id ?>">
-                                            <div class="comment-header">
-                                                <strong class="comment-author"><?= htmlspecialchars($comment->name) ?></strong>
-                                                <span class="comment-date"><?= date('M j, Y g:i A', strtotime($comment->created_at)) ?></span>
-                                            </div>
-                                            <div class="comment-content">
-                                                <?= nl2br(htmlspecialchars($comment->content)) ?>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <p class="no-comments">No comments yet. Be the first to share your thoughts!</p>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Comment Form -->
-                            <div class="comment-form-container">
-                                <h4>Leave a Comment</h4>
-                                <form method="POST" action="/comments" class="comment-form">
-                                    <input type="hidden" name="page_id" value="<?= $page->id ?>">
-
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <input type="text" name="name" placeholder="Your Name" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <input type="email" name="email" placeholder="Your Email" required>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <textarea name="content" placeholder="Your comment..." required></textarea>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary">Post Comment</button>
-                                </form>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                    @include('comments')
 
                     <!-- Social Media Links -->
                     <?php if ($page->social && $page->social->enable_sharing): ?>
@@ -166,58 +121,10 @@ $hasSidebar = !empty($sidebarBlocks);
         <?php endif; ?>
     </div>
 
-    <?php if ($page->authors && $page->authors->count() > 0): ?>
-        <section class="authors-section" style="margin-top: 3rem; padding: 2rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
-            <h3 style="margin: 0 0 1.5rem; font-size: 1.75rem;">
-                <?= $page->authors->count() > 1 ? 'Authors' : 'Author' ?>
-            </h3>
-
-            <?php foreach ($page->authors as $author): ?>
-                <div style="display: flex; gap: 2rem; align-items: start; margin-bottom: 2rem; padding-bottom: 2rem; <?= !$loop->last ? 'border-bottom: 1px solid #dee2e6;' : '' ?>">
-                    <?php if ($author->avatar): ?>
-                        <div style="flex-shrink: 0;">
-                            <img
-                                    src="<?= htmlspecialchars($author->avatar) ?>"
-                                    alt="<?= htmlspecialchars($author->name) ?>"
-                                    style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
-                            >
-                        </div>
-                    <?php endif; ?>
-
-                    <div style="flex: 1;">
-                        <h4 style="margin: 0 0 0.5rem; font-size: 1.5rem;">
-                            <?= htmlspecialchars($author->name) ?>
-                            <?php
-                            $pivotRole = $author->pivot->role ?? 'primary';
-                            if ($pivotRole === 'contributor'):
-                                ?>
-                                <span style="font-size: 0.875rem; color: #6c757d; font-weight: normal;">(Contributor)</span>
-                            <?php endif; ?>
-                        </h4>
-
-                        <?php if ($author->bio): ?>
-                            <p style="color: #666; line-height: 1.6; margin: 0.5rem 0 1rem;">
-                                <?php
-                                $bio = $author->bio;
-                                $truncated = strlen($bio) > 200 ? substr($bio, 0, 200) . '...' : $bio;
-                                echo htmlspecialchars($truncated);
-                                ?>
-                            </p>
-                        <?php endif; ?>
-
-
-                        <a href="/authors/<?= htmlspecialchars($author->slug) ?>"
-                        style="display: inline-block; padding: 0.5rem 1.5rem; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; transition: background 0.2s;"
-                        onmouseover="this.style.background='#0056b3'"
-                        onmouseout="this.style.background='#007bff'"
-                        >
-                        View Full Profile →
-                        </a>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </section>
-    <?php endif; ?>
+  @include('authors')
 </main>
 
-@include('estate/footer');
+<?php if (isset($footerMenu) && $footerMenu) {
+    $footerRenderer = new \App\Services\FooterRenderer();
+    echo $footerRenderer->renderFooter($footerMenu);
+} ?>

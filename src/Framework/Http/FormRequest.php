@@ -9,6 +9,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\ConfirmedRule;
+use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\ExistsRule;
 use App\Framework\Validation\Rules\InRule;
@@ -281,6 +282,7 @@ abstract class FormRequest extends Request
     {
         $ruleMap = [
             'required' => RequiredRule::class,
+            'date' => DateRule::class,
             'required_with' => RequiredWithRule::class, // ADD THIS LINE
             'string' => StringRule::class, // You'll need this
             'integer' => IntegerRule::class,

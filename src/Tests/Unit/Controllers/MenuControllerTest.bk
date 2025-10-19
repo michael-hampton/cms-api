@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Controllers;
 use App\Controllers\MenuController;
 use App\Framework\Support\Collection;
 use App\Models\Menu;
+use App\Repositories\MenuRepository;
 use App\Requests\CreateMenuRequest;
 use App\Requests\UpdateMenuRequest;
 use App\Services\MenuService;
@@ -22,7 +23,8 @@ class MenuControllerTest extends FunctionalTestCase
         parent::setUp();
 
         $this->menuService = Mockery::mock(MenuService::class);
-        $this->controller = new MenuController($this->menuService);
+        $this->menuRepository = Mockery::mock(MenuRepository::class);
+        $this->controller = new MenuController($this->menuService, $this->menuRepository);
     }
 
     protected function tearDown(): void

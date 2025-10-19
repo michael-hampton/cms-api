@@ -7,6 +7,10 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Models\Product;
+use App\Models\ProductImage;
+use App\Models\ProductMerchant;
+use App\Models\ProductSpecification;
+use App\Models\ProductVariant;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductViewRepository;
 use Exception;
@@ -67,7 +71,33 @@ class ProductService
             $data['image'] = $this->saveBase64Image($data['image']);
         }
 
-        return $this->repository->create($data);
+        // Extract related data
+        $images = $data['images'] ?? [];
+        $merchants = $data['merchants'] ?? [];
+        $variants = $data['variants'] ?? [];
+        $specifications = $data['specifications'] ?? [];
+
+        // Remove from main data array
+        unset($data['images'], $data['merchants'], $data['variants'], $data['specifications']);
+
+        // Create product
+        $product = $this->repository->create($data);
+
+        // Create related records
+        if (!empty($images)) {
+            $this->repository->syncImages($product->id, $images);
+        }
+        if (!empty($merchants)) {
+            $this->repository->syncMerchants($product->id, $merchants);
+        }
+        if (!empty($variants)) {
+            $this->repository->syncVariants($product->id, $variants);
+        }
+        if (!empty($specifications)) {
+            $this->repository->syncSpecifications($product->id, $specifications);
+        }
+
+        return $product;
     }
 
     public function updateProduct(int $id, array $data, ?UploadedFile $imageFile = null): ?Model
@@ -99,7 +129,33 @@ class ProductService
             $data['image'] = $this->saveBase64Image($data['image']);
         }
 
-        return $this->repository->update($id, $data);
+        // Extract related data
+        $images = $data['images'] ?? null;
+        $merchants = $data['merchants'] ?? null;
+        $variants = $data['variants'] ?? null;
+        $specifications = $data['specifications'] ?? null;
+
+        // Remove from main data array
+        unset($data['images'], $data['merchants'], $data['variants'], $data['specifications']);
+
+        // Update product
+        $product = $this->repository->update($id, $data);
+
+        // Sync related records if provided
+        if ($images !== null) {
+            $this->repository->syncImages($product->id, $images);
+        }
+        if ($merchants !== null) {
+            $this->repository->syncMerchants($product->id, $merchants);
+        }
+        if ($variants !== null) {
+            $this->repository->syncVariants($product->id, $variants);
+        }
+        if ($specifications !== null) {
+            $this->repository->syncSpecifications($product->id, $specifications);
+        }
+
+        return $product;
     }
 
     public function deleteProduct(int $id): bool
@@ -266,6 +322,78 @@ class ProductService
             }
         }
 
-        return $this->repository->create($data);
+        // Create duplicated product
+        $newProduct = $this->repository->create($data);
+
+        // Duplicate related data
+        $this->duplicateProductRelations($originalProduct->id, $newProduct->id);
+
+        return $newProduct;
+    }
+
+    protected function duplicateProductRelations(int $originalId, int $newId): void
+    {
+        // Duplicate images
+        $images = $this->repository->getImages($originalId);
+        $imageData = [];
+        foreach ($images as $image) {
+            $newImageUrl = $this->duplicateImage($image->url);
+            if ($newImageUrl) {
+                $imageData[] = [
+                    'url' => $newImageUrl,
+                    'alt' => $image->alt,
+                    'is_primary' => $image->is_primary,
+                    'sort_order' => $image->sort_order,
+                ];
+            }
+        }
+        if (!empty($imageData)) {
+            $this->repository->syncImages($newId, $imageData);
+        }
+
+        // Duplicate merchants
+        $merchants = $this->repository->getMerchants($originalId);
+        $merchantData = $merchants->map(fn($m) => [
+            'name' => $m->name,
+            'url' => $m->url,
+            'price' => $m->price,
+            'is_available' => $m->is_available,
+        ])->toArray();
+        if (!empty($merchantData)) {
+            $this->repository->syncMerchants($newId, $merchantData);
+        }
+
+        // Duplicate variants
+        $variants = $this->repository->getVariants($originalId);
+        $variantData = $variants->map(fn($v) => [
+            'sku' => $v->sku . '-COPY',
+            'attributes' => $v->attributes,
+            'price_modifier' => $v->price_modifier,
+            'is_active' => false, // Set to inactive by default
+        ])->toArray();
+        if (!empty($variantData)) {
+            $this->repository->syncVariants($newId, $variantData);
+        }
+
+        // Duplicate specifications
+        $specifications = $this->repository->getSpecifications($originalId);
+        $specData = $specifications->map(fn($s) => [
+            'category' => $s->category,
+            'key' => $s->key,
+            'value' => $s->value,
+            'sort_order' => $s->sort_order,
+        ])->toArray();
+        if (!empty($specData)) {
+            $this->repository->syncSpecifications($newId, $specData);
+        }
+    }
+
+    protected function duplicateImage(string $originalPath): ?string
+    {
+        try {
+            return $this->imageUploadService->duplicate($originalPath);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

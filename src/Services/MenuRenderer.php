@@ -10,7 +10,7 @@ class MenuRenderer
 {
     public function render(Menu $menu, array $options = []): string
     {
-        $layoutType = $options['layout'] ?? $menu->layout_config['type'] ?? 'horizontal';
+        $layoutType = $options['layout'] ?? $menu->getAttribute('layout_config')['type'] ?? 'horizontal';
         $cssClasses = $options['css_classes'] ?? '';
         $showIcons = $options['show_icons'] ?? true;
 
@@ -27,6 +27,7 @@ class MenuRenderer
     private function renderHorizontal(Collection $items, string $cssClasses, bool $showIcons): string
     {
         if ($items->isEmpty()) {
+            die('a');
             return '';
         }
 

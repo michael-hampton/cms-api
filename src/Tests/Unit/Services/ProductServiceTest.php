@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductRepositoryInterface;
 use App\Repositories\ProductViewRepository;
@@ -323,6 +324,8 @@ class ProductServiceTest extends FunctionalTestCase
             }))
             ->andReturn($newProduct);
 
+        $this->setDuplicateExpectations();
+
         $result = $this->service->duplicateProduct(1);
 
         $this->assertInstanceOf(Product::class, $result);
@@ -356,6 +359,8 @@ class ProductServiceTest extends FunctionalTestCase
             ->shouldReceive('create')
             ->once()
             ->andReturn(new Product(['id' => 2]));
+
+        $this->setDuplicateExpectations();
 
         $result = $this->service->duplicateProduct(1);
 
@@ -395,8 +400,167 @@ class ProductServiceTest extends FunctionalTestCase
             }))
             ->andReturn(new Product(['id' => 2]));
 
+        $this->setDuplicateExpectations();
+
         $result = $this->service->duplicateProduct(1);
 
         $this->assertInstanceOf(Product::class, $result);
     }
+
+    public function testCreateProductWithImagesArray()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'images' => [
+                ['url' => 'img1.jpg', 'alt' => 'Image 1', 'is_primary' => true, 'sort_order' => 0],
+                ['url' => 'img2.jpg', 'alt' => 'Image 2', 'is_primary' => false, 'sort_order' => 1],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($createData) {
+                return !isset($createData['images']);
+            }))
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('syncImages')
+            ->once()
+            ->with(1, Mockery::on(function($images) {
+                return count($images) === 2 && $images[0]['url'] === 'img1.jpg';
+            }));
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testCreateProductWithMerchants()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'merchants' => [
+                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->with(1, Mockery::type('array'));
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testCreateProductWithVariants()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'variants' => [
+                ['sku' => 'VAR-001', 'attributes' => ['color' => 'Red'], 'price_modifier' => 0, 'is_active' => true],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->with(1, Mockery::type('array'));
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testCreateProductWithSpecifications()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'specifications' => [
+                ['category' => 'Technical', 'key' => 'Weight', 'value' => '1kg', 'sort_order' => 0],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('syncSpecifications')
+            ->once()
+            ->with(1, Mockery::type('array'));
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testCreateProductWithAllRelations()
+    {
+        $data = [
+            'name' => 'Complete Product',
+            'price' => 99.99,
+            'images' => [['url' => 'img1.jpg', 'alt' => 'Image 1', 'is_primary' => true, 'sort_order' => 0]],
+            'merchants' => [['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true]],
+            'variants' => [['sku' => 'VAR-001', 'attributes' => [], 'price_modifier' => 0, 'is_active' => true]],
+            'specifications' => [['category' => 'Tech', 'key' => 'Weight', 'value' => '1kg', 'sort_order' => 0]],
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Complete Product']);
+
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('syncImages')->once();
+        $this->repository->shouldReceive('syncMerchants')->once();
+        $this->repository->shouldReceive('syncVariants')->once();
+        $this->repository->shouldReceive('syncSpecifications')->once();
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Complete Product', $result->name);
+    }
+
+    private function setDuplicateExpectations() {
+        $this->repository
+            ->shouldReceive('getImages')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->repository
+            ->shouldReceive('getMerchants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->repository
+            ->shouldReceive('getSpecifications')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+    }
+
 }

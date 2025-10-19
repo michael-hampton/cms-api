@@ -21,13 +21,14 @@ class MenuItemController extends Controller
         try {
             $menuItem = $this->menuService->createMenuItem($request->validated());
 
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => true,
-                'data' => $menuItem->with(['children'])->get(),
+                'data' => $menuItem->toArray(),
                 'message' => 'Menu item created successfully'
             ], 201);
         } catch (\Exception $e) {
-            return $this->jsonResponse([
+            echo $e->getMessage();
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Failed to create menu item'
             ], 500);
@@ -38,13 +39,13 @@ class MenuItemController extends Controller
     {
         try {
             $menuItem = $this->menuService->updateMenuItem($id, $request->validated());
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => true,
-                'data' => $menuItem->with(['children'])->get(),
+                'data' => $menuItem->toArray(),
                 'message' => 'Menu item updated successfully'
             ]);
        } catch (\Exception $e) {
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Failed to update menu item'
             ], 500);

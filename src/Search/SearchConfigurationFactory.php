@@ -4,14 +4,56 @@ namespace App\Search;
 
 use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\CustomFilter;
+use App\Search\Filters\DateRangeFilter;
 use App\Search\Filters\EqualsFilter;
 use App\Search\Filters\InFilter;
 use App\Search\Filters\LikeFilter;
+use App\Search\Filters\RangeFilter;
 use App\Search\Filters\RelationshipExistsFilter;
 use App\Search\Filters\RelationshipFilter;
 
 class SearchConfigurationFactory
 {
+    public static function createVoucherConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration();
+
+        // Filters
+        $config->addFilter(new InFilter('status', 'status'))
+            ->addFilter(new InFilter('type', 'type'))
+            ->addFilter(new RangeFilter('value', 'value'))
+            ->addFilter(new RangeFilter('minimum_order_value', 'minimum_order_value'))
+            ->addFilter(new RangeFilter('maximum_discount', 'maximum_discount'))
+            ->addFilter(new RangeFilter('usage_limit', 'usage_limit'))
+            ->addFilter(new RangeFilter('usage_count', 'usage_count'))
+            ->addFilter(new DateRangeFilter('starts_at', 'starts_at'))
+            ->addFilter(new DateRangeFilter('expires_at', 'expires_at'))
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
+
+        self::applyMandatoryFilters($config);
+
+        // Sorts
+        $config->addSort(new SortSpecification('code', 'code'))
+            ->addSort(new SortSpecification('name', 'name'))
+            ->addSort(new SortSpecification('value', 'value'))
+            ->addSort(new SortSpecification('status', 'status'))
+            ->addSort(new SortSpecification('usage_count', 'usage_count'))
+            ->addSort(new SortSpecification('date_created', 'created_at'))
+            ->addSort(new SortSpecification('date_updated', 'updated_at'))
+            ->addSort(new SortSpecification('expires_at', 'expires_at'));
+
+        // Searchable columns
+        $config->addSearchableColumn('code')
+            ->addSearchableColumn('name')
+            ->addSearchableColumn('description');
+
+        // Default sort
+        $config->setDefaultSort('date_created', 'desc');
+
+        return $config;
+    }
+
     public static function createPageConfiguration(): SearchConfiguration
     {
         $config = new SearchConfiguration();

@@ -1,17 +1,17 @@
 <?php
+// App/Controllers/CommentController.php
 
 namespace App\Controllers;
 
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
-use App\Repositories\CommentRepository;
 use App\Requests\CreateCommentRequest;
-use App\Services\NotificationService;
+use App\Services\CommentService;
 
 class CommentController extends Controller
 {
     public function __construct(
-        private CommentRepository $commentRepository,
-        private NotificationService $notificationService
+        private CommentService $commentService
     ) {
         parent::__construct();
     }
@@ -19,46 +19,123 @@ class CommentController extends Controller
     public function store(CreateCommentRequest $request)
     {
         try {
-            $comment = $this->commentRepository->createComment($request->validated());
+            $comment = $this->commentService->createComment($request->validated());
 
-            // Send notification if comment is approved automatically
-            if ($comment->isApproved()) {
-                $this->notificationService->notifyNewComment($comment);
-            }
-
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => true,
-                'message' => 'Comment posted successfully',
-                'comment' => $comment->toArray(),
+                'message' => $this->getStatusMessage($comment->status),
+                'comment' => [
+                    'id' => $comment->id,
+                    'name' => $comment->name,
+                    'content' => $comment->content,
+                    'created_at' => $comment->created_at,
+                    'status' => $comment->status
+                ],
                 'status' => $comment->status
             ]);
 
+        } catch (ValidationException|\InvalidArgumentException $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Failed to post comment. Please try again.'
-            ], 400);
+            ], 500);
         }
     }
 
     public function moderate(int $commentId, Request $request)
     {
-//        $data = $this->validateRequest([
-//            'status' => 'required|in:approved,rejected,spam'
-//        ]); //todo
+        try {
+            $status = $request->get('status');
 
-        $success = $this->commentRepository->moderateComment($commentId, $request->get('status') );;
+            if (!$status) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Status is required'
+                ], 422);
+            }
 
-        if ($success) {
+            $success = $this->commentService->moderateComment($commentId, $status);
+
+            if ($success) {
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Comment status updated successfully'
+                ]);
+            }
+
             return $this->jsonResponse([
-                'success' => true,
-                'message' => 'Comment status updated successfully'
-            ]);
-        }
+                'success' => false,
+                'message' => 'Comment not found'
+            ], 404);
 
-        return $this->jsonResponse([
-            'success' => false,
-            'message' => 'Failed to update comment status'
-        ], 400);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to update comment status'
+            ], 500);
+        }
+    }
+
+    public function index(int $pageId)
+    {
+        try {
+            $comments = $this->commentService->getCommentsForPage($pageId);
+            $stats = $this->commentService->getCommentStats($pageId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'comments' => $comments->toArray(),
+                'stats' => $stats
+            ]);
+        } catch (\Exception $e) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Failed to fetch comments'
+            ], 500);
+        }
+    }
+
+    public function destroy(int $commentId)
+    {
+        try {
+            $success = $this->commentService->deleteComment($commentId);
+
+            if ($success) {
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Comment deleted successfully'
+                ]);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Comment not found'
+            ], 404);
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to delete comment'
+            ], 500);
+        }
+    }
+
+    private function getStatusMessage(string $status): string
+    {
+        return match($status) {
+            'approved' => 'Comment posted successfully!',
+            'pending' => 'Your comment is awaiting moderation.',
+            'spam' => 'Your comment was flagged as spam.',
+            default => 'Comment submitted.'
+        };
     }
 }

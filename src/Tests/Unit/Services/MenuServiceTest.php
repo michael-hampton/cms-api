@@ -196,4 +196,103 @@ class MenuServiceTest extends TestCase
 
         $this->assertInstanceOf(\App\Framework\Support\Collection::class, $result);
     }
+
+    public function testCreateFooterMenuWithLayoutConfig()
+    {
+        $data = [
+            'name' => 'Footer Menu',
+            'menu_type' => 'footer',
+            'layout_config' => [
+                'footer_style' => 'modern',
+                'show_brand_section' => true,
+                'logo_type' => 'icon',
+                'logo_icon' => '🏠',
+                'social_links' => [
+                    'facebook' => 'https://facebook.com/test',
+                    'twitter' => 'https://twitter.com/test'
+                ],
+                'show_newsletter' => true
+            ]
+        ];
+
+        $this->menuRepository->shouldReceive('findBySlug')
+            ->with('footer-menu')
+            ->once()
+            ->andReturn(null);
+
+        $menu = Mockery::mock(Menu::class);
+        $this->menuRepository->shouldReceive('createMenu')
+            ->once()
+            ->with(Mockery::on(function ($arg) use ($data) {
+                $layoutConfig = json_decode($arg['layout_config'], true);
+                return $arg['slug'] === 'footer-menu'
+                    && $arg['menu_type'] === 'footer'
+                    && $layoutConfig['footer_style'] === 'modern'
+                    && $layoutConfig['show_newsletter'] === true;
+            }))
+            ->andReturn($menu);
+
+        $result = $this->service->createMenu($data);
+
+        $this->assertSame($menu, $result);
+    }
+
+    public function testUpdateMenuType()
+    {
+        $menu = Mockery::mock(Menu::class)->makePartial();
+        $menu->id = 1;
+        $menu->menu_type = 'header';
+
+        $this->menuRepository->shouldReceive('getMenuById')
+            ->with(1)
+            ->andReturn($menu);
+
+        $this->menuRepository->shouldReceive('updateMenu')
+            ->once()
+            ->with(
+                $menu,
+                ['menu_type' => 'footer', 'layout_config' => null]
+            )
+            ->andReturn($menu);
+
+        $result = $this->service->updateMenu(1, ['menu_type' => 'footer']);
+
+        $this->assertSame($menu, $result);
+    }
+
+    public function testUpdateFooterLayoutConfig()
+    {
+        $menu = Mockery::mock(Menu::class)->makePartial();
+        $menu->id = 1;
+        $menu->menu_type = 'footer';
+        $menu->layout_config = ['footer_style' => 'default'];
+
+        $newConfig = [
+            'footer_style' => 'modern',
+            'show_brand_section' => true,
+            'social_links' => [
+                'facebook' => 'https://facebook.com/updated'
+            ]
+        ];
+
+        $this->menuRepository->shouldReceive('getMenuById')
+            ->with(1)
+            ->andReturn($menu);
+
+        $this->menuRepository->shouldReceive('updateMenu')
+            ->once()
+            ->with(
+                $menu,
+                Mockery::on(function ($arg) use ($newConfig) {
+                    $layoutConfig = json_decode($arg['layout_config'], true);
+                    return $layoutConfig['footer_style'] === 'modern'
+                        && $layoutConfig['show_brand_section'] === true;
+                })
+            )
+            ->andReturn($menu);
+
+        $result = $this->service->updateMenu(1, ['layout_config' => $newConfig]);
+
+        $this->assertSame($menu, $result);
+    }
 }

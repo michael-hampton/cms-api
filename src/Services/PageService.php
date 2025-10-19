@@ -204,7 +204,7 @@ class PageService
             'hero_image_id' => 'hero_image_id',
             'hero_video_url' => 'hero_video_url',
             'forms.meta.slug' => 'slug',
-            'forms.meta.status' => 'status',
+            'status' => 'status',
             'forms.seo.meta_title' => 'meta_title',
             'forms.seo.meta_description' => 'meta_description',
             'forms.listing.synopsis' => 'listing_synopsis',
@@ -339,6 +339,13 @@ class PageService
         ];
 
         $data = $this->mapFormData($settingsForm, $mapping);
+
+        $isCompletelyEmpty = count(array_filter($data, fn($v) => !empty($v))) === 0;
+
+        if ($isCompletelyEmpty) {
+            return;
+        }
+
         $this->settingsRepository->createOrUpdate($pageId, $data);
 
         // Handle access roles separately

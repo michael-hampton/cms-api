@@ -15,8 +15,8 @@ use App\Services\Url\UrlResolutionResult;
 class ContentController extends Controller
 {
     public function __construct(
-        private BlockParserService $blockParserService,
-        private CommentRepository $commentRepository
+        private readonly BlockParserService $blockParserService,
+        private readonly CommentRepository  $commentRepository
     ) {
         parent::__construct();
     }
@@ -28,6 +28,13 @@ class ContentController extends Controller
 
         $menu = Menu::where('is_active', true)
             ->where('site_id', $siteId)
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
+        $footerMenu = Menu::where('is_active', true)
+            ->where('site_id', $siteId)
+            ->where('menu_type', 'footer')
             ->with(['items'])
             ->first();
 
@@ -39,15 +46,13 @@ class ContentController extends Controller
 
         $data = [
             'menu' => $menu,
+            'footerMenu' => $footerMenu,
             'page' => $page,
             'blockParserService' => $this->blockParserService,
             'site' => SiteContext::get()
         ];
 
-        // Load comments for blog pages
-        if ($page->page_type === 'blog') {
-            $data['comments'] = $this->commentRepository->getPageComments($page->id, 'approved');
-        }
+        $data['comments'] = $this->commentRepository->getCommentsForPage($page->id, true);
 
         // Use site-specific theme if available
         $theme = SiteContext::getTheme();

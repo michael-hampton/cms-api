@@ -4,8 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Framework\Support\Collection;
-use App\Models\Page;
+use App\Framework\Support\SiteContext;
 use App\Repositories\PageRepository;
 
 class SearchController extends Controller
@@ -18,15 +17,28 @@ class SearchController extends Controller
     public function pages(Request $request): JsonResponse
     {
         try {
+            $siteId = SiteContext::getId();
+            $request->merge(['site_id' => $siteId]);
             $query = $request->get('q', '');
             $limit = min($request->get('limit', 20), 50);
 
             $pages = $this->pageRepository->quickSearch($query, [
                 'limit' => $limit,
-                'status' => 'published'
+                'status' => 'published',
+                'site_id' => $siteId,
             ]);
 
-            return $this->jsonResponse($pages->items);
+            $allPages = $pages->items;
+            $formattedPages = [];
+
+            foreach ($allPages as $page) {
+                $page['crop_overrides'] = json_decode($page['crop_overrides'], true) ?? [];
+                $page['resolved_images'] = json_decode($page['resolved_images'], true) ?? [];
+
+                $formattedPages[] = $page;
+            }
+
+            return $this->jsonResponse($formattedPages);
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,

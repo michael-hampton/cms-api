@@ -98,6 +98,10 @@ class PageRepository extends Repository
             $criteria->addFilter('status', $status);
         }
 
+        if(!empty($options['site_id'])) {
+            $criteria->addFilter('site_id', $options['site_id']);
+        }
+
         // Set limit (per_page in SearchCriteria)
         $limit = $options['limit'] ?? 20;
         $criteria->setPerPage($limit);

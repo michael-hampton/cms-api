@@ -1,4 +1,4 @@
-@include('wine/header', ['menu' => $menu])
+@include('header', ['menu' => $menu])
 
 
 <?php
@@ -67,85 +67,10 @@ $hasSidebar = !empty($sidebarBlocks);
                     <?php endforeach; ?>
 
                     <!-- Blog Comments Section -->
-                    <?php if ($page->page_type === 'blog'): ?>
-                        <div class="comments-section">
-                            <h3>Comments</h3>
-                            <div id="comments-container">
-                                <?php if (isset($comments) && !empty($comments)): ?>
-                                    <?php foreach ($comments as $comment): ?>
-                                        <div class="comment" data-comment-id="<?= $comment->id ?>">
-                                            <div class="comment-header">
-                                                <strong class="comment-author"><?= htmlspecialchars($comment->name) ?></strong>
-                                                <span class="comment-date"><?= date('M j, Y g:i A', strtotime($comment->created_at)) ?></span>
-                                            </div>
-                                            <div class="comment-content">
-                                                <?= nl2br(htmlspecialchars($comment->content)) ?>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <p class="no-comments">No comments yet. Be the first to share your thoughts!</p>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Comment Form -->
-                            <div class="comment-form-container">
-                                <h4>Leave a Comment</h4>
-                                <form method="POST" action="/comments" class="comment-form">
-                                    <input type="hidden" name="page_id" value="<?= $page->id ?>">
-
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <input type="text" name="name" placeholder="Your Name" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <input type="email" name="email" placeholder="Your Email" required>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <textarea name="content" placeholder="Your comment..." required></textarea>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary">Post Comment</button>
-                                </form>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                    @include('comments')
 
                     <!-- Social Media Links -->
-                    <?php if ($page->social && $page->social->enable_sharing): ?>
-                        <div class="social-sharing">
-                            <h4>Share this page:</h4>
-                            <div class="social-buttons">
-                                <?php
-                                $platforms = $page->social->platforms ?? [];
-                                $shareText = urlencode($page->social->share_text ?? $page->title);
-                                $currentUrl = urlencode("https://{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}");
-                                ?>
-
-                                <?php if (in_array('facebook', $platforms)): ?>
-                                    <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $currentUrl ?>"
-                                       target="_blank" class="social-btn facebook">Facebook</a>
-                                <?php endif; ?>
-
-                                <?php if (in_array('twitter', $platforms)): ?>
-                                    <a href="https://twitter.com/intent/tweet?text=<?= $shareText ?>&url=<?= $currentUrl ?>"
-                                       target="_blank" class="social-btn twitter">Twitter</a>
-                                <?php endif; ?>
-
-                                <?php if (in_array('linkedin', $platforms)): ?>
-                                    <a href="https://www.linkedin.com/sharing/share-offsite/?url=<?= $currentUrl ?>"
-                                       target="_blank" class="social-btn linkedin">LinkedIn</a>
-                                <?php endif; ?>
-
-                                <?php if (in_array('email', $platforms)): ?>
-                                    <a href="mailto:?subject=<?= $shareText ?>&body=<?= $currentUrl ?>"
-                                       class="social-btn email">Email</a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                    @include('links)
                 </div>
 
                 <!-- Sidebar -->
@@ -169,4 +94,7 @@ $hasSidebar = !empty($sidebarBlocks);
     </div>
 </main>
 
-@include('wine/footer');
+<?php if (isset($footerMenu) && $footerMenu) {
+    $footerRenderer = new \App\Services\FooterRenderer();
+    echo $footerRenderer->renderFooter($footerMenu);
+} ?>

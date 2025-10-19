@@ -117,4 +117,44 @@ class CommentRepository extends Repository
             'rejected' => Comment::where('status', 'rejected')->count()
         ];
     }
+    public function findById(int $id): Model
+    {
+        return Comment::find($id);
+    }
+
+    public function countApprovedCommentsByEmail(string $email): int
+    {
+        return Comment::where('email', $email)
+            ->where('status', 'approved')
+            ->count();
+    }
+
+    public function countCommentsByPage(int $pageId, ?string $status = null): int
+    {
+        $query = Comment::where('page_id', $pageId);
+
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+
+        return $query->count();
+    }
+
+    public function deleteComment(int $commentId): bool
+    {
+        $comment = Comment::find($commentId);
+        return $comment ? $comment->delete() : false;
+    }
+
+    public function getCommentsForPage(int $pageId, bool $onlyApproved = true): Collection
+    {
+        $query = Comment::where('page_id', $pageId)
+            ->orderBy('created_at', 'DESC');
+
+        if ($onlyApproved) {
+            $query->where('status', 'approved');
+        }
+
+        return $query->get();
+    }
 }

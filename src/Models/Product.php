@@ -94,4 +94,55 @@ class Product extends Model
     {
         return $this->approvedReviews()->count();
     }
+
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    public function primaryImage()
+    {
+        return $this->hasOne(ProductImage::class)->where('is_primary', true);
+    }
+
+    public function merchants()
+    {
+        return $this->hasMany(ProductMerchant::class);
+    }
+
+    public function availableMerchants()
+    {
+        return $this->hasMany(ProductMerchant::class)->where('is_available', true);
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function activeVariants()
+    {
+        return $this->hasMany(ProductVariant::class)->where('is_active', true);
+    }
+
+    public function specifications()
+    {
+        return $this->hasMany(ProductSpecification::class)->orderBy('sort_order');
+    }
+
+    public function inclusions()
+    {
+        return $this->hasMany(ProductInclusion::class);
+    }
+
+    public function priceHistory()
+    {
+        return $this->hasMany(ProductPriceHistory::class)->orderBy('recorded_at', 'desc');
+    }
+
+// Accessor for main image URL
+    public function getMainImageUrlAttribute(): ?string
+    {
+        return $this->primaryImage?->url ?? $this->images->first()?->url ?? $this->image;
+    }
 }

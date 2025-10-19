@@ -19,7 +19,7 @@ class CreateMenuItemRequest extends FormRequest
             'label' => 'required|string|max:255',
             'target_type' => 'required|in:page,category,custom,external',
             'target_id' => 'string|max:255',
-            'custom_url' => 'url|max:500',
+            'custom_url' => 'max:500',
             'css_class' => 'string|max:255',
             'icon' => 'string|max:255',
             'attributes' => 'array',

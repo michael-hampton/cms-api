@@ -10,7 +10,8 @@ class Menu extends Model
         'description',
         'layout_config',
         'is_active',
-        'site_id'
+        'site_id',
+        'menu_type'
     ];
 
     protected $casts = [
@@ -33,5 +34,31 @@ class Menu extends Model
     public function getActiveItemsAttribute()
     {
         return $this->items()->where('is_active', true)->with(['activeChildren'])->get();
+    }
+
+    public function scopeHeader($query)
+    {
+        return $query->where('menu_type', 'header');
+    }
+
+    public function scopeFooter($query)
+    {
+        return $query->where('menu_type', 'footer');
+    }
+
+    public function getLayoutConfigAttribute()
+    {
+        $layoutConfig = $this->attributes['layout_config'];
+
+        if (is_null($layoutConfig)) {
+            return [];
+        }
+
+        if (is_string($layoutConfig)) {
+            $decoded = json_decode($layoutConfig, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return is_array($layoutConfig) ? $layoutConfig : [];
     }
 }

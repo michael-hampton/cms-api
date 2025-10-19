@@ -3,30 +3,50 @@
 namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
+use App\Repositories\MenuRepository;
 use App\Requests\CreateMenuRequest;
 use App\Requests\UpdateMenuRequest;
+use App\Resources\MenuResource;
 use App\Services\MenuService;
 
 class MenuController extends Controller
 {
     public function __construct(
-        protected MenuService $menuService
+        protected MenuService $menuService,
+        private MenuRepository $menuRepository,
     ) {
         parent::__construct();
     }
 
-    public function index(string $siteName): JsonResponse
+    public function index(Request $request, string $siteName)
     {
         try {
-            $menus = $this->menuService->getAllMenus($siteName);
+            $type = $request->get('type'); // Get type from query params
+
+            if ($type) {
+                // Validate type
+                if (!in_array($type, ['header', 'footer', 'sidebar'])) {
+                    return $this->resourceResponse([
+                        'success' => false,
+                        'message' => 'Invalid menu type'
+                    ], 422);
+                }
+
+                $menus = $this->menuRepository->getMenusByType($type, $siteName);
+            } else {
+                $menus = $this->menuRepository->getAllMenus($siteName);
+            }
+
             return $this->jsonResponse([
                 'success' => true,
-                'data' => $menus
+                'data' => $menus->toArray()
             ]);
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,
-                'message' => 'Failed to retrieve menus'
+                'message' => 'Failed to fetch menus',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -45,7 +65,7 @@ class MenuController extends Controller
 
             return $this->jsonResponse([
                 'success' => true,
-                'menu' => $menu->toArray()
+                'menu' => MenuResource::make($menu)->toArray()
             ]);
         } catch (\Exception $e) {
             return $this->jsonResponse([
@@ -107,6 +127,8 @@ class MenuController extends Controller
                 'message' => 'Menu updated successfully'
             ]);
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Failed to update menu'

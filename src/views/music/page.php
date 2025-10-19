@@ -1,4 +1,4 @@
-@include('music/header', ['menu' => $menu])
+@include('header', ['menu' => $menu])
 
 <?php
 use App\Framework\Support\SiteContext;
@@ -76,127 +76,10 @@ $hasSidebar = !empty($sidebarBlocks);
                     </div>
 
                     <!-- Blog Comments -->
-                    <?php if ($page->page_type === 'blog'): ?>
-                        <section class="comments-section">
-                            <h3 class="comments-title">Comments</h3>
-
-                            <div class="comments-list">
-                                <?php if (isset($comments) && !empty($comments)): ?>
-                                    <?php foreach ($comments as $comment): ?>
-                                        <div class="comment" data-comment-id="<?= $comment->id ?>">
-                                            <div class="comment-header">
-                                                <strong class="comment-author">
-                                                    <?= htmlspecialchars($comment->name) ?>
-                                                </strong>
-                                                <span class="comment-date">
-                                                    <?= date('M j, Y', strtotime($comment->created_at)) ?>
-                                                </span>
-                                            </div>
-                                            <div class="comment-content">
-                                                <?= nl2br(htmlspecialchars($comment->content)) ?>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <p class="no-comments">
-                                        No comments yet. Be the first to share your thoughts!
-                                    </p>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Comment Form -->
-                            <div class="comment-form-wrapper">
-                                <h4 class="comment-form-title">Leave a Comment</h4>
-                                <form method="POST" action="/comments" class="comment-form">
-                                    <input type="hidden" name="page_id" value="<?= $page->id ?>">
-
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="comment-name">Name *</label>
-                                            <input type="text"
-                                                   id="comment-name"
-                                                   name="name"
-                                                   required
-                                                   class="form-control">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="comment-email">Email *</label>
-                                            <input type="email"
-                                                   id="comment-email"
-                                                   name="email"
-                                                   required
-                                                   class="form-control">
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="comment-content">Comment *</label>
-                                        <textarea id="comment-content"
-                                                  name="content"
-                                                  required
-                                                  class="form-control"
-                                                  rows="5"></textarea>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary">
-                                        Post Comment
-                                    </button>
-                                </form>
-                            </div>
-                        </section>
-                    <?php endif; ?>
+                    @include('comments')
 
                     <!-- Social Sharing -->
-                    <?php if (isset($page->social) && $page->social->enable_sharing): ?>
-                        <div class="social-sharing">
-                            <h4 class="social-sharing-title">Share this article</h4>
-                            <div class="social-buttons">
-                                <?php
-                                $platforms = $page->social->platforms ?? [];
-                                $shareText = urlencode($page->social->share_text ?? $page->title);
-                                $currentUrl = urlencode("https://{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}");
-                                ?>
-
-                                <?php if (in_array('facebook', $platforms)): ?>
-                                    <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $currentUrl ?>"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       class="social-btn social-facebook">
-                                        <span class="social-icon">f</span>
-                                        Facebook
-                                    </a>
-                                <?php endif; ?>
-
-                                <?php if (in_array('twitter', $platforms)): ?>
-                                    <a href="https://twitter.com/intent/tweet?text=<?= $shareText ?>&url=<?= $currentUrl ?>"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       class="social-btn social-twitter">
-                                        <span class="social-icon">𝕏</span>
-                                        Twitter
-                                    </a>
-                                <?php endif; ?>
-
-                                <?php if (in_array('linkedin', $platforms)): ?>
-                                    <a href="https://www.linkedin.com/sharing/share-offsite/?url=<?= $currentUrl ?>"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       class="social-btn social-linkedin">
-                                        <span class="social-icon">in</span>
-                                        LinkedIn
-                                    </a>
-                                <?php endif; ?>
-
-                                <?php if (in_array('email', $platforms)): ?>
-                                    <a href="mailto:?subject=<?= $shareText ?>&body=<?= $currentUrl ?>"
-                                       class="social-btn social-email">
-                                        <span class="social-icon">✉</span>
-                                        Email
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                    @include('links)
                 </article>
 
                 <!-- Sidebar -->
@@ -227,4 +110,8 @@ $hasSidebar = !empty($sidebarBlocks);
 </main>
 
 @js('carousel.js');
-@include('music/footer')
+
+<?php if (isset($footerMenu) && $footerMenu) {
+    $footerRenderer = new \App\Services\FooterRenderer();
+    echo $footerRenderer->renderFooter($footerMenu);
+} ?>

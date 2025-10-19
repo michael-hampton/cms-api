@@ -17,12 +17,14 @@ class MenuItem extends Model
         'open_in_new_tab',
         'sort_order',
         'is_active',
+        'column_group'
     ];
 
     protected $casts = [
         'attributes' => 'array',
         'open_in_new_tab' => 'boolean',
         'is_active' => 'boolean',
+        'column_group' => 'integer',
     ];
 
     protected $table = 'menu_items';
@@ -46,10 +48,10 @@ class MenuItem extends Model
 
     public function activeChildren()
     {
-        return $this->hasMany(MenuItem::class, 'parent_id')
+        return $this->hasMany(MenuItem::class, 'parent_id', null, true)
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->with(['activeChildren']);
+            ->with(['activeChildren'])->get();
     }
 
     public function getUrlAttribute(): string
