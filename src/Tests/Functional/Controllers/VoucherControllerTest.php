@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Product;
 use App\Models\Voucher;
 
 class VoucherControllerTest extends FunctionalTestCase
@@ -501,5 +502,112 @@ class VoucherControllerTest extends FunctionalTestCase
         $response = $this->getForSiteUnauthenticated('/api/vouchers');
 
         $this->assertResponseStatus(401, $response);
+    }
+
+    public function testCreateVoucherWithProducts()
+    {
+        $product1 = Product::create(['name' => 'Product 1', 'price' => 50, 'site_id' => $this->siteId]);
+        $product2 = Product::create(['name' => 'Product 2', 'price' => 75, 'site_id' => $this->siteId]);
+
+        $voucherData = [
+            'code' => 'PRODUCTS10',
+            'name' => 'Product Specific Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'product_ids' => [$product1->id, $product2->id]
+        ];
+
+        $response = $this->postForSite('/api/vouchers', $voucherData);
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $voucherId = $data['data']['voucher']['id'];
+
+        $voucher = Voucher::find($voucherId);
+        $this->assertCount(2, $voucher->products);
+    }
+
+    public function testValidateVoucherForProduct()
+    {
+        $product = Product::create(['name' => 'Test Product', 'price' => 100, 'site_id' => $this->siteId]);
+
+        $voucher = Voucher::create([
+            'code' => 'PRODUCT10',
+            'name' => 'Product Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $voucher->products(true)->attach($product->id);
+
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'PRODUCT10',
+            'order_value' => 100,
+            'product_id' => $product->id
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['valid']);
+    }
+
+    public function testValidateVoucherNotApplicableToProduct()
+    {
+        $product1 = Product::create(['name' => 'Product 1', 'price' => 100, 'site_id' => $this->siteId]);
+        $product2 = Product::create(['name' => 'Product 2', 'price' => 100, 'site_id' => $this->siteId]);
+
+        $voucher = Voucher::create([
+            'code' => 'SPECIFIC',
+            'name' => 'Specific Product Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $voucher->products(true)->attach($product1->id); // Only linked to product1
+
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'SPECIFIC',
+            'order_value' => 100,
+            'product_id' => $product2->id // Trying with product2
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['data']['valid']);
+        $this->assertStringContainsString('not applicable', $data['data']['message']);
+    }
+
+    public function testDuplicateVoucherCopiesProductLinks()
+    {
+        $product1 = Product::create(['name' => 'Product 1', 'price' => 50, 'site_id' => $this->siteId]);
+        $product2 = Product::create(['name' => 'Product 2', 'price' => 75, 'site_id' => $this->siteId]);
+
+        $original = Voucher::create([
+            'code' => 'ORIGINAL',
+            'name' => 'Original',
+            'type' => 'percentage',
+            'value' => 10,
+            'site_id' => $this->siteId
+        ]);
+
+        $original->products(true)->attach([$product1->id, $product2->id]);
+
+        $response = $this->postForSite("/api/vouchers/{$original->id}/duplicate");
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $newVoucherId = $data['data']['voucher']['id'];
+
+        $newVoucher = Voucher::find($newVoucherId);
+        $this->assertCount(2, $newVoucher->products);
     }
 }

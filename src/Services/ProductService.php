@@ -7,10 +7,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Models\Product;
-use App\Models\ProductImage;
-use App\Models\ProductMerchant;
-use App\Models\ProductSpecification;
-use App\Models\ProductVariant;
+use App\Models\ProductPriceHistory;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductViewRepository;
 use Exception;
@@ -21,10 +18,11 @@ class ProductService
     protected ImageUploadService $imageUploadService;
 
     public function __construct(
-        ProductRepository $repository,
-        ImageUploadService $imageUploadService,
+        ProductRepository                      $repository,
+        ImageUploadService                     $imageUploadService,
         private readonly ProductViewRepository $productViewRepository
-    ) {
+    )
+    {
         $this->repository = $repository;
         $this->imageUploadService = $imageUploadService;
 
@@ -83,12 +81,24 @@ class ProductService
         // Create product
         $product = $this->repository->create($data);
 
+        // Record initial price history
+        $this->repository->recordPriceHistory($product);
+
         // Create related records
         if (!empty($images)) {
             $this->repository->syncImages($product->id, $images);
         }
         if (!empty($merchants)) {
-            $this->repository->syncMerchants($product->id, $merchants);
+            $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+            // Record price history for each merchant
+            foreach ($merchantIds as $index => $merchantId) {
+                $this->repository->recordMerchantPriceHistory(
+                    $product->id,
+                    $merchantId,
+                    $merchants[$index]['price']
+                );
+            }
         }
         if (!empty($variants)) {
             $this->repository->syncVariants($product->id, $variants);
@@ -107,6 +117,10 @@ class ProductService
         if (!$product) {
             return null;
         }
+
+        // Store old prices for comparison
+        $oldPrice = $product->price;
+        $oldSalePrice = $product->sale_price;
 
         $oldImagePath = $product->image ?? null;
 
@@ -141,12 +155,33 @@ class ProductService
         // Update product
         $product = $this->repository->update($id, $data);
 
-        // Sync related records if provided
-        if ($images !== null) {
-            $this->repository->syncImages($product->id, $images);
+        // Record price history if prices changed
+        $newPrice = $data['price'] ?? $oldPrice;
+        $newSalePrice = $data['sale_price'] ?? $oldSalePrice;
+
+        if ($newPrice != $oldPrice || $newSalePrice != $oldSalePrice) {
+            $this->repository->recordPriceHistory($product);
         }
+
+        // Sync related records if provided
         if ($merchants !== null) {
-            $this->repository->syncMerchants($product->id, $merchants);
+            $oldMerchants = $this->repository->getMerchants($product->id)->keyBy('id');
+            $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+            // Record price history for merchants with price changes
+            foreach ($merchants as $index => $merchantData) {
+                $merchantId = $merchantIds[$index];
+                $oldMerchant = !empty($merchantData['id']) ? $oldMerchants->get($merchantData['id']) : null;
+
+                // Record if new merchant or price changed
+                if (!$oldMerchant || $oldMerchant->price != $merchantData['price']) {
+                    $this->repository->recordMerchantPriceHistory(
+                        $product->id,
+                        $merchantId,
+                        $merchantData['price']
+                    );
+                }
+            }
         }
         if ($variants !== null) {
             $this->repository->syncVariants($product->id, $variants);
@@ -168,15 +203,29 @@ class ProductService
 
         // Delete image using ImageUploadService
         if ($product->image) {
-            try {
-                $this->imageUploadService->delete($product->image);
-            } catch (Exception $e) {
-                // Log but don't fail deletion
-                error_log('Failed to delete product image: ' . $e->getMessage());
-            }
+            $this->deleteImage($product->image);
         }
 
+        $productImages = $this->repository->getImages($id);
+
+        foreach ($productImages as $image) {
+            $this->deleteImage($image->url);
+        }
+
+        // Delete price history
+        $this->repository->deletePriceHistory($id);
+
         return $this->repository->delete($id);
+    }
+
+    protected function deleteImage(string $path): void
+    {
+        try {
+            $this->imageUploadService->delete($path);
+        } catch (Exception $e) {
+            // Log but don't fail
+            error_log('Failed to delete image: ' . $e->getMessage());
+        }
     }
 
     public function getProductsByCategory(string $category): Collection
@@ -257,7 +306,7 @@ class ProductService
                 'price' => $product->sale_price ?? $product->price,
                 'priceCurrency' => 'USD',
                 'availability' => $product->in_stock ? 'InStock' : 'OutOfStock',
-                'url' =>'/products/' . $product->slug
+                'url' => '/products/' . $product->slug
             ]
         ];
     }

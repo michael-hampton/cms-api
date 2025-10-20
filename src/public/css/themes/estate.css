@@ -2763,3 +2763,64 @@ nav.header-nav ul {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
 }
+
+.voucher-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.deal-voucher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    margin: 12px 0;
+}
+
+.voucher-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.voucher-code {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    color: #667eea;
+    letter-spacing: 1px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.voucher-copy-btn {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.voucher-copy-btn:hover {
+    background: #5568d3;
+}
+
+.voucher-copy-btn:active {
+    transform: scale(0.95);
+}

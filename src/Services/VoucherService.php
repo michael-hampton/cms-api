@@ -22,12 +22,38 @@ class VoucherService
 
     public function create(array $data): Voucher
     {
-        return $this->repository->create($data);
+        $productIds = $data['product_ids'] ?? [];
+        unset($data['product_ids']);
+
+        $voucher = $this->repository->create($data);
+
+        if (!empty($productIds)) {
+            $this->syncProducts($voucher->id, $productIds);
+        }
+
+        return $voucher;
     }
 
     public function update(int $voucherId, array $data): ?Voucher
     {
-        return $this->repository->update($voucherId, $data);
+        $productIds = $data['product_ids'] ?? null;
+        unset($data['product_ids']);
+
+        $voucher = $this->repository->update($voucherId, $data);
+
+        if ($productIds !== null) {
+            $this->syncProducts($voucherId, $productIds);
+        }
+
+        return $voucher;
+    }
+
+    protected function syncProducts(int $voucherId, array $productIds): void
+    {
+        $voucher = Voucher::find($voucherId);
+        if ($voucher) {
+            $voucher->products(true)->sync($productIds);
+        }
     }
 
     public function delete(int $voucherId): bool
@@ -96,11 +122,19 @@ class VoucherService
 
             $data['code'] = $code;
 
-            return $this->repository->create($data);
+            $newVoucher = $this->repository->create($data);
+
+            // Duplicate product associations
+            $productIds = $originalVoucher->products()->pluck('id')->toArray();
+            if (!empty($productIds)) {
+                $newVoucher->products(true)->sync($productIds);
+            }
+
+            return $newVoucher;
         });
     }
 
-    public function validateVoucher(string $code, float $orderValue, ?int $userId = null): array
+    public function validateVoucher(string $code, float $orderValue, ?int $userId = null, ?int $productId = null): array
     {
         $voucher = $this->repository->findByCode($code);
 
@@ -130,7 +164,16 @@ class VoucherService
             ];
         }
 
-        if ($voucher->minimum_order_value && $orderValue < $voucher->minimum_order_value) {
+        // Check if voucher applies to specific product
+        if ($productId && !$voucher->isApplicableToProduct($productId)) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher not applicable to this product',
+                'discount' => 0
+            ];
+        }
+
+        if (!empty($orderValue) && $voucher->minimum_order_value && $orderValue < $voucher->minimum_order_value) {
             return [
                 'valid' => false,
                 'message' => "Minimum order value of {$voucher->minimum_order_value} required",

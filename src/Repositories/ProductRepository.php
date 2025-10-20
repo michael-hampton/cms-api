@@ -7,9 +7,9 @@ use App\Models\Model;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
+use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
-use App\Models\Tag;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -28,7 +28,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Product::query();
+        $query = Product::with(['activeVariants', 'availableMerchants', 'images', 'specifications', 'priceHistory']);
         return $this->searchEngine->search($query, $criteria);
     }
 
@@ -81,7 +81,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     protected function getModelClass(): string
     {
-       return Product::class;
+        return Product::class;
     }
 
     public function findRelated(Product $product, int $limit = 8): Collection
@@ -89,7 +89,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return $this->model
             ->where('id', '!=', $product->id)
             ->where('is_active', true)
-            ->where(function($query) use ($product) {
+            ->where(function ($query) use ($product) {
                 $query->where('category_id', $product->category_id)
                     ->orWhere('brand_id', $product->brand_id);
             })
@@ -147,12 +147,20 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     }
 
     // Merchant operations
-    public function syncMerchants(int $productId, array $merchants): void
+    public function syncMerchants(int $productId, array $merchants): array
     {
-        ProductMerchant::where('product_id', $productId)->delete();
+        $productMerchants = ProductMerchant::all()->keyBy('name');
+
+        $merchantIds = [];
 
         foreach ($merchants as $merchantData) {
-            ProductMerchant::create([
+
+            if ($productMerchants->has($merchantData['name'])) {
+                $merchantIds[] = $productMerchants->get($merchantData['name'])->id;
+                continue;
+            }
+
+            $merchant = ProductMerchant::create([
                 'product_id' => $productId,
                 'name' => $merchantData['name'],
                 'url' => $merchantData['url'],
@@ -161,7 +169,37 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 'variant_id' => $merchantData['variant_id'] ?? null,
                 'last_price_check' => now(),
             ]);
+
+            $merchantIds[] = $merchant->id;
         }
+
+        return $merchantIds;
+    }
+
+    public function recordMerchantPriceHistory(int $productId, int $merchantId, float $price): ?Model
+    {
+        if ($price < 0) {
+            return null;
+        }
+
+        return ProductPriceHistory::create([
+            'product_id' => $productId,
+            'merchant_id' => $merchantId,
+            'price' => $price,
+            'sale_price' => null,
+            'recorded_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+
+    public function getPriceHistory(int $productId, ?int $merchantId = null): Collection
+    {
+        $query = ProductPriceHistory::where('product_id', $productId);
+
+        if ($merchantId !== null) {
+            $query->where('merchant_id', $merchantId);
+        }
+
+        return $query->orderBy('recorded_at', 'desc')->get();
     }
 
     public function getMerchants(int $productId): Collection
@@ -226,5 +264,25 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function deleteSpecifications(int $productId): void
     {
         ProductSpecification::where('product_id', $productId)->delete();
+    }
+
+    public function recordPriceHistory(Product $product): ?Model
+    {
+        if ($product->price < 0 && $product->sale_price < 0) {
+            return null;
+        }
+
+        return ProductPriceHistory::create([ //todo need to apply per merchant
+            'product_id' => $product->id,
+            'merchant_id' => null,
+            'price' => $product->price,
+            'sale_price' => $product->sale_price,
+            'recorded_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+
+    public function deletePriceHistory(int $productId): void
+    {
+        ProductPriceHistory::where('product_id', $productId)->delete();
     }
 }

@@ -72,9 +72,20 @@ class PageGridService
                 $data['created_by'] = $this->authenticationService->getUserId();
             }
 
-            // FIXED: Initialize pages as empty array instead of null
-            if (!isset($data['pages']) || empty($data['pages'])) {
-                $data['pages'] = [];
+            // Handle migration from 'pages' to 'items'
+            if (isset($data['pages']) && !isset($data['items'])) {
+                $data['items'] = $data['pages'];
+                unset($data['pages']);
+            }
+
+            // Initialize items as empty array instead of null
+            if (!isset($data['items']) || empty($data['items'])) {
+                $data['items'] = [];
+            }
+
+            // Validate and normalize items
+            if (!empty($data['items'])) {
+                $data['items'] = $this->normalizeItems($data['items']);
             }
 
             if (!empty($data['start_date']) && !empty($data['end_date'])) {
@@ -95,6 +106,45 @@ class PageGridService
         });
     }
 
+    private function normalizeItems(array $items): array
+    {
+        return array_map(function ($item) {
+            // Ensure type is set
+            if (!isset($item['type'])) {
+                $item['type'] = 'page'; // Default to page for backwards compatibility
+            }
+
+            // Validate required fields based on type
+            switch ($item['type']) {
+                case 'page':
+                    if (!isset($item['title']) || !isset($item['slug'])) {
+                        throw new \Exception('Pages require title and slug');
+                    }
+                    break;
+                case 'author':
+                    if (!isset($item['name'])) {
+                        throw new \Exception('Authors require name');
+                    }
+                    if (!isset($item['slug'])) {
+                        $item['slug'] = $this->generateUniqueSlug($item['name']);
+                    }
+                    break;
+                case 'product':
+                    if (!isset($item['name'])) {
+                        throw new \Exception('Products require name');
+                    }
+                    if (!isset($item['slug'])) {
+                        $item['slug'] = $this->generateUniqueSlug($item['name']);
+                    }
+                    break;
+                default:
+                    throw new \Exception("Invalid item type: {$item['type']}");
+            }
+
+            return $item;
+        }, $items);
+    }
+
     public function updatePageGrid(int $id, array $data): PageGrid
     {
         return $this->database->transaction(function () use ($id, $data) {
@@ -104,7 +154,18 @@ class PageGridService
                 throw new \Exception('Page grid not found');
             }
 
+            // Handle migration from 'pages' to 'items'
+            if (isset($data['pages']) && !isset($data['items'])) {
+                $data['items'] = $data['pages'];
+                unset($data['pages']);
+            }
+
             $changes = $this->detectChanges($pageGrid, $data);
+
+            // Validate and normalize items if provided
+            if (isset($data['items'])) {
+                $data['items'] = $this->normalizeItems($data['items']);
+            }
 
             // Update slug if title changed and slug not provided
             if (isset($data['title']) && !isset($data['slug']) && $data['title'] !== $pageGrid->title) {
@@ -142,7 +203,7 @@ class PageGridService
     private function detectChanges($pageGrid, array $newData): array
     {
         $changes = [];
-        $fields = ['title', 'subtitle', 'layout', 'columns', 'is_active', 'start_date', 'end_date', 'pages', 'use_hero'];
+        $fields = ['title', 'subtitle', 'layout', 'columns', 'is_active', 'start_date', 'end_date', 'items', 'use_hero'];
 
         foreach ($fields as $field) {
             if (isset($newData[$field]) && $pageGrid->$field != $newData[$field]) {
@@ -193,15 +254,33 @@ class PageGridService
                     $duplicate->update(['created_by' => $this->authenticationService->getUserId()]);
                 }
 
+                $items = $duplicate->items;
+
                 // Log history for the duplicate
                 $this->logHistory($duplicate->id, 'created', [
                     'data' => $duplicate->toArray(),
-                    'duplicated_from' => $original->id
+                    'duplicated_from' => $original->id,
+                    'items_count' => count($items ?? []),
+                    'item_types' => $this->getItemTypeCounts($items ?? [])
                 ]);
             }
 
             return $duplicate;
         });
+    }
+
+    private function getItemTypeCounts(array $items): array
+    {
+        $counts = ['page' => 0, 'author' => 0, 'product' => 0];
+
+        foreach ($items as $item) {
+            $type = $item['type'] ?? 'page';
+            if (isset($counts[$type])) {
+                $counts[$type]++;
+            }
+        }
+
+        return $counts;
     }
 
     public function addPageToGrid(int $id, array $pageData): PageGrid
@@ -300,5 +379,54 @@ class PageGridService
         }
 
         return $slug;
+    }
+
+    public function addItemToGrid(int $id, string $type, array $itemData): PageGrid
+    {
+        return $this->database->transaction(function () use ($id, $type, $itemData) {
+            $pageGrid = $this->repository->find($id);
+
+            if (!$pageGrid) {
+                throw new \Exception('Page grid not found');
+            }
+
+            $item = array_merge($itemData, ['type' => $type]);
+            $pageGrid->addItem($item);
+            $pageGrid->save();
+
+            return $pageGrid;
+        });
+    }
+
+    public function removeItemFromGrid(int $id, int $itemIndex): PageGrid
+    {
+        return $this->database->transaction(function () use ($id, $itemIndex) {
+            $pageGrid = $this->repository->find($id);
+
+            if (!$pageGrid) {
+                throw new \Exception('Page grid not found');
+            }
+
+            $pageGrid->removeItem($itemIndex);
+            $pageGrid->save();
+
+            return $pageGrid;
+        });
+    }
+
+    public function updateItemInGrid(int $id, int $itemIndex, array $itemData): PageGrid
+    {
+        return $this->database->transaction(function () use ($id, $itemIndex, $itemData) {
+            $pageGrid = $this->repository->find($id);
+
+            if (!$pageGrid) {
+                throw new \Exception('Page grid not found');
+            }
+
+            $pageGrid->updateItem($itemIndex, $itemData);
+            $pageGrid->save();
+
+            return $pageGrid->fresh();
+        });
     }
 }

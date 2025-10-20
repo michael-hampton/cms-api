@@ -294,4 +294,39 @@ class DealBlockParserTest extends FunctionalTestCase
 
         $this->assertFalse($result->isValid());
     }
+
+    public function testDealBlockParserWithVoucher()
+    {
+        $parser = new DealBlockParser();
+        $data = [
+            'title' => 'Deal',
+            'productName' => 'Product',
+            'link' => 'https://example.com',
+            'price' => 100,
+            'currency' => '£',
+            'voucherId' => 'SAVE20'
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertEquals('SAVE20', $result['voucherId']);
+        $this->assertTrue($result['has_voucher']);
+    }
+
+    public function testDealBlockParserWithoutVoucher()
+    {
+        $parser = new DealBlockParser();
+        $data = [
+            'title' => 'Deal',
+            'productName' => 'Product',
+            'link' => 'https://example.com',
+            'price' => 100,
+            'currency' => '£'
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertEquals('', $result['voucherId']);
+        $this->assertFalse($result['has_voucher']);
+    }
 }

@@ -145,4 +145,19 @@ class Product extends Model
     {
         return $this->primaryImage?->url ?? $this->images->first()?->url ?? $this->image;
     }
+
+    public function vouchers()
+    {
+        return $this->belongsToMany(Voucher::class, 'product_voucher');
+    }
+
+    public function activeVouchers()
+    {
+        return $this->belongsToMany(Voucher::class, 'product_voucher')
+            ->where('status', 'active')
+            ->where(function($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', date('Y-m-d H:i:s'));
+            });
+    }
 }

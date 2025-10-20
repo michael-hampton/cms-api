@@ -156,12 +156,13 @@ class VoucherController extends Controller
             $code = $request->get('code');
             $orderValue = (float) $request->get('order_value', 0);
             $userId = $request->get('user_id', null);
+            $productId = $request->get('product_id', null);
 
             if (!$code) {
                 return $this->errorResponse('Voucher code is required', 422);
             }
 
-            $result = $this->voucherService->validateVoucher($code, $orderValue, $userId);
+            $result = $this->voucherService->validateVoucher($code, $orderValue, $userId, $productId);
 
             return $this->jsonResponse($result);
         } catch (Exception $e) {

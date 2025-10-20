@@ -16,7 +16,7 @@ class PageGrid extends Model
         'show_image',
         'show_features',
         'show_actions',
-        'pages',
+        'items',
         'is_active',
         'created_by',
         'updated_by',
@@ -29,7 +29,7 @@ class PageGrid extends Model
     ];
 
     protected $casts = [
-        'pages' => 'array',
+        'items' => 'array',
         'show_excerpt' => 'boolean',
         'show_image' => 'boolean',
         'show_features' => 'boolean',
@@ -106,43 +106,43 @@ class PageGrid extends Model
     // Accessors & Mutators
     public function getPagesCountAttribute(): int
     {
-        return is_array($this->pages) ? count($this->pages) : 0;
+        return is_array($this->items) ? count($this->items) : 0;
     }
 
     // Helper Methods
     public function addPage(array $pageData): void
     {
-        $pages = $this->pages ?? [];
-        $pages[] = $pageData;
-        $this->pages = $pages;
+        $items = $this->items ?? [];
+        $items[] = $pageData;
+        $this->items = $items;
     }
 
     public function removePage(int $index): void
     {
-        $pages = $this->pages ?? [];
+        $items = $this->items ?? [];
 
-        if (isset($pages[$index])) {
-            array_splice($pages, $index, 1);
-            $this->pages = $pages;
+        if (isset($items[$index])) {
+            array_splice($items, $index, 1);
+            $this->items = $items;
         }
     }
 
     public function updatePage(int $index, array $pageData): void
     {
-        $pages = $this->pages ?? [];
+        $items = $this->items ?? [];
 
-        if (isset($pages[$index])) {
-            $pages[$index] = array_merge($pages[$index], $pageData);
-            $this->pages = $pages;
+        if (isset($items[$index])) {
+            $items[$index] = array_merge($items[$index], $pageData);
+            $this->items = $items;
         }
 
-        // REMOVED: $this->pages = json_encode($this->pages ?? []);
+        // REMOVED: $this->items = json_encode($this->items ?? []);
         // The casting system handles JSON encoding automatically
     }
 
     public function reorderPages(array $order): void
     {
-        $pages = $this->pages ?? [];
+        $pages = $this->items ?? [];
         $reordered = [];
 
         foreach ($order as $index) {
@@ -151,6 +151,38 @@ class PageGrid extends Model
             }
         }
 
-        $this->pages = $reordered;
+        $this->items = $reordered;
+    }
+
+    public function addItem(array $itemData): void
+    {
+        $items = $this->items ?? []; // Using 'items' column for storage
+        $items[] = $itemData;
+        $this->items = $items;
+    }
+
+    public function removeItem(int $index): void
+    {
+        $items = $this->items ?? [];
+
+        if (isset($items[$index])) {
+            array_splice($items, $index, 1);
+            $this->items = $items;
+        }
+    }
+
+    public function updateItem(int $index, array $itemData): void
+    {
+        $items = $this->items ?? [];
+
+        if (isset($items[$index])) {
+            $items[$index] = array_merge($items[$index], $itemData);
+            $this->items = $items;
+        }
+    }
+
+    public function getItemsCountAttribute(): int
+    {
+        return is_array($this->items) ? count($this->items) : 0;
     }
 }

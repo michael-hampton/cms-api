@@ -146,6 +146,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/products/{id}', ProductController::class, 'update');
         $router->delete('/products/{id}', ProductController::class, 'destroy');
         $router->post('/products/{id}/duplicate', ProductController::class, 'duplicate');
+        $router->get('/products/{id}/price-history', ProductController::class, 'priceHistory');
+
 
         $router->get('/users', UserController::class, 'index');
         $router->post('/users', UserController::class, 'store');
@@ -169,6 +171,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/page-grids/{id}', PageGridController::class, 'update');
         $router->delete('/page-grids/{id}', PageGridController::class, 'destroy');
         $router->get('/page-grids/{id}/history', [PageGridController::class, 'history']);
+
 
         $router->post('/page-grids/{id}/restore', PageGridController::class, 'restore');
         $router->delete('/page-grids/{id}/force', PageGridController::class, 'forceDestroy');

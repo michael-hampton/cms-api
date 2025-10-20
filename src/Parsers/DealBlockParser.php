@@ -74,7 +74,10 @@ class DealBlockParser extends BaseBlockParser
             ],
             'starBlock' => [
                 new BooleanRule()
-            ]
+            ],
+            'voucherId' => [
+                new MaxLengthRule(255)
+            ],
         ];
     }
 
@@ -104,6 +107,8 @@ class DealBlockParser extends BaseBlockParser
             'savings_percent' => $savingsPercent,
             'savingMode' => $data['savingMode'] ?? 'percent',
             'has_savings' => $savings > 0,
+            'voucherId' => $data['voucherId'] ?? '',
+            'has_voucher' => !empty($data['voucherId']),
             'formatted_description' => nl2br(htmlspecialchars($data['description'] ?? '')),
             'link_attributes' => $this->buildLinkAttributes(
                 $data['noFollow'] ?? false,
@@ -160,6 +165,11 @@ class DealBlockParser extends BaseBlockParser
             $html .= "<span class=\"sponsored-badge\">Sponsored</span>";
         }
 
+        // Add voucher badge if present
+        if ($parsedData['has_voucher']) {
+            $html .= "<span class=\"voucher-badge\">🎟️ Voucher Available</span>";
+        }
+
         if (!empty($parsedData['image'])) {
             $html .= "<div class=\"deal-image\">";
             $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['productName']}\" class=\"deal-img\">";
@@ -188,6 +198,15 @@ class DealBlockParser extends BaseBlockParser
             $html .= "<span class=\"deal-price\">{$parsedData['currency']}{$parsedData['price']}</span>";
         }
         $html .= "</div>";
+
+        // Add voucher section before the button
+        if ($parsedData['has_voucher']) {
+            $html .= "<div class=\"deal-voucher\">";
+            $html .= "<span class=\"voucher-label\">Use Code:</span>";
+            $html .= "<span class=\"voucher-code\">{$parsedData['voucherId']}</span>";
+            $html .= "<button class=\"voucher-copy-btn\" onclick=\"navigator.clipboard.writeText('{$parsedData['voucherId']}')\">Copy</button>";
+            $html .= "</div>";
+        }
 
         if ($parsedData['showDealButton'] && !empty($parsedData['link'])) {
             $linkAttrs = '';

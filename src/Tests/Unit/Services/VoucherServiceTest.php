@@ -369,4 +369,136 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $this->assertEquals($expectedCount, $result);
     }
+
+    public function testCreateVoucherWithProducts()
+    {
+        $data = [
+            'code' => 'TEST10',
+            'name' => 'Test Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'site_id' => 1,
+            'product_ids' => [1, 2, 3]
+        ];
+
+        $voucher = new Voucher(array_merge($data, ['id' => 1]));
+
+        $this->repository->expects($this->once())
+            ->method('create')
+            ->willReturn($voucher);
+
+        $result = $this->service->create($data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testUpdateVoucherProducts()
+    {
+        $voucherId = 1;
+        $data = [
+            'name' => 'Updated Voucher',
+            'product_ids' => [4, 5]
+        ];
+
+        $voucher = new Voucher(['id' => $voucherId]);
+
+        $this->repository->expects($this->once())
+            ->method('update')
+            ->willReturn($voucher);
+
+        $result = $this->service->update($voucherId, $data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testDuplicateVoucherCopiesProductAssociations()
+    {
+        $voucherId = 1;
+        $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $originalVoucher->id = $voucherId;
+        $originalVoucher->code = 'ORIGINAL';
+        $originalVoucher->name = 'Original';
+        $originalVoucher->type = 'percentage';
+        $originalVoucher->value = 10;
+        $originalVoucher->site_id = 1;
+
+        $products = collect([
+            (object)['id' => 1],
+            (object)['id' => 2]
+        ]);
+
+        $originalVoucher->shouldReceive('products->pluck->toArray')
+            ->andReturn([1, 2]);
+
+        $newVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher->id = 2;
+
+        $newVoucher->shouldReceive('products->sync')
+            ->once()
+            ->with([1, 2]);
+
+        $this->repository->expects($this->once())
+            ->method('find')
+            ->willReturn($originalVoucher);
+
+        $this->repository->expects($this->once())
+            ->method('findByCode')
+            ->willReturn(null);
+
+        $this->databaseMock->expects($this->once())
+            ->method('transaction')
+            ->willReturnCallback(function($callback) {
+                return $callback();
+            });
+
+        $this->repository->expects($this->once())
+            ->method('create')
+            ->willReturn($newVoucher);
+
+        $result = $this->service->duplicateVoucher($voucherId);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testValidateVoucherForSpecificProduct()
+    {
+        $code = 'PRODUCT10';
+        $productId = 5;
+        $orderValue = 100;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->minimum_order_value = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(true);
+        $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->repository->expects($this->once())
+            ->method('findByCode')
+            ->willReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testValidateVoucherNotApplicableToProduct()
+    {
+        $code = 'PRODUCT10';
+        $productId = 99;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(false);
+
+        $this->repository->expects($this->once())
+            ->method('findByCode')
+            ->willReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, 100, null, $productId);
+
+        $this->assertFalse($result['valid']);
+        $this->assertEquals('Voucher not applicable to this product', $result['message']);
+    }
 }

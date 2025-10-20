@@ -87,4 +87,21 @@ class Voucher extends Model
 
         return round($discount, 2);
     }
+
+    public function products($returnRelation = false)
+    {
+        return $this->belongsToMany(Product::class, 'product_voucher', null, null, $returnRelation);
+    }
+
+    public function isApplicableToProduct(int $productId): bool
+    {
+        // If no products linked, voucher applies to all
+        if ($this->products()->count() === 0) {
+            return true;
+        }
+
+        $products = $this->products(true)->where('product_id', $productId)->get();
+
+        return $products->count() > 0;
+    }
 }

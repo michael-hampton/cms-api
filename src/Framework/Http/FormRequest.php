@@ -19,6 +19,7 @@ use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\NullableRule;
 use App\Framework\Validation\Rules\NumericRule;
+use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\RequiredWithRule;
 use App\Framework\Validation\Rules\SometimesRule;
@@ -282,6 +283,7 @@ abstract class FormRequest extends Request
     {
         $ruleMap = [
             'required' => RequiredRule::class,
+            'required_if' => RequiredIfRule::class,
             'date' => DateRule::class,
             'required_with' => RequiredWithRule::class, // ADD THIS LINE
             'string' => StringRule::class, // You'll need this

@@ -402,4 +402,505 @@ class PageGridServiceTest extends FunctionalTestCase
             'password' => '<PASSWORD>',
         ]);
     }
+
+    public function testAddAuthorToGrid()
+    {
+        $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $authorData = [
+            'type' => 'author',
+            'id' => 1,
+            'name' => 'John Doe',
+            'slug' => 'john-doe',
+            'bio' => 'Author bio'
+        ];
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($pageGrid);
+
+        $pageGrid->shouldReceive('addItem')
+            ->with($authorData)
+            ->once();
+
+        $pageGrid->shouldReceive('save')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->addItemToGrid(1, 'author', $authorData);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testAddProductToGrid()
+    {
+        $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $productData = [
+            'type' => 'product',
+            'id' => 1,
+            'name' => 'Test Product',
+            'slug' => 'test-product',
+            'price' => 99.99
+        ];
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($pageGrid);
+
+        $pageGrid->shouldReceive('addItem')
+            ->with($productData)
+            ->once();
+
+        $pageGrid->shouldReceive('save')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->addItemToGrid(1, 'product', $productData);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testRemoveItemFromGrid()
+    {
+        $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($pageGrid);
+
+        $pageGrid->shouldReceive('removeItem')
+            ->with(0)
+            ->once();
+
+        $pageGrid->shouldReceive('save')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->removeItemFromGrid(1, 0);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testUpdateItemInGrid()
+    {
+        $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $updateData = ['name' => 'Updated Name'];
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($pageGrid);
+
+        $pageGrid->shouldReceive('updateItem')
+            ->with(0, $updateData)
+            ->once();
+
+        $pageGrid->shouldReceive('save')
+            ->once()
+            ->andReturn(true);
+
+        $pageGrid->shouldReceive('fresh')->once()->andReturn($pageGrid);
+
+        $result = $this->service->updateItemInGrid(1, 0, $updateData);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testMixedContentTypes()
+    {
+        $data = [
+            'title' => 'Mixed Content Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
+                ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1'],
+                ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1']
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'mixed-content-grid', 'id' => 1]));
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $this->repositoryMock
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertCount(3, $result->items);
+        $this->assertEquals('page', $result->items[0]['type']);
+        $this->assertEquals('author', $result->items[1]['type']);
+        $this->assertEquals('product', $result->items[2]['type']);
+    }
+
+    public function testCreatePageGridWithMixedItems()
+    {
+        $data = [
+            'title' => 'Mixed Content Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                [
+                    'type' => 'page',
+                    'title' => 'Test Page',
+                    'slug' => 'test-page',
+                    'excerpt' => 'Page excerpt'
+                ],
+                [
+                    'type' => 'author',
+                    'name' => 'John Doe',
+                    'slug' => 'john-doe',
+                    'bio' => 'Author bio'
+                ],
+                [
+                    'type' => 'product',
+                    'name' => 'Test Product',
+                    'slug' => 'test-product',
+                    'price' => '99.99',
+                    'description' => 'Product description'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'mixed-content-grid', 'id' => 1]));
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $this->repositoryMock
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertCount(3, $result->items);
+        $this->assertEquals('page', $result->items[0]['type']);
+        $this->assertEquals('author', $result->items[1]['type']);
+        $this->assertEquals('product', $result->items[2]['type']);
+    }
+
+    public function testCreatePageGridWithAuthorsOnly()
+    {
+        $data = [
+            'title' => 'Authors Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                [
+                    'type' => 'author',
+                    'name' => 'Author 1',
+                    'slug' => 'author-1',
+                    'bio' => 'Bio 1'
+                ],
+                [
+                    'type' => 'author',
+                    'name' => 'Author 2',
+                    'slug' => 'author-2',
+                    'bio' => 'Bio 2'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'authors-grid', 'id' => 1]));
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $this->repositoryMock
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertCount(2, $result->items);
+        $this->assertEquals('author', $result->items[0]['type']);
+        $this->assertEquals('author', $result->items[1]['type']);
+    }
+
+    public function testCreatePageGridWithProductsOnly()
+    {
+        $data = [
+            'title' => 'Products Grid',
+            'layout' => 'grid',
+            'columns' => 4,
+            'items' => [
+                [
+                    'type' => 'product',
+                    'name' => 'Product 1',
+                    'slug' => 'product-1',
+                    'price' => '49.99'
+                ],
+                [
+                    'type' => 'product',
+                    'name' => 'Product 2',
+                    'slug' => 'product-2',
+                    'price' => '99.99'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $expectedGrid = new PageGrid(array_merge($data, ['slug' => 'products-grid', 'id' => 1]));
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $this->repositoryMock
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertCount(2, $result->items);
+        $this->assertEquals('product', $result->items[0]['type']);
+        $this->assertEquals('product', $result->items[1]['type']);
+    }
+
+    public function testCreatePageGridRejectsInvalidItemType()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid item type: invalid');
+
+        $data = [
+            'title' => 'Invalid Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                [
+                    'type' => 'invalid',
+                    'name' => 'Test'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $this->service->createPageGrid($data);
+    }
+
+    public function testCreatePageGridRequiresNameForAuthor()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Authors require name');
+
+        $data = [
+            'title' => 'Invalid Author Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                [
+                    'type' => 'author',
+                    'slug' => 'author-1'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $this->service->createPageGrid($data);
+    }
+
+    public function testCreatePageGridRequiresNameForProduct()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Products require name');
+
+        $data = [
+            'title' => 'Invalid Product Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                [
+                    'type' => 'product',
+                    'price' => '99.99'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $this->service->createPageGrid($data);
+    }
+
+    public function testUpdatePageGridWithMixedItems()
+    {
+        $existingGrid = new PageGrid([
+            'id' => 1,
+            'title' => 'Old Title',
+            'items' => [
+                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1']
+            ]
+        ]);
+
+        $updatedData = [
+            'title' => 'New Title',
+            'items' => [
+                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
+                ['type' => 'author', 'name' => 'John Doe', 'slug' => 'john-doe'],
+                ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1']
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->twice()
+            ->andReturn($existingGrid);
+
+        $this->repositoryMock
+            ->shouldReceive('update')
+            ->with(1, Mockery::type('array'))
+            ->once()
+            ->andReturn($existingGrid);
+
+        $existingGrid->title = 'New Title';
+        $existingGrid->items = $updatedData['items'];
+
+        $result = $this->service->updatePageGrid(1, $updatedData);
+
+        $this->assertEquals('New Title', $result->title);
+        $this->assertCount(3, $result->items);
+    }
+
+    public function testDuplicatePageGridWithMixedItems()
+    {
+        $original = new PageGrid([
+            'id' => 1,
+            'title' => 'Original',
+            'items' => [
+                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
+                ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1'],
+                ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1']
+            ]
+        ]);
+
+        $duplicate = Mockery::mock(PageGrid::class)->makePartial();
+        $duplicate->id = 2;
+        $duplicate->title = 'Original (Copy)';
+        $duplicate->items = $original->items;
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($original);
+
+        $this->repositoryMock
+            ->shouldReceive('duplicate')
+            ->with(1)
+            ->once()
+            ->andReturn($duplicate);
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+
+        $duplicate->shouldReceive('toArray')
+            ->once()
+            ->andReturn([
+                'id' => 2,
+                'title' => 'Original (Copy)',
+                'items' => $duplicate->items
+            ]);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->with(2, 'created', null, Mockery::on(function($arg) {
+                return isset($arg['data'])
+                    && isset($arg['duplicated_from'])
+                    && $arg['duplicated_from'] === 1
+                    && isset($arg['items_count'])
+                    && isset($arg['item_types'])
+                    && $arg['items_count'] === 3;
+            }))
+            ->andReturn(true);
+
+        $result = $this->service->duplicatePageGrid(1);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+        $this->assertCount(3, $result->items);
+    }
+
+    public function testBackwardsCompatibilityWithPagesField()
+    {
+        $data = [
+            'title' => 'Backwards Compatible Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'pages' => [ // Using old 'pages' field
+                [
+                    'title' => 'Page 1',
+                    'slug' => 'page-1'
+                ]
+            ]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $expectedGrid = new PageGrid([
+            'id' => 1,
+            'title' => 'Backwards Compatible Grid',
+            'slug' => 'backwards-compatible-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'items' => [
+                [
+                    'type' => 'page',
+                    'title' => 'Page 1',
+                    'slug' => 'page-1'
+                ]
+            ]
+        ]);
+
+        $this->repositoryMock
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($arg) {
+                // Should convert 'pages' to 'items'
+                return isset($arg['items']) && !isset($arg['pages']);
+            }))
+            ->andReturn($expectedGrid);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertArrayNotHasKey('pages', $result->toArray());
+        $this->assertArrayHasKey('items', $result->toArray());
+    }
+
 }

@@ -138,4 +138,20 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function priceHistory(int $id, Request $request): JsonResponse
+    {
+        $merchantId = $request->query('merchant_id');
+
+        $history = $this->productRepository->getPriceHistory($id, $merchantId);
+
+        if ($history->isEmpty()) {
+            return $this->jsonResponse([
+                'message' => 'No price history found',
+                'data' => []
+            ]);
+        }
+
+        return $this->jsonResponse($history->toArray());
+    }
 }

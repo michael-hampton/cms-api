@@ -432,13 +432,18 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return null;
     }
 
-    public function get(int $index)
+    public function get(mixed $index)
     {
         if (!isset($this->items[$index])) {
             throw new \OutOfBoundsException(sprintf('No item found at index %d', $index));
         }
 
         return $this->items[$index];
+    }
+
+    public function has(mixed $key): bool
+    {
+        return array_key_exists($key, $this->items);
     }
 
     public function mapWithKeys(callable $callback)

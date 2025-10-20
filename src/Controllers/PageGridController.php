@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Http\jsonResponse;
 use App\Framework\Http\Request;
+use App\Models\PageGridHistory;
 use App\Requests\StorePageGridRequest;
 use App\Requests\UpdatePageGridRequest;
 use App\Services\PageGridService;
@@ -43,8 +44,8 @@ class PageGridController extends Controller
                 'success' => true,
                 'data' => $pageGrids['data']->map(fn($item) => [
                     ...$item->toArray(),
-                    'pages' => $item->pages ?? [],
-                ]), // Handle both formats
+                    'items' => $item->items ?? $item->pages ?? [],
+                ]),
                 'pagination' => $pageGrids['pagination'] ?? null,
             ]);
         } catch (\Exception $e) {
