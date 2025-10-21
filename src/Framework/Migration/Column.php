@@ -14,12 +14,26 @@ class Column
     private $unique = false;
     private $primary = false;
     private string $after;
+    protected bool $useCurrent = false;
+    protected bool $useCurrentOnUpdate = false;
 
     public function __construct(string $type, string $name, array $parameters = [])
     {
         $this->type = $type;
         $this->name = $name;
         $this->parameters = $parameters;
+    }
+
+    public function useCurrent(): self
+    {
+        $this->useCurrent = true;
+        return $this;
+    }
+
+    public function useCurrentOnUpdate(): self
+    {
+        $this->useCurrentOnUpdate = true;
+        return $this;
     }
 
     public function nullable(): self
@@ -100,6 +114,14 @@ class Column
                     $sql .= " DEFAULT '{$escaped}'";
                 }
             }
+        }
+
+        if ($this->useCurrent) {
+            $sql .= " DEFAULT CURRENT_TIMESTAMP";
+        }
+
+        if ($this->useCurrentOnUpdate) {
+            $sql .= " ON UPDATE CURRENT_TIMESTAMP";
         }
 
         if (isset($this->after)) {

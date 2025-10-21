@@ -212,7 +212,7 @@ class VideoService
             throw new ValidationException("File size exceeds maximum allowed size of {$maxSizeMB}MB");
         }
 
-        if ($_ENV['APP_ENV'] !== 'testing' && !in_array($file->getMimeType(), self::ALLOWED_MIME_TYPES)) {
+        if (!in_array($file->getMimeType(), self::ALLOWED_MIME_TYPES)) {
             throw new ValidationException('File type not allowed. Only MP4, MOV, and AVI files are supported.');
         }
     }

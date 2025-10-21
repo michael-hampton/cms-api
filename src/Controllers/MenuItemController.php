@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Requests\CreateMenuItemRequest;
 use App\Requests\ReorderMenuItemsRequest;
@@ -26,12 +27,12 @@ class MenuItemController extends Controller
                 'data' => $menuItem->toArray(),
                 'message' => 'Menu item created successfully'
             ], 201);
-        } catch (\Exception $e) {
-            echo $e->getMessage();
-            return $this->resourceResponse([
-                'success' => false,
-                'message' => 'Failed to create menu item'
-            ], 500);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         }
     }
 

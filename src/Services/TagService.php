@@ -6,6 +6,7 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
+use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
 
 class TagService
@@ -14,7 +15,11 @@ class TagService
     protected TagRepository $repository;
 
 
-    public function __construct(Database $database, TagRepository $repository)
+    public function __construct(
+        Database $database,
+        TagRepository $repository,
+        private PageRepository $pageRepository,
+    )
     {
         $this->database = $database ?? Database::getInstance();
         $this->repository = $repository;
@@ -49,10 +54,8 @@ class TagService
                 // Get pages and update them individually
                 $pages = $this->repository->getPagesByTagId($tagId);
                 foreach ($pages as $page) {
-                    $page->tag_id = $reassignToTagId;
-                    $page->save();
+                    $this->pageRepository->syncTags($page->id, $reassignToTagId);
                 }
-                $tag->delete();
             });
 
             return true;

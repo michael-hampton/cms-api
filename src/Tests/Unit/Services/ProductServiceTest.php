@@ -25,6 +25,7 @@ class ProductServiceTest extends FunctionalTestCase
     protected $repository;
     protected $imageUploadService;
     protected ProductService $service;
+    private $databaseMock;
 
     protected function setUp(): void
     {
@@ -66,6 +67,10 @@ class ProductServiceTest extends FunctionalTestCase
                 return $data['image'] === 'products/2025-01/product_123.jpg';
             }))
             ->andReturn($product);
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
 
         $data = ['name' => 'Test Product', 'price' => 99.99];
         $result = $this->service->createProduct($data, $file);
@@ -113,6 +118,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1)
             ->once()
             ->andReturn(collect([]));
+
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
 
         $this->imageUploadService->shouldReceive('delete')
             ->once()
@@ -186,6 +195,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($product);
 
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Test Product', $result->name);
@@ -239,6 +252,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1)
             ->once()
             ->andReturn(collect([]));
+
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
 
         $this->repository->shouldReceive('delete')
             ->with(1)
@@ -450,6 +467,10 @@ class ProductServiceTest extends FunctionalTestCase
                 return count($images) === 2 && $images[0]['url'] === 'img1.jpg';
             }));
 
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Test Product', $result->name);
@@ -474,6 +495,10 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('syncMerchants')
             ->once()
             ->with(1, Mockery::type('array'));
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
 
         $result = $this->service->createProduct($data);
 
@@ -500,6 +525,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->with(1, Mockery::type('array'));
 
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Test Product', $result->name);
@@ -525,6 +554,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->with(1, Mockery::type('array'));
 
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Test Product', $result->name);
@@ -548,6 +581,10 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('syncMerchants')->once();
         $this->repository->shouldReceive('syncVariants')->once();
         $this->repository->shouldReceive('syncSpecifications')->once();
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
 
         $result = $this->service->createProduct($data);
 
@@ -623,6 +660,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->with(1, Mockery::type('array'));
 
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
         $data = [
             'name' => 'Updated Product',
             'images' => [
@@ -643,12 +684,21 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('update')->once()->andReturn($product);
         $this->repository->shouldReceive('syncMerchants')
             ->once()
-            ->with(1, Mockery::type('array'));
+            ->with(1, Mockery::type('array'))
+        ->andReturn([0 => 1]);
+
+        $this->repository->shouldReceive('getMerchants')
+            ->with(1)
+            ->andReturn(collect([]));
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->with(1, 1, 89.99)
+            ->andReturn(new ProductPriceHistory());
 
         $data = [
             'name' => 'Updated Product',
             'merchants' => [
-                ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true],
+                ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true, 'id' => 1],
             ]
         ];
 
@@ -742,6 +792,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn(true);
 
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
+
         $result = $this->service->deleteProduct(1);
 
         $this->assertTrue($result);
@@ -767,6 +821,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn(true);
 
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
+
         $result = $this->service->deleteProduct(1);
 
         $this->assertTrue($result);
@@ -786,6 +844,10 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('delete')
             ->with(1)
             ->andReturn(true);
+
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
 
         // Should not throw, just log error
         $result = $this->service->deleteProduct(1);
@@ -1128,6 +1190,10 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('delete')
             ->with(1)
             ->andReturn(true);
+
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
 
         $result = $this->service->deleteProduct(1);
 

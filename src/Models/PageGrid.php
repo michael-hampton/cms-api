@@ -135,9 +135,6 @@ class PageGrid extends Model
             $items[$index] = array_merge($items[$index], $pageData);
             $this->items = $items;
         }
-
-        // REMOVED: $this->items = json_encode($this->items ?? []);
-        // The casting system handles JSON encoding automatically
     }
 
     public function reorderPages(array $order): void

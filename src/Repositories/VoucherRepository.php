@@ -27,7 +27,7 @@ class VoucherRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Voucher::query();
+        $query = Voucher::with(['products']);
         return $this->searchEngine->search($query, $criteria);
     }
 

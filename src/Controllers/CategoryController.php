@@ -73,8 +73,8 @@ class CategoryController extends Controller
         try {
             $category = $this->categoryRepository->create($request->validated());
             return $this->jsonResponse(['category' => $category->toArray()], 201);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 422);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
         }
     }
 

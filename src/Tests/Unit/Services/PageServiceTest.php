@@ -1186,11 +1186,26 @@ class PageServiceTest extends FunctionalTestCase
             ->with('custom_field_definition_id')
             ->andReturn(collect([1]));
 
+        $this->setMergeExpectations();
+
         $this->setDuplicationExpectations();
 
         $result = $this->service->mergePages(1, 2, ['strategy' => 'append']);
 
         $this->assertSame($targetPage, $result);
+    }
+
+    private function setMergeExpectations()
+    {
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn(null);
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn(null);
     }
 
     public function testMergePagesWithReplaceStrategy()
@@ -1226,6 +1241,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')
             ->with(2)->once()->andReturn($targetPage);
 
+        $this->setMergeExpectations();
+
         $result = $this->service->mergePages(1, 2, ['strategy' => 'replace']);
 
         $this->assertSame($targetPage, $result);
@@ -1241,6 +1258,8 @@ class PageServiceTest extends FunctionalTestCase
 
         // Only many-to-many relations are merged
         $this->setDuplicationExpectations();
+
+        $this->setMergeExpectations();
 
         // Blocks appended with keep_target
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(3);
@@ -1281,6 +1300,8 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturnUsing(fn($callback) => $callback());
 
         $this->setDuplicationExpectations();
+
+        $this->setMergeExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
         $this->blockRepository->shouldReceive('getBlocksForPage')->andReturn(collect([]));
@@ -1351,6 +1372,8 @@ class PageServiceTest extends FunctionalTestCase
         // Many-to-many relations
         $this->setDuplicationExpectations();
 
+        $this->setMergeExpectations();
+
         // Blocks appended
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(0);
         $this->blockRepository->shouldReceive('getBlocksForPage')->with(1)->andReturn(collect([]));
@@ -1396,6 +1419,8 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturnUsing(fn($callback) => $callback());
 
         $this->setDuplicationExpectations();
+
+        $this->setMergeExpectations();
 
         // Target has max order of 3
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(3);
@@ -1452,6 +1477,7 @@ class PageServiceTest extends FunctionalTestCase
 
         $this->setupSettingsMergeExpectations();
         $this->setupCustomFieldsMergeExpectations();
+        $this->setMergeExpectations();
 
         $this->pageRepository->shouldReceive('delete')->with(1)->andReturn(true);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($targetPage);
@@ -1477,6 +1503,7 @@ class PageServiceTest extends FunctionalTestCase
 
 
         $this->setDuplicationExpectations();
+        $this->setMergeExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
         $this->blockRepository->shouldReceive('getBlocksForPage')->andReturn(collect([]));

@@ -40,6 +40,8 @@ class SearchController extends Controller
 
             return $this->jsonResponse($formattedPages);
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Failed to search pages'

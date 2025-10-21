@@ -5,7 +5,6 @@ namespace App\Tests\Unit\Services;
 use App\Framework\FileUpload\FileSystemInterface;
 use App\Framework\Http\UploadedFile;
 use App\Services\ImageUploadService;
-use Mockery;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

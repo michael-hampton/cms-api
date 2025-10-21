@@ -23,7 +23,7 @@ class PageGridModelTest extends FunctionalTestCase
             'show_image' => true,
             'show_features' => false,
             'show_actions' => true,
-            'pages' => json_encode([
+            'items' => json_encode([
                 ['id' => 1, 'title' => 'Page 1'],
                 ['id' => 2, 'title' => 'Page 2']
             ]),
@@ -45,7 +45,7 @@ class PageGridModelTest extends FunctionalTestCase
 
     public function testGetPagesCountAttributeReturnsCorrectCount()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1'],
             ['id' => 2, 'title' => 'Page 2'],
             ['id' => 3, 'title' => 'Page 3']
@@ -57,39 +57,39 @@ class PageGridModelTest extends FunctionalTestCase
 
     public function testGetPagesCountAttributeReturnsZeroForNull()
     {
-        $this->pageGrid->pages = null;
+        $this->pageGrid->items = null;
         $count = $this->pageGrid->getPagesCountAttribute();
         $this->assertEquals(0, $count);
     }
 
     public function testGetPagesCountAttributeReturnsZeroForNonArray()
     {
-        $this->pageGrid->pages = 'not an array';
+        $this->pageGrid->items = 'not an array';
         $count = $this->pageGrid->getPagesCountAttribute();
         $this->assertEquals(0, $count);
     }
 
     public function testAddPageAddsNewPage()
     {
-        $this->pageGrid->pages = [['id' => 1, 'title' => 'Page 1']];
+        $this->pageGrid->items = [['id' => 1, 'title' => 'Page 1']];
         $this->pageGrid->addPage(['id' => 2, 'title' => 'Page 2']);
 
-        $this->assertCount(2, $this->pageGrid->pages);
-        $this->assertEquals(['id' => 2, 'title' => 'Page 2'], $this->pageGrid->pages[1]);
+        $this->assertCount(2, $this->pageGrid->items);
+        $this->assertEquals(['id' => 2, 'title' => 'Page 2'], $this->pageGrid->items[1]);
     }
 
     public function testAddPageHandlesNullPages()
     {
-        $this->pageGrid->pages = null;
+        $this->pageGrid->items = null;
         $this->pageGrid->addPage(['id' => 1, 'title' => 'Page 1']);
 
-        $this->assertCount(1, $this->pageGrid->pages);
-        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->pages[0]);
+        $this->assertCount(1, $this->pageGrid->items);
+        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->items[0]);
     }
 
     public function testRemovePageRemovesCorrectPage()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1'],
             ['id' => 2, 'title' => 'Page 2'],
             ['id' => 3, 'title' => 'Page 3']
@@ -97,51 +97,51 @@ class PageGridModelTest extends FunctionalTestCase
 
         $this->pageGrid->removePage(1);
 
-        $this->assertCount(2, $this->pageGrid->pages);
-        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->pages[0]);
-        $this->assertEquals(['id' => 3, 'title' => 'Page 3'], $this->pageGrid->pages[1]);
+        $this->assertCount(2, $this->pageGrid->items);
+        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->items[0]);
+        $this->assertEquals(['id' => 3, 'title' => 'Page 3'], $this->pageGrid->items[1]);
     }
 
     public function testRemovePageDoesNothingForInvalidIndex()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1'],
             ['id' => 2, 'title' => 'Page 2']
         ];
 
         $this->pageGrid->removePage(5);
 
-        $this->assertCount(2, $this->pageGrid->pages);
+        $this->assertCount(2, $this->pageGrid->items);
     }
 
     public function testUpdatePageUpdatesCorrectPage()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1'],
             ['id' => 2, 'title' => 'Page 2']
         ];
 
         $this->pageGrid->updatePage(1, ['title' => 'Updated Page 2']);
 
-        $this->assertEquals('Updated Page 2', $this->pageGrid->pages[1]['title']);
-        $this->assertEquals(2, $this->pageGrid->pages[1]['id']);
+        $this->assertEquals('Updated Page 2', $this->pageGrid->items[1]['title']);
+        $this->assertEquals(2, $this->pageGrid->items[1]['id']);
     }
 
     public function testUpdatePageDoesNothingForInvalidIndex()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1']
         ];
 
-        $originalPages = $this->pageGrid->pages;
+        $originalPages = $this->pageGrid->items;
         $this->pageGrid->updatePage(5, ['title' => 'Should not update']);
 
-        $this->assertEquals($originalPages, $this->pageGrid->pages);
+        $this->assertEquals($originalPages, $this->pageGrid->items);
     }
 
     public function testReorderPagesReordersCorrectly()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1'],
             ['id' => 2, 'title' => 'Page 2'],
             ['id' => 3, 'title' => 'Page 3']
@@ -149,23 +149,23 @@ class PageGridModelTest extends FunctionalTestCase
 
         $this->pageGrid->reorderPages([2, 0, 1]);
 
-        $this->assertEquals(['id' => 3, 'title' => 'Page 3'], $this->pageGrid->pages[0]);
-        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->pages[1]);
-        $this->assertEquals(['id' => 2, 'title' => 'Page 2'], $this->pageGrid->pages[2]);
+        $this->assertEquals(['id' => 3, 'title' => 'Page 3'], $this->pageGrid->items[0]);
+        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->items[1]);
+        $this->assertEquals(['id' => 2, 'title' => 'Page 2'], $this->pageGrid->items[2]);
     }
 
     public function testReorderPagesSkipsInvalidIndices()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1'],
             ['id' => 2, 'title' => 'Page 2']
         ];
 
         $this->pageGrid->reorderPages([1, 5, 0]);
 
-        $this->assertCount(2, $this->pageGrid->pages);
-        $this->assertEquals(['id' => 2, 'title' => 'Page 2'], $this->pageGrid->pages[0]);
-        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->pages[1]);
+        $this->assertCount(2, $this->pageGrid->items);
+        $this->assertEquals(['id' => 2, 'title' => 'Page 2'], $this->pageGrid->items[0]);
+        $this->assertEquals(['id' => 1, 'title' => 'Page 1'], $this->pageGrid->items[1]);
     }
 
     public function testScopeActiveAddsCorrectWhereClause()
@@ -290,8 +290,8 @@ class PageGridModelTest extends FunctionalTestCase
             ['id' => 5, 'title' => 'Page 5'],
             ['id' => 6, 'title' => 'Page 6']
         ];
-        $this->pageGrid->pages = $pages;
-        $this->assertEquals($pages, $this->pageGrid->pages);
+        $this->pageGrid->items = $pages;
+        $this->assertEquals($pages, $this->pageGrid->items);
     }
 
     public function testSetAndGetIsActive()
@@ -325,9 +325,9 @@ class PageGridModelTest extends FunctionalTestCase
     public function testPagesArrayIsCastedCorrectly()
     {
         $pages = [['id' => 1], ['id' => 2]];
-        $this->pageGrid->pages = $pages;
+        $this->pageGrid->items = $pages;
 
-        $retrieved = $this->pageGrid->pages;
+        $retrieved = $this->pageGrid->items;
         $this->assertIsArray($retrieved);
         $this->assertCount(2, $retrieved);
     }
@@ -377,27 +377,27 @@ class PageGridModelTest extends FunctionalTestCase
 
     public function testAddMultiplePages()
     {
-        $this->pageGrid->pages = [];
+        $this->pageGrid->items = [];
 
         $this->pageGrid->addPage(['id' => 1, 'title' => 'Page 1']);
         $this->pageGrid->addPage(['id' => 2, 'title' => 'Page 2']);
         $this->pageGrid->addPage(['id' => 3, 'title' => 'Page 3']);
 
-        $this->assertCount(3, $this->pageGrid->pages);
-        $this->assertEquals('Page 1', $this->pageGrid->pages[0]['title']);
-        $this->assertEquals('Page 3', $this->pageGrid->pages[2]['title']);
+        $this->assertCount(3, $this->pageGrid->items);
+        $this->assertEquals('Page 1', $this->pageGrid->items[0]['title']);
+        $this->assertEquals('Page 3', $this->pageGrid->items[2]['title']);
     }
 
     public function testUpdatePagePreservesOtherFields()
     {
-        $this->pageGrid->pages = [
+        $this->pageGrid->items = [
             ['id' => 1, 'title' => 'Page 1', 'featured' => true]
         ];
 
         $this->pageGrid->updatePage(0, ['title' => 'Updated Page 1']);
 
-        $this->assertEquals('Updated Page 1', $this->pageGrid->pages[0]['title']);
-        $this->assertTrue($this->pageGrid->pages[0]['featured']);
-        $this->assertEquals(1, $this->pageGrid->pages[0]['id']);
+        $this->assertEquals('Updated Page 1', $this->pageGrid->items[0]['title']);
+        $this->assertTrue($this->pageGrid->items[0]['featured']);
+        $this->assertEquals(1, $this->pageGrid->items[0]['id']);
     }
 }

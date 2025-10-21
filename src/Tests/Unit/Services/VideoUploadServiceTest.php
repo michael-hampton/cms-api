@@ -10,9 +10,6 @@ use Exception;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-// Use a trait for mocking global functions if you have php-mock-phpunit installed:
-// use phpmock\phpunit\PHPMockTrait;
-
 class VideoUploadServiceTest extends TestCase
 {
     private FileSystemInterface|MockObject $fileSystem;

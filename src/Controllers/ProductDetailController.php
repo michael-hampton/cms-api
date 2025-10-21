@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
+use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Services\ProductService;
 use App\Services\ReviewService;
@@ -20,7 +21,9 @@ class ProductDetailController extends Controller
 
     public function show(Request $request, string $slug)
     {
-        $product = $this->productRepository->findBySlug($slug);
+        $product = Product::with(['specifications', 'availableMerchants', 'priceHistory', 'activeVariants', 'category', 'brand'])
+            ->where('slug', $slug)
+            ->first();
 
         if (!$product) {
             return $this->view('errors.404', [

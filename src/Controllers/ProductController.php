@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Repositories\ProductRepository;
@@ -54,8 +55,12 @@ class ProductController extends Controller
                 'message' => 'Product created successfully',
                 'product' => $product->toArray() // Make sure to call toArray()
             ], 201);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 422);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         }
     }
 
@@ -94,8 +99,12 @@ class ProductController extends Controller
                 'message' => 'Product updated successfully',
                 'product' => $product
             ]);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 404);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         }
     }
 

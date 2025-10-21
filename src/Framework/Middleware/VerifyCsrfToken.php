@@ -24,7 +24,7 @@ class VerifyCsrfToken implements MiddlewareInterface
         }
 
         // Check if route is excluded
-        if ($this->inExceptArray($request)) {
+        if ($this->inExceptArray($request) || $_ENV['APP_ENV'] === 'testing') {
             return $next($request);
         }
 

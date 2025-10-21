@@ -177,7 +177,7 @@ class PasswordResetServiceTest extends FunctionalTestCase
         ]);
 
         // Reset password
-        $result = $this->service->resetPassword($plainToken, $newPassword);
+        $result = $this->service->resetPassword($plainToken, $newPassword, $this->siteId);
 
         $this->assertTrue($result, 'Password reset should succeed');
 

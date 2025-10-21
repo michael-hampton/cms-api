@@ -63,8 +63,8 @@ class TagController extends Controller
         try {
             $tag = $this->tagRepository->create($request->validated());
             return $this->jsonResponse(['tag' => $tag->toArray()], 201);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 422);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
         }
     }
 
@@ -76,8 +76,8 @@ class TagController extends Controller
                 return $this->errorResponse('Tag not found', 404);
             }
             return $this->jsonResponse(['tag' => $tag->toArray()]);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
         }
     }
 

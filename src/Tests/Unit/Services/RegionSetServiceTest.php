@@ -326,15 +326,12 @@ class RegionSetServiceTest extends FunctionalTestCase
 
         $mockPage1 = Mockery::mock(Page::class)->makePartial();
         $mockPage1->id = 1;
-        $mockPage1->shouldReceive('save')->once()->andReturn(true);
 
         $mockPage2 = Mockery::mock(Page::class)->makePartial();
         $mockPage2->id = 2;
-        $mockPage2->shouldReceive('save')->once()->andReturn(true);
 
         $mockPage3 = Mockery::mock(Page::class)->makePartial();
         $mockPage3->id = 3;
-        $mockPage3->shouldReceive('save')->once()->andReturn(true);
 
         $this->databaseMock->expects($this->once())
             ->method('transaction')
@@ -342,17 +339,9 @@ class RegionSetServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-
-        $this->pageRepository
-            ->method('find')
-            ->willReturnCallback(function ($id) use ($mockPage1, $mockPage2, $mockPage3) {
-                return match ($id) {
-                    1 => $mockPage1,
-                    2 => $mockPage2,
-                    3 => $mockPage3,
-                    default => null,
-                };
-            });
+        $this->pageRegionSetRepository->expects($this->once())
+            ->method('assignPages')
+            ->with($regionSetId);
 
         $service = new RegionSetService(
             $this->databaseMock,

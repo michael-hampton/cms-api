@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\jsonResponse;
 use App\Framework\Http\Request;
 use App\Models\PageGridHistory;
@@ -71,12 +72,17 @@ class PageGridController extends Controller
                 'message' => 'Page grid created successfully',
                 'data' => $pageGrid->toArray(),
             ], 201);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         } catch (\Exception $e) {
-            return $this->resourceResponse([
-                'success' => false,
-                'message' => 'Failed to create page grid',
-                'error' => $e->getMessage(),
-            ], 422);
+            return $this->errorResponse(
+                'Validation failed',
+                422
+            );
         }
     }
 

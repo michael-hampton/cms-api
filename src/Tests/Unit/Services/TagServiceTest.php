@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\PageCategory;
 use App\Models\PageTag;
 use App\Models\Tag;
+use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
 use App\Services\TagService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -19,14 +20,17 @@ class TagServiceTest extends FunctionalTestCase
 {
     protected $repository;
     protected $service;
+    private $databaseMock;
+    private $pageRepository;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->pageRepository = Mockery::mock(PageRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(TagRepository::class);
-        $this->service = new TagService($this->databaseMock, $this->repository);
+        $this->service = new TagService($this->databaseMock, $this->repository, $this->pageRepository);
     }
 
     protected function tearDown(): void
@@ -88,7 +92,7 @@ class TagServiceTest extends FunctionalTestCase
 
         // Mock a page that will be reassigned
         $page = Mockery::mock(PageTag::class)->makePartial();
-        $page->shouldReceive('save')->once();
+        $page->id = 1;
 
         $this->repository->shouldReceive('find')
             ->with($authorId)
@@ -106,9 +110,9 @@ class TagServiceTest extends FunctionalTestCase
             ->twice()
             ->andReturn(collect([$page]));
 
-        $author->shouldReceive('delete')
+        $this->pageRepository->shouldReceive('syncTags')
             ->once()
-            ->andReturn(true);
+            ->with($page->id, $reassignAuthorId);
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()

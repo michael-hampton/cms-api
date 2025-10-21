@@ -32,7 +32,9 @@ class FooterRenderer
         // Main footer content
         $html .= "<div class='footer-main'>";
         $html .= "<div class='footer-container'>";
-        $html .= "<div class='footer-grid' style='grid-template-columns: repeat({$this->getColumnCount($columns, $config)}, 1fr);'>";
+
+        // REMOVED the inline style that was limiting width
+        $html .= "<div class='footer-grid'>";
 
         // Dynamic columns from menu items
         foreach ($columns as $columnGroup => $columnItems) {
@@ -134,11 +136,12 @@ class FooterRenderer
             $html .= "<p class='newsletter-description'>" . htmlspecialchars($config['newsletter_description']) . "</p>";
         }
 
-        $html .= "<form class='newsletter-form' action='" . ($config['newsletter_action'] ?? '/subscribe') . "' method='POST'>";
-        $html .= "<input type='email' name='email' class='newsletter-input' placeholder='" .
+        $html .= "<form class='newsletter-form' id='newsletter-form'>";
+        $html .= "<input type='email' name='email' class='newsletter-input' id='newsletter-email' placeholder='" .
             htmlspecialchars($config['newsletter_placeholder'] ?? 'Your email address') . "' required>";
-        $html .= "<button type='submit' class='newsletter-button'>" .
+        $html .= "<button type='submit' class='newsletter-button' id='newsletter-submit'>" .
             htmlspecialchars($config['newsletter_button_text'] ?? 'Subscribe') . "</button>";
+        $html .= "<div class='newsletter-message' id='newsletter-message'></div>";
         $html .= "</form>";
 
         $html .= "</div>";

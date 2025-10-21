@@ -7,7 +7,6 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Models\Product;
-use App\Models\ProductPriceHistory;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductViewRepository;
 use Exception;
@@ -171,7 +170,7 @@ class ProductService
             // Record price history for merchants with price changes
             foreach ($merchants as $index => $merchantData) {
                 $merchantId = $merchantIds[$index];
-                $oldMerchant = !empty($merchantData['id']) ? $oldMerchants->get($merchantData['id']) : null;
+                $oldMerchant = !empty($merchantData['id']) && $oldMerchants->has($merchantData['id']) ? $oldMerchants->get($merchantData['id']) : null;
 
                 // Record if new merchant or price changed
                 if (!$oldMerchant || $oldMerchant->price != $merchantData['price']) {
@@ -188,6 +187,10 @@ class ProductService
         }
         if ($specifications !== null) {
             $this->repository->syncSpecifications($product->id, $specifications);
+        }
+
+        if (!empty($images)) {
+            $this->repository->syncImages($product->id, $images);
         }
 
         return $product;

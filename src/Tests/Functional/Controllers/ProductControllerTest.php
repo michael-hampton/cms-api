@@ -233,7 +233,7 @@ class ProductControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertEquals(422, $response->getStatusCode());
         $this->assertEquals('Validation failed', $data['error']);
     }
 

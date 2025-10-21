@@ -51,9 +51,9 @@ class PageTerritoryRepository extends Repository
         }
     }
 
-    public function unassignPages(int $territoryId, array $pageIds): void
+    public function unassignPages(int $territoryId, array $pageIds): int
     {
-        PageTerritory::where('territory_id', $territoryId)
+        return PageTerritory::where('territory_id', $territoryId)
             ->whereIn('page_id', $pageIds)
             ->delete();
     }

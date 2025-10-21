@@ -12,6 +12,7 @@ use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
+use App\Controllers\NewsletterController;
 use App\Controllers\PageController;
 use App\Controllers\PageGridController;
 use App\Controllers\PageHistoryController;
@@ -172,7 +173,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/page-grids/{id}', PageGridController::class, 'destroy');
         $router->get('/page-grids/{id}/history', [PageGridController::class, 'history']);
 
-
+        // page grids
         $router->post('/page-grids/{id}/restore', PageGridController::class, 'restore');
         $router->delete('/page-grids/{id}/force', PageGridController::class, 'forceDestroy');
         $router->post('/page-grids/{id}/duplicate', PageGridController::class, 'duplicate');
@@ -183,6 +184,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/page-grids/{id}/pages/{pageIndex}', PageGridController::class, 'updatePage');
         $router->post('/page-grids/{id}/pages/reorder', PageGridController::class, 'reorderPages');
 
+        // Sites
         $router->get('/sites', [SiteController::class, 'index']);
         $router->get('/sites/current', [SiteController::class, 'getCurrent']);
         $router->get('/sites/{id}', [SiteController::class, 'show']);
@@ -259,10 +261,17 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/vouchers/{id}/duplicate', VoucherController::class, 'duplicate');
         $router->post('/vouchers/validate', VoucherController::class, 'validate');
         $router->post('/vouchers/{id}/apply', VoucherController::class, 'apply');
+
+         $router->post('/newsletter/signup', NewsletterController::class, 'signup');
+         $router->post('/newsletter/confirm', NewsletterController::class, 'confirm');
+         $router->post('/newsletter/unsubscribe', NewsletterController::class, 'unsubscribe');
+         $router->get('/newsletter/subscribers', NewsletterController::class, 'getSubscribers');
     });
 
     $router->post('/sites', [SiteController::class, 'create']);
 });
+
+$router->post('/api/{siteName}/newsletter/web/signup', NewsletterController::class, 'signup');
 
 
 $router->get('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'getCustomFields');

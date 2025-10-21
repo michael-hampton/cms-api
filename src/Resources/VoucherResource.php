@@ -26,6 +26,8 @@ class VoucherResource extends JsonResource
             'status' => $this->getAttribute('status'),
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),
+            'products' => $this->whenLoaded('products'),
+            'product_ids' => array_column($this->getAttribute('products'), 'id') ?? [],
         ];
     }
 }

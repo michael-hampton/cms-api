@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Repositories\MenuRepository;
@@ -108,11 +109,12 @@ class MenuController extends Controller
                 'menu' => $menu,
                 'message' => 'Menu created successfully'
             ], 201);
-        } catch (\Exception $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Failed to create menu'
-            ], 422);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         }
     }
 
@@ -126,13 +128,12 @@ class MenuController extends Controller
                 'menu' => $menu->toArray(),
                 'message' => 'Menu updated successfully'
             ]);
-        } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Failed to update menu'
-            ], 500);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         }
     }
 

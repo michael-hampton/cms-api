@@ -121,7 +121,7 @@ class PageController extends Controller
             return $this->errorResponse(
                 'Validation failed',
                 422,
-                $e->getValidationResult()->getErrors()
+                $e->getErrors()
             );
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

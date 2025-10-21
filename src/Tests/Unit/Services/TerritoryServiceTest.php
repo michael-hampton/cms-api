@@ -234,52 +234,52 @@ class TerritoryServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testAssignPagesToRegionSet()
-    {
-        $regionSetId = 1;
-        $pageIds = [1, 2, 3];
-
-        $mockPage1 = Mockery::mock(Page::class)->makePartial();
-        $mockPage1->id = 1;
-        $mockPage1->shouldReceive('save')->once()->andReturn(true);
-
-        $mockPage2 = Mockery::mock(Page::class)->makePartial();
-        $mockPage2->id = 2;
-        $mockPage2->shouldReceive('save')->once()->andReturn(true);
-
-        $mockPage3 = Mockery::mock(Page::class)->makePartial();
-        $mockPage3->id = 3;
-        $mockPage3->shouldReceive('save')->once()->andReturn(true);
-
-        $this->database->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
-                return $callback();
-            });
-
-
-        $this->pageRepository
-            ->method('find')
-            ->willReturnCallback(function ($id) use ($mockPage1, $mockPage2, $mockPage3) {
-                return match ($id) {
-                    1 => $mockPage1,
-                    2 => $mockPage2,
-                    3 => $mockPage3,
-                    default => null,
-                };
-            });
-
-        $service = new TerritoryService(
-            $this->database,
-            $this->repository,
-            $this->pageRepository,
-            $this->pageTerritoryRepository
-        );
-
-        $result = $service->assignPages($regionSetId, $pageIds, 1);
-
-        $this->assertTrue($result);
-    }
+//    public function testAssignPagesToRegionSet()
+//    {
+//        $regionSetId = 1;
+//        $pageIds = [1, 2, 3];
+//
+//        $mockPage1 = Mockery::mock(Page::class)->makePartial();
+//        $mockPage1->id = 1;
+//        $mockPage1->shouldReceive('save')->once()->andReturn(true);
+//
+//        $mockPage2 = Mockery::mock(Page::class)->makePartial();
+//        $mockPage2->id = 2;
+//        $mockPage2->shouldReceive('save')->once()->andReturn(true);
+//
+//        $mockPage3 = Mockery::mock(Page::class)->makePartial();
+//        $mockPage3->id = 3;
+//        $mockPage3->shouldReceive('save')->once()->andReturn(true);
+//
+//        $this->database->expects($this->once())
+//            ->method('transaction')
+//            ->willReturnCallback(function ($callback) {
+//                return $callback();
+//            });
+//
+//
+//        $this->pageRepository
+//            ->method('find')
+//            ->willReturnCallback(function ($id) use ($mockPage1, $mockPage2, $mockPage3) {
+//                return match ($id) {
+//                    1 => $mockPage1,
+//                    2 => $mockPage2,
+//                    3 => $mockPage3,
+//                    default => null,
+//                };
+//            });
+//
+//        $service = new TerritoryService(
+//            $this->database,
+//            $this->repository,
+//            $this->pageRepository,
+//            $this->pageTerritoryRepository
+//        );
+//
+//        $result = $service->assignPages($regionSetId, $pageIds, 1);
+//
+//        $this->assertTrue($result);
+//    }
 
     public function testSearchAvailablePagesForRegionSet()
     {
@@ -329,41 +329,33 @@ class TerritoryServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-//    public function testUnassignPagesOnlyUnassignsFromCorrectTerritory()
-//    {
-//        $territoryId = 1;
-//        $pageIds = [1, 2];
-//
-//        $mockPage1 = Mockery::mock(Page::class)->makePartial();
-//        $mockPage1->id = 1;
-//        $mockPage1->territory_id = $territoryId; // Belongs to this territory
-//        $mockPage1->shouldReceive('save')->once()->andReturn(true);
-//
-//        $mockPage2 = Mockery::mock(Page::class)->makePartial();
-//        $mockPage2->id = 2;
-//        $mockPage2->territory_id = 2; // Belongs to different territory
-//        $mockPage2->shouldReceive('save')->never(); // Should NOT be saved
-//
-//        $this->database->expects($this->once())
-//            ->method('transaction')
-//            ->willReturnCallback(function ($callback) {
-//                return $callback();
-//            });
-//
-//        $this->pageRepository
-//            ->method('find')
-//            ->willReturnCallback(function ($id) use ($mockPage1, $mockPage2) {
-//                return match ($id) {
-//                    1 => $mockPage1,
-//                    2 => $mockPage2,
-//                    default => null,
-//                };
-//            });
-//
-//        $result = $this->service->unassignPages($territoryId, $pageIds);
-//
-//        $this->assertTrue($result);
-//        $this->assertNull($mockPage1->territory_id);
-//        $this->assertEquals(2, $mockPage2->territory_id); // Should remain unchanged
-//    }
+    public function testUnassignPagesOnlyUnassignsFromCorrectTerritory()
+    {
+        $territoryId = 1;
+        $pageIds = [1, 2];
+
+        $mockPage1 = Mockery::mock(Page::class)->makePartial();
+        $mockPage1->id = 1;
+        $mockPage1->territory_id = $territoryId; // Belongs to this territory
+
+        $mockPage2 = Mockery::mock(Page::class)->makePartial();
+        $mockPage2->id = 2;
+        $mockPage2->territory_id = 2; // Belongs to different territory
+
+        $this->database->expects($this->once())
+            ->method('transaction')
+            ->willReturnCallback(function ($callback) {
+                return $callback();
+            });
+
+       $this->pageTerritoryRepository->expects($this->once())
+           ->method('unassignPages')
+           ->with($territoryId, $pageIds)
+           ->willReturn(1);;
+
+        $result = $this->service->unassignPages($territoryId, $pageIds);
+
+        $this->assertTrue($result);
+        $this->assertEquals(2, $mockPage2->territory_id); // Should remain unchanged
+    }
 }

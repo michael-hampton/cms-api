@@ -54,8 +54,12 @@ class RegionSetController extends Controller
             return $this->jsonResponse(['region_set' => $regionSet->toArrayWithRelations()], 201);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         }
     }
 

@@ -601,4 +601,9 @@ class PageRepository extends Repository
             ->where('site_id', $siteId)
             ->first();
     }
+
+    public function syncTags(int $pageId, int $reassignTagId) {
+        PageTag::where('page_id', $pageId)->delete();
+        return PageTag::create(['page_id' => $pageId, 'tag_id' => $reassignTagId]);
+    }
 }

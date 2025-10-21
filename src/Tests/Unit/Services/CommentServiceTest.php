@@ -7,6 +7,7 @@ use App\Models\Comment;
 use App\Repositories\CommentRepository;
 use App\Services\CommentService;
 use App\Services\NotificationService;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class CommentServiceTest extends TestCase
@@ -235,12 +236,18 @@ class CommentServiceTest extends TestCase
 
     private function createMockComment(int $id, string $status): Comment
     {
-        $comment = \Mockery::mock(Comment::class)->makePartial();
+        $comment = Mockery::mock(Comment::class)->makePartial();
         $comment->id = $id;
         $comment->status = $status;
 
         $comment->shouldReceive('isApproved')->andReturn($status === 'approved');
 
         return $comment;
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }

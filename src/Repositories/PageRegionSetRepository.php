@@ -52,9 +52,9 @@ class PageRegionSetRepository extends Repository
         }
     }
 
-    public function unassignPages(int $regionSetId, array $pageIds): void
+    public function unassignPages(int $regionSetId, array $pageIds): int
     {
-        PageRegionSet::where('region_set_id', $regionSetId)
+        return PageRegionSet::where('region_set_id', $regionSetId)
             ->whereIn('page_id', $pageIds)
             ->delete();
     }

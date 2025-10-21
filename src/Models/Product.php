@@ -135,6 +135,16 @@ class Product extends Model
         return $this->hasMany(ProductInclusion::class);
     }
 
+    public function brand()
+    {
+        return $this->belongsTo(Brand::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
     public function priceHistory()
     {
         return $this->hasMany(ProductPriceHistory::class)->orderBy('recorded_at', 'desc');

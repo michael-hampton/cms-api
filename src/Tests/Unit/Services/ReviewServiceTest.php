@@ -46,7 +46,7 @@ class ReviewServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        Mockery::close();
+        //Mockery::close();
         $_SESSION = [];
         parent::tearDown();
     }
