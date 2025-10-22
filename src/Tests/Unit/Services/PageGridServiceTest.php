@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services;
 
 use App\Framework\Authorization\AuthenticationService;
 use App\Models\PageGrid;
+use App\Models\Territory;
 use App\Models\User;
 use App\Repositories\PageGridRepository;
 use App\Services\PageGridService;
@@ -901,6 +902,73 @@ class PageGridServiceTest extends FunctionalTestCase
 
         $this->assertArrayNotHasKey('pages', $result->toArray());
         $this->assertArrayHasKey('items', $result->toArray());
+    }
+
+    public function testCreatePageGridWithTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1]);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => 1]);
+
+        $data = [
+            'title' => 'Test Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'territory_ids' => [$territory1->id, $territory2->id]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $expectedGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $expectedGrid->id = 1;
+
+        $this->repositoryMock->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $expectedGrid->shouldReceive('syncTerritories')
+            ->once()
+            ->with([$territory1->id, $territory2->id]);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testUpdatePageGridTerritories()
+    {
+        $existingGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $existingGrid->id = 1;
+        $existingGrid->title = 'Test Grid';
+
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1]);
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->twice()
+            ->andReturn($existingGrid);
+
+        $this->repositoryMock
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($existingGrid);
+
+        $existingGrid->shouldReceive('syncTerritories')
+            ->once()
+            ->with([$territory1->id]);
+
+        $result = $this->service->updatePageGrid(1, [
+            'territory_ids' => [$territory1->id]
+        ]);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
     }
 
 }

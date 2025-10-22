@@ -3,6 +3,8 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Menu;
+use App\Models\MenuTerritory;
+use App\Models\Territory;
 
 class MenuControllerTest extends FunctionalTestCase
 {
@@ -237,5 +239,58 @@ class MenuControllerTest extends FunctionalTestCase
         foreach ($data['data']['data'] as $menu) {
             $this->assertEquals('footer', $menu['menu_type']);
         }
+    }
+
+    public function testStoreCreatesMenuWithTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $menuData = [
+            'name' => 'Multi-Territory Menu',
+            'territory_ids' => [$territory1->id, $territory2->id]
+        ];
+
+        $response = $this->postForSite('/api/menu', $menuData);
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $menu = Menu::find($data['data']['menu']['id']);
+        $territoryIds = MenuTerritory::where('menu_id', $menu->id)
+            ->get()
+            ->pluck('territory_id');;
+
+        $this->assertCount(2, $territoryIds);
+        $this->assertContains($territory1->id, $territoryIds);
+        $this->assertContains($territory2->id, $territoryIds);
+    }
+
+    public function testUpdateMenuTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $data = [
+            'name' => 'Test Menu',
+            'slug' => 'test-menu',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ];
+
+        $menu = Menu::create($data);
+
+        $response = $this->putForSite("/api/menu/{$menu->id}",
+            array_merge($data, ['territory_ids' => [$territory1->id, $territory2->id]])
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $territoryIds = MenuTerritory::where('menu_id', $menu->id)
+            ->get()
+            ->pluck('territory_id');
+
+        $this->assertCount(2, $territoryIds);
     }
 }

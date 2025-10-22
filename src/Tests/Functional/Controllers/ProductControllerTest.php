@@ -5,8 +5,13 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductPriceHistory;
+use App\Models\ProductSpecification;
+use App\Models\ProductVariant;
+use App\Models\Site;
+use App\Services\ImageUploadService;
 
 class ProductControllerTest extends FunctionalTestCase
 {
@@ -693,6 +698,105 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertCount(1, $data['data']);
         $this->assertEquals(79.99, $data['data'][0]['price']);
         $this->assertEquals($merchant1->id, $data['data'][0]['merchant_id']);
+    }
+
+    public function testDuplicateProductToAnotherSite(): void
+    {
+        $site1 = Site::create(['name' => 'Site 1', 'domain' => 'site1.com']);
+        $site2 = Site::create(['name' => 'Site 2', 'domain' => 'site2.com']);
+
+        $product = Product::create([
+            'name' => 'iPhone 15',
+            'slug' => 'iphone-15',
+            'price' => 999.99,
+            'site_id' => $site1->id,
+            'status' => 'active'
+        ]);
+
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
+            'name' => 'iPhone 15 Site 2',
+            'site_id' => $site2->id,
+            'clone_images' => true,
+            'clone_merchants' => true,
+            'clone_variants' => false,
+            'clone_specifications' => true,
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('iPhone 15 Site 2', $data['data']['name']);
+        $this->assertEquals($site2->id, $data['data']['site_id']);
+    }
+
+    public function testDuplicateProductToSameSite(): void
+    {
+        $site = Site::create(['name' => 'Test Site', 'domain' => 'test.com']);
+
+        $product = Product::create([
+            'name' => 'Product',
+            'slug' => 'product',
+            'price' => 99.99,
+            'site_id' => $site->id
+        ]);
+
+        // Clone without site_id should use same site
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
+            'name' => 'Product Copy'
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals($site->id, $data['data']['site_id']);
+    }
+
+    public function testDuplicateProductWithSelectiveRelations(): void
+    {
+        $data = [
+            'name' => 'Test Product',
+            'description' => 'Test Description',
+            'price' => 99.99,
+            'brand' => 'TestBrand',
+        ];
+
+        $files = [
+            'image' => $this->createUploadedFile('product.jpg', 'image/jpeg')
+        ];
+
+
+        $response = $this->postForSite('/api/products', $data, $files);
+        $responseData = json_decode($response->getContent(), true);
+
+        $productId = $responseData['data']['product']['id'];
+
+        $productImage = ProductImage::create(['product_id' => $productId, 'url' => $responseData['data']['product']['image']]);
+
+        // Add relations
+        ProductImage::create(['product_id' => $productId, 'url' => 'img.jpg']);
+        ProductMerchant::create(['product_id' => $productId, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 89.99]);
+        ProductVariant::create(['product_id' => $productId, 'sku' => 'VAR-001', 'attributes' => []]);
+        ProductSpecification::create(['product_id' => $productId, 'category' => 'Tech', 'key' => 'Weight', 'value' => '1kg']);
+
+        // Clone only images and specifications
+        $response = $this->postForSite("/api/products/{$productId}/duplicate", [
+            'name' => 'Selective Clone',
+            'clone_images' => true,
+            'clone_merchants' => false,
+            'clone_variants' => false,
+            'clone_specifications' => true,
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+        $newProductId = $data['data']['id'];
+
+        $newProduct = Product::with(['images', 'merchants', 'variants', 'specifications'])->find($newProductId);
+
+        $this->assertCount(2, $newProduct->images);
+        $this->assertCount(0, $newProduct->merchants);
+        $this->assertCount(0, $newProduct->variants);
+        $this->assertCount(1, $newProduct->specifications);
     }
 
 }

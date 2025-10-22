@@ -30,6 +30,7 @@ class VideoRepository
             $query->where(function($q) use ($searchTerm) {
                 $q->where('original_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('title', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('filename', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('description', 'LIKE', "%{$searchTerm}%");
             });
         }

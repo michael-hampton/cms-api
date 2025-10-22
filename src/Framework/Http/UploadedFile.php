@@ -115,4 +115,9 @@ class UploadedFile
 
         return new self($_FILES[$key]);
     }
+
+    public function getFileInfo(): array
+    {
+        return $this->fileInfo;
+    }
 }

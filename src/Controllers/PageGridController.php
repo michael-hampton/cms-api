@@ -73,12 +73,14 @@ class PageGridController extends Controller
                 'data' => $pageGrid->toArray(),
             ], 201);
         } catch (ValidationException $e) {
+            die('here');
             return $this->errorResponse(
                 'Validation failed',
                 422,
                 $e->getErrors()
             );
         } catch (\Exception $e) {
+            echo $e->getMessage();
             return $this->errorResponse(
                 'Validation failed',
                 422

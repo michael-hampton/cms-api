@@ -62,6 +62,9 @@ class PageGridService
     public function createPageGrid(array $data): PageGrid
     {
         return $this->database->transaction(function () use ($data) {
+            $territoryIds = $data['territory_ids'] ?? [];
+            unset($data['territory_ids']);
+
             // Auto-generate slug if not provided
             if (empty($data['slug']) && !empty($data['title'])) {
                 $data['slug'] = $this->generateUniqueSlug($data['title']);
@@ -100,6 +103,10 @@ class PageGridService
 
             $pageGrid = $this->repository->create($data);
 
+            if (!empty($territoryIds)) {
+                $pageGrid->syncTerritories($territoryIds);
+            }
+
             $this->logHistory($pageGrid->id, 'created', ['data' => $data]);
 
             return $pageGrid;
@@ -109,6 +116,7 @@ class PageGridService
     private function normalizeItems(array $items): array
     {
         return array_map(function ($item) {
+
             // Ensure type is set
             if (!isset($item['type'])) {
                 $item['type'] = 'page'; // Default to page for backwards compatibility
@@ -154,6 +162,9 @@ class PageGridService
                 throw new \Exception('Page grid not found');
             }
 
+            $territoryIds = $data['territory_ids'] ?? null;
+            unset($data['territory_ids']);
+
             // Handle migration from 'pages' to 'items'
             if (isset($data['pages']) && !isset($data['items'])) {
                 $data['items'] = $data['pages'];
@@ -184,6 +195,10 @@ class PageGridService
             }
 
             $this->repository->update($id, $data);
+
+            if ($territoryIds !== null) {
+                $pageGrid->syncTerritories($territoryIds);
+            }
 
             if (!empty($changes)) {
                 $this->logHistory($id, 'updated', ['changes' => $changes]);

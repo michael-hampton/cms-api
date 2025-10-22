@@ -182,4 +182,25 @@ class PageGrid extends Model
     {
         return is_array($this->items) ? count($this->items) : 0;
     }
+
+    public function territories($relation = false)
+    {
+        return $this->belongsToMany(
+            Territory::class,
+            'page_grid_territory',
+            'page_grid_id',
+            'territory_id',
+            $relation
+        );
+    }
+
+    public function hasTerritory(int $territoryId): bool
+    {
+        return $this->territories()->where('territory_id', $territoryId)->exists();
+    }
+
+    public function syncTerritories(array $territoryIds): void
+    {
+        $this->territories(true)->sync($territoryIds);
+    }
 }

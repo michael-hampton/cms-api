@@ -4,12 +4,14 @@ namespace App\Tests\Unit\Services;
 
 use App\Framework\Support\Str;
 use App\Models\Menu;
+use App\Models\Territory;
 use App\Repositories\MenuRepository;
 use App\Services\MenuService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class MenuServiceTest extends TestCase
+class MenuServiceTest extends FunctionalTestCase
 {
     private $menuRepository;
     private $service;
@@ -295,4 +297,62 @@ class MenuServiceTest extends TestCase
 
         $this->assertSame($menu, $result);
     }
+
+    public function testCreateMenuWithTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId, 'region_set_id' => null]);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId, 'region_set_id' => null]);
+
+        $data = [
+            'name' => 'Test Menu',
+            'territory_ids' => [$territory1->id, $territory2->id]
+        ];
+
+        $this->menuRepository->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
+
+        $menu = Mockery::mock(Menu::class)->makePartial();
+        $menu->id = 1;
+
+        $this->menuRepository->shouldReceive('createMenu')
+            ->once()
+            ->andReturn($menu);
+
+        $menu->shouldReceive('syncTerritories')
+            ->once()
+            ->with([$territory1->id, $territory2->id]);
+
+        $result = $this->service->createMenu($data);
+
+        $this->assertSame($menu, $result);
+    }
+
+    public function testUpdateMenuTerritories()
+    {
+        $menu = Mockery::mock(Menu::class)->makePartial();
+        $menu->id = 1;
+        $menu->slug = 'test-menu';
+
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1]);
+
+        $this->menuRepository->shouldReceive('getMenuById')
+            ->with(1)
+            ->andReturn($menu);
+
+        $this->menuRepository->shouldReceive('updateMenu')
+            ->once()
+            ->andReturn($menu);
+
+        $menu->shouldReceive('syncTerritories')
+            ->once()
+            ->with([$territory1->id]);
+
+        $result = $this->service->updateMenu(1, [
+            'territory_ids' => [$territory1->id]
+        ]);
+
+        $this->assertSame($menu, $result);
+    }
+
 }

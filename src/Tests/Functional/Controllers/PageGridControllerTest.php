@@ -3,6 +3,8 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\PageGrid;
+use App\Models\PageGridTerritory;
+use App\Models\Territory;
 
 class PageGridControllerTest extends FunctionalTestCase
 {
@@ -1392,6 +1394,96 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('actions', $item);
         $this->assertArrayHasKey('badge', $item);
         $this->assertArrayHasKey('image', $item);
+    }
+
+    public function testCanCreatePageGridWithTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $data = [
+            'title' => 'Multi-Territory Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'territory_ids' => [$territory1->id, $territory2->id],
+            'is_active' => true,
+            'items' => [['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1', 'name' => 'Page 1']]
+        ];
+
+        $response = $this->postForSite('/api/page-grids', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $pageGrid = PageGrid::find($responseData['data']['id']);
+        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
+            ->get()
+            ->pluck('territory_id');
+
+        $this->assertCount(2, $territoryIds);
+        $this->assertContains($territory1->id, $territoryIds);
+        $this->assertContains($territory2->id, $territoryIds);
+    }
+
+    public function testCanUpdatePageGridTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true,
+            'items' => [],
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'territory_ids' => [$territory1->id, $territory2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
+            ->get()
+            ->pluck('territory_id');
+
+        $this->assertCount(2, $territoryIds);
+    }
+
+    public function testCanRemoveAllTerritories()
+    {
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true,
+            'items' => [],
+            'site_id' => $this->siteId
+        ]);
+
+        // First assign a territory
+        $pageGrid->syncTerritories([$territory1->id]);
+
+        // Then remove all territories
+        $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'territory_ids' => []
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
+            ->get()
+            ->pluck('territory_id');
+
+        $this->assertCount(0, $territoryIds);
     }
 
 

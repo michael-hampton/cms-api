@@ -128,8 +128,22 @@ class ProductController extends Controller
         try {
             $data = $request->all();
             $newName = $data['name'] ?? null;
+            $targetSiteId = $data['site_id'] ?? null;
 
-            $duplicatedProduct = $this->productService->duplicateProduct($id, $newName);
+            // Determine which relations to clone (default all true)
+            $cloneRelations = [
+                'images' => $data['clone_images'] ?? true,
+                'merchants' => $data['clone_merchants'] ?? true,
+                'variants' => $data['clone_variants'] ?? true,
+                'specifications' => $data['clone_specifications'] ?? true,
+            ];
+
+            $duplicatedProduct = $this->productService->duplicateProduct(
+                $id,
+                $newName,
+                $targetSiteId,
+                $cloneRelations
+            );
 
             return $this->jsonResponse($duplicatedProduct->toArray(), 201);
 

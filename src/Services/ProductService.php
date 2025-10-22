@@ -335,13 +335,28 @@ class ProductService
         return $filename;
     }
 
-    public function duplicateProduct(int $productId, ?string $newName = null): Model
-    {
+    public function duplicateProduct(
+        int $productId,
+        ?string $newName = null,
+        ?int $targetSiteId = null,
+        array $cloneRelations = []
+    ): Model    {
         $originalProduct = $this->repository->find($productId);
 
         if (!$originalProduct) {
             throw new \Exception("Product not found");
         }
+
+        // Default all relations to true if not specified
+        $cloneRelations = array_merge([
+            'images' => true,
+            'merchants' => true,
+            'variants' => true,
+            'specifications' => true,
+        ], $cloneRelations);
+
+        // Use target site or original product's site
+        $siteId = $targetSiteId ?? $originalProduct->site_id;
 
         $data = [
             'name' => $newName ?? ($originalProduct->name . ' (Copy)'),
@@ -351,6 +366,10 @@ class ProductService
             'brand_id' => $originalProduct->brand_id,
             'category_id' => $originalProduct->category_id,
             'status' => 'draft',
+            'site_id' => $siteId,
+            'meta_title' => $originalProduct->meta_title,
+            'meta_description' => $originalProduct->meta_description,
+            'meta_keywords' => $originalProduct->meta_keywords,
         ];
 
         // Generate unique slug
@@ -358,7 +377,7 @@ class ProductService
         $slug = Str::slug($baseName);
         $counter = 1;
 
-        while ($this->repository->findBySlug($slug)) {
+        while ($this->repository->findBySlugAndSite($slug, $siteId)) {
             $slug = Str::slug($baseName . '-' . $counter);
             $counter++;
         }
@@ -378,65 +397,75 @@ class ProductService
         $newProduct = $this->repository->create($data);
 
         // Duplicate related data
-        $this->duplicateProductRelations($originalProduct->id, $newProduct->id);
+        $this->duplicateProductRelations($originalProduct->id, $newProduct->id, $cloneRelations);
 
         return $newProduct;
     }
 
-    protected function duplicateProductRelations(int $originalId, int $newId): void
+    protected function duplicateProductRelations(int $originalId, int $newId, array $cloneRelations): void
     {
-        // Duplicate images
-        $images = $this->repository->getImages($originalId);
-        $imageData = [];
-        foreach ($images as $image) {
-            $newImageUrl = $this->duplicateImage($image->url);
-            if ($newImageUrl) {
-                $imageData[] = [
-                    'url' => $newImageUrl,
-                    'alt' => $image->alt,
-                    'is_primary' => $image->is_primary,
-                    'sort_order' => $image->sort_order,
-                ];
+        // Duplicate images if selected
+        if ($cloneRelations['images']) {
+            $images = $this->repository->getImages($originalId);
+
+            $imageData = [];
+            foreach ($images as $image) {
+                $newImageUrl = $this->duplicateImage($image->url);
+
+                if ($newImageUrl) {
+                    $imageData[] = [
+                        'url' => $newImageUrl,
+                        'alt' => $image->alt,
+                        'is_primary' => $image->is_primary,
+                        'sort_order' => $image->sort_order,
+                    ];
+                }
+            }
+            if (!empty($imageData)) {
+                $this->repository->syncImages($newId, $imageData);
             }
         }
-        if (!empty($imageData)) {
-            $this->repository->syncImages($newId, $imageData);
+
+        // Duplicate merchants if selected
+        if ($cloneRelations['merchants']) {
+            $merchants = $this->repository->getMerchants($originalId);
+            $merchantData = $merchants->map(fn($m) => [
+                'name' => $m->name,
+                'url' => $m->url,
+                'price' => $m->price,
+                'is_available' => $m->is_available,
+            ])->toArray();
+            if (!empty($merchantData)) {
+                $this->repository->syncMerchants($newId, $merchantData);
+            }
         }
 
-        // Duplicate merchants
-        $merchants = $this->repository->getMerchants($originalId);
-        $merchantData = $merchants->map(fn($m) => [
-            'name' => $m->name,
-            'url' => $m->url,
-            'price' => $m->price,
-            'is_available' => $m->is_available,
-        ])->toArray();
-        if (!empty($merchantData)) {
-            $this->repository->syncMerchants($newId, $merchantData);
+        // Duplicate variants if selected
+        if ($cloneRelations['variants']) {
+            $variants = $this->repository->getVariants($originalId);
+            $variantData = $variants->map(fn($v) => [
+                'sku' => $v->sku . '-COPY',
+                'attributes' => $v->attributes,
+                'price_modifier' => $v->price_modifier,
+                'is_active' => false, // Set to inactive by default
+            ])->toArray();
+            if (!empty($variantData)) {
+                $this->repository->syncVariants($newId, $variantData);
+            }
         }
 
-        // Duplicate variants
-        $variants = $this->repository->getVariants($originalId);
-        $variantData = $variants->map(fn($v) => [
-            'sku' => $v->sku . '-COPY',
-            'attributes' => $v->attributes,
-            'price_modifier' => $v->price_modifier,
-            'is_active' => false, // Set to inactive by default
-        ])->toArray();
-        if (!empty($variantData)) {
-            $this->repository->syncVariants($newId, $variantData);
-        }
-
-        // Duplicate specifications
-        $specifications = $this->repository->getSpecifications($originalId);
-        $specData = $specifications->map(fn($s) => [
-            'category' => $s->category,
-            'key' => $s->key,
-            'value' => $s->value,
-            'sort_order' => $s->sort_order,
-        ])->toArray();
-        if (!empty($specData)) {
-            $this->repository->syncSpecifications($newId, $specData);
+        // Duplicate specifications if selected
+        if ($cloneRelations['specifications']) {
+            $specifications = $this->repository->getSpecifications($originalId);
+            $specData = $specifications->map(fn($s) => [
+                'category' => $s->category,
+                'key' => $s->key,
+                'value' => $s->value,
+                'sort_order' => $s->sort_order,
+            ])->toArray();
+            if (!empty($specData)) {
+                $this->repository->syncSpecifications($newId, $specData);
+            }
         }
     }
 

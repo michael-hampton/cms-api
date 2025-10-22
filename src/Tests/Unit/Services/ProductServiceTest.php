@@ -11,6 +11,7 @@ use App\Models\ProductMerchant;
 use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
+use App\Models\Site;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductRepositoryInterface;
 use App\Repositories\ProductViewRepository;
@@ -1426,6 +1427,71 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertNotNull($result);
     }
 
+    public function testDuplicateProductToAnotherSite(): void
+    {
+        $originalProduct = new Product([
+            'id' => 1,
+            'name' => 'Product',
+            'site_id' => 1,
+            'slug' => 'product'
+        ]);
 
+        $this->repository->shouldReceive('find')->with(1)->andReturn($originalProduct);
+
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->with('product-copy', 2)
+            ->andReturn(null);
+
+        $newProduct = new Product(['id' => 2, 'site_id' => 2]);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['site_id'] === 2;
+            }))
+            ->andReturn($newProduct);
+
+        $this->setDuplicateExpectations();
+
+        $result = $this->service->duplicateProduct(1, 'Product Copy', 2);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
+
+    public function testDuplicateProductWithSelectiveRelations(): void
+    {
+        $originalProduct = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => $this->siteId]);;
+
+        $images = new Collection([new ProductImage(['url' => 'img.jpg'])]);
+        $merchants = new Collection([new ProductMerchant(['name' => 'Amazon'])]);
+
+        $this->repository->shouldReceive('find')->andReturn($originalProduct);
+        $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
+        $this->repository->shouldReceive('create')->andReturn(new Product(['id' => 2]));
+
+        $this->repository->shouldReceive('getImages')->andReturn($images);
+        $this->repository->shouldReceive('getMerchants')->andReturn($merchants);
+        $this->repository->shouldReceive('getVariants')->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getSpecifications')->andReturn(new Collection([]));
+
+        // Only images should be synced
+        $this->repository->shouldReceive('syncImages')->once();
+        $this->repository->shouldNotReceive('syncMerchants');
+        $this->repository->shouldNotReceive('syncVariants');
+        $this->repository->shouldNotReceive('syncSpecifications');
+
+        $this->imageUploadService->shouldReceive('duplicate')->andReturn('img-copy.jpg');
+
+        $cloneRelations = [
+            'images' => true,
+            'merchants' => false,
+            'variants' => false,
+            'specifications' => false,
+        ];
+
+        $result = $this->service->duplicateProduct(1, null, null, $cloneRelations);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
 
 }

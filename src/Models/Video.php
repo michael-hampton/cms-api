@@ -20,7 +20,8 @@ class Video extends Model
         'title',
         'description',
         'site_id',
-        'deleted_at'
+        'deleted_at',
+        'created_at'
     ];
 
     protected $casts = [

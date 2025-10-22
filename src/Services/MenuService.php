@@ -33,16 +33,28 @@ class MenuService
 
     public function createMenu(array $data): Model
     {
+        $territoryIds = $data['territory_ids'] ?? [];
+        unset($data['territory_ids']);
+
         $slug = Str::slug($data['name']);
         $data['slug'] = $this->ensureUniqueSlug($slug);
         $data['layout_config'] = !empty($data['layout_config']) ? json_encode($data['layout_config']) : null;
 
-        return $this->menuRepository->createMenu($data);
+        $menu = $this->menuRepository->createMenu($data);
+
+        if (!empty($territoryIds)) {
+            $menu->syncTerritories($territoryIds);
+        }
+
+        return $menu;
     }
 
     public function updateMenu(int $menuId, array $data): Model
     {
         $menu = $this->menuRepository->getMenuById($menuId);
+
+        $territoryIds = $data['territory_ids'] ?? null;
+        unset($data['territory_ids']);
 
         if (!empty($data['slug']) && $data['slug'] !== $menu->slug) {
             $data['slug'] = $this->ensureUniqueSlug($data['slug'], $menu->id);
@@ -52,7 +64,13 @@ class MenuService
 
         $data['layout_config'] = !empty($data['layout_config']) ? json_encode($data['layout_config']) : null;
 
-        return $this->menuRepository->updateMenu($menu, $data);
+        $updatedMenu = $this->menuRepository->updateMenu($menu, $data);
+
+        if ($territoryIds !== null) {
+            $updatedMenu->syncTerritories($territoryIds);
+        }
+
+        return $updatedMenu;
     }
 
     public function deleteMenu(int $menuId): bool

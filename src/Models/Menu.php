@@ -61,4 +61,25 @@ class Menu extends Model
 
         return is_array($layoutConfig) ? $layoutConfig : [];
     }
+
+    public function territories($relation = false)
+    {
+        return $this->belongsToMany(
+            Territory::class,
+            'menu_territory',
+            'menu_id',
+            'territory_id',
+            $relation
+        );
+    }
+
+    public function hasTerritory(int $territoryId): bool
+    {
+        return $this->territories()->where('territory_id', $territoryId)->exists();
+    }
+
+    public function syncTerritories(array $territoryIds): void
+    {
+        $this->territories(true)->sync($territoryIds);
+    }
 }

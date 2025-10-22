@@ -64,4 +64,36 @@ class Territory extends Model
             'page_count' => $this->getPageCount()
         ]);
     }
+
+    public function menus(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            Menu::class,
+            'menu_territory',
+            'territory_id',
+            'menu_id',
+            $relation
+        )->withTimestamps();
+    }
+
+    public function pageGrids(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            PageGrid::class,
+            'page_grid_territory',
+            'territory_id',
+            'page_grid_id',
+            $relation
+        )->withTimestamps();
+    }
+
+    public function getMenuCount(): int
+    {
+        return MenuTerritory::where('territory_id', $this->id)->count();
+    }
+
+    public function getPageGridCount(): int
+    {
+        return PageGridTerritory::where('territory_id', $this->id)->get()->count();
+    }
 }

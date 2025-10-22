@@ -149,7 +149,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     // Merchant operations
     public function syncMerchants(int $productId, array $merchants): array
     {
-        $productMerchants = ProductMerchant::all()->keyBy('name');
+        $productMerchants = ProductMerchant::where('product_id', $productId)->get()->keyBy('name');
 
         $merchantIds = [];
 
@@ -272,7 +272,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             return null;
         }
 
-        return ProductPriceHistory::create([ //todo need to apply per merchant
+        return ProductPriceHistory::create([
             'product_id' => $product->id,
             'merchant_id' => null,
             'price' => $product->price,
@@ -284,5 +284,12 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function deletePriceHistory(int $productId): void
     {
         ProductPriceHistory::where('product_id', $productId)->delete();
+    }
+
+    public function findBySlugAndSite(string $slug, int $siteId): ?Product
+    {
+        return Product::where('slug', $slug)
+            ->where('site_id', $siteId)
+            ->first();
     }
 }
