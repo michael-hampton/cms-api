@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Exceptions\CannotDeleteException;
+use App\Exceptions\CategoryAssignmentException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
@@ -110,6 +111,10 @@ class CategoryController extends Controller
             return $this->jsonResponse([
                 'message' => $e->getMessage()
             ], 422);
+        } catch (CategoryAssignmentException $e) {
+            return $this->jsonResponse([
+                'message' => $e->getMessage()
+            ], 400);
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'message' => 'Category not found'

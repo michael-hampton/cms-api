@@ -13,6 +13,7 @@ use App\Controllers\ImageController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\NewsletterController;
+use App\Controllers\OrderController;
 use App\Controllers\PageController;
 use App\Controllers\PageGridController;
 use App\Controllers\PageHistoryController;
@@ -70,6 +71,21 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/brands/merge', BrandController::class, 'merge');
         $router->get('/brands/active', BrandController::class, 'active');
         $router->post('/brands/{id}/duplicate', BrandController::class, 'duplicate');
+
+        //Orders
+        $router->get('/orders', OrderController::class, 'index');
+        $router->post('orders', OrderController::class, 'store');
+        $router->get('/orders/by-status', OrderController::class, 'byStatus');
+        $router->get('/orders/revenue', OrderController::class, 'revenue');
+        $router->get('/orders/by-user/{userId}', OrderController::class, 'byUser');
+        $router->get('/orders/{id}', OrderController::class, 'show');
+        $router->put('/orders/{id}', OrderController::class, 'update');
+        $router->put('/orders/{id}/items', OrderController::class, 'updateItems');
+        $router->delete('/orders/{id}', OrderController::class, 'destroy');
+        $router->post('/orders/{id}/cancel', OrderController::class, 'cancel');
+        $router->post('/orders/{id}/complete', OrderController::class, 'complete');
+        $router->post('/orders/{id}/refund', OrderController::class, 'refund');
+        $router->post('/orders/{id}/duplicate', OrderController::class, 'duplicate');
 
         // Tags API
         $router->get('/tags', TagController::class, 'index');

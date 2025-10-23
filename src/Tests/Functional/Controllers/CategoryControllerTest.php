@@ -323,4 +323,96 @@ class CategoryControllerTest extends FunctionalTestCase
         $this->assertEquals(0, $data['data']['no_index']);
         $this->assertNull($data['data']['canonical_url']);
     }
+
+    public function testCannotDeleteCategoryWithChildren(): void
+    {
+        $parent = Category::create([
+            'name' => 'Electronics',
+            'slug' => 'electronics',
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $child = Category::create([
+            'name' => 'Smartphones',
+            'slug' => 'smartphones',
+            'parent_id' => $parent->id,
+            'is_active' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->deleteForSite("/api/categories/{$parent->id}");
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('subcategories', $data['data']['message']);
+    }
+
+    public function testCheckDeleteReturnsHasChildren(): void
+    {
+        $parent = Category::create([
+            'name' => 'Electronics',
+            'slug' => 'electronics',
+            'site_id' => $this->siteId
+        ]);
+
+        $child = Category::create([
+            'name' => 'Smartphones',
+            'slug' => 'smartphones',
+            'parent_id' => $parent->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite("/api/categories/{$parent->id}/check-delete");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['data']['can_delete']);
+        $this->assertTrue($data['data']['has_children']);
+        $this->assertEquals(1, $data['data']['children_count']);
+    }
+
+    public function testDuplicateCategoryWithChildren(): void
+    {
+        $parent = Category::create([
+            'name' => 'Electronics',
+            'slug' => 'electronics',
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $child1 = Category::create([
+            'name' => 'Smartphones',
+            'slug' => 'smartphones',
+            'parent_id' => $parent->id,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $child2 = Category::create([
+            'name' => 'Tablets',
+            'slug' => 'tablets',
+            'parent_id' => $parent->id,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/categories/{$parent->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        // Verify parent was duplicated
+        $this->assertEquals('Electronics (Copy)', $data['data']['name']);
+        $newParentId = $data['data']['id'];
+
+        // Verify children were duplicated
+        $children = Category::where('parent_id', $newParentId)->get();
+        $this->assertEquals(2, $children->count());
+
+        $childNames = $children->pluck('name')->toArray();
+        $this->assertContains('Smartphones', $childNames);
+        $this->assertContains('Tablets', $childNames);
+    }
 }

@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Framework\Support\Collection;
+use App\Models\Order;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
+
+class OrderRepository extends Repository
+{
+    private SearchEngine $searchEngine;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $config = SearchConfigurationFactory::createOrderConfiguration();
+        $this->searchEngine = new SearchEngine($config);
+    }
+
+    protected function getModelClass(): string
+    {
+        return Order::class;
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $query = Order::with(['items', 'user']);
+        return $this->searchEngine->search($query, $criteria);
+    }
+
+    public function findByOrderNumber(string $orderNumber): ?Order
+    {
+        return $this->where('order_number', $orderNumber)->first();
+    }
+
+    public function getByStatus(string $status): Collection
+    {
+        return Order::where('status', $status)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    public function getByUser(int $userId, ?int $limit = null): Collection
+    {
+        $query = Order::where('user_id', $userId)
+            ->orderBy('created_at', 'desc');
+
+        if ($limit) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
+    }
+
+    public function getRecentOrders(?int $limit = 10): Collection
+    {
+        return Order::orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getOrdersWithItems(?int $limit = null): Collection
+    {
+        $query = Order::with(['items', 'user'])
+            ->orderBy('created_at', 'desc');
+
+        if ($limit) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
+    }
+
+    public function getTotalRevenue(?string $startDate = null, ?string $endDate = null): float
+    {
+        $query = Order::where('status', 'completed')
+            ->where('payment_status', 'paid');
+
+        if ($startDate) {
+            $query->where('completed_at', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $query->where('completed_at', '<=', $endDate);
+        }
+
+        $orders = $query->get();
+        return $orders->sum('total');
+    }
+
+    public function getOrderCount(?string $status = null): int
+    {
+        $query = Order::query();
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        return $query->count();
+    }
+
+    public function getOrderById(int $orderId): ?Order
+    {
+        return Order::with(['item', 'user'])->find($orderId);
+    }
+}

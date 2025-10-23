@@ -213,19 +213,60 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     }
 
     // Variant operations
-    public function syncVariants(int $productId, array $variants): void
+    public function syncVariants(int $productId, array $variants): array
     {
         ProductVariant::where('product_id', $productId)->delete();
 
+        $variantIds = [];
         foreach ($variants as $variantData) {
-            ProductVariant::create([
+            $images = $variantData['images'] ?? [];
+            unset($variantData['images']);
+
+            $variant = ProductVariant::create([
                 'product_id' => $productId,
                 'sku' => $variantData['sku'],
                 'attributes' => $variantData['attributes'] ?? [],
                 'price_modifier' => $variantData['price_modifier'] ?? 0,
                 'is_active' => $variantData['is_active'] ?? true,
             ]);
+
+            $variantIds[] = $variant->id;
+
+            // Sync variant images if provided
+            if (!empty($images)) {
+                $this->syncVariantImages($variant->id, $productId, $images);
+            }
         }
+
+        return $variantIds;
+    }
+
+    public function syncVariantImages(int $variantId, int $productId, array $images): void
+    {
+        ProductImage::where('variant_id', $variantId)->delete();
+
+        foreach ($images as $imageData) {
+            ProductImage::create([
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+                'url' => $imageData['url'],
+                'alt' => $imageData['alt'] ?? null,
+                'is_primary' => $imageData['is_primary'] ?? false,
+                'sort_order' => $imageData['sort_order'] ?? 0,
+            ]);
+        }
+    }
+
+    public function getVariantImages(int $variantId): Collection
+    {
+        return ProductImage::where('variant_id', $variantId)
+            ->orderBy('sort_order')
+            ->get();
+    }
+
+    public function deleteVariantImages(int $variantId): void
+    {
+        ProductImage::where('variant_id', $variantId)->delete();
     }
 
     public function getVariants(int $productId): Collection

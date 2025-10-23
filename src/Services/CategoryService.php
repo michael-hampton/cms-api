@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Exceptions\CannotDeleteException;
+use App\Exceptions\CategoryAssignmentException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
+use App\Models\Category;
 use App\Repositories\CategoryRepository;
 
 class CategoryService
@@ -25,6 +27,12 @@ class CategoryService
 
         if (!$category) {
             throw new \Exception('Category not found');
+        }
+
+        // Check for child categories
+        $childrenCount = $category->children()->count();
+        if ($childrenCount > 0) {
+            throw new CategoryAssignmentException("Cannot delete category with {$childrenCount} subcategories. Please delete or reassign subcategories first.");
         }
 
         $pagesCount = $this->repository->getPagesByCategoryId($categoryId)->count();
@@ -69,11 +77,14 @@ class CategoryService
         }
 
         $pagesCount = $category->pages()->count();
+        $childrenCount = $category->children()->count();
 
         return [
-            'can_delete' => $pagesCount === 0,
+            'can_delete' => $pagesCount === 0 && $childrenCount === 0,
             'pages_count' => $pagesCount,
-            'requires_reassignment' => $pagesCount > 0
+            'children_count' => $childrenCount,
+            'requires_reassignment' => $pagesCount > 0,
+            'has_children' => $childrenCount > 0
         ];
     }
 
@@ -117,7 +128,56 @@ class CategoryService
 
             $newCategory = $this->repository->create($data);
 
+            if (!$newCategory) {
+                throw new \Exception("Failed to create duplicate category");
+            }
+
+            // Duplicate child categories recursively
+            $children = $originalCategory->children();
+            foreach ($children as $child) {
+                $this->duplicateCategoryRecursive($child, $newCategory->id);
+            }
+
             return $newCategory !== null;
         });
+    }
+
+    private function duplicateCategoryRecursive(Category $category, int $newParentId): void
+    {
+        $data = [
+            'name' => $category->name,
+            'description' => $category->description,
+            'parent_id' => $newParentId,
+            'status' => 'inactive',
+            'site_id' => $category->site_id,
+            'seo_title' => $category->seo_title,
+            'seo_description' => $category->seo_description,
+            'no_index' => $category->no_index ?? false,
+            'canonical_url' => null,
+            'color' => $category->color,
+            'icon' => $category->icon,
+            'sort_order' => $category->sort_order,
+            'is_active' => false,
+        ];
+
+        // Generate unique slug
+        $baseName = $data['name'];
+        $slug = Str::slug($baseName);
+        $counter = 1;
+
+        while ($this->repository->findBySlug($slug)) {
+            $slug = Str::slug($baseName . '-' . $counter);
+            $counter++;
+        }
+
+        $data['slug'] = $slug;
+
+        $newCategory = $this->repository->create($data);
+
+        // Recursively duplicate children
+        $children = $category->children();
+        foreach ($children as $child) {
+            $this->duplicateCategoryRecursive($child, $newCategory->id);
+        }
     }
 }

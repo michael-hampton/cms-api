@@ -132,6 +132,12 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn(true);
 
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
         $result = $this->service->deleteProduct(1);
 
         $this->assertTrue($result);
@@ -263,6 +269,12 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(true);
 
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
         $result = $this->service->deleteProduct(1);
 
         $this->assertTrue($result);
@@ -323,7 +335,8 @@ class ProductServiceTest extends FunctionalTestCase
             'sale_price' => 899.99,
             'brand_id' => 5,
             'category_id' => 10,
-            'slug' => 'iphone-15'
+            'slug' => 'iphone-15',
+            'site_id' => 1,
         ]);
 
         $this->repository
@@ -333,8 +346,8 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn($originalProduct);
 
         $this->repository
-            ->shouldReceive('findBySlug')
-            ->with('iphone-15-copy')
+            ->shouldReceive('findBySlugAndSite')
+            ->with('iphone-15-copy', 1)
             ->once()
             ->andReturn(null);
 
@@ -373,7 +386,8 @@ class ProductServiceTest extends FunctionalTestCase
             'id' => 1,
             'name' => 'Product',
             'image' => null,
-            'slug' => 'product'
+            'slug' => 'product',
+            'site_id' => 1,
         ]);
 
         $this->repository
@@ -383,8 +397,9 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn($originalProduct);
 
         $this->repository
-            ->shouldReceive('findBySlug')
+            ->shouldReceive('findBySlugAndSite')
             ->once()
+            ->with('product-copy', 1)
             ->andReturn(null);
 
         $this->imageUploadService
@@ -408,7 +423,8 @@ class ProductServiceTest extends FunctionalTestCase
             'id' => 1,
             'name' => 'Product',
             'image' => 'products/test.jpg',
-            'slug' => 'product'
+            'slug' => 'product',
+            'site_id' => 1,
         ]);
 
         $this->repository
@@ -423,8 +439,9 @@ class ProductServiceTest extends FunctionalTestCase
             ->andThrow(new \Exception('File error'));
 
         $this->repository
-            ->shouldReceive('findBySlug')
+            ->shouldReceive('findBySlugAndSite')
             ->once()
+            ->with('product-copy', 1)
             ->andReturn(null);
 
         $this->repository
@@ -787,6 +804,12 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn(new Collection([]));
 
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
         $this->imageUploadService->shouldNotReceive('delete');
 
         $this->repository->shouldReceive('delete')
@@ -818,6 +841,12 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->with('main.jpg');
 
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
+
         $this->repository->shouldReceive('delete')
             ->with(1)
             ->andReturn(true);
@@ -845,6 +874,12 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('delete')
             ->with(1)
             ->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
 
         $this->repository->shouldReceive('deletePriceHistory')
             ->with(1)
@@ -911,6 +946,7 @@ class ProductServiceTest extends FunctionalTestCase
             'category_id' => 10,
             'slug' => 'original-product',
             'image' => null,
+            'site_id' => 1
         ]);
 
         $this->repository->shouldReceive('find')
@@ -918,8 +954,8 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($original);
 
-        $this->repository->shouldReceive('findBySlug')
-            ->with('original-product-copy')
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->with('original-product-copy', 1)
             ->once()
             ->andReturn(null);
 
@@ -951,10 +987,11 @@ class ProductServiceTest extends FunctionalTestCase
             'id' => 1,
             'name' => 'Product',
             'slug' => 'product',
+            'site_id' => 1
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
-        $this->repository->shouldReceive('findBySlug')->with('custom-name')->andReturn(null);
+        $this->repository->shouldReceive('findBySlugAndSite')->with('custom-name', 1)->andReturn(null);
 
         $newProduct = new Product(['id' => 2, 'name' => 'Custom Name']);
 
@@ -982,10 +1019,16 @@ class ProductServiceTest extends FunctionalTestCase
             'name' => 'Product',
             'slug' => 'product',
             'image' => 'products/original.jpg',
+            'site_id' => 1
         ]);
 
-        $this->repository->shouldReceive('find')->with(1)->andReturn($original);
-        $this->repository->shouldReceive('findBySlug')->andReturn(null);
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($original);
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->once()
+            ->with('product-copy', 1)
+            ->andReturn(null);
 
         $this->imageUploadService->shouldReceive('duplicate')
             ->with('products/original.jpg')
@@ -1013,7 +1056,7 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithAllRelations()
     {
-        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product']);
+        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => 1]);
 
         $images = new Collection([
             new ProductImage(['url' => 'img1.jpg', 'alt' => 'Alt 1', 'is_primary' => true, 'sort_order' => 0]),
@@ -1032,7 +1075,10 @@ class ProductServiceTest extends FunctionalTestCase
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
-        $this->repository->shouldReceive('findBySlug')->andReturn(null);
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->once()
+            ->with('product-copy', 1)
+            ->andReturn(null);
 
         $newProduct = new Product(['id' => 2]);
         $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
@@ -1077,23 +1123,26 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductHandlesSlugCollision()
     {
-        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product']);
+        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => 1]);;
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
 
         // First attempt - collision
-        $this->repository->shouldReceive('findBySlug')
-            ->with('product-copy')
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->once()
+            ->with('product-copy', 1)
             ->andReturn(new Product(['slug' => 'product-copy']));
 
         // Second attempt - collision
-        $this->repository->shouldReceive('findBySlug')
-            ->with('product-copy-1')
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->once()
+            ->with('product-copy-1', 1)
             ->andReturn(new Product(['slug' => 'product-copy-1']));
 
         // Third attempt - available
-        $this->repository->shouldReceive('findBySlug')
-            ->with('product-copy-2')
+        $this->repository->shouldReceive('findBySlugAndSite')
+            ->once()
+            ->with('product-copy-2', 1)
             ->andReturn(null);
 
         $newProduct = new Product(['id' => 2, 'slug' => 'product-copy-2']);
@@ -1183,6 +1232,12 @@ class ProductServiceTest extends FunctionalTestCase
         $this->imageUploadService->shouldReceive('delete')
             ->with('img1.jpg')
             ->once();
+
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
 
         $this->imageUploadService->shouldReceive('delete')
             ->with('img2.jpg')
@@ -1297,6 +1352,12 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('find')->andReturn($product);
         $this->repository->shouldReceive('getImages')->andReturn(collect([]));
         $this->repository->shouldReceive('delete')->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getVariants')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([]));
 
         $this->repository->shouldReceive('deletePriceHistory')->once();
 
@@ -1493,5 +1554,185 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->assertInstanceOf(Product::class, $result);
     }
+
+    public function testCreateProductWithVariantsAndImages()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'variants' => [
+                [
+                    'sku' => 'VAR-001',
+                    'attributes' => ['color' => 'Red'],
+                    'price_modifier' => 0,
+                    'is_active' => true,
+                    'images' => [
+                        ['url' => 'var-img1.jpg', 'alt' => 'Variant Image 1', 'is_primary' => true, 'sort_order' => 0],
+                        ['url' => 'var-img2.jpg', 'alt' => 'Variant Image 2', 'is_primary' => false, 'sort_order' => 1],
+                    ]
+                ],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->with(1, Mockery::on(function($variants) {
+                return count($variants) === 1
+                    && isset($variants[0]['images'])
+                    && count($variants[0]['images']) === 2;
+            }))
+            ->andReturn([1]);
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testUpdateProductWithVariantImages()
+    {
+        $product = new Product(['id' => 1, 'name' => 'Product']);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
+
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->with(1, Mockery::on(function($variants) {
+                return isset($variants[0]['images']) && count($variants[0]['images']) === 1;
+            }))
+            ->andReturn([1]);
+
+        $data = [
+            'name' => 'Updated Product',
+            'variants' => [
+                [
+                    'sku' => 'VAR-002',
+                    'attributes' => [],
+                    'price_modifier' => 5,
+                    'is_active' => true,
+                    'images' => [
+                        ['url' => 'updated-var-img.jpg', 'alt' => 'Updated', 'is_primary' => true, 'sort_order' => 0],
+                    ]
+                ],
+            ]
+        ];
+
+        $result = $this->service->updateProduct(1, $data);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testDeleteProductDeletesVariantImages()
+    {
+        $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'main.jpg']);
+
+        $variant = new ProductVariant(['id' => 1, 'sku' => 'VAR-001']);
+        $variant->setRelation('images', collect([
+            new ProductImage(['url' => 'var-img1.jpg']),
+            new ProductImage(['url' => 'var-img2.jpg']),
+        ]));
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+        $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn(collect([$variant]));
+
+        $this->repository->shouldReceive('deleteVariantImages')
+            ->with(1)
+            ->andReturn(true);
+
+        $this->repository->shouldReceive('getVariantImages')
+            ->with(1)
+            ->andReturn(collect([
+                new ProductImage(['url' => 'var-img1.jpg']),
+                new ProductImage(['url' => 'var-img2.jpg']),
+            ]));
+
+        $this->imageUploadService->shouldReceive('delete')
+            ->with('main.jpg')
+            ->once();
+
+        $this->imageUploadService->shouldReceive('delete')
+            ->with('var-img1.jpg')
+            ->once();
+
+        $this->imageUploadService->shouldReceive('delete')
+            ->with('var-img2.jpg')
+            ->once();
+
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->with(1)
+            ->andReturn(new ProductPriceHistory());
+
+        $this->repository->shouldReceive('delete')
+            ->with(1)
+            ->andReturn(true);
+
+        $result = $this->service->deleteProduct(1);
+
+        $this->assertTrue($result);
+    }
+
+    public function testDuplicateProductWithVariantImages()
+    {
+        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => $this->siteId]);;
+
+        $variantImage1 = new ProductImage(['url' => 'var-img1.jpg', 'alt' => 'Var 1', 'is_primary' => true, 'sort_order' => 0]);
+        $variantImage2 = new ProductImage(['url' => 'var-img2.jpg', 'alt' => 'Var 2', 'is_primary' => false, 'sort_order' => 1]);
+
+        $variant = new ProductVariant([
+            'sku' => 'VAR-001',
+            'attributes' => ['color' => 'Red'],
+            'price_modifier' => 0,
+            'is_active' => true
+        ]);
+        $variant->setRelation('images', collect([$variantImage1, $variantImage2]));
+
+        $variants = new Collection([$variant]);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($original);
+        $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
+
+        $newProduct = new Product(['id' => 2]);
+        $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
+
+        $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getMerchants')->with(1)->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn($variants);
+        $this->repository->shouldReceive('getSpecifications')->with(1)->andReturn(new Collection([]));
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->with('var-img1.jpg')
+            ->andReturn('var-img1-copy.jpg');
+
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->with('var-img2.jpg')
+            ->andReturn('var-img2-copy.jpg');
+
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->with(2, Mockery::on(function($data) {
+                return count($data) === 1
+                    && $data[0]['sku'] === 'VAR-001-COPY'
+                    && count($data[0]['images']) === 2
+                    && $data[0]['images'][0]['url'] === 'var-img1-copy.jpg'
+                    && $data[0]['images'][1]['url'] === 'var-img2-copy.jpg';
+            }))
+            ->andReturn([1]);
+
+        $result = $this->service->duplicateProduct(1);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
+
 
 }

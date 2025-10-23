@@ -215,6 +215,18 @@ class ProductService
             $this->deleteImage($image->url);
         }
 
+        // Delete variant images
+        $variants = $this->repository->getVariants($id);
+        foreach ($variants as $variant) {
+            $variantImages = $this->repository->getVariantImages($variant->id);
+
+            $this->repository->deleteVariantImages($variant->id);
+
+            foreach ($variantImages as $image) {
+                $this->deleteImage($image->url);
+            }
+        }
+
         // Delete price history
         $this->repository->deletePriceHistory($id);
 
@@ -443,12 +455,33 @@ class ProductService
         // Duplicate variants if selected
         if ($cloneRelations['variants']) {
             $variants = $this->repository->getVariants($originalId);
-            $variantData = $variants->map(fn($v) => [
-                'sku' => $v->sku . '-COPY',
-                'attributes' => $v->attributes,
-                'price_modifier' => $v->price_modifier,
-                'is_active' => false, // Set to inactive by default
-            ])->toArray();
+            $variantData = $variants->map(function($v) {
+                $imageData = [];
+
+                // Duplicate variant images
+                if ($v->images) {
+                    foreach ($v->images as $image) {
+                        $newImageUrl = $this->duplicateImage($image->url);
+                        if ($newImageUrl) {
+                            $imageData[] = [
+                                'url' => $newImageUrl,
+                                'alt' => $image->alt,
+                                'is_primary' => $image->is_primary,
+                                'sort_order' => $image->sort_order,
+                            ];
+                        }
+                    }
+                }
+
+                return [
+                    'sku' => $v->sku . '-COPY',
+                    'attributes' => $v->attributes,
+                    'price_modifier' => $v->price_modifier,
+                    'is_active' => false,
+                    'images' => $imageData,
+                ];
+            })->toArray();
+
             if (!empty($variantData)) {
                 $this->repository->syncVariants($newId, $variantData);
             }

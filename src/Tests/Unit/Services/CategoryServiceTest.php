@@ -99,6 +99,10 @@ class CategoryServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($author);
 
+        $author->shouldReceive('children')
+            ->once()
+            ->andReturn(collect([]));
+
         $this->categoryRepository->shouldReceive('find')
             ->with($reassignAuthorId)
             ->once()
@@ -220,6 +224,130 @@ class CategoryServiceTest extends FunctionalTestCase
                 return $data['slug'] === 'technology-copy-1';
             }))
             ->andReturn(new Category(['id' => 2]));
+
+        $result = $this->service->duplicateCategory(1);
+
+        $this->assertTrue($result);
+    }
+
+    public function testCannotDeleteCategoryWithChildren(): void
+    {
+        $parent = Mockery::mock(Category::class);
+        $childrenCollection = Mockery::mock(Collection::class);
+
+        $this->categoryRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($parent);
+
+        $parent->shouldReceive('children')
+            ->once()
+            ->andReturn($childrenCollection);
+
+        $childrenCollection->shouldReceive('count')
+            ->once()
+            ->andReturn(2);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot delete category with 2 subcategories');
+
+        $this->service->delete(1);
+    }
+
+    public function testCheckDeletableReturnsChildrenCount(): void
+    {
+        $category = Mockery::mock(Category::class);
+        $pagesCollection = Mockery::mock(Collection::class);
+        $childrenCollection = Mockery::mock(Collection::class);
+
+        $this->categoryRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($category);
+
+        $category->shouldReceive('pages')
+            ->once()
+            ->andReturn($pagesCollection);
+
+        $category->shouldReceive('children')
+            ->once()
+            ->andReturn($childrenCollection);
+
+        $pagesCollection->shouldReceive('count')
+            ->once()
+            ->andReturn(0);
+
+        $childrenCollection->shouldReceive('count')
+            ->once()
+            ->andReturn(3);
+
+        $result = $this->service->checkDeletable(1);
+
+        $this->assertFalse($result['can_delete']);
+        $this->assertEquals(3, $result['children_count']);
+        $this->assertTrue($result['has_children']);
+    }
+
+    public function testDuplicateCategoryWithChildren(): void
+    {
+        $mockCategory = Mockery::mock(Category::class)->makePartial();
+        $mockCategory->id = 1;
+
+        $child1 = Mockery::mock(Category::class)->makePartial();
+        $child1->id = 2;
+        $child1->parent_id = 1;
+        $child1->name = 'Test1';
+
+        $child2 = Mockery::mock(Category::class)->makePartial();
+        $child2->id = 3;
+        $child2->parent_id = 1;
+        $child2->name = 'Test2';
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->categoryRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($mockCategory);
+
+        $this->categoryRepository
+            ->shouldReceive('findBySlug')
+            ->andReturn(null);
+
+        $newParent = new Category([
+            'id' => 10,
+            'name' => 'Technology (Copy)',
+            'slug' => 'technology-copy'
+        ]);
+
+        $this->categoryRepository
+            ->shouldReceive('create')
+            ->times(3) // parent + 2 children
+            ->andReturn($newParent, new Category(['id' => 11]), new Category(['id' => 12]));
+
+
+        // Mock children() to return collection
+        $childrenMock = Mockery::mock(Collection::class);
+        $childrenMock->shouldReceive('getIterator')
+            ->andReturn(new \ArrayIterator([$child1, $child2]));
+
+        $mockCategory->shouldReceive('children')
+            ->once()
+            ->andReturn($childrenMock);
+
+        // Mock for recursive children (no grandchildren)
+        $emptyChildren = Mockery::mock(Collection::class);
+        $emptyChildren->shouldReceive('getIterator')
+            ->andReturn(new \ArrayIterator([]));
+
+        $child1->shouldReceive('children')->once()->andReturn($emptyChildren);
+        $child2->shouldReceive('children')->once()->andReturn($emptyChildren);
 
         $result = $this->service->duplicateCategory(1);
 

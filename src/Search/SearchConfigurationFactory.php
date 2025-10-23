@@ -14,6 +14,53 @@ use App\Search\Filters\RelationshipFilter;
 
 class SearchConfigurationFactory
 {
+    public static function createOrderConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration(Order::class);
+
+        // Filters
+        $config->addFilter(new InFilter('status', 'status'))
+            ->addFilter(new InFilter('payment_status', 'payment_status'))
+            ->addFilter(new EqualsFilter('user_id', 'user_id'))
+            ->addFilter(new RangeFilter('total', 'total'))
+            ->addFilter(new RangeFilter('subtotal', 'subtotal'))
+            ->addFilter(new RangeFilter('tax', 'tax'))
+            ->addFilter(new RangeFilter('shipping', 'shipping'))
+            ->addFilter(new RangeFilter('discount', 'discount'))
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'))
+            ->addFilter(new DateRangeFilter('completed_at', 'completed_at'))
+            ->addFilter(new DateRangeFilter('cancelled_at', 'cancelled_at'));
+
+        self::applyMandatoryFilters($config);
+
+        // Sorts
+        $config->addSort(new SortSpecification('order_number', 'order_number'))
+            ->addSort(new SortSpecification('status', 'status'))
+            ->addSort(new SortSpecification('payment_status', 'payment_status'))
+            ->addSort(new SortSpecification('total', 'total'))
+            ->addSort(new SortSpecification('subtotal', 'subtotal'))
+            ->addSort(new SortSpecification('date_created', 'created_at'))
+            ->addSort(new SortSpecification('date_updated', 'updated_at'))
+            ->addSort(new SortSpecification('date_completed', 'completed_at'))
+            ->addSort(new SortSpecification('date_cancelled', 'cancelled_at'));
+
+        // Searchable columns
+        $config->addSearchableColumn('order_number')
+            ->addSearchableColumn('status')
+            ->addSearchableColumn('payment_status')
+            ->addSearchableColumn('shipping_address')
+            ->addSearchableColumn('billing_address')
+            ->addSearchableColumn('customer_notes')
+            ->addSearchableColumn('admin_notes');
+
+
+        // Default sort
+        $config->setDefaultSort('date_created', 'desc');
+
+        return $config;
+    }
+
     public static function createVoucherConfiguration(): SearchConfiguration
     {
         $config = new SearchConfiguration();
