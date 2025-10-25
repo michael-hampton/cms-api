@@ -310,6 +310,7 @@ class SiteContext
     public static function css(): string
     {
         $theme = self::getTheme();
+
         return "/themes/{$theme}.css";
     }
 

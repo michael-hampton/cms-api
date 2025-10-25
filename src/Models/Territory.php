@@ -9,7 +9,7 @@ class Territory extends Model
     protected $table = 'territories';
 
     protected $fillable = [
-        'name', 'code', 'region_set_id', 'is_active', 'sort_order', 'site_id'
+        'name', 'code', 'region_set_id', 'is_active', 'sort_order', 'site_id', 'slug'
     ];
 
     protected $casts = [

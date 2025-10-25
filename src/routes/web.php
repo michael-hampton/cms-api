@@ -10,6 +10,7 @@ use App\Controllers\EventController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
+use App\Controllers\RegionContentController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
 use App\Framework\Container;
@@ -113,3 +114,7 @@ $router->group(['middleware' => [RequireMemberAuth::class]], function($router) {
 // Apply page member access check to content routes
 $router->get('/{slug}', [ContentController::class, 'show'])
     ->middleware([CheckPageMemberAccess::class]);
+
+$router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
+    ->middleware([CheckPageMemberAccess::class]);
+    //->where('regionSlug', 'asia-pacific|europe|americas');
