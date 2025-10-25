@@ -15,7 +15,7 @@ use App\Repositories\BlockRepository;
 use App\Repositories\CategoryRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
-use App\Services\BlockParserService;
+use App\Parsers\BlockParserService;
 
 class TravelMagazineSeeder extends Seeder
 {

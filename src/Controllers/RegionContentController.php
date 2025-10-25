@@ -5,7 +5,9 @@ namespace App\Controllers;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
+use App\Models\PageGrid;
 use App\Models\Territory;
+use App\Parsers\PageGridRenderer;
 use App\Repositories\CommentRepository;
 use App\Services\BlockParserService;
 
@@ -36,6 +38,19 @@ class RegionContentController extends Controller
             })
             ->with(['blocks', 'categories', 'tags', 'metadata', 'seo', 'settings', 'social', 'customFields', 'authors'])
             ->first();
+
+        // Get page grid for this territory
+        $pageGrid = PageGrid::where('is_active', true)
+            ->whereHas('territories', function($query) use ($territory) {
+                $query->where('territories.id', $territory->id);
+            })
+            ->first();
+
+        $pageGridHtml = null;
+        if ($pageGrid) {
+            // Pass the territory to the renderer
+            $pageGridHtml = (new PageGridRenderer())->render($pageGrid, $territory);
+        }
 
         // Get region-specific menu
         $menu = Menu::where('is_active', true)
@@ -71,6 +86,7 @@ class RegionContentController extends Controller
 
         $data = [
             'menu' => $menu,
+            'pageGridHtml' => $pageGridHtml,
             'footerMenu' => $footerMenu,
             'page' => $page,
             'territory' => $territory,

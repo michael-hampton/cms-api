@@ -11,6 +11,8 @@ use App\Search\SearchCriteria;
 use App\Services\VideoService;
 use App\Services\VideoUploadService;
 use Exception;
+use Mockery;
+use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Constraint\IsInstanceOf;
 use PHPUnit\Framework\TestCase;
 
@@ -35,11 +37,9 @@ class VideoServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        // Mock dependencies using PHPUnit's createMock
-        $this->videoRepository = $this->createMock(VideoRepository::class);
-        $this->videoUploadService = $this->createMock(VideoUploadService::class);
+        $this->videoRepository = Mockery::mock(VideoRepository::class);
+        $this->videoUploadService = Mockery::mock(VideoUploadService::class);
 
-        // Instantiate the service with mocked dependencies (Dependency Injection)
         $this->videoService = new VideoService(
             $this->videoRepository,
             $this->videoUploadService
@@ -51,14 +51,14 @@ class VideoServiceTest extends TestCase
     public function testUploadVideoSuccess()
     {
         // Arrange
-        $uploadedFileMock = $this->createMock(UploadedFile::class);
-        $videoModelMock = $this->createMock(Video::class);
+        $uploadedFileMock = Mockery::mock(UploadedFile::class);
+        $videoModelMock = Mockery::mock(Video::class);
 
         // Mock UploadedFile methods for validation
-        $uploadedFileMock->method('isValid')->willReturn(true);
-        $uploadedFileMock->method('getSize')->willReturn(10 * 1024 * 1024); // 10MB
-        $uploadedFileMock->method('getMimeType')->willReturn('video/mp4');
-        $uploadedFileMock->method('getClientOriginalName')->willReturn('test_video.mp4');
+        $uploadedFileMock->shouldReceive('isValid')->andReturn(true);
+        $uploadedFileMock->shouldReceive('getSize')->andReturn(10 * 1024 * 1024); // 10MB
+        $uploadedFileMock->shouldReceive('getMimeType')->andReturn('video/mp4');
+        $uploadedFileMock->shouldReceive('getClientOriginalName')->andReturn('test_video.mp4');
 
         $uploadResult = [
             'path' => '2025-10-08/unique_filename.mp4',
@@ -73,30 +73,29 @@ class VideoServiceTest extends TestCase
         $metadata = ['title' => 'My Video', 'description' => 'A test video'];
 
         // Expect calls to VideoUploadService and VideoRepository
-        $this->videoUploadService->expects($this->once())
-            ->method('upload')
+        $this->videoUploadService->shouldReceive('upload')
+            ->once()
             ->with($uploadedFileMock)
-            ->willReturn($uploadResult);
+            ->andReturn($uploadResult);
 
         $expectedVideoData = [
             'filename' => 'unique_filename.mp4',
             'original_name' => 'test_video.mp4',
             'file_path' => 'videos/2025-10-08/unique_filename.mp4',
-            'url' => 'http://localhost/uploads/videos/2025-10-08/unique_filename.mp4',
-            'mime_type' => 'video/mp4',
-            'file_size' => 10485760,
+            'url' => '/uploads/videos/2025-10-08/unique_filename.mp4',
+            'mime_type' => 'video/mp4', 'file_size' => 10485760,
             'duration' => 120.5,
             'width' => 1920,
             'height' => 1080,
-            'thumbnails' => json_encode($uploadResult['thumbnails']),
+            'thumbnails' => '["\/tests\/uploads\/thumbnails\/path\/thumb_1.jpg"]',
             'title' => 'My Video',
-            'description' => 'A test video',
+            'description' => 'A test video'
         ];
 
-        $this->videoRepository->expects($this->once())
-            ->method('create')
+        $this->videoRepository->shouldReceive('create')
+            ->once()
             ->with($expectedVideoData)
-            ->willReturn($videoModelMock);
+            ->andReturn($videoModelMock);
 
         // Act
         $result = $this->videoService->uploadVideo($uploadedFileMock, $metadata);
@@ -108,8 +107,8 @@ class VideoServiceTest extends TestCase
     public function testUploadVideoFailsOnInvalidFile()
     {
         // Arrange
-        $uploadedFileMock = $this->createMock(UploadedFile::class);
-        $uploadedFileMock->method('isValid')->willReturn(false);
+        $uploadedFileMock = Mockery::mock(UploadedFile::class);
+        $uploadedFileMock->shouldReceive('isValid')->andReturn(false);
 
         // Expect a ValidationException
         $this->expectException(ValidationException::class);
@@ -122,9 +121,9 @@ class VideoServiceTest extends TestCase
     public function testUploadVideoFailsOnFileSize()
     {
         // Arrange
-        $uploadedFileMock = $this->createMock(UploadedFile::class);
-        $uploadedFileMock->method('isValid')->willReturn(true);
-        $uploadedFileMock->method('getSize')->willReturn(100 * 1024 * 1024 + 1); // Too large
+        $uploadedFileMock = Mockery::mock(UploadedFile::class);
+        $uploadedFileMock->shouldReceive('isValid')->andReturn(true);
+        $uploadedFileMock->shouldReceive('getSize')->andReturn(100 * 1024 * 1024 + 1); // Too large
 
         // Expect a ValidationException
         $this->expectException(ValidationException::class);
@@ -137,10 +136,11 @@ class VideoServiceTest extends TestCase
     public function testUploadVideoFailsOnMimeType()
     {
         // Arrange
-        $uploadedFileMock = $this->createMock(UploadedFile::class);
-        $uploadedFileMock->method('isValid')->willReturn(true);
-        $uploadedFileMock->method('getSize')->willReturn(10 * 1024 * 1024);
-        $uploadedFileMock->method('getMimeType')->willReturn('application/pdf'); // Invalid MIME type
+        $uploadedFileMock = Mockery::mock(UploadedFile::class);
+        $uploadedFileMock->shouldReceive('isValid')->andReturn(true);
+        $uploadedFileMock->shouldReceive('getFileInfo')->andReturn([]);
+        $uploadedFileMock->shouldReceive('getSize')->andReturn(10 * 1024 * 1024);
+        $uploadedFileMock->shouldReceive('getMimeType')->andReturn('application/pdf'); // Invalid MIME type
 
         // Expect a ValidationException
         $this->expectException(ValidationException::class);
@@ -152,7 +152,7 @@ class VideoServiceTest extends TestCase
 
     public function testGetVideosCallsRepositorySearchWithCorrectCriteria()
     {
-        // Arrange: Define all expected variables first
+        // Arrange
         $filters = [
             'mime_type' => 'video/mp4',
             'sort_by' => 'title',
@@ -161,7 +161,7 @@ class VideoServiceTest extends TestCase
             'per_page' => 50,
             'query' => 'test search'
         ];
-        $paginatedResultMock = $this->createMock(PaginatedResult::class);
+        $paginatedResultMock = Mockery::mock(PaginatedResult::class);
 
         // Define the expected criteria object fields
         $expectedFilters = ['mime_type' => 'video/mp4'];
@@ -171,18 +171,12 @@ class VideoServiceTest extends TestCase
         $expectedPerPage = 50;
         $expectedQuery = 'test search';
 
-        // Create a constraint that verifies the internal state of the SearchCriteria object.
-        $criteriaConstraint = $this->logicalAnd(
-        // 1. Ensure the object is the correct class
-            new IsInstanceOf(SearchCriteria::class),
-
-            // 2. Use a simpler callback *only* to assert properties
-            $this->callback(function (SearchCriteria $criteria) use (
-                // Use clause ensures variables are available inside the closure
+        // Use Mockery's on() for the constraint
+        $this->videoRepository->shouldReceive('search')
+            ->once()
+            ->with(Mockery::on(function (SearchCriteria $criteria) use (
                 $expectedFilters, $expectedSortBy, $expectedSortOrder, $expectedPage, $expectedPerPage, $expectedQuery
             ) {
-                // Assert all properties *inside* the callback
-                // Assuming SearchCriteria has getter methods
                 $this->assertSame($expectedFilters, $criteria->getFilters(), 'Filters mismatch');
                 $this->assertSame($expectedSortBy, $criteria->getSortBy(), 'SortBy mismatch');
                 $this->assertSame($expectedSortOrder, $criteria->getSortOrder(), 'SortOrder mismatch');
@@ -190,15 +184,8 @@ class VideoServiceTest extends TestCase
                 $this->assertSame($expectedPerPage, $criteria->getPerPage(), 'PerPage mismatch');
                 $this->assertSame($expectedQuery, $criteria->getSearchQuery(), 'SearchQuery mismatch');
                 return true;
-            })
-        );
-
-        // Expect call to the repository's search method
-        $this->videoRepository->expects($this->once())
-            ->method('search')
-            // Pass the combined constraint to with()
-            ->with($criteriaConstraint)
-            ->willReturn($paginatedResultMock);
+            }))
+            ->andReturn($paginatedResultMock);
 
         // Act
         $result = $this->videoService->getVideos($filters);
@@ -214,16 +201,18 @@ class VideoServiceTest extends TestCase
     {
         // Arrange
         $videoId = 1;
-        $videoModelMock = $this->createMock(Video::class);
-        $videoModelMock->method('isUsed')->willReturn(true); // Usage is irrelevant for soft delete
+        $videoModelMock = Mockery::mock(Video::class);
+        $videoModelMock->shouldReceive('isUsed')->andReturn(true); // Usage is irrelevant for soft delete
 
         // Find the video
-        $this->videoRepository->method('find')->with($videoId)->willReturn($videoModelMock);
+        $this->videoRepository->shouldReceive('find')
+            ->with($videoId)
+            ->andReturn($videoModelMock);
 
         // Expect softDelete call and no delete/videoUploadService::delete calls
-        $videoModelMock->expects($this->once())->method('softDelete')->willReturn(true);
-        $this->videoUploadService->expects($this->never())->method('delete');
-        $videoModelMock->expects($this->never())->method('delete');
+        $videoModelMock->shouldReceive('softDelete')->once()->andReturn(true);
+        $this->videoUploadService->shouldReceive('delete')->never();
+        $videoModelMock->shouldReceive('delete')->never();
 
         // Act
         $result = $this->videoService->deleteVideo($videoId, false);
@@ -279,17 +268,19 @@ class VideoServiceTest extends TestCase
     {
         // Arrange
         $videoId = 3;
-        $videoModelMock = $this->createMock(Video::class);
-        $videoModelMock->method('isUsed')->willReturn(true); // In use
+        $videoModelMock = Mockery::mock(Video::class);
+        $videoModelMock->shouldReceive('isUsed')->andReturn(true); // In use
 
         // Find the video
-        $this->videoRepository->method('find')->with($videoId)->willReturn($videoModelMock);
+        $this->videoRepository->shouldReceive('find')
+            ->with($videoId)
+            ->andReturn($videoModelMock);
 
         // Expect an exception and no delete calls
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Cannot delete video that is currently in use');
-        $this->videoUploadService->expects($this->never())->method('delete');
-        $videoModelMock->expects($this->never())->method('delete');
+        $this->videoUploadService->shouldReceive('delete')->never();
+        $videoModelMock->shouldReceive('delete')->never();
 
         // Act
         $this->videoService->deleteVideo($videoId, true);
@@ -299,7 +290,9 @@ class VideoServiceTest extends TestCase
     {
         // Arrange
         $videoId = 4;
-        $this->videoRepository->method('find')->with($videoId)->willReturn(null);
+        $this->videoRepository->shouldReceive('find')
+            ->with($videoId)
+            ->andReturn(null);
 
         // Expect an exception
         $this->expectException(Exception::class);
@@ -367,11 +360,11 @@ class VideoServiceTest extends TestCase
 
     public function testUploadVideoSuccessfully()
     {
-        $file = $this->createMock(UploadedFile::class);
-        $file->method('isValid')->willReturn(true);
-        $file->method('getSize')->willReturn(50 * 1024 * 1024); // 50MB
-        $file->method('getMimeType')->willReturn('video/mp4');
-        $file->method('getClientOriginalName')->willReturn('test-video.mp4');
+        $file = Mockery::mock(UploadedFile::class)->makePartial();
+        $file->shouldReceive('isValid')->andReturn(true);
+        $file->shouldReceive('getSize')->andReturn(50 * 1024 * 1024); // 50MB
+        $file->shouldReceive('getMimeType')->andReturn('video/mp4');
+        $file->shouldReceive('getClientOriginalName')->andReturn('test-video.mp4');
 
         $uploadResult = [
             'filename' => 'test-video_123.mp4',
@@ -383,34 +376,17 @@ class VideoServiceTest extends TestCase
             'thumbnails' => ['/uploads/thumbnails/thumb1.jpg']
         ];
 
-        $this->videoUploadService
-            ->expects($this->once())
-            ->method('upload')
+        $this->videoUploadService->shouldReceive('upload')
+            ->once()
             ->with($file)
-            ->willReturn($uploadResult);
+            ->andReturn($uploadResult);
 
-        $videoData = [
-            'filename' => 'test-video_123.mp4',
-            'original_name' => 'test-video.mp4',
-            'file_path' => 'videos/2024-01-01/test-video_123.mp4',
-            'url' => $this->anything(),
-            'mime_type' => 'video/mp4',
-            'file_size' => 50 * 1024 * 1024,
-            'duration' => 120.5,
-            'width' => 1920,
-            'height' => 1080,
-            'thumbnails' => json_encode(['/uploads/thumbnails/thumb1.jpg']),
-            'title' => 'Test Video',
-            'description' => 'Test Description'
-        ];
-
-        $video = $this->createMock(Video::class);
+        $video = Mockery::mock(Video::class)->makePartial();
         $video->id = 1;
 
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('create')
-            ->willReturn($video);
+        $this->videoRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($video);
 
         $result = $this->videoService->uploadVideo($file, [
             'title' => 'Test Video',
@@ -418,7 +394,6 @@ class VideoServiceTest extends TestCase
         ]);
 
         $this->assertInstanceOf(Video::class, $result);
-        //$this->assertEquals(1, $result->id);
     }
 
     public function testUploadVideoThrowsExceptionForInvalidFile()
@@ -426,8 +401,8 @@ class VideoServiceTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Invalid file upload');
 
-        $file = $this->createMock(UploadedFile::class);
-        $file->method('isValid')->willReturn(false);
+        $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('isValid')->andReturn(false);
 
         $this->videoService->uploadVideo($file);
     }
@@ -437,9 +412,9 @@ class VideoServiceTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('File size exceeds maximum allowed size');
 
-        $file = $this->createMock(UploadedFile::class);
-        $file->method('isValid')->willReturn(true);
-        $file->method('getSize')->willReturn(150 * 1024 * 1024); // 150MB
+        $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('isValid')->andReturn(true);
+        $file->shouldReceive('getSize')->andReturn(150 * 1024 * 1024); // 150MB
 
         $this->videoService->uploadVideo($file);
     }
@@ -449,38 +424,36 @@ class VideoServiceTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('File type not allowed');
 
-        $file = $this->createMock(UploadedFile::class);
-        $file->method('isValid')->willReturn(true);
-        $file->method('getSize')->willReturn(50 * 1024 * 1024);
-        $file->method('getMimeType')->willReturn('video/webm');
+        $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('getFileInfo')->andReturn([]);
+        $file->shouldReceive('isValid')->andReturn(true);
+        $file->shouldReceive('getSize')->andReturn(50 * 1024 * 1024);
+        $file->shouldReceive('getMimeType')->andReturn('video/webm');
 
         $this->videoService->uploadVideo($file);
     }
 
     public function testGetVideo()
     {
-        $video = $this->createMock(Video::class);
+        $video = Mockery::mock(Video::class)->makePartial();
         $video->id = 1;
 
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('find')
+        $this->videoRepository->shouldReceive('find')
+            ->once()
             ->with(1)
-            ->willReturn($video);
+            ->andReturn($video);
 
         $result = $this->videoService->getVideo(1);
 
         $this->assertInstanceOf(Video::class, $result);
-        //$this->assertEquals(1, $result->id);
     }
 
     public function testGetVideoReturnsNull()
     {
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('find')
+        $this->videoRepository->shouldReceive('find')
+            ->once()
             ->with(999)
-            ->willReturn(null);
+            ->andReturn(null);
 
         $result = $this->videoService->getVideo(999);
 
@@ -489,16 +462,15 @@ class VideoServiceTest extends TestCase
 
     public function testDeleteVideoSoftDelete()
     {
-        $video = $this->createMock(Video::class);
-        $video->expects($this->once())
-            ->method('softDelete')
-            ->willReturn(true);
+        $video = Mockery::mock(Video::class)->makePartial();
+        $video->shouldReceive('softDelete')
+            ->once()
+            ->andReturn(true);
 
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('find')
+        $this->videoRepository->shouldReceive('find')
+            ->once()
             ->with(1)
-            ->willReturn($video);
+            ->andReturn($video);
 
         $result = $this->videoService->deleteVideo(1, false);
 
@@ -539,16 +511,15 @@ class VideoServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Cannot delete video that is currently in use');
 
-        $video = $this->createMock(Video::class);
-        $video->expects($this->once())
-            ->method('isUsed')
-            ->willReturn(true);
+        $video = Mockery::mock(Video::class);
+        $video->shouldReceive('isUsed')
+            ->once()
+            ->andReturn(true);
 
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('find')
+        $this->videoRepository->shouldReceive('find')
+            ->once()
             ->with(1)
-            ->willReturn($video);
+            ->andReturn($video);
 
         $this->videoService->deleteVideo(1, true);
     }
@@ -598,34 +569,34 @@ class VideoServiceTest extends TestCase
 //        $this->assertEquals(2, $result->id);
 //    }
 
+    #[DoesNotPerformAssertions]
     public function testTrackVideoUsage()
     {
-        $video = $this->createMock(Video::class);
-        $video->expects($this->once())
-            ->method('addUsage')
+        $video = Mockery::mock(Video::class);
+        $video->shouldReceive('addUsage')
+            ->once()
             ->with('Product', 123, 'main_video');
 
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('find')
+        $this->videoRepository->shouldReceive('find')
+            ->once()
             ->with(1)
-            ->willReturn($video);
+            ->andReturn($video);
 
         $this->videoService->trackVideoUsage(1, 'Product', 123, 'main_video');
     }
 
+    #[DoesNotPerformAssertions]
     public function testRemoveVideoUsage()
     {
-        $video = $this->createMock(Video::class);
-        $video->expects($this->once())
-            ->method('removeUsage')
+        $video = Mockery::mock(Video::class);
+        $video->shouldReceive('removeUsage')
+            ->once()
             ->with('Product', 123, 'main_video');
 
-        $this->videoRepository
-            ->expects($this->once())
-            ->method('find')
+        $this->videoRepository->shouldReceive('find')
+            ->once()
             ->with(1)
-            ->willReturn($video);
+            ->andReturn($video);
 
         $this->videoService->removeVideoUsage(1, 'Product', 123, 'main_video');
     }

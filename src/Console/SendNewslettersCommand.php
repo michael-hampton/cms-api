@@ -6,9 +6,9 @@ use App\Models\Site;
 use App\Repositories\NewsletterRepository;
 use App\Repositories\NewsletterSendRepository;
 use App\Repositories\SubscriberRepository;
-use App\Services\BlockParserService;
-use App\Services\EmailService;
-use App\Services\NewsletterSendService;
+use App\Parsers\BlockParserService;
+use App\Parsers\EmailService;
+use App\Parsers\NewsletterSendService;
 
 class SendNewslettersCommand
 {

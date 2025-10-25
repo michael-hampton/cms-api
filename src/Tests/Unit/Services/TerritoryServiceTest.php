@@ -25,10 +25,10 @@ class TerritoryServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->database = $this->createMock(Database::class);
-        $this->repository = $this->createMock(TerritoryRepository::class);
-        $this->pageRepository = $this->createMock(PageRepository::class);
-        $this->pageTerritoryRepository = $this->createMock(PageTerritoryRepository::class);
+        $this->database = Mockery::mock(Database::class);
+        $this->repository = Mockery::mock(TerritoryRepository::class);
+        $this->pageRepository = Mockery::mock(PageRepository::class);
+        $this->pageTerritoryRepository = Mockery::mock(PageTerritoryRepository::class);
 
         $this->service = new TerritoryService(
             $this->database,
@@ -43,27 +43,64 @@ class TerritoryServiceTest extends TestCase
         $data = [
             'name' => 'United Kingdom',
             'code' => 'GB',
+            'slug' => 'united-kingdom',
             'region_set_id' => 1,
             'site_id' => 1
         ];
 
-        $this->database->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $mockTerritory = $this->createMock(Territory::class);
+        $mockTerritory = Mockery::mock(Territory::class)->makePartial();
         $mockTerritory->id = 1;
 
-        $this->repository->expects($this->once())
-            ->method('create')
+        $this->repository->shouldReceive('create')
+            ->once()
             ->with($data)
-            ->willReturn($mockTerritory);
+            ->andReturn($mockTerritory);
 
         $result = $this->service->create($data);
 
         $this->assertInstanceOf(Territory::class, $result);
+    }
+
+    public function testCreateTerritoryWithoutSlug()
+    {
+        $data = [
+            'name' => 'United Kingdom',
+            'code' => 'GB',
+            'region_set_id' => 1,
+            'site_id' => 1
+        ];
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $mockTerritory = Mockery::mock(Territory::class)->makePartial();
+        $mockTerritory->id = 1;
+        $mockTerritory->slug = 'united-kingdom';
+
+        $this->repository->shouldReceive('slugExists')
+            ->once()
+            ->andReturn(false);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return isset($data['slug']) && $data['slug'] === 'united-kingdom';
+            }))
+            ->andReturn($mockTerritory);
+
+        $result = $this->service->create($data);
+
+        $this->assertInstanceOf(Territory::class, $result);
+        $this->assertEquals('united-kingdom', $result->slug);
     }
 
     public function testUpdateTerritory()
@@ -74,24 +111,24 @@ class TerritoryServiceTest extends TestCase
             'code' => 'GB'
         ];
 
-        $mockTerritory = $this->createMock(Territory::class);
+        $mockTerritory = Mockery::mock(Territory::class)->makePartial();
         $mockTerritory->id = $territoryId;
 
-        $this->database->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($territoryId)
-            ->willReturn($mockTerritory);
+            ->andReturn($mockTerritory);
 
-        $this->repository->expects($this->once())
-            ->method('update')
+        $this->repository->shouldReceive('update')
+            ->once()
             ->with($territoryId, $data)
-            ->willReturn($mockTerritory);
+            ->andReturn($mockTerritory);
 
         $result = $this->service->update($territoryId, $data);
 
@@ -102,20 +139,20 @@ class TerritoryServiceTest extends TestCase
     {
         $territoryId = 1;
 
-        $mockTerritory = $this->createMock(Territory::class);
-        $mockTerritory->expects($this->once())
-            ->method('getPageCount')
-            ->willReturn(0);
+        $mockTerritory = Mockery::mock(Territory::class)->makePartial();
+        $mockTerritory->shouldReceive('getPageCount')
+            ->once()
+            ->andReturn(0);
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($territoryId)
-            ->willReturn($mockTerritory);
+            ->andReturn($mockTerritory);
 
-        $this->repository->expects($this->once())
-            ->method('delete')
+        $this->repository->shouldReceive('delete')
+            ->once()
             ->with($territoryId)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->delete($territoryId);
 
@@ -126,15 +163,15 @@ class TerritoryServiceTest extends TestCase
     {
         $territoryId = 1;
 
-        $mockTerritory = $this->createMock(Territory::class);
-        $mockTerritory->expects($this->once())
-            ->method('getPageCount')
-            ->willReturn(5);
+        $mockTerritory = Mockery::mock(Territory::class);
+        $mockTerritory->shouldReceive('getPageCount')
+            ->once()
+            ->andReturn(5);
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($territoryId)
-            ->willReturn($mockTerritory);
+            ->andReturn($mockTerritory);
 
         $this->expectException(CannotDeleteException::class);
 
@@ -146,39 +183,36 @@ class TerritoryServiceTest extends TestCase
         $territoryId = 1;
         $reassignToId = 2;
 
-        $mockTerritory = $this->createMock(Territory::class);
+        $mockTerritory = Mockery::mock(Territory::class)->makePartial();
         $mockTerritory->id = $territoryId;
-        $mockTerritory->expects($this->once())
-            ->method('getPageCount')
-            ->willReturn(3);
+        $mockTerritory->shouldReceive('getPageCount')
+            ->once()
+            ->andReturn(3);
 
-        $mockReassignTerritory = $this->createMock(Territory::class);
+        $mockReassignTerritory = Mockery::mock(Territory::class)->makePartial();
         $mockReassignTerritory->id = $reassignToId;
 
-        $this->repository->expects($this->exactly(2))
-            ->method('find')
-            ->willReturnMap([
-                [$territoryId, $mockTerritory],
-                [$reassignToId, $mockReassignTerritory]
-            ]);
+        $this->repository->shouldReceive('find')
+            ->with($territoryId)
+            ->andReturn($mockTerritory);
 
-        $this->database->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->repository->shouldReceive('find')
+            ->with($reassignToId)
+            ->andReturn($mockReassignTerritory);
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $mockTerritory->expects($this->once())
-            ->method('pages')
-            ->willReturnSelf();
+        $mockTerritory->shouldReceive('pages')
+            ->once()
+            ->andReturnSelf();
 
-//        $mockTerritory->expects($this->once())
-//            ->method('get')
-//            ->willReturn(collect([]));
-
-        $mockTerritory->expects($this->once())
-            ->method('delete')
-            ->willReturn(true);
+        $mockTerritory->shouldReceive('delete')
+            ->once()
+            ->andReturn(true);
 
         $result = $this->service->delete($territoryId, $reassignToId);
 
@@ -195,10 +229,10 @@ class TerritoryServiceTest extends TestCase
             'requires_reassignment' => true
         ];
 
-        $this->repository->expects($this->once())
-            ->method('checkDeletable')
+        $this->repository->shouldReceive('checkDeletable')
+            ->once()
             ->with($territoryId)
-            ->willReturn($expectedResult);
+            ->andReturn($expectedResult);
 
         $result = $this->service->checkDeletable($territoryId);
 
@@ -210,10 +244,10 @@ class TerritoryServiceTest extends TestCase
         $territoryIds = [1, 2, 3];
         $newRegionSetId = 5;
 
-        $this->repository->expects($this->once())
-            ->method('bulkUpdateRegionSet')
+        $this->repository->shouldReceive('bulkUpdateRegionSet')
+            ->once()
             ->with($territoryIds, $newRegionSetId)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->bulkUpdateRegionSet($territoryIds, $newRegionSetId);
 
@@ -224,10 +258,10 @@ class TerritoryServiceTest extends TestCase
     {
         $orderedIds = [3, 1, 2];
 
-        $this->repository->expects($this->once())
-            ->method('reorderTerritories')
+        $this->repository->shouldReceive('reorderTerritories')
+            ->once()
             ->with($orderedIds)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->reorder($orderedIds);
 
@@ -291,10 +325,10 @@ class TerritoryServiceTest extends TestCase
             ['id' => 2, 'title' => 'Test Page 2']
         ];
 
-        $this->repository->expects($this->once())
-            ->method('searchAvailablePages')
-            ->with($regionSetId, $searchQuery)
-            ->willReturn($mockPages);
+        $this->repository->shouldReceive('searchAvailablePages')
+            ->once()
+            ->with($regionSetId, $searchQuery, 20, 1)
+            ->andReturn($mockPages);
 
         $service = new TerritoryService(
             $this->database,
@@ -314,14 +348,14 @@ class TerritoryServiceTest extends TestCase
         $territoryId = 1;
         $pageIds = [1, 2];
 
-        $this->database->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->pageTerritoryRepository->expects($this->once())
-            ->method('unassignPages')
+        $this->pageTerritoryRepository->shouldReceive('unassignPages')
+            ->once()
             ->with($territoryId, $pageIds);
 
         $result = $this->service->unassignPages($territoryId, $pageIds);
@@ -336,26 +370,26 @@ class TerritoryServiceTest extends TestCase
 
         $mockPage1 = Mockery::mock(Page::class)->makePartial();
         $mockPage1->id = 1;
-        $mockPage1->territory_id = $territoryId; // Belongs to this territory
+        $mockPage1->territory_id = $territoryId;
 
         $mockPage2 = Mockery::mock(Page::class)->makePartial();
         $mockPage2->id = 2;
-        $mockPage2->territory_id = 2; // Belongs to different territory
+        $mockPage2->territory_id = 2;
 
-        $this->database->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-       $this->pageTerritoryRepository->expects($this->once())
-           ->method('unassignPages')
-           ->with($territoryId, $pageIds)
-           ->willReturn(1);;
+        $this->pageTerritoryRepository->shouldReceive('unassignPages')
+            ->once()
+            ->with($territoryId, $pageIds)
+            ->andReturn(1);
 
         $result = $this->service->unassignPages($territoryId, $pageIds);
 
         $this->assertTrue($result);
-        $this->assertEquals(2, $mockPage2->territory_id); // Should remain unchanged
+        $this->assertEquals(2, $mockPage2->territory_id);
     }
 }

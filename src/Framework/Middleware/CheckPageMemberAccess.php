@@ -18,7 +18,7 @@ class CheckPageMemberAccess
             return $response;
         }
 
-        $needsLogin = (new \App\Services\Url\CheckPageMemberAccess())->handle($request, $page);
+        $needsLogin = (new \App\Parsers\Url\CheckPageMemberAccess())->handle($request, $page);
 
         if ($needsLogin) {
             $message = $page->non_member_message ?? 'This content requires a member login.';

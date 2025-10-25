@@ -151,4 +151,9 @@ class TerritoryRepository extends Repository
             ->orderBy('title')
             ->paginate($perPage, $page);
     }
+
+    public function slugExists(string $slug): bool
+    {
+        return Territory::where('slug', $slug)->exists();
+    }
 }

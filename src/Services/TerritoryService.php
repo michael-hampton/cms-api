@@ -31,6 +31,11 @@ class TerritoryService
     public function create(array $data): Territory
     {
         return $this->database->transaction(function () use ($data) {
+            if (empty($data['slug'])) {
+                $baseSlug = Str::slug($data['name']);
+                $data['slug'] = $this->ensureUniqueSlug($baseSlug);
+            }
+
             return $this->repository->create($data);
         });
     }
@@ -46,6 +51,19 @@ class TerritoryService
 
             return $this->repository->update($territoryId, $data);
         });
+    }
+
+    private function ensureUniqueSlug(string $baseSlug): string
+    {
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while ($this->repository->slugExists($slug)) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
     }
 
     public function delete(int $territoryId, ?int $reassignToTerritoryId = null): bool

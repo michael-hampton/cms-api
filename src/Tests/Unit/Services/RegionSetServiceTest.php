@@ -28,11 +28,11 @@ class RegionSetServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        $this->databaseMock = $this->createMock(Database::class);
-        $this->repository = $this->createMock(RegionSetRepository::class);
-        $this->territoryRepository = $this->createMock(TerritoryRepository::class);
-        $this->pageRepository = $this->createMock(PageRepository::class);
-        $this->pageRegionSetRepository = $this->createMock(PageRegionSetRepository::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->repository = Mockery::mock(RegionSetRepository::class);
+        $this->territoryRepository = Mockery::mock(TerritoryRepository::class);
+        $this->pageRepository = Mockery::mock(PageRepository::class);
+        $this->pageRegionSetRepository = Mockery::mock(PageRegionSetRepository::class);
 
         $this->service = new RegionSetService(
             $this->databaseMock,
@@ -52,25 +52,25 @@ class RegionSetServiceTest extends FunctionalTestCase
             'site_id' => 1
         ];
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $mockRegionSet = $this->createMock(RegionSet::class);
+        $mockRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockRegionSet->id = 1;
 
-        $this->repository->expects($this->once())
-            ->method('findBySlug')
-            ->willReturn(null);
+        $this->repository->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->with($this->callback(function ($data) {
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
                 return $data['slug'] === 'europe';
             }))
-            ->willReturn($mockRegionSet);
+            ->andReturn($mockRegionSet);
 
         $result = $this->service->create($data);
 
@@ -89,21 +89,26 @@ class RegionSetServiceTest extends FunctionalTestCase
             ]
         ];
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
         $mockRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockRegionSet->id = 1;
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn($mockRegionSet);
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($mockRegionSet);
 
-        $this->territoryRepository->expects($this->exactly(2))
-            ->method('create');
+        $this->territoryRepository->shouldReceive('getByRegionSet')
+            ->once()
+            ->with(1)
+            ->andReturn(collect([]));
+
+        $this->territoryRepository->shouldReceive('create')
+            ->twice();
 
         $result = $this->service->create($data);
 
@@ -118,29 +123,29 @@ class RegionSetServiceTest extends FunctionalTestCase
             'description' => 'Updated description'
         ];
 
-        $mockRegionSet = $this->createMock(RegionSet::class);
+        $mockRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockRegionSet->id = $regionSetId;
         $mockRegionSet->name = 'Europe';
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($regionSetId)
-            ->willReturn($mockRegionSet);
+            ->andReturn($mockRegionSet);
 
-        $this->repository->expects($this->once())
-            ->method('findBySlug')
-            ->willReturn(null);
+        $this->repository->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
 
-        $this->repository->expects($this->once())
-            ->method('update')
-            ->with($regionSetId, $this->anything())
-            ->willReturn($mockRegionSet);
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->with($regionSetId, Mockery::any())
+            ->andReturn($mockRegionSet);
 
         $result = $this->service->update($regionSetId, $data);
 
@@ -151,23 +156,23 @@ class RegionSetServiceTest extends FunctionalTestCase
     {
         $regionSetId = 1;
 
-        $mockRegionSet = $this->createMock(RegionSet::class);
-        $mockRegionSet->expects($this->once())
-            ->method('getTerritoryCount')
-            ->willReturn(0);
-        $mockRegionSet->expects($this->once())
-            ->method('getPageCount')
-            ->willReturn(0);
+        $mockRegionSet = Mockery::mock(RegionSet::class);
+        $mockRegionSet->shouldReceive('getTerritoryCount')
+            ->once()
+            ->andReturn(0);
+        $mockRegionSet->shouldReceive('getPageCount')
+            ->once()
+            ->andReturn(0);
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($regionSetId)
-            ->willReturn($mockRegionSet);
+            ->andReturn($mockRegionSet);
 
-        $this->repository->expects($this->once())
-            ->method('delete')
+        $this->repository->shouldReceive('delete')
+            ->once()
             ->with($regionSetId)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->delete($regionSetId);
 
@@ -178,15 +183,15 @@ class RegionSetServiceTest extends FunctionalTestCase
     {
         $regionSetId = 1;
 
-        $mockRegionSet = $this->createMock(RegionSet::class);
-        $mockRegionSet->expects($this->once())
-            ->method('getTerritoryCount')
-            ->willReturn(5);
+        $mockRegionSet = Mockery::mock(RegionSet::class)->makePartial();
+        $mockRegionSet->shouldReceive('getTerritoryCount')
+            ->once()
+            ->andReturn(5);
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($regionSetId)
-            ->willReturn($mockRegionSet);
+            ->andReturn($mockRegionSet);
 
         $this->expectException(CannotDeleteException::class);
 
@@ -198,46 +203,43 @@ class RegionSetServiceTest extends FunctionalTestCase
         $regionSetId = 1;
         $reassignToId = 2;
 
-        $mockRegionSet = $this->createMock(RegionSet::class);
+        $mockRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockRegionSet->id = $regionSetId;
-        $mockRegionSet->expects($this->once())
-            ->method('getTerritoryCount')
-            ->willReturn(3);
-        $mockRegionSet->expects($this->once())
-            ->method('getPageCount')
-            ->willReturn(2);
+        $mockRegionSet->shouldReceive('getTerritoryCount')
+            ->once()
+            ->andReturn(3);
+        $mockRegionSet->shouldReceive('getPageCount')
+            ->once()
+            ->andReturn(2);
 
-        $mockReassignRegionSet = $this->createMock(RegionSet::class);
+        $mockReassignRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockReassignRegionSet->id = $reassignToId;
 
-        $this->repository->expects($this->exactly(2))
-            ->method('find')
-            ->willReturnMap([
-                [$regionSetId, $mockRegionSet],
-                [$reassignToId, $mockReassignRegionSet]
-            ]);
+        $this->repository->shouldReceive('find')
+            ->with($regionSetId)
+            ->andReturn($mockRegionSet);
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->repository->shouldReceive('find')
+            ->with($reassignToId)
+            ->andReturn($mockReassignRegionSet);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->territoryRepository->expects($this->once())
-            ->method('getByRegionSet')
-            ->willReturn(collect([]));
+        $this->territoryRepository->shouldReceive('getByRegionSet')
+            ->once()
+            ->andReturn(collect([]));
 
-        $mockRegionSet->expects($this->once())
-            ->method('pages')
-            ->willReturnSelf();
+        $mockRegionSet->shouldReceive('pages')
+            ->once()
+            ->andReturnSelf();
 
-//        $mockRegionSet->expects($this->once())
-//            ->method('get')
-//            ->willReturn(collect([]));
-
-        $mockRegionSet->expects($this->once())
-            ->method('delete')
-            ->willReturn(true);
+        $mockRegionSet->shouldReceive('delete')
+            ->once()
+            ->andReturn(true);
 
         $result = $this->service->delete($regionSetId, $reassignToId);
 
@@ -255,10 +257,10 @@ class RegionSetServiceTest extends FunctionalTestCase
             'requires_reassignment' => true
         ];
 
-        $this->repository->expects($this->once())
-            ->method('checkDeletable')
+        $this->repository->shouldReceive('checkDeletable')
+            ->once()
             ->with($regionSetId)
-            ->willReturn($expectedResult);
+            ->andReturn($expectedResult);
 
         $result = $this->service->checkDeletable($regionSetId);
 
@@ -270,33 +272,33 @@ class RegionSetServiceTest extends FunctionalTestCase
         $regionSetId = 1;
         $newName = 'Europe Copy';
 
-        $mockOriginalRegionSet = $this->createMock(RegionSet::class);
+        $mockOriginalRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockOriginalRegionSet->id = $regionSetId;
         $mockOriginalRegionSet->name = 'Europe';
         $mockOriginalRegionSet->description = 'European region';
         $mockOriginalRegionSet->site_id = 1;
 
-        $mockNewRegionSet = $this->createMock(RegionSet::class);
+        $mockNewRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockNewRegionSet->id = 2;
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->repository->expects($this->once())
-            ->method('findWithRelations')
+        $this->repository->shouldReceive('findWithRelations')
+            ->once()
             ->with($regionSetId)
-            ->willReturn($mockOriginalRegionSet);
+            ->andReturn($mockOriginalRegionSet);
 
-        $this->repository->expects($this->once())
-            ->method('findBySlug')
-            ->willReturn(null);
+        $this->repository->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn($mockNewRegionSet);
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($mockNewRegionSet);
 
         $mockOriginalRegionSet->territories = collect([]);
 
@@ -309,10 +311,10 @@ class RegionSetServiceTest extends FunctionalTestCase
     {
         $orderedIds = [3, 1, 2];
 
-        $this->repository->expects($this->once())
-            ->method('reorderRegionSets')
+        $this->repository->shouldReceive('reorderRegionSets')
+            ->once()
             ->with($orderedIds)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->reorder($orderedIds);
 
@@ -333,15 +335,15 @@ class RegionSetServiceTest extends FunctionalTestCase
         $mockPage3 = Mockery::mock(Page::class)->makePartial();
         $mockPage3->id = 3;
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->pageRegionSetRepository->expects($this->once())
-            ->method('assignPages')
-            ->with($regionSetId);
+        $this->pageRegionSetRepository->shouldReceive('assignPages')
+            ->once()
+            ->with($regionSetId, [1, 2, 3], 1);
 
         $service = new RegionSetService(
             $this->databaseMock,
@@ -386,37 +388,36 @@ class RegionSetServiceTest extends FunctionalTestCase
         $mockNewRegionSet->id = 2;
 
         // Transaction wrapper
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        // Mock repository behavior
-        $this->repository->expects($this->once())
-            ->method('findWithRelations')
+        $this->repository->shouldReceive('findWithRelations')
+            ->once()
             ->with($regionSetId)
-            ->willReturn($mockOriginalRegionSet);
+            ->andReturn($mockOriginalRegionSet);
 
-        $this->repository->expects($this->once())
-            ->method('findBySlug')
-            ->willReturn(null);
+        $this->repository->shouldReceive('findBySlug')
+            ->once()
+            ->with('europe-copy')
+            ->andReturn(null);
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn($mockNewRegionSet);
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(['name' => 'Europe Copy', 'description' => 'European region', 'is_active' => false, 'site_id' => 1, 'slug' => 'europe-copy'])
+            ->andReturn($mockNewRegionSet);
 
-        // Territory repository behavior
-        $this->territoryRepository->expects($this->once())
-            ->method('findByCode')
+        $this->territoryRepository->shouldReceive('findByCode')
+            ->once()
             ->with('GB-copy', 1)
-            ->willReturn(null);
+            ->andReturn(null);
 
-        $this->territoryRepository->expects($this->once())
-            ->method('create')
-            ->with($this->callback(function ($data) {
-                return $data['code'] === 'GB-copy';
-            }));
+        $this->territoryRepository->shouldReceive('create')
+            ->once()
+            ->with(['name' => 'United Kingdom', 'code' => 'GB-copy', 'region_set_id' => 2, 'is_active' => true, 'sort_order' => 0, 'site_id' => 1])
+            ->andReturn($mockTerritory);
 
         // Act
         $result = $this->service->duplicate($regionSetId, $newName);
@@ -430,14 +431,14 @@ class RegionSetServiceTest extends FunctionalTestCase
         $regionSetId = 1;
         $pageIds = [1, 2];
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->pageRegionSetRepository->expects($this->once())
-            ->method('unassignPages')
+        $this->pageRegionSetRepository->shouldReceive('unassignPages')
+            ->once()
             ->with($regionSetId, $pageIds);
 
         $result = $this->service->unassignPages($regionSetId, $pageIds);

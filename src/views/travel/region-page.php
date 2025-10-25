@@ -27,6 +27,7 @@ $hasSidebar = !empty($sidebarBlocks);
     <title><?= htmlspecialchars($title) ?></title>
     <meta name="description" content="<?= htmlspecialchars($description) ?>">
     <?php
+
     use App\Framework\Support\SiteContext;
 
     $cssFile = asset(SiteContext::css(), 'css');
@@ -113,48 +114,16 @@ $hasSidebar = !empty($sidebarBlocks);
                     <?php endforeach; ?>
 
                     <!-- Region Articles Grid -->
-                    <?php if (!empty($regionArticles) && count($regionArticles) > 0): ?>
-                        <div class="region-articles">
-                            <h2 style="font-size: 2rem; font-weight: 700; margin: 3rem 0 2rem;">
-                                More from <?= htmlspecialchars($territory->name) ?>
-                            </h2>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-                                <?php foreach ($regionArticles as $article): ?>
-                                    <article style="background: var(--bg-light); border-radius: 12px; overflow: hidden; transition: transform 0.2s;">
-                                        <a href="/<?= htmlspecialchars($site->slug)?>/<?= htmlspecialchars($territory->slug) ?>/<?= htmlspecialchars($article->slug) ?>"
-                                           style="text-decoration: none; color: inherit;">
-                                            <?php
-                                            $excerpt = '';
-                                            foreach ($article->customFields as $cf) {
-                                                if ($cf->customFieldDefinition && $cf->customFieldDefinition->key === 'excerpt') {
-                                                    $excerpt = $cf->field_value;
-                                                    break;
-                                                }
-                                            }
-                                            ?>
-                                            <div style="height: 200px; background: #ddd;">
-                                                <!-- Article image would go here -->
-                                            </div>
-                                            <div style="padding: 1.5rem;">
-                                                <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">
-                                                    <?= htmlspecialchars($article->title) ?>
-                                                </h3>
-                                                <?php if ($excerpt): ?>
-                                                    <p style="color: var(--text-light); font-size: 0.875rem;">
-                                                        <?= htmlspecialchars(substr($excerpt, 0, 120)) ?>...
-                                                    </p>
-                                                <?php endif; ?>
-                                            </div>
-                                        </a>
-                                    </article>
-                                <?php endforeach; ?>
-                            </div>
+                    <?php if (!empty($pageGridHtml)): ?>
+                        <div class="region-page-grid">
+                            <?= $pageGridHtml ?>
                         </div>
                     <?php endif; ?>
 
                     <!-- Comments Section -->
                     <?php if (!empty($comments)): ?>
-                        <div class="comments-section" style="margin-top: 4rem; padding-top: 2rem; border-top: 2px solid var(--border-color);">
+                        <div class="comments-section"
+                             style="margin-top: 4rem; padding-top: 2rem; border-top: 2px solid var(--border-color);">
                             <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">Comments</h3>
                             <?php foreach ($comments as $comment): ?>
                                 <div style="padding: 1rem; background: var(--bg-light); border-radius: 8px; margin-bottom: 1rem;">
@@ -180,7 +149,9 @@ $hasSidebar = !empty($sidebarBlocks);
             <div style="text-align: center; padding: 4rem 0;">
                 <h1>Page Not Found</h1>
                 <p>The page you're looking for doesn't exist.</p>
-                <a href="/" style="display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px;">Go Home</a>
+                <a href="/"
+                   style="display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px;">Go
+                    Home</a>
             </div>
         <?php endif; ?>
     </div>
@@ -244,9 +215,6 @@ $hasSidebar = !empty($sidebarBlocks);
 
 <script>
     function switchRegion(regionSlug) {
-
-        alert(regionSlug)
-
         // Get current page slug from URL
         const pathParts = window.location.pathname.split('/').filter(p => p);
 
@@ -256,6 +224,65 @@ $hasSidebar = !empty($sidebarBlocks);
         // Navigate to the homepage of the selected region
         window.location.href = '/' + siteName + '/' + regionSlug + '/' + regionSlug;
     }
+
+    function scrollPageGrid(button, direction) {
+        const carousel = button.closest('.page-grid-carousel');
+        const track = carousel.querySelector('.page-grid-track');
+        const cardWidth = track.querySelector('.page-card').offsetWidth;
+        const gap = 32; // 2rem gap
+        const scrollAmount = cardWidth + gap;
+
+        if (direction === 'prev') {
+            track.scrollBy({left: -scrollAmount, behavior: 'smooth'});
+        } else {
+            track.scrollBy({left: scrollAmount, behavior: 'smooth'});
+        }
+
+        updateIndicators(carousel);
+    }
+
+    function scrollPageGridToIndex(button, index) {
+        const carousel = button.closest('.page-grid-carousel');
+        const track = carousel.querySelector('.page-grid-track');
+        const cardWidth = track.querySelector('.page-card').offsetWidth;
+        const gap = 32;
+        const scrollAmount = (cardWidth + gap) * index;
+
+        track.scrollTo({left: scrollAmount, behavior: 'smooth'});
+        updateIndicators(carousel);
+    }
+
+    function updateIndicators(carousel) {
+        const track = carousel.querySelector('.page-grid-track');
+        const indicators = carousel.querySelectorAll('.page-grid-indicator');
+        const cardWidth = track.querySelector('.page-card').offsetWidth;
+        const gap = 32;
+        const currentIndex = Math.round(track.scrollLeft / (cardWidth + gap));
+
+        indicators.forEach((indicator, index) => {
+            if (index === currentIndex) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        });
+    }
+
+    // Auto-update indicators on scroll
+    document.addEventListener('DOMContentLoaded', function () {
+        const carousels = document.querySelectorAll('.page-grid-carousel');
+
+        carousels.forEach(carousel => {
+            const track = carousel.querySelector('.page-grid-track');
+
+            if (track) {
+                track.addEventListener('scroll', () => {
+                    updateIndicators(carousel);
+                });
+            }
+        });
+    });
+
 </script>
 </body>
 </html>

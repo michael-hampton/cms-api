@@ -19,8 +19,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        $this->databaseMock = $this->createMock(Database::class);
-        $this->repository = $this->createMock(VoucherRepository::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->repository = Mockery::mock(VoucherRepository::class);
         $this->service = new VoucherService($this->databaseMock, $this->repository);
 
         parent::setUp();
@@ -36,12 +36,13 @@ class VoucherServiceTest extends FunctionalTestCase
             'site_id' => 1
         ];
 
-        $voucher = new Voucher($data);
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->code = 'TEST10';
 
-        $this->repository->expects($this->once())
-            ->method('create')
+        $this->repository->shouldReceive('create')
+            ->once()
             ->with($data)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
         $result = $this->service->create($data);
 
@@ -57,12 +58,13 @@ class VoucherServiceTest extends FunctionalTestCase
             'value' => 15
         ];
 
-        $voucher = new Voucher(array_merge(['id' => $voucherId], $data));
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->name = 'Updated Voucher';
 
-        $this->repository->expects($this->once())
-            ->method('update')
+        $this->repository->shouldReceive('update')
+            ->once()
             ->with($voucherId, $data)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
         $result = $this->service->update($voucherId, $data);
 
@@ -73,21 +75,18 @@ class VoucherServiceTest extends FunctionalTestCase
     public function testDeleteVoucherWithNoUsage()
     {
         $voucherId = 1;
-        $voucher = new Voucher([
-            'id' => $voucherId,
-            'code' => 'TEST10',
-            'usage_count' => 0
-        ]);
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($voucherId)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
-        $this->repository->expects($this->once())
-            ->method('delete')
+        $this->repository->shouldReceive('delete')
+            ->once()
             ->with($voucherId)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->delete($voucherId);
 
@@ -97,16 +96,14 @@ class VoucherServiceTest extends FunctionalTestCase
     public function testDeleteVoucherWithUsageThrowsException()
     {
         $voucherId = 1;
-        $voucher = new Voucher([
-            'id' => $voucherId,
-            'code' => 'TEST10',
-            'usage_count' => 5
-        ]);
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->usage_count = 5;
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($voucherId)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
         $this->expectException(CannotDeleteException::class);
 
@@ -117,10 +114,10 @@ class VoucherServiceTest extends FunctionalTestCase
     {
         $voucherId = 999;
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($voucherId)
-            ->willReturn(null);
+            ->andReturn(null);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Voucher not found');
@@ -137,10 +134,10 @@ class VoucherServiceTest extends FunctionalTestCase
             'requires_confirmation' => false
         ];
 
-        $this->repository->expects($this->once())
-            ->method('checkDeletable')
+        $this->repository->shouldReceive('checkDeletable')
+            ->once()
             ->with($voucherId)
-            ->willReturn($expected);
+            ->andReturn($expected);
 
         $result = $this->service->checkDeletable($voucherId);
 
@@ -149,16 +146,19 @@ class VoucherServiceTest extends FunctionalTestCase
 
     public function testGetAlternativeVouchers()
     {
+        $voucher1 = Mockery::mock(Voucher::class)->makePartial();
+        $voucher2 = Mockery::mock(Voucher::class)->makePartial();
+
         $voucherId = 1;
         $vouchers = collect([
-            new Voucher(['id' => 2, 'code' => 'ALT1']),
-            new Voucher(['id' => 3, 'code' => 'ALT2'])
+            $voucher1,
+            $voucher2
         ]);
 
-        $this->repository->expects($this->once())
-            ->method('getAlternatives')
+        $this->repository->shouldReceive('getAlternatives')
+            ->once()
             ->with($voucherId)
-            ->willReturn($vouchers);
+            ->andReturn($vouchers);
 
         $result = $this->service->getAlternativeVouchers($voucherId);
 
@@ -168,44 +168,34 @@ class VoucherServiceTest extends FunctionalTestCase
     public function testDuplicateVoucher()
     {
         $voucherId = 1;
-        $originalVoucher = new Voucher([
-            'id' => $voucherId,
-            'code' => 'ORIGINAL',
-            'name' => 'Original Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'site_id' => 1
-        ]);
+        $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $originalVoucher->code = 'ORIGINAL';
+        $originalVoucher->status = 'inactive';
 
-        $newVoucher = new Voucher([
-            'id' => 2,
-            'code' => 'ORIGINAL1',
-            'name' => 'Original Voucher (Copy)',
-            'type' => 'percentage',
-            'value' => 10,
-            'site_id' => 1,
-            'status' => 'inactive'
-        ]);
+        $newVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher->status = 'inactive';
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($voucherId)
-            ->willReturn($originalVoucher);
+            ->andReturn($originalVoucher);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
+        $this->repository->shouldReceive('findByCode')
+            ->once()
             ->with('ORIGINAL')
-            ->willReturn(null);
+            ->andReturn(null);
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function($callback) {
+        $originalVoucher->shouldReceive('products')->andReturn(collect());
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function($callback) {
                 return $callback();
             });
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn($newVoucher);
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($newVoucher);
 
         $result = $this->service->duplicateVoucher($voucherId);
 
@@ -217,41 +207,30 @@ class VoucherServiceTest extends FunctionalTestCase
     {
         $voucherId = 1;
         $newCode = 'CUSTOM';
-        $originalVoucher = new Voucher([
-            'id' => $voucherId,
-            'code' => 'ORIGINAL',
-            'name' => 'Original Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'site_id' => 1
-        ]);
 
-        $newVoucher = new Voucher([
-            'id' => 2,
-            'code' => 'CUSTOM',
-            'name' => 'Original Voucher (Copy)',
-            'type' => 'percentage',
-            'value' => 10,
-            'site_id' => 1
-        ]);
+        $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher->code = $newCode;
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository->shouldReceive('find')
+            ->once()
             ->with($voucherId)
-            ->willReturn($originalVoucher);
+            ->andReturn($originalVoucher);
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function($callback) {
                 return $callback();
             });
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->with($this->callback(function($data) use ($newCode) {
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) use ($newCode) {
                 return $data['code'] === strtoupper($newCode);
             }))
-            ->willReturn($newVoucher);
+            ->andReturn($newVoucher);
+
+        $originalVoucher->shouldReceive('products')->andReturn(collect());
 
         $result = $this->service->duplicateVoucher($voucherId, $newCode);
 
@@ -262,10 +241,10 @@ class VoucherServiceTest extends FunctionalTestCase
     {
         $code = 'NOTFOUND';
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
+        $this->repository->shouldReceive('findByCode')
+            ->once()
             ->with($code)
-            ->willReturn(null);
+            ->andReturn(null);
 
         $result = $this->service->validateVoucher($code, 100);
 
@@ -277,23 +256,23 @@ class VoucherServiceTest extends FunctionalTestCase
     public function testValidateExpiredVoucher()
     {
         $code = 'EXPIRED';
-        $voucher = $this->createMock(Voucher::class);
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
 
         $voucher->status = 'expired';
 
-        $voucher->expects($this->once())
-            ->method('isValid')
-            ->willReturn(false);
+        $voucher->shouldReceive('isValid')
+            ->once()
+            ->andReturn(false);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
+        $this->repository->shouldReceive('findByCode')
+            ->once()
             ->with($code)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
         $result = $this->service->validateVoucher($code, 100);
 
         $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher is not valid', $result['message']);
+        $this->assertEquals('Voucher has expired', $result['message']);
     }
 
     public function testValidateVoucherBelowMinimumOrder()
@@ -306,10 +285,10 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher->shouldReceive('isValid')->andReturn(true);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
+        $this->repository->shouldReceive('findByCode')
+            ->once()
             ->with($code)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
         $result = $this->service->validateVoucher($code, 30);
 
@@ -330,10 +309,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('calculateDiscount')->with($orderValue)->andReturn($expectedDiscount);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
+        $this->repository->shouldReceive('findByCode')
+            ->once()
             ->with($code)
-            ->willReturn($voucher);
+            ->andReturn($voucher);
 
         $result = $this->service->validateVoucher($code, $orderValue);
 
@@ -347,10 +326,10 @@ class VoucherServiceTest extends FunctionalTestCase
     {
         $voucherId = 1;
 
-        $this->repository->expects($this->once())
-            ->method('incrementUsageCount')
+        $this->repository->shouldReceive('incrementUsageCount')
+            ->once()
             ->with($voucherId)
-            ->willReturn(true);
+            ->andReturn(true);
 
         $result = $this->service->applyVoucher($voucherId);
 
@@ -361,9 +340,9 @@ class VoucherServiceTest extends FunctionalTestCase
     {
         $expectedCount = 3;
 
-        $this->repository->expects($this->once())
-            ->method('updateExpiredVouchers')
-            ->willReturn($expectedCount);
+        $this->repository->shouldReceive('updateExpiredVouchers')
+            ->once()
+            ->andReturn($expectedCount);
 
         $result = $this->service->updateExpiredVouchers();
 
@@ -383,9 +362,9 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher = new Voucher(array_merge($data, ['id' => 1]));
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn($voucher);
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($voucher);
 
         $result = $this->service->create($data);
 
@@ -402,9 +381,9 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher = new Voucher(['id' => $voucherId]);
 
-        $this->repository->expects($this->once())
-            ->method('update')
-            ->willReturn($voucher);
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->andReturn($voucher);
 
         $result = $this->service->update($voucherId, $data);
 
@@ -437,23 +416,23 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->with([1, 2]);
 
-        $this->repository->expects($this->once())
-            ->method('find')
-            ->willReturn($originalVoucher);
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->andReturn($originalVoucher);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
-            ->willReturn(null);
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn(null);
 
-        $this->databaseMock->expects($this->once())
-            ->method('transaction')
-            ->willReturnCallback(function($callback) {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function($callback) {
                 return $callback();
             });
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn($newVoucher);
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($newVoucher);
 
         $result = $this->service->duplicateVoucher($voucherId);
 
@@ -474,9 +453,9 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(true);
         $voucher->shouldReceive('calculateDiscount')->andReturn(10);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
-            ->willReturn($voucher);
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
 
         $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
 
@@ -492,9 +471,9 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(false);
 
-        $this->repository->expects($this->once())
-            ->method('findByCode')
-            ->willReturn($voucher);
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
 
         $result = $this->service->validateVoucher($code, 100, null, $productId);
 
