@@ -49,7 +49,7 @@ class RegionSet extends Model
 
     public function getPageCount(): int
     {
-        return Page::where('region_set_id', $this->id)->count();
+        return PageRegionSet::where('region_set_id', $this->id)->count();
     }
 
     public function toArrayWithRelations(): array

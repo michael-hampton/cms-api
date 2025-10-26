@@ -279,4 +279,120 @@ class TagControllerTest extends FunctionalTestCase
         $this->assertEquals(1, $data['data']['no_index']);
         $this->assertNull($data['data']['canonical_url']);
     }
+
+    public function testMergeTagsSuccessfully(): void
+    {
+        // Arrange
+        $fromTag = Tag::create([
+            'name' => 'Old Tag',
+            'slug' => 'old-tag',
+            'usage_count' => 5,
+            'site_id' => $this->siteId,
+        ]);
+
+        $toTag = Tag::create([
+            'name' => 'New Tag',
+            'slug' => 'new-tag',
+            'usage_count' => 10,
+            'site_id' => $this->siteId,
+        ]);
+
+        // Create pages with fromTag
+        $page1 = Page::create([
+            'title' => 'Page 1',
+            'slug' => 'page-1',
+            'status' => 'published',
+            'site_id' => $this->siteId,
+        ]);
+
+        $page2 = Page::create([
+            'title' => 'Page 2',
+            'slug' => 'page-2',
+            'status' => 'published',
+            'site_id' => $this->siteId,
+        ]);
+
+        PageTag::create([
+            'page_id' => $page1->id,
+            'tag_id' => $fromTag->id,
+            'site_id' => $this->siteId,
+        ]);
+
+        PageTag::create([
+            'page_id' => $page2->id,
+            'tag_id' => $fromTag->id,
+            'site_id' => $this->siteId,
+        ]);
+
+        // Act
+        $response = $this->postForSite('/api/tags/merge', [
+            'from_tag_id' => $fromTag->id,
+            'to_tag_id' => $toTag->id,
+        ]);
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('merged successfully', $data['message']);
+
+        // Verify fromTag is deleted
+        $this->assertNull(Tag::find($fromTag->id));
+
+        // Verify toTag has updated usage count
+        $freshToTag = Tag::find($toTag->id);
+        $this->assertEquals(15, $freshToTag->usage_count);
+
+        // Verify pages are now associated with toTag
+        $pageTags = PageTag::where('tag_id', $toTag->id)->count();
+        $this->assertEquals(2, $pageTags);
+    }
+
+    public function testMergeTagsFailsForSameTag(): void
+    {
+        $tag = Tag::create([
+            'name' => 'Tag',
+            'slug' => 'tag',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->postForSite('/api/tags/merge', [
+            'from_tag_id' => $tag->id,
+            'to_tag_id' => $tag->id,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testMergeTagsFailsWhenSourceNotFound(): void
+    {
+        $toTag = Tag::create([
+            'name' => 'Target Tag',
+            'slug' => 'target-tag',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->postForSite('/api/tags/merge', [
+            'from_tag_id' => 9999,
+            'to_tag_id' => $toTag->id,
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testMergeTagsFailsWhenTargetNotFound(): void
+    {
+        $fromTag = Tag::create([
+            'name' => 'Source Tag',
+            'slug' => 'source-tag',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->postForSite('/api/tags/merge', [
+            'from_tag_id' => $fromTag->id,
+            'to_tag_id' => 9999,
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
 }

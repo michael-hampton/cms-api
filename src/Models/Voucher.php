@@ -90,7 +90,7 @@ class Voucher extends Model
 
     public function products($returnRelation = false)
     {
-        return $this->belongsToMany(Product::class, 'product_voucher', null, null, $returnRelation);
+        return $this->belongsToMany(Product::class, 'product_voucher', 'voucher_id', 'product_id', $returnRelation);
     }
 
     public function isApplicableToProduct(int $productId): bool

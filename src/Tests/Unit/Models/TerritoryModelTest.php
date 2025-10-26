@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Page;
+use App\Models\PageTerritory;
 use App\Models\RegionSet;
 use App\Models\Territory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -22,6 +23,7 @@ class TerritoryModelTest extends FunctionalTestCase
         $territory = Territory::create([
             'name' => 'Test Territory',
             'code' => 'TT',
+            'slug' => 'test-territory',
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 1,
@@ -39,6 +41,7 @@ class TerritoryModelTest extends FunctionalTestCase
         $territory = Territory::create([
             'name' => 'Test Territory',
             'code' => 'TT',
+            'slug' => 'test-territory',
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 1,
@@ -66,6 +69,7 @@ class TerritoryModelTest extends FunctionalTestCase
         Territory::create([
             'name' => 'Active Territory',
             'code' => 'AT',
+            'slug' => 'test-territory',
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 1,
@@ -75,6 +79,7 @@ class TerritoryModelTest extends FunctionalTestCase
         Territory::create([
             'name' => 'Inactive Territory',
             'code' => 'IT',
+            'slug' => 'test-territory',
             'region_set_id' => 1,
             'is_active' => false,
             'sort_order' => 2,
@@ -94,6 +99,7 @@ class TerritoryModelTest extends FunctionalTestCase
         Territory::create([
             'name' => 'Territory B',
             'code' => 'TB',
+            'slug' => 'test-territory',
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 2,
@@ -103,6 +109,7 @@ class TerritoryModelTest extends FunctionalTestCase
         Territory::create([
             'name' => 'Territory A',
             'code' => 'TA',
+            'slug' => 'test-territory',
             'region_set_id' => 1,
             'is_active' => true,
             'sort_order' => 1,
@@ -137,6 +144,7 @@ class TerritoryModelTest extends FunctionalTestCase
             'name' => 'Territory 1',
             'code' => 'T1',
             'region_set_id' => $regionSet1->id,
+            'slug' => 'test-territory',
             'is_active' => true,
             'sort_order' => 1,
             'site_id' => $this->siteId
@@ -146,6 +154,7 @@ class TerritoryModelTest extends FunctionalTestCase
             'name' => 'Territory 2',
             'code' => 'T2',
             'region_set_id' => $regionSet2->id,
+            'slug' => 'test-territory',
             'is_active' => true,
             'sort_order' => 2,
             'site_id' => $this->siteId
@@ -165,23 +174,34 @@ class TerritoryModelTest extends FunctionalTestCase
             'name' => 'Test Territory',
             'code' => 'TT',
             'region_set_id' => $regionSet->id,
+            'slug' => 'test-territory',
             'is_active' => true,
             'sort_order' => 1,
             'site_id' => $this->siteId
         ]);
 
-        Page::create([
+        $page = Page::create([
             'title' => 'Page 1',
             'slug' => 'page-1',
             'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
             'territory_id' => $territory->id,
             'site_id' => $this->siteId
         ]);
 
-        Page::create([
+        $page2 = Page::create([
             'title' => 'Page 2',
             'slug' => 'page-2',
             'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page2->id,
             'territory_id' => $territory->id,
             'site_id' => $this->siteId
         ]);
@@ -203,6 +223,7 @@ class TerritoryModelTest extends FunctionalTestCase
             'name' => 'Test Territory',
             'code' => 'TT',
             'region_set_id' => $regionSet->id,
+            'slug' => 'test-territory',
             'is_active' => true,
             'sort_order' => 1,
             'site_id' => $this->siteId
@@ -223,6 +244,7 @@ class TerritoryModelTest extends FunctionalTestCase
             'name' => 'Test Territory',
             'code' => 'TT',
             'region_set_id' => $regionSet->id,
+            'slug' => 'test-territory',
             'is_active' => 1,
             'sort_order' => '5',
             'site_id' => $this->siteId

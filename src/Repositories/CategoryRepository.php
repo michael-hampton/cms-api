@@ -47,9 +47,13 @@ class CategoryRepository extends Repository
         return $this->applySiteFilter($query)->get();
     }
 
-    public function getRootCategories(): array
+    public function getRootCategories(): Collection
     {
-        return Category::roots()->active()->ordered()->get();
+        return Category::roots()
+            ->where('is_active', true)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get();
     }
 
 
@@ -85,7 +89,8 @@ class CategoryRepository extends Repository
 
     public function findOrCreateByName(string $name, int $siteId): Model
     {
-        $slug = Str::slug($name, [$this, 'findBySlug']);
+        $slug = Str::slug($name, [$this, 'findBySlug'], '-', 'en', true);
+
         $existing = $this->findBySlug($slug);
 
         if ($existing) {
@@ -100,10 +105,10 @@ class CategoryRepository extends Repository
         ]);
     }
 
-    public function getPopularCategories(int $limit = 10): array
+    public function getPopularCategories(int $limit = 10): Collection
     {
         return Category::withCount('pages')
-            ->active()
+            ->where('is_active', true)
             ->orderBy('pages_count', 'desc')
             ->orderBy('name', 'asc')
             ->limit($limit)

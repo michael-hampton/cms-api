@@ -27,13 +27,6 @@ class PageRegionSetRepository extends Repository
         }
     }
 
-    public function getRegionSetsForPage(int $pageId): Collection
-    {
-        return PageRegionSet::where('page_id', $pageId)
-            ->with(['regionSet'])
-            ->get();
-    }
-
     public function assignPages(int $regionSetId, array $pageIds, int $siteId): void
     {
         foreach ($pageIds as $pageId) {

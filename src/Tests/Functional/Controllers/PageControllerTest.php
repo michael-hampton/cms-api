@@ -20,12 +20,15 @@ use App\Models\RegionSet;
 use App\Models\Site;
 use App\Models\Tag;
 use App\Models\Territory;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsPagesList()
     {
-        Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published', 'site_id' => $this->siteId]);;
+        $this->createPage();
         $response = $this->getForSite('/api/pages');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -36,8 +39,9 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchCriteria()
     {
-        Page::create(['title' => 'Published Page', 'slug' => 'published', 'status' => 'published', 'site_id' => $this->siteId]);
-        Page::create(['title' => 'Draft Page', 'slug' => 'draft', 'status' => 'draft', 'site_id' => $this->siteId]);;
+       $this->createPage(['status' => 'published']);
+        $this->createPage(['status' => 'draft']);
+
         $response = $this->getForSite('/api/pages?status=published');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -65,8 +69,8 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testStoreWithAllFormData()
     {
-        $category = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true, 'site_id' => $this->siteId]);;
-        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;;
+        $category = $this->createCategory();
+        $tag = $this->createTag();
         $pageData = [
             'site_id' => $this->siteId,
             'forms' => [
@@ -91,7 +95,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testShowReturnsPageById()
     {
-        $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published']);
+        $page = $this->createPage();
         $response = $this->getForSite("/api/pages/{$page->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -100,7 +104,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testShowReturnsPageBySlug()
     {
-        Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published', 'site_id' => $this->siteId]);;
+       $this->createPage(['slug' => 'test-page']);
         $response = $this->getForSite('/api/pages/test-page');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -115,7 +119,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesExistingPage()
     {
-        $page = Page::create(['title' => 'Original Title', 'slug' => 'original', 'status' => 'published', 'site_id' => $this->siteId]);;
+        $page = $this->createPage();
         $updateData = ['status' => 'published', 'forms' => ['main' => ['title' => 'Updated Title'], 'meta' => ['slug' => 'updated']], 'site_id' => $this->siteId];
         $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
         $this->assertEquals(200, $response->getStatusCode());
@@ -126,7 +130,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testUpdateReplacesBlocks()
     {
-        $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published', 'site_id' => $this->siteId]);;
+        $page = $this->createPage();
         $updateData = [
             'site_id' => $this->siteId,
             'forms' => ['main' => ['title' => 'Test Page']],
@@ -143,7 +147,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesPage()
     {
-        $page = Page::create(['title' => 'Test Page', 'slug' => 'test-page', 'status' => 'published', 'site_id' => $this->siteId]);
+        $page = $this->createPage();
         $response = $this->deleteForSite("/api/pages/{$page->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -159,8 +163,8 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testBulkUpdatePages()
     {
-        $page1 = Page::create(['title' => 'Page 1', 'slug' => 'page-1', 'status' => 'draft']);
-        $page2 = Page::create(['title' => 'Page 2', 'slug' => 'page-2', 'status' => 'draft']);
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
         $response = $this->postForSite('/api/pages/bulk-update', [
             'site_id' => $this->siteId,
             'page_ids' => [$page1->id, $page2->id],
@@ -173,7 +177,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePage()
     {
-        $page = Page::create(['title' => 'Original Page', 'slug' => 'original-page', 'status' => 'published', 'site_id' => $this->siteId]);
+        $page = $this->createPage();
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -190,11 +194,11 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testGetFeaturedPages()
     {
-        $page1 = Page::create(['title' => 'Featured 1', 'slug' => 'featured-1', 'status' => 'published']);
-        $page2 = Page::create(['title' => 'Featured 2', 'slug' => 'featured-2', 'status' => 'published']);
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
 
-        PageMetadata::create(['page_id' => $page1->id, 'featured' => true]);
-        PageMetadata::create(['page_id' => $page2->id, 'featured' => true]);
+        $this->createPageMetadata($page1->id, ['featured' => true]);
+        $this->createPageMetadata($page2->id, ['featured' => true]);
 
         $response = $this->getForSite('/api/featured-pages');
         $this->assertEquals(200, $response->getStatusCode());
@@ -204,48 +208,14 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageClonesAllRelations()
     {
-        $category = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true]);
-        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        $category = $this->createCategory();
+        $tag = $this->createTag();
 
-        $page = Page::create([
-            'title' => 'Original Page',
-            'slug' => 'original-page',
-            'status' => 'published',
-            'meta_title' => 'Original Meta',
-            'meta_description' => 'Original Description',
-            'site_id' => $this->siteId
-        ]);
-
-        // Create metadata
-        PageMetadata::create([
-            'page_id' => $page->id,
-            'content_type' => 'article',
-            'author' => 1,
-            'featured' => true,
-            'allow_comments' => true
-        ]);
-
-        // Create SEO
-        PageSeo::create([
-            'page_id' => $page->id,
-            'meta_keywords' => 'test, keywords',
-            'canonical_url' => 'https://example.com/original',
-            'no_index' => false
-        ]);
-
-        // Create settings
-        PageSettings::create([
-            'page_id' => $page->id,
-            'template' => 'custom',
-            'menu_order' => 5
-        ]);
-
-        // Create social
-        PageSocial::create([
-            'page_id' => $page->id,
-            'enable_sharing' => true,
-            'platforms' => json_encode(['facebook', 'twitter'])
-        ]);
+        $page = $this->createPage();
+        $this->createPageMetadata($page->id, ['content_type' => 'article', 'featured' => 1]);;
+        $this->createPageSeo($page->id, ['meta_keywords' => 'test, keywords']);;
+        $this->createPageSettings($page->id, ['template' => 'custom', 'menu_order' => 5]);;;
+        $this->createPageSocial($page->id);
 
         // Create block
         Block::create([
@@ -255,16 +225,8 @@ class PageControllerTest extends FunctionalTestCase
             'order' => 1
         ]);
 
-        // Associate categories and tags
-        PageCategory::create([
-            'page_id' => $page->id,
-            'category_id' => $category->id
-        ]);
-
-        PageTag::create([
-            'page_id' => $page->id,
-            'tag_id' => $tag->id
-        ]);
+        $this->attachCategoryToPage($page, $category);
+        $this->attachTagToPage($page, $tag);;
 
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
@@ -310,12 +272,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageWithMultipleBlocks()
     {
-        $page = Page::create([
-            'title' => 'Page with Blocks',
-            'slug' => 'page-with-blocks',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
         Block::create([
             'page_id' => $page->id,
@@ -351,22 +308,17 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageWithMultipleCategoriesAndTags()
     {
-        $cat1 = Category::create(['name' => 'Tech', 'slug' => 'tech', 'is_active' => true, 'site_id' => $this->siteId]);;
-        $cat2 = Category::create(['name' => 'News', 'slug' => 'news', 'is_active' => true, 'site_id' => $this->siteId]);;;
-        $tag1 = Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;;;
-        $tag2 = Tag::create(['name' => 'Testing', 'slug' => 'testing', 'site_id' => $this->siteId]);
+        $cat1 = $this->createCategory();
+        $cat2 = $this->createCategory();
+        $tag1 = $this->createTag();
+        $tag2 = $this->createTag();
 
-        $page = Page::create([
-            'title' => 'Multi Category Page',
-            'slug' => 'multi-category',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
-        PageCategory::create(['page_id' => $page->id, 'category_id' => $cat1->id]);
-        PageCategory::create(['page_id' => $page->id, 'category_id' => $cat2->id]);
-        PageTag::create(['page_id' => $page->id, 'tag_id' => $tag1->id]);
-        PageTag::create(['page_id' => $page->id, 'tag_id' => $tag2->id]);
+        $this->attachCategoryToPage($page, $cat1);
+        $this->attachCategoryToPage($page, $cat2);
+        $this->attachTagToPage($page, $tag1);
+        $this->attachTagToPage($page, $tag2);;
 
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
@@ -477,12 +429,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDestroyCreatesDeleteHistoryEntry()
     {
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
         $pageId = $page->id;
 
@@ -502,12 +449,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicateCreatesHistoryEntries()
     {
-        $page = Page::create([
-            'title' => 'Original Page',
-            'slug' => 'original-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
@@ -555,39 +497,13 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testStoreWithMultipleRegionSetsAndTerritories()
     {
-        $regionSet1 = RegionSet::create([
-            'name' => 'North America',
-            'slug' => 'north-america',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet1 = $this->createRegionSet();
 
-        $regionSet2 = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'is_active' => true,
-            'sort_order' => 2,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet2 = $this->createRegionSet();
 
-        $territory1 = Territory::create([
-            'name' => 'USA',
-            'code' => 'US',
-            'region_set_id' => $regionSet1->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory1 = $this->createTerritory();
 
-        $territory2 = Territory::create([
-            'name' => 'UK',
-            'code' => 'GB',
-            'region_set_id' => $regionSet2->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory2 = $this->createTerritory();
 
         $pageData = [
             'site_id' => $this->siteId,
@@ -615,41 +531,15 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageClonesRegionSetsAndTerritories()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Test Region',
-            'slug' => 'test-region',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'Test Territory',
-            'code' => 'TT',
-            'region_set_id' => $regionSet->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory();
 
-        $page = Page::create([
-            'title' => 'Original Page',
-            'slug' => 'original-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
-        PageRegionSet::create([
-            'page_id' => $page->id,
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
+        $this->attachRegionSetToPage($page, $regionSet);
 
-        PageTerritory::create([
-            'page_id' => $page->id,
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
+        $this->attachTerritoryToPage($page, $territory);
 
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
@@ -664,38 +554,15 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageClonesAuthorsAndContributors()
     {
-        $page = Page::create([
-            'title' => 'Original Page',
-            'slug' => 'original-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
         $author1 = $this->createAuthor();
         $author2 = $this->createAuthor();
         $author3 = $this->createAuthor();
 
-        // Create authors
-        PageAuthor::create([
-            'page_id' => $page->id,
-            'author_id' => $author1->id,
-            'role' => 'primary',
-            'sort_order' => 0
-        ]);
-
-        PageAuthor::create([
-            'page_id' => $page->id,
-            'author_id' => $author2->id,
-            'role' => 'primary',
-            'sort_order' => 1
-        ]);
-
-        PageAuthor::create([
-            'page_id' => $page->id,
-            'author_id' => $author3->id,
-            'role' => 'contributor',
-            'sort_order' => 0
-        ]);
+        $this->attachAuthorToPage($page, $author1, ['role' => 'primary']);
+        $this->attachAuthorToPage($page, $author2, ['role' => 'contributor']);
+        $this->attachAuthorToPage($page, $author3, ['role' => 'primary']);
 
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
 
@@ -717,24 +584,9 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertCount(1, $contributors);
     }
 
-    private function createAuthor()
-    {
-        return Author::create([
-            'name' => '<NAME>',
-            'email' => '<EMAIL>',
-            'slug' => 'test-author-'.date('YmdHis'),
-            'status' => 'active',
-        ]);
-    }
-
     public function testCloneToSiteCreatesPageInDifferentSite()
     {
-        $sourcePage = Page::create([
-            'title' => 'Source Page',
-            'slug' => 'source-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -752,12 +604,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteWithCustomTitle()
     {
-        $sourcePage = Page::create([
-            'title' => 'Original Title',
-            'slug' => 'original',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -775,79 +622,23 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteClonesAllRelations()
     {
-        $category = Category::create([
-            'name' => 'Tech',
-            'slug' => 'tech',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
-
-        $tag = Tag::create([
-            'name' => 'PHP',
-            'slug' => 'php',
-            'site_id' => $this->siteId
-        ]);
-
+        $category = $this->createCategory();
+        $tag = $this->createTag();
         $author = $this->createAuthor();
-
-        $sourcePage = Page::create([
-            'title' => 'Complete Page',
-            'slug' => 'complete-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        // Add metadata
-        PageMetadata::create([
-            'page_id' => $sourcePage->id,
-            'content_type' => 'article',
-            'featured' => true
-        ]);
-
-        // Add SEO
-        PageSeo::create([
-            'page_id' => $sourcePage->id,
-            'meta_keywords' => 'test, keywords'
-        ]);
-
-        // Add settings
-        PageSettings::create([
-            'page_id' => $sourcePage->id,
-            'template' => 'custom'
-        ]);
-
-        // Add social
-        PageSocial::create([
-            'page_id' => $sourcePage->id,
-            'enable_sharing' => true
-        ]);
+        $sourcePage = $this->createPage();
+        $this->createPageMetadata($sourcePage->id, ['meta_keywords' => 'test, keywords', 'content_type' => 'article']);
+        $this->createPageSeo($sourcePage->id, ['meta_keywords' => 'test, keywords', 'meta_description' => 'test description']);;
+        $this->createPageSettings($sourcePage->id, ['template' => 'custom']);
+        $this->createPageSocial($sourcePage->id, ['enable_sharing' => true]);
 
         // Add blocks
-        Block::create([
-            'page_id' => $sourcePage->id,
-            'type' => 'text',
-            'data' => json_encode(['content' => 'Test']),
-            'order' => 1
-        ]);
+        $this->createBlock($sourcePage->id);
 
-        // Add category and tag
-        PageCategory::create([
-            'page_id' => $sourcePage->id,
-            'category_id' => $category->id
-        ]);
-
-        PageTag::create([
-            'page_id' => $sourcePage->id,
-            'tag_id' => $tag->id
-        ]);
+        $this->attachCategoryToPage($sourcePage, $category);
+        $this->attachTagToPage($sourcePage, $tag);
 
         // Add author
-        PageAuthor::create([
-            'page_id' => $sourcePage->id,
-            'author_id' => $author->id,
-            'role' => 'primary',
-            'sort_order' => 0
-        ]);
+        $this->attachAuthorToPage($sourcePage, $author);
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -885,35 +676,17 @@ class PageControllerTest extends FunctionalTestCase
     public function testCloneToSiteReusesExistingCategory()
     {
         // Create category in source site
-        $sourceCategory = Category::create([
-            'name' => 'Tech',
-            'slug' => 'tech',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $sourceCategory = $this->createCategory(['name' => 'Tech', 'slug' => 'tech']);;
 
-        $sourcePage = Page::create([
-            'title' => 'Source Page',
-            'slug' => 'source-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
-        PageCategory::create([
-            'page_id' => $sourcePage->id,
-            'category_id' => $sourceCategory->id
-        ]);
+        $this->attachCategoryToPage($sourcePage, $sourceCategory);;
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
 
         // Create category with same slug in target site
-        $targetCategory = Category::create([
-            'name' => 'Tech',
-            'slug' => 'tech',
-            'is_active' => true,
-            'site_id' => $targetSiteId
-        ]);
+        $targetCategory = $this->createCategory(['name' => 'Tech', 'slug' => 'tech', 'site_id' => $targetSiteId]);
 
         $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
             'target_site_id' => $targetSiteId
@@ -935,33 +708,17 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteReusesExistingTag()
     {
-        $sourceTag = Tag::create([
-            'name' => 'PHP',
-            'slug' => 'php',
-            'site_id' => $this->siteId
-        ]);
+        $sourceTag = $this->createTag();
 
-        $sourcePage = Page::create([
-            'title' => 'Source Page',
-            'slug' => 'source-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
-        PageTag::create([
-            'page_id' => $sourcePage->id,
-            'tag_id' => $sourceTag->id
-        ]);
+        $this->attachTagToPage($sourcePage, $sourceTag);
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
 
         // Create tag with same slug in target site
-        $targetTag = Tag::create([
-            'name' => 'PHP',
-            'slug' => 'php',
-            'site_id' => $targetSiteId
-        ]);
+        $targetTag = $this->createTag(['slug' => $sourceTag->slug, 'site_id' => $targetSiteId]);;
 
         $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
             'target_site_id' => $targetSiteId
@@ -975,7 +732,7 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals($targetTag->id, $data['data']['page']['tags'][0]['id']);
 
         // Verify no duplicate tag was created
-        $tagCount = Tag::where('slug', 'php')
+        $tagCount = Tag::where('slug', $sourceTag->slug)
             ->where('site_id', $targetSiteId)
             ->count();
         $this->assertEquals(1, $tagCount);
@@ -985,31 +742,15 @@ class PageControllerTest extends FunctionalTestCase
     {
         $sourceAuthor = $this->createAuthor();
 
-        $sourcePage = Page::create([
-            'title' => 'Source Page',
-            'slug' => 'source-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
-        PageAuthor::create([
-            'page_id' => $sourcePage->id,
-            'author_id' => $sourceAuthor->id,
-            'role' => 'primary',
-            'sort_order' => 0
-        ]);
+        $this->attachAuthorToPage($sourcePage, $sourceAuthor);
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
 
         // Create author with same slug in target site
-        $targetAuthor = Author::create([
-            'name' => $sourceAuthor->name,
-            'email' => 'different@example.com',
-            'slug' => $sourceAuthor->slug,
-            'status' => 'active',
-            'site_id' => $targetSiteId
-        ]);
+        $targetAuthor = $this->createAuthor(['slug' => $sourceAuthor->slug, 'site_id' => $targetSiteId]);
 
         $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
             'target_site_id' => $targetSiteId
@@ -1031,18 +772,14 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteGeneratesUniqueSlug()
     {
-        $sourcePage = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
 
         // Create page with same slug in target site
-        Page::create([
+
+        $this->createPage([
             'title' => 'Existing Page',
             'slug' => 'test-page',
             'status' => 'published',
@@ -1063,41 +800,15 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteWithRegionSetsAndTerritories()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'North America',
-            'slug' => 'north-america',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'USA',
-            'code' => 'US',
-            'region_set_id' => $regionSet->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory();
 
-        $sourcePage = Page::create([
-            'title' => 'Regional Page',
-            'slug' => 'regional-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
-        PageRegionSet::create([
-            'page_id' => $sourcePage->id,
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
+        $this->attachRegionSetToPage($sourcePage, $regionSet);
 
-        PageTerritory::create([
-            'page_id' => $sourcePage->id,
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
+       $this->attachTerritoryToPage($sourcePage, $territory);
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -1124,12 +835,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteReturns422WithoutTargetSiteId()
     {
-        $sourcePage = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
         $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", []);
 
@@ -1140,12 +846,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteCreatesHistoryEntry()
     {
-        $sourcePage = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -1173,33 +874,11 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteHandlesMultipleBlocks()
     {
-        $sourcePage = Page::create([
-            'title' => 'Multi Block Page',
-            'slug' => 'multi-block',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
-        Block::create([
-            'page_id' => $sourcePage->id,
-            'type' => 'text',
-            'data' => json_encode(['content' => 'Block 1']),
-            'order' => 1
-        ]);
-
-        Block::create([
-            'page_id' => $sourcePage->id,
-            'type' => 'image',
-            'data' => json_encode(['url' => 'image.jpg', 'alt' => 'Test']),
-            'order' => 2
-        ]);
-
-        Block::create([
-            'page_id' => $sourcePage->id,
-            'type' => 'text',
-            'data' => json_encode(['content' => 'Block 3']),
-            'order' => 3
-        ]);
+       $this->createBlock($sourcePage->id, ['type' => 'text']);
+        $this->createBlock($sourcePage->id, ['type' => 'image']);
+        $this->createBlock($sourcePage->id, ['type' => 'text']);
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -1219,43 +898,20 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testCloneToSiteWithMultipleCategoriesAndTags()
     {
-        $cat1 = Category::create([
-            'name' => 'Tech',
-            'slug' => 'tech',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $cat1 = $this->createCategory();
 
-        $cat2 = Category::create([
-            'name' => 'News',
-            'slug' => 'news',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $cat2 = $this->createCategory();
 
-        $tag1 = Tag::create([
-            'name' => 'PHP',
-            'slug' => 'php',
-            'site_id' => $this->siteId
-        ]);
+        $tag1 = $this->createTag();
 
-        $tag2 = Tag::create([
-            'name' => 'Testing',
-            'slug' => 'testing',
-            'site_id' => $this->siteId
-        ]);
+        $tag2 = $this->createTag();
 
-        $sourcePage = Page::create([
-            'title' => 'Multi Taxonomy Page',
-            'slug' => 'multi-taxonomy',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $sourcePage = $this->createPage();
 
-        PageCategory::create(['page_id' => $sourcePage->id, 'category_id' => $cat1->id]);
-        PageCategory::create(['page_id' => $sourcePage->id, 'category_id' => $cat2->id]);
-        PageTag::create(['page_id' => $sourcePage->id, 'tag_id' => $tag1->id]);
-        PageTag::create(['page_id' => $sourcePage->id, 'tag_id' => $tag2->id]);
+        $this->attachCategoryToPage($sourcePage, $cat1);
+        $this->attachCategoryToPage($sourcePage, $cat2);
+        $this->attachTagToPage($sourcePage, $tag1);
+        $this->attachTagToPage($sourcePage, $tag2);;
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -1273,51 +929,16 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testIndexFiltersByAuthor()
     {
-        $author1 = Author::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'slug' => 'john-doe',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $author1 = $this->createAuthor();
 
-        $author2 = Author::create([
-            'name' => 'Jane Smith',
-            'email' => 'jane@example.com',
-            'slug' => 'jane-smith',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $author2 = $this->createAuthor();
 
-        $page1 = Page::create([
-            'title' => 'Page by John',
-            'slug' => 'page-by-john',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page1 = $this->createPage(['title' => 'Page by John']);
 
-        $page2 = Page::create([
-            'title' => 'Page by Jane',
-            'slug' => 'page-by-jane',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page2 = $this->createPage();
 
-        PageAuthor::create([
-            'page_id' => $page1->id,
-            'author_id' => $author1->id,
-            'role' => 'primary',
-            'sort_order' => 0,
-            'site_id' => $this->siteId
-        ]);
-
-        PageAuthor::create([
-            'page_id' => $page2->id,
-            'author_id' => $author2->id,
-            'role' => 'primary',
-            'sort_order' => 0,
-            'site_id' => $this->siteId
-        ]);
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
 
         $response = $this->getForSite("/api/pages?author={$author1->id}");
 
@@ -1331,37 +952,19 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testIndexFiltersByMultipleAuthors()
     {
-        $author1 = Author::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'slug' => 'john-doe',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $author1 = $this->createAuthor();
 
-        $author2 = Author::create([
-            'name' => 'Jane Smith',
-            'email' => 'jane@example.com',
-            'slug' => 'jane-smith',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $author2 = $this->createAuthor();
 
-        $author3 = Author::create([
-            'name' => 'Bob Johnson',
-            'email' => 'bob@example.com',
-            'slug' => 'bob-johnson',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $author3 = $this->createAuthor();
 
-        $page1 = Page::create(['title' => 'Page 1', 'slug' => 'page-1', 'status' => 'published', 'site_id' => $this->siteId]);
-        $page2 = Page::create(['title' => 'Page 2', 'slug' => 'page-2', 'status' => 'published', 'site_id' => $this->siteId]);
-        $page3 = Page::create(['title' => 'Page 3', 'slug' => 'page-3', 'status' => 'published', 'site_id' => $this->siteId]);
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $page3 = $this->createPage();
 
-        PageAuthor::create(['page_id' => $page1->id, 'author_id' => $author1->id, 'role' => 'primary', 'sort_order' => 0, 'site_id' => $this->siteId]);
-        PageAuthor::create(['page_id' => $page2->id, 'author_id' => $author2->id, 'role' => 'primary', 'sort_order' => 0, 'site_id' => $this->siteId]);
-        PageAuthor::create(['page_id' => $page3->id, 'author_id' => $author3->id, 'role' => 'primary', 'sort_order' => 0, 'site_id' => $this->siteId]);
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+        $this->attachAuthorToPage($page3, $author3);
 
         $response = $this->getForSite("/api/pages?author={$author1->id},{$author2->id}");
 

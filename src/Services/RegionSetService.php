@@ -112,7 +112,7 @@ class RegionSetService
                 }
 
                 // Reassign pages
-                $pages = $regionSet->pages();
+                $pages = $regionSet->pages(); //todo
                 foreach ($pages as $page) {
                     $page->region_set_id = $reassignToRegionSetId;
                     $page->save();
@@ -171,6 +171,7 @@ class RegionSetService
 
                     $this->territoryRepository->create([
                         'name' => $territory->name,
+                        'slug' => Str::slug($territory->name), //todo
                         'code' => $newCode,
                         'region_set_id' => $newRegionSet->id,
                         'is_active' => $territory->is_active,

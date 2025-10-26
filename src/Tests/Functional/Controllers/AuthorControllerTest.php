@@ -385,7 +385,7 @@ class AuthorControllerTest extends FunctionalTestCase
         @mkdir(dirname($avatarPath), 0755, true);
         file_put_contents($avatarPath, 'dummy image content');
 
-        $response = $this->postForSite("/api/authors/duplicate/{$author->id}");
+        $response = $this->postForSite("/api/authors/duplicate/{$author->id}", [], [], [], true);
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);

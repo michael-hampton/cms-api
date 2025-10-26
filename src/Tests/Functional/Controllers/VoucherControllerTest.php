@@ -4,9 +4,12 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\Product;
 use App\Models\Voucher;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class VoucherControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -259,14 +262,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testDestroyPreventsDeleteWithUsage()
     {
-        $voucher = Voucher::create([
-            'code' => 'USED123',
-            'name' => 'Used Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'usage_count' => 5,
-            'site_id' => $this->siteId
-        ]);
+        $voucher = $this->createVoucher(['usage_count' => 5]);
 
         $response = $this->deleteForSite('/api/vouchers/' . $voucher->id);
 
@@ -275,14 +271,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testCheckDeleteReturnsStatus()
     {
-        $voucher = Voucher::create([
-            'code' => 'CHECK123',
-            'name' => 'Check Test',
-            'type' => 'percentage',
-            'value' => 10,
-            'usage_count' => 0,
-            'site_id' => $this->siteId
-        ]);
+        $voucher = $this->createVoucher();
 
         $response = $this->getForSite('/api/vouchers/' . $voucher->id . '/check-delete');
 
@@ -296,32 +285,9 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testAlternativesReturnsOtherVouchers()
     {
-        $voucher1 = Voucher::create([
-            'code' => 'MAIN',
-            'name' => 'Main Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
-
-        Voucher::create([
-            'code' => 'ALT1',
-            'name' => 'Alternative 1',
-            'type' => 'percentage',
-            'value' => 15,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
-
-        Voucher::create([
-            'code' => 'ALT2',
-            'name' => 'Alternative 2',
-            'type' => 'fixed',
-            'value' => 20,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $voucher1 = $this->createVoucher();
+        $this->createVoucher();
+        $this->createVoucher();
 
         $response = $this->getForSite('/api/vouchers/' . $voucher1->id . '/alternatives');
 
@@ -335,14 +301,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testDuplicateCreatesNewVoucher()
     {
-        $original = Voucher::create([
-            'code' => 'ORIGINAL',
-            'name' => 'Original Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'description' => 'Original description',
-            'site_id' => $this->siteId
-        ]);
+        $original = $this->createVoucher();
 
         $response = $this->postForSite('/api/vouchers/' . $original->id . '/duplicate');
 
@@ -358,13 +317,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testDuplicateWithCustomCode()
     {
-        $original = Voucher::create([
-            'code' => 'ORIGINAL',
-            'name' => 'Original Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'site_id' => $this->siteId
-        ]);
+        $original = $this->createVoucher();
 
         $response = $this->postForSite('/api/vouchers/' . $original->id . '/duplicate', [
             'code' => 'CUSTOM'
@@ -378,14 +331,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testValidateVoucherSuccess()
     {
-        Voucher::create([
-            'code' => 'VALID10',
-            'name' => 'Valid Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $this->createVoucher([ 'code' => 'VALID10', 'value' => 10, 'status' => 'active']);
 
         $response = $this->postForSite('/api/vouchers/validate', [
             'code' => 'VALID10',
@@ -418,15 +364,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testValidateVoucherBelowMinimum()
     {
-        Voucher::create([
-            'code' => 'MINIMUM50',
-            'name' => 'Minimum Order Voucher',
-            'type' => 'fixed',
-            'value' => 10,
-            'minimum_order_value' => 50,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+       $this->createVoucher(['minimum_order_value' => 50, 'code' => 'MINIMUM50', 'value' => 10, 'status' => 'active']);;
 
         $response = $this->postForSite('/api/vouchers/validate', [
             'code' => 'MINIMUM50',
@@ -443,14 +381,7 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testApplyVoucher()
     {
-        $voucher = Voucher::create([
-            'code' => 'APPLY10',
-            'name' => 'Apply Test',
-            'type' => 'percentage',
-            'value' => 10,
-            'usage_count' => 0,
-            'site_id' => $this->siteId
-        ]);
+        $voucher = $this->createVoucher();
 
         $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply');
 
@@ -466,23 +397,8 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testActiveReturnsOnlyActiveVouchers()
     {
-        Voucher::create([
-            'code' => 'ACTIVE1',
-            'name' => 'Active Voucher 1',
-            'type' => 'percentage',
-            'value' => 10,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
-
-        Voucher::create([
-            'code' => 'INACTIVE1',
-            'name' => 'Inactive Voucher',
-            'type' => 'percentage',
-            'value' => 15,
-            'status' => 'inactive',
-            'site_id' => $this->siteId
-        ]);
+       $this->createVoucher(['status' => 'active']);
+       $this->createVoucher(['status' => 'inactive']);
 
         $response = $this->getForSite('/api/vouchers/active');
 
@@ -506,8 +422,8 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testCreateVoucherWithProducts()
     {
-        $product1 = Product::create(['name' => 'Product 1', 'price' => 50, 'site_id' => $this->siteId]);
-        $product2 = Product::create(['name' => 'Product 2', 'price' => 75, 'site_id' => $this->siteId]);
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
 
         $voucherData = [
             'code' => 'PRODUCTS10',
@@ -531,16 +447,9 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testValidateVoucherForProduct()
     {
-        $product = Product::create(['name' => 'Test Product', 'price' => 100, 'site_id' => $this->siteId]);
+        $product = $this->createProduct(['price' => 100]);
 
-        $voucher = Voucher::create([
-            'code' => 'PRODUCT10',
-            'name' => 'Product Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $voucher = $this->createVoucher(['code' => 'PRODUCT10', 'status' => 'active']);
 
         $voucher->products(true)->attach($product->id);
 
@@ -553,22 +462,16 @@ class VoucherControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
 
         $data = json_decode($response->getContent(), true);
+
         $this->assertTrue($data['data']['valid']);
     }
 
     public function testValidateVoucherNotApplicableToProduct()
     {
-        $product1 = Product::create(['name' => 'Product 1', 'price' => 100, 'site_id' => $this->siteId]);
-        $product2 = Product::create(['name' => 'Product 2', 'price' => 100, 'site_id' => $this->siteId]);
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
 
-        $voucher = Voucher::create([
-            'code' => 'SPECIFIC',
-            'name' => 'Specific Product Voucher',
-            'type' => 'percentage',
-            'value' => 10,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $voucher = $this->createVoucher(['code' => 'SPECIFIC', 'status' => 'active']);;
 
         $voucher->products(true)->attach($product1->id); // Only linked to product1
 
@@ -587,16 +490,10 @@ class VoucherControllerTest extends FunctionalTestCase
 
     public function testDuplicateVoucherCopiesProductLinks()
     {
-        $product1 = Product::create(['name' => 'Product 1', 'price' => 50, 'site_id' => $this->siteId]);
-        $product2 = Product::create(['name' => 'Product 2', 'price' => 75, 'site_id' => $this->siteId]);
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
 
-        $original = Voucher::create([
-            'code' => 'ORIGINAL',
-            'name' => 'Original',
-            'type' => 'percentage',
-            'value' => 10,
-            'site_id' => $this->siteId
-        ]);
+        $original = $this->createVoucher();
 
         $original->products(true)->attach([$product1->id, $product2->id]);
 

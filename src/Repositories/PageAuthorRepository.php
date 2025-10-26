@@ -29,30 +29,4 @@ class PageAuthorRepository extends Repository
             ]);
         }
     }
-
-    public function getPageAuthors(int $pageId, ?string $role = null): Collection
-    {
-        $query = PageAuthor::with(['author'])
-            ->where('page_id', $pageId);
-
-        if ($role) {
-            $query->where('role', $role);
-        }
-
-        return $query->ordered()->get();
-    }
-
-    public function duplicatePageAuthors(int $sourcePageId, int $targetPageId): void
-    {
-        $authors = PageAuthor::where('page_id', $sourcePageId)->get();
-
-        foreach ($authors as $author) {
-            PageAuthor::create([
-                'page_id' => $targetPageId,
-                'author_id' => $author->author_id,
-                'role' => $author->role,
-                'sort_order' => $author->sort_order
-            ]);
-        }
-    }
 }

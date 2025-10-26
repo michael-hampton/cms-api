@@ -27,13 +27,6 @@ class PageTerritoryRepository extends Repository
         }
     }
 
-    public function getTerritoriesForPage(int $pageId): Collection
-    {
-        return PageTerritory::where('page_id', $pageId)
-            ->with(['territory'])
-            ->get();
-    }
-
     public function assignPages(int $territoryId, array $pageIds, int $siteId): void
     {
         foreach ($pageIds as $pageId) {

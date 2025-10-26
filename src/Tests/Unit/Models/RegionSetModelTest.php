@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Page;
+use App\Models\PageRegionSet;
 use App\Models\RegionSet;
 use App\Models\Territory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -25,6 +26,7 @@ class RegionSetModelTest extends FunctionalTestCase
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 1,
+            'slug' => 'test-territory',
             'site_id' => $this->siteId
         ]);
 
@@ -120,6 +122,7 @@ class RegionSetModelTest extends FunctionalTestCase
             'name' => 'Territory 1',
             'code' => 'T1',
             'region_set_id' => $regionSet->id,
+            'slug' => 'test-territory',
             'is_active' => true,
             'sort_order' => 1,
             'site_id' => $this->siteId
@@ -129,6 +132,7 @@ class RegionSetModelTest extends FunctionalTestCase
             'name' => 'Territory 2',
             'code' => 'T2',
             'region_set_id' => $regionSet->id,
+            'slug' => 'test-territory',
             'is_active' => true,
             'sort_order' => 2,
             'site_id' => $this->siteId
@@ -147,7 +151,7 @@ class RegionSetModelTest extends FunctionalTestCase
             'site_id' => $this->siteId
         ]);
 
-        Page::create([
+        $page = Page::create([
             'title' => 'Page 1',
             'slug' => 'page-1',
             'status' => 'published',
@@ -155,10 +159,22 @@ class RegionSetModelTest extends FunctionalTestCase
             'site_id' => $this->siteId
         ]);
 
-        Page::create([
+        PageRegionSet::create([
+            'page_id' => $page->id,
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = Page::create([
             'title' => 'Page 2',
             'slug' => 'page-2',
             'status' => 'published',
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageRegionSet::create([
+            'page_id' => $page2->id,
             'region_set_id' => $regionSet->id,
             'site_id' => $this->siteId
         ]);
@@ -183,6 +199,7 @@ class RegionSetModelTest extends FunctionalTestCase
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 1,
+            'slug' => 'test-territory',
             'site_id' => $this->siteId
         ]);
 

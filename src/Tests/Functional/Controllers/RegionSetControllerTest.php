@@ -6,9 +6,12 @@ use App\Models\Page;
 use App\Models\PageRegionSet;
 use App\Models\RegionSet;
 use App\Models\Territory;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class RegionSetControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsRegionSets()
     {
         $dateStr = (new \DateTime())->format('Y-m-d H:i:s');
@@ -71,12 +74,14 @@ class RegionSetControllerTest extends FunctionalTestCase
                 [
                     'name' => 'United Kingdom',
                     'code' => 'GB',
-                    'is_active' => true
+                    'is_active' => true,
+                    'slug' => 'united-kingdom'
                 ],
                 [
                     'name' => 'France',
                     'code' => 'FR',
-                    'is_active' => true
+                    'is_active' => true,
+                    'slug' => 'france'
                 ]
             ]
         ];
@@ -95,12 +100,7 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testShowReturnsRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'description' => 'European region',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet(['name' => 'Europe']);
 
         $response = $this->getForSite("/api/region-sets/{$regionSet->id}");
 
@@ -123,12 +123,7 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'description' => 'European region',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
         $updateData = [
             'name' => 'Updated Europe',
@@ -149,12 +144,7 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'description' => 'European region',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
         $response = $this->deleteForSite("/api/region-sets/{$regionSet->id}");
 
@@ -167,18 +157,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testDestroyWithDependenciesRequiresReassignment()
     {
-        $regionSet1 = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet1 = $this->createRegionSet();
 
-        Territory::create([
-            'name' => 'United Kingdom',
-            'code' => 'GB',
-            'region_set_id' => $regionSet1->id,
-            'site_id' => $this->siteId
-        ]);
+        $this->createTerritory(['region_set_id' => $regionSet1->id]);
 
         $response = $this->deleteForSite("/api/region-sets/{$regionSet1->id}");
 
@@ -187,24 +168,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testDestroyWithReassignment()
     {
-        $regionSet1 = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        $regionSet2 = RegionSet::create([
-            'name' => 'Asia',
-            'slug' => 'asia',
-            'site_id' => $this->siteId
-        ]);
-
-        Territory::create([
-            'name' => 'United Kingdom',
-            'code' => 'GB',
-            'region_set_id' => $regionSet1->id,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+        $this->createTerritory(['region_set_id' => $regionSet1->id, 'code' => 'GB']);
 
         $response = $this->deleteForSite(
             "/api/region-sets/{$regionSet1->id}?reassign_to_region_set_id={$regionSet2->id}"
@@ -219,18 +185,8 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testCheckDeletable()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        Territory::create([
-            'name' => 'United Kingdom',
-            'code' => 'GB',
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
+        $this->createTerritory(['region_set_id' => $regionSet->id]);
 
         $response = $this->getForSite("/api/region-sets/{$regionSet->id}/check-deletable");
 
@@ -246,23 +202,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testGetAlternatives()
     {
-        $regionSet1 = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        $regionSet2 = RegionSet::create([
-            'name' => 'Asia',
-            'slug' => 'asia',
-            'site_id' => $this->siteId
-        ]);
-
-        $regionSet3 = RegionSet::create([
-            'name' => 'North America',
-            'slug' => 'north-america',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet1 = $this->createRegionSet();
+        $this->createRegionSet();
+        $this->createRegionSet();
 
         $response = $this->getForSite("/api/region-sets/{$regionSet1->id}/alternatives");
 
@@ -277,19 +219,8 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testDuplicate()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'description' => 'European region',
-            'site_id' => $this->siteId
-        ]);
-
-        Territory::create([
-            'name' => 'United Kingdom',
-            'code' => 'GB',
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
+        $this->createTerritory(['region_set_id' => $regionSet->id]);
 
         $response = $this->postForSite("/api/region-sets/{$regionSet->id}/duplicate", [
             'name' => 'Europe Copy'
@@ -309,26 +240,11 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testReorder()
     {
-        $regionSet1 = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'sort_order' => 0,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet1 = $this->createRegionSet();
 
-        $regionSet2 = RegionSet::create([
-            'name' => 'Asia',
-            'slug' => 'asia',
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet2 = $this->createRegionSet();
 
-        $regionSet3 = RegionSet::create([
-            'name' => 'North America',
-            'slug' => 'north-america',
-            'sort_order' => 2,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet3 = $this->createRegionSet();
 
         $orderedIds = [$regionSet3->id, $regionSet1->id, $regionSet2->id];
 
@@ -350,26 +266,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testGetActive()
     {
-        RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
-
-        RegionSet::create([
-            'name' => 'Asia',
-            'slug' => 'asia',
-            'is_active' => false,
-            'site_id' => $this->siteId
-        ]);
-
-        RegionSet::create([
-            'name' => 'North America',
-            'slug' => 'north-america',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $this->createRegionSet(['is_active' => true]);
+        $this->createRegionSet(['is_active' => false]);
+        $this->createRegionSet(['is_active' => true]);
 
         $response = $this->getForSite('/api/region-sets/active');
 
@@ -383,25 +282,9 @@ class RegionSetControllerTest extends FunctionalTestCase
     }
     public function testSearchAvailablePagesForRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        Page::create([
-            'title' => 'Global Test Page',
-            'slug' => 'global-test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        Page::create([
-            'title' => 'Another Page',
-            'slug' => 'another-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
+       $this->createPage();
+       $this->createPage();
 
         $response = $this->getForSite("/api/region-sets/{$regionSet->id}/search-pages?q=test");
 
@@ -414,25 +297,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testAssignPagesToRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        $page1 = Page::create([
-            'title' => 'Page 1',
-            'slug' => 'page-1',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        $page2 = Page::create([
-            'title' => 'Page 2',
-            'slug' => 'page-2',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
 
         $response = $this->postForSite("/api/region-sets/{$regionSet->id}/assign-pages", [
             'page_ids' => [$page1->id, $page2->id]
@@ -447,24 +314,9 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testUnassignPagesFromRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
-
-        $page = Page::create([
-            'title' => 'European Page',
-            'slug' => 'european-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        PageRegionSet::create([
-            'page_id' => $page->id,
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
+        $page = $this->createPage();
+        $this->attachRegionSetToPage($page, $regionSet);
 
         $response = $this->postForSite("/api/region-sets/{$regionSet->id}/unassign-pages", [
             'page_ids' => [$page->id]
@@ -481,11 +333,7 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testAssignPagesWithEmptyArrayReturnsError()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe',
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
         $response = $this->postForSite("/api/region-sets/{$regionSet->id}/assign-pages", [
             'page_ids' => []
@@ -496,45 +344,12 @@ class RegionSetControllerTest extends FunctionalTestCase
 
     public function testGetPagesForRegionSet()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Europe',
-            'slug' => 'europe-' . time(),
-            'site_id' => $this->siteId
-        ]);
-
-        $page1 = Page::create([
-            'title' => 'European Page 1',
-            'slug' => 'european-page-1',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        $page2 = Page::create([
-            'title' => 'European Page 2',
-            'slug' => 'european-page-2',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        $page3 = Page::create([
-            'title' => 'Non-European Page',
-            'slug' => 'non-european-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        // Create pivot table entries for pages 1 and 2 only
-        PageRegionSet::create([
-            'page_id' => $page1->id,
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
-
-        PageRegionSet::create([
-            'page_id' => $page2->id,
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
+        $page1 = $this->createPage(['title' => 'European Page 1']);
+        $page2 = $this->createPage(['title' => 'European Page 2']);;
+        $page3 = $this->createPage(['title' => 'Non-European Page']);
+        $this->attachRegionSetToPage($page1, $regionSet);
+        $this->attachRegionSetToPage($page2, $regionSet);
 
         $response = $this->getForSite("/api/region-sets/{$regionSet->id}/pages");
 

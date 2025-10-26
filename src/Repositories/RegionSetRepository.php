@@ -42,26 +42,8 @@ class RegionSetRepository extends Repository
 
     public function getActive(): Collection
     {
-        $query = RegionSet::ordered()->where('is_active', true);;
+        $query = RegionSet::ordered()->where('is_active', true);
         return $this->applySiteFilter($query)->get();
-    }
-
-    public function getAllWithTerritories(): Collection
-    {
-        $query = RegionSet::ordered()->with(['territories']);
-        return $this->applySiteFilter($query)->get();
-    }
-
-    public function getTerritoryCountByRegionSet(int $regionSetId): int
-    {
-        $regionSet = $this->find($regionSetId);
-        return $regionSet ? $regionSet->getTerritoryCount() : 0;
-    }
-
-    public function getPageCountByRegionSet(int $regionSetId): int
-    {
-        $regionSet = $this->find($regionSetId);
-        return $regionSet ? $regionSet->getPageCount() : 0;
     }
 
     public function checkDeletable(int $regionSetId): array
@@ -96,6 +78,11 @@ class RegionSetRepository extends Repository
         try {
             foreach ($orderedIds as $index => $id) {
                 $regionSet = $this->find($id);
+
+                if(empty($regionSet)) {
+                    throw new \Exception('Region set not found');
+                }
+
                 if ($regionSet) {
                     $regionSet->sort_order = $index;
                     $regionSet->save();
@@ -110,8 +97,9 @@ class RegionSetRepository extends Repository
         }
     }
 
-    public function searchAvailablePages(int $regionSetId, string $query, int $perPage = 20, int $page = 1): array
+    public function searchAvailablePages(int $regionSetId, string $query, int $perPage = 20, int $page = 1, ?int $siteId = null): array
     {
+        $siteId = $siteId ?? SiteContext::getId();
         // Step 1: Get all page IDs assigned to *other* region sets
         $pageRegionSets = PageRegionSet::where('region_set_id', '!=', $regionSetId)->get();
         $excludedIds = $pageRegionSets->pluck('page_id')
@@ -123,17 +111,22 @@ class RegionSetRepository extends Repository
                 $query->whereNotIn('id', $excludedIds);
             })
             ->where('title', 'LIKE', "%{$query}%")
-            ->where('site_id', SiteContext::getId())
+            ->where('site_id', $siteId)
             ->orderBy('title');
 
         // Step 3: Paginate results
         return $queryBuilder->paginate($perPage, $page);
     }
 
-    public function getPagesByRegionSet(int $regionSetId, int $perPage = 20, int $page = 1): array
+    public function reassignPages(int $oldRegionSetId, int $newRegionSetId): bool
     {
-        return Page::where('region_set_id', $regionSetId)
-            ->orderBy('title')
-            ->paginate($perPage, $page);
+        $pageRegionsets = PageRegionSet::where('region_set_id', $oldRegionSetId)->get();
+
+        foreach ($pageRegionsets as $pageRegionset) {
+            $pageRegionset->region_set_id = $newRegionSetId;
+            $pageRegionset->save();
+        }
+        
+        return true;
     }
 }

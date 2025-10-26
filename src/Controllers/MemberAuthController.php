@@ -80,8 +80,6 @@ class MemberAuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        die('here');
-
         $credentials = $request->validated();
 
         if (MemberAuth::attempt($credentials)) {

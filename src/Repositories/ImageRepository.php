@@ -33,37 +33,12 @@ class ImageRepository extends Repository
         return Image::class;
     }
 
-    public function findByFilename(string $filename): ?Image
-    {
-        return Image::where('filename', $filename)->first();
-    }
-
-    public function getActiveImages(): Collection
-    {
-        return Image::active()->orderBy('created_at', 'desc')->get();
-    }
-
     public function getRecentImages(int $limit = 10): Collection
     {
         return Image::active()
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();
-    }
-
-    public function getImagesByCategory(int $categoryId, ?int $limit = null): Collection
-    {
-        $query = Image::active()
-            ->whereHas('categories', function($q) use ($categoryId) {
-                $q->where('image_categories.id', $categoryId);
-            })
-            ->orderBy('created_at', 'desc');
-
-        if ($limit) {
-            $query->limit($limit);
-        }
-
-        return $query->get();
     }
 
     public function getUnusedImages(?int $olderThanDays = null): Collection
@@ -80,24 +55,13 @@ class ImageRepository extends Repository
         return $query->get();
     }
 
-    public function getImagesByUsage(string $usableType, int $usableId): Collection
-    {
-        return Image::active()
-            ->whereHas('usage', function($q) use ($usableType, $usableId) {
-                $q->where('usable_type', $usableType)
-                    ->where('usable_id', $usableId);
-            })
-            ->orderBy('created_at', 'desc')
-            ->get();
-    }
-
     public function getImageStatistics(): array
     {
         $stats = [
             'total_images' => Image::active()->count(),
             'total_size' => Image::active()->sum('file_size'),
             'avg_size' => Image::active()->avg('file_size'),
-            'recent_uploads' => Image::active()->recent(7)->count(),
+            'recent_uploads' => Image::recent(7)->where('is_active', true)->count(),
             'unused_images' => Image::active()->doesntHave('usage')->count(),
         ];
 
@@ -124,43 +88,6 @@ class ImageRepository extends Repository
         $stats['mime_types'] = $mimeTypes;
 
         return $stats;
-    }
-
-    public function bulkUpdateMetadata(array $imageIds, array $metadata): int
-    {
-        $allowedFields = ['alt_text', 'caption', 'description'];
-        $updateData = array_intersect_key($metadata, array_flip($allowedFields));
-
-        if (empty($updateData) || empty($imageIds)) {
-            return 0;
-        }
-
-        return Image::whereIn('id', $imageIds)->update($updateData);
-    }
-
-    public function bulkDelete(array $imageIds, bool $hardDelete = false): int
-    {
-        if (empty($imageIds)) {
-            return 0;
-        }
-
-        if ($hardDelete) {
-            return Image::whereIn('id', $imageIds)->delete();
-        } else {
-            return Image::whereIn('id', $imageIds)->update(['is_active' => false]);
-        }
-    }
-
-    public function getDuplicateImages(): Collection
-    {
-        // Find images with same file_size and similar names
-        return Image::active()
-            ->select('file_size', 'original_name')
-            ->selectRaw('COUNT(*) as duplicate_count')
-            ->selectRaw('GROUP_CONCAT(id) as image_ids')
-            ->groupBy('file_size', 'original_name')
-            ->havingRaw('COUNT(*) > 1')
-            ->get();
     }
 
     private function formatBytes(int $bytes): string

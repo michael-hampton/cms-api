@@ -48,7 +48,7 @@ class Territory extends Model
 
     public function getPageCount(): int
     {
-        return Page::where('territory_id', $this->id)->count();
+        return PageTerritory::where('territory_id', $this->id)->count();
     }
 
     public function toArrayWithRelations(): array

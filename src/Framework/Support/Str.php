@@ -8,11 +8,13 @@ class Str
      * Convert a string to a URL-friendly slug
      */
     public static function slug(
-        string $title,
+        string    $title,
         ?callable $existsCallback = null,
-        string $separator = '-',
-        string $language = 'en'
-    ): string {
+        string    $separator = '-',
+        string    $language = 'en',
+        bool      $returnSlugOnly = false
+    ): string
+    {
         $title = static::ascii($title, $language);
 
         // Convert all dashes/underscores into separator
@@ -30,6 +32,10 @@ class Str
 
         $slug = trim($title, $separator);
         $slug = mb_strtolower($slug, 'UTF-8'); // <-- ensures lowercase
+
+        if ($returnSlugOnly) {
+            return $slug;
+        }
 
         return $existsCallback ? static::ensureUniqueSlug($slug, $existsCallback) : $slug;
     }
@@ -124,7 +130,7 @@ class Str
      */
     public static function contains(string $haystack, $needles): bool
     {
-        $needles = (array) $needles;
+        $needles = (array)$needles;
         foreach ($needles as $needle) {
             if ($needle !== '' && mb_strpos($haystack, $needle) !== false) {
                 return true;
@@ -138,9 +144,9 @@ class Str
      */
     public static function startsWith(string $haystack, $needles): bool
     {
-        $needles = (array) $needles;
+        $needles = (array)$needles;
         foreach ($needles as $needle) {
-            if ($needle !== '' && substr($haystack, 0, strlen($needle)) === (string) $needle) {
+            if ($needle !== '' && substr($haystack, 0, strlen($needle)) === (string)$needle) {
                 return true;
             }
         }
@@ -152,9 +158,9 @@ class Str
      */
     public static function endsWith(string $haystack, $needles): bool
     {
-        $needles = (array) $needles;
+        $needles = (array)$needles;
         foreach ($needles as $needle) {
-            if (substr($haystack, -strlen($needle)) === (string) $needle) {
+            if (substr($haystack, -strlen($needle)) === (string)$needle) {
                 return true;
             }
         }

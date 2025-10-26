@@ -43,7 +43,7 @@ class TagRepository extends Repository
 
     public function findOrCreateByName(string $name, int $siteId): Model
     {
-        $slug = Str::slug($name, [$this, 'findBySlug']);
+        $slug = Str::slug($name, [$this, 'findBySlug'], '-', 'en', true,);
         $existing = $this->findBySlug($slug);
 
         if ($existing) {
@@ -54,7 +54,8 @@ class TagRepository extends Repository
         return $this->create([
             'name' => $name,
             'slug' => $slug,
-            'usage_count' => 1
+            'usage_count' => 1,
+            'site_id' => $siteId
         ]);
     }
 

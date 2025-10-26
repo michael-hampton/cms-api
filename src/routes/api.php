@@ -91,6 +91,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/tags', TagController::class, 'index');
         $router->get('/tags/cloud', TagController::class, 'cloud');
         $router->post('/tags', TagController::class, 'store');
+        $router->post('/tags/merge', TagController::class, 'merge');
         $router->get('/tags/{id}', TagController::class, 'show');
         $router->put('/tags/{id}', TagController::class, 'update');
         $router->delete('/tags/{id}', TagController::class, 'destroy');

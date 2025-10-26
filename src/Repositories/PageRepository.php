@@ -73,7 +73,7 @@ class PageRepository extends Repository
         return $this->applySiteFilter($query)->first();
     }
 
-    public function getPublishedPages(): array
+    public function getPublishedPages(): Collection
     {
         $query = Page::published()->orderBy('created_at', 'desc');
         return $this->applySiteFilter($query)->get();
@@ -120,8 +120,9 @@ class PageRepository extends Repository
         return collect($result->getData());
     }
 
-    public function getPagesByCategory(int $categoryId, ?int $limit = null): Collection
+    public function getPagesByCategory(int $categoryId, ?int $limit = null, ?int $siteId = null): Collection
     {
+        $siteId = $siteId ?? $this->siteId;
         $query = PageCategory::with(['category', 'page'])
             ->where('category_id', $categoryId)
             ->orderBy('created_at', 'desc');
@@ -134,9 +135,9 @@ class PageRepository extends Repository
 
         return $categories->map(function($item) {
             return $item->page;
-        })->filter(function($page) {
+        })->filter(function($page)  use ( $siteId ) {
             // Filter by current site
-            return $page && $page->site_id === $this->siteId;
+            return $page && $page->site_id === $siteId;
         });
     }
 
@@ -148,8 +149,9 @@ class PageRepository extends Repository
             ->get();
     }
 
-    public function getFeaturedPages(?int $limit = null): Collection
+    public function getFeaturedPages(?int $limit = null, ?int $siteId = null): Collection
     {
+        $siteId = $siteId ?? $this->siteId;
         $query = PageMetadata::with(['page'])->where('featured', 1)
             ->orderBy('created_at', 'desc');
 
@@ -159,10 +161,10 @@ class PageRepository extends Repository
 
         $results = $query->get();
 
-        return $results->filter(function($item) {
+        return $results->filter(function($item) use ($siteId) {
             return $item->page
                 && $item->page->status == 'published'
-                && $item->page->site_id === $this->siteId;
+                && $item->page->site_id === $siteId;
         })->map(function($item) {
             return $item->page;
         });

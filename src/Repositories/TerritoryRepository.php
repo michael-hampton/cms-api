@@ -58,9 +58,11 @@ class TerritoryRepository extends Repository
         return $this->applySiteFilter($query)->first();
     }
 
-    public function checkDeletable(int $territoryId): array
+    public function checkDeletable(int $territoryId, ?int $siteId = null): array
     {
-        $territory = $this->find($territoryId);
+        $siteId = $siteId ?? SiteContext::getId();
+        $territory = Territory::where('id', $territoryId)->where('site_id', $siteId)->first();
+
 
         if (!$territory) {
             throw new \Exception('Territory not found');
@@ -127,8 +129,9 @@ class TerritoryRepository extends Repository
         }
     }
 
-    public function searchAvailablePages(int $territoryId, string $query, int $perPage = 20, int $page = 1): array
+    public function searchAvailablePages(int $territoryId, string $query, int $perPage = 20, int $page = 1, ?int $siteId = null): array
     {
+        $siteId = $siteId ?? SiteContext::getId();
         $pageTerritories = PageTerritory::where('territory_id', '!=', $territoryId)->get();
         $excludedIds = $pageTerritories->pluck('page_id')
             ->toArray();
@@ -139,17 +142,10 @@ class TerritoryRepository extends Repository
                 $query->whereNotIn('id', $excludedIds);
             })
             ->where('title', 'LIKE', "%{$query}%")
-            ->where('site_id', SiteContext::getId())
+            ->where('site_id', $siteId)
             ->orderBy('title');
 
         return $queryBuilder->paginate($perPage, $page);
-    }
-
-    public function getPagesByTerritory(int $territoryId, int $perPage = 20, int $page = 1): array
-    {
-        return Page::where('territory_id', $territoryId)
-            ->orderBy('title')
-            ->paginate($perPage, $page);
     }
 
     public function slugExists(string $slug): bool

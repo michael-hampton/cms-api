@@ -2,12 +2,10 @@
 
 namespace App\Repositories;
 
-use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\Model;
-use App\Models\Page;
 use App\Models\Site;
 
 class MenuRepository extends Repository
@@ -15,7 +13,7 @@ class MenuRepository extends Repository
 
     protected function getModelClass(): string
     {
-       return Menu::class;
+        return Menu::class;
     }
 
     public function createMenu(array $data): Model
@@ -35,13 +33,17 @@ class MenuRepository extends Repository
         return Menu::with(['items', 'territories'])->where('site_id', $site)->where('is_active', true)->get();
     }
 
-    public function createMenuItem(array $data): Model
+    public function createMenuItem(array $data, ?int $siteId = null): Model
     {
         if (!isset($data['sort_order'])) {
-            $maxOrder = MenuItem::where('menu_id', $data['menu_id'])
-                ->where('parent_id', $data['parent_id'] ?? null)
-                ->where('column_group', $data['column_group'] ?? 0)
+            $query = MenuItem::where('menu_id', $data['menu_id']);
+
+            $query = !empty($data['parent_id']) ? $query->where('parent_id', $data['parent_id']) : $query;
+
+            //->where('parent_id', $data['parent_id'] ?? null)
+            $maxOrder = $query->where('column_group', $data['column_group'] ?? 0)
                 ->max('sort_order');
+
             $data['sort_order'] = ($maxOrder ?? 0) + 1;
         }
 

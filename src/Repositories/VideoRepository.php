@@ -27,7 +27,7 @@ class VideoRepository
         // Apply search
         if ($criteria->getSearchQuery()) {
             $searchTerm = $criteria->getSearchQuery();
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('original_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('title', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('filename', 'LIKE', "%{$searchTerm}%")
@@ -49,10 +49,12 @@ class VideoRepository
         $total = $query->count();
 
         // Apply sorting
-        $query->orderBy(
-            $criteria->getSortBy(),
-            $criteria->getSortOrder()
-        );
+        if (!empty($criteria->getSortBy()) && !empty($criteria->getSortOrder())) {
+            $query->orderBy(
+                $criteria->getSortBy(),
+                $criteria->getSortOrder()
+            );
+        }
 
         // Apply pagination
         $offset = ($criteria->getPage() - 1) * $criteria->getPerPage();

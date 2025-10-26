@@ -63,30 +63,6 @@ class AuthorRepository extends Repository
         return $queryBuilder->get();
     }
 
-    public function getAuthorsWithPageCount(): Collection
-    {
-        // Returns authors with their page count
-        return Author::with(['pages'])
-            ->orderBy('name', 'asc')
-            ->get();
-    }
-
-    /**
-     * Get authors who have published pages
-     */
-    public function getAuthorsWithPublishedPages(): array
-    {
-        return Author::whereHas('pages', function($query) {
-            $query->where('status', 'published');
-        })
-            ->with(['pages' => function($query) {
-                $query->where('status', 'published')
-                    ->orderBy('published_at', 'desc');
-            }])
-            ->orderBy('name', 'asc')
-            ->get();
-    }
-
     public function getPagesByAuthorId(int $authorId, ?int $limit = null): Collection
     {
         $query = Page::where('author_id', $authorId)

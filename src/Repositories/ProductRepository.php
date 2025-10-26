@@ -98,13 +98,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->get();
     }
 
-    public function findByIds(array $ids): Collection
-    {
-        return $this->model->whereIn('id', $ids)
-            ->where('is_active', true)
-            ->get();
-    }
-
     public function getRecentlyViewed(array $productIds, int $limit = 6): Collection
     {
         if (empty($productIds)) {
@@ -139,11 +132,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return ProductImage::where('product_id', $productId)
             ->orderBy('sort_order')
             ->get();
-    }
-
-    public function deleteImages(int $productId): void
-    {
-        ProductImage::where('product_id', $productId)->delete();
     }
 
     // Merchant operations

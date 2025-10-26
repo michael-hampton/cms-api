@@ -5,9 +5,12 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\Menu;
 use App\Models\MenuTerritory;
 use App\Models\Territory;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MenuControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsAllMenus()
     {
         Menu::create(['name' => 'Main Menu', 'slug' => 'main-menu', 'is_active' => true]);
@@ -243,8 +246,8 @@ class MenuControllerTest extends FunctionalTestCase
 
     public function testStoreCreatesMenuWithTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
-        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
 
         $menuData = [
             'name' => 'Multi-Territory Menu',
@@ -269,8 +272,8 @@ class MenuControllerTest extends FunctionalTestCase
 
     public function testUpdateMenuTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
-        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
 
         $data = [
             'name' => 'Test Menu',

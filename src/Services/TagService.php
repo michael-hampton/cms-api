@@ -121,4 +121,23 @@ class TagService
             return $newTag !== null;
         });
     }
+
+    public function mergeTags(int $fromTagId, int $toTagId): bool
+    {
+        if ($fromTagId === $toTagId) {
+            throw new \InvalidArgumentException('Cannot merge a tag with itself');
+        }
+
+        $fromTag = $this->repository->find($fromTagId);
+        if (!$fromTag) {
+            throw new \Exception('Source tag not found');
+        }
+
+        $toTag = $this->repository->find($toTagId);
+        if (!$toTag) {
+            throw new \Exception('Target tag not found');
+        }
+
+        return $this->repository->mergeTags($fromTagId, $toTagId);
+    }
 }

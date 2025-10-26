@@ -203,7 +203,7 @@ class BrandControllerTest extends FunctionalTestCase
         @mkdir(dirname($logoPath), 0755, true);
         file_put_contents($logoPath, 'dummy logo content');
 
-        $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
+        $response = $this->postForSite("/api/brands/{$brand->id}/duplicate", [], [], [], true);
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);

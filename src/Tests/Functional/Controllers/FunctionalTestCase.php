@@ -7,7 +7,6 @@ use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
 use App\Framework\Migration\MigrationRunner;
-use App\Framework\Session\Session;
 use App\Models\Site;
 use App\Models\User;
 use PHPUnit\Framework\TestCase;
@@ -71,7 +70,8 @@ abstract class FunctionalTestCase extends TestCase
 
     }
 
-    protected function ensureSiteExists() {
+    protected function ensureSiteExists()
+    {
         $sites = Site::all();
         $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
         $this->siteSlug = $site->slug;
@@ -271,7 +271,6 @@ abstract class FunctionalTestCase extends TestCase
     }
 
 
-
     protected function getForSite(string $uri, array $headers = []): Response
     {
         return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
@@ -282,18 +281,29 @@ abstract class FunctionalTestCase extends TestCase
         return $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
     }
 
-    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = [], $productionMode = false): Response
     {
         if (!empty($files)) {
             $_FILES = $files;
         }
+
+        if ($productionMode) {
+            $_ENV['APP_ENV'] = 'production';
+        }
+
         $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
 
-        return new TestResponse(
+        $response = new TestResponse(
             $response->getContent(),
             $response->getStatusCode(),
             $response->getHeaders()
         );
+
+        if ($productionMode) {
+            $_ENV['APP_ENV'] = 'testing';
+        }
+
+        return $response;
     }
 
     protected function postForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response

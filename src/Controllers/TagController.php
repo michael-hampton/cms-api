@@ -161,6 +161,21 @@ class TagController extends Controller
         }
     }
 
+    public function merge(Request $request): JsonResponse
+    {
+        try {
+            $fromTagId = $request->get('from_tag_id');
+            $toTagId = $request->get('to_tag_id');
+
+            $deletedCount = $this->tagService->mergeTags($fromTagId, $toTagId);
+            return $this->successResponse("merged successfully");
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        }
+    }
+
     public function checkDelete(int $id, string $siteName): JsonResponse
     {
         try {
