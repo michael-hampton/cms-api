@@ -29,26 +29,6 @@ class PageGridService
         return $this->repository->all();
     }
 
-    public function getPaginatedPageGrids(
-        int     $perPage = 15,
-        ?string $search = null,
-        ?string $layout = null,
-        ?bool   $isActive = null,
-        string  $sortBy = 'created_at',
-        string  $sortOrder = 'desc'
-    ): array
-    {
-        return $this->repository->paginate(
-            $perPage,
-            1,
-            $search,
-            $layout,
-            $isActive,
-            $sortBy,
-            $sortOrder
-        );
-    }
-
     public function getPageGrid(int $id): ?Model
     {
         return $this->repository->find($id);

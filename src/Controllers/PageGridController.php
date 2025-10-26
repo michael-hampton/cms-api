@@ -5,9 +5,13 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\jsonResponse;
 use App\Framework\Http\Request;
+use App\Models\PageGrid;
 use App\Models\PageGridHistory;
 use App\Requests\StorePageGridRequest;
 use App\Requests\UpdatePageGridRequest;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteriaParser;
+use App\Search\SearchEngine;
 use App\Services\PageGridService;
 
 class PageGridController extends Controller
@@ -21,36 +25,19 @@ class PageGridController extends Controller
     /**
      * Display a listing of page grids.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $perPage = $request->input('per_page', 15);
-            $page = $request->input('page', 1); // Add this line
-            $search = $request->input('search');
-            $layout = $request->input('layout');
-            $isActive = $request->has('is_active') ? $request->boolean('is_active') : null;
-            $sortBy = $request->input('sort_by', 'created_at');
-            $sortOrder = $request->input('sort_order', 'desc');
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
 
-            $pageGrids = $this->pageGridService->getPaginatedPageGrids(
-                (int)$perPage,
-                $search,
-                $layout,
-                $isActive,
-                $sortBy,
-                $sortOrder
-            );
+            // Use the search engine
+            $config = SearchConfigurationFactory::createPageGridConfiguration();
+            $searchEngine = new SearchEngine($config);
 
-            return $this->resourceResponse([
-                'success' => true,
-                'data' => $pageGrids['data']->map(fn($item) => [
-                    ...$item->toArray(),
-                    'items' => $item->items ?? $item->pages ?? [],
-                ]),
-                'pagination' => $pageGrids['pagination'] ?? null,
-            ]);
+            $result = $searchEngine->search( PageGrid::with(['territories']), $criteria);
+
+            return $this->searchResponse($result);
         } catch (\Exception $e) {
-            echo $e->getMessage();
             return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Failed to fetch page grids',
@@ -73,14 +60,12 @@ class PageGridController extends Controller
                 'data' => $pageGrid->toArray(),
             ], 201);
         } catch (ValidationException $e) {
-            die('here');
             return $this->errorResponse(
                 'Validation failed',
                 422,
                 $e->getErrors()
             );
         } catch (\Exception $e) {
-            echo $e->getMessage();
             return $this->errorResponse(
                 'Validation failed',
                 422

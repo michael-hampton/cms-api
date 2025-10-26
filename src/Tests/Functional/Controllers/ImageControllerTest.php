@@ -79,7 +79,7 @@ class ImageControllerTest extends FunctionalTestCase
 
     public function testShowReturns404ForNonexistent()
     {
-        $response = $this->get('/api/images/999');
+        $response = $this->getForSite('/api/images/999');
         $this->assertEquals(404, $response->getStatusCode());
     }
 

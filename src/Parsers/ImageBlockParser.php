@@ -68,6 +68,7 @@ class ImageBlockParser extends BaseBlockParser
         $sponsored = $this->parseBooleanValue($data['sponsored'] ?? false);
         $openInNewTab = $this->parseBooleanValue($data['openInNewTab'] ?? false);
         $layout = $data['layout'] ?? 'full';
+        $endorsements = $data['endorsements'] ?? [];
 
         $imageData = $this->getImageData($data['image_id'] ?? null);
 
@@ -106,7 +107,10 @@ class ImageBlockParser extends BaseBlockParser
             'layout_css_class' => $this->getLayoutCssClass($layout),
             'is_responsive_layout' => $this->isResponsiveLayout($layout),
             'alignment' => $data['alignment'] ?? 'fullscreen',
-            'alignment_css_class' => $this->getAlignmentCssClass($data['alignment'] ?? 'fullscreen')
+            'alignment_css_class' => $this->getAlignmentCssClass($data['alignment'] ?? 'fullscreen'),
+            'endorsements' => $endorsements,
+            'has_endorsements' => !empty($endorsements),
+            'endorsement_positions' => array_keys($endorsements)
         ];
     }
 
@@ -312,6 +316,14 @@ class ImageBlockParser extends BaseBlockParser
         }
 
         $html .= "<img src=\"{$src}\" alt=\"{$alt}\" loading=\"lazy\">";
+
+        if (!empty($parsedData['endorsements'])) {
+            foreach ($parsedData['endorsements'] as $position => $endorsement) {
+                $endorsementSrc = htmlspecialchars($endorsement['url'], ENT_QUOTES, 'UTF-8');
+                $endorsementAlt = htmlspecialchars($endorsement['alt'] ?? 'Endorsement', ENT_QUOTES, 'UTF-8');
+                $html .= "<img src=\"{$endorsementSrc}\" alt=\"{$endorsementAlt}\" class=\"endorsement-image {$position}\" loading=\"lazy\">";
+            }
+        }
 
         if (!empty($parsedData['linkUrl'])) {
             $html .= "</a>";

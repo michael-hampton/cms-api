@@ -19,12 +19,12 @@ class PageGridControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertArrayHasKey('success', $data);
-        $this->assertArrayHasKey('data', $data);
+        $this->assertArrayHasKey('items', $data);
         $this->assertArrayHasKey('pagination', $data);
 
         // Check structure of first item if data exists
-        if (!empty($data['data'])) {
-            $firstItem = $data['data'][0];
+        if (!empty($data['items'])) {
+            $firstItem = $data['items'][0];
 
             $this->assertArrayHasKey('id', $firstItem);
             $this->assertArrayHasKey('title', $firstItem);
@@ -34,7 +34,7 @@ class PageGridControllerTest extends FunctionalTestCase
             $this->assertArrayHasKey('is_active', $firstItem);
         }
 
-        $this->assertCount(3, $data['data']);
+        $this->assertCount(3, $data['items']);
     }
 
     public function testCanListPageGridsWithSearch()
@@ -47,7 +47,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertCount(2, $data['data']);
+        $this->assertCount(2, $data['items']);
     }
 
     public function testCanListPageGridsWithFilters()
@@ -86,7 +86,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertCount(2, $data['data']);
+        $this->assertCount(2, $data['items']);
     }
 
     public function testCanCreatePageGrid()
@@ -638,20 +638,18 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('success', $data);
-        $this->assertArrayHasKey('data', $data);
+        $this->assertArrayHasKey('items', $data);
         $this->assertArrayHasKey('pagination', $data);
 
         $pagination = $data['pagination'];
         $this->assertArrayHasKey('current_page', $pagination);
-        $this->assertArrayHasKey('last_page', $pagination);
         $this->assertArrayHasKey('per_page', $pagination);
         $this->assertArrayHasKey('total', $pagination);
-        $this->assertArrayHasKey('from', $pagination);
-        $this->assertArrayHasKey('to', $pagination);
+        $this->assertArrayHasKey('total_pages', $pagination);
 
-        $this->assertCount(10, $data['data']);
+        $this->assertCount(10, $data['items']);
         $this->assertEquals(25, $pagination['total']);
-        $this->assertEquals(3, $pagination['last_page']);
+        $this->assertEquals(3, $pagination['total_pages']);
     }
 
     public function testSortingWorksCorrectly()
@@ -705,9 +703,9 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertEquals('Alpha', $data['data'][0]['title']);
-        $this->assertEquals('Beta', $data['data'][1]['title']);
-        $this->assertEquals('Zebra', $data['data'][2]['title']);
+        $this->assertEquals('Alpha', $data['items'][0]['title']);
+        $this->assertEquals('Beta', $data['items'][1]['title']);
+        $this->assertEquals('Zebra', $data['items'][2]['title']);
 
         // Sort by created_at descending (most recent first)
         $response = $this->getForSite('/api/page-grids?sort_by=created_at&sort_order=desc');
@@ -716,9 +714,9 @@ class PageGridControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Beta was created most recently (-1 day), so it should be first
-        $this->assertEquals('Beta', $data['data'][0]['title']);
-        $this->assertEquals('Alpha', $data['data'][1]['title']);
-        $this->assertEquals('Zebra', $data['data'][2]['title']);
+        $this->assertEquals('Beta', $data['items'][0]['title']);
+        $this->assertEquals('Alpha', $data['items'][1]['title']);
+        $this->assertEquals('Zebra', $data['items'][2]['title']);
     }
 
     public function testCanCreatePageGridWithUseHero()
@@ -1217,10 +1215,10 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        $firstItem = $data['data'][0];
+        $firstItem = $data['items'][0];
 
         $this->assertArrayHasKey('items', $firstItem);
-        $this->assertIsArray($firstItem['items']);
+        $this->assertIsArray($data['items']);
     }
 
     public function testShowPageGridReturnsItemsWithTypes()
@@ -1398,8 +1396,8 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanCreatePageGridWithTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
-        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
 
         $data = [
             'title' => 'Multi-Territory Grid',
@@ -1429,8 +1427,8 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanUpdatePageGridTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
-        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
 
         $pageGrid = PageGrid::create([
             'title' => 'Test Grid',
@@ -1457,7 +1455,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanRemoveAllTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId]);
+        $territory1 = $this->createTerritory();
 
         $pageGrid = PageGrid::create([
             'title' => 'Test Grid',
@@ -1511,5 +1509,19 @@ class PageGridControllerTest extends FunctionalTestCase
         $text = preg_replace('~-+~', '-', $text);
         $text = strtolower($text);
         return $text;
+    }
+
+    private function createTerritory()
+    {
+        $code = substr(strtoupper(bin2hex(random_bytes(ceil(10 / 2)))), 0, 10);
+
+        return Territory::create([
+            'name' => 'Territory 1',
+            'code' => $code,
+            'is_active' => true,
+            'slug' => 'territory-1',
+            'site_id' => $this->siteId
+        ]);
+
     }
 }

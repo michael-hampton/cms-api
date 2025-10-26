@@ -353,4 +353,58 @@ class ImageBlockParserTest extends FunctionalTestCase
         $this->assertStringNotContainsString('image-credit', $html);
         $this->assertStringNotContainsString('Optional Credit', $html);
     }
+
+    public function testImageBlockParserHandlesEndorsements()
+    {
+        $parser = new ImageBlockParser();
+        $data = [
+            'src' => 'test.jpg',
+            'alt' => 'Alt text',
+            'endorsements' => [
+                'top-left' => [
+                    'url' => 'endorsement1.jpg',
+                    'alt' => 'Endorsement 1'
+                ],
+                'bottom-right' => [
+                    'url' => 'endorsement2.jpg',
+                    'alt' => 'Endorsement 2'
+                ]
+            ]
+        ];
+
+        $result = $parser->parse($data);
+
+        $this->assertTrue($result['has_endorsements']);
+        $this->assertCount(2, $result['endorsements']);
+        $this->assertContains('top-left', $result['endorsement_positions']);
+        $this->assertContains('bottom-right', $result['endorsement_positions']);
+    }
+
+    public function testImageBlockParserHtmlIncludesEndorsements()
+    {
+        $parser = new ImageBlockParser();
+        $parsed = [
+            'src' => 'image.jpg',
+            'alt' => 'Alt text',
+            'caption' => '',
+            'formatted_caption' => '',
+            'linkUrl' => '',
+            'layout_css_class' => 'image-layout-full',
+            'alignment_css_class' => 'image-align-center',
+            'link_attributes' => [],
+            'endorsements' => [
+                'top-left' => [
+                    'url' => 'endorsement.jpg',
+                    'alt' => 'Endorsement'
+                ]
+            ],
+            'has_endorsements' => true
+        ];
+
+        $html = $parser->generateHtml($parsed);
+
+        $this->assertStringContainsString('endorsement-image', $html);
+        $this->assertStringContainsString('top-left', $html);
+        $this->assertStringContainsString('endorsement.jpg', $html);
+    }
 }

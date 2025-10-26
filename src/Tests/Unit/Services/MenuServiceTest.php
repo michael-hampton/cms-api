@@ -300,8 +300,8 @@ class MenuServiceTest extends FunctionalTestCase
 
     public function testCreateMenuWithTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => $this->siteId, 'region_set_id' => null]);
-        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => $this->siteId, 'region_set_id' => null]);
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
 
         $data = [
             'name' => 'Test Menu',
@@ -334,7 +334,7 @@ class MenuServiceTest extends FunctionalTestCase
         $menu->id = 1;
         $menu->slug = 'test-menu';
 
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1]);
+        $territory1 = $this->createTerritory();
 
         $this->menuRepository->shouldReceive('getMenuById')
             ->with(1)
@@ -353,6 +353,13 @@ class MenuServiceTest extends FunctionalTestCase
         ]);
 
         $this->assertSame($menu, $result);
+    }
+
+    private function createTerritory()
+    {
+        $code = substr(strtoupper(bin2hex(random_bytes(ceil(10 / 2)))), 0, 10);
+        return Territory::create(['name' => 'Territory 1', 'code' => $code, 'is_active' => true, 'site_id' => 1, 'slug' => 'territory-1']);
+
     }
 
 }

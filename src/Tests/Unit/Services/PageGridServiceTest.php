@@ -906,8 +906,8 @@ class PageGridServiceTest extends FunctionalTestCase
 
     public function testCreatePageGridWithTerritories()
     {
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1]);
-        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => 1]);
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1, 'slug' => 'territory-1']);
+        $territory2 = Territory::create(['name' => 'Territory 2', 'code' => 'T2', 'is_active' => true, 'site_id' => 1, 'slug' => 'territory-2']);;
 
         $data = [
             'title' => 'Test Grid',
@@ -945,7 +945,7 @@ class PageGridServiceTest extends FunctionalTestCase
         $existingGrid->id = 1;
         $existingGrid->title = 'Test Grid';
 
-        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1]);
+        $territory1 = Territory::create(['name' => 'Territory 1', 'code' => 'T1', 'is_active' => true, 'site_id' => 1, 'slug' => 'territory-1']);;
 
         $this->authenticationService->shouldReceive('check')->andReturn(false);
 

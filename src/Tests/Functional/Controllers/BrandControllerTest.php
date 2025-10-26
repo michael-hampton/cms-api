@@ -89,7 +89,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testShowReturns404ForNonexistent()
     {
-        $response = $this->get('/api/brands/999');
+        $response = $this->getForSite('/api/brands/999');
 
         $this->assertEquals(404, $response->getStatusCode());
     }

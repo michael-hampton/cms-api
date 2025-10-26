@@ -196,4 +196,9 @@ class ImageRepository extends Repository
     {
         return $image->tags();
     }
+
+    public function getImage(int $id) : ?Model
+    {
+        return Image::with(['categories', 'tags', 'tags.tag'])->find($id);
+    }
 }

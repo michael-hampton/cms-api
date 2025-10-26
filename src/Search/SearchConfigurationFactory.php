@@ -14,9 +14,41 @@ use App\Search\Filters\RelationshipFilter;
 
 class SearchConfigurationFactory
 {
+    public static function createPageGridConfiguration(): SearchConfiguration
+    {
+        $config = new SearchConfiguration();
+
+        // Filters
+        $config->addFilter(new InFilter('layout', 'layout'))
+            ->addFilter(new BooleanFilter('is_active', 'is_active'))
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'))
+            ->addFilter(new DateRangeFilter('start_date', 'start_date'))
+            ->addFilter(new DateRangeFilter('end_date', 'end_date'))
+            ->addFilter(new RelationshipFilter('territory_id', 'territories', 'id'));
+
+        self::applyMandatoryFilters($config);
+
+        // Sorts
+        $config->addSort(new SortSpecification('title', 'title'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('updated_at', 'updated_at'))
+            ->addSort(new SortSpecification('is_active', 'is_active'));
+
+        // Searchable columns
+        $config->addSearchableColumn('title')
+            ->addSearchableColumn('subtitle')
+            ->addSearchableColumn('slug');
+
+        // Default sort
+        $config->setDefaultSort('created_at', 'desc');
+
+        return $config;
+    }
+
     public static function createOrderConfiguration(): SearchConfiguration
     {
-        $config = new SearchConfiguration(Order::class);
+        $config = new SearchConfiguration();
 
         // Filters
         $config->addFilter(new InFilter('status', 'status'))

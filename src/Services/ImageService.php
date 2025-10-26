@@ -137,7 +137,7 @@ class ImageService
 
     public function getImage(int $id): ?Image
     {
-        return $this->imageRepository->find($id);
+        return $this->imageRepository->getImage($id);
     }
 
     public function updateImageMetadata(int $imageId, array $metadata): Model

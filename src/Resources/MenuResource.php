@@ -20,6 +20,7 @@ class MenuResource extends JsonResource
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),
             'items' => $this->getAttribute('items'),
+            'territories' => $this->getAttribute('territories'),
         ];
     }
 }

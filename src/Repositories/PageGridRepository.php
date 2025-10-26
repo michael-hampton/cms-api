@@ -6,9 +6,23 @@ use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PageGrid;
 use App\Models\PageGridHistory;
+use App\Models\Product;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class PageGridRepository extends Repository
 {
+    private SearchEngine $searchEngine;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $config = SearchConfigurationFactory::createPageGridConfiguration();
+        $this->searchEngine = new SearchEngine($config);
+    }
+
     public function findBySlug(string $slug): ?PageGrid
     {
         return $this->model
@@ -82,43 +96,10 @@ class PageGridRepository extends Repository
         return $query->exists();
     }
 
-    public function paginate(
-        int $perPage = 15,
-        int $page = 1,
-        ?string $search = null,
-        ?string $layout = null,
-        ?bool $isActive = null,
-        string $sortBy = 'created_at',
-        string $sortOrder = 'desc'
-    ): array
+    public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = $this->model->query();
-
-        $query->whereNull('deleted_at');
-
-        // Apply search filter
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'LIKE', "%{$search}%")
-                    ->orWhere('subtitle', 'LIKE', "%{$search}%");
-            });
-        }
-
-        // Apply layout filter
-        if ($layout) {
-            $query->where('layout', $layout);
-        }
-
-        // Apply is_active filter
-        if ($isActive !== null) {
-            $query->where('is_active', $isActive);
-        }
-
-        // Apply sorting
-        $query->orderBy($sortBy, $sortOrder);
-
-        // Use parent paginate or implement pagination
-        return $query->paginate($perPage, $page);
+        $query = PageGrid::with(['territories']);
+        return $this->searchEngine->search($query, $criteria);
     }
 
     public function logHistory(int $pageGridId, string $action, ?int $userId = null, array $changes = []): void

@@ -54,7 +54,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testShowReturns404ForNonexistent()
     {
-        $response = $this->get('/api/custom-fields/999');
+        $response = $this->getForSite('/api/custom-fields/999');
         $this->assertEquals(404, $response->getStatusCode());
     }
 

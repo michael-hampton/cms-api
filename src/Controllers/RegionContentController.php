@@ -44,6 +44,7 @@ class RegionContentController extends Controller
             ->whereHas('territories', function($query) use ($territory) {
                 $query->where('territories.id', $territory->id);
             })
+            ->where('site_id', $siteId)
             ->first();
 
         $pageGridHtml = null;
