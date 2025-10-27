@@ -4,13 +4,16 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\Brand;
 use App\Models\Product;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class BrandControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsBrandsList()
     {
-        Brand::create(['name' => 'Apple', 'slug' => 'apple', 'site_id' => $this->siteId]);;
-        Brand::create(['name' => 'Nike', 'slug' => 'nike', 'site_id' => $this->siteId]);;;
+        $this->createBrand();
+        $this->createBrand();
 
         $response = $this->getForSite('/api/brands');
 
@@ -22,8 +25,8 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchQuery()
     {
-        Brand::create(['name' => 'Apple Inc', 'slug' => 'apple-inc', 'site_id' => $this->siteId]);
-        Brand::create(['name' => 'Nike Sports', 'slug' => 'nike-sports', 'site_id' => $this->siteId]);
+        $this->createBrand(['name' => 'Apple Inc', 'slug' => 'apple-inc']);
+        $this->createBrand(['name' => 'Nike Sports', 'slug' => 'nike-sports']);
 
         $response = $this->getForSite('/api/brands?q=apple');
 
@@ -66,7 +69,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testShowReturnsBrandById()
     {
-        $brand = Brand::create(['name' => 'Puma', 'slug' => 'puma']);
+        $brand = $this->createBrand(['name' => 'Puma', 'slug' => 'puma']);
 
         $response = $this->getForSite("/api/brands/{$brand->id}");
 
@@ -78,7 +81,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testShowReturnsBrandBySlug()
     {
-        Brand::create(['name' => 'Reebok', 'slug' => 'reebok']);
+        $this->createBrand(['name' => 'Reebok', 'slug' => 'reebok']);
 
         $response = $this->getForSite('/api/brands/reebok');
 
@@ -96,7 +99,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesExistingBrand()
     {
-        $brand = Brand::create(['name' => 'Old Brand', 'slug' => 'old-brand']);
+        $brand = $this->createBrand(['name' => 'Old Brand', 'slug' => 'old-brand']);
 
         $updateData = [
             'name' => 'New Brand',
@@ -114,7 +117,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesBrand()
     {
-        $brand = Brand::create(['name' => 'Test Brand', 'slug' => 'test-brand']);
+        $brand = $this->createBrand();
 
         $response = $this->deleteForSite("/api/brands/{$brand->id}");
 
@@ -131,7 +134,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testCheckDeletableForBrandWithoutProducts()
     {
-        $brand = Brand::create(['name' => 'Test Brand', 'slug' => 'test-brand']);
+        $brand = $this->createBrand();
 
         $response = $this->getForSite("/api/brands/{$brand->id}/check-delete");
 
@@ -143,9 +146,9 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testAlternativesReturnsOtherBrands()
     {
-        $brand1 = Brand::create(['name' => 'Brand 1', 'slug' => 'brand-1']);
-        Brand::create(['name' => 'Brand 2', 'slug' => 'brand-2']);
-        Brand::create(['name' => 'Brand 3', 'slug' => 'brand-3']);
+        $brand1 = $this->createBrand(['name' => 'Brand 1', 'slug' => 'brand-1']);
+        $brand2 = $this->createBrand();
+        $brand3 = $this->createBrand();
 
         $response = $this->getForSite("/api/brands/{$brand1->id}/alternatives");
 
@@ -157,8 +160,8 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testMergeBrands()
     {
-        $source = Brand::create(['name' => 'Source Brand', 'slug' => 'source-brand']);
-        $target = Brand::create(['name' => 'Target Brand', 'slug' => 'target-brand']);
+        $source = $this->createBrand();
+        $target = $this->createBrand();
 
         $response = $this->postForSite('/api/brands/merge', [
             'source_brand_id' => $source->id,
@@ -171,13 +174,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testDuplicateBrandSuccessfully(): void
     {
-        $brand = Brand::create([
-            'name' => 'Nike',
-            'description' => 'Sports brand',
-            'website' => 'https://nike.com',
-            'slug' => 'nike',
-            'status' => 'active'
-        ]);
+        $brand = $this->createBrand(['name' => 'Nike', 'slug' => 'nike', 'description' => 'Sports brand']);;
 
         $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
 
@@ -191,12 +188,7 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testDuplicateBrandWithLogo(): void
     {
-        $brand = Brand::create([
-            'name' => 'Adidas',
-            'slug' => 'adidas',
-            'logo' => 'logos/adidas.png',
-            'status' => 'active'
-        ]);
+        $brand = $this->createBrand(['logo' => 'logos/adidas.png']);
 
         // Create dummy logo file
         $logoPath = 'uploads/logos/adidas.png';
@@ -220,26 +212,11 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testDuplicateBrandWithProducts(): void
     {
-        $brand = Brand::create([
-            'name' => 'Apple',
-            'slug' => 'apple',
-            'status' => 'active'
-        ]);
+        $brand = $this->createBrand(['name' => 'Apple', 'slug' => 'apple']);
 
         // Create products for the brand
-        Product::create([
-            'name' => 'iPhone',
-            'brand_id' => $brand->id,
-            'price' => 999.99,
-            'slug' => 'iphone'
-        ]);
-
-        Product::create([
-            'name' => 'MacBook',
-            'brand_id' => $brand->id,
-            'price' => 1999.99,
-            'slug' => 'macbook'
-        ]);
+        $this->createProduct(['brand_id' => $brand->id]);
+        $this->createProduct(['brand_id' => $brand->id]);
 
         $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
 
@@ -260,15 +237,15 @@ class BrandControllerTest extends FunctionalTestCase
 
     public function testDuplicateBrandWithSeoFields(): void
     {
-        $brand = Brand::create([
+        $brand = $this->createBrand([
             'name' => 'Nike',
             'slug' => 'nike',
-            'status' => 'active',
+            'description' => 'Sports brand',
             'seo_title' => 'Nike SEO Title',
             'seo_description' => 'Nike SEO Description',
             'no_index' => false,
             'canonical_url' => 'https://example.com/nike'
-        ]);
+        ]);;
 
         $response = $this->postForSite("/api/brands/{$brand->id}/duplicate");
 
@@ -281,17 +258,4 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertEquals(0, $data['data']['no_index']);
         $this->assertNull($data['data']['canonical_url']);
     }
-
-//    public function testActiveReturnsOnlyActiveBrands()
-//    {
-//        Brand::create(['name' => 'Active Brand', 'slug' => 'active-brand', 'is_active' => true]);
-//        Brand::create(['name' => 'Inactive Brand', 'slug' => 'inactive-brand', 'is_active' => false]);
-//
-//        $response = $this->get('/api/brands/active');
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertCount(1, $data['data']['brands']);
-//        $this->assertEquals('Active Brand', $data['data']['brands'][0]['name']);
-//    }
 }

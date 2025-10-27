@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageTerritory;
@@ -148,8 +149,40 @@ class TerritoryRepository extends Repository
         return $queryBuilder->paginate($perPage, $page);
     }
 
+    public function generateUniqueSlug(string $name, int $siteId, ?int $excludeId = null): string
+    {
+        $slug = Str::slug($name);
+        $counter = 1;
+
+        while (true) {
+            $query = Territory::where('slug', $slug)
+                ->where('site_id', $siteId);
+
+            if ($excludeId) {
+                $query->where('id', '!=', $excludeId);
+            }
+
+            $existing = $query->first();
+
+            if (!$existing) {
+                break;
+            }
+
+            $slug = Str::slug($name) . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
     public function slugExists(string $slug): bool
     {
         return Territory::where('slug', $slug)->exists();
+    }
+
+    public function reassignPages(int $oldTerritoryId, int $newTerritoryId): bool
+    {
+        return PageTerritory::where('territory_id', $oldTerritoryId)
+            ->update(['territory_id' => $newTerritoryId]);
     }
 }

@@ -2,8 +2,6 @@
 
 namespace App\Tests\Functional\Controllers;
 
-use App\Models\Brand;
-use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
@@ -11,13 +9,17 @@ use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Models\Site;
-use App\Services\ImageUploadService;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class ProductControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexUsesSearchInfrastructure()
     {
-        $this->createProduct(3);
+        $this->createProduct();
+        $this->createProduct();
+        $this->createProduct();
 
         $response = $this->getForSite('/api/products');
         $data = json_decode($response->getContent(), true);
@@ -29,12 +31,9 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchQuery()
     {
-        Product::create([
+        $this->createProduct([
             'name' => 'Wireless Mouse',
-            'description' => 'test',
-            'price' => 29.99,
-            'brand' => 'LogiTech',
-            'site_id' => $this->siteId
+            'description' => 'test'
         ]);
 
         $response = $this->getForSite('/api/products?search=wireless');
@@ -46,14 +45,11 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testIndexWithFilters()
     {
-        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
+        $category = $this->createCategory(['name' => 'Electronics']);
 
-        Product::create([
+        $this->createProduct([
             'name' => 'Product 1',
-            'description' => 'test',
-            'price' => 99.99,
-            'category_id' => $category->id,
-            'brand' => 'BrandA'
+            'category_id' => $category->id
         ]);
 
         $response = $this->getForSite('/api/products?filter[category_id]=' . $category->id);
@@ -65,7 +61,9 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testIndexWithSorting()
     {
-        $this->createProduct(3);
+        $this->createProduct();
+        $this->createProduct();
+        $this->createProduct();
 
         $response = $this->getForSite('/api/products?sort=name&order=asc');
         $data = json_decode($response->getContent(), true);
@@ -76,7 +74,9 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testIndexWithPagination()
     {
-        $this->createProduct(15);
+        for ($i = 0; $i < 15; $i++) {
+            $this->createProduct();
+        }
 
         $response = $this->getForSite('/api/products?page=1&per_page=10');
         $data = json_decode($response->getContent(), true);
@@ -109,12 +109,7 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testUpdateWithImageFile()
     {
-        $product = Product::create([
-            'name' => 'Old Product',
-            'description' => 'test',
-            'price' => 99.99,
-            'brand' => 'TestBrand'
-        ]);
+        $product = $this->createProduct(['name' => 'Old Product']);
 
         $data = [
             'name' => 'Updated Product',
@@ -136,7 +131,7 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testItCanCreateAProduct()
     {
-        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
+        $category = $this->createCategory(['name' => 'Electronics']);
 
         $data = [
             'name' => 'Test Product',
@@ -278,29 +273,9 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
     }
 
-    private function createProduct(int $times = 1, array $data = [])
-    {
-        $products = [];
-
-        for ($i = 0; $i < $times; $i++) {
-            $products[] = Product::create([
-                'name' => $data['name'] ?? 'test',
-                'id' => $i + 1,
-                'description' => 'test',
-                'price' => 12.99,
-                'sale_price' => 10.99,
-                'category_id' => $data['category'] ?? null,
-                'brand' => $data['brand'] ?? 'test',
-                'site_id' => $this->siteId,
-            ]);
-        }
-
-        return collect($products);
-    }
-
     public function testDuplicateProductSuccessfully(): void
     {
-        $product = Product::create([
+        $product = $this->createProduct([
             'name' => 'iPhone 15',
             'description' => 'Latest iPhone',
             'price' => 999.99,
@@ -308,7 +283,6 @@ class ProductControllerTest extends FunctionalTestCase
             'sku' => 'IPH15-001',
             'slug' => 'iphone-15',
             'status' => 'active',
-            'site_id' => $this->siteId,
         ]);
 
         $response = $this->postForSite("/api/products/{$product->id}/duplicate");
@@ -325,13 +299,12 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testDuplicateProductWithImage(): void
     {
-        $product = Product::create([
+        $product = $this->createProduct([
             'name' => 'MacBook Pro',
             'slug' => 'macbook-pro',
             'price' => 1999.99,
             'image' => 'products/macbook.jpg',
             'status' => 'active',
-            'site_id' => $this->siteId,
         ]);
 
         // Create dummy image
@@ -356,12 +329,9 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testDuplicateProductWithCustomName(): void
     {
-        $product = Product::create([
+        $product = $this->createProduct([
             'name' => 'AirPods Pro',
             'slug' => 'airpods-pro',
-            'price' => 249.99,
-            'status' => 'active',
-            'site_id' => $this->siteId,
         ]);
 
         $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
@@ -376,26 +346,17 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testDuplicateProductWithBrandAndCategory(): void
     {
-        $brand = Brand::create([
-            'name' => 'Samsung',
-            'slug' => 'samsung',
-            'status' => 'active'
-        ]);
+        $brand = $this->createBrand();
 
-        $category = Category::create([
-            'name' => 'Smartphones',
-            'slug' => 'smartphones',
-            'status' => 'active'
-        ]);
+        $category = $this->createCategory();
 
-        $product = Product::create([
+        $product = $this->createProduct([
             'name' => 'Galaxy S24',
             'slug' => 'galaxy-s24',
             'price' => 899.99,
             'brand_id' => $brand->id,
             'category_id' => $category->id,
             'status' => 'active',
-            'site_id' => $this->siteId,
         ]);
 
         $response = $this->postForSite("/api/products/{$product->id}/duplicate");
@@ -410,8 +371,8 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testItCanCreateProductWithAllRelations()
     {
-        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
-        $brand = Brand::create(['name' => 'Apple', 'slug' => 'apple']);
+        $category = $this->createCategory(['name' => 'Electronics']);
+        $brand = $this->createBrand();
 
         $data = [
             'name' => 'Complete Product',
@@ -474,12 +435,9 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testUpdateProductPriceRecordsHistory()
     {
-        $product = Product::create([
-            'name' => 'Test Product',
-            'description' => 'Test',
+        $product = $this->createProduct([
             'price' => 99.99,
             'sale_price' => 79.99,
-            'brand' => 'Test'
         ]);
 
         $updateData = [
@@ -500,8 +458,8 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testCreateProductRecordsMerchantPriceHistory()
     {
-        $brand = Brand::create(['name' => 'Apple', 'slug' => 'apple']);
-        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
+        $brand = $this->createBrand();
+        $category = $this->createCategory(['name' => 'Electronics']);
 
         $data = [
             'name' => 'iPhone 15',
@@ -548,29 +506,14 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testUpdateProductMerchantPriceRecordsHistory()
     {
-        $product = Product::create([
-            'name' => 'Test Product',
-            'description' => 'Test',
-            'price' => 99.99,
-            'brand' => 'Test'
+        $product = $this->createProduct();
+
+        $merchant = $this->createProductMerchant($product->id, [
+            'price' => 79.99,
+            'name' => 'Amazon'
         ]);
 
-        $merchant = ProductMerchant::create([
-            'product_id' => $product->id,
-            'name' => 'Amazon',
-            'url' => 'https://amazon.com',
-            'price' => 79.99,
-            'is_available' => true,
-            'last_price_check' => now()
-        ]);
-
-        // Record initial price
-        ProductPriceHistory::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
-            'price' => 79.99,
-            'recorded_at' => now()
-        ]);
+        $this->createProductPriceHistory(['merchant_id' => $merchant->id]);
 
         $updateData = [
             'name' => 'Test Product',
@@ -609,41 +552,33 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testGetProductPriceHistory()
     {
-        $product = Product::create([
-            'name' => 'Test Product',
-            'price' => 99.99,
-            'brand' => 'Test'
-        ]);
+        $product = $this->createProduct();
 
-        $merchant = ProductMerchant::create([
-            'product_id' => $product->id,
-            'name' => 'Amazon',
-            'url' => 'https://amazon.com',
-            'price' => 79.99,
-            'is_available' => true
-        ]);
+        $merchant = $this->createProductMerchant($product->id);
 
-        // Create price history entries
-        ProductPriceHistory::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
-            'price' => 79.99,
-            'recorded_at' => now_datetime()->modify('-2 days')->format('Y-m-d H:i:s')
-        ]);
+        $this->createProductPriceHistory(
+            [
+                'product_id' => $product->id,
+                'merchant_id' => $merchant->id,
+                'price' => 79.99,
+            ]
+        );
 
-        ProductPriceHistory::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
-            'price' => 74.99,
-            'recorded_at' => now_datetime()->modify('-1 day')->format('Y-m-d H:i:s')
-        ]);
+        $this->createProductPriceHistory(
+            [
+                'product_id' => $product->id,
+                'merchant_id' => $merchant->id,
+                'price' => 74.99,
+            ]
+        );
 
-        ProductPriceHistory::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
-            'price' => 69.99,
-            'recorded_at' => now()
-        ]);
+        $this->createProductPriceHistory(
+            [
+                'product_id' => $product->id,
+                'merchant_id' => $merchant->id,
+                'price' => 69.99,
+            ]
+        );
 
         $response = $this->getForSite("/api/products/{$product->id}/price-history");
         $data = json_decode($response->getContent(), true);
@@ -659,40 +594,21 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testGetProductPriceHistoryByMerchant()
     {
-        $product = Product::create([
-            'name' => 'Test Product',
-            'price' => 99.99,
-            'brand' => 'Test'
-        ]);
+        $product = $this->createProduct();
 
-        $merchant1 = ProductMerchant::create([
-            'product_id' => $product->id,
-            'name' => 'Amazon',
-            'url' => 'https://amazon.com',
-            'price' => 79.99,
-            'is_available' => true
-        ]);
+        $merchant1 = $this->createProductMerchant($product->id);
+        $merchant2 = $this->createProductMerchant($product->id);
 
-        $merchant2 = ProductMerchant::create([
-            'product_id' => $product->id,
-            'name' => 'eBay',
-            'url' => 'https://ebay.com',
-            'price' => 89.99,
-            'is_available' => true
-        ]);
-
-        ProductPriceHistory::create([
+        $this->createProductPriceHistory([
             'product_id' => $product->id,
             'merchant_id' => $merchant1->id,
             'price' => 79.99,
-            'recorded_at' => now()
         ]);
 
-        ProductPriceHistory::create([
+        $this->createProductPriceHistory([
             'product_id' => $product->id,
             'merchant_id' => $merchant2->id,
             'price' => 89.99,
-            'recorded_at' => now()
         ]);
 
         $response = $this->getForSite("/api/products/{$product->id}/price-history?merchant_id={$merchant1->id}");
@@ -709,13 +625,7 @@ class ProductControllerTest extends FunctionalTestCase
         $site1 = Site::create(['name' => 'Site 1', 'domain' => 'site1.com']);
         $site2 = Site::create(['name' => 'Site 2', 'domain' => 'site2.com']);
 
-        $product = Product::create([
-            'name' => 'iPhone 15',
-            'slug' => 'iphone-15',
-            'price' => 999.99,
-            'site_id' => $site1->id,
-            'status' => 'active'
-        ]);
+        $product = $this->createProduct();
 
         $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
             'name' => 'iPhone 15 Site 2',
@@ -737,12 +647,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $site = Site::create(['name' => 'Test Site', 'domain' => 'test.com']);
 
-        $product = Product::create([
-            'name' => 'Product',
-            'slug' => 'product',
-            'price' => 99.99,
-            'site_id' => $site->id
-        ]);
+        $product = $this->createProduct(['site_id' => $site->id]);
 
         // Clone without site_id should use same site
         $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
@@ -805,8 +710,8 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testCreateProductWithVariantsAndImages()
     {
-        $brand = Brand::create(['name' => 'Apple', 'slug' => 'apple']);
-        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
 
         $data = [
             'name' => 'iPhone 15',
@@ -855,29 +760,11 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testUpdateProductVariantImages()
     {
-        $product = Product::create([
-            'name' => 'Test Product',
-            'description' => 'Test',
-            'price' => 99.99,
-            'brand' => 'Test'
-        ]);
+        $product = $this->createProduct();
 
-        $variant = ProductVariant::create([
-            'product_id' => $product->id,
-            'sku' => 'VAR-001',
-            'attributes' => ['color' => 'Red'],
-            'price_modifier' => 0,
-            'is_active' => true
-        ]);
+        $variant = $this->createProductVariant($product->id);
 
-        ProductImage::create([
-            'product_id' => $product->id,
-            'variant_id' => $variant->id,
-            'url' => 'old-img.jpg',
-            'alt' => 'Old Image',
-            'is_primary' => true,
-            'sort_order' => 0
-        ]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
 
         $updateData = [
             'name' => 'Test Product',
@@ -908,38 +795,12 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testDeleteProductDeletesVariantImages()
     {
-        $product = Product::create([
-            'name' => 'Test Product',
-            'description' => 'Test',
-            'price' => 99.99,
-            'brand' => 'Test'
-        ]);
+        $product = $this->createProduct();
 
-        $variant = ProductVariant::create([
-            'product_id' => $product->id,
-            'sku' => 'VAR-001',
-            'attributes' => [],
-            'price_modifier' => 0,
-            'is_active' => true
-        ]);
+        $variant = $this->createProductVariant($product->id);
 
-        ProductImage::create([
-            'variant_id' => $variant->id,
-            'product_id' => $product->id,
-            'url' => 'var-img1.jpg',
-            'alt' => 'Variant Image 1',
-            'is_primary' => true,
-            'sort_order' => 0
-        ]);
-
-        ProductImage::create([
-            'variant_id' => $variant->id,
-            'product_id' => $product->id,
-            'url' => 'var-img2.jpg',
-            'alt' => 'Variant Image 2',
-            'is_primary' => false,
-            'sort_order' => 1
-        ]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
 
         $this->assertCount(2, ProductImage::where('variant_id', $variant->id)->get());
 
@@ -951,21 +812,9 @@ class ProductControllerTest extends FunctionalTestCase
 
     public function testDuplicateProductWithVariantImages()
     {
-        $product = Product::create([
-            'name' => 'iPhone 15',
-            'slug' => 'iphone-15',
-            'price' => 999.99,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $product = $this->createProduct();
 
-        $variant = ProductVariant::create([
-            'product_id' => $product->id,
-            'sku' => 'IPH15-RED',
-            'attributes' => ['color' => 'Red'],
-            'price_modifier' => 0,
-            'is_active' => true
-        ]);
+        $variant = $this->createProductVariant($product->id);
 
         // Create dummy variant images
         $imagePath1 = 'uploads/products/red-front.jpg';
@@ -974,23 +823,8 @@ class ProductControllerTest extends FunctionalTestCase
         file_put_contents($imagePath1, 'dummy image 1');
         file_put_contents($imagePath2, 'dummy image 2');
 
-        ProductImage::create([
-            'variant_id' => $variant->id,
-            'product_id' => $product->id,
-            'url' => 'products/red-front.jpg',
-            'alt' => 'Red Front',
-            'is_primary' => true,
-            'sort_order' => 0
-        ]);
-
-        ProductImage::create([
-            'variant_id' => $variant->id,
-            'product_id' => $product->id,
-            'url' => 'products/red-back.jpg',
-            'alt' => 'Red Back',
-            'is_primary' => false,
-            'sort_order' => 1
-        ]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
 
         $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
             'clone_variants' => true

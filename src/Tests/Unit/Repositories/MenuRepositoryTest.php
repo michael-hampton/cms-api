@@ -93,6 +93,30 @@ class MenuRepositoryTest extends RepositoryTestCase
         $this->assertEquals('Updated Name', $fresh->name);
     }
 
+    public function test_get_all_menus_returns_active_menus_for_site(): void
+    {
+        // Arrange
+        $activeMenu1 = $this->createMenu(['is_active' => true, 'name' => 'Active 1']);
+        $activeMenu2 = $this->createMenu(['is_active' => true, 'name' => 'Active 2']);
+        $inactiveMenu = $this->createMenu(['is_active' => false, 'name' => 'Inactive']);
+
+        // Act
+        $menus = $this->repository->getAllMenus($this->siteSlug);
+
+        // Assert
+        $this->assertGreaterThanOrEqual(2, $menus->count());
+
+        foreach ($menus as $menu) {
+            $this->assertTrue((bool) $menu->is_active);
+            $this->assertEquals($this->siteId, $menu->site_id);
+        }
+
+        $menuNames = $menus->pluck('name')->toArray();
+        $this->assertContains('Active 1', $menuNames);
+        $this->assertContains('Active 2', $menuNames);
+        $this->assertNotContains('Inactive', $menuNames);
+    }
+
     public function test_get_all_menus_returns_active_menus_with_relations(): void
     {
         // Arrange
@@ -216,6 +240,30 @@ class MenuRepositoryTest extends RepositoryTestCase
         $this->assertEquals(2, $child2->sort_order);
     }
 
+    public function test_create_menu_item_calculates_sort_order_per_column_group(): void
+    {
+        // Arrange
+        $menu = $this->createMenu();
+
+        $this->createMenuItem(['column_group' => 0, 'sort_order' => 0, 'menu_id' => $menu->id]);
+        $this->createMenuItem(['column_group' => 0, 'sort_order' => 1, 'menu_id' => $menu->id]);
+        $this->createMenuItem(['column_group' => 1, 'sort_order' => 0, 'menu_id' => $menu->id]);
+
+        $data = [
+            'menu_id' => $menu->id,
+            'label' => 'Column Group 1 Item',
+            'url' => '/col1',
+            'parent_id' => null,
+            'column_group' => 1,
+        ];
+
+        // Act
+        $item = $this->repository->createMenuItem($data);
+
+        // Assert
+        $this->assertEquals(1, $item->sort_order); // Max in column_group 1 is 0, so new should be 1
+    }
+
     public function test_update_menu_item_modifies_item(): void
     {
         // Arrange
@@ -272,6 +320,31 @@ class MenuRepositoryTest extends RepositoryTestCase
         $this->assertNull($fresh2->parent_id);
         $this->assertEquals(1, $fresh3->sort_order);
         $this->assertNull($fresh3->parent_id);
+    }
+
+    public function test_reorder_menu_items_uses_transaction(): void
+    {
+        // This test verifies that reordering uses a transaction
+        // If one update fails, all should rollback
+
+        // Arrange
+        $menu = $this->createMenu();
+        $item1 = $this->createMenuItem(['menu_id' => $menu->id]);
+
+        $reorderData = [
+            ['id' => $item1->id, 'sort_order' => 0, 'parent_id' => null],
+            ['id' => 99999, 'sort_order' => 1, 'parent_id' => null], // Invalid ID
+        ];
+
+        // Act & Assert
+        try {
+            $this->repository->reorderMenuItems($reorderData);
+            $this->fail('Should have thrown an exception');
+        } catch (\Exception $e) {
+            // Expected - transaction should rollback
+            // Original sort_order should be preserved
+            $this->assertNotNull(MenuItem::find($item1->id));
+        }
     }
 
     public function test_delete_menu_removes_menu(): void

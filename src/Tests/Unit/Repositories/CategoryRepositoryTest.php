@@ -21,7 +21,7 @@ class CategoryRepositoryTest extends RepositoryTestCase
         $this->repository = new CategoryRepository();
     }
 
-    public function test_it_can_find_category_by_slug(): void
+    public function testItCanFindCategoryBySlug(): void
     {
         // Arrange
         $category = $this->createCategory(['slug' => 'unique-category-slug', 'name' => 'Unique Category']);

@@ -647,12 +647,6 @@ abstract class Model
         return json_encode($this->toArray());
     }
 
-    protected function class_basename(string $class): string
-    {
-        $class = is_object($class) ? get_class($class) : $class;
-        return basename(str_replace('\\', '/', $class));
-    }
-
     public static function scope(string $name, callable $callback): void
     {
         static::$scopes[$name] = $callback;

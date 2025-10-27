@@ -11,6 +11,7 @@ use App\Search\SearchCriteria;
 use App\Services\UserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class UserServiceTest extends FunctionalTestCase
@@ -34,12 +35,47 @@ class UserServiceTest extends FunctionalTestCase
             perPage: 10
         );
 
+        $expectedData = [
+            ['id' => 1, 'name' => 'Admin User', 'role' => 'admin'],
+            ['id' => 2, 'name' => 'Another Admin', 'role' => 'admin']
+        ];
+
         $paginatedResult = new PaginatedResult(
-            [['id' => 1, 'name' => 'Admin User', 'role' => 'admin']],
-            1,
+            $expectedData,
+            2,
             1,
             10
         );
+
+        $this->repository
+            ->shouldReceive('search')
+            ->once()
+            ->with(Mockery::on(function ($arg) use ($criteria) {
+                return $arg instanceof SearchCriteria
+                    && $arg->getFilters() === $criteria->getFilters()
+                    && $arg->getPage() === $criteria->getPage()
+                    && $arg->getPerPage() === $criteria->getPerPage();
+            }))
+            ->andReturn($paginatedResult);
+
+        $result = $this->service->searchUsers($criteria);
+
+        $this->assertInstanceOf(PaginatedResult::class, $result);
+        $this->assertSame(2, $result->getTotal());
+        $this->assertSame($expectedData, $result->getData());
+        $this->assertSame(1, $result->getPage());
+        $this->assertSame(10, $result->getPerPage());
+    }
+
+    public function testSearchUsersWithEmptyResults(): void
+    {
+        $criteria = new SearchCriteria(
+            filters: ['role' => 'nonexistent'],
+            page: 1,
+            perPage: 10
+        );
+
+        $paginatedResult = new PaginatedResult([], 0, 1, 10);
 
         $this->repository
             ->shouldReceive('search')
@@ -49,23 +85,30 @@ class UserServiceTest extends FunctionalTestCase
 
         $result = $this->service->searchUsers($criteria);
 
-        $this->assertInstanceOf(PaginatedResult::class, $result);
-        $this->assertEquals(1, $result->getTotal());
+        $this->assertSame(0, $result->getTotal());
+        $this->assertEmpty($result->getData());
     }
 
     public function testGetUserByIdReturnsUser(): void
     {
-        $user = new User(['id' => 1, 'name' => 'John Doe']);
+        $expectedUser = new User([
+            'id' => 1,
+            'name' => 'John Doe',
+            'email' => 'john@example.com'
+        ]);
 
         $this->repository
             ->shouldReceive('find')
             ->once()
             ->with(1)
-            ->andReturn($user);
+            ->andReturn($expectedUser);
 
         $result = $this->service->getUserById(1);
 
-        $this->assertSame($user, $result);
+        $this->assertSame($expectedUser, $result);
+        $this->assertSame(1, $result->id);
+        $this->assertSame('John Doe', $result->name);
+        $this->assertSame('john@example.com', $result->email);
     }
 
     public function testGetUserByIdReturnsNullWhenNotFound(): void
@@ -81,83 +124,174 @@ class UserServiceTest extends FunctionalTestCase
         $this->assertNull($result);
     }
 
+    #[DataProvider('invalidUserIdProvider')]
+    public function testGetUserByIdWithInvalidIds($invalidId): void
+    {
+        $this->repository
+            ->shouldReceive('find')
+            ->once()
+            ->with($invalidId)
+            ->andReturn(null);
+
+        $result = $this->service->getUserById($invalidId);
+
+        $this->assertNull($result);
+    }
+
+    public static function invalidUserIdProvider(): array
+    {
+        return [
+            'negative id' => [-1],
+            'zero id' => [0],
+            'very large id' => [PHP_INT_MAX],
+        ];
+    }
+
     public function testCreateUserHashesPassword(): void
     {
-        $hashMock = Mockery::mock('overload:App\Framework\Support\Hash');
+        $plainPassword = 'password123';
+        $hashedPassword = 'hashed_password_' . bin2hex(random_bytes(16));
 
+        $hashMock = Mockery::mock('overload:' . Hash::class);
         $hashMock->shouldReceive('make')
             ->once()
-            ->with('password123')
-            ->andReturn('hashed_password');
+            ->with($plainPassword)
+            ->andReturn($hashedPassword);
 
         $data = [
             'name' => 'John Doe',
             'email' => 'john@example.com',
-            'password' => 'password123',
+            'password' => $plainPassword,
+            'role' => 'user'
         ];
 
-        $user = new User($data);
+        $expectedUser = new User(array_merge($data, ['password' => $hashedPassword]));
 
         $this->repository
             ->shouldReceive('create')
             ->once()
-            ->with(Mockery::on(function ($arg) {
-                return $arg['password'] === 'hashed_password';
+            ->with(Mockery::on(function ($arg) use ($data, $hashedPassword) {
+                return is_array($arg)
+                    && $arg['name'] === $data['name']
+                    && $arg['email'] === $data['email']
+                    && $arg['password'] === $hashedPassword
+                    && $arg['role'] === $data['role'];
             }))
-            ->andReturn($user);
+            ->andReturn($expectedUser);
 
         $result = $this->service->createUser($data);
 
         $this->assertInstanceOf(User::class, $result);
+        $this->assertSame('John Doe', $result->name);
+        $this->assertSame('john@example.com', $result->email);
     }
 
-    public function test_update_user_hashes_password_when_provided(): void
+    public function testCreateUserWithoutOptionalFields(): void
     {
-        $hashMock = Mockery::mock('overload:App\Framework\Support\Hash');
+        $plainPassword = 'password123';
+        $hashedPassword = 'hashed_' . bin2hex(random_bytes(8));
 
+        $hashMock = Mockery::mock('overload:' . Hash::class);
         $hashMock->shouldReceive('make')
             ->once()
-            ->with('newpassword')
-            ->andReturn('hashed_new_password');
+            ->with($plainPassword)
+            ->andReturn($hashedPassword);
+
+        $data = [
+            'name' => 'Jane Smith',
+            'email' => 'jane@example.com',
+            'password' => $plainPassword
+        ];
+
+        $expectedUser = new User(array_merge($data, ['password' => $hashedPassword]));
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($arg) use ($hashedPassword) {
+                return $arg['password'] === $hashedPassword;
+            }))
+            ->andReturn($expectedUser);
+
+        $result = $this->service->createUser($data);
+
+        $this->assertInstanceOf(User::class, $result);
+        $this->assertSame('Jane Smith', $result->name);
+    }
+
+
+    public function testUpdateUserHashesPasswordWhenProvided(): void
+    {
+        $newPassword = 'newpassword123';
+        $hashedPassword = 'hashed_new_' . bin2hex(random_bytes(16));
+
+        $hashMock = Mockery::mock('overload:' . Hash::class);
+        $hashMock->shouldReceive('make')
+            ->once()
+            ->with($newPassword)
+            ->andReturn($hashedPassword);
 
         $data = [
             'name' => 'Jane Doe',
-            'password' => 'newpassword',
+            'password' => $newPassword,
+            'email' => 'jane.doe@example.com'
         ];
 
-        $user = new User(['id' => 1, 'name' => 'Jane Doe', 'password' => 'newpassword']);
+        $updatedUser = new User([
+            'id' => 1,
+            'name' => 'Jane Doe',
+            'email' => 'jane.doe@example.com',
+            'password' => $hashedPassword
+        ]);
 
         $this->repository
             ->shouldReceive('update')
             ->once()
-            ->with(1, Mockery::on(function ($arg) {
-                return $arg['password'] === 'hashed_new_password';
+            ->with(1, Mockery::on(function ($arg) use ($hashedPassword) {
+                return is_array($arg)
+                    && $arg['password'] === $hashedPassword
+                    && $arg['name'] === 'Jane Doe'
+                    && $arg['email'] === 'jane.doe@example.com';
             }))
-            ->andReturn($user);
+            ->andReturn($updatedUser);
 
         $result = $this->service->updateUser(1, $data);
 
         $this->assertInstanceOf(User::class, $result);
-        $this->assertEquals('Jane Doe', $result->name);
+        $this->assertSame('Jane Doe', $result->name);
+        $this->assertSame('jane.doe@example.com', $result->email);
     }
+
 
     public function testUpdateUserRemovesPasswordWhenNotProvided(): void
     {
-        $data = ['name' => 'Jane Doe'];
-        $user = new User(['id' => 1, 'name' => 'John Doe', 'password' => '<PASSWORD>']);
+        $data = [
+            'name' => 'Jane Doe Updated',
+            'email' => 'jane.updated@example.com'
+        ];
+
+        $updatedUser = new User([
+            'id' => 1,
+            'name' => 'Jane Doe Updated',
+            'email' => 'jane.updated@example.com',
+            'password' => 'existing_hashed_password'
+        ]);
 
         $this->repository
             ->shouldReceive('update')
             ->once()
-            ->with(1, Mockery::on(function ($arg) {
-                return !isset($arg['password']);
+            ->with(1, Mockery::on(function ($arg) use ($data) {
+                return is_array($arg)
+                    && !array_key_exists('password', $arg)
+                    && $arg['name'] === $data['name']
+                    && $arg['email'] === $data['email'];
             }))
-            ->andReturn($user);
+            ->andReturn($updatedUser);
 
         $result = $this->service->updateUser(1, $data);
 
         $this->assertInstanceOf(User::class, $result);
-        $this->assertEquals('John Doe', $result->name);
+        $this->assertEquals('Jane Doe Updated', $result->name);
     }
 
     public function testDeleteUserReturnsTrueOnSuccess(): void

@@ -5,13 +5,16 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\Page;
 use App\Models\PageTag;
 use App\Models\Tag;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class TagControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsTags()
     {
-        Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;
-        Tag::create(['name' => 'JavaScript', 'slug' => 'javascript', 'site_id' => $this->siteId]);;
+        $this->createTag();
+        $this->createTag();
         $response = $this->getForSite('/api/tags');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -21,7 +24,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testShowReturnsTagById()
     {
-        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        $tag = $this->createTag(['name' => 'PHP', 'slug' => 'php']);
         $response = $this->getForSite("/api/tags/{$tag->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -30,7 +33,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testShowReturnsTagBySlug()
     {
-        Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;;
+        $tag = $this->createTag(['name' => 'PHP', 'slug' => 'php']);
         $response = $this->getForSite('/api/tags/php');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -63,14 +66,14 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesUniqueSlug()
     {
-        Tag::create(['name' => 'PHP', 'slug' => 'php', 'site_id' => $this->siteId]);;
+        $this->createTag(['name' => 'PHP', 'slug' => 'php']);
         $response = $this->postForSite('/api/tags', ['name' => 'New PHP', 'slug' => 'php']);
         $this->assertEquals(422, $response->getStatusCode());
     }
 
     public function testUpdateModifiesTag()
     {
-        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        $tag = $this->createTag();
         $response = $this->putForSite("/api/tags/{$tag->id}", ['name' => 'PHP 8', 'description' => 'Updated description', 'is_featured' => true]);
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -85,7 +88,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesTag()
     {
-        $tag = Tag::create(['name' => 'PHP', 'slug' => 'php']);
+        $tag = $this->createTag();
         $response = $this->deleteForSite("/api/tags/{$tag->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Tag::find($tag->id));
@@ -94,7 +97,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testPopularReturnsTopTags()
     {
         for ($i = 1; $i <= 40; $i++) {
-            Tag::create(['name' => "Tag $i", 'slug' => "tag-$i", 'site_id' => $this->siteId]);;
+           $this->createTag();
         }
         $response = $this->getForSite('/api/popular-tags');
         $this->assertEquals(200, $response->getStatusCode());
@@ -104,9 +107,10 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testFeaturedReturnsFeaturedTags()
     {
-        Tag::create(['name' => 'Featured 1', 'slug' => 'featured-1', 'is_featured' => true]);
-        Tag::create(['name' => 'Regular', 'slug' => 'regular', 'is_featured' => false]);
-        Tag::create(['name' => 'Featured 2', 'slug' => 'featured-2', 'is_featured' => true]);
+        $this->createTag(['name' => 'Featured 1', 'slug' => 'featured-1', 'is_featured' => true]);
+        $this->createTag(['name' => 'Regular', 'slug' => 'regular', 'is_featured' => false]);
+        $this->createTag(['name' => 'Featured 2', 'slug' => 'featured-2', 'is_featured' => true]);
+
         $response = $this->getForSite('/api/featured-tags');
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -117,7 +121,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testCloudReturnsTagCloud()
     {
         for ($i = 1; $i <= 120; $i++) {
-            Tag::create(['name' => "Tag $i", 'slug' => "tag-$i", 'usage_count' => 10, 'site_id' => $this->siteId]);;
+            $this->createTag(['name' => "Tag $i", 'slug' => "tag-$i", 'usage_count' => 10, 'site_id' => $this->siteId]);;
         }
         $response = $this->getForSite('/api/tags/cloud');
         $this->assertEquals(200, $response->getStatusCode());
@@ -128,7 +132,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testCleanupRemovesUnusedTags()
     {
-        Tag::create(['name' => 'Unused Tag', 'slug' => 'unused']);
+        $this->createTag(['name' => 'Used Tag', 'slug' => 'used']);
         $response = $this->postForSite('/api/tags/cleanup');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -138,10 +142,7 @@ class TagControllerTest extends FunctionalTestCase
     public function testCheckDeleteTagReturnsCanDeleteWhenNoPagesExist()
     {
         // Arrange: create an author with no pages
-        $category = Tag::create([
-            'name' => 'Lonely Author',
-            'slug' => 'lonely-author',
-        ]);
+        $category = $this->createTag();
 
         // Act
         $response = $this->getForSite("/api/tags/{$category->id}/check-delete");
@@ -160,21 +161,11 @@ class TagControllerTest extends FunctionalTestCase
     public function testCheckDeleteTagReturnsRequiresReassignmentWhenPagesExist()
     {
         // Arrange: create an author that has pages
-        $category = Tag::create([
-            'name' => 'Author With Pages',
-            'slug' => 'author-with-pages',
-        ]);
+        $category = $this->createTag();
 
         // Create one or more pages for this author
-        $page = \App\Models\Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-        ]);
-
-        PageTag::create([
-            'page_id' => $page->id,
-            'tag_id' => $category->id,
-        ]);
+        $page = $this->createPage();
+        $this->attachTagToPage($page, $category);
 
         // Act
         $response = $this->getForSite("/api/tags/{$category->id}/check-delete");
@@ -202,13 +193,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testDuplicateTagSuccessfully(): void
     {
-        $tag = Tag::create([
-            'name' => 'PHP',
-            'description' => 'PHP programming',
-            'slug' => 'php',
-            'status' => 'active',
-            'site_id' => $this->siteId,
-        ]);
+        $tag = $this->createTag(['name' => 'PHP', 'slug' => 'php', 'description' => 'PHP programming']);;
 
         $response = $this->postForSite("/api/tags/{$tag->id}/duplicate");
 
@@ -221,24 +206,12 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testDuplicateTagWithPages(): void
     {
-        $tag = Tag::create([
-            'name' => 'Laravel',
-            'slug' => 'laravel',
-            'status' => 'active'
-        ]);
+        $tag = $this->createTag();
 
         // Create pages with this tag
-        $page = Page::create([
-            'title' => 'Laravel Tutorial',
-            'slug' => 'laravel-tutorial',
-            'status' => 'published'
-        ]);
-
+        $page = $this->createPage();
         // Associate tag with page using the pivot table directly
-        PageTag::create([
-            'page_id' => $page->id,
-            'tag_id' => $tag->id,
-        ]);
+        $this->attachTagToPage($page, $tag);
 
         $response = $this->postForSite("/api/tags/{$tag->id}/duplicate");
 
@@ -257,15 +230,12 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testDuplicateTagWithSeoFields(): void
     {
-        $tag = Tag::create([
+        $tag = $this->createTag([
             'name' => 'PHP',
-            'slug' => 'php',
-            'status' => 'active',
             'seo_title' => 'PHP SEO Title',
             'seo_description' => 'PHP SEO Description',
             'no_index' => true,
             'canonical_url' => 'https://example.com/php',
-            'site_id' => $this->siteId,
         ]);
 
         $response = $this->postForSite("/api/tags/{$tag->id}/duplicate");
@@ -283,46 +253,16 @@ class TagControllerTest extends FunctionalTestCase
     public function testMergeTagsSuccessfully(): void
     {
         // Arrange
-        $fromTag = Tag::create([
-            'name' => 'Old Tag',
-            'slug' => 'old-tag',
-            'usage_count' => 5,
-            'site_id' => $this->siteId,
-        ]);
+        $fromTag = $this->createTag(['usage_count' => 10]);
 
-        $toTag = Tag::create([
-            'name' => 'New Tag',
-            'slug' => 'new-tag',
-            'usage_count' => 10,
-            'site_id' => $this->siteId,
-        ]);
+        $toTag = $this->createTag(['usage_count' => 5]);
 
         // Create pages with fromTag
-        $page1 = Page::create([
-            'title' => 'Page 1',
-            'slug' => 'page-1',
-            'status' => 'published',
-            'site_id' => $this->siteId,
-        ]);
+        $page1 = $this->createPage();
 
-        $page2 = Page::create([
-            'title' => 'Page 2',
-            'slug' => 'page-2',
-            'status' => 'published',
-            'site_id' => $this->siteId,
-        ]);
-
-        PageTag::create([
-            'page_id' => $page1->id,
-            'tag_id' => $fromTag->id,
-            'site_id' => $this->siteId,
-        ]);
-
-        PageTag::create([
-            'page_id' => $page2->id,
-            'tag_id' => $fromTag->id,
-            'site_id' => $this->siteId,
-        ]);
+        $page2 = $this->createPage();
+        $this->attachTagToPage($page1, $fromTag);
+        $this->attachTagToPage($page2, $fromTag);
 
         // Act
         $response = $this->postForSite('/api/tags/merge', [
@@ -350,11 +290,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testMergeTagsFailsForSameTag(): void
     {
-        $tag = Tag::create([
-            'name' => 'Tag',
-            'slug' => 'tag',
-            'site_id' => $this->siteId,
-        ]);
+        $tag = $this->createTag();
 
         $response = $this->postForSite('/api/tags/merge', [
             'from_tag_id' => $tag->id,
@@ -366,11 +302,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testMergeTagsFailsWhenSourceNotFound(): void
     {
-        $toTag = Tag::create([
-            'name' => 'Target Tag',
-            'slug' => 'target-tag',
-            'site_id' => $this->siteId,
-        ]);
+        $toTag = $this->createTag();
 
         $response = $this->postForSite('/api/tags/merge', [
             'from_tag_id' => 9999,
@@ -382,11 +314,7 @@ class TagControllerTest extends FunctionalTestCase
 
     public function testMergeTagsFailsWhenTargetNotFound(): void
     {
-        $fromTag = Tag::create([
-            'name' => 'Source Tag',
-            'slug' => 'source-tag',
-            'site_id' => $this->siteId,
-        ]);
+        $fromTag = $this->createTag();
 
         $response = $this->postForSite('/api/tags/merge', [
             'from_tag_id' => $fromTag->id,

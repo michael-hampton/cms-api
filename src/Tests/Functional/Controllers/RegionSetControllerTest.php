@@ -172,6 +172,10 @@ class RegionSetControllerTest extends FunctionalTestCase
         $regionSet2 = $this->createRegionSet();
         $this->createTerritory(['region_set_id' => $regionSet1->id, 'code' => 'GB']);
 
+        // Add page assignment
+        $page = $this->createPage();
+        $this->attachRegionSetToPage($page, $regionSet1);
+
         $response = $this->deleteForSite(
             "/api/region-sets/{$regionSet1->id}?reassign_to_region_set_id={$regionSet2->id}"
         );
@@ -181,6 +185,12 @@ class RegionSetControllerTest extends FunctionalTestCase
         // Verify territory was reassigned
         $territory = Territory::where('code', 'GB')->first();
         $this->assertEquals($regionSet2->id, $territory->region_set_id);
+
+        // Verify page was reassigned via pivot table
+        $pageAssignment = PageRegionSet::where('page_id', $page->id)
+            ->where('region_set_id', $regionSet2->id)
+            ->first();
+        $this->assertNotNull($pageAssignment);
     }
 
     public function testCheckDeletable()

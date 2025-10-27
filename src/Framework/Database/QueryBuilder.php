@@ -585,7 +585,18 @@ class QueryBuilder
         return $this->increment($column, -$amount, $extra);
     }
 
-    public function updateQuery(array $values): int
+    /**
+     * Update records in the database with the given values.
+     *
+     * @param array $values
+     * @return int The number of affected rows.
+     */
+    public function update(array $values): int
+    {
+        return $this->updateQuery($values);
+    }
+
+    private function updateQuery(array $values): int
     {
         $setParts = [];
         $bindings = [];

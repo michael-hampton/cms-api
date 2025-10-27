@@ -233,9 +233,10 @@ class RegionSetServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(collect([]));
 
-        $mockRegionSet->shouldReceive('pages')
+        $this->repository->shouldReceive('reassignPages')
             ->once()
-            ->andReturnSelf();
+            ->with($regionSetId, $reassignToId)
+            ->andReturn(true);
 
         $mockRegionSet->shouldReceive('delete')
             ->once()
@@ -414,9 +415,22 @@ class RegionSetServiceTest extends FunctionalTestCase
             ->with('GB-copy', 1)
             ->andReturn(null);
 
+        $this->territoryRepository->shouldReceive('generateUniqueSlug')
+            ->once()
+            ->with('United Kingdom', 1)
+            ->andReturn('united-kingdom');
+
         $this->territoryRepository->shouldReceive('create')
             ->once()
-            ->with(['name' => 'United Kingdom', 'code' => 'GB-copy', 'region_set_id' => 2, 'is_active' => true, 'sort_order' => 0, 'site_id' => 1])
+            ->with([
+                'name' => 'United Kingdom',
+                'slug' => 'united-kingdom',
+                'code' => 'GB-copy',
+                'region_set_id' => 2,
+                'is_active' => true,
+                'sort_order' => 0,
+                'site_id' => 1
+            ])
             ->andReturn($mockTerritory);
 
         // Act

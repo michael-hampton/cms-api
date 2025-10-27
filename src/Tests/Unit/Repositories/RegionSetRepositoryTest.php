@@ -3,8 +3,6 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageRegionSet;
-use App\Models\RegionSet;
-use App\Models\Territory;
 use App\Repositories\RegionSetRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -19,19 +17,6 @@ class RegionSetRepositoryTest extends RepositoryTestCase
     {
         parent::setUp();
         $this->repository = new RegionSetRepository();
-    }
-
-    protected function createRegionSet(array $overrides = []): RegionSet
-    {
-        return RegionSet::create(array_merge([
-            'site_id' => $this->siteId,
-            'name' => 'Test Region Set',
-            'slug' => 'test-region-set-' . uniqid(),
-            'is_active' => true,
-            'sort_order' => 0,
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
-        ], $overrides));
     }
 
     public function test_search_returns_paginated_results_with_relations(): void
@@ -116,12 +101,7 @@ class RegionSetRepositoryTest extends RepositoryTestCase
         // Arrange
         $regionSet = $this->createRegionSet();
         $page = $this->createPage();
-
-        PageRegionSet::create([
-            'page_id' => $page->id,
-            'region_set_id' => $regionSet->id,
-            'site_id' => $this->siteId,
-        ]);
+        $this->attachRegionSetToPage($page, $regionSet);
 
         // Act
         $result = $this->repository->checkDeletable($regionSet->id);
@@ -205,12 +185,7 @@ class RegionSetRepositoryTest extends RepositoryTestCase
         $page1 = $this->createPage(['title' => 'Available Page', 'site_id' => $this->siteId]);
         $page2 = $this->createPage(['title' => 'Assigned Page', 'site_id' => $this->siteId]);
 
-        // Assign page2 to regionSet2
-        PageRegionSet::create([
-            'page_id' => $page2->id,
-            'region_set_id' => $regionSet2->id,
-            'site_id' => $this->siteId,
-        ]);
+        $this->attachRegionSetToPage($page2, $regionSet2);
 
         // Act
         $result = $this->repository->searchAvailablePages($regionSet1->id, '', 20, 1, $this->siteId);
@@ -287,5 +262,38 @@ class RegionSetRepositoryTest extends RepositoryTestCase
         $this->assertArrayHasKey('total', $result['pagination']);
         $this->assertCount(10, $result['data']);
         $this->assertGreaterThanOrEqual(25, $result['pagination']['total']);
+    }
+
+    public function test_reassign_pages_updates_pivot_table(): void
+    {
+        // Arrange
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        PageRegionSet::create([
+            'page_id' => $page1->id,
+            'region_set_id' => $regionSet1->id,
+            'site_id' => $this->siteId,
+        ]);
+
+        PageRegionSet::create([
+            'page_id' => $page2->id,
+            'region_set_id' => $regionSet1->id,
+            'site_id' => $this->siteId,
+        ]);
+
+        // Act
+        $result = $this->repository->reassignPages($regionSet1->id, $regionSet2->id);
+
+        // Assert
+        $this->assertTrue($result);
+
+        $reassigned = PageRegionSet::where('region_set_id', $regionSet2->id)->count();
+        $this->assertEquals(2, $reassigned);
+
+        $oldAssignments = PageRegionSet::where('region_set_id', $regionSet1->id)->count();
+        $this->assertEquals(0, $oldAssignments);
     }
 }

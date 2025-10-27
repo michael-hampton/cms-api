@@ -252,13 +252,214 @@ class VoucherRepositoryTest extends RepositoryTestCase
     }
 
     /** @test */
-//    public function check_deletable_throws_exception_when_not_found(): void
-//    {
-//        // Expect
-//        $this->expectException(\Exception::class);
-//        $this->expectExceptionMessage('Voucher not found');
-//
-//        // Act
-//        $this->repository->checkDeletable
+    public function test_check_deletable_throws_exception_when_not_found(): void
+    {
+        // Expect
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Voucher not found');
 
+        // Act
+        $this->repository->checkDeletable(99999);
+    }
+
+    public function test_get_alternatives_returns_other_active_vouchers(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher(['code' => 'MAIN', 'status' => 'active']);
+        $alternative1 = $this->createVoucher(['code' => 'ALT1', 'status' => 'active']);
+        $alternative2 = $this->createVoucher(['code' => 'ALT2', 'status' => 'active']);
+        $inactiveVoucher = $this->createVoucher(['code' => 'INACTIVE', 'status' => 'inactive']);
+
+        // Act
+        $alternatives = $this->repository->getAlternatives($voucher->id);
+
+        // Assert
+        $alternativeIds = $alternatives->pluck('id')->toArray();
+
+        $this->assertContains($alternative1->id, $alternativeIds);
+        $this->assertContains($alternative2->id, $alternativeIds);
+        $this->assertNotContains($voucher->id, $alternativeIds); // Should exclude itself
+        $this->assertNotContains($inactiveVoucher->id, $alternativeIds);
+    }
+
+    public function test_get_alternatives_filters_by_site(): void
+    {
+        $site = $this->createSite();
+        // Arrange
+        $voucher = $this->createVoucher(['site_id' => $this->siteId]);
+        $sameSiteVoucher = $this->createVoucher(['site_id' => $this->siteId, 'status' => 'active']);
+        $otherSiteVoucher = $this->createVoucher(['site_id' => $site->id, 'status' => 'active']);
+
+        // Act
+        $alternatives = $this->repository->getAlternatives($voucher->id, $this->siteId);
+
+        // Assert
+        $alternativeIds = $alternatives->pluck('id')->toArray();
+
+        $this->assertContains($sameSiteVoucher->id, $alternativeIds);
+        $this->assertNotContains($otherSiteVoucher->id, $alternativeIds);
+    }
+
+    public function test_get_alternatives_returns_empty_collection_when_voucher_not_found(): void
+    {
+        // Act
+        $alternatives = $this->repository->getAlternatives(99999);
+
+        // Assert
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $alternatives);
+        $this->assertCount(0, $alternatives);
+    }
+
+    public function test_code_exists_in_site_returns_true_when_exists(): void
+    {
+        // Arrange
+        $this->createVoucher(['code' => 'EXISTINGCODE', 'site_id' => $this->siteId]);
+
+        // Act
+        $exists = $this->repository->codeExistsInSite('EXISTINGCODE', $this->siteId);
+
+        // Assert
+        $this->assertTrue($exists);
+    }
+
+    public function test_code_exists_in_site_returns_false_when_not_exists(): void
+    {
+        // Act
+        $exists = $this->repository->codeExistsInSite('NONEXISTENT', $this->siteId);
+
+        // Assert
+        $this->assertFalse($exists);
+    }
+
+    public function test_code_exists_in_site_filters_by_site(): void
+    {
+        $site = $this->createSite();
+        // Arrange
+        $this->createVoucher(['code' => 'TESTCODE', 'site_id' => $site->id]);
+
+        // Act
+        $exists = $this->repository->codeExistsInSite('TESTCODE', $this->siteId);
+
+        // Assert
+        $this->assertFalse($exists); // Should not find code in different site
+    }
+
+    public function test_code_exists_in_site_excludes_specific_id(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher(['code' => 'TESTCODE', 'site_id' => $this->siteId]);
+
+        // Act
+        $exists = $this->repository->codeExistsInSite('TESTCODE', $this->siteId, $voucher->id);
+
+        // Assert
+        $this->assertFalse($exists); // Should return false because we're excluding this voucher
+    }
+
+    public function test_code_exists_in_site_with_exclude_id_still_finds_other_matches(): void
+    {
+        // Arrange
+        $voucher1 = $this->createVoucher(['code' => 'SAMECODE', 'site_id' => $this->siteId]);
+        $voucher2 = $this->createVoucher(['code' => 'SAMECODE', 'site_id' => $this->siteId]);
+
+        // Act
+        $exists = $this->repository->codeExistsInSite('SAMECODE', $this->siteId, $voucher1->id);
+
+        // Assert
+        $this->assertTrue($exists); // Should still find voucher2
+    }
+
+    public function test_update_expired_vouchers_expires_vouchers_past_expiry_date(): void
+    {
+        // Arrange
+        $expiredVoucher1 = $this->createVoucher([
+            'status' => 'active',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-2 days'))
+        ]);
+
+        $expiredVoucher2 = $this->createVoucher([
+            'status' => 'active',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-1 hour'))
+        ]);
+
+        $activeVoucher = $this->createVoucher([
+            'status' => 'active',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+1 day'))
+        ]);
+
+        // Act
+        $count = $this->repository->updateExpiredVouchers();
+
+        // Assert
+        $this->assertEquals(2, $count);
+
+        $this->assertEquals('expired', $this->fresh($expiredVoucher1)->status);
+        $this->assertEquals('expired', $this->fresh($expiredVoucher2)->status);
+        $this->assertEquals('active', $this->fresh($activeVoucher)->status);
+    }
+
+    public function test_update_expired_vouchers_only_affects_current_site(): void
+    {
+        // Arrange
+        $thisSiteVoucher = $this->createVoucher([
+            'site_id' => $this->siteId,
+            'status' => 'active',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        $otherSiteVoucher = $this->createVoucher();
+
+        // Act
+        $count = $this->repository->updateExpiredVouchers();
+
+        // Assert
+        $this->assertEquals(1, $count); // Only this site's voucher
+        $this->assertEquals('expired', $this->fresh($thisSiteVoucher)->status);
+        $this->assertEquals('active', $this->fresh($otherSiteVoucher)->status);
+    }
+
+    public function test_update_expired_vouchers_returns_zero_when_none_expired(): void
+    {
+        // Arrange
+        $this->createVoucher([
+            'status' => 'active',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+1 day'))
+        ]);
+
+        // Act
+        $count = $this->repository->updateExpiredVouchers();
+
+        // Assert
+        $this->assertEquals(0, $count);
+    }
+
+    public function test_update_expired_vouchers_ignores_already_expired_status(): void
+    {
+        // Arrange
+        $this->createVoucher([
+            'status' => 'expired',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        // Act
+        $count = $this->repository->updateExpiredVouchers();
+
+        // Assert
+        $this->assertEquals(0, $count); // Should not process already expired vouchers
+    }
+
+    public function test_update_expired_vouchers_ignores_inactive_vouchers(): void
+    {
+        // Arrange
+        $this->createVoucher([
+            'status' => 'inactive',
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        // Act
+        $count = $this->repository->updateExpiredVouchers();
+
+        // Assert
+        $this->assertEquals(0, $count);
+    }
 }

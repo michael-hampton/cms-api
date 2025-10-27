@@ -3,18 +3,15 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Author;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class AuthorControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsAuthorsList()
     {
-        Author::create([
-            'name' => 'John Doe',
-            'slug' => 'john-doe',
-            'email' => 'john@example.com',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+       $this->createAuthor();
 
         $response = $this->getForSite('/api/authors');
 
@@ -26,8 +23,8 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchCriteria()
     {
-        Author::create(['name' => 'John Doe', 'slug' => 'john-doe', 'status' => 'active', 'site_id' => $this->siteId]);
-        Author::create(['name' => 'Jane Smith', 'slug' => 'jane-smith', 'status' => 'inactive', 'site_id' => $this->siteId]);
+        $this->createAuthor(['name' => 'John Doe']);
+        $this->createAuthor(['name' => 'Jane Smith']);
 
         $response = $this->getForSite('/api/authors?status=active');
 
@@ -86,13 +83,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesUniqueEmail()
     {
-        Author::create([
-            'name' => 'John Doe',
-            'slug' => 'john-doe',
-            'email' => 'john@example.com',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+      $this->createAuthor(['email' => 'john@example.com']);
 
         $response = $this->postForSite('/api/authors', [
             'name' => 'Jane Doe',
@@ -100,18 +91,14 @@ class AuthorControllerTest extends FunctionalTestCase
         ]);
 
         $this->assertEquals(422, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertStringContainsString('email', strtolower($data['message']));
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('email', $data['errors']);
     }
 
     public function testShowReturnsAuthorById()
     {
-        $author = Author::create([
-            'name' => 'John Doe',
-            'slug' => 'john-doe',
-            'email' => 'john@example.com',
-            'status' => 'active'
-        ]);
+        $author = $this->createAuthor(['name' => 'John Doe']);
 
         $response = $this->getForSite("/api/authors/{$author->id}");
 
@@ -123,13 +110,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testShowReturnsAuthorBySlug()
     {
-        Author::create([
-            'name' => 'John Doe',
-            'slug' => 'john-doe',
-            'email' => 'john@example.com',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $this->createAuthor(['slug' => 'john-doe', 'name' => 'John Doe']);
 
         $response = $this->getForSite('/api/authors/john-doe');
 
@@ -147,12 +128,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesAuthor()
     {
-        $author = Author::create([
-            'name' => 'John Doe',
-            'slug' => 'john-doe',
-            'email' => 'john@example.com',
-            'status' => 'active'
-        ]);
+        $author = $this->createAuthor();
 
         $response = $this->putForSite("/api/authors/{$author->id}", [
             'name' => 'John Updated',
@@ -194,12 +170,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesAuthor()
     {
-        $author = Author::create([
-            'name' => 'John Doe',
-            'slug' => 'john-doe',
-            'email' => 'john@example.com',
-            'status' => 'active'
-        ]);
+        $author = $this->createAuthor();
 
         $response = $this->deleteForSite("/api/authors/{$author->id}?reassignId=1");
 
@@ -216,8 +187,8 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testGetActiveReturnsOnlyActiveAuthors()
     {
-        Author::create(['name' => 'Active Author', 'slug' => 'active', 'status' => 'active']);
-        Author::create(['name' => 'Inactive Author', 'slug' => 'inactive', 'status' => 'inactive']);
+       $this->createAuthor(['status' => 'active', 'name' => 'Active Author']);
+       $this->createAuthor(['status' => 'inactive']);
 
         $response = $this->getForSite('/api/authors/active');
 
@@ -229,8 +200,8 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testMergeAuthors()
     {
-        $source = Author::create(['name' => 'Source', 'slug' => 'source', 'status' => 'active']);
-        $target = Author::create(['name' => 'Target', 'slug' => 'target', 'status' => 'active']);
+        $source = $this->createAuthor();
+        $target = $this->createAuthor();
 
         $response = $this->postForSite('/api/authors/merge', [
             'source_author_id' => $source->id,
@@ -253,11 +224,7 @@ class AuthorControllerTest extends FunctionalTestCase
     public function testCheckDeleteReturnsCanDeleteWhenNoPagesExist()
     {
         // Arrange: create an author with no pages
-        $author = Author::create([
-            'name' => 'Lonely Author',
-            'slug' => 'lonely-author',
-            'status' => 'active',
-        ]);
+        $author = $this->createAuthor();
 
         // Act
         $response = $this->getForSite("/api/authors/{$author->id}/check-delete");
@@ -276,18 +243,11 @@ class AuthorControllerTest extends FunctionalTestCase
     public function testCheckDeleteReturnsRequiresReassignmentWhenPagesExist()
     {
         // Arrange: create an author that has pages
-        $author = Author::create([
-            'name' => 'Author With Pages',
-            'slug' => 'author-with-pages',
-            'status' => 'active',
-        ]);
-
+        $author = $this->createAuthor();
         // Create one or more pages for this author
-        $page = \App\Models\Page::create([
-            'title' => 'Test Page',
-            'author_id' => $author->id,
-            'slug' => 'test-page',
-        ]);
+        $page = $this->createPage();
+
+        $this->attachAuthorToPage($page, $author);
 
         // Act
         $response = $this->getForSite("/api/authors/{$author->id}/check-delete");
@@ -316,14 +276,7 @@ class AuthorControllerTest extends FunctionalTestCase
     public function testDuplicateAuthorSuccessfully(): void
     {
         // Create original author
-        $author = Author::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'bio' => 'Original author bio',
-            'website' => 'https://johndoe.com',
-            'slug' => 'john-doe',
-            'status' => 'active'
-        ]);
+        $author = $this->createAuthor(['name' => 'John Doe', 'bio' => 'Original author bio', 'website' => 'https://johndoe.com', 'status' => 'active']);;
 
         // Duplicate the author
         $response = $this->postForSite("/api/authors/duplicate/{$author->id}");
@@ -351,12 +304,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testDuplicateAuthorWithCustomName(): void
     {
-        $author = Author::create([
-            'name' => 'Jane Smith',
-            'email' => 'jane@example.com',
-            'slug' => 'jane-smith',
-            'status' => 'active'
-        ]);
+        $author = $this->createAuthor();
 
         $response = $this->postForSite("/api/authors/duplicate/{$author->id}", [
             'name' => 'Jane Smith - Editor'
@@ -372,13 +320,7 @@ class AuthorControllerTest extends FunctionalTestCase
     public function testDuplicateAuthorWithAvatar(): void
     {
         // Create author with avatar
-        $author = Author::create([
-            'name' => 'Bob Jones',
-            'email' => 'bob@example.com',
-            'slug' => 'bob-jones',
-            'avatar' => 'avatars/bob.jpg',
-            'status' => 'active'
-        ]);
+        $author = $this->createAuthor(['avatar' => 'avatars/bob.jpg']);
 
         // Create dummy avatar file
         $avatarPath = 'uploads/avatars/bob.jpg';

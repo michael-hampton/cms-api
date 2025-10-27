@@ -3,21 +3,17 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\User;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class UserControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsPaginatedUsers(): void
     {
         // Create test users
         for ($i = 1; $i <= 20; $i++) {
-            User::create([
-                'name' => "Test User $i",
-                'email' => "user$i@example.com",
-                'password' => password_hash('password', PASSWORD_DEFAULT),
-                'role' => 'user',
-                'is_active' => true,
-                'site_id' => $this->siteId,
-            ]);
+            $this->createUser();
         }
 
         $response = $this->getForSite('/api/users');
@@ -33,23 +29,8 @@ class UserControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchQuery(): void
     {
-        User::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
-
-        User::create([
-            'name' => 'Jane Smith',
-            'email' => 'jane@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'admin',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
+        $this->createUser(['name' => 'John Doe']);
+        $this->createUser(['name' => 'Jane Doe']);
 
         $response = $this->getForSite('/api/users?q=John');
 
@@ -62,23 +43,8 @@ class UserControllerTest extends FunctionalTestCase
 
     public function testIndexWithRoleFilter(): void
     {
-        User::create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'admin',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
-
-        User::create([
-            'name' => 'Regular User',
-            'email' => 'user@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
+        $this->createUser(['role' => 'admin']);
+        $this->createUser(['role' => 'user']);
 
         $response = $this->getForSite('/api/users?role=admin');
 
@@ -91,23 +57,8 @@ class UserControllerTest extends FunctionalTestCase
 
     public function testIndexWithIsActiveFilter(): void
     {
-        User::create([
-            'name' => 'Active User',
-            'email' => 'active@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
-
-        User::create([
-            'name' => 'Inactive User',
-            'email' => 'inactive@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => false,
-            'site_id' => $this->siteId,
-        ]);
+        $this->createUser(['is_active' => true]);
+        $this->createUser(['is_active' => false]);
 
         $response = $this->getForSite('/api/users?is_active=true');
 
@@ -121,23 +72,8 @@ class UserControllerTest extends FunctionalTestCase
 
     public function testIndexWithSorting(): void
     {
-        User::create([
-            'name' => 'Zoe',
-            'email' => 'zoe@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
-
-        User::create([
-            'name' => 'Alice',
-            'email' => 'alice@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
+        $this->createUser(['name' => 'Zoe']);
+        $this->createUser(['name' => 'Alice']);
 
         $response = $this->getForSite('/api/users?sort_by=name&sort_order=asc');
 
@@ -150,14 +86,7 @@ class UserControllerTest extends FunctionalTestCase
     public function testIndexWithPagination(): void
     {
         for ($i = 1; $i <= 25; $i++) {
-            User::create([
-                'name' => "User $i",
-                'email' => "user$i@example.com",
-                'password' => password_hash('password', PASSWORD_DEFAULT),
-                'role' => 'user',
-                'is_active' => true,
-                'site_id' => $this->siteId,
-            ]);
+            $this->createUser();
         }
 
         $response = $this->getForSite('/api/users?page=2&per_page=10');
@@ -173,14 +102,7 @@ class UserControllerTest extends FunctionalTestCase
 
     public function testShowReturnsSingleUser(): void
     {
-        $user = User::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ]);
+        $user = $this->createUser(['name' => 'John Doe', 'email' => 'john@example.com']);
 
         $response = $this->getForSite("/api/users/{$user->id}");
 
@@ -315,22 +237,6 @@ class UserControllerTest extends FunctionalTestCase
 
         $response->assertStatus(404)
             ->assertJson(['message' => 'User not found']);
-    }
-
-    private function createUser(array $data = []) {
-        $email = !empty($data['email']) ? $data['email'] : sprintf('user_%s@example.com', uniqid());
-
-        $data = [
-            'name' => 'Jane Doe',
-            'email' => $email,
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-            'role' => 'user',
-            'is_active' => true,
-            'site_id' => $this->siteId,
-        ];
-
-       return User::create($data);
     }
 
 }

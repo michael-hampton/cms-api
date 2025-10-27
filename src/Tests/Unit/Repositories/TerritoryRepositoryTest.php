@@ -22,7 +22,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->repository = new TerritoryRepository();
     }
 
-    public function test_search_returns_paginated_results_with_relations(): void
+    public function testSearchReturnsPaginatedResultsWithRelations(): void
     {
         // Arrange
         $regionSet = $this->createRegionSet();
@@ -38,7 +38,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertGreaterThan(0, count($result->getData()));
     }
 
-    public function test_find_with_relations_loads_region_set(): void
+    public function testFindWithRelationsLoadsRegionSet(): void
     {
         // Arrange
         $regionSet = $this->createRegionSet();
@@ -52,7 +52,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertRelationLoaded($result, 'regionSet');
     }
 
-    public function test_get_by_region_set_returns_territories_for_region_set(): void
+    public function testGetByRegionSetReturnsTerritoriesForRegionSet(): void
     {
         // Arrange
         $regionSet1 = $this->createRegionSet();
@@ -72,7 +72,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertCollectionDoesNotContain($territories, ['name' => 'Territory 3']);
     }
 
-    public function test_get_active_returns_only_active_territories(): void
+    public function testGetActiveReturnsOnlyActiveTerritories(): void
     {
         // Arrange
         $active1 = $this->createTerritory(['name' => 'Active 1', 'is_active' => true]);
@@ -89,7 +89,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         }
     }
 
-    public function test_find_by_code_returns_territory(): void
+    public function testFindByCodeReturnsTerritory(): void
     {
         // Arrange
         $territory = $this->createTerritory(['code' => 'UNIQUE-CODE']);
@@ -103,7 +103,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertEquals('UNIQUE-CODE', $found->code);
     }
 
-    public function test_find_by_code_filters_by_site(): void
+    public function testFindByCodeFiltersBySite(): void
     {
         // Arrange
         $otherSite = $this->createSite();
@@ -116,7 +116,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertNotEmpty($found);
     }
 
-    public function test_check_deletable_returns_can_delete_when_no_pages(): void
+    public function testCheckDeletableReturnsCanDeleteWhenNoPages(): void
     {
         // Arrange
         $territory = $this->createTerritory();
@@ -130,7 +130,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result['requires_reassignment']);
     }
 
-    public function test_check_deletable_returns_requires_reassignment_when_pages_exist(): void
+    public function testCheckDeletableReturnsRequiresReassignmentWhenPagesExist(): void
     {
         // Arrange
         $territory = $this->createTerritory();
@@ -151,7 +151,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertTrue($result['requires_reassignment']);
     }
 
-    public function test_check_deletable_throws_exception_when_not_found(): void
+    public function testCheckDeletableThrowsExceptionWhenNotFound(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Territory not found');
@@ -159,7 +159,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->repository->checkDeletable(99999);
     }
 
-    public function test_get_alternatives_in_region_set_excludes_specified_territory(): void
+    public function testGetAlternativesInRegionSetExcludesSpecifiedTerritory(): void
     {
         // Arrange
         $regionSet = $this->createRegionSet();
@@ -175,7 +175,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertCollectionDoesNotContain($alternatives, ['id' => $territory2->id]);
     }
 
-    public function test_get_alternatives_in_region_set_includes_null_region_set(): void
+    public function testGetAlternativesInRegionSetIncludesNullRegionSet(): void
     {
         // Arrange
         $regionSet = $this->createRegionSet();
@@ -196,7 +196,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertTrue($foundNullRegionSet);
     }
 
-    public function test_reorder_territories_updates_sort_order(): void
+    public function testReorderTerritoriesUpdatesSortOrder(): void
     {
         // Arrange
         $territory1 = $this->createTerritory(['sort_order' => 0]);
@@ -222,7 +222,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $fresh3->sort_order);
     }
 
-    public function test_bulk_update_region_set_updates_all_territories(): void
+    public function testBulkUpdateRegionSetUpdatesAllTerritories(): void
     {
         // Arrange
         $oldRegionSet = $this->createRegionSet();
@@ -247,7 +247,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertEquals($newRegionSet->id, $fresh2->region_set_id);
     }
 
-    public function test_search_available_pages_excludes_pages_in_other_territories(): void
+    public function testSearchAvailablePagesExcludesPagesInOtherTerritories(): void
     {
         // Arrange
         $territory1 = $this->createTerritory();
@@ -280,7 +280,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertFalse($foundPage2);
     }
 
-    public function test_search_available_pages_filters_by_query(): void
+    public function testSearchAvailablePagesFiltersByQuery(): void
     {
         // Arrange
         $territory = $this->createTerritory();
@@ -295,7 +295,7 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertEquals('Laravel Tutorial', $result['data']->first()->title);;
     }
 
-    public function test_slug_exists_returns_true_when_exists(): void
+    public function testSlugExistsReturnsTrueWhenExists(): void
     {
         // Arrange
         $territory = $this->createTerritory(['slug' => 'existing-slug']);
@@ -307,12 +307,73 @@ class TerritoryRepositoryTest extends RepositoryTestCase
         $this->assertTrue($exists);
     }
 
-    public function test_slug_exists_returns_false_when_not_exists(): void
+    public function testSlugExistsReturnsFalseWhenNotExists(): void
     {
         // Act
         $exists = $this->repository->slugExists('non-existent-slug');
 
         // Assert
         $this->assertFalse($exists);
+    }
+
+    public function testGenerateUniqueSlugCreatesUniqueSlug(): void
+    {
+        // Arrange
+        $this->createTerritory(['name' => 'United Kingdom', 'slug' => 'united-kingdom']);
+
+        // Act
+        $newSlug = $this->repository->generateUniqueSlug('United Kingdom', $this->siteId);
+
+        // Assert
+        $this->assertEquals('united-kingdom-1', $newSlug);
+    }
+
+    public function testGenerateUniqueSlugIncrementsCounter(): void
+    {
+        // Arrange
+        $this->createTerritory(['name' => 'France', 'slug' => 'france']);
+        $this->createTerritory(['name' => 'France', 'slug' => 'france-1']);
+
+        // Act
+        $newSlug = $this->repository->generateUniqueSlug('France', $this->siteId);
+
+        // Assert
+        $this->assertEquals('france-2', $newSlug);
+    }
+
+    public function testGenerateUniqueSlugExcludesId(): void
+    {
+        // Arrange
+        $territory = $this->createTerritory(['name' => 'Germany', 'slug' => 'germany']);
+
+        // Act - excluding the existing territory should return same slug
+        $newSlug = $this->repository->generateUniqueSlug('Germany', $this->siteId, $territory->id);
+
+        // Assert
+        $this->assertEquals('germany', $newSlug);
+    }
+
+    public function test_reassign_pages_updates_pivot_table(): void
+    {
+        // Arrange
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        $this->attachTerritoryToPage($page1, $territory1);
+        $this->attachTerritoryToPage($page2, $territory1);
+
+        // Act
+        $result = $this->repository->reassignPages($territory1->id, $territory2->id);
+
+        // Assert
+        $this->assertTrue($result);
+
+        $reassigned = PageTerritory::where('territory_id', $territory2->id)->count();
+        $this->assertEquals(2, $reassigned);
+
+        $oldAssignments = PageTerritory::where('territory_id', $territory1->id)->count();
+        $this->assertEquals(0, $oldAssignments);
     }
 }

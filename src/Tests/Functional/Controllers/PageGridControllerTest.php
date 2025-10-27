@@ -5,12 +5,15 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\PageGrid;
 use App\Models\PageGridTerritory;
 use App\Models\Territory;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageGridControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testCanListPageGrids()
     {
-        $this->createPageGrid(3);
+        $this->createPageGrids(3);
 
         $response = $this->getForSite('/api/page-grids');
 
@@ -39,9 +42,9 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanListPageGridsWithSearch()
     {
-        $this->createPageGrid(1, ['title' => 'Featured Properties']);
-        $this->createPageGrid(1, ['title' => 'Latest News']);
-        $this->createPageGrid(1, ['title' => 'Featured Articles']);
+        $this->createPageGrid(['title' => 'Featured Properties']);
+        $this->createPageGrid(['title' => 'Latest News']);
+        $this->createPageGrid(['title' => 'Featured Articles']);
 
         $response = $this->getForSite('/api/page-grids?search=featured');
 
@@ -52,35 +55,9 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanListPageGridsWithFilters()
     {
-        PageGrid::create([
-            'title' => 'Grid 1',
-            'slug' => 'grid-1',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED: Array instead of json_encode
-            'site_id' => $this->siteId
-        ]);
-
-        PageGrid::create([
-            'title' => 'Grid 2',
-            'slug' => 'grid-2',
-            'layout' => 'list',
-            'columns' => 1,
-            'is_active' => false,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
-
-        PageGrid::create([
-            'title' => 'Grid 3',
-            'slug' => 'grid-3',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $this->createPageGrid(['is_active' => true]);
+        $this->createPageGrid(['is_active' => false]);
+        $this->createPageGrid(['is_active' => true]);
 
         $response = $this->getForSite('/api/page-grids?layout=grid&is_active=1');
 
@@ -174,15 +151,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanShowPageGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $response = $this->getForSite("/api/page-grids/{$pageGrid->id}");
 
@@ -198,15 +167,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanShowPageGridBySlug()
     {
-        PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $this->createPageGrid(['slug' => 'test-grid']);
 
         $response = $this->getForSite('/api/page-grids/slug/test-grid');
 
@@ -230,15 +191,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanUpdatePageGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Old Title',
-            'slug' => 'old-title',
-            'layout' => 'grid',
-            'columns' => 2,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $updateData = [
             'title' => 'New Title',
@@ -297,15 +250,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanGetPageGridHistory()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         // Update it to create history
         $this->putForSite("/api/page-grids/{$pageGrid->id}", [
@@ -323,15 +268,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testHistoryTracksPageGridUpdates()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Original Title',
-            'slug' => 'original-title',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid(['title' => 'Original Title', 'slug' => 'original-title']);;
 
         $this->putForSite("/api/page-grids/{$pageGrid->id}", [
             'title' => 'New Title',
@@ -354,15 +291,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanDeletePageGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $response = $this->deleteForSite("/api/page-grids/{$pageGrid->id}");
 
@@ -379,15 +308,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanRestorePageGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         // Soft delete the grid
         $pageGrid->delete();
@@ -407,15 +328,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanForceDeletePageGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $pageGrid->delete();
 
@@ -433,15 +346,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanDuplicatePageGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Original Grid',
-            'slug' => 'original-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid(['title' => 'Original Grid', 'slug' => 'original-grid']);
 
         $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/duplicate");
 
@@ -467,15 +372,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanToggleActiveStatus()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/toggle-active");
 
@@ -492,15 +389,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanAddPageToGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $pageData = [
             'title' => 'New Page',
@@ -524,17 +413,11 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanRemovePageFromGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
                 ['title' => 'Page 1', 'slug' => 'page-1'],
                 ['title' => 'Page 2', 'slug' => 'page-2'],
-            ],
-            'site_id' => $this->siteId
+            ]
         ]);
 
         $response = $this->deleteForSite("/api/page-grids/{$pageGrid->id}/pages/0");
@@ -554,16 +437,10 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanUpdatePageInGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
-                ['title' => 'Old Title', 'slug' => 'old-slug'],
-            ],
-            'site_id' => $this->siteId
+                ['title' => 'Page 1', 'slug' => 'page-1'],
+            ]
         ]);
 
         $updateData = [
@@ -587,18 +464,12 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanReorderPagesInGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
                 ['title' => 'Page 1', 'slug' => 'page-1'],
                 ['title' => 'Page 2', 'slug' => 'page-2'],
                 ['title' => 'Page 3', 'slug' => 'page-3'],
-            ],
-            'site_id' => $this->siteId
+            ]
         ]);
 
         $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/pages/reorder", [
@@ -621,15 +492,7 @@ class PageGridControllerTest extends FunctionalTestCase
     public function testPaginationWorksCorrectly()
     {
         for ($i = 1; $i <= 25; $i++) {
-            PageGrid::create([
-                'title' => "Grid $i",
-                'slug' => "grid-$i",
-                'layout' => 'grid',
-                'columns' => 3,
-                'is_active' => true,
-                'pages' => [], // FIXED
-                'site_id' => $this->siteId
-            ]);
+            $this->createPageGrid();
         }
 
         $response = $this->getForSite('/api/page-grids?per_page=10');
@@ -655,44 +518,20 @@ class PageGridControllerTest extends FunctionalTestCase
     public function testSortingWorksCorrectly()
     {
         // Create records with explicit created_at timestamps
-        $zebra = PageGrid::create([
-            'title' => 'Zebra',
-            'slug' => 'zebra',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $zebra = $this->createPageGrid(['title' => 'Zebra']);;
         // Manually update created_at to ensure proper ordering
         $this->database->query(
             "UPDATE page_grids SET created_at = ? WHERE id = ?",
             [date('Y-m-d H:i:s', strtotime('-3 days')), $zebra->id]
         );
 
-        $alpha = PageGrid::create([
-            'title' => 'Alpha',
-            'slug' => 'alpha',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $alpha = $this->createPageGrid(['title' => 'Alpha']);
         $this->database->query(
             "UPDATE page_grids SET created_at = ? WHERE id = ?",
             [date('Y-m-d H:i:s', strtotime('-2 days')), $alpha->id]
         );
 
-        $beta = PageGrid::create([
-            'title' => 'Beta',
-            'slug' => 'beta',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [], // FIXED
-            'site_id' => $this->siteId
-        ]);
+        $beta = $this->createPageGrid(['title' => 'Beta']);;
         $this->database->query(
             "UPDATE page_grids SET created_at = ? WHERE id = ?",
             [date('Y-m-d H:i:s', strtotime('-1 day')), $beta->id]
@@ -737,16 +576,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanUpdateUseHeroFlag()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'pages' => [],
-            'use_hero' => false,
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid(['use_hero' => false]);
 
         $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
             'use_hero' => true
@@ -951,16 +781,10 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanUpdatePageGridWithMixedItems()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Old Grid',
-            'slug' => 'old-grid',
-            'layout' => 'grid',
-            'columns' => 2,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
-                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1']
-            ],
-            'site_id' => $this->siteId
+                ['title' => 'Page 1', 'slug' => 'page-1'],
+            ]
         ]);
 
         $updateData = [
@@ -985,18 +809,14 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanDuplicatePageGridWithMixedItems()
     {
-        $pageGrid = PageGrid::create([
+        $pageGrid = $this->createPageGrid([
             'title' => 'Original Mixed Grid',
-            'slug' => 'original-mixed-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+            'subtitle' => 'Test Subtitle',
             'items' => [
                 ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
                 ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1', 'bio' => 'Bio'],
                 ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1', 'price' => '99.99']
-            ],
-            'site_id' => $this->siteId
+            ]
         ]);
 
         $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/duplicate");
@@ -1018,15 +838,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanAddAuthorToGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'items' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $authorData = [
             'type' => 'author',
@@ -1056,15 +868,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanAddProductToGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'items' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $productData = [
             'type' => 'product',
@@ -1099,18 +903,12 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanRemoveDifferentItemTypesFromGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
                 ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
                 ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1'],
                 ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1', 'price' => '99.99']
-            ],
-            'site_id' => $this->siteId
+            ]
         ]);
 
         // Remove the author (index 1)
@@ -1129,18 +927,12 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testCanReorderMixedItemTypesInGrid()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
                 ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
                 ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1'],
                 ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1', 'price' => '99.99']
-            ],
-            'site_id' => $this->siteId
+            ]
         ]);
 
         $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/pages/reorder", [
@@ -1160,16 +952,10 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testHistoryTracksItemTypeChanges()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
-                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1']
-            ],
-            'site_id' => $this->siteId
+                ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
+            ]
         ]);
 
         // Update to add author and product
@@ -1197,17 +983,11 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testListPageGridsShowsItemsField()
     {
-        PageGrid::create([
-            'title' => 'Grid with Items',
-            'slug' => 'grid-with-items',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $this->createPageGrid([
             'items' => [
                 ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
-                ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1']
-            ],
-            'site_id' => $this->siteId
+                ['type' => 'author', 'name' => 'New Author', 'slug' => 'new-author'],
+            ]
         ]);
 
         $response = $this->getForSite('/api/page-grids');
@@ -1223,18 +1003,12 @@ class PageGridControllerTest extends FunctionalTestCase
 
     public function testShowPageGridReturnsItemsWithTypes()
     {
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
+        $pageGrid = $this->createPageGrid([
             'items' => [
                 ['type' => 'page', 'title' => 'Page 1', 'slug' => 'page-1'],
-                ['type' => 'author', 'name' => 'Author 1', 'slug' => 'author-1', 'bio' => 'Bio'],
-                ['type' => 'product', 'name' => 'Product 1', 'slug' => 'product-1', 'price' => '99.99']
-            ],
-            'site_id' => $this->siteId
+                ['type' => 'author', 'name' => 'New Author', 'slug' => 'new-author'],
+                ['type' => 'product', 'name' => 'New Product', 'slug' => 'new-product', 'price' => '99.99']
+            ]
         ]);
 
         $response = $this->getForSite("/api/page-grids/{$pageGrid->id}");
@@ -1430,15 +1204,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $territory1 = $this->createTerritory();
         $territory2 = $this->createTerritory();
 
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'items' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
             'territory_ids' => [$territory1->id, $territory2->id]
@@ -1457,15 +1223,7 @@ class PageGridControllerTest extends FunctionalTestCase
     {
         $territory1 = $this->createTerritory();
 
-        $pageGrid = PageGrid::create([
-            'title' => 'Test Grid',
-            'slug' => 'test-grid',
-            'layout' => 'grid',
-            'columns' => 3,
-            'is_active' => true,
-            'items' => [],
-            'site_id' => $this->siteId
-        ]);
+        $pageGrid = $this->createPageGrid();
 
         // First assign a territory
         $pageGrid->syncTerritories([$territory1->id]);
@@ -1484,22 +1242,6 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertCount(0, $territoryIds);
     }
 
-
-    protected function createPageGrid(int $count = 1, array $data = [])
-    {
-        for ($i = 1; $i <= $count; $i++) {
-            PageGrid::create([
-                'title' => $data['title'] ?? "Test Page Grid $i",
-                'slug' => isset($data['title']) ? $this->slugify($data['title']) : "test-page-grid-$i",
-                'layout' => 'grid',
-                'columns' => 3,
-                'is_active' => true,
-                'pages' => [], // FIXED
-                'site_id' => $this->siteId
-            ]);
-        }
-    }
-
     protected function slugify(string $text): string
     {
         $text = preg_replace('~[^\pL\d]+~u', '-', $text);
@@ -1509,19 +1251,5 @@ class PageGridControllerTest extends FunctionalTestCase
         $text = preg_replace('~-+~', '-', $text);
         $text = strtolower($text);
         return $text;
-    }
-
-    private function createTerritory()
-    {
-        $code = substr(strtoupper(bin2hex(random_bytes(ceil(10 / 2)))), 0, 10);
-
-        return Territory::create([
-            'name' => 'Territory 1',
-            'code' => $code,
-            'is_active' => true,
-            'slug' => 'territory-1',
-            'site_id' => $this->siteId
-        ]);
-
     }
 }

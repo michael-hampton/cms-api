@@ -83,7 +83,7 @@ class VoucherRepository extends Repository
         ];
     }
 
-    public function getAlternatives(int $voucherId): Collection
+    public function getAlternatives(int $voucherId, ?int $siteId = null): Collection
     {
         $voucher = $this->find($voucherId);
 
@@ -94,7 +94,7 @@ class VoucherRepository extends Repository
         $query = Voucher::where('id', '!=', $voucherId)
             ->where('status', 'active');
 
-        return $this->applySiteFilter($query)->get();
+        return !empty($siteId) ? $query->where('site_id', $siteId)->get() : $this->applySiteFilter($query)->get();
     }
 
     public function codeExistsInSite(string $code, int $siteId, ?int $excludeId = null): bool

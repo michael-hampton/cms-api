@@ -135,24 +135,31 @@ class TerritoryControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(500, $response);
     }
 
-//    public function testDestroyWithReassignment()
-//    {
-//        $territory1 = $this->createTerritory(['region_set_id' => $this->regionSet->id]);
-//        $territory2 = $this->createTerritory(['region_set_id' => $this->regionSet->id]);
-//        $page = $this->createPage();
-//        $this->attachTerritoryToPage($page, $territory1);
-//
-//        $response = $this->deleteForSite(
-//            "/api/territories/{$territory1->id}?reassign_to_territory_id={$territory2->id}"
-//        );
-//
-//        $this->assertResponseOk($response);
-//
-//        // Verify page was reassigned
-//        $page = $page->fresh();
-//
-//        $this->assertEquals($territory2->id, $page->territory_id);
-//    }
+    public function testDestroyWithReassignment()
+    {
+        $territory1 = $this->createTerritory(['region_set_id' => $this->regionSet->id]);
+        $territory2 = $this->createTerritory(['region_set_id' => $this->regionSet->id]);
+        $page = $this->createPage();
+        $this->attachTerritoryToPage($page, $territory1);
+
+        $response = $this->deleteForSite(
+            "/api/territories/{$territory1->id}?reassign_to_territory_id={$territory2->id}"
+        );
+
+        $this->assertResponseOk($response);
+
+        // Verify page was reassigned via pivot table
+        $pageAssignment = PageTerritory::where('page_id', $page->id)
+            ->where('territory_id', $territory2->id)
+            ->first();
+        $this->assertNotNull($pageAssignment);
+
+        // Verify old assignment is gone
+        $oldAssignment = PageTerritory::where('page_id', $page->id)
+            ->where('territory_id', $territory1->id)
+            ->first();
+        $this->assertNull($oldAssignment);
+    }
 
     public function testCheckDeletable()
     {

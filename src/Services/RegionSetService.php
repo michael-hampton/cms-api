@@ -112,11 +112,7 @@ class RegionSetService
                 }
 
                 // Reassign pages
-                $pages = $regionSet->pages(); //todo
-                foreach ($pages as $page) {
-                    $page->region_set_id = $reassignToRegionSetId;
-                    $page->save();
-                }
+                $this->repository->reassignPages($regionSetId, $reassignToRegionSetId);
 
                 return $regionSet->delete();
             });
@@ -169,9 +165,11 @@ class RegionSetService
                         $counter++;
                     }
 
+                    $newSlug = $this->territoryRepository->generateUniqueSlug($territory->name, $territory->site_id);
+
                     $this->territoryRepository->create([
                         'name' => $territory->name,
-                        'slug' => Str::slug($territory->name), //todo
+                        'slug' => $newSlug,
                         'code' => $newCode,
                         'region_set_id' => $newRegionSet->id,
                         'is_active' => $territory->is_active,

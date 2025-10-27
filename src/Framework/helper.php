@@ -22,6 +22,14 @@ if (!function_exists('message')) {
     }
 }
 
+if (!function_exists('class_basename')) {
+    function class_basename(string $class): string
+    {
+        $class = is_object($class) ? get_class($class) : $class;
+        return basename(str_replace('\\', '/', $class));
+    }
+}
+
 if (!function_exists('old')) {
     function old(?string $key = null, $default = null)
     {

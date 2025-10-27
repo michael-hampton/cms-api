@@ -5,14 +5,18 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageCustomField;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsActiveFields()
     {
-        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true, 'site_id' => $this->siteId]);
-        CustomFieldDefinition::create(['name' => 'Size', 'key' => 'size', 'type' => 'number', 'is_active' => true, 'site_id' => $this->siteId]);
-        CustomFieldDefinition::create(['name' => 'Inactive', 'key' => 'inactive', 'type' => 'text', 'is_active' => false, 'site_id' => $this->siteId]);
+        $this->createCustomFieldDefinition(['is_active' => true]);
+        $this->createCustomFieldDefinition(['is_active' => true]);
+        $this->createCustomFieldDefinition(['is_active' => false]);
+
         $response = $this->getForSite('/api/custom-fields');
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -23,8 +27,9 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testGroupedReturnsFieldsByGroup()
     {
-        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'group_name' => 'Product', 'is_active' => true, 'site_id' => $this->siteId]);;
-        CustomFieldDefinition::create(['name' => 'Author', 'key' => 'author', 'type' => 'text', 'group_name' => 'Content', 'is_active' => true, 'site_id' => $this->siteId]);
+        $this->createCustomFieldDefinition(['group_name' => 'Product', 'is_active' => true]);
+        $this->createCustomFieldDefinition(['group_name' => 'Content', 'is_active' => true]);
+
         $response = $this->getForSite('/api/custom-fields/grouped');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -36,7 +41,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testShowReturnsFieldById()
     {
-        $field = CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
+        $field = $this->createCustomFieldDefinition(['name' => 'Color']);
         $response = $this->getForSite("/api/custom-fields/{$field->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -45,7 +50,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testShowReturnsFieldByKey()
     {
-        CustomFieldDefinition::create(['name' => 'Color', 'key' => 'product_color', 'type' => 'text', 'is_active' => true]);
+        $this->createCustomFieldDefinition(['key' => 'product_color', 'type' => 'text', 'is_active' => true, 'name' => 'Color']);
         $response = $this->getForSite('/api/custom-fields/product_color');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -79,7 +84,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesField()
     {
-        $field = CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
+        $field = $this->createCustomFieldDefinition();
         $response = $this->putForSite("/api/custom-fields/{$field->id}", ['name' => 'Updated Color', 'type' => 'text', 'description' => 'New description']);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -95,7 +100,7 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesField()
     {
-        $field = CustomFieldDefinition::create(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
+        $field = $this->createCustomFieldDefinition();
         $response = $this->deleteForSite("/api/custom-fields/{$field->id}");
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(CustomFieldDefinition::find($field->id));
@@ -103,8 +108,9 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testRequiredReturnsOnlyRequiredFields()
     {
-        CustomFieldDefinition::create(['name' => 'Required', 'key' => 'required', 'type' => 'text', 'is_required' => true, 'is_active' => true, 'site_id' => $this->siteId]);;
-        CustomFieldDefinition::create(['name' => 'Optional', 'key' => 'optional', 'type' => 'text', 'is_required' => false, 'is_active' => true, 'site_id' => $this->siteId]);;;
+        $this->createCustomFieldDefinition(['name' => 'Required', 'is_required' => true]);
+        $this->createCustomFieldDefinition(['name' => 'Optional', 'is_required' => false]);
+
         $response = $this->getForSite('/api/custom-fields/required');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -115,8 +121,9 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
 
     public function testSearchableReturnsOnlySearchableFields()
     {
-        CustomFieldDefinition::create(['name' => 'Searchable', 'key' => 'searchable', 'type' => 'text', 'is_searchable' => true, 'is_active' => true, 'site_id' => $this->siteId]);;
-        CustomFieldDefinition::create(['name' => 'Not Searchable', 'key' => 'not_searchable', 'type' => 'text', 'is_searchable' => false, 'is_active' => true, 'site_id' => $this->siteId]);;;
+        $this->createCustomFieldDefinition(['name' => 'Searchable', 'is_searchable' => true]);
+        $this->createCustomFieldDefinition(['name' => 'Not Searchable', 'is_searchable' => false]);
+
         $response = $this->getForSite('/api/custom-fields/searchable');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -128,44 +135,13 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testGetCustomFieldsReturnsAllFieldsAndValues()
     {
         // Create a page
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'draft',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
-        // Create custom field definitions
-        $colorField = CustomFieldDefinition::create([
-            'name' => 'Color',
-            'key' => 'color',
-            'type' => 'text',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $colorField = $this->createCustomFieldDefinition(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
+        $sizeField = $this->createCustomFieldDefinition(['name' => 'Size', 'key' => 'size', 'type' => 'number', 'is_active' => true]);
+        $inactiveField = $this->createCustomFieldDefinition(['name' => 'Inactive', 'key' => 'inactive', 'type' => 'text', 'is_active' => false]);
 
-        $sizeField = CustomFieldDefinition::create([
-            'name' => 'Size',
-            'key' => 'size',
-            'type' => 'number',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
-
-        $inactiveField = CustomFieldDefinition::create([
-            'name' => 'Inactive',
-            'key' => 'inactive',
-            'type' => 'text',
-            'is_active' => false,
-            'site_id' => $this->siteId
-        ]);
-
-        // Set values for some fields
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $colorField->id,
-            'field_value' => 'blue'
-        ]);
+        $this->attachCustomFieldToPage($page, $colorField, ['field_value' => 'blue']);
 
         // Make request
         $response = $this->get("/api/pages/{$page->id}/custom-fields");
@@ -201,55 +177,14 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testGetCustomFieldsGroupedReturnsFieldsByGroup()
     {
         // Create a page
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'draft'
-        ]);
+        $page = $this->createPage();
+        $colorField = $this->createCustomFieldDefinition(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'group_name' => 'Product', 'is_active' => true]);
+        $authorField = $this->createCustomFieldDefinition(['name' => 'Author', 'key' => 'author', 'type' => 'text', 'group_name' => 'Content', 'is_active' => true]);
+        $ungroupedField = $this->createCustomFieldDefinition(['name' => 'Notes', 'key' => 'notes', 'type' => 'textarea', 'group_name' => null, 'is_active' => true]);
 
-        // Create grouped custom fields
-        $colorField = CustomFieldDefinition::create([
-            'name' => 'Color',
-            'key' => 'color',
-            'type' => 'text',
-            'group_name' => 'Product',
-            'is_active' => true
-        ]);
-
-        $authorField = CustomFieldDefinition::create([
-            'name' => 'Author',
-            'key' => 'author',
-            'type' => 'text',
-            'group_name' => 'Content',
-            'is_active' => true
-        ]);
-
-        $ungroupedField = CustomFieldDefinition::create([
-            'name' => 'Notes',
-            'key' => 'notes',
-            'type' => 'textarea',
-            'group_name' => null,
-            'is_active' => true
-        ]);
-
-        // Set values
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $colorField->id,
-            'field_value' => 'red'
-        ]);
-
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $authorField->id,
-            'field_value' => 'John Doe'
-        ]);
-
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $ungroupedField->id,
-            'field_value' => 'Some notes'
-        ]);
+        $this->attachCustomFieldToPage($page, $colorField, ['field_value' => 'red']);
+        $this->attachCustomFieldToPage($page, $authorField, ['field_value' => 'John Doe']);;
+        $this->attachCustomFieldToPage($page, $ungroupedField, ['field_value' => 'Some notes']);
 
         // Make request
         $response = $this->getForSite("/api/pages/{$page->id}/custom-fields/grouped");
@@ -280,20 +215,10 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testGetCustomFieldsReturnsEmptyForPageWithNoValues()
     {
         // Create a page
-        $page = Page::create([
-            'title' => 'Empty Page',
-            'slug' => 'empty-page',
-            'status' => 'draft',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
         // Create custom field definitions but don't set values
-        CustomFieldDefinition::create([
-            'name' => 'Color',
-            'key' => 'color',
-            'type' => 'text',
-            'is_active' => true
-        ]);
+        $this->createCustomFieldDefinition();
 
         $response = $this->get("/api/pages/{$page->id}/custom-fields");
 
@@ -316,27 +241,9 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testUpdateCustomFieldsUpdatesPageFields()
     {
         // Create a page
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'draft',
-            'site_id' => $this->siteId
-        ]);
-
-        // Create custom field definitions
-        $colorField = CustomFieldDefinition::create([
-            'name' => 'Color',
-            'key' => 'color',
-            'type' => 'text',
-            'is_active' => true
-        ]);
-
-        $sizeField = CustomFieldDefinition::create([
-            'name' => 'Size',
-            'key' => 'size',
-            'type' => 'number',
-            'is_active' => true
-        ]);
+        $page = $this->createPage();
+        $colorField = $this->createCustomFieldDefinition(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
+        $sizeField = $this->createCustomFieldDefinition(['name' => 'Size', 'key' => 'size', 'type' => 'number', 'is_active' => true]);
 
         // Update fields
         $fieldsData = [
@@ -363,27 +270,10 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testUpdateCustomFieldsRemovesOldValues()
     {
         // Create a page
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'draft',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
+        $colorField = $this->createCustomFieldDefinition(['name' => 'Color', 'key' => 'color', 'type' => 'text', 'is_active' => true]);
 
-        // Create custom field definition
-        $colorField = CustomFieldDefinition::create([
-            'name' => 'Color',
-            'key' => 'color',
-            'type' => 'text',
-            'is_active' => true
-        ]);
-
-        // Set initial value
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $colorField->id,
-            'field_value' => 'red'
-        ]);
+        $this->attachCustomFieldToPage($page, $colorField);
 
         // Update with empty fields (should remove the value)
         $fieldsData = ['fields' => []];
@@ -401,56 +291,14 @@ class CustomFieldDefinitionControllerTest extends FunctionalTestCase
     public function testGetCustomFieldsHandlesTypeCasting()
     {
         // Create a page
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'draft',
-            'site_id' => 1
-        ]);
+        $page = $this->createPage();
+        $numberField = $this->createCustomFieldDefinition(['name' => 'Count', 'key' => 'count', 'type' => 'number', 'is_active' => true]);
+        $boolField = $this->createCustomFieldDefinition(['name' => 'Featured', 'key' => 'featured', 'type' => 'boolean', 'is_active' => true]);
+        $jsonField = $this->createCustomFieldDefinition(['name' => 'Settings', 'key' => 'settings', 'type' => 'json', 'is_active' => true]);
 
-        // Create different typed fields
-        $numberField = CustomFieldDefinition::create([
-            'name' => 'Count',
-            'key' => 'count',
-            'type' => 'number',
-            'is_active' => true,
-            'site_id' => 1
-        ]);
-
-        $boolField = CustomFieldDefinition::create([
-            'name' => 'Featured',
-            'key' => 'featured',
-            'type' => 'boolean',
-            'is_active' => true,
-            'site_id' => 1
-        ]);
-
-        $jsonField = CustomFieldDefinition::create([
-            'name' => 'Settings',
-            'key' => 'settings',
-            'type' => 'json',
-            'is_active' => true,
-            'site_id' => 1
-        ]);
-
-        // Set values (stored as strings in DB)
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $numberField->id,
-            'field_value' => '42'
-        ]);
-
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $boolField->id,
-            'field_value' => '1'
-        ]);
-
-        PageCustomField::create([
-            'page_id' => $page->id,
-            'custom_field_definition_id' => $jsonField->id,
-            'field_value' => '{"theme":"dark","notifications":true}'
-        ]);
+        $this->attachCustomFieldToPage($page, $numberField, ['field_value' => '42']);
+        $this->attachCustomFieldToPage($page, $boolField, ['field_value' => '1']);;
+        $this->attachCustomFieldToPage($page, $jsonField, ['field_value' => '{"theme": "dark", "notifications": true}']);
 
         // Make request
         $response = $this->get("/api/pages/{$page->id}/custom-fields");

@@ -4,13 +4,16 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\Category;
 use App\Models\PageCategory;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CategoryControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsCategories()
     {
-        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true, 'site_id' => $this->siteId]);;
-        Category::create(['name' => 'Science', 'slug' => 'science', 'is_active' => true, 'site_id' => $this->siteId]);;;
+        $this->createCategory();
+        $this->createCategory();
 
         $response = $this->getForSite('/api/categories');
 
@@ -23,7 +26,7 @@ class CategoryControllerTest extends FunctionalTestCase
     public function testIndexWithPagination()
     {
         for ($i = 1; $i <= 15; $i++) {
-            Category::create(['name' => "Category $i", 'slug' => "category-$i", 'is_active' => true, 'site_id' => $this->siteId]);;;
+            $this->createCategory();
         }
 
         $response = $this->getForSite('/api/categories?page=1&per_page=10');
@@ -34,23 +37,9 @@ class CategoryControllerTest extends FunctionalTestCase
         $this->assertEquals(15, $data['pagination']['total']);
     }
 
-//    public function testTreeReturnsHierarchicalStructure()
-//    {
-//        $parent = Category::create(['name' => 'Parent', 'slug' => 'parent', 'is_active' => true]);
-//        Category::create(['name' => 'Child', 'slug' => 'child', 'parent_id' => $parent->id, 'is_active' => true]);
-//
-//        $response = $this->get('/api/categories/tree');
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertArrayHasKey('tree', $data);
-//        $this->assertCount(1, $data['tree']);
-//        $this->assertArrayHasKey('children', $data['tree'][0]);
-//    }
-
     public function testShowReturnsCategoryById()
     {
-        $category = Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
+        $category = $this->createCategory(['name' => 'Technology']);
 
         $response = $this->getForSite("/api/categories/{$category->id}");
 
@@ -61,7 +50,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testShowReturnsCategoryBySlug()
     {
-        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true, 'site_id' => $this->siteId]);;
+        $this->createCategory(['name' => 'Technology', 'slug' => 'technology']);
 
         $response = $this->getForSite('/api/categories/technology');
 
@@ -105,7 +94,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesUniqueSlug()
     {
-        Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true, 'site_id' => $this->siteId]);;
+        $this->createCategory(['name' => 'Technology', 'slug' => 'technology']);
 
         $response = $this->postForSite('/api/categories', [
             'name' => 'New Tech',
@@ -127,7 +116,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesCategory()
     {
-        $category = Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
+        $category = $this->createCategory();
 
         $response = $this->putForSite("/api/categories/{$category->id}", [
             'name' => 'Updated Technology',
@@ -149,7 +138,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesCategory()
     {
-        $category = Category::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
+        $category = $this->createCategory();
 
         $response = $this->deleteForSite("/api/categories/{$category->id}");
 
@@ -168,10 +157,7 @@ class CategoryControllerTest extends FunctionalTestCase
     public function testCheckDeleteCategoryReturnsCanDeleteWhenNoPagesExist()
     {
         // Arrange: create an author with no pages
-        $category = Category::create([
-            'name' => 'Lonely Author',
-            'slug' => 'lonely-author',
-        ]);
+        $category = $this->createCategory();
 
         // Act
         $response = $this->getForSite("/api/categories/{$category->id}/check-delete");
@@ -190,21 +176,10 @@ class CategoryControllerTest extends FunctionalTestCase
     public function testCheckDeleteCategoryReturnsRequiresReassignmentWhenPagesExist()
     {
         // Arrange: create an author that has pages
-        $category = Category::create([
-            'name' => 'Author With Pages',
-            'slug' => 'author-with-pages',
-        ]);
-
+        $category = $this->createCategory();
         // Create one or more pages for this author
-        $page = \App\Models\Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-        ]);
-
-        PageCategory::create([
-            'page_id' => $page->id,
-            'category_id' => $category->id,
-        ]);
+        $page = $this->createPage();
+        $this->attachCategoryToPage($page, $category);;
 
         // Act
         $response = $this->getForSite("/api/categories/{$category->id}/check-delete");
@@ -232,12 +207,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDuplicateCategorySuccessfully(): void
     {
-        $category = Category::create([
-            'name' => 'Technology',
-            'description' => 'Tech articles',
-            'slug' => 'technology',
-            'status' => 'active',
-        ]);
+        $category = $this->createCategory(['name' => 'Technology', 'slug' => 'technology', 'description' => 'Tech articles']);
 
         $response = $this->postForSite("/api/categories/{$category->id}/duplicate");
 
@@ -251,18 +221,9 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDuplicateCategoryWithParent(): void
     {
-        $parent = Category::create([
-            'name' => 'Electronics',
-            'slug' => 'electronics',
-            'status' => 'active'
-        ]);
+        $parent = $this->createCategory(['name' => 'Smartphones', 'slug' => 'smartphones']);;
 
-        $child = Category::create([
-            'name' => 'Smartphones',
-            'slug' => 'smartphones',
-            'parent_id' => $parent->id,
-            'status' => 'active'
-        ]);
+        $child = $this->createCategory(['parent_id' => $parent->id, 'name' => 'Smartphones', 'slug' => 'smartphones']);
 
         $response = $this->postForSite("/api/categories/{$child->id}/duplicate");
 
@@ -276,13 +237,7 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDuplicateCategoryHandlesSlugConflict(): void
     {
-        // Create original
-        $category1 = Category::create([
-            'name' => 'News',
-            'slug' => 'news',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $category1 = $this->createCategory(['name' => 'News', 'slug' => 'news', 'description' => 'News articles']);
 
         // Create first duplicate
         $response1 = $this->postForSite("/api/categories/{$category1->id}/duplicate");
@@ -302,10 +257,10 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDuplicateCategoryWithSeoFields(): void
     {
-        $category = Category::create([
+        $category = $this->createCategory([
             'name' => 'Technology',
             'slug' => 'technology',
-            'status' => 'active',
+            'description' => 'Tech articles',
             'seo_title' => 'Tech SEO Title',
             'seo_description' => 'Tech SEO Description',
             'no_index' => false,
@@ -326,20 +281,9 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testCannotDeleteCategoryWithChildren(): void
     {
-        $parent = Category::create([
-            'name' => 'Electronics',
-            'slug' => 'electronics',
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $parent = $this->createCategory();
 
-        $child = Category::create([
-            'name' => 'Smartphones',
-            'slug' => 'smartphones',
-            'parent_id' => $parent->id,
-            'is_active' => true,
-            'site_id' => $this->siteId
-        ]);
+        $child = $this->createCategory([ 'parent_id' => $parent->id]);
 
         $response = $this->deleteForSite("/api/categories/{$parent->id}");
 
@@ -350,18 +294,9 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testCheckDeleteReturnsHasChildren(): void
     {
-        $parent = Category::create([
-            'name' => 'Electronics',
-            'slug' => 'electronics',
-            'site_id' => $this->siteId
-        ]);
+        $parent = $this->createCategory();
 
-        $child = Category::create([
-            'name' => 'Smartphones',
-            'slug' => 'smartphones',
-            'parent_id' => $parent->id,
-            'site_id' => $this->siteId
-        ]);
+        $child = $this->createCategory( ['parent_id' => $parent->id]);
 
         $response = $this->getForSite("/api/categories/{$parent->id}/check-delete");
 
@@ -375,28 +310,11 @@ class CategoryControllerTest extends FunctionalTestCase
 
     public function testDuplicateCategoryWithChildren(): void
     {
-        $parent = Category::create([
-            'name' => 'Electronics',
-            'slug' => 'electronics',
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $parent = $this->createCategory(['name' => 'Electronics', 'slug' => 'electronics']);;
 
-        $child1 = Category::create([
-            'name' => 'Smartphones',
-            'slug' => 'smartphones',
-            'parent_id' => $parent->id,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $child1 = $this->createCategory(['parent_id' => $parent->id, 'name' => 'Smartphones', 'slug' => 'smartphones']);
 
-        $child2 = Category::create([
-            'name' => 'Tablets',
-            'slug' => 'tablets',
-            'parent_id' => $parent->id,
-            'status' => 'active',
-            'site_id' => $this->siteId
-        ]);
+        $child2 = $this->createCategory(['parent_id' => $parent->id, 'name' => 'Tablets', 'slug' => 'tablets']);
 
         $response = $this->postForSite("/api/categories/{$parent->id}/duplicate");
 

@@ -120,13 +120,7 @@ class RegionSetRepository extends Repository
 
     public function reassignPages(int $oldRegionSetId, int $newRegionSetId): bool
     {
-        $pageRegionsets = PageRegionSet::where('region_set_id', $oldRegionSetId)->get();
-
-        foreach ($pageRegionsets as $pageRegionset) {
-            $pageRegionset->region_set_id = $newRegionSetId;
-            $pageRegionset->save();
-        }
-        
-        return true;
+        return PageRegionSet::where('region_set_id', $oldRegionSetId)
+            ->update(['region_set_id' => $newRegionSetId]);
     }
 }

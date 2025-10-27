@@ -66,7 +66,7 @@ class MenuRepository extends Repository
         return $this->database->transaction(function () use ($items) {
             foreach ($items as $item) {
                 MenuItem::where('id', $item['id'])
-                    ->updateQuery([
+                    ->update([
                         'sort_order' => $item['sort_order'],
                         'parent_id' => $item['parent_id'] ?? null,
                     ]);

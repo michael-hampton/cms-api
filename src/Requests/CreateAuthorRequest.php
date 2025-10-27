@@ -58,7 +58,7 @@ class CreateAuthorRequest extends FormRequest
                 if ($request->has('email')) {
                     $existing = $this->authorRepository->findByEmail($request->get('email'));;
                     if ($existing && (!$authorId || $existing->id !== $authorId)) {
-                        throw new ValidationException('Email already exists');
+                        throw new ValidationException('Email already exists', ['email' => 'Email already exists']);
                     }
                 }
 

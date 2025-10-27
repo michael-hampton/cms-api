@@ -92,12 +92,8 @@ class TerritoryService
             }
 
             return $this->database->transaction(function () use ($territoryId, $territory, $reassignToTerritoryId) {
-                // Reassign pages
-                $pages = $territory->pages();
-                foreach ($pages as $page) {
-                    $page->territory_id = $reassignToTerritoryId;
-                    $page->save();
-                }
+                // Reassign pages - update pivot table records
+                $this->repository->reassignPages($territoryId, $reassignToTerritoryId);
 
                 return $territory->delete();
             });

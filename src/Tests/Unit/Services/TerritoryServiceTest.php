@@ -206,9 +206,10 @@ class TerritoryServiceTest extends TestCase
                 return $callback();
             });
 
-        $mockTerritory->shouldReceive('pages')
+        $this->repository->shouldReceive('reassignPages')
             ->once()
-            ->andReturnSelf();
+            ->with($territoryId, $reassignToId)
+            ->andReturn(true);
 
         $mockTerritory->shouldReceive('delete')
             ->once()
