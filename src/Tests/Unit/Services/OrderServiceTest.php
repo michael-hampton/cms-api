@@ -3,8 +3,10 @@
 namespace App\Tests\Unit\Services;
 
 use App\Framework\Database\Database;
+use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Repositories\MemberRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderItemRepository;
 use App\Services\OrderService;
@@ -16,6 +18,7 @@ class OrderServiceTest extends FunctionalTestCase
 {
     private $orderRepository;
     private $orderItemRepository;
+    private $memberRepository;
     private $databaseMock;
     private OrderService $service;
 
@@ -24,12 +27,14 @@ class OrderServiceTest extends FunctionalTestCase
         parent::setUp(); // Call parent setup if it exists
         // Use Mockery::mock() instead of $this->createMock()
         $this->orderRepository = m::mock(OrderRepository::class);
+        $this->memberRepository = m::mock(MemberRepository::class);
         $this->orderItemRepository = m::mock(OrderItemRepository::class);
         $this->databaseMock = m::mock(Database::class);
 
         $this->service = new OrderService(
             $this->orderRepository,
             $this->orderItemRepository,
+            $this->memberRepository,
             $this->databaseMock
         );
     }
@@ -1146,5 +1151,183 @@ class OrderServiceTest extends FunctionalTestCase
         $result = $this->service->getTotalRevenue();
 
         $this->assertEquals($expectedRevenue, $result);
+    }
+
+    public function testCreateOrderCreatesNewMemberWhenUserIdNotProvided()
+    {
+        $data = [
+            'customer_name' => 'Jane Smith',
+            'customer_email' => 'jane.smith@example.com',
+            'customer_phone' => '123-456-7890',
+            'status' => 'pending',
+            'shipping' => 10.00,
+            'discount' => 0.00,
+            'currency' => 'USD',
+        ];
+        $items = [
+            [
+                'product_name' => 'Product 1',
+                'quantity' => 1,
+                'unit_price' => 100.00
+            ]
+        ];
+        $siteId = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        // Mock Member::findByEmail to return null (member doesn't exist)
+        $this->memberRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('jane.smith@example.com')
+            ->andReturn(null);
+
+        // Mock Member::create
+        $mockMember = m::mock(Member::class)->makePartial();
+        $mockMember->id = 123;
+
+       $this->memberRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($memberData) use ($siteId) {
+                return $memberData['email'] === 'jane.smith@example.com'
+                    && $memberData['first_name'] === 'Jane'
+                    && $memberData['last_name'] === 'Smith'
+                    && $memberData['site_id'] === $siteId
+                    && $memberData['is_active'] === true
+                    && isset($memberData['password']);
+            }))
+            ->andReturn($mockMember);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($orderData) {
+                return $orderData['user_id'] === 123 // The newly created member's ID
+                    && !isset($orderData['customer_name'])
+                    && !isset($orderData['customer_email'])
+                    && !isset($orderData['customer_phone']);
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderItemRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(m::mock(OrderItem::class));
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(1)
+            ->andReturn($mockOrder);
+
+        $result = $this->service->createOrder($data, $items, $siteId);
+
+        $this->assertSame($mockOrder, $result);
+    }
+
+    public function testCreateOrderUsesExistingMemberWhenEmailExists()
+    {
+        $existingMember = m::mock(Member::class)->makePartial();
+        $existingMember->id = 456;
+
+        $data = [
+            'customer_name' => 'John Doe',
+            'customer_email' => 'existing@example.com',
+            'status' => 'pending',
+        ];
+        $items = [
+            [
+                'product_name' => 'Product 1',
+                'quantity' => 1,
+                'unit_price' => 50.00
+            ]
+        ];
+        $siteId = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        // Mock Member::findByEmail to return existing member
+        $this->memberRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('existing@example.com')
+            ->andReturn($existingMember);
+
+        // Member::create should NOT be called
+        $this->memberRepository->shouldReceive('create')
+            ->never();
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($orderData) {
+                return $orderData['user_id'] === 456; // Existing member's ID
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderItemRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(m::mock(OrderItem::class));
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(1)
+            ->andReturn($mockOrder);
+
+        $result = $this->service->createOrder($data, $items, $siteId);
+
+        $this->assertSame($mockOrder, $result);
+    }
+
+    public function testCreateOrderParsesCustomerNameCorrectly()
+    {
+        // Test single name
+        $this->assertEquals(
+            ['first_name' => 'John', 'last_name' => ''],
+            $this->invokePrivateMethod($this->service, 'parseCustomerName', ['John'])
+        );
+
+        // Test full name
+        $this->assertEquals(
+            ['first_name' => 'John', 'last_name' => 'Doe'],
+            $this->invokePrivateMethod($this->service, 'parseCustomerName', ['John Doe'])
+        );
+
+        // Test name with multiple spaces
+        $this->assertEquals(
+            ['first_name' => 'John', 'last_name' => 'Michael Doe'],
+            $this->invokePrivateMethod($this->service, 'parseCustomerName', ['John Michael Doe'])
+        );
+
+        // Test empty name
+//        $this->assertEquals(
+//            ['first_name' => 'Guest', 'last_name' => 'User'],
+//            $this->invokePrivateMethod($this->service, 'parseCustomerName', [''])
+//        );
+    }
+
+// Helper method to test private methods
+    private function invokePrivateMethod($object, $methodName, array $parameters = [])
+    {
+        $reflection = new \ReflectionClass(get_class($object));
+        $method = $reflection->getMethod($methodName);
+        $method->setAccessible(true);
+        return $method->invokeArgs($object, $parameters);
     }
 }

@@ -53,7 +53,7 @@ class Order extends Model
 
     public function user($relation = false)
     {
-        return $this->belongsTo(User::class, 'user_id', 'id', $relation);
+        return $this->belongsTo(Member::class, 'user_id', 'id', $relation);
     }
 
     public function isPending(): bool
@@ -137,5 +137,15 @@ class Order extends Model
         }
 
         return $data;
+    }
+
+    public function getCustomerNameAttribute()
+    {
+        return $this->user ? $this->user->first_name . ' ' . $this->user->last_name : '';
+    }
+
+    public function getCustomerEmailAttribute()
+    {
+        return $this->user ? $this->user->email : '';
     }
 }

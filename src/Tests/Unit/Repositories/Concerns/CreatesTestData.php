@@ -12,6 +12,8 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\CustomFieldDefinition;
 use App\Models\Model;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Page;
 use App\Models\PageAuthor;
 use App\Models\PageCategory;
@@ -321,8 +323,9 @@ trait CreatesTestData
             ->create($overrides);
     }
 
-    protected function createPageHistory(int $pageId, int $userId, array $overrides = []): PageHistory
+    protected function createPageHistory(int $pageId, ?int $userId = null, array $overrides = []): PageHistory
     {
+        $userId = $userId ?? $this->createUser()->id;
         return $this->factory(PageHistory::class)
             ->forSite($this->siteId)
             ->forPage($pageId)
@@ -331,7 +334,7 @@ trait CreatesTestData
     }
 
     protected function createUser(array $overrides = []): User
-    {
+            {
         return $this->factory(User::class)
             ->forSite($this->siteId)
             ->create($overrides);
@@ -340,6 +343,20 @@ trait CreatesTestData
     protected function createProductPriceHistory(array $overrides = []): Model
     {
         return $this->factory(ProductPriceHistory::class)
+            ->create($overrides);
+    }
+
+    protected function createOrder(array $overrides = []): Order
+    {
+        return $this->factory(Order::class)
+            ->forSite($this->siteId)
+            ->create($overrides);
+    }
+
+    protected function createOrderItem(int $orderId, array $overrides = []): OrderItem
+    {
+        return $this->factory(OrderItem::class)
+            ->forOrder($orderId)
             ->create($overrides);
     }
 }

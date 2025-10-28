@@ -4,10 +4,13 @@ namespace App\Services;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Models\Member;
+use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Repositories\OrderRepository;
+use App\Repositories\MemberRepository;
 use App\Repositories\OrderItemRepository;
+use App\Repositories\OrderRepository;
 use Exception;
 
 class OrderService
@@ -15,10 +18,12 @@ class OrderService
     private Database $database;
 
     public function __construct(
-        private OrderRepository $orderRepository,
-        private OrderItemRepository $orderItemRepository,
-        ?Database $database = null
-    ) {
+        private readonly OrderRepository     $orderRepository,
+        private readonly OrderItemRepository $orderItemRepository,
+        private readonly MemberRepository             $memberRepository,
+        ?Database                            $database = null
+    )
+    {
         $this->database = $database ?? Database::getInstance();
     }
 
@@ -43,7 +48,16 @@ class OrderService
 
     public function createOrder(array $data, array $items, int $siteId): Order
     {
-        return $this->database->transaction(function() use ($data, $items, $siteId) {
+        return $this->database->transaction(function () use ($data, $items, $siteId) {
+            // Handle user creation if user_id is not provided
+            if (empty($data['user_id']) && !empty($data['customer_email'])) {
+                $member = $this->createOrGetMember($data, $siteId);
+                $data['user_id'] = !empty($member) ? $member->id : null;
+            }
+
+            // Remove customer fields from order data as they're not part of orders table
+            unset($data['customer_name'], $data['customer_email'], $data['customer_phone']);
+
             // Generate order number if not provided
             if (empty($data['order_number'])) {
                 $data['order_number'] = $this->generateOrderNumber();
@@ -70,9 +84,56 @@ class OrderService
         });
     }
 
+    private function createOrGetMember(array $data, int $siteId): ?Model
+    {
+        $email = $data['customer_email'];
+
+        // Check if member already exists
+        $existingMember = $this->memberRepository->findByEmail($email);
+
+        if ($existingMember) {
+            return $existingMember;
+        }
+
+        // Parse customer name into first_name and last_name
+        $nameParts = $this->parseCustomerName($data['customer_name'] ?? '');
+
+        if (empty($nameParts)) {
+            return null;
+        }
+
+        // Create new member
+        $memberData = [
+            'site_id' => $siteId,
+            'email' => $email,
+            'first_name' => $nameParts['first_name'],
+            'last_name' => $nameParts['last_name'],
+            'password' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), // Random password
+            'is_active' => true,
+        ];
+
+        return $this->memberRepository->create($memberData);
+    }
+
+    private function parseCustomerName(string $fullName): array
+    {
+        $fullName = trim($fullName);
+
+        if (empty($fullName)) {
+            return [];
+        }
+
+        $parts = explode(' ', $fullName, 2);
+
+        return [
+            'first_name' => $parts[0],
+            'last_name' => $parts[1] ?? ''
+        ];
+    }
+
     public function updateOrder(int $id, array $data): Order
     {
-        return $this->database->transaction(function() use ($id, $data) {
+        return $this->database->transaction(function () use ($id, $data) {
             $order = $this->orderRepository->find($id);
 
             if (!$order) {
@@ -96,7 +157,7 @@ class OrderService
 
     public function updateOrderItems(int $orderId, array $items): Order
     {
-        return $this->database->transaction(function() use ($orderId, $items) {
+        return $this->database->transaction(function () use ($orderId, $items) {
             $order = $this->orderRepository->find($orderId);
 
             if (!$order) {
@@ -121,7 +182,7 @@ class OrderService
 
     public function cancelOrder(int $orderId, ?string $reason = null): Order
     {
-        return $this->database->transaction(function() use ($orderId, $reason) {
+        return $this->database->transaction(function () use ($orderId, $reason) {
             $order = $this->orderRepository->find($orderId);
 
             if (!$order) {
@@ -156,7 +217,7 @@ class OrderService
 
     public function refundOrder(int $orderId, ?string $reason = null): Order
     {
-        return $this->database->transaction(function() use ($orderId, $reason) {
+        return $this->database->transaction(function () use ($orderId, $reason) {
             $order = $this->orderRepository->find($orderId);
 
             if (!$order) {
@@ -185,7 +246,7 @@ class OrderService
             throw new Exception('Order not found');
         }
 
-        return $this->database->transaction(function() use ($order) {
+        return $this->database->transaction(function () use ($order) {
             // Items will be deleted via cascade
             return $order->delete();
         });
@@ -193,7 +254,7 @@ class OrderService
 
     public function duplicateOrder(int $orderId): Order
     {
-        return $this->database->transaction(function() use ($orderId) {
+        return $this->database->transaction(function () use ($orderId) {
             $originalOrder = $this->getOrderById($orderId);
 
             if (!$originalOrder) {

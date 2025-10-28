@@ -5,11 +5,13 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
 use App\Repositories\OrderRepository;
 use App\Requests\CreateOrderRequest;
-use App\Requests\UpdateOrderRequest;
 use App\Requests\UpdateOrderItemsRequest;
+use App\Requests\UpdateOrderRequest;
+use App\Resources\OrderResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\OrderService;
 use Exception;
@@ -17,9 +19,10 @@ use Exception;
 class OrderController extends Controller
 {
     public function __construct(
-        private OrderService $orderService,
+        private OrderService    $orderService,
         private OrderRepository $orderRepository
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -29,7 +32,21 @@ class OrderController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->orderRepository->search($criteria);
 
-            return $this->searchResponse($result);
+            $formattedData = $result->getData();
+
+            $formattedData = array_map(function ($order) {
+                return [
+                    ...$order,
+                    'customer_name' => $order['user']->first_name . ' ' . $order['user']->last_name,
+                    'customer_email' => $order['user']->email
+                ];
+            }, $formattedData);
+
+            $result->setData($formattedData);
+
+            $collection = new PaginatedResourceCollection($result, OrderResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -72,7 +89,7 @@ class OrderController extends Controller
                 return $this->errorResponse('Order not found', 404);
             }
 
-            return $this->jsonResponse(['order' => $order->toArray()]);
+            return $this->jsonResponse(['order' => OrderResource::make($order)->toArray()]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

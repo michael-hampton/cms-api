@@ -2,35 +2,17 @@
 
 namespace App\Tests\Functional\Controllers;
 
-use App\Models\Page;
-use App\Models\PageHistory;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageHistoryControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testIndexReturnsPageHistory()
     {
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        PageHistory::create([
-            'page_id' => $page->id,
-            'site_id' => $this->siteId,
-            'action' => 'created',
-            'description' => 'Page created',
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
-
-        PageHistory::create([
-            'page_id' => $page->id,
-            'site_id' => $this->siteId,
-            'action' => 'updated',
-            'description' => 'Page updated',
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
+        $page = $this->createPage();
+        $this->createPageHistory($page->id);
+        $this->createPageHistory($page->id);
 
         $response = $this->getForSite("/api/pages/{$page->id}/history");
 
@@ -43,20 +25,9 @@ class PageHistoryControllerTest extends FunctionalTestCase
 
     public function testShowReturnsHistoryEntry()
     {
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
-        $history = PageHistory::create([
-            'page_id' => $page->id,
-            'site_id' => $this->siteId,
-            'action' => 'created',
-            'description' => 'Page created',
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
+        $history = $this->createPageHistory($page->id);
 
         $response = $this->getForSite("/api/history/{$history->id}");
 
@@ -69,35 +40,11 @@ class PageHistoryControllerTest extends FunctionalTestCase
 
     public function testRecentReturnsRecentHistory()
     {
-        $page1 = Page::create([
-            'title' => 'Page 1',
-            'slug' => 'page-1',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page1 = $this->createPage();
 
-        $page2 = Page::create([
-            'title' => 'Page 2',
-            'slug' => 'page-2',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        PageHistory::create([
-            'page_id' => $page1->id,
-            'site_id' => $this->siteId,
-            'action' => 'created',
-            'description' => 'Page 1 created',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-2 hours'))
-        ]);
-
-        PageHistory::create([
-            'page_id' => $page2->id,
-            'site_id' => $this->siteId,
-            'action' => 'created',
-            'description' => 'Page 2 created',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-1 hour'))
-        ]);
+        $page2 = $this->createPage();
+        $this->createPageHistory($page1->id);
+        $this->createPageHistory($page2->id);
 
         $response = $this->getForSite('/api/history/recent');
 
@@ -110,12 +57,7 @@ class PageHistoryControllerTest extends FunctionalTestCase
 
     public function testRestoreFromHistory()
     {
-        $page = Page::create([
-            'title' => 'Original Title',
-            'slug' => 'original-slug',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
         $snapshot = [
             'id' => $page->id,
@@ -124,14 +66,7 @@ class PageHistoryControllerTest extends FunctionalTestCase
             'status' => 'published'
         ];
 
-        $history = PageHistory::create([
-            'page_id' => $page->id,
-            'site_id' => $this->siteId,
-            'action' => 'updated',
-            'description' => 'Page updated',
-            'snapshot' => json_encode($snapshot),
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
+        $history = $this->createPageHistory($page->id, null, ['snapshot' => $snapshot]);
 
         // Update page to different values
         $page->title = 'Modified Title';

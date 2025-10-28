@@ -86,7 +86,7 @@ class CreateOrderRequest extends FormRequest
 
     private function validateAddress(array $address): bool
     {
-        $requiredFields = ['street', 'city', 'country'];
+        $requiredFields = ['address_line_1', 'city', 'country'];
         foreach ($requiredFields as $field) {
             if (empty($address[$field])) {
                 return false;

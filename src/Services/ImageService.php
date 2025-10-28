@@ -165,9 +165,7 @@ class ImageService
             $this->assignCategoriesToImage($image, $metadata['categories']);
         }
 
-        if (!empty($metadata['tags'])) {
-            $this->imageRepository->syncTags($image, $metadata['tags']);
-        }
+        $this->imageRepository->syncTags($image, $metadata['tags']);
 
         return $image->fresh();
     }

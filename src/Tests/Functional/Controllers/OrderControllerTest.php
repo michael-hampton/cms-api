@@ -6,9 +6,11 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
     private Member $testUser;
 
     protected function setUp(): void
@@ -28,13 +30,7 @@ class OrderControllerTest extends FunctionalTestCase
     // EXISTING TESTS (keeping for reference)
     public function testIndexReturnsOrdersList()
     {
-        Order::create([
-            'order_number' => 'ORD-001',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+       $this->createOrder();
 
         $response = $this->getForSite('/api/orders');
 
@@ -46,18 +42,8 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchCriteria()
     {
-        Order::create([
-            'order_number' => 'ORD-001',
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
-        Order::create([
-            'order_number' => 'ORD-002',
-            'status' => 'completed',
-            'total' => 200.00,
-            'site_id' => $this->siteId
-        ]);
+        $this->createOrder(['status' => 'pending']);
+        $this->createOrder(['status' => 'completed']);
 
         $response = $this->getForSite('/api/orders?status=completed');
 
@@ -119,13 +105,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testShowReturnsOrderById()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-001',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder(['order_number' => 'ORD-TEST-001']);
 
         $response = $this->getForSite("/api/orders/{$order->id}");
 
@@ -140,13 +120,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testShowReturnsOrderByNumber()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-002',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 150.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder(['order_number' => 'ORD-TEST-002']);
 
         $response = $this->getForSite("/api/orders/ORD-TEST-002");
 
@@ -169,13 +143,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testUpdateModifiesOrder()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-003',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder();
 
         $updateData = [
             'status' => 'processing',
@@ -196,24 +164,8 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testUpdateItemsReplacesOrderItems()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-004',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'subtotal' => 100.00,
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
-
-        OrderItem::create([
-            'order_id' => $order->id,
-            'product_name' => 'Old Product',
-            'product_sku' => 'OLD-001',
-            'quantity' => 1,
-            'unit_price' => 100.00,
-            'subtotal' => 100.00,
-            'total' => 100.00
-        ]);
+        $order = $this->createOrder();
+        $this->createOrderItem($order->id);
 
         $updateData = [
             'items' => [
@@ -247,13 +199,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testDestroyDeletesOrder()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-005',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder();
 
         $orderId = $order->id;
 
@@ -279,13 +225,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testCancelChangesOrderStatus()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-006',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder(['status' => 'pending']);
 
         $cancelData = [
             'reason' => 'Customer requested cancellation'
@@ -307,13 +247,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testCompleteChangesOrderStatus()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-007',
-            'user_id' => $this->testUser->id,
-            'status' => 'processing',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder(['status' => 'processing']);
 
         $response = $this->postForSite("/api/orders/{$order->id}/complete");
 
@@ -326,14 +260,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testRefundChangesOrderStatusAndPaymentStatus()
     {
-        $order = Order::create([
-            'order_number' => 'ORD-TEST-008',
-            'user_id' => $this->testUser->id,
-            'status' => 'completed',
-            'payment_status' => 'paid',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
+        $order = $this->createOrder();
 
         $refundData = [
             'reason' => 'Product defect'
@@ -354,25 +281,9 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testDuplicateCreatesNewOrder()
     {
-        $originalOrder = Order::create([
-            'order_number' => 'ORD-TEST-009',
-            'user_id' => $this->testUser->id,
-            'status' => 'completed',
-            'subtotal' => 100.00,
-            'total' => 100.00,
-            'currency' => 'USD',
-            'site_id' => $this->siteId
-        ]);
+        $originalOrder = $this->createOrder();
 
-        OrderItem::create([
-            'order_id' => $originalOrder->id,
-            'product_name' => 'Test Product',
-            'product_sku' => 'TEST-001',
-            'quantity' => 2,
-            'unit_price' => 50.00,
-            'subtotal' => 100.00,
-            'total' => 100.00
-        ]);
+        $this->createOrderItem($originalOrder->id);
 
         $response = $this->postForSite("/api/orders/{$originalOrder->id}/duplicate");
 
@@ -404,29 +315,9 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testByStatusReturnsFilteredOrders()
     {
-        Order::create([
-            'order_number' => 'ORD-010',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
-
-        Order::create([
-            'order_number' => 'ORD-011',
-            'user_id' => $this->testUser->id,
-            'status' => 'completed',
-            'total' => 200.00,
-            'site_id' => $this->siteId
-        ]);
-
-        Order::create([
-            'order_number' => 'ORD-012',
-            'user_id' => $this->testUser->id,
-            'status' => 'completed',
-            'total' => 300.00,
-            'site_id' => $this->siteId
-        ]);
+        $this->createOrder(['status' => 'pending']);
+        $this->createOrder(['status' => 'completed']);
+        $this->createOrder(['status' => 'completed']);
 
         $response = $this->getForSite('/api/orders/by-status?status=completed');
 
@@ -461,29 +352,9 @@ class OrderControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId
         ]);
 
-        Order::create([
-            'order_number' => 'ORD-013',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'total' => 100.00,
-            'site_id' => $this->siteId
-        ]);
-
-        Order::create([
-            'order_number' => 'ORD-014',
-            'user_id' => $this->testUser->id,
-            'status' => 'completed',
-            'total' => 200.00,
-            'site_id' => $this->siteId
-        ]);
-
-        Order::create([
-            'order_number' => 'ORD-015',
-            'user_id' => $anotherUser->id,
-            'status' => 'pending',
-            'total' => 300.00,
-            'site_id' => $this->siteId
-        ]);
+        $this->createOrder(['user_id' => $this->testUser->id]);
+        $this->createOrder(['user_id' => $this->testUser->id]);
+        $this->createOrder(['user_id' => $anotherUser->id]);
 
         $response = $this->getForSite("/api/orders/by-user/{$this->testUser->id}");
 
@@ -501,13 +372,7 @@ class OrderControllerTest extends FunctionalTestCase
     public function testByUserRespectsLimitParameter()
     {
         for ($i = 1; $i <= 5; $i++) {
-            Order::create([
-                'order_number' => "ORD-01{$i}",
-                'user_id' => $this->testUser->id,
-                'status' => 'pending',
-                'total' => 100.00 * $i,
-                'site_id' => $this->siteId
-            ]);
+            $this->createOrder(['user_id' => $this->testUser->id]);
         }
 
         $response = $this->getForSite("/api/orders/by-user/{$this->testUser->id}?limit=3");
@@ -520,34 +385,21 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testRevenueCalculatesTotalRevenue()
     {
-        Order::create([
-            'order_number' => 'ORD-016',
-            'user_id' => $this->testUser->id,
-            'status' => 'completed',
-            'payment_status' => 'paid',
-            'total' => 100.00,
+        $this->createOrder([
             'completed_at' => '2024-01-15 10:00:00',
-            'site_id' => $this->siteId
-        ]);
-
-        Order::create([
-            'order_number' => 'ORD-017',
-            'user_id' => $this->testUser->id,
+            'total' => 100.00,
             'status' => 'completed',
-            'payment_status' => 'paid',
-            'total' => 200.00,
-            'completed_at' => '2024-02-20 10:00:00',
-            'site_id' => $this->siteId
+            'payment_status' => 'paid'
         ]);
 
-        Order::create([
-            'order_number' => 'ORD-018',
-            'user_id' => $this->testUser->id,
-            'status' => 'pending',
-            'payment_status' => 'unpaid',
-            'total' => 300.00,
-            'site_id' => $this->siteId
+        $this->createOrder([
+            'completed_at' => '2024-02-20 10:00:00',
+            'total' => 200.00,
+            'status' => 'completed',
+            'payment_status' => 'paid'
         ]);
+
+        $this->createOrder(['status' => 'pending', 'total' => 300.00]);
 
         $response = $this->getForSite('/api/orders/revenue?start_date=2024-01-01&end_date=2024-12-31');
 
@@ -562,24 +414,19 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testRevenueWithoutDateRangeCalculatesAllRevenue()
     {
-        Order::create([
-            'order_number' => 'ORD-019',
-            'user_id' => $this->testUser->id,
+        $this->createOrder([
             'status' => 'completed',
             'payment_status' => 'paid',
             'total' => 150.00,
             'completed_at' => '2023-01-15 10:00:00',
-            'site_id' => $this->siteId
         ]);
 
-        Order::create([
-            'order_number' => 'ORD-020',
+        $this->createOrder([
             'user_id' => $this->testUser->id,
             'status' => 'completed',
             'payment_status' => 'paid',
             'total' => 250.00,
             'completed_at' => '2024-01-15 10:00:00',
-            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite('/api/orders/revenue');
@@ -588,5 +435,86 @@ class OrderControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(400.00, $data['data']['revenue']);
+    }
+
+    public function testStoreCreatesOrderWithNewCustomer()
+    {
+        $orderData = [
+            'customer_name' => 'New Customer',
+            'customer_email' => 'newcustomer@example.com',
+            'customer_phone' => '555-1234',
+            'status' => 'pending',
+            'shipping' => 10.00,
+            'discount' => 0.00,
+            'currency' => 'USD',
+            'items' => [
+                [
+                    'product_name' => 'Test Product',
+                    'product_sku' => 'TEST-001',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertArrayHasKey('order', $data['data']);
+        $this->assertEquals('pending', $data['data']['order']['status']);
+
+        // Verify member was created
+        $member = Member::findByEmail('newcustomer@example.com', $this->siteId);
+        $this->assertNotNull($member);
+        $this->assertEquals('New', $member->first_name);
+        $this->assertEquals('Customer', $member->last_name);
+
+        // Verify order was linked to the new member
+        $order = Order::find($data['data']['order']['id']);
+        $this->assertEquals($member->id, $order->user_id);
+    }
+
+    public function testStoreUsesExistingMemberForDuplicateEmail()
+    {
+        // Create an existing member
+        $existingMember = Member::create([
+            'email' => 'existing@example.com',
+            'first_name' => 'Existing',
+            'last_name' => 'Member',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'site_id' => $this->siteId,
+            'is_active' => true
+        ]);
+
+        $orderData = [
+            'customer_name' => 'Different Name',
+            'customer_email' => 'existing@example.com', // Same email
+            'status' => 'pending',
+            'items' => [
+                [
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 50.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify order uses existing member
+        $order = Order::find($data['data']['order']['id']);
+        $this->assertEquals($existingMember->id, $order->user_id);
+
+        // Verify no duplicate member was created
+        $memberCount = Member::where('email', 'existing@example.com')
+            ->where('site_id', $this->siteId)
+            ->count();
+        $this->assertEquals(1, $memberCount);
     }
 }

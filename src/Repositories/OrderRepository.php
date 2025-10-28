@@ -88,6 +88,7 @@ class OrderRepository extends Repository
         }
 
         $orders = $query->get();
+
         return $orders->sum('total');
     }
 
