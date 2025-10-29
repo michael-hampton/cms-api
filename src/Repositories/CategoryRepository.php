@@ -20,7 +20,7 @@ class CategoryRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createCategoryConfiguration();
+        $config = SearchConfigurationFactory::create('category');
         $this->searchEngine = new SearchEngine($config);
     }
 

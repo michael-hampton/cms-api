@@ -18,7 +18,7 @@ class ImageRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createImageConfiguration();
+        $config = SearchConfigurationFactory::create('image');
         $this->searchEngine = new SearchEngine($config);
     }
 

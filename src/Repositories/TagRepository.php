@@ -20,7 +20,7 @@ class TagRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createTagConfiguration();
+        $config = SearchConfigurationFactory::create('tag');
         $this->searchEngine = new SearchEngine($config);
     }
 

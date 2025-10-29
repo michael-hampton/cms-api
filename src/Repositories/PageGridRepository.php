@@ -19,7 +19,7 @@ class PageGridRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createPageGridConfiguration();
+        $config = SearchConfigurationFactory::create('page_grid');
         $this->searchEngine = new SearchEngine($config);
     }
 

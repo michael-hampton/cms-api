@@ -22,13 +22,13 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createProductConfiguration();
+        $config = SearchConfigurationFactory::create('product');
         $this->searchEngine = new SearchEngine($config);
     }
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Product::with(['activeVariants', 'availableMerchants', 'images', 'specifications', 'priceHistory']);
+        $query = Product::with(['activeVariants', 'availableMerchants', 'images', 'specifications', 'priceHistory', 'activeVariants.images']);
         return $this->searchEngine->search($query, $criteria);
     }
 
@@ -213,7 +213,10 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             $variant = ProductVariant::create([
                 'product_id' => $productId,
                 'sku' => $variantData['sku'],
+                'name' => $variantData['name'] ?? null,
                 'attributes' => $variantData['attributes'] ?? [],
+                'price' => $variantData['price'] ?? 0,
+                'sale_price' => $variantData['sale_price'] ?? null,
                 'price_modifier' => $variantData['price_modifier'] ?? 0,
                 'is_active' => $variantData['is_active'] ?? true,
             ]);
@@ -240,7 +243,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 'url' => $imageData['url'],
                 'alt' => $imageData['alt'] ?? null,
                 'is_primary' => $imageData['is_primary'] ?? false,
-                'sort_order' => $imageData['sort_order'] ?? 0,
+                'sort_order' => !empty($imageData['sort_order']) && is_numeric($imageData['sort_order']) ? $imageData['sort_order'] : 0,
             ]);
         }
     }
@@ -259,7 +262,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function getVariants(int $productId): Collection
     {
-        return ProductVariant::where('product_id', $productId)->get();
+        return ProductVariant::with(['images'])->where('product_id', $productId)->get();
     }
 
     public function deleteVariants(int $productId): void
@@ -320,5 +323,39 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return Product::where('slug', $slug)
             ->where('site_id', $siteId)
             ->first();
+    }
+
+    public function getAllMerchants(): Collection
+    {
+        return ProductMerchant::select('id', 'name')
+            ->distinct()
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function updateVariant(int $variantId, array $data): bool
+    {
+        $variant = ProductVariant::find($variantId);
+
+        if (!$variant) {
+            return false;
+        }
+
+        $variant->update($data);
+        return true;
+    }
+
+    public function deleteVariant(int $variantId): bool
+    {
+        $variant = ProductVariant::find($variantId);
+
+        if (!$variant) {
+            return false;
+        }
+
+        // Delete variant images first
+        $this->deleteVariantImages($variantId);
+
+        return $variant->delete();
     }
 }

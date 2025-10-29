@@ -845,4 +845,272 @@ class ProductControllerTest extends FunctionalTestCase
         @unlink($imagePath2);
     }
 
+    public function testGetProductMerchants(): void
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $this->createProductMerchant($product1->id, ['name' => 'Amazon']);
+        $this->createProductMerchant($product1->id, ['name' => 'eBay']);
+        $this->createProductMerchant($product2->id, ['name' => 'Amazon']); // Duplicate
+        $this->createProductMerchant($product2->id, ['name' => 'BestBuy']);
+
+        $response = $this->getForSite('/api/products/merchants');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(3, $data['items']); // Amazon, eBay, BestBuy (unique)
+    }
+
+    public function testFilterProductsByMerchant(): void
+    {
+        $product1 = $this->createProduct(['name' => 'Product 1']);
+        $product2 = $this->createProduct(['name' => 'Product 2']);
+        $product3 = $this->createProduct(['name' => 'Product 3']);
+
+        $this->createProductMerchant($product1->id, ['name' => 'Amazon']);
+        $this->createProductMerchant($product2->id, ['name' => 'eBay']);
+        $this->createProductMerchant($product3->id, ['name' => 'Amazon']);
+
+        $response = $this->getForSite('/api/products?merchant[]=Amazon');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(2, $data['items']); // Only products 1 and 3
+    }
+
+    public function testGetProductVariants(): void
+    {
+        $product = $this->createProduct();
+        $variant1 = $this->createProductVariant($product->id, ['sku' => 'VAR-001']);
+        $variant2 = $this->createProductVariant($product->id, ['sku' => 'VAR-002']);
+
+        $response = $this->getForSite("/api/products/{$product->id}/variants");
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['items']);
+    }
+
+    public function testUpdateProductVariant(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'OLD-SKU',
+            'price_modifier' => 5.00,
+            'is_active' => true
+        ]);
+
+        $updateData = [
+            'sku' => 'NEW-SKU',
+            'price_modifier' => 10.00,
+            'is_active' => false
+        ];
+
+        $response = $this->putForSite(
+            "/api/products/{$product->id}/variants/{$variant->id}",
+            $updateData
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $updated = ProductVariant::find($variant->id);
+        $this->assertEquals('NEW-SKU', $updated->sku);
+        $this->assertEquals(10.00, $updated->price_modifier);
+        $this->assertFalse($updated->is_active);
+    }
+
+    public function testDeleteProductVariant(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+
+        // Add variant images
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+
+        $response = $this->deleteForSite("/api/products/{$product->id}/variants/{$variant->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify variant is deleted
+        $this->assertDatabaseMissing('product_variants', ['id' => $variant->id]);
+
+        // Verify variant images are deleted
+        $this->assertCount(0, ProductImage::where('variant_id', $variant->id)->get());
+    }
+
+    public function testUpdateNonExistentVariant(): void
+    {
+        $product = $this->createProduct();
+
+        $response = $this->putForSite(
+            "/api/products/{$product->id}/variants/9999",
+            ['sku' => 'TEST']
+        );
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testDeleteNonExistentVariant(): void
+    {
+        $product = $this->createProduct();
+
+        $response = $this->deleteForSite("/api/products/{$product->id}/variants/9999");
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testUpdateVariantImages(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+
+        // Create initial images
+        $this->createProductImage($product->id, ['variant_id' => $variant->id, 'url' => 'old1.jpg']);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id, 'url' => 'old2.jpg']);
+
+        $newImages = [
+            [
+                'url' => 'new1.jpg',
+                'alt' => 'New Image 1',
+                'is_primary' => true,
+                'sort_order' => 0
+            ],
+            [
+                'url' => 'new2.jpg',
+                'alt' => 'New Image 2',
+                'is_primary' => false,
+                'sort_order' => 1
+            ],
+            [
+                'url' => 'new3.jpg',
+                'alt' => 'New Image 3',
+                'is_primary' => false,
+                'sort_order' => 2
+            ]
+        ];
+
+        $response = $this->putForSite(
+            "/api/products/{$product->id}/variants/{$variant->id}/images",
+            ['images' => $newImages]
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify old images are removed
+        $this->assertDatabaseMissing('product_images', [
+            'variant_id' => $variant->id,
+            'url' => 'old1.jpg'
+        ]);
+
+        // Verify new images are added
+        $images = ProductImage::where('variant_id', $variant->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $images = $images->toArray();
+
+        $this->assertCount(3, $images);
+        $this->assertEquals('new1.jpg', $images[0]['url']);
+        $this->assertTrue((bool)$images[0]['is_primary']);
+        $this->assertEquals('new2.jpg', $images[1]['url']);
+        $this->assertFalse((bool)$images[1]['is_primary']);
+    }
+
+    public function testUpdateVariantImagesForNonExistentVariant(): void
+    {
+        $product = $this->createProduct();
+
+        $response = $this->putForSite(
+            "/api/products/{$product->id}/variants/9999/images",
+            ['images' => []]
+        );
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testUpdateVariantImagesDeletesAllWhenEmptyArray(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+
+        $response = $this->putForSite(
+            "/api/products/{$product->id}/variants/{$variant->id}/images",
+            ['images' => []]
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $count = ProductImage::where('variant_id', $variant->id)->count();
+        $this->assertEquals(0, $count);
+    }
+
+    public function testFilterProductsByMultipleBrands(): void
+    {
+        $brand1 = $this->createBrand(['name' => 'Apple']);
+        $brand2 = $this->createBrand(['name' => 'Samsung']);
+        $brand3 = $this->createBrand(['name' => 'Google']);
+
+        $product1 = $this->createProduct(['name' => 'iPhone', 'brand_id' => $brand1->id]);
+        $product2 = $this->createProduct(['name' => 'Galaxy', 'brand_id' => $brand2->id]);
+        $product3 = $this->createProduct(['name' => 'Pixel', 'brand_id' => $brand3->id]);
+
+        $brandStr = $brand1->id . ',' . $brand2->id;
+
+        $response = $this->getForSite('/api/products?brands=' .$brandStr);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(2, $data['items']); // iPhone and Galaxy
+    }
+
+    public function testFilterProductsByMerchantsMultiple(): void
+    {
+        $product1 = $this->createProduct(['name' => 'Product 1']);
+        $product2 = $this->createProduct(['name' => 'Product 2']);
+        $product3 = $this->createProduct(['name' => 'Product 3']);
+
+        $this->createProductMerchant($product1->id, ['name' => 'Amazon', 'is_available' => true]);
+        $this->createProductMerchant($product2->id, ['name' => 'eBay', 'is_available' => true]);
+        $this->createProductMerchant($product3->id, ['name' => 'Amazon', 'is_available' => true]);
+
+        // Test single merchant filter
+        $response = $this->getForSite('/api/products?merchant=Amazon');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(2, $data['items']); // Only products 1 and 3
+
+        // Test multiple merchant filter
+        $response = $this->getForSite('/api/products?merchant=Amazon,eBay');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(3, $data['items']); // All three products
+    }
+
+    public function testFilterProductsByMultipleCategories(): void
+    {
+        $cat1 = $this->createCategory(['name' => 'Smartphones']);
+        $cat2 = $this->createCategory(['name' => 'Tablets']);
+        $cat3 = $this->createCategory(['name' => 'Laptops']);
+
+        $product1 = $this->createProduct(['name' => 'iPhone', 'category_id' => $cat1->id]);
+        $product2 = $this->createProduct(['name' => 'iPad', 'category_id' => $cat2->id]);
+        $product3 = $this->createProduct(['name' => 'MacBook', 'category_id' => $cat3->id]);
+
+        $categoryStr = $cat1->id .',' . $cat2->id;
+
+        $response = $this->getForSite('/api/products?categories=' . $categoryStr);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(2, $data['items']); // iPhone and iPad
+    }
 }

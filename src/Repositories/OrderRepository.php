@@ -16,7 +16,7 @@ class OrderRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createOrderConfiguration();
+        $config = SearchConfigurationFactory::create('order');
         $this->searchEngine = new SearchEngine($config);
     }
 

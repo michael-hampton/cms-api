@@ -20,7 +20,7 @@ class RegionSetRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createRegionSetConfiguration();
+        $config = SearchConfigurationFactory::create('region_set');
         $this->searchEngine = new SearchEngine($config);
     }
 

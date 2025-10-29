@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Models\ProductVariant;
 use App\Repositories\ProductRepository;
 use App\Requests\CreateProductRequest;
 use App\Requests\UpdateProductRequest;
@@ -31,6 +32,7 @@ class ProductController extends Controller
         try {
             // Use search infrastructure
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+
             $result = $this->productRepository->search($criteria);
 
             return $this->searchResponse($result);
@@ -176,5 +178,100 @@ class ProductController extends Controller
         }
 
         return $this->jsonResponse($history->toArray());
+    }
+
+    public function merchants(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $merchants = $this->productRepository->getAllMerchants();
+
+            return $this->resourceResponse([
+                'success' => true,
+                'items' => $merchants->map(fn($m) => [
+                    'id' => $m->id,
+                    'name' => $m->name
+                ])->unique('name')->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function variants(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $variants = $this->productRepository->getVariants($id);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'items' => $variants->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateVariant(int $productId, int $variantId, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->only(['sku', 'name', 'price', 'sale_price', 'price_modifier', 'is_active']);
+
+            $updated = $this->productRepository->updateVariant($variantId, $data);
+
+            if (!$updated) {
+                return $this->jsonResponse(['message' => 'Variant not found'], 404);
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Variant updated successfully'
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function deleteVariant(int $productId, int $variantId, string $siteName): JsonResponse
+    {
+        try {
+            $deleted = $this->productRepository->deleteVariant($variantId);
+
+            if (!$deleted) {
+                return $this->jsonResponse(['message' => 'Variant not found'], 404);
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Variant deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateVariantImages(int $productId, int $variantId, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $images = $request->input('images', []);
+
+            // Validate variant exists and belongs to product
+            $variant = ProductVariant::where('id', $variantId)
+                ->where('product_id', $productId)
+                ->first();
+
+            if (!$variant) {
+                return $this->jsonResponse(['message' => 'Variant not found'], 404);
+            }
+
+            // Sync images
+            $this->productRepository->syncVariantImages($variantId, $productId, $images);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Images updated successfully'
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 }

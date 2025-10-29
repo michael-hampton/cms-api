@@ -10,6 +10,8 @@ class SearchEngine
 
     public function search($queryBuilder, SearchCriteria $criteria): PaginatedResult
     {
+        $this->configuration->configure();
+
         // Apply search query
         if ($criteria->getSearchQuery()) {
             $queryBuilder = $this->applySearchQuery($queryBuilder, $criteria->getSearchQuery());

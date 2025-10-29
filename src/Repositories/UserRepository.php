@@ -24,7 +24,7 @@ class UserRepository extends Repository implements UserRepositoryInterface
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $configuration = SearchConfigurationFactory::createUserConfiguration();
+        $configuration = SearchConfigurationFactory::create('user');
         $engine = new SearchEngine($configuration);
 
         $query = User::query();

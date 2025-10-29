@@ -17,7 +17,7 @@ class AuthorRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createAuthorConfiguration();
+        $config = SearchConfigurationFactory::create('author');
         $this->searchEngine = new SearchEngine($config);
     }
 

@@ -475,7 +475,10 @@ class ProductService
 
                 return [
                     'sku' => $v->sku . '-COPY',
+                    'name' => $v->name,
                     'attributes' => $v->attributes,
+                    'price' => $v->price,
+                    'sale_price' => $v->sale_price,
                     'price_modifier' => $v->price_modifier,
                     'is_active' => false,
                     'images' => $imageData,

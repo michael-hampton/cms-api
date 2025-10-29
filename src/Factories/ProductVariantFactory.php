@@ -19,6 +19,8 @@ class ProductVariantFactory extends Factory
             'sku' => 'SKU-' . uniqid(),
             'attributes' => json_encode(['color' => 'red', 'size' => 'M']),
             'price_modifier' => 0,
+            'price' => 12.99,
+            'sale_price' => 12,99,
             'is_active' => true,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),

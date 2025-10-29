@@ -166,6 +166,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/products/{id}/duplicate', ProductController::class, 'duplicate');
         $router->get('/products/{id}/price-history', ProductController::class, 'priceHistory');
 
+        // Product variants
+        $router->get('/products/{id}/variants', [ProductController::class, 'variants']);
+        $router->put('/products/{productId}/variants/{variantId}', [ProductController::class, 'updateVariant']);
+        $router->delete('/products/{productId}/variants/{variantId}', [ProductController::class, 'deleteVariant']);
+        $router->put('/products/{productId}/variants/{variantId}/images', [ProductController::class, 'updateVariantImages']);
+
+        // Product merchants
+        $router->get('/products/merchants', [ProductController::class, 'merchants']);
+
 
         $router->get('/users', UserController::class, 'index');
         $router->post('/users', UserController::class, 'store');

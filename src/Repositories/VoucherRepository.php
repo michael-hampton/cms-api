@@ -16,7 +16,7 @@ class VoucherRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createVoucherConfiguration();
+        $config = SearchConfigurationFactory::create('voucher');
         $this->searchEngine = new SearchEngine($config);
     }
 

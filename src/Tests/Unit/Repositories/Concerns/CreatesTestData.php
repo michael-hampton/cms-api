@@ -11,6 +11,7 @@ use App\Models\Block;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\CustomFieldDefinition;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -357,6 +358,24 @@ trait CreatesTestData
     {
         return $this->factory(OrderItem::class)
             ->forOrder($orderId)
+            ->create($overrides);
+    }
+
+    protected function createMember(array $overrides = []): Member
+    {
+        return $this->factory(Member::class)
+            ->forSite($this->siteId)
+            ->create($overrides);
+    }
+
+    /**
+     * Create multiple test members
+     */
+    protected function createMembers(int $count, array $overrides = []): array
+    {
+        return $this->factory(Member::class)
+            ->forSite($this->siteId)
+            ->count($count)
             ->create($overrides);
     }
 }

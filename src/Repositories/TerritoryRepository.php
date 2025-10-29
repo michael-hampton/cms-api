@@ -21,7 +21,7 @@ class TerritoryRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createTerritoryConfiguration();
+        $config = SearchConfigurationFactory::create('territory');
         $this->searchEngine = new SearchEngine($config);
     }
 

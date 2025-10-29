@@ -1734,5 +1734,71 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertInstanceOf(Product::class, $result);
     }
 
+    public function testGetProductVariants()
+    {
+        $product = new Product(['id' => 1, 'name' => 'Product']);
 
+        $variants = new Collection([
+            new ProductVariant(['id' => 1, 'sku' => 'VAR-001']),
+            new ProductVariant(['id' => 2, 'sku' => 'VAR-002'])
+        ]);
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('getVariants')
+            ->with(1)
+            ->andReturn($variants);
+
+        $result = $this->repository->getVariants(1);
+
+        $this->assertCount(2, $result);
+        $this->assertEquals('VAR-001', $result->first()->sku);
+    }
+
+    public function testUpdateProductVariant()
+    {
+        $this->repository->shouldReceive('updateVariant')
+            ->with(1, ['sku' => 'NEW-SKU', 'price_modifier' => 10.00])
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->repository->updateVariant(1, [
+            'sku' => 'NEW-SKU',
+            'price_modifier' => 10.00
+        ]);
+
+        $this->assertTrue($result);
+    }
+
+    public function testDeleteProductVariant()
+    {
+        $this->repository->shouldReceive('deleteVariant')
+            ->with(1)
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->repository->deleteVariant(1);
+
+        $this->assertTrue($result);
+    }
+
+    public function testGetAllMerchants()
+    {
+        $merchants = new Collection([
+            new ProductMerchant(['id' => 1, 'name' => 'Amazon']),
+            new ProductMerchant(['id' => 2, 'name' => 'eBay']),
+            new ProductMerchant(['id' => 3, 'name' => 'BestBuy'])
+        ]);
+
+        $this->repository->shouldReceive('getAllMerchants')
+            ->once()
+            ->andReturn($merchants);
+
+        $result = $this->repository->getAllMerchants();
+
+        $this->assertCount(3, $result);
+        $this->assertEquals('Amazon', $result->first()->name);
+    }
 }

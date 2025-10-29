@@ -2,6 +2,19 @@
 
 namespace App\Search;
 
+use App\Search\Configurations\AuthorSearchConfiguration;
+use App\Search\Configurations\BrandSearchConfiguration;
+use App\Search\Configurations\CategorySearchConfiguration;
+use App\Search\Configurations\ImageSearchConfiguration;
+use App\Search\Configurations\OrderSearchConfiguration;
+use App\Search\Configurations\PageGridSearchConfiguration;
+use App\Search\Configurations\PageSearchConfiguration;
+use App\Search\Configurations\ProductSearchConfiguration;
+use App\Search\Configurations\RegionSetSearchConfiguration;
+use App\Search\Configurations\TagSearchConfiguration;
+use App\Search\Configurations\TerritorySearchConfiguration;
+use App\Search\Configurations\UserSearchConfiguration;
+use App\Search\Configurations\VoucherSearchConfiguration;
 use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\CustomFilter;
 use App\Search\Filters\DateRangeFilter;
@@ -14,390 +27,29 @@ use App\Search\Filters\RelationshipFilter;
 
 class SearchConfigurationFactory
 {
-    public static function createPageGridConfiguration(): SearchConfiguration
+    private static array $configurations = [
+        'product' => ProductSearchConfiguration::class,
+        'page' => PageSearchConfiguration::class,
+        'order' => OrderSearchConfiguration::class,
+        'voucher' => VoucherSearchConfiguration::class,
+        'category' => CategorySearchConfiguration::class,
+        'tag' => TagSearchConfiguration::class,
+        'author' => AuthorSearchConfiguration::class,
+        'image' => ImageSearchConfiguration::class,
+        'user' => UserSearchConfiguration::class,
+        'brand' => BrandSearchConfiguration::class,
+        'region_set' => RegionSetSearchConfiguration::class,
+        'territory' => TerritorySearchConfiguration::class,
+        'page_grid' => PageGridSearchConfiguration::class,
+    ];
+
+    public static function create(string $type): SearchConfiguration
     {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new InFilter('layout', 'layout'))
-            ->addFilter(new BooleanFilter('is_active', 'is_active'))
-            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
-            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'))
-            ->addFilter(new DateRangeFilter('start_date', 'start_date'))
-            ->addFilter(new DateRangeFilter('end_date', 'end_date'))
-            ->addFilter(new RelationshipFilter('territory_id', 'territories', 'id'));
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('title', 'title'))
-            ->addSort(new SortSpecification('created_at', 'created_at'))
-            ->addSort(new SortSpecification('updated_at', 'updated_at'))
-            ->addSort(new SortSpecification('is_active', 'is_active'));
-
-        // Searchable columns
-        $config->addSearchableColumn('title')
-            ->addSearchableColumn('subtitle')
-            ->addSearchableColumn('slug');
-
-        // Default sort
-        $config->setDefaultSort('created_at', 'desc');
-
-        return $config;
-    }
-
-    public static function createOrderConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new InFilter('status', 'status'))
-            ->addFilter(new InFilter('payment_status', 'payment_status'))
-            ->addFilter(new EqualsFilter('user_id', 'user_id'))
-            ->addFilter(new RangeFilter('total', 'total'))
-            ->addFilter(new RangeFilter('subtotal', 'subtotal'))
-            ->addFilter(new RangeFilter('tax', 'tax'))
-            ->addFilter(new RangeFilter('shipping', 'shipping'))
-            ->addFilter(new RangeFilter('discount', 'discount'))
-            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
-            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'))
-            ->addFilter(new DateRangeFilter('completed_at', 'completed_at'))
-            ->addFilter(new DateRangeFilter('cancelled_at', 'cancelled_at'));
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('order_number', 'order_number'))
-            ->addSort(new SortSpecification('status', 'status'))
-            ->addSort(new SortSpecification('payment_status', 'payment_status'))
-            ->addSort(new SortSpecification('total', 'total'))
-            ->addSort(new SortSpecification('subtotal', 'subtotal'))
-            ->addSort(new SortSpecification('date_created', 'created_at'))
-            ->addSort(new SortSpecification('date_updated', 'updated_at'))
-            ->addSort(new SortSpecification('date_completed', 'completed_at'))
-            ->addSort(new SortSpecification('date_cancelled', 'cancelled_at'));
-
-        // Searchable columns
-        $config->addSearchableColumn('order_number')
-            ->addSearchableColumn('status')
-            ->addSearchableColumn('payment_status')
-            ->addSearchableColumn('shipping_address')
-            ->addSearchableColumn('billing_address')
-            ->addSearchableColumn('customer_notes')
-            ->addSearchableColumn('admin_notes');
-
-
-        // Default sort
-        $config->setDefaultSort('date_created', 'desc');
-
-        return $config;
-    }
-
-    public static function createVoucherConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new InFilter('status', 'status'))
-            ->addFilter(new InFilter('type', 'type'))
-            ->addFilter(new RangeFilter('value', 'value'))
-            ->addFilter(new RangeFilter('minimum_order_value', 'minimum_order_value'))
-            ->addFilter(new RangeFilter('maximum_discount', 'maximum_discount'))
-            ->addFilter(new RangeFilter('usage_limit', 'usage_limit'))
-            ->addFilter(new RangeFilter('usage_count', 'usage_count'))
-            ->addFilter(new DateRangeFilter('starts_at', 'starts_at'))
-            ->addFilter(new DateRangeFilter('expires_at', 'expires_at'))
-            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
-            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('code', 'code'))
-            ->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('value', 'value'))
-            ->addSort(new SortSpecification('status', 'status'))
-            ->addSort(new SortSpecification('usage_count', 'usage_count'))
-            ->addSort(new SortSpecification('date_created', 'created_at'))
-            ->addSort(new SortSpecification('date_updated', 'updated_at'))
-            ->addSort(new SortSpecification('expires_at', 'expires_at'));
-
-        // Searchable columns
-        $config->addSearchableColumn('code')
-            ->addSearchableColumn('name')
-            ->addSearchableColumn('description');
-
-        // Default sort
-        $config->setDefaultSort('date_created', 'desc');
-
-        return $config;
-    }
-
-    public static function createPageConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new InFilter('status', 'status'))
-            ->addFilter(new RelationshipExistsFilter('content_type', 'metadata', 'content_type'))
-            ->addFilter(new RelationshipFilter('region_set_id', 'regionSets', 'id'))
-            ->addFilter(new RelationshipFilter('territory_id', 'territories', 'id'))
-            ->addFilter(new InFilter('template', 'page_type'))
-            ->addFilter(new RelationshipFilter('author', 'pageAuthors', 'author_id'))
-            ->addFilter(new RelationshipExistsFilter('featured', 'metadata', 'featured'))
-            ->addFilter(new RelationshipExistsFilter('visibility', 'metadata', 'visibility'))
-            ->addFilter(new RelationshipFilter('category', 'categories', 'id'))
-            ->addFilter(new RelationshipFilter('tag', 'tags', 'id'));
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('title', 'title'))
-            ->addSort(new SortSpecification('date_created', 'created_at'))
-            ->addSort(new SortSpecification('date_updated', 'updated_at'))
-            ->addSort(new SortSpecification('status', 'status'));
-
-        // Searchable columns
-        $config->addSearchableColumn('title')
-            ->addSearchableColumn('slug');
-
-        // Default sort
-        $config->setDefaultSort('date_created', 'desc');
-
-        return $config;
-    }
-
-    public static function createCategoryConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new EqualsFilter('parent', 'parent_id'));
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('date', 'created_at'))
-            ->addSort(new RelationshipCountSort('usage', 'pages'));
-
-        // Searchable columns
-        $config->addSearchableColumn('name')
-            ->addSearchableColumn('slug');
-
-        // Default sort
-        $config->setDefaultSort('name', 'asc');
-
-        return $config;
-    }
-
-    public static function createTagConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Sorts only (no filters)
-        $config->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('date', 'created_at'))
-            ->addSort(new SortSpecification('usage', 'usage_count'));
-
-        self::applyMandatoryFilters($config);
-
-        // Searchable columns
-        $config->addSearchableColumn('name')
-            ->addSearchableColumn('slug');
-
-        // Default sort
-        $config->setDefaultSort('usage', 'desc');
-
-        return $config;
-    }
-
-    public static function createAuthorConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Sorts only (no filters)
-        $config->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('date', 'created_at'))
-            ->addSort(new SortSpecification('email', 'email'));
-
-        self::applyMandatoryFilters($config);
-
-        // Searchable columns
-        $config->addSearchableColumn('name')
-            ->addSearchableColumn('email')
-            ->addSearchableColumn('bio');
-
-        // Default sort
-        $config->setDefaultSort('name', 'asc');
-
-        return $config;
-    }
-
-    public static function createImageConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new LikeFilter('query', 'filename'))
-            ->addFilter(new EqualsFilter('mime_type', 'mime_type'))
-            ->addFilter(new EqualsFilter('category_id', 'category_id'))
-            ->addFilter(new CustomFilter('tags', function($query, $value) {
-                // Value can be comma-separated tag IDs
-                $tagIds = is_array($value) ? $value : explode(',', $value);
-                $tagIds = array_filter(array_map('intval', $tagIds));
-
-                if (!empty($tagIds)) {
-                    $query->whereHas('tags', function($q) use ($tagIds) {
-                        $q->whereIn('tag_id', $tagIds);
-                    });
-                }
-                return $query;
-            }));;
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('created_at', 'created_at'))
-            ->addSort(new SortSpecification('original_name', 'original_name'))
-            ->addSort(new SortSpecification('file_size', 'file_size'))
-            ->addSort(new SortSpecification('updated_at', 'updated_at'));
-
-        // Searchable columns
-        $config->addSearchableColumn('filename')
-            ->addSearchableColumn('alt_text')
-            ->addSearchableColumn('caption')
-            ->addSearchableColumn('name')
-            ->addSearchableColumn('credit');
-
-        // Default sort
-        $config->setDefaultSort('created_at', 'desc');
-
-        return $config;
-    }
-
-    public static function createProductConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new EqualsFilter('category_id', 'category_id'))
-            ->addFilter(new LikeFilter('brand', 'brand_id'))
-            ->addFilter(new CustomFilter('on_sale', function($query, $value) {
-                if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
-                    $query->whereNotNull('sale_price')
-                        ->whereColumn('sale_price', '<', 'price');
-                }
-                return $query;
-            }));
-
-        self::applyMandatoryFilters($config);
-
-        // Sorts
-        $config->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('price', 'price'))
-            ->addSort(new SortSpecification('created_at', 'created_at'))
-            ->addSort(new SortSpecification('updated_at', 'updated_at'));
-
-        // Searchable columns
-        $config->addSearchableColumn('name')
-            ->addSearchableColumn('description')
-            ->addSearchableColumn('brand_id');
-
-        // Default sort
-        $config->setDefaultSort('created_at', 'desc');
-
-        return $config;
-    }
-
-    public static function createUserConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // Filters
-        $config->addFilter(new EqualsFilter('role', 'role'))
-            ->addFilter(new BooleanFilter('is_active', 'is_active'));
-
-        // Sorts
-        $config->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('email', 'email'))
-            ->addSort(new SortSpecification('created_at', 'created_at'))
-            ->addSort(new SortSpecification('updated_at', 'updated_at'))
-            ->addSort(new SortSpecification('role', 'role'));
-
-        // Searchable columns
-        $config->addSearchableColumn('name')
-            ->addSearchableColumn('email');
-
-        // Default sort
-        $config->setDefaultSort('name', 'asc');
-
-        return $config;
-    }
-
-    public static function createBrandConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-
-        // No filters needed for basic brand search
-
-        // Sorts
-        $config->addSort(new SortSpecification('name', 'name'))
-            ->addSort(new SortSpecification('created_at', 'created_at'))
-            ->addSort(new SortSpecification('updated_at', 'updated_at'))
-            ->addSort(new RelationshipCountSort('products', 'products'));
-
-        self::applyMandatoryFilters($config);
-
-        // Searchable columns
-        $config->addSearchableColumn('name')
-            ->addSearchableColumn('description');
-
-        // Default sort
-        $config->setDefaultSort('name', 'asc');
-
-        return $config;
-    }
-
-    public static function createRegionSetConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-        $config->addFilter(new EqualsFilter('site_id', 'site_id'));
-        $config->addFilter(new EqualsFilter('is_active', 'is_active'));
-        $config->addSort(new SortSpecification('name', 'name'));
-        $config->addSort(new SortSpecification('slug', 'slug'));
-        $config->addSort(new SortSpecification('is_active', 'is_active'));
-        $config->addSort(new SortSpecification('sort_order', 'sort_order'));
-        $config->addSort(new SortSpecification('created_at', 'created_at'));
-        $config->addSort(new SortSpecification('updated_at', 'updated_at'));
-        $config->addSearchableColumn('name');
-        $config->addSearchableColumn('slug');
-        $config->addSearchableColumn('description');
-        $config->setDefaultSort('sort_order', 'asc');
-        return $config;
-    }
-
-    public static function createTerritoryConfiguration(): SearchConfiguration
-    {
-        $config = new SearchConfiguration();
-        $config->addFilter(new EqualsFilter('site_id', 'site_id'));
-        $config->addFilter(new EqualsFilter('is_active', 'is_active'));
-        $config->addFilter(new EqualsFilter('region_set_id', 'region_set_id'));
-        $config->addSort(new SortSpecification('name', 'name'));
-        $config->addSort(new SortSpecification('code', 'code'));
-        $config->addSort(new SortSpecification('is_active', 'is_active'));
-        $config->addSort(new SortSpecification('sort_order', 'sort_order'));
-        $config->addSort(new SortSpecification('created_at', 'created_at'));
-        $config->addSort(new SortSpecification('updated_at', 'updated_at'));
-        $config->addSearchableColumn('name');
-        $config->addSearchableColumn('code');
-        $config->setDefaultSort('sort_order', 'asc');
-        return $config;
-    }
-
-    private static function applyMandatoryFilters(SearchConfiguration $config): void
-    {
-        // Example: add a filter that applies to all configs
-        $config->addFilter(new EqualsFilter('site_id', 'site_id'));
+        if (!isset(self::$configurations[$type])) {
+            throw new \InvalidArgumentException("Unknown configuration type: {$type}");
+        }
+
+        $class = self::$configurations[$type];
+        return new $class();
     }
 }

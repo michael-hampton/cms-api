@@ -809,4 +809,76 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertLessThanOrEqual(3, $viewed->count());
     }
+
+    public function test_get_all_merchants_returns_unique_names(): void
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $this->createProductMerchant($product1->id, ['name' => 'Amazon']);
+        $this->createProductMerchant($product1->id, ['name' => 'eBay']);
+        $this->createProductMerchant($product2->id, ['name' => 'Amazon']); // Duplicate
+        $this->createProductMerchant($product2->id, ['name' => 'BestBuy']);
+
+        $merchants = $this->repository->getAllMerchants();
+
+        // Should return unique merchant names
+        $this->assertGreaterThanOrEqual(3, $merchants->count());
+
+        $merchantNames = $merchants->pluck('name')->toArray();
+        $this->assertContains('Amazon', $merchantNames);
+        $this->assertContains('eBay', $merchantNames);
+        $this->assertContains('BestBuy', $merchantNames);
+    }
+
+    public function test_update_variant_updates_fields(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'OLD-SKU',
+            'price_modifier' => 5.00,
+            'is_active' => true
+        ]);
+
+        $updated = $this->repository->updateVariant($variant->id, [
+            'sku' => 'NEW-SKU',
+            'price_modifier' => 10.00,
+            'is_active' => false
+        ]);
+
+        $this->assertTrue($updated);
+
+        $variant = $variant->fresh();
+        $this->assertEquals('NEW-SKU', $variant->sku);
+        $this->assertEquals(10.00, $variant->price_modifier);
+        $this->assertFalse($variant->is_active);
+    }
+
+    public function test_update_variant_returns_false_for_nonexistent(): void
+    {
+        $updated = $this->repository->updateVariant(9999, ['sku' => 'TEST']);
+        $this->assertFalse($updated);
+    }
+
+    public function test_delete_variant_removes_variant_and_images(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+
+        // Add images
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+        $this->createProductImage($product->id, ['variant_id' => $variant->id]);
+
+        $deleted = $this->repository->deleteVariant($variant->id);
+
+        $this->assertTrue($deleted);
+        $this->assertDatabaseMissing('product_variants', ['id' => $variant->id]);
+        $this->assertCount(0, ProductImage::where('variant_id', $variant->id)->get());
+    }
+
+    public function test_delete_variant_returns_false_for_nonexistent(): void
+    {
+        $deleted = $this->repository->deleteVariant(9999);
+        $this->assertFalse($deleted);
+    }
 }

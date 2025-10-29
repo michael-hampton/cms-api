@@ -8,7 +8,9 @@ class SearchCriteriaParser
 {
     private const FILTER_PARAMS = [
         'status', 'visibility', 'page_type', 'author',
-        'featured', 'category', 'tag', 'parent', 'template', 'role', 'is_active', 'site_id', 'region_set_id', 'territory_id'
+        'featured', 'categories', 'tag', 'parent',
+        'template', 'role', 'is_active', 'site_id', 'region_set_id',
+        'territory_id', 'merchant', 'brands'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria
@@ -55,6 +57,7 @@ class SearchCriteriaParser
 
         // Extract filters from flat query params
         foreach (self::FILTER_PARAMS as $key) {
+
             $value = $request->get($key);
 
             if ($value !== null && $value !== '') {

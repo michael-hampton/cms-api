@@ -31,7 +31,7 @@ class PageGridController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
 
             // Use the search engine
-            $config = SearchConfigurationFactory::createPageGridConfiguration();
+            $config = SearchConfigurationFactory::create('page_grid');
             $searchEngine = new SearchEngine($config);
 
             $result = $searchEngine->search( PageGrid::with(['territories']), $criteria);

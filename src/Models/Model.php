@@ -46,6 +46,7 @@ abstract class Model
     protected $dateFormat = 'Y-m-d H:i:s';
     protected $database;
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
+    protected $appends = [];
     protected $relations = [];
     protected $with = [];
     protected $eagerLoaded = [];
@@ -505,6 +506,16 @@ abstract class Model
 
         // Apply visibility rules
         $attributes = $this->getVisibleAttributes($attributes);
+
+        // Append custom attributes
+        if (!empty($this->appends)) {
+            foreach ($this->appends as $key) {
+                // Check if the attribute is visible before appending it
+                if ($this->shouldIncludeAttribute($key)) {
+                    $attributes[$key] = $this->getAttribute($key);
+                }
+            }
+        }
 
         // Automatically include loaded relations
         foreach ($this->eagerLoaded as $relation => $data) {

@@ -17,7 +17,7 @@ class BrandRepository extends Repository
     public function __construct()
     {
         parent::__construct();
-        $config = SearchConfigurationFactory::createBrandConfiguration();
+        $config = SearchConfigurationFactory::create('brand');
         $this->searchEngine = new SearchEngine($config);
     }
 

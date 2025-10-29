@@ -591,4 +591,51 @@ abstract class FunctionalTestCase extends TestCase
         return $fullPath;
     }
 
+    /**
+     * Assert record exists in database
+     */
+    protected function assertDatabaseHas(string $table, array $attributes): void
+    {
+        $count = $this->countRecords($table, $attributes);
+        $this->assertGreaterThan(
+            0,
+            $count,
+            "Failed asserting that table [{$table}] contains record with attributes: " . json_encode($attributes)
+        );
+    }
+
+    /**
+     * Assert record does not exist in database
+     */
+    protected function assertDatabaseMissing(string $table, array $attributes): void
+    {
+        $count = $this->countRecords($table, $attributes);
+        $this->assertEquals(
+            0,
+            $count,
+            "Failed asserting that table [{$table}] does not contain record with attributes: " . json_encode($attributes)
+        );
+    }
+
+    /**
+     * Count records in a table
+     */
+    protected function countRecords(string $table, array $where = []): int
+    {
+        $sql = "SELECT COUNT(*) as count FROM {$table}";
+        $bindings = [];
+
+        if (!empty($where)) {
+            $conditions = [];
+            foreach ($where as $key => $value) {
+                $conditions[] = "`{$key}` = :{$key}";
+                $bindings[$key] = $value;
+            }
+            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $stmt = $this->database->query($sql, $bindings);
+        return (int) $stmt->fetch()['count'];
+    }
+
 }
