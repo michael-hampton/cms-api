@@ -3,12 +3,13 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
+use App\Models\PageGrid;
 
 class StorePageGridRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user() && $this->user()->can('create', PageGrid::class);
     }
 
     public function rules(): array

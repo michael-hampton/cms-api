@@ -17,6 +17,11 @@ class UpdateAuthorRequest extends FormRequest
         $this->authorRepository = new AuthorRepository();
     }
 
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('update', 'Author');
+    }
+
     public function rules(): array
     {
         return [

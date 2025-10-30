@@ -109,7 +109,7 @@ class SchemaBlockParser extends BaseBlockParser
         } else {
             $html .= "<div class=\"schema-howto-block\">";
 
-            if (!empty($parsedData['image'])) {
+            if (!empty($parsedData['image']) && !empty($parsedData['image']['src'])) {
                 $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['title']}\" class=\"schema-image\">";
             }
 

@@ -20,7 +20,7 @@ class UpdateUserRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return true;
+        return $this->user() && $this->user()->can('create', 'User');
     }
 
     public function rules(): array

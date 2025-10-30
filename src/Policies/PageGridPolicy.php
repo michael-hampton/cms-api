@@ -5,7 +5,7 @@ namespace App\Policies;
 use App\Framework\AuthenticatedUser;
 use App\Models\Model;
 
-class CategoryPolicy
+class PageGridPolicy
 {
     public function create(?AuthenticatedUser $user, Model $model): bool
     {

@@ -7,6 +7,11 @@ use App\Framework\Http\FormRequest;
 
 class CreateOrderRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('create', 'Order');
+    }
+
     public function rules(): array
     {
         return [
@@ -30,12 +35,6 @@ class CreateOrderRequest extends FormRequest
             'items.*.tax' => 'numeric|min:0',
             'items.*.metadata' => 'array'
         ];
-    }
-
-    public function authorize(): bool
-    {
-        return true;
-        //return $this->user() && $this->user()->can('create', 'Order');
     }
 
     public function after(): array

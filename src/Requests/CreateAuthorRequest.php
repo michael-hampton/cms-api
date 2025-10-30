@@ -34,6 +34,11 @@ class CreateAuthorRequest extends FormRequest
         ];
     }
 
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('create', 'Author');
+    }
+
     protected function prepareForValidation(): void
     {
         if (empty($this->data['slug']) && !empty($this->data['name'])) {

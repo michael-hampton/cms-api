@@ -16,6 +16,11 @@ class CreateVoucherRequest extends FormRequest
         $this->voucherRepository = new VoucherRepository();
     }
 
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('create', 'Voucher');
+    }
+
     public function rules(): array
     {
         return [
@@ -32,11 +37,6 @@ class CreateVoucherRequest extends FormRequest
             'expires_at' => 'date',
             'status' => 'in:active,inactive,expired'
         ];
-    }
-
-    public function authorize(): bool
-    {
-        return true;
     }
 
     public function after(): array

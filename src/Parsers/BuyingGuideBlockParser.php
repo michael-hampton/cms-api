@@ -86,7 +86,7 @@ class BuyingGuideBlockParser extends BaseBlockParser
             $html .= "<span class=\"sponsored-badge\">Sponsored</span>";
         }
 
-        if ($parsedData['has_image']) {
+        if ($parsedData['has_image'] && !empty($parsedData['image']['src'])) {
             $html .= "<div class=\"buying-guide-image\">";
             $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['title']}\" class=\"guide-img\">";
             $html .= "</div>";

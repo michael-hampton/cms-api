@@ -135,7 +135,7 @@ class ProductBlockParser extends BaseBlockParser
             $html .= "<span class=\"sponsored-badge\">Sponsored</span>";
         }
 
-        if (!empty($parsedData['image'])) {
+        if (!empty($parsedData['image']) && !empty($parsedData['image']['src'])) {
             $html .= "<div class=\"product-image\">";
             $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['name']}\" class=\"product-img\">";
             $html .= "</div>";

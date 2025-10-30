@@ -7,6 +7,11 @@ use App\Framework\Http\FormRequest;
 
 class CreateUserRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('create', 'User');
+    }
+
     public function rules(): array
     {
         return [
@@ -16,11 +21,6 @@ class CreateUserRequest extends FormRequest
             'age' => 'required|integer|min:18',
             'role' => 'in:user,admin'
         ];
-    }
-
-    public function authorize(): bool
-    {
-        return $this->user() && $this->user()->can('create', User::class);
     }
 
     public function messages(): array

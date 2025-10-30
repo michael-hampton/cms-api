@@ -170,7 +170,7 @@ class DealBlockParser extends BaseBlockParser
             $html .= "<span class=\"voucher-badge\">🎟️ Voucher Available</span>";
         }
 
-        if (!empty($parsedData['image'])) {
+        if (!empty($parsedData['image']) && !empty($parsedData['image']['src'])) {
             $html .= "<div class=\"deal-image\">";
             $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['productName']}\" class=\"deal-img\">";
             $html .= "</div>";

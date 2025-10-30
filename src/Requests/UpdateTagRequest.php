@@ -16,6 +16,11 @@ class UpdateTagRequest extends FormRequest
         $this->tagRepository = new TagRepository();
     }
 
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('update', 'Tag');
+    }
+
     public function rules(): array
     {
         return [
@@ -26,12 +31,6 @@ class UpdateTagRequest extends FormRequest
             'is_featured' => 'boolean'
         ];
     }
-
-//    public function authorize(): bool
-//    {
-//        $tag = $this->getTag();
-//        return $this->user() && $this->user()->can('update', $tag);
-//    }
 
     public function after(): array
     {

@@ -7,6 +7,10 @@ use App\Framework\Support\Str;
 
 class CreateMenuRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('create', 'Menu');
+    }
 
     public function rules(): array
     {

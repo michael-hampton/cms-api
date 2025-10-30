@@ -9,6 +9,11 @@ class TagPolicy
 {
     public function create(?AuthenticatedUser $user, Model $model): bool
     {
-        return $user !== null;
+        return $user->role === 'admin';
+    }
+
+    public function update(?AuthenticatedUser $user, Model $model): bool
+    {
+        return $user->role === 'admin';
     }
 }

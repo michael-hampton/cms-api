@@ -18,6 +18,11 @@ class UpdateCategoryRequest extends FormRequest
         $this->categoryRepository = new CategoryRepository();
     }
 
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('update', 'Category');
+    }
+
     public function rules(): array
     {
         return [
@@ -30,11 +35,6 @@ class UpdateCategoryRequest extends FormRequest
             'is_active' => 'boolean'
         ];
     }
-
-//    public function authorize(): bool
-//    {
-//        return $this->user() && $this->user()->can('update', Category::find($this->route('id')));
-//    }
 
     public function after(): array
     {

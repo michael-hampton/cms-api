@@ -7,10 +7,15 @@ use App\Framework\Http\FormRequest;
 
 class UpdateOrderRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return $this->user() && $this->user()->can('create', 'Order');
+    }
     public function rules(): array
     {
         return [
             'user_id' => 'integer|exists:users,id',
+            'order_number' => 'string|max:255',
             'status' => 'string|in:pending,processing,completed,cancelled,refunded',
             'shipping' => 'numeric|min:0',
             'discount' => 'numeric|min:0',
@@ -20,14 +25,15 @@ class UpdateOrderRequest extends FormRequest
             'shipping_address' => 'array',
             'billing_address' => 'array',
             'payment_method' => 'string|max:255',
-            'payment_status' => 'string|in:unpaid,paid,refunded'
+            'payment_status' => 'string|in:unpaid,paid,refunded',
+            'items' => 'required|array|min:1',
+            'items.*.product_name' => 'required|string|max:255',
+            'items.*.product_sku' => 'string|max:255',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.tax' => 'numeric|min:0',
+            'items.*.metadata' => 'array'
         ];
-    }
-
-    public function authorize(): bool
-    {
-        return true;
-        //return $this->user() && $this->user()->can('update', 'Order');
     }
 
     public function after(): array
@@ -50,7 +56,7 @@ class UpdateOrderRequest extends FormRequest
 
     private function validateAddress(array $address): bool
     {
-        $requiredFields = ['street', 'city', 'country'];
+        $requiredFields = ['address_line_1', 'city', 'country'];
         foreach ($requiredFields as $field) {
             if (empty($address[$field])) {
                 return false;
