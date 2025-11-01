@@ -974,6 +974,244 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['items']);
     }
 
+    public function testStoreCreatesGalleryWithSlides()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Gallery Page'],
+                'meta' => ['slug' => 'gallery-page', 'status' => 'draft', 'content_type' => 'gallery']
+            ],
+            'gallery_slides' => [
+                [
+                    'id' => 0,
+                    'image_id' => 1,
+                    'image_url' => 'http://example.com/image1.jpg',
+                    'title' => 'Slide 1',
+                    'caption' => 'First slide',
+                    'alt' => 'Alt text 1',
+                    'blocks' => []
+                ],
+                [
+                    'id' => 1,
+                    'image_id' => 2,
+                    'image_url' => 'http://example.com/image2.jpg',
+                    'title' => 'Slide 2',
+                    'caption' => 'Second slide',
+                    'alt' => 'Alt text 2',
+                    'blocks' => []
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Gallery Page', $data['data']['page']['title']);
+        $this->assertEquals('gallery', $data['data']['page']['metadata']['content_type']);
+        $this->assertNotNull($data['data']['page']['gallery_slides']);
+
+        $slides = json_decode($data['data']['page']['gallery_slides'], true);
+        $this->assertCount(2, $slides);
+    }
+
+    public function testDuplicatePageClonesGallerySlides()
+    {
+        $page = $this->createPage(['page_type' => 'gallery']);
+
+        $slides = [
+            [
+                'id' => 0,
+                'image_id' => 1,
+                'image_url' => 'http://example.com/image1.jpg',
+                'title' => 'Slide 1',
+                'blocks' => []
+            ]
+        ];
+
+        Page::where('id', $page->id)->update([
+            'gallery_slides' => json_encode($slides)
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('gallery', $data['data']['page']['page_type']);
+        $this->assertNotNull($data['data']['page']['gallery_slides']);
+
+        $duplicatedSlides = json_decode($data['data']['page']['gallery_slides'], true);
+        $this->assertCount(1, $duplicatedSlides);
+    }
+
+    public function testCloneToSiteClonesGallerySlides()
+    {
+        $sourcePage = $this->createPage(['page_type' => 'gallery']);
+
+        $slides = [
+            [
+                'id' => 0,
+                'image_id' => 1,
+                'image_url' => 'http://example.com/image1.jpg',
+                'title' => 'Slide 1',
+                'blocks' => []
+            ]
+        ];
+
+        Page::where('id', $sourcePage->id)->update([
+            'gallery_slides' => json_encode($slides)
+        ]);
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals($targetSiteId, $data['data']['page']['site_id']);
+        $this->assertEquals('gallery', $data['data']['page']['page_type']);
+        $this->assertNotNull($data['data']['page']['gallery_slides']);
+
+        $clonedSlides = json_decode($data['data']['page']['gallery_slides'], true);
+        $this->assertCount(1, $clonedSlides);
+    }
+
+    public function testStoreValidatesBlocks()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Test Page'],
+                'meta' => ['slug' => 'test-page', 'status' => 'draft']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'text',
+                    // Missing required 'paragraphs' field
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        // Should return validation error
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+    }
+
+    public function testStoreValidatesGallerySlideBlocks()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Gallery Page'],
+                'meta' => [
+                    'slug' => 'gallery-page',
+                    'status' => 'draft',
+                    'content_type' => 'gallery'
+                ]
+            ],
+            'gallery_slides' => [
+                [
+                    'id' => 0,
+                    'image_id' => 1,
+                    'image_url' => 'http://example.com/image1.jpg',
+                    'title' => 'Slide 1',
+                    'caption' => 'First slide',
+                    'alt' => 'Alt text 1',
+                    'blocks' => [
+                        [
+                            'type' => 'text',
+                            // Missing required 'paragraphs' field
+                        ]
+                    ]
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        // Should return validation error
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertStringContainsString('slide', strtolower(json_encode($data['errors'])));
+    }
+
+    public function testStoreAcceptsValidGallerySlideBlocks()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Gallery Page'],
+                'meta' => [
+                    'slug' => 'gallery-page',
+                    'status' => 'draft',
+                    'content_type' => 'gallery'
+                ]
+            ],
+            'gallery_slides' => [
+                [
+                    'id' => 0,
+                    'image_id' => 1,
+                    'image_url' => 'http://example.com/image1.jpg',
+                    'title' => 'Slide 1',
+                    'caption' => 'First slide',
+                    'alt' => 'Alt text 1',
+                    'blocks' => [
+                        [
+                            'type' => 'text',
+                            'paragraphs' => ['This is valid text']
+                        ]
+                    ]
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Gallery Page', $data['data']['page']['title']);
+    }
+
+    public function testUpdateValidatesBlocks()
+    {
+        $page = $this->createPage();
+
+        $updateData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Updated Page'],
+                'meta' => ['slug' => 'updated-page']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'heading',
+                    // Missing required 'text' field
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        // Should return validation error
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+    }
+
 
     private function createSite() {
         return Site::create([

@@ -38,7 +38,7 @@ class ProductSearchConfiguration extends SearchConfiguration implements SearchCo
                 return $query->whereHas('availableMerchants', function($q) use ($value) {
                     // Check if values are numeric (IDs) or strings (names)
                     if (is_numeric($value[0])) {
-                        $q->whereIn('id', $value);
+                        $q->whereIn('merchant_id', $value);
                     } else {
                         $q->whereIn('name', $value);
                     }

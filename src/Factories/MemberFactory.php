@@ -23,6 +23,7 @@ class MemberFactory extends Factory
             'last_name' => 'User',
             'email' => 'user' . uniqid() . '@example.com',
             'password' => password_hash('password', PASSWORD_BCRYPT),
+            'is_active' => true
         ];
     }
 

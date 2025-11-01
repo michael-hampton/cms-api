@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Models\Merchant;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
@@ -512,7 +513,12 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('syncMerchants')
             ->once()
-            ->with(1, Mockery::type('array'));
+            ->with(1, Mockery::type('array'))
+            ->andReturn([1]); // Returns product_merchant IDs
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->once()
+            ->with(1, 1, 79.99);
 
         $this->repository->shouldReceive('recordPriceHistory')
             ->with($product)
@@ -617,7 +623,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn(collect([]));
 
         $this->repository
-            ->shouldReceive('getMerchants')
+            ->shouldReceive('getProductMerchantsWithDetails')
             ->with(1)
             ->once()
             ->andReturn(collect([]));
@@ -705,7 +711,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1, Mockery::type('array'))
         ->andReturn([0 => 1]);
 
-        $this->repository->shouldReceive('getMerchants')
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')
             ->with(1)
             ->andReturn(collect([]));
 
@@ -972,7 +978,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
-        $this->repository->shouldReceive('getMerchants')->with(1)->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->with(1)->andReturn(new Collection([]));
         $this->repository->shouldReceive('getVariants')->with(1)->andReturn(new Collection([]));
         $this->repository->shouldReceive('getSpecifications')->with(1)->andReturn(new Collection([]));
 
@@ -1003,7 +1009,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->andReturn(new Collection([]));
-        $this->repository->shouldReceive('getMerchants')->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getVariants')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getSpecifications')->andReturn(new Collection([]));
 
@@ -1045,7 +1051,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->andReturn(new Collection([]));
-        $this->repository->shouldReceive('getMerchants')->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getVariants')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getSpecifications')->andReturn(new Collection([]));
 
@@ -1084,7 +1090,7 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->with(1)->andReturn($images);
-        $this->repository->shouldReceive('getMerchants')->with(1)->andReturn($merchants);
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->with(1)->andReturn($merchants);
         $this->repository->shouldReceive('getVariants')->with(1)->andReturn($variants);
         $this->repository->shouldReceive('getSpecifications')->with(1)->andReturn($specifications);
 
@@ -1155,7 +1161,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->andReturn(new Collection([]));
-        $this->repository->shouldReceive('getMerchants')->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getVariants')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getSpecifications')->andReturn(new Collection([]));
 
@@ -1418,14 +1424,14 @@ class ProductServiceTest extends FunctionalTestCase
         ]);
 
         $existingMerchants = collect([
-            new ProductMerchant(['id' => 1, 'name' => 'Amazon', 'price' => 79.99]),
-            new ProductMerchant(['id' => 2, 'name' => 'eBay', 'price' => 89.99])
+           ['id' => 1, 'name' => 'Amazon', 'price' => 79.99],
+           ['id' => 2, 'name' => 'eBay', 'price' => 89.99]
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
         $this->repository->shouldReceive('update')->once()->andReturn($product);
 
-        $this->repository->shouldReceive('getMerchants')
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')
             ->with(1)
             ->andReturn($existingMerchants);
 
@@ -1456,12 +1462,12 @@ class ProductServiceTest extends FunctionalTestCase
         $product = new Product(['id' => 1, 'name' => 'Product']);
 
         $existingMerchants = collect([
-            new ProductMerchant(['id' => 1, 'name' => 'Amazon', 'price' => 79.99])
+            ['id' => 1, 'name' => 'Amazon', 'price' => 79.99]
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
         $this->repository->shouldReceive('update')->once()->andReturn($product);
-        $this->repository->shouldReceive('getMerchants')->andReturn($existingMerchants);
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn($existingMerchants);
 
         $data = [
             'merchants' => [
@@ -1531,7 +1537,7 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('create')->andReturn(new Product(['id' => 2]));
 
         $this->repository->shouldReceive('getImages')->andReturn($images);
-        $this->repository->shouldReceive('getMerchants')->andReturn($merchants);
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn($merchants);
         $this->repository->shouldReceive('getVariants')->andReturn(new Collection([]));
         $this->repository->shouldReceive('getSpecifications')->andReturn(new Collection([]));
 
@@ -1706,7 +1712,7 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
-        $this->repository->shouldReceive('getMerchants')->with(1)->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->with(1)->andReturn(new Collection([]));
         $this->repository->shouldReceive('getVariants')->with(1)->andReturn($variants);
         $this->repository->shouldReceive('getSpecifications')->with(1)->andReturn(new Collection([]));
 
@@ -1784,21 +1790,35 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertTrue($result);
     }
 
-    public function testGetAllMerchants()
+    public function testUpdateProductChangingPrimaryImage()
     {
-        $merchants = new Collection([
-            new ProductMerchant(['id' => 1, 'name' => 'Amazon']),
-            new ProductMerchant(['id' => 2, 'name' => 'eBay']),
-            new ProductMerchant(['id' => 3, 'name' => 'BestBuy'])
-        ]);
+        $product = new Product(['id' => 1, 'name' => 'Product']);
 
-        $this->repository->shouldReceive('getAllMerchants')
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
+
+        // Simulate changing which image is primary
+        $this->repository->shouldReceive('syncImages')
             ->once()
-            ->andReturn($merchants);
+            ->with(1, Mockery::on(function($images) {
+                // Verify second image is now primary
+                return count($images) === 2
+                    && $images[0]['is_primary'] === false
+                    && $images[1]['is_primary'] === true
+                    && $images[0]['url'] === 'img1.jpg'
+                    && $images[1]['url'] === 'img2.jpg';
+            }));
 
-        $result = $this->repository->getAllMerchants();
+        $data = [
+            'name' => 'Updated Product',
+            'images' => [
+                ['url' => 'img1.jpg', 'alt' => 'Image 1', 'is_primary' => false, 'sort_order' => 0],
+                ['url' => 'img2.jpg', 'alt' => 'Image 2', 'is_primary' => true, 'sort_order' => 1],
+            ]
+        ];
 
-        $this->assertCount(3, $result);
-        $this->assertEquals('Amazon', $result->first()->name);
+        $result = $this->service->updateProduct(1, $data);
+
+        $this->assertNotNull($result);
     }
 }

@@ -146,6 +146,10 @@ class PageControllerTest extends FunctionalTestCase
 
         $response = $this->controller->index($request, $this->siteSlug);
 
+        echo '<pre>';
+        print_r($response->getContent());
+        die;
+
         $this->assertEquals(200, $response->getStatusCode());
     }
 

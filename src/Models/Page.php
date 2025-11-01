@@ -42,6 +42,7 @@ class Page extends Model
         'hero_video_url',
         'crop_overrides',
         'resolved_images',
+        'gallery_slides'
     ];
 
     protected $alwaysInclude = [

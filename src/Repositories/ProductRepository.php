@@ -3,6 +3,8 @@
 namespace App\Repositories;
 
 use App\Framework\Support\Collection;
+use App\Framework\Support\Str;
+use App\Models\Merchant;
 use App\Models\Model;
 use App\Models\Product;
 use App\Models\ProductImage;
@@ -28,7 +30,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Product::with(['activeVariants', 'availableMerchants', 'images', 'specifications', 'priceHistory', 'activeVariants.images']);
+        $query = Product::with(['activeVariants', 'availableMerchants', 'images', 'specifications', 'priceHistory', 'activeVariants.images', 'availableMerchants.merchant']);
         return $this->searchEngine->search($query, $criteria);
     }
 
@@ -134,34 +136,85 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->get();
     }
 
+    private function getFormattedMerchants(int $productId)
+    {
+        $existingMerchants = ProductMerchant::with(['merchant'])->where('product_id', $productId)
+            ->get()->toArray();
+
+        $formattedMerchants = [];
+
+        foreach ($existingMerchants as $existingMerchant) {
+            $formattedMerchants[$existingMerchant['merchant']['id']] = $existingMerchant;
+        }
+
+        return collect($formattedMerchants);
+    }
+
     // Merchant operations
     public function syncMerchants(int $productId, array $merchants): array
     {
-        $productMerchants = ProductMerchant::where('product_id', $productId)->get()->keyBy('name');
+        $existingMerchants = $this->getFormattedMerchants($productId);
 
         $merchantIds = [];
 
         foreach ($merchants as $merchantData) {
+            // Find or create merchant in lookup table
+            $merchantLookup = $this->findOrCreateMerchant($merchantData['name']);
 
-            if ($productMerchants->has($merchantData['name'])) {
-                $merchantIds[] = $productMerchants->get($merchantData['name'])->id;
-                continue;
+            // Check if this product-merchant combination already exists
+            $existingPM = null;
+            if (!empty($merchantData['id']) && $existingMerchants->has($merchantData['id'])) {
+                $existingPM = $existingMerchants->get($merchantData['id']);
+            } else {
+
+                // Check by merchant_id
+                $existingPM = ProductMerchant::where('product_id', $productId)
+                    ->where('merchant_id', $merchantLookup->id)
+                    //->where('variant_id', $merchantData['variant_id'] ?? null)
+                    ->first();
             }
 
-            $merchant = ProductMerchant::create([
-                'product_id' => $productId,
-                'name' => $merchantData['name'],
-                'url' => $merchantData['url'],
-                'price' => $merchantData['price'],
-                'is_available' => $merchantData['is_available'] ?? true,
-                'variant_id' => $merchantData['variant_id'] ?? null,
-                'last_price_check' => now(),
-            ]);
-
-            $merchantIds[] = $merchant->id;
+            if ($existingPM) {
+                // Update existing
+                $existingPM->update([
+                    'url' => $merchantData['url'],
+                    'price' => $merchantData['price'],
+                    'is_available' => $merchantData['is_available'] ?? true,
+                ]);
+                $merchantIds[] = $existingPM->id;
+            } else {
+                // Create new
+                $productMerchant = ProductMerchant::create([
+                    'product_id' => $productId,
+                    'merchant_id' => $merchantLookup->id,
+                    'url' => $merchantData['url'],
+                    'price' => $merchantData['price'],
+                    'is_available' => $merchantData['is_available'] ?? true,
+                    'variant_id' => $merchantData['variant_id'] ?? null,
+                    'last_price_check' => now(),
+                ]);
+                $merchantIds[] = $productMerchant->id;
+            }
         }
 
         return $merchantIds;
+    }
+
+    protected function findOrCreateMerchant(string $name): Merchant
+    {
+        $merchant = Merchant::where('name', $name)->first();
+
+        if (!$merchant) {
+            $merchant = Merchant::create(['name' => $name, 'slug' => Str::slug($name)]);
+        }
+
+        return $merchant;
+    }
+
+// Keep original getMerchants for backward compatibility
+    public function getMerchants(int $productId): Collection
+    {
+        return $this->getProductMerchantsWithDetails($productId);
     }
 
     public function recordMerchantPriceHistory(int $productId, int $merchantId, float $price): ?Model
@@ -188,11 +241,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         }
 
         return $query->orderBy('recorded_at', 'desc')->get();
-    }
-
-    public function getMerchants(int $productId): Collection
-    {
-        return ProductMerchant::where('product_id', $productId)->get();
     }
 
     public function deleteMerchants(int $productId): void
@@ -325,13 +373,13 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->first();
     }
 
-    public function getAllMerchants(): Collection
-    {
-        return ProductMerchant::select('id', 'name')
-            ->distinct()
-            ->orderBy('name')
-            ->get();
-    }
+//    public function getAllMerchants(): Collection
+//    {
+//        return ProductMerchant::select('id', 'name')
+//            ->distinct()
+//            ->orderBy('name')
+//            ->get();
+//    }
 
     public function updateVariant(int $variantId, array $data): bool
     {
@@ -357,5 +405,29 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $this->deleteVariantImages($variantId);
 
         return $variant->delete();
+    }
+
+    public function getAllMerchantLookups(): Collection
+    {
+        return Merchant::orderBy('name')->get();
+    }
+
+    public function getProductMerchantsWithDetails(int $productId): Collection
+    {
+        return ProductMerchant::with(['merchant'])
+            ->where('product_id', $productId)
+            ->get()
+            ->map(function($pm) {
+                return [
+                    'id' => $pm->id,
+                    'merchant_id' => $pm->merchant_id,
+                    'name' => $pm->merchant->name,
+                    'url' => $pm->url,
+                    'price' => $pm->price,
+                    'is_available' => $pm->is_available,
+                    'variant_id' => $pm->variant_id,
+                    'last_price_check' => $pm->last_price_check,
+                ];
+            });
     }
 }

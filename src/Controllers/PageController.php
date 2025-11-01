@@ -67,10 +67,6 @@ class PageController extends Controller
         try {
             $requestData = $request->all();
 
-            echo '<pre>';
-            print_r($requestData);
-            die;
-
             // Determine if this is an update or create based on presence of ID
             if (!empty($requestData['id'])) {
                 $page = $this->pageService->updatePageWithAllData($requestData['id'], $requestData, $request->get('site_id'));

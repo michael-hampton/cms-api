@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Framework\Database\Database;
+use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
+use App\Framework\Validation\Validator;
 use App\Models\Page;
 use App\Models\PageMetadata;
 use App\Models\PageSeo;
@@ -132,11 +134,86 @@ class PageService
             $this->processAllFormsData($page->id, $requestData, $siteId);
 
             if (!empty($requestData['blocks'])) {
-                $this->blockParserService->replacePageBlocks($page->id, $requestData['blocks']);
+                $this->validateAndReplaceBlocks($page->id, $requestData['blocks']);
+            }
+
+            if (!empty($requestData['gallery_slides'])) {
+                $this->validateGallerySlides($page->id, $requestData['gallery_slides']);
             }
 
             return $this->getCompletePageData($page->id);
         });
+    }
+
+    /**
+     * Validate and replace page blocks using BlockParserService
+     */
+    private function validateAndReplaceBlocks(int $pageId, array $blocks): void
+    {
+        try {
+            // Use BlockParserService to validate and parse blocks
+            $this->blockParserService->replacePageBlocks($pageId, $blocks);
+        } catch (ValidationException $e) {
+            throw new ValidationException('Block validation failed', $e->getErrors());
+        } catch (Exception $e) {
+            throw new Exception("Failed to process blocks: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Validate gallery slides and their blocks
+     */
+    private function validateGallerySlides(int $pageId, array $slides): void
+    {
+        $errors = [];
+
+        foreach ($slides as $slideIndex => $slide) {
+            // Validate slide structure
+            if (empty($slide['image_id'])) {
+                $errors["slide_{$slideIndex}"] = ['image_id' => 'Slide must have an image'];
+            }
+
+            if (empty($slide['title'])) {
+                $errors["slide_{$slideIndex}"] = ['title' => 'Slide must have a title'];
+            }
+
+            // Validate blocks within the slide
+            if (!empty($slide['blocks'])) {
+                try {
+                    // Create a temporary validation - we don't actually save these to the blocks table
+                    // since they're stored as JSON in gallery_slides
+                    foreach ($slide['blocks'] as $blockIndex => $blockData) {
+                        $this->validateBlockStructure($blockData, $slideIndex, $blockIndex);
+                    }
+                } catch (ValidationException $e) {
+                    $errors["slide_{$slideIndex}_blocks"] = $e->getErrors();
+                }
+            }
+        }
+
+        if (!empty($errors)) {
+            throw new ValidationException('Gallery slide validation failed', $errors);
+        }
+    }
+
+    /**
+     * Validate individual block structure without saving
+     */
+    private function validateBlockStructure(array $blockData, int $slideIndex, int $blockIndex): void
+    {
+        try {
+            // Use BlockParserService's public validateBlock method
+            $this->blockParserService->validateBlock($blockData);
+        } catch (ValidationException $e) {
+            throw new ValidationException(
+                "Validation failed for block at slide {$slideIndex}, position {$blockIndex}",
+                $e->getErrors()
+            );
+        } catch (BlockParserNotFoundException $e) {
+            throw new ValidationException(
+                "Invalid block type '{$blockData['type']}' at slide {$slideIndex}, position {$blockIndex}"
+            );
+        }
     }
 
     public function createPageWithAllData(array $requestData, int $siteId): Page
@@ -212,6 +289,7 @@ class PageService
             'forms.listing.dekLabel' => 'listing_label',
             'forms.listing.imageId' => 'listing_image_id',
             'forms.listing.useAsHero' => 'listing_use_as_hero',
+            'forms.meta.content_type' => 'page_type',
         ];
 
         foreach ($fieldMappings as $path => $field) {
@@ -239,6 +317,10 @@ class PageService
         // Auto-generate slug if title exists but slug doesn't
         if (!empty($mainData['title']) && empty($mainData['slug'])) {
             $mainData['slug'] = Str::slug($mainData['title']);
+        }
+
+        if (!empty($requestData['gallery_slides'])) {
+            $mainData['gallery_slides'] = json_encode($requestData['gallery_slides']);
         }
 
         return $mainData;
@@ -545,7 +627,7 @@ class PageService
     private function validateCompletePageData(array $data): void
     {
         $errors = [];
-        $validator = new \App\Framework\Validation\Validator($this->database);
+        $validator = new Validator($this->database);
         $validationRules = new PageFormValidationRules();
 
         $formValidators = [
@@ -615,6 +697,9 @@ class PageService
                 'hero_video_url' => $originalPage->hero_video_url,
                 'crop_overrides' => $originalPage->crop_overrides,
                 'resolved_images' => $originalPage->resolved_images,
+                'page_type' => $originalPage->page_type,
+                'gallery_slides' => $originalPage->gallery_slides, // ADD THIS
+
             ];
 
             $newPage = $this->pageRepository->create($pageData);
@@ -1157,6 +1242,8 @@ class PageService
                 'hero_video_url' => $sourcePage->hero_video_url,
                 'crop_overrides' => $sourcePage->crop_overrides,
                 'resolved_images' => $sourcePage->resolved_images,
+                'page_type' => $sourcePage->page_type,
+                'gallery_slides' => $sourcePage->gallery_slides,
             ];
 
             $newPage = $this->pageRepository->create($pageData);

@@ -10,6 +10,7 @@ use App\Controllers\CommentController;
 use App\Controllers\CustomFieldDefinitionController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
+use App\Controllers\MemberController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\NewsletterController;
@@ -36,6 +37,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
     // Pages API
     $router->group(['prefix' => '{siteName}'], function ($router) {
         $router->get('/contact-info', SiteController::class, 'getContactInfo');
+
+        $router->get('/members', MemberController::class, 'search');
 
         $router->get('/pages', PageController::class, 'index');
         $router->post('/pages', PageController::class, 'store', [AuthenticateWithToken::class]);

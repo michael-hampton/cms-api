@@ -164,16 +164,21 @@ class ProductService
 
         // Sync related records if provided
         if ($merchants !== null) {
-            $oldMerchants = $this->repository->getMerchants($product->id)->keyBy('id');
+            $oldMerchants = $this->repository->getProductMerchantsWithDetails($product->id)->keyBy('id');
             $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
 
             // Record price history for merchants with price changes
             foreach ($merchants as $index => $merchantData) {
                 $merchantId = $merchantIds[$index];
-                $oldMerchant = !empty($merchantData['id']) && $oldMerchants->has($merchantData['id']) ? $oldMerchants->get($merchantData['id']) : null;
+
+                // Find old merchant by id or merchant_id
+                $oldMerchant = null;
+                if (!empty($merchantData['id']) && $oldMerchants->has($merchantData['id'])) {
+                    $oldMerchant = $oldMerchants->get($merchantData['id']);
+                }
 
                 // Record if new merchant or price changed
-                if (!$oldMerchant || $oldMerchant->price != $merchantData['price']) {
+                if (!$oldMerchant || $oldMerchant['price'] != $merchantData['price']) {
                     $this->repository->recordMerchantPriceHistory(
                         $product->id,
                         $merchantId,
@@ -440,7 +445,7 @@ class ProductService
 
         // Duplicate merchants if selected
         if ($cloneRelations['merchants']) {
-            $merchants = $this->repository->getMerchants($originalId);
+            $merchants = $this->repository->getProductMerchantsWithDetails($originalId);
             $merchantData = $merchants->map(fn($m) => [
                 'name' => $m->name,
                 'url' => $m->url,

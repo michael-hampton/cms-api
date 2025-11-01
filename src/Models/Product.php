@@ -170,4 +170,14 @@ class Product extends Model
                     ->orWhere('expires_at', '>', date('Y-m-d H:i:s'));
             });
     }
+
+    public function merchantLookups()
+    {
+        return $this->belongsToMany(
+            Merchant::class,
+            'product_merchants',
+            'product_id',
+            'merchant_id'
+        )->withPivot(['url', 'price', 'is_available', 'variant_id', 'last_price_check']);
+    }
 }

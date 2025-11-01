@@ -183,14 +183,28 @@ class ProductController extends Controller
     public function merchants(Request $request, string $siteName): JsonResponse
     {
         try {
-            $merchants = $this->productRepository->getAllMerchants();
+            $merchants = $this->productRepository->getAllMerchantLookups();
 
             return $this->resourceResponse([
                 'success' => true,
                 'items' => $merchants->map(fn($m) => [
                     'id' => $m->id,
                     'name' => $m->name
-                ])->unique('name')->toArray()
+                ])->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function productMerchants(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $merchants = $this->productRepository->getProductMerchantsWithDetails($id);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'items' => $merchants->toArray()
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

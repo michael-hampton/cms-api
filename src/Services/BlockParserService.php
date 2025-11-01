@@ -106,7 +106,7 @@ class BlockParserService
             $blockData = $parser->beforeValidation($blockData);
         }
 
-        $this->validateBlockData($blockData, $parser);
+        $this->performValidation($blockData, $parser);
 
         $parsedData = $parser->parse($blockData);
 
@@ -131,7 +131,7 @@ class BlockParserService
         }
 
         if (!$isPreviewMode) {
-            $this->validateBlockData($blockData, $parser);
+            $this->performValidation($blockData, $parser);
         }
 
         $parsedData = $parser->parse($blockData);
@@ -150,7 +150,7 @@ class BlockParserService
         $type = $blockData['type'] ?? $block->type;
         $parser = $this->getParser($type);
 
-        $this->validateBlockData($blockData, $parser);
+        $this->performValidation($blockData, $parser);
 
         $parsedData = $parser->parse($blockData);
 
@@ -196,7 +196,7 @@ class BlockParserService
         }
     }
 
-    private function getParser($type)
+    public function getParser($type)
     {
         $parser = $this->blockRegistry->getParser($type);
 
@@ -255,5 +255,34 @@ class BlockParserService
             'page_index' => $pageIndex,
             'error' => $e->getMessage()
         ]);
+    }
+
+    /**
+     * Validate block data without saving (useful for gallery slides)
+     */
+    public function validateBlock(array $blockData): void
+    {
+        $this->validateBlockType($blockData);
+
+        $type = $blockData['type'];
+        $parser = $this->getParser($type);
+
+        if (method_exists($parser, 'beforeValidation')) {
+            $blockData = $parser->beforeValidation($blockData);
+        }
+
+        $this->performValidation($blockData, $parser);
+    }
+
+    /**
+     * Internal validation method used by both parseBlock and validateBlock
+     */
+    private function performValidation(array $blockData, $parser): void
+    {
+        $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
+
+        if (!$validationResult->isValid()) {
+            throw new ValidationException('Failed to validate block data', $validationResult->getErrors());
+        }
     }
 }

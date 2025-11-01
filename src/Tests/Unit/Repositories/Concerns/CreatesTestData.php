@@ -12,6 +12,7 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\CustomFieldDefinition;
 use App\Models\Member;
+use App\Models\Merchant;
 use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -376,6 +377,12 @@ trait CreatesTestData
         return $this->factory(Member::class)
             ->forSite($this->siteId)
             ->count($count)
+            ->create($overrides);
+    }
+
+    protected function createMerchant(array $overrides = []): Model
+    {
+        return $this->factory(Merchant::class)
             ->create($overrides);
     }
 }

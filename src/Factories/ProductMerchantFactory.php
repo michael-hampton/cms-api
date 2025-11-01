@@ -16,7 +16,6 @@ class ProductMerchantFactory extends Factory
     {
         return [
             'product_id' => null,
-            'name' => 'Test Merchant',
             'url' => 'https://example.com',
             'price' => 99.99,
             'is_available' => true,

@@ -13,7 +13,8 @@ class ProductMerchant extends Model
         'url',
         'price',
         'last_price_check',
-        'is_available'
+        'is_available',
+        'merchant_id'
     ];
 
     protected $casts = [
@@ -30,5 +31,10 @@ class ProductMerchant extends Model
     public function variant()
     {
         return $this->belongsTo(ProductVariant::class);
+    }
+
+    public function merchant()
+    {
+        return $this->belongsTo(Merchant::class);
     }
 }

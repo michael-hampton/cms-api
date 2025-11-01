@@ -2,6 +2,8 @@
 
 namespace App\Tests\Unit\Repositories;
 
+use App\Framework\Support\Str;
+use App\Models\Merchant;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductSpecification;
@@ -186,15 +188,17 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Arrange
         $product = $this->createProduct();
 
+        $merchant = $this->createMerchant(['name' => 'Amazon']);;
+
         // Create existing merchant
         $existingMerchant = $this->createProductMerchant($product->id, [
-            'name' => 'Amazon',
-            'price' => 99.99
+            'price' => 99.99,
+            'merchant_id' => $merchant->id,
         ]);
 
         $merchants = [
             [
-                'name' => 'Amazon',  // Existing - should be kept
+                'name' => $merchant->name,  // Existing - should be kept
                 'url' => 'https://amazon.com/product',
                 'price' => 89.99,  // Price changed
                 'is_available' => true
@@ -212,15 +216,20 @@ class ProductRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(2, $merchantIds);
-        $this->assertContains($existingMerchant->id, $merchantIds);
+
+        $this->assertContains($merchant->id, $merchantIds);
 
         $allMerchants = ProductMerchant::where('product_id', $product->id)->get();
-        $this->assertCount(2, $allMerchants);
 
-        $amazon = $allMerchants->where('name', 'Amazon')->first();
-        $ebay = $allMerchants->where('name', 'eBay')->first();
+        $this->assertEquals(2, $allMerchants->count());
 
-        $this->assertEquals($existingMerchant->id, $amazon->id);
+        $amazonLookup = Merchant::where('name', 'Amazon')->first();
+        $ebayLookup = Merchant::where('name', 'eBay')->first();
+
+        $amazon = $allMerchants->where('merchant_id', $amazonLookup->id)->first();
+        $ebay = $allMerchants->where('merchant_id', $ebayLookup->id)->first();
+
+        $this->assertEquals($merchant->id, $amazon->id);
         $this->assertNotNull($ebay);
     }
 
@@ -246,10 +255,12 @@ class ProductRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $merchantIds);
+
+        $amazonLookup = Merchant::where('name', 'Amazon')->first();
         $this->assertDatabaseHas('product_merchants', [
             'product_id' => $product->id,
             'variant_id' => $variant->id,
-            'name' => 'Amazon'
+            'merchant_id' => $amazonLookup->id
         ]);
     }
 
@@ -296,10 +307,13 @@ class ProductRepositoryTest extends RepositoryTestCase
     /** @test */
     public function test_get_price_history_returns_all_for_product(): void
     {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+
         // Arrange
         $product = $this->createProduct();
-        $merchant1 = $this->createProductMerchant($product->id, ['name' => 'Amazon']);
-        $merchant2 = $this->createProductMerchant($product->id, ['name' => 'eBay']);
+        $merchant1 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
+        $merchant2 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant2->id]);
 
         $this->repository->recordMerchantPriceHistory($product->id, $merchant1->id, 99.99);
         $this->repository->recordMerchantPriceHistory($product->id, $merchant2->id, 89.99);
@@ -314,10 +328,13 @@ class ProductRepositoryTest extends RepositoryTestCase
     /** @test */
     public function test_get_price_history_filters_by_merchant(): void
     {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+
         // Arrange
         $product = $this->createProduct();
-        $merchant1 = $this->createProductMerchant($product->id, ['name' => 'Amazon']);
-        $merchant2 = $this->createProductMerchant($product->id, ['name' => 'eBay']);
+        $merchant1 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
+        $merchant2 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant2->id]);
 
         $this->repository->recordMerchantPriceHistory($product->id, $merchant1->id, 99.99);
         $this->repository->recordMerchantPriceHistory($product->id, $merchant2->id, 89.99);
@@ -333,10 +350,13 @@ class ProductRepositoryTest extends RepositoryTestCase
     /** @test */
     public function test_get_merchants_returns_all_product_merchants(): void
     {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+
         // Arrange
         $product = $this->createProduct();
-        $this->createProductMerchant($product->id, ['name' => 'Amazon']);
-        $this->createProductMerchant($product->id, ['name' => 'eBay']);
+        $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
+        $this->createProductMerchant($product->id, ['merchant_id' => $merchant2->id]);
 
         // Act
         $merchants = $this->repository->getMerchants($product->id);
@@ -810,27 +830,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertLessThanOrEqual(3, $viewed->count());
     }
 
-    public function test_get_all_merchants_returns_unique_names(): void
-    {
-        $product1 = $this->createProduct();
-        $product2 = $this->createProduct();
-
-        $this->createProductMerchant($product1->id, ['name' => 'Amazon']);
-        $this->createProductMerchant($product1->id, ['name' => 'eBay']);
-        $this->createProductMerchant($product2->id, ['name' => 'Amazon']); // Duplicate
-        $this->createProductMerchant($product2->id, ['name' => 'BestBuy']);
-
-        $merchants = $this->repository->getAllMerchants();
-
-        // Should return unique merchant names
-        $this->assertGreaterThanOrEqual(3, $merchants->count());
-
-        $merchantNames = $merchants->pluck('name')->toArray();
-        $this->assertContains('Amazon', $merchantNames);
-        $this->assertContains('eBay', $merchantNames);
-        $this->assertContains('BestBuy', $merchantNames);
-    }
-
     public function test_update_variant_updates_fields(): void
     {
         $product = $this->createProduct();
@@ -880,5 +879,138 @@ class ProductRepositoryTest extends RepositoryTestCase
     {
         $deleted = $this->repository->deleteVariant(9999);
         $this->assertFalse($deleted);
+    }
+
+    public function test_sync_merchants_creates_lookup_entries(): void
+    {
+        $product = $this->createProduct();
+
+        $merchants = [
+            ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 99.99, 'is_available' => true],
+            ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 95.00, 'is_available' => true],
+        ];
+
+        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+        $this->assertCount(2, $merchantIds);
+
+        // Check lookup table
+        $this->assertEquals(2, Merchant::count());
+        $this->assertDatabaseHas('merchants', ['name' => 'Amazon']);
+        $this->assertDatabaseHas('merchants', ['name' => 'eBay']);
+
+        // Check product_merchants
+        $productMerchants = ProductMerchant::where('product_id', $product->id)->get();
+        $this->assertCount(2, $productMerchants);
+    }
+
+    public function test_sync_merchants_reuses_existing_lookup(): void
+    {
+        $product = $this->createProduct();
+
+        // First sync
+        $merchants1 = [
+            ['name' => 'Amazon', 'url' => 'https://amazon.com/1', 'price' => 99.99, 'is_available' => true],
+        ];
+        $this->repository->syncMerchants($product->id, $merchants1);
+
+        $merchantCountAfterFirst = Merchant::count();
+        $this->assertEquals(1, $merchantCountAfterFirst);
+
+        // Second sync with same merchant name
+        $merchants2 = [
+            ['name' => 'Amazon', 'url' => 'https://amazon.com/2', 'price' => 89.99, 'is_available' => true],
+        ];
+        $this->repository->syncMerchants($product->id, $merchants2);
+
+        // Should still only have 1 merchant in lookup
+        $this->assertEquals(1, Merchant::count());
+
+        // But product_merchant should be updated
+        $pm = ProductMerchant::where('product_id', $product->id)->first();
+        $this->assertEquals(89.99, $pm->price);
+        $this->assertEquals('https://amazon.com/2', $pm->url);
+    }
+
+    public function test_get_all_merchant_lookups_returns_all(): void
+    {
+        Merchant::create(['name' => 'Amazon', 'slug' => Str::slug('Amazon')]);;
+        Merchant::create(['name' => 'eBay', 'slug' => Str::slug('eBay')]);;
+        Merchant::create(['name' => 'BestBuy', 'slug' => Str::slug('BestBuy')]);;;
+
+        $merchants = $this->repository->getAllMerchantLookups();
+
+        $this->assertCount(3, $merchants);
+        $this->assertEquals('Amazon', $merchants->first()->name);
+    }
+
+    public function test_get_product_merchants_with_details(): void
+    {
+        $product = $this->createProduct();
+        $amazonLookup = Merchant::create(['name' => 'Amazon', 'slug' => Str::slug('Amazon')]);;;
+
+        ProductMerchant::create([
+            'product_id' => $product->id,
+            'merchant_id' => $amazonLookup->id,
+            'url' => 'https://amazon.com',
+            'price' => 99.99,
+            'is_available' => true
+        ]);
+
+        $merchants = $this->repository->getProductMerchantsWithDetails($product->id);
+
+        $this->assertCount(1, $merchants);
+        $this->assertEquals('Amazon', $merchants->first()['name']);
+        $this->assertEquals(99.99, $merchants->first()['price']);
+    }
+
+    /** @test */
+    public function test_sync_images_updates_primary_flag(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+
+        // Create initial images with img1 as primary
+        $this->createProductImage($product->id, [
+            'url' => 'img1.jpg',
+            'is_primary' => true,
+            'sort_order' => 0
+        ]);
+        $this->createProductImage($product->id, [
+            'url' => 'img2.jpg',
+            'is_primary' => false,
+            'sort_order' => 1
+        ]);
+
+        // Now sync with img2 as primary
+        $newImages = [
+            [
+                'url' => 'img1.jpg',
+                'alt' => 'Image 1',
+                'is_primary' => false, // Changed
+                'sort_order' => 0
+            ],
+            [
+                'url' => 'img2.jpg',
+                'alt' => 'Image 2',
+                'is_primary' => true, // Changed
+                'sort_order' => 1
+            ],
+        ];
+
+        // Act
+        $this->repository->syncImages($product->id, $newImages);
+
+        // Assert
+        $images = ProductImage::where('product_id', $product->id)
+            ->orderBy('sort_order')
+            ->get()
+            ->toArray();
+
+        $this->assertCount(2, $images);
+        $this->assertEquals('img1.jpg', $images[0]['url']);
+        $this->assertEquals(0, $images[0]['is_primary']); // No longer primary
+        $this->assertEquals('img2.jpg', $images[1]['url']);
+        $this->assertEquals(1, $images[1]['is_primary']); // Now primary
     }
 }

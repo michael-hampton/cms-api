@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Merchant;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
@@ -485,9 +486,11 @@ class ProductControllerTest extends FunctionalTestCase
         // Verify merchants were created
         $this->assertCount(2, $product->merchants);
 
+        $createdMerchants = Merchant::all()->keyBy('name');
+
         // Verify price history was recorded for each merchant
-        $amazonMerchant = $product->merchants->where('name', 'Amazon')->first();
-        $bestbuyMerchant = $product->merchants->where('name', 'BestBuy')->first();
+        $amazonMerchant = $product->merchants->where('merchant_id', $createdMerchants->get('Amazon')->id)->first();
+        $bestbuyMerchant = $product->merchants->where('merchant_id', $createdMerchants->get('BestBuy')->id)->first();
 
         $amazonHistory = ProductPriceHistory::where('product_id', $productId)
             ->where('merchant_id', $amazonMerchant->id)
@@ -507,10 +510,11 @@ class ProductControllerTest extends FunctionalTestCase
     public function testUpdateProductMerchantPriceRecordsHistory()
     {
         $product = $this->createProduct();
+        $merchant = $this->createMerchant();
 
-        $merchant = $this->createProductMerchant($product->id, [
+        $productMerchant = $this->createProductMerchant($product->id, [
             'price' => 79.99,
-            'name' => 'Amazon'
+            'merchant_id' => $merchant->id
         ]);
 
         $this->createProductPriceHistory(['merchant_id' => $merchant->id]);
@@ -522,8 +526,9 @@ class ProductControllerTest extends FunctionalTestCase
             'brand' => 'Test',
             'merchants' => [
                 [
-                    'id' => $merchant->id,
-                    'name' => 'Amazon',
+                    'name' => $merchant->name,
+                    'id' => $productMerchant->id,
+                    'merchant_id' => $merchant->id,
                     'url' => 'https://amazon.com',
                     'price' => 74.99, // Price changed
                     'is_available' => true
@@ -681,9 +686,11 @@ class ProductControllerTest extends FunctionalTestCase
 
         $productImage = ProductImage::create(['product_id' => $productId, 'url' => $responseData['data']['product']['image']]);
 
+        $merchant = $this->createMerchant();
+
         // Add relations
         ProductImage::create(['product_id' => $productId, 'url' => 'img.jpg']);
-        ProductMerchant::create(['product_id' => $productId, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 89.99]);
+        ProductMerchant::create(['product_id' => $productId, 'merchant_id' => $merchant->id, 'url' => 'https://amazon.com', 'price' => 89.99]);
         ProductVariant::create(['product_id' => $productId, 'sku' => 'VAR-001', 'attributes' => []]);
         ProductSpecification::create(['product_id' => $productId, 'category' => 'Tech', 'key' => 'Weight', 'value' => '1kg']);
 
@@ -850,10 +857,14 @@ class ProductControllerTest extends FunctionalTestCase
         $product1 = $this->createProduct();
         $product2 = $this->createProduct();
 
-        $this->createProductMerchant($product1->id, ['name' => 'Amazon']);
-        $this->createProductMerchant($product1->id, ['name' => 'eBay']);
-        $this->createProductMerchant($product2->id, ['name' => 'Amazon']); // Duplicate
-        $this->createProductMerchant($product2->id, ['name' => 'BestBuy']);
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+        $merchant3 = $this->createMerchant(['name' => 'BestBuy']);
+
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant1->id]);
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant2->id]);
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant1->id]); // Duplicate
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant3->id]);
 
         $response = $this->getForSite('/api/products/merchants');
         $data = json_decode($response->getContent(), true);
@@ -869,11 +880,14 @@ class ProductControllerTest extends FunctionalTestCase
         $product2 = $this->createProduct(['name' => 'Product 2']);
         $product3 = $this->createProduct(['name' => 'Product 3']);
 
-        $this->createProductMerchant($product1->id, ['name' => 'Amazon']);
-        $this->createProductMerchant($product2->id, ['name' => 'eBay']);
-        $this->createProductMerchant($product3->id, ['name' => 'Amazon']);
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
 
-        $response = $this->getForSite('/api/products?merchant[]=Amazon');
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant1->id]);
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant2->id]);
+        $this->createProductMerchant($product3->id, ['merchant_id' => $merchant1->id]);
+
+        $response = $this->getForSite('/api/products?merchant[]=' . $merchant1->id);;
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1076,19 +1090,24 @@ class ProductControllerTest extends FunctionalTestCase
         $product2 = $this->createProduct(['name' => 'Product 2']);
         $product3 = $this->createProduct(['name' => 'Product 3']);
 
-        $this->createProductMerchant($product1->id, ['name' => 'Amazon', 'is_available' => true]);
-        $this->createProductMerchant($product2->id, ['name' => 'eBay', 'is_available' => true]);
-        $this->createProductMerchant($product3->id, ['name' => 'Amazon', 'is_available' => true]);
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant1->id, 'is_available' => true]);
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant2->id, 'is_available' => true]);
+        $this->createProductMerchant($product3->id, ['merchant_id' => $merchant1->id, 'is_available' => true]);
 
         // Test single merchant filter
-        $response = $this->getForSite('/api/products?merchant=Amazon');
+        $response = $this->getForSite('/api/products?merchant=' . $merchant1->id);
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertCount(2, $data['items']); // Only products 1 and 3
 
+        $merchantStr = $merchant1->id . ',' . $merchant2->id;
+
         // Test multiple merchant filter
-        $response = $this->getForSite('/api/products?merchant=Amazon,eBay');
+        $response = $this->getForSite('/api/products?merchant=' . $merchantStr);;
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1112,5 +1131,43 @@ class ProductControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertCount(2, $data['items']); // iPhone and iPad
+    }
+
+    public function testUpdateProductChangingPrimaryImage()
+    {
+        $product = $this->createProduct();
+
+        // Create initial images
+        $image1 = $this->createProductImage($product->id, [
+            'url' => 'img1.jpg',
+            'is_primary' => true
+        ]);
+        $image2 = $this->createProductImage($product->id, [
+            'url' => 'img2.jpg',
+            'is_primary' => false
+        ]);
+
+        // Update with img2 as primary
+        $updateData = [
+            'name' => 'Updated Product',
+            'description' => 'Test',
+            'price' => 99.99,
+            'brand' => 'Test',
+            'images' => [
+                ['url' => 'img1.jpg', 'alt' => 'Image 1', 'is_primary' => false, 'sort_order' => 0],
+                ['url' => 'img2.jpg', 'alt' => 'Image 2', 'is_primary' => true, 'sort_order' => 1],
+            ]
+        ];
+
+        $response = $this->putForSite("/api/products/{$product->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify primary flag was updated
+        $updatedProduct = Product::with(['images'])->find($product->id);
+        $images = $updatedProduct->images->sortBy('sort_order')->toArray();
+
+        $this->assertFalse((bool)$images[0]['is_primary']);
+        $this->assertTrue((bool)$images[1]['is_primary']);
     }
 }
