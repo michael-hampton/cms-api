@@ -21,7 +21,7 @@ class ProductDetailController extends Controller
 
     public function show(Request $request, string $slug)
     {
-        $product = Product::with(['specifications', 'availableMerchants', 'priceHistory', 'activeVariants', 'category', 'brand'])
+        $product = Product::with(['specifications', 'availableMerchants', 'priceHistory', 'activeVariants', 'category', 'brand', 'availableMerchants.merchant'])
             ->where('slug', $slug)
             ->first();
 

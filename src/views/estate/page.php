@@ -68,6 +68,10 @@ $hasSidebar = !empty($sidebarBlocks);
 
                     @include('comments')
 
+                    <?php if ($page->gallery_slides): ?>
+                        @include('gallery')
+                    <?php endif; ?>
+
                     <!-- Social Media Links -->
                     <?php if ($page->social && $page->social->enable_sharing): ?>
                         <div class="social-sharing">

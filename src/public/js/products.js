@@ -178,7 +178,7 @@
         elements.productsGrid.innerHTML = products.map(product => `
             <div class="product-card">
                 <a href="/shop/details/${product.slug}" class="product-image">
-                    <img src="${product.image_url || '/images/placeholder.jpg'}" 
+                    <img src="${product.image || '/images/placeholder.jpg'}" 
                          alt="${escapeHtml(product.name)}">
                     ${product.discount_percentage > 0 ? `
                         <span class="badge-sale">-${product.discount_percentage}%</span>

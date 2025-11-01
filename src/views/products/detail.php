@@ -882,8 +882,16 @@
                             <div class="merchants-list">
                                 <?php foreach ($product->availableMerchants as $merchant): ?>
                                     <div class="merchant-card <?= !$merchant->is_available ? 'merchant-unavailable' : '' ?>">
-                                        <div class="merchant-name"><?= htmlspecialchars($merchant->name) ?></div>
-                                        <div class="merchant-price">$<?= number_format($merchant->price, 2) ?></div>
+                                        <div class="merchant-name"><?= htmlspecialchars($merchant->merchant->name) ?></div>
+                                        <?php
+                                        if(!empty($merchant->sale_price)) { ?>
+                                            <span class="price-sale">$<?= number_format($merchant->sale_price, 2) ?></span>
+                                            <span class="price-original">$<?= number_format($merchant->price, 2) ?></span>
+                                        <?php } else {?>
+                                            <div class="merchant-price">$<?= number_format($merchant->price, 2) ?></div>
+                                       <?php }
+                                        ?>
+
                                         <?php if ($merchant->is_available): ?>
                                             <a href="<?= htmlspecialchars($merchant->url) ?>"
                                                class="merchant-link"
@@ -1270,7 +1278,7 @@
                             <div class="product-card">
                                 <a href="/products/<?= htmlspecialchars($relatedProduct->slug) ?>"
                                    class="product-image">
-                                    <img src="<?= htmlspecialchars($relatedProduct->image_url ?? '/images/placeholder.jpg') ?>"
+                                    <img src="<?= htmlspecialchars($relatedProduct->image ?? '/images/placeholder.jpg') ?>"
                                          alt="<?= htmlspecialchars($relatedProduct->name) ?>">
                                     <?php if ($relatedProduct->discount_percentage > 0): ?>
                                         <span class="badge-sale">-<?= $relatedProduct->discount_percentage ?>%</span>

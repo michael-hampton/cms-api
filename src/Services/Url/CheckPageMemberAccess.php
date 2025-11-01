@@ -9,7 +9,8 @@ use App\Models\Page;
 class CheckPageMemberAccess
 {
 
-    public function handle(Request $request, Page $page): bool {
+    public function handle(Request $request, Page $page): bool
+    {
 
         // Check if page requires member login
         if (!$page->metadata || $page->metadata->visibility === 'public') { //todo enum

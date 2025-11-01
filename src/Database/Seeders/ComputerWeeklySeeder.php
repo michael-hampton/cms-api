@@ -58,6 +58,7 @@ class ComputerWeeklySeeder extends Seeder
 
     public function run(): void
     {
+        $this->site = Site::where('slug', 'tech-weekly')->first();
 //        $this->createSite();
 //        $this->createMenu();
 //
@@ -65,7 +66,7 @@ class ComputerWeeklySeeder extends Seeder
 //        $this->createCategories();
 //        $this->createCustomFields();
 //        $this->createHomepage();
-//        $this->createArticles();
+        $this->createArticles();
 //        $this->createAboutPage();
 //        $this->createContactPage();
     }
@@ -368,446 +369,446 @@ class ComputerWeeklySeeder extends Seeder
     private function createArticles(): void
     {
         $articles = [
-            [
-                'title' => 'The Rise of Quantum Computing: What It Means for Cybersecurity',
-                'slug' => 'quantum-computing-cybersecurity',
-                'tags' => ['featured', 'quantum-computing', 'cybersecurity', 'encryption'],
-                'categories' => ['Security', 'Cybersecurity', 'Threats'],
-                'custom_fields' => [
-                    'author_name' => 'Dr. Sarah Chen',
-                    'author_bio' => 'Dr. Chen is a quantum computing researcher and cybersecurity expert with a PhD from MIT.',
-                    'read_time' => 12,
-                    'difficulty_level' => 'intermediate',
-                    'excerpt' => 'As quantum computers become more powerful, they pose both opportunities and threats to modern encryption systems. Here\'s what you need to know.',
-                    'related_technologies' => 'Quantum Computing, Cryptography, Post-Quantum Encryption'
-                ],
-                'content' => [
-                    [
-                        'type' => 'image',
-                        'data' => [
-                            'src' => 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80',
-                            'alt' => 'Quantum Computer Hardware',
-                            'caption' => 'IBM\'s latest quantum computer with 1,000+ qubits',
-                            'layout' => 'full',
-                            'alignment' => 'fullscreen'
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Quantum computing has moved from theoretical physics to practical reality. Major tech companies like IBM, Google, and Amazon are racing to build quantum computers powerful enough to solve problems that would take classical computers millions of years.',
-                                'But this technological leap comes with a dark side: quantum computers could break most of the encryption that protects our digital world. From bank transactions to government communications, much of our modern infrastructure relies on encryption algorithms that quantum computers could crack in minutes.',
-                                'The threat is real enough that organizations worldwide are scrambling to develop "post-quantum cryptography" – encryption methods that can withstand attacks from quantum computers.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Understanding the Quantum Threat',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Traditional computers process information as bits – ones and zeros. Quantum computers use quantum bits, or "qubits," which can exist in multiple states simultaneously thanks to a property called superposition.',
-                                'This allows quantum computers to perform certain calculations exponentially faster than classical computers. Specifically, they excel at problems involving factoring large numbers – the mathematical foundation of RSA encryption, which secures most of today\'s internet traffic.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'info',
-                        'data' => [
-                            'infoType' => 'warning',
-                            'description' => 'Security experts estimate that a sufficiently powerful quantum computer could break RSA-2048 encryption within 8 hours. Current quantum computers are not yet powerful enough, but they\'re advancing rapidly.'
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Shor\'s Algorithm: The Encryption Killer',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'In 1994, mathematician Peter Shor developed an algorithm that allows quantum computers to factor large numbers efficiently. This discovery sent shockwaves through the cybersecurity community because factoring large primes is the basis of RSA encryption.',
-                                'To understand the scale of the threat, consider this: RSA-2048 encryption uses a 2048-bit number that\'s the product of two large primes. Classical computers would need billions of years to factor this number. A quantum computer running Shor\'s algorithm could do it in hours.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'table',
-                        'data' => [
-                            'hasHeader' => true,
-                            'rows' => [
-                                ['Encryption Method', 'Classical Time to Break', 'Quantum Time to Break', 'Status'],
-                                ['RSA-2048', 'Billions of years', '~8 hours', 'Vulnerable'],
-                                ['ECC-256', 'Trillions of years', '~1 hour', 'Vulnerable'],
-                                ['AES-256', 'Effectively unbreakable', 'Centuries', 'Resistant'],
-                                ['Lattice-based', 'Effectively unbreakable', 'Effectively unbreakable', 'Quantum-safe']
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Post-Quantum Cryptography: The Solution',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'The cryptography community isn\'t sitting idle. Researchers have been developing post-quantum cryptographic algorithms that remain secure even against quantum attacks. In 2022, NIST (National Institute of Standards and Technology) announced the first four quantum-resistant cryptographic algorithms to be standardized.',
-                                'These algorithms are based on mathematical problems that even quantum computers find difficult to solve, such as lattice-based cryptography, hash-based signatures, and multivariate polynomial cryptography.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'What Organizations Should Do Now',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'list',
-                        'data' => [
-                            'listType' => 'ol',
-                            'schemaType' => 'steps',
-                            'items' => [
-                                'Inventory all systems using public-key cryptography',
-                                'Prioritize systems that handle sensitive data or have long-term security requirements',
-                                'Begin testing post-quantum cryptographic algorithms in non-production environments',
-                                'Develop a migration timeline for transitioning to quantum-safe encryption',
-                                'Stay informed about NIST standards and industry best practices',
-                                'Consider "crypto-agility" – designing systems that can easily switch encryption methods'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'note',
-                        'data' => [
-                            'title' => 'Timeline Alert',
-                            'paragraphs' => [
-                                'Security experts recommend beginning the transition to post-quantum cryptography now, even though large-scale quantum computers don\'t yet exist. The reason? "Harvest now, decrypt later" attacks where adversaries collect encrypted data today with the intent to decrypt it once quantum computers become available.'
-                            ],
-                            'alignment' => 'fullscreen'
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'The Road Ahead',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'The transition to post-quantum cryptography will be one of the largest infrastructure upgrades in internet history. It won\'t happen overnight – NIST estimates the transition will take 10-15 years.',
-                                'But the effort is essential. As quantum computing advances, the cryptographic foundations of our digital world must evolve with it. Organizations that start planning now will be best positioned to maintain security in the quantum era.',
-                                'The quantum revolution is coming. The question isn\'t whether to prepare, but whether we\'ll be ready in time.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'quote',
-                        'data' => [
-                            'text' => 'The quantum threat to cryptography isn\'t a matter of if, but when. Organizations need to act now to protect their long-term security.',
-                            'attribution' => 'Dr. Lily Chen, NIST Mathematician'
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'title' => 'Building Scalable Microservices with Go and Kubernetes',
-                'slug' => 'microservices-go-kubernetes',
-                'tags' => ['featured', 'programming', 'go', 'kubernetes', 'devops', 'tutorials'],
-                'categories' => ['Development', 'Programming', 'Tools'],
-                'custom_fields' => [
-                    'author_name' => 'James Rodriguez',
-                    'author_bio' => 'James is a senior software architect specializing in distributed systems and cloud-native applications.',
-                    'read_time' => 25,
-                    'difficulty_level' => 'advanced',
-                    'excerpt' => 'A comprehensive guide to architecting, developing, and deploying production-ready microservices using Go and Kubernetes.',
-                    'code_samples' => true,
-                    'github_repo' => 'https://github.com/techweekly/go-microservices-example',
-                    'related_technologies' => 'Go, Kubernetes, Docker, gRPC, Prometheus'
-                ],
-                'content' => [
-                    [
-                        'type' => 'image',
-                        'data' => [
-                            'src' => 'https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80',
-                            'alt' => 'Kubernetes Architecture Diagram',
-                            'caption' => 'Microservices architecture on Kubernetes',
-                            'layout' => 'full',
-                            'alignment' => 'fullscreen'
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Microservices architecture has become the de facto standard for building scalable, maintainable applications. When combined with Go\'s performance and simplicity, and Kubernetes\' powerful orchestration capabilities, you have a robust foundation for production systems.',
-                                'In this comprehensive guide, we\'ll walk through building a complete microservices application from scratch. We\'ll cover service design, inter-service communication, deployment strategies, monitoring, and everything else you need for production readiness.',
-                                'By the end of this tutorial, you\'ll have a fully functional microservices application running on Kubernetes, complete with service discovery, health checks, monitoring, and auto-scaling.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Why Go and Kubernetes?',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Go (Golang) is an excellent choice for microservices due to its fast compilation, built-in concurrency support, small binary sizes, and excellent standard library. Major companies like Google, Uber, and Netflix use Go for their microservices.',
-                                'Kubernetes provides the orchestration layer that makes managing dozens or hundreds of microservices feasible. It handles service discovery, load balancing, scaling, and self-healing automatically.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'table',
-                        'data' => [
-                            'hasHeader' => true,
-                            'rows' => [
-                                ['Feature', 'Benefit', 'Impact'],
-                                ['Go Concurrency', 'Goroutines for lightweight threading', 'Handle thousands of concurrent requests'],
-                                ['Small Binaries', 'Minimal container images', 'Faster deployments and less storage'],
-                                ['Fast Compilation', 'Quick build times', 'Faster development cycles'],
-                                ['K8s Auto-scaling', 'Dynamic resource allocation', 'Cost optimization and performance'],
-                                ['Service Mesh', 'Advanced traffic management', 'Canary deployments and A/B testing']
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Architecture Overview',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Our example application will be an e-commerce platform with the following microservices:',
-                                'Each service will be independently deployable, with its own database, and communicate via gRPC for internal calls and REST for external APIs.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'list',
-                        'data' => [
-                            'listType' => 'ul',
-                            'items' => [
-                                'API Gateway - Entry point for all external requests',
-                                'User Service - Authentication and user management',
-                                'Product Service - Product catalog and inventory',
-                                'Order Service - Order processing and management',
-                                'Payment Service - Payment processing integration',
-                                'Notification Service - Email and SMS notifications'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Setting Up the Development Environment',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'info',
-                        'data' => [
-                            'infoType' => 'note',
-                            'description' => 'Prerequisites: Go 1.21+, Docker, kubectl, and access to a Kubernetes cluster (minikube for local development)'
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Building Your First Service',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Let\'s start with the User Service. We\'ll implement a simple service with health checks, structured logging, and graceful shutdown – all essential for production systems.',
-                                'The code structure follows Go best practices with clear separation of concerns: handlers, services, repositories, and models.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Service Communication with gRPC',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'While REST is great for external APIs, gRPC is superior for inter-service communication. It\'s faster, supports streaming, and provides strong typing through Protocol Buffers.',
-                                'We\'ll define our service contracts using .proto files and generate Go code automatically. This ensures type safety and makes API changes explicit.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Kubernetes Deployment',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Each microservice gets its own Kubernetes Deployment, Service, and ConfigMap. We\'ll use Helm charts to manage these resources, making deployments consistent and repeatable.',
-                                'Key Kubernetes features we\'ll leverage include health checks (liveness and readiness probes), resource limits, horizontal pod autoscaling, and rolling updates.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'list',
-                        'data' => [
-                            'listType' => 'ol',
-                            'schemaType' => 'steps',
-                            'items' => [
-                                'Create Dockerfile for each microservice with multi-stage builds',
-                                'Build and push Docker images to container registry',
-                                'Create Kubernetes manifests (Deployment, Service, ConfigMap)',
-                                'Configure health checks and resource limits',
-                                'Set up Horizontal Pod Autoscaler',
-                                'Deploy to Kubernetes cluster',
-                                'Verify deployment with kubectl and monitoring tools'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Observability: Logging, Metrics, and Tracing',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Production microservices need comprehensive observability. We\'ll implement structured logging with zerolog, expose Prometheus metrics, and add distributed tracing with OpenTelemetry.',
-                                'This gives us complete visibility into system behavior, performance bottlenecks, and error patterns across all services.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'note',
-                        'data' => [
-                            'title' => 'Pro Tip',
-                            'paragraphs' => [
-                                'Always include correlation IDs in your logs and traces. This makes debugging distributed systems infinitely easier by allowing you to trace a single request across multiple services.'
-                            ],
-                            'alignment' => 'fullscreen'
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Handling Failures Gracefully',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'In distributed systems, failures are inevitable. Services crash, networks partition, and databases go down. Your architecture must handle these scenarios gracefully.',
-                                'We implement circuit breakers to prevent cascading failures, retries with exponential backoff, and timeouts on all external calls. The go-resilience library provides excellent patterns for this.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Security Best Practices',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'list',
-                        'data' => [
-                            'listType' => 'ul',
-                            'items' => [
-                                'Use mutual TLS (mTLS) for service-to-service communication',
-                                'Implement API authentication with JWT tokens',
-                                'Store secrets in Kubernetes Secrets or external secret managers',
-                                'Run containers as non-root users',
-                                'Use network policies to restrict service communication',
-                                'Regularly scan container images for vulnerabilities',
-                                'Implement rate limiting to prevent abuse'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Performance Optimization',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Go\'s performance is excellent out of the box, but microservices have unique optimization opportunities. Connection pooling, caching strategies, and efficient serialization can dramatically improve throughput.',
-                                'We\'ll implement Redis for distributed caching, use connection pooling for database and gRPC clients, and leverage Go\'s sync.Pool for object reuse. These optimizations can reduce response times by 50% or more.'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'quote',
-                        'data' => [
-                            'text' => 'Microservices are not a free lunch. They introduce complexity. But done right, they provide scalability and flexibility that monoliths can\'t match.',
-                            'attribution' => 'Martin Fowler'
-                        ]
-                    ],
-                    [
-                        'type' => 'heading',
-                        'data' => [
-                            'text' => 'Conclusion',
-                            'level' => 2
-                        ]
-                    ],
-                    [
-                        'type' => 'text',
-                        'data' => [
-                            'paragraphs' => [
-                                'Building production-ready microservices with Go and Kubernetes requires careful attention to architecture, observability, security, and operational concerns. But the result is a system that can scale to handle millions of requests while remaining maintainable.',
-                                'The complete source code for this tutorial is available on GitHub. Fork it, experiment with it, and adapt it to your needs. Happy coding!',
-                                'In our next article, we\'ll dive deeper into service mesh implementations with Istio and advanced deployment patterns like canary releases and blue-green deployments.'
-                            ]
-                        ]
-                    ]
-                ]
-            ],
+//            [
+//                'title' => 'The Rise of Quantum Computing: What It Means for Cybersecurity',
+//                'slug' => 'quantum-computing-cybersecurity',
+//                'tags' => ['featured', 'quantum-computing', 'cybersecurity', 'encryption'],
+//                'categories' => ['Security', 'Cybersecurity', 'Threats'],
+//                'custom_fields' => [
+//                    'author_name' => 'Dr. Sarah Chen',
+//                    'author_bio' => 'Dr. Chen is a quantum computing researcher and cybersecurity expert with a PhD from MIT.',
+//                    'read_time' => 12,
+//                    'difficulty_level' => 'intermediate',
+//                    'excerpt' => 'As quantum computers become more powerful, they pose both opportunities and threats to modern encryption systems. Here\'s what you need to know.',
+//                    'related_technologies' => 'Quantum Computing, Cryptography, Post-Quantum Encryption'
+//                ],
+//                'content' => [
+//                    [
+//                        'type' => 'image',
+//                        'data' => [
+//                            'src' => 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80',
+//                            'alt' => 'Quantum Computer Hardware',
+//                            'caption' => 'IBM\'s latest quantum computer with 1,000+ qubits',
+//                            'layout' => 'full',
+//                            'alignment' => 'fullscreen'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Quantum computing has moved from theoretical physics to practical reality. Major tech companies like IBM, Google, and Amazon are racing to build quantum computers powerful enough to solve problems that would take classical computers millions of years.',
+//                                'But this technological leap comes with a dark side: quantum computers could break most of the encryption that protects our digital world. From bank transactions to government communications, much of our modern infrastructure relies on encryption algorithms that quantum computers could crack in minutes.',
+//                                'The threat is real enough that organizations worldwide are scrambling to develop "post-quantum cryptography" – encryption methods that can withstand attacks from quantum computers.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Understanding the Quantum Threat',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Traditional computers process information as bits – ones and zeros. Quantum computers use quantum bits, or "qubits," which can exist in multiple states simultaneously thanks to a property called superposition.',
+//                                'This allows quantum computers to perform certain calculations exponentially faster than classical computers. Specifically, they excel at problems involving factoring large numbers – the mathematical foundation of RSA encryption, which secures most of today\'s internet traffic.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'info',
+//                        'data' => [
+//                            'infoType' => 'warning',
+//                            'description' => 'Security experts estimate that a sufficiently powerful quantum computer could break RSA-2048 encryption within 8 hours. Current quantum computers are not yet powerful enough, but they\'re advancing rapidly.'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Shor\'s Algorithm: The Encryption Killer',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'In 1994, mathematician Peter Shor developed an algorithm that allows quantum computers to factor large numbers efficiently. This discovery sent shockwaves through the cybersecurity community because factoring large primes is the basis of RSA encryption.',
+//                                'To understand the scale of the threat, consider this: RSA-2048 encryption uses a 2048-bit number that\'s the product of two large primes. Classical computers would need billions of years to factor this number. A quantum computer running Shor\'s algorithm could do it in hours.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'table',
+//                        'data' => [
+//                            'hasHeader' => true,
+//                            'rows' => [
+//                                ['Encryption Method', 'Classical Time to Break', 'Quantum Time to Break', 'Status'],
+//                                ['RSA-2048', 'Billions of years', '~8 hours', 'Vulnerable'],
+//                                ['ECC-256', 'Trillions of years', '~1 hour', 'Vulnerable'],
+//                                ['AES-256', 'Effectively unbreakable', 'Centuries', 'Resistant'],
+//                                ['Lattice-based', 'Effectively unbreakable', 'Effectively unbreakable', 'Quantum-safe']
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Post-Quantum Cryptography: The Solution',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'The cryptography community isn\'t sitting idle. Researchers have been developing post-quantum cryptographic algorithms that remain secure even against quantum attacks. In 2022, NIST (National Institute of Standards and Technology) announced the first four quantum-resistant cryptographic algorithms to be standardized.',
+//                                'These algorithms are based on mathematical problems that even quantum computers find difficult to solve, such as lattice-based cryptography, hash-based signatures, and multivariate polynomial cryptography.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'What Organizations Should Do Now',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'list',
+//                        'data' => [
+//                            'listType' => 'ol',
+//                            'schemaType' => 'steps',
+//                            'items' => [
+//                                'Inventory all systems using public-key cryptography',
+//                                'Prioritize systems that handle sensitive data or have long-term security requirements',
+//                                'Begin testing post-quantum cryptographic algorithms in non-production environments',
+//                                'Develop a migration timeline for transitioning to quantum-safe encryption',
+//                                'Stay informed about NIST standards and industry best practices',
+//                                'Consider "crypto-agility" – designing systems that can easily switch encryption methods'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'note',
+//                        'data' => [
+//                            'title' => 'Timeline Alert',
+//                            'paragraphs' => [
+//                                'Security experts recommend beginning the transition to post-quantum cryptography now, even though large-scale quantum computers don\'t yet exist. The reason? "Harvest now, decrypt later" attacks where adversaries collect encrypted data today with the intent to decrypt it once quantum computers become available.'
+//                            ],
+//                            'alignment' => 'fullscreen'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'The Road Ahead',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'The transition to post-quantum cryptography will be one of the largest infrastructure upgrades in internet history. It won\'t happen overnight – NIST estimates the transition will take 10-15 years.',
+//                                'But the effort is essential. As quantum computing advances, the cryptographic foundations of our digital world must evolve with it. Organizations that start planning now will be best positioned to maintain security in the quantum era.',
+//                                'The quantum revolution is coming. The question isn\'t whether to prepare, but whether we\'ll be ready in time.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'quote',
+//                        'data' => [
+//                            'text' => 'The quantum threat to cryptography isn\'t a matter of if, but when. Organizations need to act now to protect their long-term security.',
+//                            'attribution' => 'Dr. Lily Chen, NIST Mathematician'
+//                        ]
+//                    ]
+//                ]
+//            ],
+//            [
+//                'title' => 'Building Scalable Microservices with Go and Kubernetes',
+//                'slug' => 'microservices-go-kubernetes',
+//                'tags' => ['featured', 'programming', 'go', 'kubernetes', 'devops', 'tutorials'],
+//                'categories' => ['Development', 'Programming', 'Tools'],
+//                'custom_fields' => [
+//                    'author_name' => 'James Rodriguez',
+//                    'author_bio' => 'James is a senior software architect specializing in distributed systems and cloud-native applications.',
+//                    'read_time' => 25,
+//                    'difficulty_level' => 'advanced',
+//                    'excerpt' => 'A comprehensive guide to architecting, developing, and deploying production-ready microservices using Go and Kubernetes.',
+//                    'code_samples' => true,
+//                    'github_repo' => 'https://github.com/techweekly/go-microservices-example',
+//                    'related_technologies' => 'Go, Kubernetes, Docker, gRPC, Prometheus'
+//                ],
+//                'content' => [
+//                    [
+//                        'type' => 'image',
+//                        'data' => [
+//                            'src' => 'https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80',
+//                            'alt' => 'Kubernetes Architecture Diagram',
+//                            'caption' => 'Microservices architecture on Kubernetes',
+//                            'layout' => 'full',
+//                            'alignment' => 'fullscreen'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Microservices architecture has become the de facto standard for building scalable, maintainable applications. When combined with Go\'s performance and simplicity, and Kubernetes\' powerful orchestration capabilities, you have a robust foundation for production systems.',
+//                                'In this comprehensive guide, we\'ll walk through building a complete microservices application from scratch. We\'ll cover service design, inter-service communication, deployment strategies, monitoring, and everything else you need for production readiness.',
+//                                'By the end of this tutorial, you\'ll have a fully functional microservices application running on Kubernetes, complete with service discovery, health checks, monitoring, and auto-scaling.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Why Go and Kubernetes?',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Go (Golang) is an excellent choice for microservices due to its fast compilation, built-in concurrency support, small binary sizes, and excellent standard library. Major companies like Google, Uber, and Netflix use Go for their microservices.',
+//                                'Kubernetes provides the orchestration layer that makes managing dozens or hundreds of microservices feasible. It handles service discovery, load balancing, scaling, and self-healing automatically.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'table',
+//                        'data' => [
+//                            'hasHeader' => true,
+//                            'rows' => [
+//                                ['Feature', 'Benefit', 'Impact'],
+//                                ['Go Concurrency', 'Goroutines for lightweight threading', 'Handle thousands of concurrent requests'],
+//                                ['Small Binaries', 'Minimal container images', 'Faster deployments and less storage'],
+//                                ['Fast Compilation', 'Quick build times', 'Faster development cycles'],
+//                                ['K8s Auto-scaling', 'Dynamic resource allocation', 'Cost optimization and performance'],
+//                                ['Service Mesh', 'Advanced traffic management', 'Canary deployments and A/B testing']
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Architecture Overview',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Our example application will be an e-commerce platform with the following microservices:',
+//                                'Each service will be independently deployable, with its own database, and communicate via gRPC for internal calls and REST for external APIs.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'list',
+//                        'data' => [
+//                            'listType' => 'ul',
+//                            'items' => [
+//                                'API Gateway - Entry point for all external requests',
+//                                'User Service - Authentication and user management',
+//                                'Product Service - Product catalog and inventory',
+//                                'Order Service - Order processing and management',
+//                                'Payment Service - Payment processing integration',
+//                                'Notification Service - Email and SMS notifications'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Setting Up the Development Environment',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'info',
+//                        'data' => [
+//                            'infoType' => 'note',
+//                            'description' => 'Prerequisites: Go 1.21+, Docker, kubectl, and access to a Kubernetes cluster (minikube for local development)'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Building Your First Service',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Let\'s start with the User Service. We\'ll implement a simple service with health checks, structured logging, and graceful shutdown – all essential for production systems.',
+//                                'The code structure follows Go best practices with clear separation of concerns: handlers, services, repositories, and models.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Service Communication with gRPC',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'While REST is great for external APIs, gRPC is superior for inter-service communication. It\'s faster, supports streaming, and provides strong typing through Protocol Buffers.',
+//                                'We\'ll define our service contracts using .proto files and generate Go code automatically. This ensures type safety and makes API changes explicit.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Kubernetes Deployment',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Each microservice gets its own Kubernetes Deployment, Service, and ConfigMap. We\'ll use Helm charts to manage these resources, making deployments consistent and repeatable.',
+//                                'Key Kubernetes features we\'ll leverage include health checks (liveness and readiness probes), resource limits, horizontal pod autoscaling, and rolling updates.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'list',
+//                        'data' => [
+//                            'listType' => 'ol',
+//                            'schemaType' => 'steps',
+//                            'items' => [
+//                                'Create Dockerfile for each microservice with multi-stage builds',
+//                                'Build and push Docker images to container registry',
+//                                'Create Kubernetes manifests (Deployment, Service, ConfigMap)',
+//                                'Configure health checks and resource limits',
+//                                'Set up Horizontal Pod Autoscaler',
+//                                'Deploy to Kubernetes cluster',
+//                                'Verify deployment with kubectl and monitoring tools'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Observability: Logging, Metrics, and Tracing',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Production microservices need comprehensive observability. We\'ll implement structured logging with zerolog, expose Prometheus metrics, and add distributed tracing with OpenTelemetry.',
+//                                'This gives us complete visibility into system behavior, performance bottlenecks, and error patterns across all services.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'note',
+//                        'data' => [
+//                            'title' => 'Pro Tip',
+//                            'paragraphs' => [
+//                                'Always include correlation IDs in your logs and traces. This makes debugging distributed systems infinitely easier by allowing you to trace a single request across multiple services.'
+//                            ],
+//                            'alignment' => 'fullscreen'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Handling Failures Gracefully',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'In distributed systems, failures are inevitable. Services crash, networks partition, and databases go down. Your architecture must handle these scenarios gracefully.',
+//                                'We implement circuit breakers to prevent cascading failures, retries with exponential backoff, and timeouts on all external calls. The go-resilience library provides excellent patterns for this.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Security Best Practices',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'list',
+//                        'data' => [
+//                            'listType' => 'ul',
+//                            'items' => [
+//                                'Use mutual TLS (mTLS) for service-to-service communication',
+//                                'Implement API authentication with JWT tokens',
+//                                'Store secrets in Kubernetes Secrets or external secret managers',
+//                                'Run containers as non-root users',
+//                                'Use network policies to restrict service communication',
+//                                'Regularly scan container images for vulnerabilities',
+//                                'Implement rate limiting to prevent abuse'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Performance Optimization',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Go\'s performance is excellent out of the box, but microservices have unique optimization opportunities. Connection pooling, caching strategies, and efficient serialization can dramatically improve throughput.',
+//                                'We\'ll implement Redis for distributed caching, use connection pooling for database and gRPC clients, and leverage Go\'s sync.Pool for object reuse. These optimizations can reduce response times by 50% or more.'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'quote',
+//                        'data' => [
+//                            'text' => 'Microservices are not a free lunch. They introduce complexity. But done right, they provide scalability and flexibility that monoliths can\'t match.',
+//                            'attribution' => 'Martin Fowler'
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'heading',
+//                        'data' => [
+//                            'text' => 'Conclusion',
+//                            'level' => 2
+//                        ]
+//                    ],
+//                    [
+//                        'type' => 'text',
+//                        'data' => [
+//                            'paragraphs' => [
+//                                'Building production-ready microservices with Go and Kubernetes requires careful attention to architecture, observability, security, and operational concerns. But the result is a system that can scale to handle millions of requests while remaining maintainable.',
+//                                'The complete source code for this tutorial is available on GitHub. Fork it, experiment with it, and adapt it to your needs. Happy coding!',
+//                                'In our next article, we\'ll dive deeper into service mesh implementations with Istio and advanced deployment patterns like canary releases and blue-green deployments.'
+//                            ]
+//                        ]
+//                    ]
+//                ]
+//            ],
             [
                 'title' => 'AI-Powered Code Generation: GitHub Copilot vs Amazon CodeWhisperer',
                 'slug' => 'ai-code-generation-comparison',
