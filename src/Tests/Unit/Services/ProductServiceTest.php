@@ -19,11 +19,14 @@ use App\Repositories\ProductViewRepository;
 use App\Services\ImageUploadService;
 use App\Services\ProductService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class ProductServiceTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected $repository;
     protected $imageUploadService;
     protected ProductService $service;
@@ -176,7 +179,7 @@ class ProductServiceTest extends FunctionalTestCase
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
         $this->repository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants', 'availableMerchants.merchant'])
             ->once()
             ->andReturn($product);
 
@@ -518,7 +521,7 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 79.99);
+            ->with(1, 1, 79.99, null);
 
         $this->repository->shouldReceive('recordPriceHistory')
             ->with($product)
@@ -716,7 +719,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn(collect([]));
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
-            ->with(1, 1, 89.99)
+            ->with(1, 1, 89.99, null)
             ->andReturn(new ProductPriceHistory());
 
         $data = [
@@ -1069,7 +1072,7 @@ class ProductServiceTest extends FunctionalTestCase
         ]);
 
         $merchants = new Collection([
-            new ProductMerchant(['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true]),
+             ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
         ]);
 
         $variants = new Collection([
@@ -1402,12 +1405,12 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 79.99)
+            ->with(1, 1, 79.99, null)
             ->andReturn(new ProductPriceHistory(['price' => 79.99]));
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 2, 89.99)
+            ->with(1, 2, 89.99, null)
             ->andReturn(new ProductPriceHistory(['price' => 89.99]));
 
         $result = $this->service->createProduct($data);
@@ -1449,7 +1452,7 @@ class ProductServiceTest extends FunctionalTestCase
         // Should only record history for Amazon (price changed)
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 74.99)
+            ->with(1, 1, 74.99, null)
             ->andReturn(new ProductPriceHistory(['price' => 74.99]));
 
         $result = $this->service->updateProduct(1, $data);
@@ -1482,12 +1485,12 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 89.99);
+            ->with(1, 1, 89.99, null);
 
         // Should record history for new merchant
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 3, 85.99);
+            ->with(1, 3, 85.99, null);
 
         $result = $this->service->updateProduct(1, $data);
 
@@ -1820,5 +1823,418 @@ class ProductServiceTest extends FunctionalTestCase
         $result = $this->service->updateProduct(1, $data);
 
         $this->assertNotNull($result);
+    }
+
+    public function testCreateProductWithMerchantsAndVariantOverrides()
+    {
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
+
+        $variant = new ProductVariant([
+            'sku' => 'VAR-001',
+            'name' => 'Red',
+            'attributes' => ['color' => 'Red'],
+            'price' => 110,
+            'sale_price' => 100,
+            'price_modifier' => 0,
+            'is_active' => true
+        ]);
+
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'variants' => [
+                [
+                    'sku' => 'VAR-001',
+                    'name' => 'Red',
+                    'attributes' => ['color' => 'Red'],
+                    'price' => 110,
+                    'sale_price' => 100,
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ],
+            ],
+            'merchants' => [
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com',
+                    'price' => 115,
+                    'override_price' => true,
+                    'override_sale_price' => false,
+                    'variant_id' => 1, // Will be resolved after variant creation
+                    'variant_sku' => 'AMZN-VAR-001',
+                    'is_available' => true
+                ],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->andReturn([1]);
+
+        $this->repository->shouldReceive('getVariants')
+            ->once()
+            ->with(1)
+            ->andReturn(collect([$variant]));
+
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->with(1, Mockery::on(function($merchants) {
+                return count($merchants) === 1
+                    && $merchants[0]['override_price'] === true
+                    && $merchants[0]['variant_sku'] === 'AMZN-VAR-001';
+            }))
+            ->andReturn([1]);
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->once()
+            ->with(1, 1, 115, null);
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testUpdateProductMerchantVariantOverrides()
+    {
+        $product = new Product([
+            'id' => 1,
+            'name' => 'Product',
+            'price' => 99.99
+        ]);
+
+        $variant = new ProductVariant([
+            'id' => 1,
+            'sku' => 'VAR-001',
+            'price' => 110
+        ]);
+
+        $existingMerchants = collect([
+            [
+                'id' => 1,
+                'name' => 'Amazon',
+                'price' => 110,
+                'override_price' => false,
+                'variant_id' => 1,
+                'effective_price' => 110
+            ]
+        ]);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
+
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')
+            ->with(1)
+            ->andReturn($existingMerchants);
+
+        $this->repository->shouldReceive('getVariants')
+            ->with(1)
+            ->andReturn(collect([$variant]));
+
+        $data = [
+            'merchants' => [
+                [
+                    'id' => 1,
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com',
+                    'price' => 120,
+                    'override_price' => true, // Now overriding
+                    'variant_id' => 1,
+                    'variant_sku' => 'CUSTOM-SKU',
+                    'is_available' => true
+                ]
+            ]
+        ];
+
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->andReturn([1]);
+
+        // Should record history because effective price changed from 110 to 120
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->once()
+            ->with(1, 1, 120, null);
+
+        $result = $this->service->updateProduct(1, $data);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testDuplicateProductWithVariantMerchants()
+    {
+        $original = new Product([
+            'id' => 1,
+            'name' => 'Product',
+            'slug' => 'product',
+            'site_id' => $this->siteId
+        ]);
+
+        $variant = new ProductVariant([
+            'id' => 1,
+            'sku' => 'VAR-001',
+            'price' => 100
+        ]);
+        $variant->setRelation('images', collect([]));
+
+        $merchants = new Collection([
+            [
+                'name' => 'Amazon',
+                'url' => 'https://amazon.com',
+                'price' => 105,
+                'override_price' => true,
+                'override_sale_price' => false,
+                'variant_id' => 1,
+                'variant_sku' => 'AMZN-VAR-001',
+                'is_available' => true,
+                'variant' => [
+                    'id' => 1,
+                    'sku' => 'VAR-001'
+                ]
+            ]
+        ]);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($original);
+        $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
+
+        $newProduct = new Product(['id' => 2]);
+        $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
+
+        $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn(collect([$variant]));
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->with(1)->andReturn($merchants);
+        $this->repository->shouldReceive('getSpecifications')->with(1)->andReturn(new Collection([]));
+
+        // Should create variant first, returning new ID
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->with(2, Mockery::on(function($data) {
+                return count($data) === 1 && $data[0]['sku'] === 'VAR-001-COPY';
+            }))
+            ->andReturn([2]); // New variant ID
+
+        // Should sync merchants with mapped variant ID
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->with(2, Mockery::on(function($data) {
+                return count($data) === 1
+                    && $data[0]['variant_id'] === 2 // Mapped to new variant
+                    && $data[0]['override_price'] === true
+                    && $data[0]['variant_sku'] === 'AMZN-VAR-001';
+            }))
+            ->andReturn([1]);
+
+        $result = $this->service->duplicateProduct(1);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
+
+    public function testCreateProductRecordsMerchantPriceHistoryWithOverrides()
+    {
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
+
+        $variantsCollection = collect([
+            'sku' => 'VAR-001',
+            'price' => 999,
+            'sale_price' => 949,
+            'attributes' => [],
+            'price_modifier' => 0,
+            'is_active' => true
+        ]);
+
+        $data = [
+            'name' => 'iPhone 15',
+            'price' => 999.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'variants' => [
+                [
+                    'sku' => 'VAR-001',
+                    'price' => 999,
+                    'sale_price' => 949,
+                    'attributes' => [],
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ]
+            ],
+            'merchants' => [
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com',
+                    'price' => 979, // Override price
+                    'override_price' => true,
+                    'variant_id' => 1,
+                    'is_available' => true
+                ],
+                [
+                    'name' => 'BestBuy',
+                    'url' => 'https://bestbuy.com',
+                    'price' => 999, // Use variant price
+                    'override_price' => false,
+                    'variant_id' => 1,
+                    'is_available' => true
+                ],
+            ]
+        ];
+
+        $product = new Product(array_merge(['id' => 1], $data));
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->once()
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->andReturn([1]);
+
+        $this->repository->shouldReceive('getVariants')
+            ->twice()
+            ->andReturn($variantsCollection);
+
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->andReturn([1, 2]);
+
+        // Amazon should record override price
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->once()
+            ->with(1, 1, 979, null);
+
+        // BestBuy should record variant price
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->once()
+            ->with(1, 2, 999, null);
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
+
+    public function testCreateProductWithMerchantsAndVariantsMapsProperly()
+    {
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
+
+        $variantsCollection = collect([
+            new ProductVariant([
+                'sku' => 'VAR-001',
+                'name' => 'Red',
+                'attributes' => ['color' => 'Red'],
+                'price' => 110,
+                'sale_price' => 100,
+                'price_modifier' => 0,
+                'is_active' => true
+            ]),
+            new ProductVariant([
+                'sku' => 'VAR-002',
+                'name' => 'Blue',
+                'attributes' => ['color' => 'Blue'],
+                'price' => 120,
+                'sale_price' => 110,
+                'price_modifier' => 0,
+                'is_active' => true
+            ])
+        ]);
+
+        // Simulate form data with variant_id as 1-indexed (from form array indices)
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'variants' => [
+                [
+                    'sku' => 'VAR-001',
+                    'name' => 'Red',
+                    'attributes' => ['color' => 'Red'],
+                    'price' => 110,
+                    'sale_price' => 100,
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ],
+                [
+                    'sku' => 'VAR-002',
+                    'name' => 'Blue',
+                    'attributes' => ['color' => 'Blue'],
+                    'price' => 120,
+                    'sale_price' => 110,
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ],
+            ],
+            'merchants' => [
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com/var1',
+                    'price' => 105,
+                    'override_price' => true,
+                    'variant_id' => 1, // Form index (1-indexed)
+                    'is_available' => true
+                ],
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com/var2',
+                    'price' => 115,
+                    'override_price' => true,
+                    'variant_id' => 2, // Form index (1-indexed)
+                    'is_available' => true
+                ],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
+        $this->repository->shouldReceive('getVariants')
+            ->twice()
+            ->with(1)
+            ->andReturn($variantsCollection);
+
+        // Variants sync returns actual DB IDs
+        $this->repository->shouldReceive('syncVariants')
+            ->once()
+            ->andReturn([101, 102]);
+
+        // Should receive merchants with mapped variant IDs
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->with(1, Mockery::on(function($merchants) {
+                // Check that variant_ids have been mapped to actual DB IDs
+                return count($merchants) === 2
+                    && $merchants[0]['variant_id'] === 101
+                    && $merchants[1]['variant_id'] === 102;
+            }))
+            ->andReturn([1, 2]);
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->twice();
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
     }
 }

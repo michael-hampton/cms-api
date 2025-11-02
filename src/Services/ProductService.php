@@ -49,7 +49,7 @@ class ProductService
 
     public function getProduct(int $id): ?Model
     {
-        return $this->repository->find($id);
+        return $this->repository->find($id, ['availableMerchants', 'availableMerchants.merchant']);
     }
 
     public function createProduct(array $data, ?UploadedFile $imageFile = null): Model
@@ -87,21 +87,48 @@ class ProductService
         if (!empty($images)) {
             $this->repository->syncImages($product->id, $images);
         }
+
+        $variantIdMapping = []; // Maps form indices to actual DB IDs
+        if (!empty($variants)) {
+            $variantIds = $this->repository->syncVariants($product->id, $variants);
+
+            // Create mapping: form index -> actual DB ID
+            foreach ($variants as $index => $variant) {
+                if (isset($variantIds[$index])) {
+                    // Form sends variant_id as 1, 2, 3... (1-indexed)
+                    // We need to map these to the actual database IDs
+                    $variantIdMapping[$index + 1] = $variantIds[$index];
+                }
+            }
+        }
+
         if (!empty($merchants)) {
-            $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+            // Map merchant variant_ids from form indices to actual DB IDs
+            $mappedMerchants = array_map(function($merchantData) use ($variantIdMapping) {
+                if (!empty($merchantData['variant_id']) && isset($variantIdMapping[$merchantData['variant_id']])) {
+                    $merchantData['variant_id'] = $variantIdMapping[$merchantData['variant_id']];
+                }
+                return $merchantData;
+            }, $merchants);
+
+            $merchantIds = $this->repository->syncMerchants($product->id, $mappedMerchants);
 
             // Record price history for each merchant
             foreach ($merchantIds as $index => $merchantId) {
-                $this->repository->recordMerchantPriceHistory(
-                    $product->id,
-                    $merchantId,
-                    $merchants[$index]['price']
-                );
+                $merchantData = $mappedMerchants[$index]; // Use mapped data
+                $prices = $this->getEffectiveMerchantPrices($merchantData, $product->id);
+
+                if ($prices['price'] !== null) {
+                    $this->repository->recordMerchantPriceHistory(
+                        $product->id,
+                        $merchantId,
+                        $prices['price'],
+                        $prices['sale_price']
+                    );
+                }
             }
         }
-        if (!empty($variants)) {
-            $this->repository->syncVariants($product->id, $variants);
-        }
+
         if (!empty($specifications)) {
             $this->repository->syncSpecifications($product->id, $specifications);
         }
@@ -171,19 +198,26 @@ class ProductService
             foreach ($merchants as $index => $merchantData) {
                 $merchantId = $merchantIds[$index];
 
-                // Find old merchant by id or merchant_id
+                // Find old merchant by id or merchant_id + variant_id
                 $oldMerchant = null;
                 if (!empty($merchantData['id']) && $oldMerchants->has($merchantData['id'])) {
                     $oldMerchant = $oldMerchants->get($merchantData['id']);
                 }
 
+                $newPrices = $this->getEffectiveMerchantPrices($merchantData, $product->id);
+                $oldPrice = $oldMerchant ? $oldMerchant['price'] : null;
+                $oldSalePrice = $oldMerchant ? $oldMerchant['sale_price'] : null;
+
                 // Record if new merchant or price changed
-                if (!$oldMerchant || $oldMerchant['price'] != $merchantData['price']) {
-                    $this->repository->recordMerchantPriceHistory(
-                        $product->id,
-                        $merchantId,
-                        $merchantData['price']
-                    );
+                if (!$oldMerchant || $oldPrice != $newPrices['price'] || $oldSalePrice != $newPrices['sale_price']) {
+                    if ($newPrices['price'] !== null) {
+                        $this->repository->recordMerchantPriceHistory(
+                            $product->id,
+                            $merchantId,
+                            $newPrices['price'],
+                            $newPrices['sale_price']
+                        );
+                    }
                 }
             }
         }
@@ -199,6 +233,47 @@ class ProductService
         }
 
         return $product;
+    }
+
+    /**
+     * Get the effective prices for a merchant, considering overrides and variant prices
+     */
+    protected function getEffectiveMerchantPrices(array $merchantData, int $productId): array
+    {
+        $price = null;
+        $salePrice = null;
+
+        // Get variant if specified
+        $variant = null;
+        if (!empty($merchantData['variant_id'])) {
+            $variants = $this->repository->getVariants($productId);
+            $variant = $variants->first(function($v) use ($merchantData) {
+                return $v->id == $merchantData['variant_id'];
+            });
+        }
+
+        // Determine effective regular price
+        if (!empty($merchantData['override_price'])) {
+            $price = $merchantData['price'] ?? null;
+        } elseif ($variant) {
+            $price = $variant->price ?? null;
+        } else {
+            $price = $merchantData['price'] ?? null;
+        }
+
+        // Determine effective sale price
+        if (!empty($merchantData['override_sale_price'])) {
+            $salePrice = $merchantData['sale_price'] ?? null;
+        } elseif ($variant) {
+            $salePrice = $variant->sale_price ?? null;
+        } else {
+            $salePrice = $merchantData['sale_price'] ?? null;
+        }
+
+        return [
+            'price' => $price,
+            'sale_price' => $salePrice
+        ];
     }
 
     public function deleteProduct(int $id): bool
@@ -443,23 +518,12 @@ class ProductService
             }
         }
 
-        // Duplicate merchants if selected
-        if ($cloneRelations['merchants']) {
-            $merchants = $this->repository->getProductMerchantsWithDetails($originalId);
-            $merchantData = $merchants->map(fn($m) => [
-                'name' => $m->name,
-                'url' => $m->url,
-                'price' => $m->price,
-                'is_available' => $m->is_available,
-            ])->toArray();
-            if (!empty($merchantData)) {
-                $this->repository->syncMerchants($newId, $merchantData);
-            }
-        }
+        $variantMapping = []; // Map old variant IDs to new variant IDs
 
         // Duplicate variants if selected
         if ($cloneRelations['variants']) {
             $variants = $this->repository->getVariants($originalId);
+
             $variantData = $variants->map(function($v) {
                 $imageData = [];
 
@@ -491,7 +555,42 @@ class ProductService
             })->toArray();
 
             if (!empty($variantData)) {
-                $this->repository->syncVariants($newId, $variantData);
+                $newVariantIds = $this->repository->syncVariants($newId, $variantData);
+
+                // Create mapping of old to new variant IDs (by array index)
+                foreach ($variants as $index => $oldVariant) {
+                    if (isset($newVariantIds[$index])) {
+                        $variantMapping[$oldVariant->id] = $newVariantIds[$index];
+                    }
+                }
+            }
+        }
+
+        // Duplicate merchants if selected
+        if ($cloneRelations['merchants']) {
+            $merchants = $this->repository->getProductMerchantsWithDetails($originalId);
+            $merchantData = $merchants->map(function($m) use ($variantMapping) {
+                $data = [
+                    'name' => $m['name'],
+                    'url' => $m['url'],
+                    'price' => $m['price'],
+                    'sale_price' => $m['sale_price'],
+                    'is_available' => $m['is_available'],
+                    'override_price' => $m['override_price'],
+                    'override_sale_price' => $m['override_sale_price'],
+                    'variant_sku' => $m['variant_sku'],
+                ];
+
+                // Map old variant ID to new variant ID if variant exists
+                if ($m['variant_id'] && isset($variantMapping[$m['variant_id']])) {
+                    $data['variant_id'] = $variantMapping[$m['variant_id']];
+                }
+
+                return $data;
+            })->toArray();
+
+            if (!empty($merchantData)) {
+                $this->repository->syncMerchants($newId, $merchantData);
             }
         }
 

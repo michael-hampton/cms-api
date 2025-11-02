@@ -6,7 +6,7 @@ use App\Models\Newsletter;
 
 class NewsletterRepository extends Repository
 {
-    public function find(int $id): ?Newsletter
+    public function find(int $id, array $relations = []): ?Newsletter
     {
         return Newsletter::find($id);
     }

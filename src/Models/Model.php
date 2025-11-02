@@ -158,6 +158,11 @@ abstract class Model
             return $this->relations[$key];
         }
 
+        // Check if it's an appended attribute with a mutator
+        if (in_array($key, $this->appends) && $this->hasGetMutator($key)) {
+            return $this->callGetMutator($key);
+        }
+
         // Check if there's a mutator
         $mutatorMethod = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
 
@@ -507,12 +512,21 @@ abstract class Model
         // Apply visibility rules
         $attributes = $this->getVisibleAttributes($attributes);
 
-        // Append custom attributes
+        // Cast all attributes
+        foreach ($attributes as $key => $value) {
+            $attributes[$key] = $this->castAttribute($key, $value);
+        }
+
+        // Append custom attributes - THIS IS THE KEY FIX
         if (!empty($this->appends)) {
             foreach ($this->appends as $key) {
                 // Check if the attribute is visible before appending it
                 if ($this->shouldIncludeAttribute($key)) {
-                    $attributes[$key] = $this->getAttribute($key);
+                    // Call the accessor directly - DON'T use getAttribute
+                    $mutatorMethod = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
+                    if (method_exists($this, $mutatorMethod)) {
+                        $attributes[$key] = $this->$mutatorMethod();
+                    }
                 }
             }
         }
@@ -1026,8 +1040,8 @@ abstract class Model
     protected function callGetMutator(string $key)
     {
         $mutatorMethod = $this->getGetMutatorMethod($key);
-        $rawValue = $this->attributes[$key] ?? null;
-        return $this->castAttribute($key, $this->$mutatorMethod($rawValue));
+        // Don't pass raw value, let the mutator access what it needs from $this
+        return $this->$mutatorMethod();
     }
 
     /**
@@ -1085,6 +1099,10 @@ abstract class Model
         // Check for eager loaded relation first for performance
         if ($this->relationLoaded($key)) {
             return $this->getRelation($key);
+        }
+
+        if (array_key_exists($key, $this->attributes)) {
+            return $this->getAttribute($key);
         }
 
         // Check for attribute mutator

@@ -310,7 +310,11 @@ class ProductControllerTest extends FunctionalTestCase
 
         // Create dummy image
         $imagePath = 'uploads/products/macbook.jpg';
-        @mkdir(dirname($imagePath), 0755, true);
+
+        if (!file_exists($imagePath)) {
+            @mkdir(dirname($imagePath), 0755, true);
+        }
+
         file_put_contents($imagePath, 'dummy image');
 
         $response = $this->postForSite("/api/products/{$product->id}/duplicate");
@@ -826,7 +830,11 @@ class ProductControllerTest extends FunctionalTestCase
         // Create dummy variant images
         $imagePath1 = 'uploads/products/red-front.jpg';
         $imagePath2 = 'uploads/products/red-back.jpg';
-        @mkdir(dirname($imagePath1), 0755, true);
+
+        if (!@file_exists($imagePath1)) {
+            @mkdir(dirname($imagePath1), 0755, true);
+        }
+
         file_put_contents($imagePath1, 'dummy image 1');
         file_put_contents($imagePath2, 'dummy image 2');
 
@@ -1077,7 +1085,7 @@ class ProductControllerTest extends FunctionalTestCase
 
         $brandStr = $brand1->id . ',' . $brand2->id;
 
-        $response = $this->getForSite('/api/products?brands=' .$brandStr);
+        $response = $this->getForSite('/api/products?brands=' . $brandStr);
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1124,7 +1132,7 @@ class ProductControllerTest extends FunctionalTestCase
         $product2 = $this->createProduct(['name' => 'iPad', 'category_id' => $cat2->id]);
         $product3 = $this->createProduct(['name' => 'MacBook', 'category_id' => $cat3->id]);
 
-        $categoryStr = $cat1->id .',' . $cat2->id;
+        $categoryStr = $cat1->id . ',' . $cat2->id;
 
         $response = $this->getForSite('/api/products?categories=' . $categoryStr);
         $data = json_decode($response->getContent(), true);
@@ -1169,5 +1177,396 @@ class ProductControllerTest extends FunctionalTestCase
 
         $this->assertFalse((bool)$images[0]['is_primary']);
         $this->assertTrue((bool)$images[1]['is_primary']);
+    }
+
+    public function testCreateProductWithVariantMerchants(): void
+    {
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
+
+        $data = [
+            'name' => 'iPhone 15',
+            'description' => 'Latest iPhone',
+            'price' => 999.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'variants' => [
+                [
+                    'sku' => 'IPH15-128',
+                    'name' => '128GB',
+                    'attributes' => ['storage' => '128GB'],
+                    'price' => 999,
+                    'sale_price' => 949,
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ],
+                [
+                    'sku' => 'IPH15-256',
+                    'name' => '256GB',
+                    'attributes' => ['storage' => '256GB'],
+                    'price' => 1099,
+                    'sale_price' => 1049,
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ]
+            ],
+            'merchants' => [
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com/iphone-128',
+                    'price' => 979,
+                    'override_price' => true,
+                    'override_sale_price' => false,
+                    'variant_id' => 1,
+                    'variant_sku' => 'AMZN-IPH15-128',
+                    'is_available' => true
+                ],
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com/iphone-256',
+                    'price' => 1079,
+                    'override_price' => true,
+                    'override_sale_price' => false,
+                    'variant_id' => 2,
+                    'variant_sku' => 'AMZN-IPH15-256',
+                    'is_available' => true
+                ],
+                [
+                    'name' => 'BestBuy',
+                    'url' => 'https://bestbuy.com/iphone-128',
+                    'price' => 999,
+                    'override_price' => false,
+                    'override_sale_price' => false,
+                    'variant_id' => 1,
+                    'is_available' => true
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/products', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $responseData = json_decode($response->getContent(), true);
+        $productId = $responseData['data']['product']['id'];
+
+        // Verify variants were created
+        $product = Product::with(['variants', 'merchants.variant', 'merchants.merchant'])->find($productId);
+        $this->assertCount(2, $product->variants);
+
+        // Verify merchants were created with correct variant associations
+        $this->assertCount(3, $product->merchants);
+
+        $amazonMerchants = $product->merchants->filter(function ($pm) {
+            return $pm->merchant->name === 'Amazon';
+        });
+
+        $this->assertCount(2, $amazonMerchants);
+
+        // Check first Amazon merchant (128GB)
+        $amazon128 = $amazonMerchants->first(function ($pm) {
+            return $pm->variant_sku === 'AMZN-IPH15-128';
+        });
+        $this->assertNotNull($amazon128);
+        $this->assertTrue($amazon128->override_price);
+        $this->assertEquals(979, $amazon128->price);
+        $this->assertEquals('AMZN-IPH15-128', $amazon128->variant_sku);
+        $this->assertEquals(979, $amazon128->effective_price);
+
+        // Check BestBuy merchant (uses variant price)
+        $bestbuy = $product->merchants->first(function ($pm) {
+            return $pm->merchant->name === 'BestBuy';
+        });
+        $this->assertNotNull($bestbuy);
+        $this->assertFalse($bestbuy->override_price);
+        $this->assertEquals(999, $bestbuy->effective_price); // Should use variant price
+    }
+
+    public function testUpdateProductVariantMerchantOverrides(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'VAR-001',
+            'price' => 100,
+            'sale_price' => 90
+        ]);
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+
+        $pm = $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant->id,
+            'price' => 100,
+            'override_price' => false,
+            'override_sale_price' => false,
+            'variant_sku' => null
+        ]);
+
+        $updateData = [
+            'name' => 'Test Product',
+            'description' => 'Test',
+            'price' => 99.99,
+            'brand' => 'Test',
+            'merchants' => [
+                [
+                    'id' => $pm->id,
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com',
+                    'price' => 95,
+                    'override_price' => true,
+                    'override_sale_price' => 0,
+                    'variant_id' => $variant->id,
+                    'variant_sku' => 'CUSTOM-SKU-001',
+                    'is_available' => true
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/products/{$product->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $updated = ProductMerchant::find($pm->id);
+        $this->assertTrue($updated->override_price);
+        $this->assertEquals(95, $updated->price);
+        $this->assertEquals('CUSTOM-SKU-001', $updated->variant_sku);
+        $this->assertEquals(95, $updated->effective_price);
+    }
+
+    public function testGetProductIncludesVariantMerchantDetails(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'VAR-001',
+            'name' => 'Red',
+            'price' => 100,
+            'sale_price' => 90
+        ]);
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+
+        $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant->id,
+            'price' => 95,
+            'override_price' => true,
+            'variant_sku' => 'AMZN-VAR-001'
+        ]);
+
+        $response = $this->getForSite("/api/products/{$product->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+
+        $merchants = $data['data']['product']['availableMerchants'];
+
+        $this->assertCount(1, $merchants);
+        $merchantData = $merchants[0];
+
+        $this->assertEquals('Amazon', $merchantData['merchant']['name']);
+        $this->assertEquals($variant->id, $merchantData['variant_id']);
+        $this->assertEquals(1, $merchantData['override_price']);
+        $this->assertEquals(95, $merchantData['price']);
+        $this->assertEquals('AMZN-VAR-001', $merchantData['variant_sku']);
+        $this->assertEquals(95, $merchantData['effective_price']);
+    }
+
+    public function testDuplicateProductPreservesVariantMerchantMappings(): void
+    {
+        $product = $this->createProduct(['name' => 'iPhone 15']);
+
+        $variant1 = $this->createProductVariant($product->id, [
+            'sku' => 'IPH15-128',
+            'price' => 999
+        ]);
+        $variant2 = $this->createProductVariant($product->id, [
+            'sku' => 'IPH15-256',
+            'price' => 1099
+        ]);
+
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+
+        $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant1->id,
+            'price' => 979,
+            'override_price' => true,
+            'variant_sku' => 'AMZN-128'
+        ]);
+
+        $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant2->id,
+            'price' => 1079,
+            'override_price' => true,
+            'variant_sku' => 'AMZN-256'
+        ]);
+
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate", [
+            'name' => 'iPhone 15 Copy',
+            'clone_variants' => true,
+            'clone_merchants' => true
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $newProductId = $data['data']['id'];
+
+        $newProduct = Product::with(['variants', 'merchants.variant'])->find($newProductId);
+
+        $this->assertCount(2, $newProduct->variants);
+        $this->assertCount(2, $newProduct->merchants);
+
+        // Verify variant-merchant mappings are preserved
+        $newVariant1 = $newProduct->variants->first(function ($v) {
+            return str_contains($v->sku, '128');
+        });
+        $newVariant2 = $newProduct->variants->first(function ($v) {
+            return str_contains($v->sku, '256');
+        });
+
+        $merchant1 = $newProduct->merchants->first(function ($pm) use ($newVariant1) {
+            return $pm->variant_id === $newVariant1->id;
+        });
+        $merchant2 = $newProduct->merchants->first(function ($pm) use ($newVariant2) {
+            return $pm->variant_id === $newVariant2->id;
+        });
+
+        $this->assertNotNull($merchant1);
+        $this->assertNotNull($merchant2);
+        $this->assertEquals(979, $merchant1->price);
+        $this->assertEquals(1079, $merchant2->price);
+        $this->assertTrue($merchant1->override_price);
+        $this->assertTrue($merchant2->override_price);
+        $this->assertEquals('AMZN-128', $merchant1->variant_sku);
+        $this->assertEquals('AMZN-256', $merchant2->variant_sku);
+    }
+
+    public function testFilterProductsByMerchantIncludesVariantMerchants(): void
+    {
+        $product1 = $this->createProduct(['name' => 'Product 1']);
+        $product2 = $this->createProduct(['name' => 'Product 2']);
+
+        $variant1 = $this->createProductVariant($product1->id);
+
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+
+        // Product 1 has Amazon merchant with variant
+        $this->createProductMerchant($product1->id, [
+            'merchant_id' => $merchant1->id,
+            'variant_id' => $variant1->id
+        ]);
+
+        // Product 2 has eBay merchant
+        $this->createProductMerchant($product2->id, [
+            'merchant_id' => $merchant2->id
+        ]);
+
+        $response = $this->getForSite('/api/products?merchant=' . $merchant1->id);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('Product 1', $data['items'][0]['name']);
+    }
+
+    public function testMerchantPriceHistoryTracksOverrides(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id, [
+            'price' => 100,
+            'sale_price' => 90
+        ]);
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+
+        // Create merchant with override
+        $pm = $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant->id,
+            'price' => 95,
+            'override_price' => true
+        ]);
+
+        // Create initial price history
+        $this->createProductPriceHistory([
+            'product_id' => $product->id,
+            'merchant_id' => $pm->id,
+            'price' => 95
+        ]);
+
+        // Update override price
+        $updateData = [
+            'name' => 'Test',
+            'description' => 'Test',
+            'price' => 99.99,
+            'brand' => 'Test',
+            'merchants' => [
+                [
+                    'id' => $pm->id,
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com',
+                    'price' => 89,
+                    'override_price' => true,
+                    'variant_id' => $variant->id,
+                    'is_available' => true
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/products/{$product->id}", $updateData);
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify new price history entry
+        $historyCount = ProductPriceHistory::where('product_id', $product->id)
+            ->where('merchant_id', $pm->id)
+            ->count();
+
+        $this->assertEquals(2, $historyCount);
+
+        $latestHistory = ProductPriceHistory::where('product_id', $product->id)
+            ->where('merchant_id', $pm->id)
+            ->orderBy('recorded_at', 'desc')
+            ->first();
+
+        $this->assertEquals(89, $latestHistory->price);
+    }
+
+    public function testValidationRequiresMerchantDataWhenVariantSpecified(): void
+    {
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
+
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'description' => 'Test',
+            'variants' => [
+                [
+                    'sku' => 'VAR-001',
+                    'price' => 100,
+                    'attributes' => [],
+                    'price_modifier' => 0,
+                    'is_active' => true
+                ]
+            ],
+            'merchants' => [
+                [
+                    'name' => 'Amazon',
+                    'url' => 'https://amazon.com',
+                    // Missing price when override_price is true
+                    'override_price' => true,
+                    'variant_id' => 1,
+                    'is_available' => true
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/products', $data);
+
+        // Should still succeed because price defaults to 0, but in real scenario you might want validation
+        $this->assertEquals(422, $response->getStatusCode());
     }
 }

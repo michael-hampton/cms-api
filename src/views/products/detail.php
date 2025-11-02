@@ -19,6 +19,239 @@
             flex-direction: column;
         }
 
+        .variant-price-info {
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+        }
+
+        .variant-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #000;
+        }
+
+        .variant-sale-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #ef4444;
+        }
+
+        .variant-original-price {
+            font-size: 1rem;
+            color: #999;
+            text-decoration: line-through;
+        }
+
+        .merchant-comparison {
+            margin: 3rem 0;
+            padding: 2rem;
+            background: #f9f9f9;
+            border-radius: 12px;
+        }
+
+        .merchant-comparison-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: #000;
+        }
+
+        .merchants-list {
+            display: grid;
+            gap: 1.5rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .merchant-card {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 2rem;
+            padding: 1.5rem 2rem;
+            background: white;
+            border: 2px solid #e5e5e5;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .merchant-card:hover {
+            border-color: #000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .merchant-card.merchant-unavailable {
+            opacity: 0.6;
+            filter: grayscale(50%);
+        }
+
+        .merchant-card.merchant-unavailable:hover {
+            transform: none;
+        }
+
+        .merchant-info {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .merchant-logo {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-weight: 700;
+            color: #666;
+            font-size: 1.25rem;
+        }
+
+        .merchant-details {
+            flex: 1;
+        }
+
+        .merchant-name {
+            font-weight: 700;
+            font-size: 1.125rem;
+            color: #000;
+            margin-bottom: 0.25rem;
+        }
+
+        .merchant-shipping {
+            font-size: 0.875rem;
+            color: #10b981;
+            font-weight: 500;
+        }
+
+        .merchant-pricing {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.5rem;
+        }
+
+        .merchant-price-container {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+        }
+
+        .merchant-price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #000;
+        }
+
+        .merchant-price.sale-price {
+            color: #ef4444;
+        }
+
+        .merchant-original-price {
+            font-size: 1.125rem;
+            color: #999;
+            text-decoration: line-through;
+        }
+
+        .merchant-savings {
+            font-size: 0.875rem;
+            color: #10b981;
+            font-weight: 600;
+            background: #d1fae5;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+        }
+
+        .merchant-action {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .merchant-link {
+            padding: 0.875rem 2rem;
+            background: #000;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .merchant-link:hover {
+            background: #333;
+            transform: translateX(4px);
+        }
+
+        .merchant-link svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .merchant-unavailable-badge {
+            padding: 0.5rem 1rem;
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .best-price-badge {
+            position: absolute;
+            top: -12px;
+            left: 1.5rem;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 0.375rem 1rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .merchant-card-wrapper {
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .merchant-card {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .merchant-info {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .merchant-pricing {
+                align-items: flex-start;
+            }
+
+            .merchant-action {
+                width: 100%;
+            }
+
+            .merchant-link {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
         .thumbnail-images {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -730,7 +963,6 @@
                     <?php endif; ?>
 
                     <!-- Product Variants -->
-                    <!-- Product Variants -->
                     <?php if ($product->activeVariants && $product->activeVariants->count() > 0): ?>
                         <div class="product-variants">
                             <h3 class="variant-title">Available Options</h3>
@@ -743,21 +975,25 @@
                                                 <div class="variant-attributes">
                                                     <?php foreach ($variant->attributes as $key => $value): ?>
                                                         <span class="variant-attribute-badge">
-                                    <strong><?= htmlspecialchars(ucfirst($key)) ?>:</strong>
-                                    <?= htmlspecialchars($value) ?>
-                                </span>
+                                        <strong><?= htmlspecialchars(ucfirst($key)) ?>:</strong>
+                                        <?= htmlspecialchars($value) ?>
+                                    </span>
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php endif; ?>
-                                            <?php if ($variant->price_modifier != 0): ?>
-                                                <div class="variant-price-modifier">
-                                                    <?= $variant->price_modifier > 0 ? '+' : '' ?>
-                                                    $<?= number_format(abs($variant->price_modifier), 2) ?>
-                                                </div>
-                                            <?php endif; ?>
+                                            <div class="variant-price-info">
+                                                <?php if (!empty($variant->sale_price) && $variant->sale_price < $variant->price): ?>
+                                                    <span class="variant-sale-price">$<?= number_format($variant->sale_price, 2) ?></span>
+                                                    <span class="variant-original-price">$<?= number_format($variant->price, 2) ?></span>
+                                                <?php else: ?>
+                                                    <span class="variant-price">$<?= number_format($variant->price, 2) ?></span>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
-                                        <button class="variant-select-btn" data-variant-id="<?= $variant->id ?>"
-                                                data-price-modifier="<?= $variant->price_modifier ?>">
+                                        <button class="variant-select-btn"
+                                                data-variant-id="<?= $variant->id ?>"
+                                                data-price="<?= $variant->price ?>"
+                                                data-sale-price="<?= $variant->sale_price ?? '' ?>">
                                             Select
                                         </button>
                                     </div>
@@ -765,7 +1001,6 @@
                             </div>
                         </div>
                     <?php endif; ?>
-
                     <div class="product-description">
                         <p><?= nl2br(htmlspecialchars($product->description)) ?></p>
                     </div>
@@ -878,30 +1113,64 @@
                 <?php if ($product->availableMerchants && $product->availableMerchants->count() > 0): ?>
                     <div class="tab-content" id="merchants-tab">
                         <div class="merchant-comparison">
-                            <h2 class="merchant-comparison-title">Compare Prices</h2>
+                            <h2 class="merchant-comparison-title">Compare Prices from Trusted Retailers</h2>
                             <div class="merchants-list">
-                                <?php foreach ($product->availableMerchants as $merchant): ?>
-                                    <div class="merchant-card <?= !$merchant->is_available ? 'merchant-unavailable' : '' ?>">
-                                        <div class="merchant-name"><?= htmlspecialchars($merchant->merchant->name) ?></div>
-                                        <?php
-                                        if(!empty($merchant->sale_price)) { ?>
-                                            <span class="price-sale">$<?= number_format($merchant->sale_price, 2) ?></span>
-                                            <span class="price-original">$<?= number_format($merchant->price, 2) ?></span>
-                                        <?php } else {?>
-                                            <div class="merchant-price">$<?= number_format($merchant->price, 2) ?></div>
-                                       <?php }
-                                        ?>
+                                <?php
+                                $merchants = $product->availableMerchants->toArray();
+                                $lowestPrice = min(array_column($merchants, 'price'));
 
-                                        <?php if ($merchant->is_available): ?>
-                                            <a href="<?= htmlspecialchars($merchant->url) ?>"
-                                               class="merchant-link"
-                                               target="_blank"
-                                               rel="noopener noreferrer">
-                                                Buy Now
-                                            </a>
-                                        <?php else: ?>
-                                            <span style="color: #999;">Out of Stock</span>
+                                foreach ($product->availableMerchants as $merchant):
+                                    $isLowest = $merchant->price <= $lowestPrice * 1.01; // Within 1% of lowest
+                                    $discount = $merchant->sale_price ? round((($merchant->price - $merchant->sale_price) / $merchant->price) * 100) : 0;
+                                    ?>
+                                    <div class="merchant-card-wrapper">
+                                        <?php if ($isLowest && $merchant->is_available): ?>
+                                            <div class="best-price-badge">🏆 Best Price</div>
                                         <?php endif; ?>
+
+                                        <div class="merchant-card <?= !$merchant->is_available ? 'merchant-unavailable' : '' ?>">
+                                            <div class="merchant-info">
+                                                <div class="merchant-logo">
+                                                    <?= strtoupper(substr($merchant->merchant->name, 0, 1)) ?>
+                                                </div>
+                                                <div class="merchant-details">
+                                                    <div class="merchant-name"><?= htmlspecialchars($merchant->merchant->name) ?></div>
+                                                    <?php if ($merchant->is_available): ?>
+                                                        <div class="merchant-shipping">✓ In Stock</div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+
+                                            <div class="merchant-action">
+                                                <div class="merchant-pricing">
+                                                    <div class="merchant-price-container">
+                                                        <?php if (!empty($merchant->sale_price) && $merchant->sale_price < $merchant->price): ?>
+                                                            <span class="merchant-price sale-price">$<?= number_format($merchant->sale_price, 2) ?></span>
+                                                            <span class="merchant-original-price">$<?= number_format($merchant->price, 2) ?></span>
+                                                        <?php else: ?>
+                                                            <span class="merchant-price">$<?= number_format($merchant->price, 2) ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <?php if ($discount > 0): ?>
+                                                        <span class="merchant-savings">Save <?= $discount ?>%</span>
+                                                    <?php endif; ?>
+                                                </div>
+
+                                                <?php if ($merchant->is_available): ?>
+                                                    <a href="<?= htmlspecialchars($merchant->url) ?>"
+                                                       class="merchant-link"
+                                                       target="_blank"
+                                                       rel="noopener noreferrer">
+                                                        Buy Now
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                                                        </svg>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span class="merchant-unavailable-badge">Out of Stock</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -1060,7 +1329,7 @@
                                             </div>
                                             <div class="timeline-content">
                                                 <div class="timeline-date">
-                                                    <?= date('M d, Y', strtotime($history['recorded_at'])) ?>
+                                                    <?= $history['recorded_at']->format('M d, Y') ?> ?>
                                                 </div>
                                                 <div class="timeline-price">
                                                     $<?= number_format($historyPrice, 2) ?>
@@ -1352,9 +1621,31 @@
 <!-- Toast Notification -->
 <div id="toast" class="toast"></div>
 
+<?php
+$merchants = json_encode(array_map(function($m) {
+
+    return [
+        'id' => $m['id'],
+        'merchant_id' => $m['merchant_id'],
+        'name' => $m['merchant']['name'] ?? $m['name'],
+        'url' => $m['url'],
+        'variant_id' => $m['variant_id'],
+        'effective_price' => $m['effective_price'],
+        'effective_sale_price' => $m['effective_sale_price'],
+        'is_available' => $m['is_available'],
+        'discount_percentage' => $m['discount_percentage']
+    ];
+}, $product->availableMerchants->toArray() ?? []));
+?>
+
+
+
 <script>
     const SITE = 'test-mike';
-    const PRODUCT_ID = <?= $product->id ?>;
+    const PRODUCT_ID = '<?= $product->id ?>';
+
+    // Store merchant data for variants
+    const merchantData = <?php echo $merchants ?>;
 
     // Image Gallery
     document.querySelectorAll('.thumbnail').forEach(thumbnail => {
@@ -1383,12 +1674,114 @@
     // Variant selection
     const selectedVariant = { id: null };
     const basePrice = <?= $product->price ?>;
-    const baseSalePrice = <?= $product->sale_price ?? 'null' ?>;
+    const baseSalePrice = <?= $product->sale_price ?? 0 ?>;
+
+    function updateMerchantPrices(variantId) {
+        const merchantsList = document.querySelector('.merchants-list');
+        if (!merchantsList) return;
+
+        // Clear current merchants
+        merchantsList.innerHTML = '';
+
+        console.log('Updating merchants for variant:', variantId);
+        console.log('Merchant data:', merchantData);
+
+        // Filter merchants for this variant (or null variant_id for general listings)
+        const relevantMerchants = merchantData.filter(m =>
+            m.variant_id === null || m.variant_id == variantId
+        );
+
+        if (relevantMerchants.length === 0) {
+            merchantsList.innerHTML = '<p style="padding: 2rem; text-align: center; color: #666;">No merchants available for this variant.</p>';
+            return;
+        }
+
+        // Find lowest price
+        const lowestPrice = Math.min(...relevantMerchants.map(m => m.effective_sale_price || m.effective_price));
+
+        // Render merchants
+        relevantMerchants.forEach(merchant => {
+            const effectivePrice = merchant.effective_sale_price || merchant.effective_price;
+            const isLowest = effectivePrice <= lowestPrice * 1.01; // Within 1% of lowest
+            const discount = merchant.effective_sale_price
+                ? Math.round(((merchant.effective_price - merchant.effective_sale_price) / merchant.effective_price) * 100)
+                : 0;
+
+            // Create wrapper
+            const merchantWrapper = document.createElement('div');
+            merchantWrapper.className = 'merchant-card-wrapper';
+
+            // Add best price badge if applicable
+            if (isLowest && merchant.is_available) {
+                const badge = document.createElement('div');
+                badge.className = 'best-price-badge';
+                badge.textContent = '🏆 Best Price';
+                merchantWrapper.appendChild(badge);
+            }
+
+            // Create merchant card
+            const merchantCard = document.createElement('div');
+            merchantCard.className = 'merchant-card' + (!merchant.is_available ? ' merchant-unavailable' : '');
+
+            // Build merchant info section
+            const merchantInfo = `
+            <div class="merchant-info">
+                <div class="merchant-logo">
+                    ${merchant.name.charAt(0).toUpperCase()}
+                </div>
+                <div class="merchant-details">
+                    <div class="merchant-name">${merchant.name}</div>
+                    ${merchant.is_available ? '<div class="merchant-shipping">✓ In Stock</div>' : ''}
+                </div>
+            </div>
+        `;
+
+            // Build pricing section
+            const pricingHtml = merchant.effective_sale_price && merchant.effective_sale_price < merchant.effective_price
+                ? `<div class="merchant-price-container">
+                    <span class="merchant-price sale-price">$${merchant.effective_sale_price.toFixed(2)}</span>
+                    <span class="merchant-original-price">$${merchant.effective_price.toFixed(2)}</span>
+               </div>`
+                : `<div class="merchant-price-container">
+                    <span class="merchant-price">$${merchant.effective_price.toFixed(2)}</span>
+               </div>`;
+
+            const savingsHtml = discount > 0
+                ? `<span class="merchant-savings">Save ${discount}%</span>`
+                : '';
+
+            // Build action section
+            const actionHtml = merchant.is_available
+                ? `<a href="${merchant.url}" class="merchant-link" target="_blank" rel="noopener noreferrer">
+                    Buy Now
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+               </a>`
+                : `<span class="merchant-unavailable-badge">Out of Stock</span>`;
+
+            // Assemble the card
+            merchantCard.innerHTML = `
+            ${merchantInfo}
+            <div class="merchant-action">
+                <div class="merchant-pricing">
+                    ${pricingHtml}
+                    ${savingsHtml}
+                </div>
+                ${actionHtml}
+            </div>
+        `;
+
+            merchantWrapper.appendChild(merchantCard);
+            merchantsList.appendChild(merchantWrapper);
+        });
+    }
 
     document.querySelectorAll('.variant-select-btn').forEach(button => {
         button.addEventListener('click', function() {
-            const variantId = this.dataset.variantId;
-            const priceModifier = parseFloat(this.dataset.priceModifier || 0);
+            const variantId = parseInt(this.dataset.variantId);
+            const variantPrice = parseFloat(this.dataset.price);
+            const variantSalePrice = this.dataset.salePrice ? parseFloat(this.dataset.salePrice) : null;
 
             // Deselect all variants
             document.querySelectorAll('.variant-item').forEach(item => {
@@ -1399,21 +1792,26 @@
             this.closest('.variant-item').classList.add('selected');
             selectedVariant.id = variantId;
 
-            // Update displayed price
-            //const newPrice = basePrice + priceModifier;
-            const newPrice = priceModifier
-            // const newSalePrice = baseSalePrice ? (baseSalePrice + priceModifier) : null;
+            // Update displayed price in the main product info section
+            const productPriceContainer = document.querySelector('.product-price');
 
-            if (baseSalePrice) {
-                //document.querySelector('.price-sale').textContent = '$' + newSalePrice.toFixed(2);
-                //document.querySelector('.price-original').textContent = '$' + newPrice.toFixed(2);
-                document.querySelector('.price-sale').style.display = 'none';
-                document.querySelector('.price-original').innerHTML = '$<span class="price-current">'+newPrice+'</span>'
+            if (variantSalePrice && variantSalePrice < variantPrice) {
+                // Has sale price
+                productPriceContainer.innerHTML = `
+                <span class="price-sale">$${variantSalePrice.toFixed(2)}</span>
+                <span class="price-original">$${variantPrice.toFixed(2)}</span>
+            `;
             } else {
-                document.querySelector('.price-current').textContent = '$' + newPrice.toFixed(2);
-           }
+                // Regular price only
+                productPriceContainer.innerHTML = `
+                <span class="price-current">$${variantPrice.toFixed(2)}</span>
+            `;
+            }
 
-            console.log('Selected variant:', variantId, 'New price:', newPrice);
+            // Update merchant prices for this variant
+            updateMerchantPrices(variantId);
+
+            console.log('Selected variant:', variantId, 'Price:', variantPrice, 'Sale Price:', variantSalePrice);
         });
     });
 

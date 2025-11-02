@@ -28,8 +28,12 @@ abstract class Repository
 
     abstract protected function getModelClass(): string;
 
-    public function find(int $id): ?Model
+    public function find(int $id, array $relations = []): ?Model
     {
+        if (!empty($relations) && is_array($relations) && count($relations) > 0) {
+            return $this->model::with($relations)->find($id);
+        }
+
         return $this->model::find($id);
     }
 
@@ -82,7 +86,7 @@ abstract class Repository
     {
         $model = $this->find($id);
 
-        if(empty($model)) {
+        if (empty($model)) {
             return null;
         }
 
@@ -97,7 +101,7 @@ abstract class Repository
     {
         $model = $this->find($id);
 
-        if(empty($model)) {
+        if (empty($model)) {
             return false;
         }
 

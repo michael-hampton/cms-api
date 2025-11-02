@@ -1013,4 +1013,300 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals('img2.jpg', $images[1]['url']);
         $this->assertEquals(1, $images[1]['is_primary']); // Now primary
     }
+
+    public function test_sync_merchants_with_variant_overrides(): void
+    {
+        // Arrange
+        $product = $this->createProduct(['price' => 100]);
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'VAR-001',
+            'price' => 120,
+            'sale_price' => 110
+        ]);
+
+        $merchants = [
+            [
+                'name' => 'Amazon',
+                'url' => 'https://amazon.com/product',
+                'price' => 125, // Override price
+                'override_price' => true,
+                'override_sale_price' => false,
+                'variant_id' => $variant->id,
+                'variant_sku' => 'AMZN-VAR-001',
+                'is_available' => true
+            ],
+            [
+                'name' => 'eBay',
+                'url' => 'https://ebay.com/product',
+                'price' => 115, // Use as sale price
+                'override_price' => false,
+                'override_sale_price' => true,
+                'variant_id' => $variant->id,
+                'variant_sku' => null, // Use variant SKU
+                'is_available' => true
+            ],
+        ];
+
+        // Act
+        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+        // Assert
+        $this->assertCount(2, $merchantIds);
+
+        $amazonLookup = Merchant::where('name', 'Amazon')->first();
+        $ebayLookup = Merchant::where('name', 'eBay')->first();
+
+        $amazon = ProductMerchant::where('merchant_id', $amazonLookup->id)
+            ->where('variant_id', $variant->id)
+            ->first();
+
+        $ebay = ProductMerchant::where('merchant_id', $ebayLookup->id)
+            ->where('variant_id', $variant->id)
+            ->first();
+
+        $this->assertNotNull($amazon);
+        $this->assertNotNull($ebay);
+
+        // Amazon assertions
+        $this->assertTrue($amazon->override_price);
+        $this->assertFalse($amazon->override_sale_price);
+        $this->assertEquals(125, $amazon->price);
+        $this->assertEquals('AMZN-VAR-001', $amazon->variant_sku);
+        $this->assertEquals(125, $amazon->effective_price); // Uses override
+
+        // eBay assertions
+        $this->assertFalse($ebay->override_price);
+        $this->assertTrue($ebay->override_sale_price);
+        $this->assertEquals(115, $ebay->price);
+        $this->assertNull($ebay->variant_sku);
+        $this->assertEquals(115, $ebay->effective_price); // Uses variant price
+        $this->assertEquals(115, $ebay->effective_sale_price); // Uses override as sale price
+    }
+
+    public function test_sync_merchants_multiple_variants_same_merchant(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $variant1 = $this->createProductVariant($product->id, ['sku' => 'VAR-001', 'price' => 100]);
+        $variant2 = $this->createProductVariant($product->id, ['sku' => 'VAR-002', 'price' => 120]);
+
+        $merchants = [
+            [
+                'name' => 'Amazon',
+                'url' => 'https://amazon.com/var1',
+                'price' => 95,
+                'override_price' => true,
+                'variant_id' => $variant1->id,
+                'is_available' => true
+            ],
+            [
+                'name' => 'Amazon',
+                'url' => 'https://amazon.com/var2',
+                'price' => 115,
+                'override_price' => true,
+                'variant_id' => $variant2->id,
+                'is_available' => true
+            ],
+        ];
+
+        // Act
+        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+        // Assert
+        $this->assertCount(2, $merchantIds);
+
+        $amazonLookup = Merchant::where('name', 'Amazon')->first();
+        $productMerchants = ProductMerchant::where('product_id', $product->id)
+            ->where('merchant_id', $amazonLookup->id)
+            ->get();
+
+        $this->assertCount(2, $productMerchants);
+
+        $pm1 = $productMerchants->where('variant_id', $variant1->id)->first();
+        $pm2 = $productMerchants->where('variant_id', $variant2->id)->first();
+
+        $this->assertEquals(95, $pm1->price);
+        $this->assertEquals(115, $pm2->price);
+    }
+
+    public function test_get_product_merchants_with_variant_details(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'VAR-001',
+            'name' => 'Red Variant',
+            'price' => 100,
+            'sale_price' => 90,
+            'attributes' => ['color' => 'red']
+        ]);
+
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+        $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant->id,
+            'price' => 105,
+            'override_price' => true,
+            'variant_sku' => 'CUSTOM-SKU'
+        ]);
+
+        // Act
+        $merchants = $this->repository->getProductMerchantsWithDetails($product->id);
+
+        // Assert
+        $this->assertCount(1, $merchants);
+
+        $merchantData = $merchants->first();
+        $this->assertEquals('Amazon', $merchantData['name']);
+        $this->assertEquals($variant->id, $merchantData['variant_id']);
+        $this->assertTrue($merchantData['override_price']);
+        $this->assertEquals('CUSTOM-SKU', $merchantData['variant_sku']);
+        $this->assertEquals(105, $merchantData['effective_price']);
+        $this->assertEquals(90, $merchantData['effective_sale_price']); // From variant
+        $this->assertEquals('CUSTOM-SKU', $merchantData['effective_sku']);
+
+        $this->assertNotNull($merchantData['variant']);
+        $this->assertEquals('VAR-001', $merchantData['variant']['sku']);
+        $this->assertEquals('Red Variant', $merchantData['variant']['name']);
+    }
+
+    public function test_sync_merchants_updates_existing_variant_merchant(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+
+        $existingPM = $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'variant_id' => $variant->id,
+            'price' => 100,
+            'override_price' => false,
+            'variant_sku' => 'OLD-SKU'
+        ]);
+
+        $merchants = [
+            [
+                'id' => $existingPM->id,
+                'name' => 'Amazon',
+                'url' => 'https://amazon.com/updated',
+                'price' => 110,
+                'override_price' => true,
+                'variant_id' => $variant->id,
+                'variant_sku' => 'NEW-SKU',
+                'is_available' => true
+            ],
+        ];
+
+        // Act
+        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+        // Assert
+        $this->assertCount(1, $merchantIds);
+
+        $this->assertContains($existingPM->id, $merchantIds);
+
+        $updated = ProductMerchant::find($existingPM->id);
+        $this->assertEquals(110, $updated->price);
+        $this->assertTrue($updated->override_price);
+        $this->assertEquals('NEW-SKU', $updated->variant_sku);
+    }
+
+    public function test_sync_merchants_with_separate_sale_price(): void
+    {
+        // Arrange
+        $product = $this->createProduct(['price' => 100]);
+        $variant = $this->createProductVariant($product->id, [
+            'sku' => 'VAR-001',
+            'price' => 120,
+            'sale_price' => 110
+        ]);
+
+        $merchants = [
+            [
+                'name' => 'Amazon',
+                'url' => 'https://amazon.com/product',
+                'price' => 125,
+                'sale_price' => 115,
+                'override_price' => true,
+                'override_sale_price' => true,
+                'variant_id' => $variant->id,
+                'variant_sku' => 'AMZN-VAR-001',
+                'is_available' => true
+            ],
+            [
+                'name' => 'eBay',
+                'url' => 'https://ebay.com/product',
+                'price' => 120, // Will use variant price
+                'sale_price' => 110,    // Will use variant sale price
+                'override_price' => false,
+                'override_sale_price' => false,
+                'variant_id' => $variant->id,
+                'variant_sku' => null,
+                'is_available' => true
+            ],
+        ];
+
+        // Act
+        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+        // Assert
+        $this->assertCount(2, $merchantIds);
+
+        $amazonLookup = Merchant::where('name', 'Amazon')->first();
+        $ebayLookup = Merchant::where('name', 'eBay')->first();
+
+        $amazon = ProductMerchant::where('merchant_id', $amazonLookup->id)
+            ->where('variant_id', $variant->id)
+            ->first();
+
+        $ebay = ProductMerchant::where('merchant_id', $ebayLookup->id)
+            ->where('variant_id', $variant->id)
+            ->first();
+
+        $this->assertNotNull($amazon);
+        $this->assertNotNull($ebay);
+
+        // Amazon assertions
+        $this->assertTrue($amazon->override_price);
+        $this->assertTrue($amazon->override_sale_price);
+        $this->assertEquals(125, $amazon->price);
+        $this->assertEquals(115, $amazon->sale_price);
+        $this->assertEquals('AMZN-VAR-001', $amazon->variant_sku);
+        $this->assertEquals(125, $amazon->effective_price);
+        $this->assertEquals(115, $amazon->effective_sale_price);
+        $this->assertEquals(8, $amazon->discount_percentage); // (125-115)/125 * 100
+        $this->assertTrue($amazon->has_discount);
+
+        // eBay assertions
+        $this->assertFalse($ebay->override_price);
+        $this->assertFalse($ebay->override_sale_price);
+        $this->assertNull($ebay->variant_sku);
+        $this->assertEquals(120, $ebay->effective_price); // From variant
+        $this->assertEquals(110, $ebay->effective_sale_price); // From variant
+        $this->assertEquals(8, $ebay->discount_percentage);
+        $this->assertTrue($ebay->has_discount);
+    }
+
+    public function test_record_merchant_price_history_with_sale_price(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $merchant = $this->createProductMerchant($product->id);
+
+        // Act
+        $history = $this->repository->recordMerchantPriceHistory(
+            $product->id,
+            $merchant->id,
+            99.99,
+            79.99
+        );
+
+        // Assert
+        $this->assertNotNull($history);
+        $this->assertEquals($product->id, $history->product_id);
+        $this->assertEquals($merchant->id, $history->merchant_id);
+        $this->assertEquals(99.99, $history->price);
+        $this->assertEquals(79.99, $history->sale_price);
+    }
 }

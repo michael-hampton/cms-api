@@ -166,33 +166,42 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             if (!empty($merchantData['id']) && $existingMerchants->has($merchantData['id'])) {
                 $existingPM = $existingMerchants->get($merchantData['id']);
             } else {
+                // Check by merchant_id and variant_id combination
+                $query = ProductMerchant::where('product_id', $productId)
+                    ->where('merchant_id', $merchantLookup->id);
 
-                // Check by merchant_id
-                $existingPM = ProductMerchant::where('product_id', $productId)
-                    ->where('merchant_id', $merchantLookup->id)
-                    //->where('variant_id', $merchantData['variant_id'] ?? null)
-                    ->first();
+                if (isset($merchantData['variant_id'])) {
+                    $query->where('variant_id', $merchantData['variant_id']);
+                } else {
+                    $query->whereNull('variant_id');
+                }
+
+                $existingPM = $query->first()?->toArray();
             }
 
+            $updateData = [
+                'url' => $merchantData['url'],
+                'is_available' => $merchantData['is_available'] ?? true,
+                'variant_id' => $merchantData['variant_id'] ?? null,
+                'variant_sku' => $merchantData['variant_sku'] ?? null,
+                'override_price' => $merchantData['override_price'] ?? 0,
+                'override_sale_price' => $merchantData['override_sale_price'] ?? 0,
+                'price' => $merchantData['price'] ?? 0,
+                'sale_price' => $merchantData['sale_price'] ?? null,
+            ];
+
             if ($existingPM) {
+
                 // Update existing
-                $existingPM->update([
-                    'url' => $merchantData['url'],
-                    'price' => $merchantData['price'],
-                    'is_available' => $merchantData['is_available'] ?? true,
-                ]);
-                $merchantIds[] = $existingPM->id;
+                ProductMerchant::where('id', $existingPM['id'])->update($updateData);
+                $merchantIds[] = $existingPM['id'];
             } else {
                 // Create new
-                $productMerchant = ProductMerchant::create([
+                $productMerchant = ProductMerchant::create(array_merge([
                     'product_id' => $productId,
                     'merchant_id' => $merchantLookup->id,
-                    'url' => $merchantData['url'],
-                    'price' => $merchantData['price'],
-                    'is_available' => $merchantData['is_available'] ?? true,
-                    'variant_id' => $merchantData['variant_id'] ?? null,
                     'last_price_check' => now(),
-                ]);
+                ], $updateData));
                 $merchantIds[] = $productMerchant->id;
             }
         }
@@ -217,7 +226,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return $this->getProductMerchantsWithDetails($productId);
     }
 
-    public function recordMerchantPriceHistory(int $productId, int $merchantId, float $price): ?Model
+    public function recordMerchantPriceHistory(int $productId, int $merchantId, float $price, ?float $salePrice = null): ?Model
     {
         if ($price < 0) {
             return null;
@@ -227,7 +236,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             'product_id' => $productId,
             'merchant_id' => $merchantId,
             'price' => $price,
-            'sale_price' => null,
+            'sale_price' => $salePrice,
             'recorded_at' => date('Y-m-d H:i:s')
         ]);
     }
@@ -414,7 +423,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function getProductMerchantsWithDetails(int $productId): Collection
     {
-        return ProductMerchant::with(['merchant'])
+        return ProductMerchant::with(['merchant', 'variant'])
             ->where('product_id', $productId)
             ->get()
             ->map(function($pm) {
@@ -424,8 +433,26 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                     'name' => $pm->merchant->name,
                     'url' => $pm->url,
                     'price' => $pm->price,
+                    'sale_price' => $pm->sale_price,
+                    'override_price' => $pm->override_price,
+                    'override_sale_price' => $pm->override_sale_price,
+                    'variant_sku' => $pm->variant_sku,
                     'is_available' => $pm->is_available,
                     'variant_id' => $pm->variant_id,
+                    'variant' => $pm->variant ? [
+                        'id' => $pm->variant->id,
+                        'sku' => $pm->variant->sku,
+                        'name' => $pm->variant->name,
+                        'price' => $pm->variant->price,
+                        'sale_price' => $pm->variant->sale_price,
+                        'attributes' => $pm->variant->attributes,
+                    ] : null,
+                    'effective_price' => $pm->effective_price,
+                    'effective_sale_price' => $pm->effective_sale_price,
+                    'effective_sku' => $pm->effective_sku,
+                    'discount_percentage' => $pm->discount_percentage,
+                    'has_discount' => $pm->has_discount,
+                    'final_price' => $pm->final_price,
                     'last_price_check' => $pm->last_price_check,
                 ];
             });

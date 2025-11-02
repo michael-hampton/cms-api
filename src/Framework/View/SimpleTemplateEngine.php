@@ -17,6 +17,21 @@ class SimpleTemplateEngine implements ViewEngineInterface
         $this->viewsPath = rtrim($viewsPath, '/');
     }
 
+    private function compileJsonDirective(string $template): string
+    {
+        // Matches @json($variable) - non-greedy match
+        return preg_replace_callback(
+            '/@json\s*\(\s*(.+?)\s*\)/U',
+            function ($matches) {
+                $expression = trim($matches[1]);
+
+                // Build safe PHP echo expression
+                return "<?php echo htmlspecialchars(json_encode($expression, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>";
+            },
+            $template
+        );
+    }
+
     public function render(string $template, array $data = []): string
     {
         $templatePath = $this->findTemplate($template);
@@ -29,9 +44,9 @@ class SimpleTemplateEngine implements ViewEngineInterface
 
         // Simple template caching
         $cacheKey = md5($templatePath . json_encode($data, JSON_PARTIAL_OUTPUT_ON_ERROR));
-        if (isset($this->cache[$cacheKey])) {
-            return $this->cache[$cacheKey];
-        }
+//        if (isset($this->cache[$cacheKey])) {
+//            return $this->cache[$cacheKey];
+//        }
 
         $content = file_get_contents($templatePath);
 
@@ -75,6 +90,7 @@ class SimpleTemplateEngine implements ViewEngineInterface
         extract($data, EXTR_OVERWRITE);
 
         // Compile template syntax
+        $template = $this->compileJsonDirective($template);
         $template = $this->compilePrintStatements($template);
         $template = $this->compileConditionals($template);
         $template = $this->compileLoops($template);
