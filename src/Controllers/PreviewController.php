@@ -73,7 +73,7 @@ class PreviewController extends Controller
         foreach ($blocks as $index => $blockData) {
             try {
 
-                $blockData = isset($blockData['data']) ? array_merge(json_decode($blockData['data'], true), ['type' => $blockData['type']]) : $blockData;
+                $blockData = isset($blockData['data']) ? array_merge($blockData['data'], ['type' => $blockData['type']]) : $blockData;
 
                 $blockHtml = $this->blockParserService->buildBlock(
                     $page->id,

@@ -29,19 +29,9 @@ class SearchController extends Controller
             ]);
 
             $allPages = $pages->items;
-            $formattedPages = [];
 
-            foreach ($allPages as $page) {
-                $page['crop_overrides'] = json_decode($page['crop_overrides'], true) ?? [];
-                $page['resolved_images'] = json_decode($page['resolved_images'], true) ?? [];
-
-                $formattedPages[] = $page;
-            }
-
-            return $this->jsonResponse($formattedPages);
+            return $this->jsonResponse($allPages);
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Failed to search pages'

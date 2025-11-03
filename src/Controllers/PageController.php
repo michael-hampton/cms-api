@@ -42,7 +42,7 @@ class PageController extends Controller
                 if (!empty($page['blocks'])) {
                     $page['blocks'] = array_map(function($block) {
                         return [
-                            'data' => [...json_decode($block['data'], true), 'type' => $block['type']],
+                            'data' => [...$block['data'], 'type' => $block['type']],
                             'type' => $block['type'],
                             'id' => $block['id'],
                             'order' => $block['order'],

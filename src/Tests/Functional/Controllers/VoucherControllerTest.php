@@ -507,4 +507,215 @@ class VoucherControllerTest extends FunctionalTestCase
         $newVoucher = Voucher::find($newVoucherId);
         $this->assertCount(2, $newVoucher->products);
     }
+
+    public function testCreateVoucherWithCategories()
+    {
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+
+        $voucherData = [
+            'code' => 'CATEGORY10',
+            'name' => 'Category Specific Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'category_ids' => [$category1->id, $category2->id]
+        ];
+
+        $response = $this->postForSite('/api/vouchers', $voucherData);
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $voucherId = $data['data']['voucher']['id'];
+
+        $voucher = Voucher::find($voucherId);
+        $this->assertCount(2, $voucher->categories);
+    }
+
+    public function testCreateVoucherWithBrands()
+    {
+        $brand1 = $this->createBrand();
+        $brand2 = $this->createBrand();
+
+        $voucherData = [
+            'code' => 'BRAND10',
+            'name' => 'Brand Specific Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'brand_ids' => [$brand1->id, $brand2->id]
+        ];
+
+        $response = $this->postForSite('/api/vouchers', $voucherData);
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $voucherId = $data['data']['voucher']['id'];
+
+        $voucher = Voucher::find($voucherId);
+        $this->assertCount(2, $voucher->brands);
+    }
+
+    public function testValidateVoucherForProductInCategory()
+    {
+        $category = $this->createCategory();
+        $product = $this->createProduct(['price' => 100, 'category_id' => $category->id]);
+
+        $voucher = $this->createVoucher(['code' => 'CATEGORY10', 'status' => 'active']);
+        $voucher->categories(true)->attach($category->id);
+
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'CATEGORY10',
+            'order_value' => 100,
+            'product_id' => $product->id
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['valid']);
+    }
+
+    public function testValidateVoucherForProductWithBrand()
+    {
+        $brand = $this->createBrand();
+        $product = $this->createProduct(['price' => 100, 'brand_id' => $brand->id]);
+
+        $voucher = $this->createVoucher(['code' => 'BRAND10', 'status' => 'active']);
+        $voucher->brands(true)->attach($brand->id);
+
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'BRAND10',
+            'order_value' => 100,
+            'product_id' => $product->id
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['valid']);
+    }
+
+    public function testValidateVoucherNotApplicableToProductCategory()
+    {
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+
+        $product = $this->createProduct(['category_id' => $category2->id]);
+
+        $voucher = $this->createVoucher(['code' => 'SPECIFIC', 'status' => 'active']);
+        $voucher->categories(true)->attach($category1->id); // Only linked to category1
+
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'SPECIFIC',
+            'order_value' => 100,
+            'product_id' => $product->id // Product in category2
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['data']['valid']);
+        $this->assertStringContainsString('not applicable', $data['data']['message']);
+    }
+
+    public function testDuplicateVoucherCopiesCategoryLinks()
+    {
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+
+        $original = $this->createVoucher();
+        $original->categories(true)->attach([$category1->id, $category2->id]);
+
+        $response = $this->postForSite("/api/vouchers/{$original->id}/duplicate");
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $newVoucherId = $data['data']['voucher']['id'];
+
+        $newVoucher = Voucher::find($newVoucherId);
+        $this->assertCount(2, $newVoucher->categories);
+    }
+
+    public function testDuplicateVoucherCopiesBrandLinks()
+    {
+        $brand1 = $this->createBrand();
+        $brand2 = $this->createBrand();
+
+        $original = $this->createVoucher();
+        $original->brands(true)->attach([$brand1->id, $brand2->id]);
+
+        $response = $this->postForSite("/api/vouchers/{$original->id}/duplicate");
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $newVoucherId = $data['data']['voucher']['id'];
+
+        $newVoucher = Voucher::find($newVoucherId);
+        $this->assertCount(2, $newVoucher->brands);
+    }
+
+    public function testUpdateVoucherCategories()
+    {
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+        $category3 = $this->createCategory();
+
+        $voucher = $this->createVoucher();
+        $voucher->categories(true)->attach([$category1->id, $category2->id]);
+
+        $updateData = [
+            'code' => $voucher->code,
+            'name' => $voucher->name,
+            'type' => $voucher->type,
+            'value' => $voucher->value,
+            'category_ids' => [$category2->id, $category3->id] // Replace with new categories
+        ];
+
+        $response = $this->putForSite('/api/vouchers/' . $voucher->id, $updateData);
+
+        $this->assertResponseOk($response);
+
+        $voucher = Voucher::find($voucher->id);
+        $categoryIds = $voucher->categories()->pluck('id')->toArray();
+
+        $this->assertCount(2, $categoryIds);
+        $this->assertContains($category2->id, $categoryIds);
+        $this->assertContains($category3->id, $categoryIds);
+        $this->assertNotContains($category1->id, $categoryIds);
+    }
+
+    public function testUpdateVoucherBrands()
+    {
+        $brand1 = $this->createBrand();
+        $brand2 = $this->createBrand();
+        $brand3 = $this->createBrand();
+
+        $voucher = $this->createVoucher();
+        $voucher->brands(true)->attach([$brand1->id, $brand2->id]);
+
+        $updateData = [
+            'code' => $voucher->code,
+            'name' => $voucher->name,
+            'type' => $voucher->type,
+            'value' => $voucher->value,
+            'brand_ids' => [$brand2->id, $brand3->id] // Replace with new brands
+        ];
+
+        $response = $this->putForSite('/api/vouchers/' . $voucher->id, $updateData);
+
+        $this->assertResponseOk($response);
+
+        $voucher = Voucher::find($voucher->id);
+        $brandIds = $voucher->brands()->pluck('id')->toArray();
+
+        $this->assertCount(2, $brandIds);
+        $this->assertContains($brand2->id, $brandIds);
+        $this->assertContains($brand3->id, $brandIds);
+        $this->assertNotContains($brand1->id, $brandIds);
+    }
 }

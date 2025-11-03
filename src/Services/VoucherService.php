@@ -23,12 +23,23 @@ class VoucherService
     public function create(array $data): Voucher
     {
         $productIds = $data['product_ids'] ?? [];
-        unset($data['product_ids']);
+        $categoryIds = $data['category_ids'] ?? [];
+        $brandIds = $data['brand_ids'] ?? [];
+
+        unset($data['product_ids'], $data['category_ids'], $data['brand_ids']);
 
         $voucher = $this->repository->create($data);
 
         if (!empty($productIds)) {
-            $this->syncProducts($voucher->id, $productIds);
+            $this->repository->syncProducts($voucher->id, $productIds);
+        }
+
+        if (!empty($categoryIds)) {
+            $this->repository->syncCategories($voucher->id, $categoryIds);
+        }
+
+        if (!empty($brandIds)) {
+            $this->repository->syncBrands($voucher->id, $brandIds);
         }
 
         return $voucher;
@@ -37,23 +48,26 @@ class VoucherService
     public function update(int $voucherId, array $data): ?Voucher
     {
         $productIds = $data['product_ids'] ?? null;
-        unset($data['product_ids']);
+        $categoryIds = $data['category_ids'] ?? null;
+        $brandIds = $data['brand_ids'] ?? null;
+
+        unset($data['product_ids'], $data['category_ids'], $data['brand_ids']);
 
         $voucher = $this->repository->update($voucherId, $data);
 
         if ($productIds !== null) {
-            $this->syncProducts($voucherId, $productIds);
+            $this->repository->syncProducts($voucherId, $productIds);
+        }
+
+        if ($categoryIds !== null) {
+            $this->repository->syncCategories($voucherId, $categoryIds);
+        }
+
+        if ($brandIds !== null) {
+            $this->repository->syncBrands($voucherId, $brandIds);
         }
 
         return $voucher;
-    }
-
-    protected function syncProducts(int $voucherId, array $productIds): void
-    {
-        $voucher = Voucher::find($voucherId);
-        if ($voucher) {
-            $voucher->products(true)->sync($productIds);
-        }
     }
 
     public function delete(int $voucherId): bool
@@ -125,9 +139,21 @@ class VoucherService
             $newVoucher = $this->repository->create($data);
 
             // Duplicate product associations
-            $productIds = $originalVoucher->products()->pluck('id')->toArray();
+            $productIds = $originalVoucher->products()?->pluck('id')->toArray();
             if (!empty($productIds)) {
                 $newVoucher->products(true)->sync($productIds);
+            }
+
+            // Duplicate category associations
+            $categoryIds = $originalVoucher->categories()?->pluck('id')->toArray();
+            if (!empty($categoryIds)) {
+                $newVoucher->categories(true)->sync($categoryIds);
+            }
+
+            // Duplicate brand associations
+            $brandIds = $originalVoucher->brands()?->pluck('id')->toArray();
+            if (!empty($brandIds)) {
+                $newVoucher->brands(true)->sync($brandIds);
             }
 
             return $newVoucher;

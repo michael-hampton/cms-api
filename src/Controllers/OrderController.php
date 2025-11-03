@@ -37,8 +37,8 @@ class OrderController extends Controller
             $formattedData = array_map(function ($order) {
                 return [
                     ...$order,
-                    'customer_name' => $order['user']->first_name . ' ' . $order['user']->last_name,
-                    'customer_email' => $order['user']->email
+                    'customer_name' => $order['user']?->first_name . ' ' . $order['user']?->last_name,
+                    'customer_email' => $order['user']?->email
                 ];
             }, $formattedData);
 

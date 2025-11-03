@@ -138,7 +138,7 @@ class MenuItemControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Header items should default to column_group 0
-        $this->assertEquals(0, $data['data']['item']['column_group']);
+        $this->assertEquals(0, $data['data']['column_group']);
     }
 
     public function testReorderItemsWithinColumn()

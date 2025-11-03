@@ -65,7 +65,7 @@ class UserControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        foreach ($data['data'] as $user) {
+        foreach ($data['items'] as $user) {
             $this->assertTrue((bool)$user['is_active']);
         }
     }

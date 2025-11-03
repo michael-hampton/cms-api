@@ -12,6 +12,7 @@ use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Order;
 use App\Models\Page;
+use App\Models\PageGrid;
 use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
@@ -20,6 +21,7 @@ use App\Policies\AuthorPolicy;
 use App\Policies\CategoryPolicy;
 use App\Policies\MenuPolicy;
 use App\Policies\OrderPolicy;
+use App\Policies\PageGridPolicy;
 use App\Policies\PagePolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\TagPolicy;
@@ -42,6 +44,7 @@ class AuthServiceProvider extends ServiceProvider
         Gate::policy(Voucher::class, VoucherPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Menu::class, MenuPolicy::class);
+        Gate::policy(PageGrid::class, PageGridPolicy::class);;
 //        Gate::define('create-tags', function () {
 //            die('mike');
 //        });

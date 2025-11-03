@@ -5,9 +5,12 @@ namespace App\Tests\Unit\Models;
 use App\Models\Author;
 use App\Models\Page;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class AuthorModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -37,19 +40,11 @@ class AuthorModelTest extends FunctionalTestCase
             'status' => 'active',
         ]);
 
-        Page::create([
-            'title' => 'Page 1',
-            'slug' => 'page-1',
-            'status' => 'published',
-            'author_id' => $author->id,
-        ]);
+       $page1 = $this->createPage();
+       $page2 = $this->createPage();
 
-        Page::create([
-            'title' => 'Page 2',
-            'slug' => 'page-2',
-            'status' => 'published',
-            'author_id' => $author->id,
-        ]);
+       $this->attachAuthorToPage($page1, $author);
+       $this->attachAuthorToPage($page2, $author);
 
         $pages = $author->pages(true)->get();
         $this->assertEquals(2, $pages->count());

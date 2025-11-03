@@ -24,7 +24,7 @@ class ProductFactory extends Factory
             'price' => 99.99,
             'is_active' => true,
             'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
         ]);
     }
 

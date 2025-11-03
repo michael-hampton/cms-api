@@ -144,10 +144,12 @@ class OrderControllerTest extends FunctionalTestCase
     public function testUpdateModifiesOrder()
     {
         $order = $this->createOrder();
+        $product = $this->createProduct();
 
         $updateData = [
             'status' => 'processing',
-            'admin_notes' => 'Order is being processed'
+            'admin_notes' => 'Order is being processed',
+            'items' => [['product_id' => $product->id, 'product_name' => $product->name, 'quantity' => 1, 'unit_price' => 100.00]]
         ];
 
         $response = $this->putForSite("/api/orders/{$order->id}", $updateData);

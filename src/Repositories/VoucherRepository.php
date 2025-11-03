@@ -27,7 +27,7 @@ class VoucherRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Voucher::with(['products']);
+        $query = Voucher::with(['products', 'categories', 'brands']);
         return $this->searchEngine->search($query, $criteria);
     }
 
@@ -125,5 +125,29 @@ class VoucherRepository extends Repository
         }
 
         return $count;
+    }
+
+    public function syncCategories(int $voucherId, array $categoryIds): void
+    {
+        $voucher = Voucher::find($voucherId);
+        if ($voucher) {
+            $voucher->categories(true)->sync($categoryIds);
+        }
+    }
+
+    public function syncBrands(int $voucherId, array $brandIds): void
+    {
+        $voucher = Voucher::find($voucherId);
+        if ($voucher) {
+            $voucher->brands(true)->sync($brandIds);
+        }
+    }
+
+    public function syncProducts(int $voucherId, array $productIds): void
+    {
+        $voucher = Voucher::find($voucherId);
+        if ($voucher) {
+            $voucher->products(true)->sync($productIds);
+        }
     }
 }

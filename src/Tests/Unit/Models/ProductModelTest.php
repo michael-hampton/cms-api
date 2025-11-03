@@ -6,10 +6,17 @@ use App\Framework\Support\Collection;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductImage;
+use App\Models\ProductMerchant;
+use App\Models\ProductSpecification;
+use App\Models\ProductVariant;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class ProductModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -90,8 +97,8 @@ class ProductModelTest extends FunctionalTestCase
 
     public function testScopeByCategory()
     {
-        $this->createCategory(2);
-        $this->createBrand(2);
+        $this->createCategories(2);
+        $this->createBrands(2);
 
         Product::create(['name' => 'Product1', 'price' => 100, 'sale_price' => 90, 'category_id' => 1, 'brand_id' => 1]);
         Product::create(['name' => 'Product2', 'price' => 200, 'sale_price' => 180, 'category_id' => 2, 'brand_id' => 1]);
@@ -103,7 +110,7 @@ class ProductModelTest extends FunctionalTestCase
 
     public function testScopeByBrand()
     {
-        $this->createBrand(2);
+        $this->createBrands(2);
 
         Product::create(['name' => 'Product1', 'price' => 100, 'sale_price' => 90, 'category_id' => 1, 'brand_id' => 1]);
         Product::create(['name' => 'Product2', 'price' => 200, 'sale_price' => 180, 'category_id' => 1, 'brand_id' => 2]);
@@ -127,7 +134,7 @@ class ProductModelTest extends FunctionalTestCase
 
     public function testScopeSearch()
     {
-        $this->createCategory(3);
+        $this->createCategories(3);
 
         Product::create([
             'name' => 'Gaming Laptop',
@@ -291,13 +298,13 @@ class ProductModelTest extends FunctionalTestCase
         $this->assertNotNull($product->updated_at);
     }
 
-    private function createCategory($times = 1) {
+    private function createCategories($times = 1) {
         for ($i = 0; $i < $times; $i++) {
             Category::create(['name' => 'Electronics', 'slug' => 'electronics']);
         }
     }
 
-    private function createBrand($times = 1)
+    private function createBrands($times = 1)
     {
         for ($i = 0; $i < $times; $i++) {
             Brand::create(['name' => 1, 'slug' => 'techcorp']);
@@ -315,5 +322,82 @@ class ProductModelTest extends FunctionalTestCase
     {
         $relation = $this->product->approvedReviews();
         $this->assertInstanceOf(Collection::class, $relation);
+    }
+
+    public function test_product_has_variants_relationship()
+    {
+        $product = $this->createProduct();
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'sku' => 'VAR-001',
+            'price' => 99.99,
+            'is_active' => true,
+            'attributes' => []
+        ]);
+
+        $this->assertCount(1, $product->variants);
+        $this->assertEquals($variant->id, $product->variants->first()->id);
+    }
+
+    public function test_product_has_images_relationship()
+    {
+        $product = $this->createProduct();
+        $image = ProductImage::create([
+            'product_id' => $product->id,
+            'url' => 'https://example.com/image.jpg',
+            'is_primary' => true
+        ]);
+
+        $this->assertCount(1, $product->images);
+        $this->assertEquals($image->id, $product->images->first()->id);
+    }
+
+    public function test_product_has_specifications_relationship()
+    {
+        $product = $this->createProduct();
+        $spec = ProductSpecification::create([
+            'product_id' => $product->id,
+            'category' => 'General',
+            'key' => 'Weight',
+            'value' => '1kg'
+        ]);
+
+        $this->assertCount(1, $product->specifications);
+        $this->assertEquals($spec->id, $product->specifications->first()->id);
+    }
+
+    public function test_product_has_merchants_relationship()
+    {
+        $product = $this->createProduct();
+        $merchant = $this->createMerchant();
+
+        $productMerchant = ProductMerchant::create([
+            'product_id' => $product->id,
+            'merchant_id' => $merchant->id,
+            'url' => 'https://example.com/product',
+            'price' => 99.99,
+            'is_available' => true
+        ]);
+
+        $this->assertCount(1, $product->merchants);
+        $this->assertEquals($productMerchant->id, $product->merchants->first()->id);
+    }
+
+    public function test_product_has_category_relationship()
+    {
+        $category = $this->createCategory();
+        $product = $this->createProduct(['category_id' => $category->id]);
+
+        $this->assertNotNull($product->category);
+        $this->assertEquals($category->id, $product->category->id);
+    }
+
+    public function test_product_has_brand_relationship()
+    {
+        $brand = $this->createBrand();
+        $product = $this->createProduct(['brand_id' => $brand->id]);
+
+        $this->assertNotNull($product->brand);
+        $this->assertEquals($brand->id, $product->brand->id);
     }
 }

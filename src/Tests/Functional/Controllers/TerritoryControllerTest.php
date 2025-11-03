@@ -250,9 +250,11 @@ class TerritoryControllerTest extends FunctionalTestCase
         $this->createTerritory(['region_set_id' => $this->regionSet->id]);
         $this->createTerritory(['region_set_id' => $this->regionSet->id]);
 
+        $regionSet2 = $this->createRegionSet();
+
         // Create another region set with a territory
         $regionSet2 = $this->createRegionSet();
-        $this->createTerritory(['region_set_id' => $this->regionSet2->id]);
+        $this->createTerritory(['region_set_id' => $regionSet2->id]);
 
         $response = $this->getForSite("/api/territories/by-region-set/{$this->regionSet->id}");
 

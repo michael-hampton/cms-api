@@ -54,7 +54,7 @@ class ProductVariant extends Model
 // Add discount percentage
     public function getDiscountPercentageAttribute(): int
     {
-        if (!$this->sale_price || $this->price == 0) {
+        if (!$this->sale_price || $this->price == 0 || $this->sale_price > $this->price) {
             return 0;
         }
         return (int) round((($this->price - $this->sale_price) / $this->price) * 100);

@@ -45,7 +45,7 @@ class ProductMerchant extends Model
 
     public function variant()
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(ProductVariant::class, 'variant_id', 'id');
     }
 
     public function merchant()

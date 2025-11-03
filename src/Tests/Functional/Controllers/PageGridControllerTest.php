@@ -229,6 +229,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(201, $response->getStatusCode());
         $responseData = json_decode($response->getContent(), true);
+
         $this->assertEquals($data['start_date'], $responseData['data']['start_date']);
         $this->assertEquals($data['end_date'], $responseData['data']['end_date']);
     }
@@ -625,7 +626,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
 
         $responseData = json_decode($response->getContent(), true);
-        $items = json_decode($responseData['data']['items'], true);
+        $items = $responseData['data']['items'];
 
         $this->assertTrue($responseData['success']);
         $this->assertCount(3, $items);
@@ -668,7 +669,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
 
         $responseData = json_decode($response->getContent(), true);
-        $items = json_decode($responseData['data']['items'], true);
+        $items = $responseData['data']['items'];
 
         $this->assertTrue($responseData['success']);
         $this->assertCount(2, $items);
@@ -711,7 +712,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
 
         $responseData = json_decode($response->getContent(), true);
-        $items = json_decode($responseData['data']['items'], true);
+        $items = $responseData['data']['items'];
         $this->assertTrue($responseData['success']);
         $this->assertCount(2, $items);
         $this->assertEquals('product', $items[0]['type']);
@@ -801,7 +802,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        $items = json_decode($data['data']['items'], true);
+        $items = $data['data']['items'];
         $this->assertTrue($data['success']);
         $this->assertEquals('Updated Grid', $data['data']['title']);
         $this->assertCount(3, $items);
@@ -824,7 +825,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        $items = json_decode($data['data']['items'], true);
+        $items = $data['data']['items'];
         $this->assertTrue($data['success']);
         $this->assertEquals('Original Mixed Grid (Copy)', $data['data']['title']);
         $this->assertCount(3, $items);
@@ -1018,7 +1019,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('items', $data['data']);
-        $items = json_decode($data['data']['items'], true);
+        $items = $data['data']['items'];
         $this->assertCount(3, $items);
 
         $types = array_column($items, 'type');
@@ -1158,7 +1159,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $responseData = json_decode($response->getContent(), true);
         $this->assertTrue($responseData['success']);
 
-        $items = json_decode($responseData['data']['items'], true);
+        $items = $responseData['data']['items'];
 
         $item = $items[0];
         $this->assertEquals('product', $item['type']);

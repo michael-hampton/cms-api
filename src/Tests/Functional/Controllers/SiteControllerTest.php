@@ -289,7 +289,7 @@ class SiteControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('settings', $data['data']);
-        $this->assertIsString($data['data']['settings']);
+        $this->assertIsArray($data['data']['settings']);
     }
 
     public function testToggleStatus(): void

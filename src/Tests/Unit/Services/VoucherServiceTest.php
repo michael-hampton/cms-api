@@ -185,7 +185,8 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with('ORIGINAL')
             ->andReturn(null);
 
-        $originalVoucher->shouldReceive('products')->andReturn(collect());
+       $this->setupRelationExpectations($originalVoucher);
+
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -201,6 +202,13 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $this->assertInstanceOf(Voucher::class, $result);
         $this->assertEquals('inactive', $result->status);
+    }
+
+    private function setupRelationExpectations(Voucher $voucher)
+    {
+        $voucher->shouldReceive('products')->andReturn(collect());
+        $voucher->shouldReceive('categories')->andReturn(collect());
+        $voucher->shouldReceive('brands')->andReturn(collect());
     }
 
     public function testDuplicateVoucherWithCustomCode()
@@ -230,7 +238,7 @@ class VoucherServiceTest extends FunctionalTestCase
             }))
             ->andReturn($newVoucher);
 
-        $originalVoucher->shouldReceive('products')->andReturn(collect());
+        $this->setupRelationExpectations($originalVoucher);
 
         $result = $this->service->duplicateVoucher($voucherId, $newCode);
 
@@ -366,6 +374,10 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($voucher);
 
+        $this->repository->shouldReceive('syncProducts')
+            ->with(1, [1, 2, 3])
+            ->once();
+
         $result = $this->service->create($data);
 
         $this->assertInstanceOf(Voucher::class, $result);
@@ -380,6 +392,10 @@ class VoucherServiceTest extends FunctionalTestCase
         ];
 
         $voucher = new Voucher(['id' => $voucherId]);
+
+        $this->repository->shouldReceive('syncProducts')
+            ->with(1, [4,5])
+            ->once();
 
         $this->repository->shouldReceive('update')
             ->once()
@@ -405,6 +421,10 @@ class VoucherServiceTest extends FunctionalTestCase
             (object)['id' => 1],
             (object)['id' => 2]
         ]);
+
+        $originalVoucher->shouldReceive('categories')->andReturn(collect([]));
+        $originalVoucher->shouldReceive('brands')->andReturn(collect([]));
+
 
         $originalVoucher->shouldReceive('products->pluck->toArray')
             ->andReturn([1, 2]);

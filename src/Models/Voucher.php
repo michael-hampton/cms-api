@@ -93,15 +93,57 @@ class Voucher extends Model
         return $this->belongsToMany(Product::class, 'product_voucher', 'voucher_id', 'product_id', $returnRelation);
     }
 
+    public function categories($returnRelation = false)
+    {
+        return $this->belongsToMany(Category::class, 'voucher_categories', 'voucher_id', 'category_id', $returnRelation);
+    }
+
+    public function brands($returnRelation = false)
+    {
+        return $this->belongsToMany(Brand::class, 'voucher_brands', 'voucher_id', 'brand_id', $returnRelation);
+    }
+
     public function isApplicableToProduct(int $productId): bool
     {
-        // If no products linked, voucher applies to all
-        if ($this->products()->count() === 0) {
+        // If no products, categories, or brands linked, voucher applies to all
+        $hasProducts = $this->products()->count() > 0;
+        $hasCategories = $this->categories()->count() > 0;
+        $hasBrands = $this->brands()->count() > 0;
+
+        if (!$hasProducts && !$hasCategories && !$hasBrands) {
             return true;
         }
 
-        $products = $this->products(true)->where('product_id', $productId)->get();
+        // Check if product is directly linked
+        if ($hasProducts) {
+            $directMatch = $this->products(true)->where('product_id', $productId)->get();
+            if ($directMatch->count() > 0) {
+                return true;
+            }
+        }
 
-        return $products->count() > 0;
+        // Check if product's category is linked
+        if ($hasCategories) {
+            $product = Product::find($productId);
+            if ($product && $product->category_id) {
+                $categoryMatch = $this->categories(true)->where('category_id', $product->category_id)->get();
+                if ($categoryMatch->count() > 0) {
+                    return true;
+                }
+            }
+        }
+
+        // Check if product's brand is linked
+        if ($hasBrands) {
+            $product = $product ?? Product::find($productId);
+            if ($product && $product->brand_id) {
+                $brandMatch = $this->brands(true)->where('brand_id', $product->brand_id)->get();
+                if ($brandMatch->count() > 0) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

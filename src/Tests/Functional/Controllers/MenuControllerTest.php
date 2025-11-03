@@ -140,7 +140,7 @@ class MenuControllerTest extends FunctionalTestCase
         $this->assertEquals('footer', $data['data']['menu']['menu_type']);
         $this->assertArrayHasKey('layout_config', $data['data']['menu']);
 
-        $config = json_decode($data['data']['menu']['layout_config'], true);
+        $config = $data['data']['menu']['layout_config'];
         $this->assertEquals('modern', $config['footer_style']);
         $this->assertTrue($config['show_brand_section']);
         $this->assertEquals('🏠', $config['logo_icon']);
@@ -199,7 +199,7 @@ class MenuControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        $config = json_decode($data['data']['menu']['layout_config'], true);
+        $config = $data['data']['menu']['layout_config'];
         $this->assertEquals('modern', $config['footer_style']);
         $this->assertTrue($config['show_brand_section']);
         $this->assertTrue($config['show_newsletter']);

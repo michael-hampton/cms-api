@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
-use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\Model;
 use App\Repositories\MenuRepository;
@@ -14,7 +13,9 @@ class MenuService
 {
     public function __construct(
         protected MenuRepository $menuRepository
-    ) {}
+    )
+    {
+    }
 
     public function getMenuBySlug(string $slug): ?Model
     {
@@ -82,6 +83,11 @@ class MenuService
     public function createMenuItem(array $data): Model
     {
         $this->validateMenuItemData($data);
+
+        if (!isset($data['column_group'])) {
+            $data['column_group'] = 0;
+        }
+
         return $this->menuRepository->createMenuItem($data);
     }
 

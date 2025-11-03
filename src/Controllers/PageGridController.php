@@ -5,10 +5,13 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\jsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\PageGrid;
 use App\Models\PageGridHistory;
 use App\Requests\StorePageGridRequest;
 use App\Requests\UpdatePageGridRequest;
+use App\Resources\PageGridResource;
+use App\Resources\PageResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
@@ -36,7 +39,9 @@ class PageGridController extends Controller
 
             $result = $searchEngine->search( PageGrid::with(['territories']), $criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, PageGridResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (\Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
@@ -57,7 +62,7 @@ class PageGridController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Page grid created successfully',
-                'data' => $pageGrid->toArray(),
+                'data' => PageGridResource::make($pageGrid)->toArray(),
             ], 201);
         } catch (ValidationException $e) {
             return $this->errorResponse(

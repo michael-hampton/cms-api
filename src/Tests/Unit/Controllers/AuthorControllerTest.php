@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 class AuthorControllerTest extends FunctionalTestCase
 {
     private $authorService;
+    private $authorRepository;
     private $controller;
 
     protected function setUp(): void

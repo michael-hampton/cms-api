@@ -101,6 +101,7 @@ abstract class Controller
             'message' => $message,
             'data' => $data,
             'status' => 200,
+            'success' => true,
             'timestamp' => date('c')
         ];
 

@@ -72,10 +72,12 @@ class OrderRepositoryTest extends RepositoryTestCase
 
     protected function createOrderItem(int $orderId, array $overrides = []): OrderItem
     {
+        $product = $this->createProduct();
+
         return OrderItem::create(array_merge([
             'order_id' => $orderId,
-            'product_id' => 1,
-            'product_name' => 'Test Product',
+            'product_id' => $product->id,
+            'product_name' => $product->name,
             'quantity' => 1,
             'unit_price' => 100.00,
             'total' => 100.00,

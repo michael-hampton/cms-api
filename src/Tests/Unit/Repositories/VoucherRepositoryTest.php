@@ -462,4 +462,35 @@ class VoucherRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertEquals(0, $count);
     }
+
+    public function test_search_returns_vouchers_with_category_and_brand_relationships(): void
+    {
+        $voucher = $this->createVoucher();
+        $category = $this->createCategory();
+        $brand = $this->createBrand();
+
+        $voucher->categories(true)->attach($category->id);
+        $voucher->brands(true)->attach($brand->id);
+
+        $criteria = new SearchCriteria();
+        $result = $this->repository->search($criteria);
+
+        $this->assertGreaterThan(0, count($result->getData()));
+        $foundVoucher = $result->getData()[0];
+
+        $this->assertArrayHasKey('categories', $foundVoucher);
+        $this->assertArrayHasKey('brands', $foundVoucher);
+    }
+
+    public function test_sync_categories_attaches_categories_to_voucher(): void
+    {
+        $voucher = $this->createVoucher();
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+
+        $this->repository->syncCategories($voucher->id, [$category1->id, $category2->id]);
+
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(2, $voucher->categories);
+    }
 }
