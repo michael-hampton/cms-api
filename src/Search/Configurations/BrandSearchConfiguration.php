@@ -18,6 +18,7 @@ class BrandSearchConfiguration extends SearchConfiguration implements SearchConf
         // Sorts
         $this->addSort(new SortSpecification('name', 'name'))
             ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('website', 'website'))
             ->addSort(new SortSpecification('updated_at', 'updated_at'))
             ->addSort(new RelationshipCountSort('products', 'products'));
 

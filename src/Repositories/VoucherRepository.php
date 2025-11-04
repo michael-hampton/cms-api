@@ -147,7 +147,7 @@ class VoucherRepository extends Repository
     {
         $voucher = Voucher::find($voucherId);
         if ($voucher) {
-            $voucher->products(true)->sync($productIds);
+            $voucher->products(true)->sync(array_unique($productIds));
         }
     }
 }

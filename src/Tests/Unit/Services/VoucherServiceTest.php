@@ -500,4 +500,277 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertFalse($result['valid']);
         $this->assertEquals('Voucher not applicable to this product', $result['message']);
     }
+
+    public function testCreateVoucherWithCategories()
+    {
+        $data = [
+            'code' => 'TEST10',
+            'name' => 'Test Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'site_id' => 1,
+            'category_ids' => [1, 2, 3]
+        ];
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->code = 'TEST10';
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($voucher);
+
+        $this->repository->shouldReceive('syncCategories')
+            ->once()
+            ->with(1, [1, 2, 3]);
+
+        $result = $this->service->create($data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testCreateVoucherWithBrands()
+    {
+        $data = [
+            'code' => 'TEST10',
+            'name' => 'Test Voucher',
+            'type' => 'percentage',
+            'value' => 10,
+            'site_id' => 1,
+            'brand_ids' => [1, 2]
+        ];
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->code = 'TEST10';
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($voucher);
+
+        $this->repository->shouldReceive('syncBrands')
+            ->once()
+            ->with(1, [1, 2]);
+
+        $result = $this->service->create($data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testUpdateVoucherCategories()
+    {
+        $voucherId = 1;
+        $data = [
+            'name' => 'Updated Voucher',
+            'category_ids' => [4, 5]
+        ];
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->name = 'Updated Voucher';
+
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->andReturn($voucher);
+
+        $this->repository->shouldReceive('syncCategories')
+            ->once()
+            ->with($voucherId, [4, 5]);
+
+        $result = $this->service->update($voucherId, $data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testUpdateVoucherBrands()
+    {
+        $voucherId = 1;
+        $data = [
+            'name' => 'Updated Voucher',
+            'brand_ids' => [6, 7]
+        ];
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->name = 'Updated Voucher';
+
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->andReturn($voucher);
+
+        $this->repository->shouldReceive('syncBrands')
+            ->once()
+            ->with($voucherId, [6, 7]);
+
+        $result = $this->service->update($voucherId, $data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testUpdateVoucherDoesNotSyncCategoriesWhenNotProvided()
+    {
+        $voucherId = 1;
+        $data = [
+            'name' => 'Updated Voucher',
+            'value' => 15
+        ];
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->name = 'Updated Voucher';
+
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->andReturn($voucher);
+
+        $this->repository->shouldNotReceive('syncCategories');
+        $this->repository->shouldNotReceive('syncBrands');
+
+        $result = $this->service->update($voucherId, $data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testDuplicateVoucherCopiesCategoryAssociations()
+    {
+        $voucherId = 1;
+        $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $originalVoucher->id = $voucherId;
+        $originalVoucher->code = 'ORIGINAL';
+        $originalVoucher->name = 'Original';
+        $originalVoucher->type = 'percentage';
+        $originalVoucher->value = 10;
+        $originalVoucher->site_id = 1;
+
+        $originalVoucher->shouldReceive('products->pluck->toArray')
+            ->andReturn([]);
+
+        $originalVoucher->shouldReceive('categories->pluck->toArray')
+            ->andReturn([1, 2]);
+
+        $originalVoucher->shouldReceive('brands->pluck->toArray')
+            ->andReturn([]);
+
+        $newVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher->id = 2;
+
+        $newVoucher->shouldReceive('categories->sync')
+            ->once()
+            ->with([1, 2]);
+
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->andReturn($originalVoucher);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function($callback) {
+                return $callback();
+            });
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($newVoucher);
+
+        $result = $this->service->duplicateVoucher($voucherId);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testDuplicateVoucherCopiesBrandAssociations()
+    {
+        $voucherId = 1;
+        $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $originalVoucher->id = $voucherId;
+        $originalVoucher->code = 'ORIGINAL';
+        $originalVoucher->name = 'Original';
+        $originalVoucher->type = 'percentage';
+        $originalVoucher->value = 10;
+        $originalVoucher->site_id = 1;
+
+        $originalVoucher->shouldReceive('products->pluck->toArray')
+            ->andReturn([]);
+
+        $originalVoucher->shouldReceive('categories->pluck->toArray')
+            ->andReturn([]);
+
+        $originalVoucher->shouldReceive('brands->pluck->toArray')
+            ->andReturn([5, 6]);
+
+        $newVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher->id = 2;
+
+        $newVoucher->shouldReceive('brands->sync')
+            ->once()
+            ->with([5, 6]);
+
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->andReturn($originalVoucher);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function($callback) {
+                return $callback();
+            });
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($newVoucher);
+
+        $result = $this->service->duplicateVoucher($voucherId);
+
+        $this->assertInstanceOf(Voucher::class, $result);
+    }
+
+    public function testValidateVoucherApplicableViaCategory()
+    {
+        $code = 'CATEGORY10';
+        $productId = 5;
+        $orderValue = 100;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->minimum_order_value = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(true);
+        $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testValidateVoucherApplicableViaBrand()
+    {
+        $code = 'BRAND10';
+        $productId = 5;
+        $orderValue = 100;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->minimum_order_value = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(true);
+        $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
+
+        $this->assertTrue($result['valid']);
+    }
 }

@@ -21,13 +21,15 @@ class VoucherResource extends JsonResource
             'usage_limit' => $this->getAttribute('usage_limit'),
             'usage_count' => $this->getAttribute('usage_count', 0),
             'per_user_limit' => $this->getAttribute('per_user_limit'),
-            'starts_at' => $this->getAttribute('starts_at'),
-            'expires_at' => $this->getAttribute('expires_at'),
+            'starts_at' => $this->getAttribute('starts_at')?->format('Y-m-d H:i:s') ?? null,
+            'expires_at' => $this->getAttribute('expires_at')?->format('Y-m-d H:i:s') ?? null,
             'status' => $this->getAttribute('status'),
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),
             'products' => $this->whenLoaded('products'),
             'product_ids' => array_column($this->getAttribute('products'), 'id') ?? [],
+            'category_ids' => array_column($this->getAttribute('categories'), 'id') ?? [],
+            'brand_ids' => array_column($this->getAttribute('brands'), 'id') ?? [],
         ];
     }
 }

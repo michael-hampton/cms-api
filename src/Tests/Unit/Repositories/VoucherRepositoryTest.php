@@ -493,4 +493,265 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $voucher = Voucher::find($voucher->id);
         $this->assertCount(2, $voucher->categories);
     }
+
+    public function test_sync_categories_replaces_existing_categories(): void
+    {
+        $voucher = $this->createVoucher();
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+        $category3 = $this->createCategory();
+
+        $voucher->categories(true)->attach([$category1->id, $category2->id]);
+
+        $this->repository->syncCategories($voucher->id, [$category3->id]);
+
+        $voucher = Voucher::find($voucher->id);
+        $categoryIds = $voucher->categories()->pluck('id')->toArray();
+
+        $this->assertCount(1, $categoryIds);
+        $this->assertContains($category3->id, $categoryIds);
+        $this->assertNotContains($category1->id, $categoryIds);
+        $this->assertNotContains($category2->id, $categoryIds);
+    }
+
+    public function test_sync_brands_attaches_brands_to_voucher(): void
+    {
+        $voucher = $this->createVoucher();
+        $brand1 = $this->createBrand();
+        $brand2 = $this->createBrand();
+        $this->repository->syncBrands($voucher->id, [$brand1->id, $brand2->id]);
+
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(2, $voucher->brands);
+    }
+
+    public function test_sync_brands_replaces_existing_brands(): void
+    {
+        $voucher = $this->createVoucher();
+        $brand1 = $this->createBrand();
+        $brand2 = $this->createBrand();
+        $brand3 = $this->createBrand();
+        $voucher->brands(true)->attach([$brand1->id, $brand2->id]);
+
+        $this->repository->syncBrands($voucher->id, [$brand3->id]);
+
+        $voucher = Voucher::find($voucher->id);
+        $brandIds = $voucher->brands()->pluck('id')->toArray();
+
+        $this->assertCount(1, $brandIds);
+        $this->assertContains($brand3->id, $brandIds);
+        $this->assertNotContains($brand1->id, $brandIds);
+        $this->assertNotContains($brand2->id, $brandIds);
+    }
+
+    public function test_sync_categories_handles_empty_array(): void
+    {
+        $voucher = $this->createVoucher();
+        $category1 = $this->createCategory();
+        $voucher->categories(true)->attach($category1->id);
+
+        $this->repository->syncCategories($voucher->id, []);
+
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(0, $voucher->categories);
+    }
+
+    public function test_sync_brands_handles_empty_array(): void
+    {
+        $voucher = $this->createVoucher();
+        $brand1 = $this->createBrand();
+        $voucher->brands(true)->attach($brand1->id);
+
+        $this->repository->syncBrands($voucher->id, []);
+
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(0, $voucher->brands);
+    }
+
+    public function test_sync_products_attaches_products_to_voucher(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        // Act
+        $this->repository->syncProducts($voucher->id, [$product1->id, $product2->id]);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(2, $voucher->products);
+    }
+
+    public function test_sync_products_replaces_existing_products(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+        $product3 = $this->createProduct();
+
+        $voucher->products(true)->attach([$product1->id, $product2->id]);
+
+        // Act
+        $this->repository->syncProducts($voucher->id, [$product3->id]);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $productIds = $voucher->products()->pluck('id')->toArray();
+
+        $this->assertCount(1, $productIds);
+        $this->assertContains($product3->id, $productIds);
+        $this->assertNotContains($product1->id, $productIds);
+        $this->assertNotContains($product2->id, $productIds);
+    }
+
+    public function test_sync_products_handles_empty_array(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product1 = $this->createProduct();
+
+        $voucher->products(true)->attach($product1->id);
+
+        // Act
+        $this->repository->syncProducts($voucher->id, []);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(0, $voucher->products);
+    }
+
+    public function test_sync_products_does_nothing_when_voucher_not_found(): void
+    {
+        // Arrange
+        $product1 = $this->createProduct();
+
+        // Act - should not throw exception
+        $this->repository->syncProducts(99999, [$product1->id]);
+
+        // Assert - no exception thrown, method completes silently
+        $this->assertTrue(true);
+    }
+
+    public function test_sync_products_maintains_correct_associations(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+        $product3 = $this->createProduct();
+
+        // Initially attach products 1 and 2
+        $voucher->products(true)->attach([$product1->id, $product2->id]);
+
+        // Act - sync to products 2 and 3 (remove 1, keep 2, add 3)
+        $this->repository->syncProducts($voucher->id, [$product2->id, $product3->id]);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $productIds = $voucher->products()->pluck('id')->toArray();
+
+        $this->assertCount(2, $productIds);
+        $this->assertNotContains($product1->id, $productIds);
+        $this->assertContains($product2->id, $productIds);
+        $this->assertContains($product3->id, $productIds);
+    }
+
+    public function test_sync_products_handles_duplicate_ids_in_array(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        // Act - sync with duplicate IDs
+        $this->repository->syncProducts($voucher->id, [$product1->id, $product2->id, $product1->id]);
+
+        // Assert - should only attach each product once
+        $voucher = Voucher::find($voucher->id);
+        $productIds = $voucher->products()->pluck('id')->toArray();
+
+        $this->assertCount(2, $productIds);
+        $this->assertContains($product1->id, $productIds);
+        $this->assertContains($product2->id, $productIds);
+    }
+
+    public function test_sync_products_preserves_other_voucher_product_relationships(): void
+    {
+        // Arrange
+        $voucher1 = $this->createVoucher();
+        $voucher2 = $this->createVoucher();
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $voucher1->products(true)->attach([$product1->id]);
+        $voucher2->products(true)->attach([$product1->id, $product2->id]);
+
+        // Act - sync voucher1 with product2
+        $this->repository->syncProducts($voucher1->id, [$product2->id]);
+
+        // Assert - voucher2 should still have both products
+        $voucher1Fresh = Voucher::find($voucher1->id);
+        $voucher2Fresh = Voucher::find($voucher2->id);
+
+        $this->assertCount(1, $voucher1Fresh->products);
+        $this->assertCount(2, $voucher2Fresh->products);
+    }
+
+    public function test_sync_products_can_handle_large_number_of_products(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $productIds = [];
+
+        for ($i = 0; $i < 50; $i++) {
+            $product = $this->createProduct();
+            $productIds[] = $product->id;
+        }
+
+        // Act
+        $this->repository->syncProducts($voucher->id, $productIds);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(50, $voucher->products);
+    }
+
+    public function test_sync_products_removes_all_products_when_syncing_empty_array(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+        $product3 = $this->createProduct();
+
+        $voucher->products(true)->attach([$product1->id, $product2->id, $product3->id]);
+
+        // Verify initial state
+        $this->assertCount(3, $voucher->products);
+
+        // Act
+        $this->repository->syncProducts($voucher->id, []);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(0, $voucher->products);
+    }
+
+    public function test_sync_products_works_with_single_product(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $product = $this->createProduct();
+
+        // Act
+        $this->repository->syncProducts($voucher->id, [$product->id]);
+
+        // Assert
+        $voucher = Voucher::find($voucher->id);
+        $this->assertCount(1, $voucher->products);
+        $this->assertEquals($product->id, $voucher->products->first()->id);
+    }
+
 }

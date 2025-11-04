@@ -14,6 +14,7 @@ class TagSearchConfiguration extends SearchConfiguration implements SearchConfig
         // Sorts only (no filters)
         $this->addSort(new SortSpecification('name', 'name'))
             ->addSort(new SortSpecification('date', 'created_at'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
             ->addSort(new SortSpecification('usage', 'usage_count'));
 
         self::applySiteFilter();

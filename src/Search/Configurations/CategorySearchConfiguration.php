@@ -22,6 +22,8 @@ class CategorySearchConfiguration extends SearchConfiguration implements SearchC
         // Sorts
         $this->addSort(new SortSpecification('name', 'name'))
             ->addSort(new SortSpecification('date', 'created_at'))
+            ->addSort(new SortSpecification('slug', 'slug'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
             ->addSort(new RelationshipCountSort('usage', 'pages'));
 
         // Searchable columns
