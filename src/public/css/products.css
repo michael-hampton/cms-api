@@ -613,3 +613,219 @@ body {
         justify-content: center;
     }
 }
+
+/* Refined color palette */
+:root {
+    --primary: #4F46E5;
+    --primary-hover: #4338CA;
+    --background: #F9FAFB;
+    --surface: #FFFFFF;
+    --border: #E5E7EB;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Collapsible sections */
+.sidebar-section.collapsible {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.section-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.section-toggle:hover {
+    background: #F9FAFB;
+}
+
+.sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.section-toggle .chevron {
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.section-toggle .chevron.rotated {
+    transform: rotate(180deg);
+}
+
+.section-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    padding: 0 1rem;
+}
+
+.section-content.open {
+    max-height: 500px;
+    padding: 0 1rem 1rem;
+}
+
+/* Refined sidebar */
+.shop-sidebar {
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+/* Refined buttons */
+.btn {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+/* Refined product cards */
+.product-card {
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.product-card:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+}
+
+/* Refined form inputs */
+.filter-select,
+.price-input,
+.search-box input {
+    border: 1px solid var(--border);
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.filter-select:focus,
+.price-input:focus,
+.search-box input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Refined toolbar */
+.shop-toolbar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Refined badges */
+.badge-sale {
+    background: #DC2626;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+}
+
+/* Filter checkbox styles */
+.filter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.filter-checkbox-label:hover {
+    background: #F9FAFB;
+}
+
+.filter-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    accent-color: var(--primary);
+}
+
+.filter-name {
+    flex: 1;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filter-count {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: #F3F4F6;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.show-more-btn {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.show-more-btn:hover {
+    background: #F9FAFB;
+    border-color: var(--primary);
+}
+
+.show-more-btn.expanded::after {
+    content: ' Less';
+}
+
+.show-more-btn:not(.expanded)::before {
+    content: 'Show ';
+}

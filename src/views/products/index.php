@@ -55,49 +55,115 @@
             <div class="shop-layout">
                 <!-- Sidebar -->
                 <aside class="shop-sidebar">
-                    <div class="sidebar-section">
-                        <h3 class="sidebar-title">Search</h3>
-                        <div class="search-box">
-                            <input type="text" id="search-input" placeholder="Search products...">
-                            <button type="button" id="search-btn">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <div class="sidebar-section collapsible" data-section="search">
+                        <button type="button" class="section-toggle" onclick="toggleSection('search')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
                                     <circle cx="11" cy="11" r="8"></circle>
                                     <path d="m21 21-4.35-4.35"></path>
                                 </svg>
-                            </button>
+                                Search
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+
+                        <div class="section-content open">
+                            <div class="search-box">
+                                <input type="text" id="search-input" placeholder="Search products...">
+                                <button type="button" id="search-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <path d="m21 21-4.35-4.35"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="sidebar-section">
-                        <h3 class="sidebar-title">Categories</h3>
-                        <div class="filter-group">
-                            <select id="category-filter" class="filter-select">
-                                <option value="">All Categories</option>
-                                <?php foreach ($categories as $category): ?>
-                                    <option value="<?= $category->id ?>"><?= htmlspecialchars($category->name) ?></option>
+                    <div class="sidebar-section collapsible" data-section="categories">
+                        <button type="button" class="section-toggle" onclick="toggleSection('categories')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"></path>
+                                </svg>
+                                Categories
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="filter-list" id="category-list">
+                                <?php foreach (array_slice($categories, 0, 5) as $category): ?>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" class="filter-checkbox" name="category[]" value="<?= $category->id ?>">
+                                        <span class="filter-name"><?= htmlspecialchars($category->name) ?></span>
+                                        <span class="filter-count"><?= $category->product_count ?? 0 ?></span>
+                                    </label>
                                 <?php endforeach; ?>
-                            </select>
+                            </div>
+                            <?php if (count($categories) > 5): ?>
+                                <button type="button" class="show-more-btn" data-filter="category">
+                                    Show More
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
-                    <div class="sidebar-section">
-                        <h3 class="sidebar-title">Brands</h3>
-                        <div class="filter-group">
-                            <select id="brand-filter" class="filter-select">
-                                <option value="">All Brands</option>
-                                <?php foreach ($brands as $brand): ?>
-                                    <option value="<?= $brand->id ?>"><?= htmlspecialchars($brand->name) ?></option>
+                    <div class="sidebar-section collapsible" data-section="brands">
+                        <button type="button" class="section-toggle" onclick="toggleSection('brands')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                                </svg>
+                                Brands
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="filter-list" id="brand-list">
+                                <?php foreach (array_slice($brands, 0, 5) as $brand): ?>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" class="filter-checkbox" name="brand[]" value="<?= $brand->id ?>">
+                                        <span class="filter-name"><?= htmlspecialchars($brand->name) ?></span>
+                                        <span class="filter-count"><?= $brand->product_count ?? 0 ?></span>
+                                    </label>
                                 <?php endforeach; ?>
-                            </select>
+                            </div>
+                            <?php if (count($brands) > 5): ?>
+                                <button type="button" class="show-more-btn" data-filter="brand">
+                                    Show More
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
-                    <div class="sidebar-section">
-                        <h3 class="sidebar-title">Price Range</h3>
-                        <div class="price-range">
-                            <input type="number" id="min-price" placeholder="Min" class="price-input">
-                            <span class="price-separator">-</span>
-                            <input type="number" id="max-price" placeholder="Max" class="price-input">
+                    <div class="sidebar-section collapsible" data-section="price-range">
+                        <button type="button" class="section-toggle" onclick="toggleSection('price-range')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                                Price Range
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="price-range">
+                                <input type="number" id="min-price" placeholder="Min" class="price-input">
+                                <span class="price-separator">-</span>
+                                <input type="number" id="max-price" placeholder="Max" class="price-input">
+                            </div>
                         </div>
                     </div>
 
@@ -110,6 +176,13 @@
 
                     <button class="btn btn-primary btn-block" id="apply-filters">Apply Filters</button>
                     <button class="btn btn-secondary btn-block" id="reset-filters">Reset</button>
+
+                    <script id="all-categories" type="application/json">
+                        <?= json_encode($categories) ?>
+                        </script>
+                    <script id="all-brands" type="application/json">
+                        <?= json_encode($brands) ?>
+                    </script>
                 </aside>
 
                 <!-- Products Area -->

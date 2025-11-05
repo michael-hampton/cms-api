@@ -9,8 +9,8 @@
         sortOrder: 'desc',
         filters: {
             search: '',
-            categoryId: '',
-            brandId: '',
+            categoryIds: [],
+            brandIds: [],
             minPrice: '',
             maxPrice: '',
             onSale: false
@@ -23,8 +23,6 @@
     const elements = {
         searchInput: document.getElementById('search-input'),
         searchBtn: document.getElementById('search-btn'),
-        categoryFilter: document.getElementById('category-filter'),
-        brandFilter: document.getElementById('brand-filter'),
         minPriceInput: document.getElementById('min-price'),
         maxPriceInput: document.getElementById('max-price'),
         onSaleFilter: document.getElementById('on-sale-filter'),
@@ -83,8 +81,16 @@
 
     // Apply filters
     function applyFilters() {
-        state.filters.categoryId = elements.categoryFilter.value;
-        state.filters.brandId = elements.brandFilter.value;
+        // Get all checked category checkboxes
+        state.filters.categoryIds = Array.from(
+            document.querySelectorAll('input[name="category[]"]:checked')
+        ).map(cb => cb.value);
+
+        // Get all checked brand checkboxes
+        state.filters.brandIds = Array.from(
+            document.querySelectorAll('input[name="brand[]"]:checked')
+        ).map(cb => cb.value);
+
         state.filters.minPrice = elements.minPriceInput.value;
         state.filters.maxPrice = elements.maxPriceInput.value;
         state.filters.onSale = elements.onSaleFilter.checked;
@@ -96,8 +102,8 @@
     function resetFilters() {
         state.filters = {
             search: '',
-            categoryId: '',
-            brandId: '',
+            categoryIds: [],
+            brandIds: [],
             minPrice: '',
             maxPrice: '',
             onSale: false
@@ -105,8 +111,8 @@
         state.currentPage = 1;
 
         elements.searchInput.value = '';
-        elements.categoryFilter.value = '';
-        elements.brandFilter.value = '';
+        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
         elements.minPriceInput.value = '';
         elements.maxPriceInput.value = '';
         elements.onSaleFilter.checked = false;
@@ -140,8 +146,8 @@
             sort_by: state.sortBy,
             sort_order: state.sortOrder,
             q: state.filters.search,
-            category_id: state.filters.categoryId,
-            brand_id: state.filters.brandId,
+            category_ids: state.filters.categoryIds.join(','),
+            brand_ids: state.filters.brandIds.join(','),
             min_price: state.filters.minPrice,
             max_price: state.filters.maxPrice,
             on_sale: state.filters.onSale ? '1' : ''
@@ -454,6 +460,78 @@
         return parseFloat(price).toFixed(2);
     }
 
+    // Show more/less functionality
+    function expandFilterList(filterType) {
+        const dataElement = document.getElementById(`all-${filterType === 'category' ? 'categories' : 'brands'}`);
+        const allItems = JSON.parse(dataElement.textContent);
+        const listElement = document.getElementById(`${filterType}-list`);
+
+        listElement.innerHTML = allItems.map(item => `
+            <label class="filter-checkbox-label">
+                <input type="checkbox" class="filter-checkbox" name="${filterType}[]" value="${item.id}">
+                <span class="filter-name">${escapeHtml(item.name)}</span>
+                <span class="filter-count">${item.product_count || 0}</span>
+            </label>
+        `).join('');
+    }
+
+    function collapsFilterList(filterType) {
+        const dataElement = document.getElementById(`all-${filterType === 'category' ? 'categories' : 'brands'}`);
+        const allItems = JSON.parse(dataElement.textContent);
+        const listElement = document.getElementById(`${filterType}-list`);
+
+        listElement.innerHTML = allItems.slice(0, 5).map(item => `
+            <label class="filter-checkbox-label">
+                <input type="checkbox" class="filter-checkbox" name="${filterType}[]" value="${item.id}">
+                <span class="filter-name">${escapeHtml(item.name)}</span>
+                <span class="filter-count">${item.product_count || 0}</span>
+            </label>
+        `).join('');
+    }
+
+    // Show more/less button click handler
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('show-more-btn')) {
+            const btn = e.target;
+            const filterType = btn.dataset.filter;
+            const isExpanded = btn.classList.contains('expanded');
+
+            if (isExpanded) {
+                // Collapse - show only first 5
+                collapsFilterList(filterType);
+                btn.classList.remove('expanded');
+                btn.textContent = 'Show More';
+            } else {
+                // Expand - show all
+                expandFilterList(filterType);
+                btn.classList.add('expanded');
+                btn.textContent = 'Show Less';
+            }
+        }
+    });
+
     // Start the app
     init();
 })();
+
+function toggleSection(sectionName) {
+    const section = document.querySelector(`[data-section="${sectionName}"]`);
+    const content = section.querySelector('.section-content');
+    const chevron = section.querySelector('.chevron');
+
+    content.classList.toggle('open');
+    chevron.classList.toggle('rotated');
+
+    // Save state
+    localStorage.setItem(`sidebar-${sectionName}`, content.classList.contains('open'));
+}
+
+// Restore saved states
+document.addEventListener('DOMContentLoaded', () => {
+    ['search', 'categories', 'brands', 'price', 'sale'].forEach(section => {
+        const isOpen = localStorage.getItem(`sidebar-${section}`) !== 'false';
+        if (!isOpen) {
+            toggleSection(section);
+        }
+    });
+});
