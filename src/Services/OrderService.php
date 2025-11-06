@@ -375,4 +375,41 @@ class OrderService
     {
         return $this->orderRepository->getTotalRevenue($startDate, $endDate);
     }
+
+    public function bulkUpdateStatus(array $orderIds, string $status): array
+    {
+        return $this->database->transaction(function() use ($orderIds, $status) {
+            $updated = [];
+            $failed = [];
+
+            foreach ($orderIds as $orderId) {
+                try {
+                    $order = $this->orderRepository->find($orderId);
+
+                    if (!$order) {
+                        $failed[] = ['id' => $orderId, 'reason' => 'Order not found'];
+                        continue;
+                    }
+
+                    $this->handleStatusChange($order, $status);
+
+                    $updatedOrder = $this->orderRepository->update($orderId, ['status' => $status]);
+
+                    if ($updatedOrder) {
+                        $updated[] = $orderId;
+                    } else {
+                        $failed[] = ['id' => $orderId, 'reason' => 'Update failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $orderId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'updated' => $updated,
+                'failed' => $failed,
+                'total' => count($orderIds)
+            ];
+        });
+    }
 }

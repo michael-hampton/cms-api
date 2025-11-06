@@ -27,17 +27,20 @@ use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
 use App\Search\SearchEngine;
+use App\Services\RelationCaster;
 
 
 class PageRepository extends Repository
 {
     private SearchEngine $searchEngine;
+    private RelationCaster $relationCaster;
 
     public function __construct()
     {
         parent::__construct();
         $config = SearchConfigurationFactory::create('page');
         $this->searchEngine = new SearchEngine($config);
+        $this->relationCaster = new RelationCaster();
     }
 
     protected function getModelClass(): string
@@ -98,7 +101,7 @@ class PageRepository extends Repository
             $criteria->addFilter('status', $status);
         }
 
-        if(!empty($options['site_id'])) {
+        if (!empty($options['site_id'])) {
             $criteria->addFilter('site_id', $options['site_id']);
         }
 
@@ -133,9 +136,9 @@ class PageRepository extends Repository
 
         $categories = $query->get();
 
-        return $categories->map(function($item) {
+        return $categories->map(function ($item) {
             return $item->page;
-        })->filter(function($page)  use ( $siteId ) {
+        })->filter(function ($page) use ($siteId) {
             // Filter by current site
             return $page && $page->site_id === $siteId;
         });
@@ -161,11 +164,11 @@ class PageRepository extends Repository
 
         $results = $query->get();
 
-        return $results->filter(function($item) use ($siteId) {
+        return $results->filter(function ($item) use ($siteId) {
             return $item->page
                 && $item->page->status == 'published'
                 && $item->page->site_id === $siteId;
-        })->map(function($item) {
+        })->map(function ($item) {
             return $item->page;
         });
     }
@@ -209,9 +212,10 @@ class PageRepository extends Repository
 
         if ($metadata) {
             $data = $metadata->toArray();
-            unset($data['id'], $data['page_id']);
-            $data['page_id'] = $targetPageId;
-            PageMetadata::create($data);
+            $castedData = $this->relationCaster->castForDuplication('metadata', $data);
+            $castedData['page_id'] = $targetPageId;
+
+            PageMetadata::create($castedData);
         }
     }
 
@@ -220,14 +224,14 @@ class PageRepository extends Repository
      */
     public function duplicateSeo(int $sourcePageId, int $targetPageId): void
     {
-        $seo = PageSeo::where('page_id', $sourcePageId)
-            ->first();
+        $seo = PageSeo::where('page_id', $sourcePageId)->first();
 
         if ($seo) {
             $data = $seo->toArray();
-            unset($data['id'], $data['page_id']);
-            $data['page_id'] = $targetPageId;
-            PageSeo::create($data);
+            $castedData = $this->relationCaster->castForDuplication('seo', $data);
+            $castedData['page_id'] = $targetPageId;
+
+            PageSeo::create($castedData);
         }
     }
 
@@ -236,14 +240,14 @@ class PageRepository extends Repository
      */
     public function duplicateSettings(int $sourcePageId, int $targetPageId): void
     {
-        $settings = PageSettings::where('page_id', $sourcePageId)
-            ->first();
+        $settings = PageSettings::where('page_id', $sourcePageId)->first();
 
         if ($settings) {
             $data = $settings->toArray();
-            unset($data['id'], $data['page_id']);
-            $data['page_id'] = $targetPageId;
-            PageSettings::create($data);
+            $castedData = $this->relationCaster->castForDuplication('settings', $data);
+            $castedData['page_id'] = $targetPageId;
+
+            PageSettings::create($castedData);
         }
     }
 
@@ -252,16 +256,16 @@ class PageRepository extends Repository
      */
     public function duplicateSocial(int $sourcePageId, int $targetPageId): void
     {
-        $social = PageSocial::where('page_id', $sourcePageId)
-            ->first();
+        $social = PageSocial::where('page_id', $sourcePageId)->first();
 
         if ($social) {
             $data = $social->toArray();
-            unset($data['id'], $data['page_id']);
-            $data['page_id'] = $targetPageId;
-            PageSocial::create($data);
+            $castedData = $this->relationCaster->castForDuplication('social', $data);
+            $castedData['page_id'] = $targetPageId;
+            PageSocial::create($castedData);
         }
     }
+
 
     /**
      * Duplicate categories from source page to target page
@@ -604,7 +608,8 @@ class PageRepository extends Repository
             ->first();
     }
 
-    public function syncTags(int $pageId, int $reassignTagId) {
+    public function syncTags(int $pageId, int $reassignTagId)
+    {
         PageTag::where('page_id', $pageId)->delete();
         return PageTag::create(['page_id' => $pageId, 'tag_id' => $reassignTagId]);
     }

@@ -353,4 +353,74 @@ class CategoryServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $category1 = Mockery::mock(Category::class)->makePartial();
+        $category2 = Mockery::mock(Category::class)->makePartial();
+
+        $emptyCollection = Mockery::mock(Collection::class);
+        $emptyCollection->shouldReceive('count')->andReturn(0);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->categoryRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($category1);
+
+        $this->categoryRepository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($category2);
+
+        $category1->shouldReceive('children')->once()->andReturn($emptyCollection);
+        $category2->shouldReceive('children')->once()->andReturn($emptyCollection);
+
+        $this->categoryRepository->shouldReceive('getPagesByCategoryId')
+            ->twice()
+            ->andReturn(collect([]));
+
+        $this->categoryRepository->shouldReceive('delete')
+            ->with(1)
+            ->once()
+            ->andReturn(true);
+
+        $this->categoryRepository->shouldReceive('delete')
+            ->with(2)
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->bulkDelete([1, 2]);
+
+        $this->assertCount(2, $result['deleted']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkDeleteFailsWhenChildrenExist(): void
+    {
+        $category1 = Mockery::mock(Category::class)->makePartial();
+
+        $childrenCollection = Mockery::mock(Collection::class);
+        $childrenCollection->shouldReceive('count')->once()->andReturn(2);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->categoryRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($category1);
+
+        $category1->shouldReceive('children')->once()->andReturn($childrenCollection);
+
+        $result = $this->service->bulkDelete([1]);
+
+        $this->assertCount(0, $result['deleted']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertStringContainsString('subcategories', $result['failed'][0]['reason']);
+    }
 }

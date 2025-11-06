@@ -333,4 +333,23 @@ class CategoryControllerTest extends FunctionalTestCase
         $this->assertContains('Smartphones', $childNames);
         $this->assertContains('Tablets', $childNames);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $category1 = $this->createCategory();
+        $category2 = $this->createCategory();
+
+        $response = $this->postForSite('/api/categories/bulk-delete', [
+            'ids' => [$category1->id, $category2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+        $this->assertCount(0, $data['result']['failed']);
+
+        $this->assertNull(Category::find($category1->id));
+        $this->assertNull(Category::find($category2->id));
+    }
 }

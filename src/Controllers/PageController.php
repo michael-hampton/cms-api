@@ -263,4 +263,49 @@ class PageController extends Controller
             return $this->errorResponse($e->getMessage(), 404);
         }
     }
+
+    public function bulkDelete(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $ids = $request->get('ids', []);
+
+            if (empty($ids)) {
+                return $this->errorResponse('No page IDs provided', 422);
+            }
+
+            $results = $this->pageService->bulkDeletePages($ids);
+
+            return $this->jsonResponse([
+                'message' => 'Pages deleted successfully',
+                'deleted' => $results
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function bulkUpdateStatus(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $ids = $request->get('ids', []);
+            $status = $request->get('status');
+
+            if (empty($ids)) {
+                return $this->errorResponse('No page IDs provided', 422);
+            }
+
+            if (empty($status)) {
+                return $this->errorResponse('Status is required', 422);
+            }
+
+            $results = $this->pageService->bulkUpdateStatus($ids, $status);
+
+            return $this->jsonResponse([
+                'message' => 'Pages updated successfully',
+                'updated' => $results
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
 }

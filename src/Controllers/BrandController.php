@@ -7,6 +7,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
+use App\Requests\BulkDeleteRequest;
 use App\Resources\BrandResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\BrandService;
@@ -177,6 +178,24 @@ class BrandController extends Controller
                 'success' => false,
                 'message' => 'Failed to duplicate brand: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function bulkDelete(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->brandService->bulkDelete($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
         }
     }
 }

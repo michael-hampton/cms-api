@@ -15,8 +15,8 @@ class PageResource extends JsonResource
             'slug' => $this->getAttribute('slug'),
             'status' => $this->getAttribute('status'),
             'author_id' => $this->getAttribute('author_id'),
-            'created_at' => $this->getAttribute('created_at'),
-            'updated_at' => $this->getAttribute('updated_at'),
+            'created_at' => is_string($this->getAttribute('created_at')) ? $this->getAttribute('created_at') : $this->getAttribute('created_at')->format('Y-m-d H:i:s'),
+            'updated_at' => is_string($this->getAttribute('updated_at')) ? $this->getAttribute('updated_at') : $this->getAttribute('updated_at')->format('Y-m-d H:i:s'),
 
             // Hero fields
             'hero_type' => $this->getAttribute('hero_type'),

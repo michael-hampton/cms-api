@@ -30,12 +30,15 @@ use App\Services\BlockParserService;
 use App\Services\PageHistoryService;
 use App\Services\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Exception;
 use Mockery;
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 
 class PageServiceTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private $pageRepository;
     private $blockRepository;
     private $blockParserService;
@@ -1482,6 +1485,40 @@ class PageServiceTest extends FunctionalTestCase
         $this->assertArrayHasKey('listing-card', $overrides);
     }
 
+    public function testBulkDeletePagesDeletesMultiplePages()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $page3 = $this->createPage();
+
+        $this->pageRepository->shouldReceive('find')
+            ->times(3)
+            ->andReturn(new Page());
+
+        $this->pageHistory->shouldReceive('logPageDeleted')
+            ->times(3);
+
+        $this->blockRepository->shouldReceive('deletePageBlocks')
+            ->times(3);
+
+        $this->pageRepository->shouldReceive('delete')
+            ->times(3)
+            ->andReturn(true);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->times(3)
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $results = $this->service->bulkDeletePages([$page1->id, $page2->id, $page3->id]);
+
+        $this->assertCount(3, $results);
+        $this->assertTrue($results[$page1->id]['success']);
+        $this->assertTrue($results[$page2->id]['success']);
+        $this->assertTrue($results[$page3->id]['success']);
+    }
+
     // Helper methods
     private function createMockPage(int $id, string $title = 'Test'): Page
     {
@@ -1674,5 +1711,43 @@ class PageServiceTest extends FunctionalTestCase
             ->shouldReceive('update')
             ->byDefault()
             ->andReturn(1);
+    }
+
+    public function testBulkUpdateStatusUpdatesMultiplePages()
+    {
+        $page1 = $this->createPage(['status' => 'draft']);
+        $page2 = $this->createPage(['status' => 'draft']);
+
+        $this->pageRepository->shouldReceive('find')
+            ->times(2)
+            ->andReturn($page1, $page2);
+
+        $this->setupTransaction();
+        $this->setupTransaction();
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->times(4) // 2 times for initial check, 2 times for final return
+            ->andReturn($page1, $page2, $page1, $page2);
+
+        $this->pageRepository->shouldReceive('update')
+            ->times(2)
+            ->andReturn($page1, $page2);
+
+        $this->pageHistory->shouldReceive('logPagePublished')
+            ->times(2);
+
+        $results = $this->service->bulkUpdateStatus([$page1->id, $page2->id], 'published');
+
+        $this->assertCount(2, $results);
+        $this->assertTrue($results[$page1->id]['success']);
+        $this->assertTrue($results[$page2->id]['success']);
+    }
+
+    public function testBulkUpdateStatusThrowsExceptionForInvalidStatus()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid status value');
+
+        $this->service->bulkUpdateStatus([1, 2], 'invalid-status');
     }
 }

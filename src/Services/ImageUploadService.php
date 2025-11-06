@@ -168,6 +168,7 @@ class ImageUploadService
         }
 
         $pathInfo = $this->fileSystem->pathinfo($originalPath);
+
         $directory = $pathInfo['dirname'];
         $filename = $pathInfo['filename'];
         $extension = $pathInfo['extension'] ?? '';
@@ -191,9 +192,9 @@ class ImageUploadService
 
     private function getFullPath(string $relativePath): string
     {
-        $projectRoot = $this->fileSystem->realpath(__DIR__ . '/../');
-        $uploadPath = rtrim(config('upload.path', 'uploads'), '/');
-        return $projectRoot . '/' . $uploadPath . '/' . ltrim($relativePath, '/');
+        $relativePath = parse_url($relativePath, PHP_URL_PATH);
+        $projectRoot = $this->fileSystem->dirName(__DIR__);
+        return $projectRoot . '/' . ltrim($relativePath, '/');
     }
 
 }

@@ -1221,4 +1221,74 @@ class PageControllerTest extends FunctionalTestCase
             'is_default' => false,
         ]);
     }
+
+    public function testBulkDeletePages()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        $response = $this->postForSite('/api/pages/bulk-delete', [
+            'ids' => [$page1->id, $page2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('message', $data['data']);
+        $this->assertArrayHasKey('deleted', $data['data']);
+
+        $this->assertNull(Page::find($page1->id));
+        $this->assertNull(Page::find($page2->id));
+    }
+
+    public function testBulkDeleteReturns422WithoutIds()
+    {
+        $response = $this->postForSite('/api/pages/bulk-delete', []);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkUpdateStatusPages()
+    {
+        $page1 = $this->createPage(['status' => 'draft']);
+        $page2 = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite('/api/pages/bulk-update-status', [
+            'ids' => [$page1->id, $page2->id],
+            'status' => 'published',
+            'site_id' => $this->siteId
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('message', $data['data']);
+        $this->assertArrayHasKey('updated', $data['data']);
+
+        $updatedPage1 = Page::find($page1->id);
+        $updatedPage2 = Page::find($page2->id);
+
+        $this->assertEquals('published', $updatedPage1->status);
+        $this->assertEquals('published', $updatedPage2->status);
+    }
+
+    public function testBulkUpdateStatusReturns422WithoutIds()
+    {
+        $response = $this->postForSite('/api/pages/bulk-update-status', [
+            'status' => 'published'
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkUpdateStatusReturns422WithoutStatus()
+    {
+        $page = $this->createPage();
+
+        $response = $this->postForSite('/api/pages/bulk-update-status', [
+            'ids' => [$page->id]
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
 }

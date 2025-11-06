@@ -354,4 +354,113 @@ class TerritoryControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('items', $data);
         $this->assertCount(2, $data['items']);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
+
+        $response = $this->postForSite('/api/territories/bulk-delete', [
+            'ids' => [$territory1->id, $territory2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+
+        // Verify deletion
+        $this->assertNull(Territory::find($territory1->id));
+        $this->assertNull(Territory::find($territory2->id));
+    }
+
+    public function testBulkDeleteFailsWhenPagesExist(): void
+    {
+        $territory1 = $this->createTerritory();
+        $territory2 = $this->createTerritory();
+
+        $page = $this->createPage();
+        $this->attachTerritoryToPage($page, $territory2);
+
+        $response = $this->postForSite('/api/territories/bulk-delete', [
+            'ids' => [$territory1->id, $territory2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertStringContainsString('associated pages', $data['result']['failed'][0]['reason']);
+    }
+
+    public function testBulkActivateSuccessfully(): void
+    {
+        $territory1 = $this->createTerritory(['is_active' => false]);
+        $territory2 = $this->createTerritory(['is_active' => false]);
+
+        $response = $this->postForSite('/api/territories/bulk-activate', [
+            'ids' => [$territory1->id, $territory2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['updated']);
+
+        // Verify activation
+        $this->assertTrue((bool)Territory::find($territory1->id)->is_active);
+        $this->assertTrue((bool)Territory::find($territory2->id)->is_active);
+    }
+
+    public function testBulkDeactivateSuccessfully(): void
+    {
+        $territory1 = $this->createTerritory(['is_active' => true]);
+        $territory2 = $this->createTerritory(['is_active' => true]);
+
+        $response = $this->postForSite('/api/territories/bulk-deactivate', [
+            'ids' => [$territory1->id, $territory2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['updated']);
+
+        // Verify deactivation
+        $this->assertFalse((bool)Territory::find($territory1->id)->is_active);
+        $this->assertFalse((bool)Territory::find($territory2->id)->is_active);
+    }
+
+    public function testBulkActivateHandlesNotFound(): void
+    {
+        $territory = $this->createTerritory(['is_active' => false]);
+
+        $response = $this->postForSite('/api/territories/bulk-activate', [
+            'ids' => [$territory->id, 9999]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['updated']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertEquals('Territory not found', $data['result']['failed'][0]['reason']);
+    }
+
+    public function testBulkDeactivateHandlesNotFound(): void
+    {
+        $territory = $this->createTerritory(['is_active' => true]);
+
+        $response = $this->postForSite('/api/territories/bulk-deactivate', [
+            'ids' => [$territory->id, 9999]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['updated']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertEquals('Territory not found', $data['result']['failed'][0]['reason']);
+    }
 }

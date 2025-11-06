@@ -9,6 +9,7 @@ use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PageRepository;
 use App\Repositories\TerritoryRepository;
+use App\Requests\BulkDeleteRequest;
 use App\Resources\PageResource;
 use App\Resources\TerritoryResource;
 use App\Search\SearchCriteriaParser;
@@ -243,6 +244,60 @@ class TerritoryController extends Controller
             return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function bulkDelete(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->service->bulkDelete($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function bulkActivate(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->service->bulkActivate($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk activate completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk activate failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function bulkDeactivate(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->service->bulkDeactivate($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk deactivate completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk deactivate failed: ' . $e->getMessage()], 500);
         }
     }
 }

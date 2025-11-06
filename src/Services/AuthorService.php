@@ -6,6 +6,7 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Models\Author;
 use App\Models\Page;
@@ -217,6 +218,7 @@ class AuthorService
                 'name' => $newName ?? ($originalAuthor->name . ' (Copy)'),
                 'email' => null, // Email must be unique, so clear it
                 'bio' => $originalAuthor->bio,
+                'site_id' => SiteContext::getId(),
                 'website' => $originalAuthor->website,
                 'social_links' => $originalAuthor->social_links,
                 'status' => 'inactive', // Set to inactive for review
@@ -236,6 +238,53 @@ class AuthorService
             }
 
             return $this->authorRepository->create($data);
+        });
+    }
+
+    public function bulkDelete(array $authorIds): array
+    {
+        return $this->database->transaction(function() use ($authorIds) {
+            $deleted = [];
+            $failed = [];
+
+            foreach ($authorIds as $authorId) {
+                try {
+                    $author = $this->authorRepository->find($authorId);
+
+                    if (!$author) {
+                        $failed[] = ['id' => $authorId, 'reason' => 'Author not found'];
+                        continue;
+                    }
+
+                    $pagesCount = $this->authorRepository->getPagesByAuthorId($authorId)->count();
+
+                    if ($pagesCount > 0) {
+                        $failed[] = [
+                            'id' => $authorId,
+                            'reason' => "Author has {$pagesCount} associated pages"
+                        ];
+                        continue;
+                    }
+
+                    if ($author->avatar) {
+                        $this->imageUploadService->delete($author->avatar);
+                    }
+
+                    if ($author->delete()) {
+                        $deleted[] = $authorId;
+                    } else {
+                        $failed[] = ['id' => $authorId, 'reason' => 'Delete failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $authorId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'deleted' => $deleted,
+                'failed' => $failed,
+                'total' => count($authorIds)
+            ];
         });
     }
 }

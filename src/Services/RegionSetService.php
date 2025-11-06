@@ -255,4 +255,93 @@ class RegionSetService
     {
         return $this->repository->searchAvailablePages($regionSetId, $query, $perPage, $page);
     }
+
+    public function bulkDelete(array $regionSetIds): array
+    {
+        return $this->database->transaction(function() use ($regionSetIds) {
+            $deleted = [];
+            $failed = [];
+
+            foreach ($regionSetIds as $regionSetId) {
+                try {
+                    $regionSet = $this->repository->find($regionSetId);
+
+                    if (!$regionSet) {
+                        $failed[] = ['id' => $regionSetId, 'reason' => 'Region set not found'];
+                        continue;
+                    }
+
+                    $territoryCount = $regionSet->getTerritoryCount();
+                    $pageCount = $regionSet->getPageCount();
+
+                    if ($territoryCount > 0 || $pageCount > 0) {
+                        $failed[] = [
+                            'id' => $regionSetId,
+                            'reason' => "Region set has {$territoryCount} territories and {$pageCount} pages"
+                        ];
+                        continue;
+                    }
+
+                    if ($this->repository->delete($regionSetId)) {
+                        $deleted[] = $regionSetId;
+                    } else {
+                        $failed[] = ['id' => $regionSetId, 'reason' => 'Delete failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $regionSetId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'deleted' => $deleted,
+                'failed' => $failed,
+                'total' => count($regionSetIds)
+            ];
+        });
+    }
+
+    public function bulkActivate(array $regionSetIds): array
+    {
+        return $this->bulkUpdateActiveStatus($regionSetIds, true);
+    }
+
+    public function bulkDeactivate(array $regionSetIds): array
+    {
+        return $this->bulkUpdateActiveStatus($regionSetIds, false);
+    }
+
+    private function bulkUpdateActiveStatus(array $regionSetIds, bool $isActive): array
+    {
+        return $this->database->transaction(function() use ($regionSetIds, $isActive) {
+            $updated = [];
+            $failed = [];
+
+            foreach ($regionSetIds as $regionSetId) {
+                try {
+                    $regionSet = $this->repository->find($regionSetId);
+
+                    if (!$regionSet) {
+                        $failed[] = ['id' => $regionSetId, 'reason' => 'Region set not found'];
+                        continue;
+                    }
+
+                    $updatedRegionSet = $this->repository->update($regionSetId, ['is_active' => $isActive]);
+
+                    if ($updatedRegionSet) {
+                        $updated[] = $regionSetId;
+                    } else {
+                        $failed[] = ['id' => $regionSetId, 'reason' => 'Update failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $regionSetId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'updated' => $updated,
+                'failed' => $failed,
+                'total' => count($regionSetIds)
+            ];
+        });
+    }
 }

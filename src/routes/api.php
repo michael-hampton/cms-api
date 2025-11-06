@@ -49,6 +49,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/pages/{id}', PageController::class, 'destroy');
         $router->get('/block-types', PageController::class, 'getAvailableBlockTypes');
         $router->post('/pages/{id}/duplicate', PageController::class, 'duplicate');
+        $router->post('/pages/bulk-delete', PageController::class, 'bulkDelete');
+        $router->post('/pages/bulk-update-status', PageController::class, 'bulkUpdateStatus');
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
 
@@ -62,6 +64,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/categories/{id}', CategoryController::class, 'destroy');
         $router->get('/categories/{id}/check-delete', CategoryController::class, 'checkDelete');
         $router->post('/categories/{id}/duplicate', CategoryController::class, 'duplicate');
+        $router->post('/categories/bulk-delete', [CategoryController::class, 'bulkDelete']);
 
         // Brands
         $router->get('/brands', BrandController::class, 'index');
@@ -74,6 +77,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/brands/merge', BrandController::class, 'merge');
         $router->get('/brands/active', BrandController::class, 'active');
         $router->post('/brands/{id}/duplicate', BrandController::class, 'duplicate');
+        $router->post('/brands/bulk-delete', [BrandController::class, 'bulkDelete']);
 
         //Orders
         $router->get('/orders', OrderController::class, 'index');
@@ -89,6 +93,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/orders/{id}/complete', OrderController::class, 'complete');
         $router->post('/orders/{id}/refund', OrderController::class, 'refund');
         $router->post('/orders/{id}/duplicate', OrderController::class, 'duplicate');
+        $router->post('/orders/bulk-status', [OrderController::class, 'bulkUpdateStatus']);
 
         // Tags API
         $router->get('/tags', TagController::class, 'index');
@@ -103,6 +108,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/popular-tags', TagController::class, 'popular');
         $router->get('/tags/{id}/check-delete', TagController::class, 'checkDelete');
         $router->post('/tags/{id}/duplicate', TagController::class, 'duplicate');
+        $router->post('/tags/bulk-delete', [TagController::class, 'bulkDelete']);
+
 
         // Custom Fields API
         $router->get('/custom-fields', CustomFieldDefinitionController::class, 'index');
@@ -158,6 +165,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/authors/{id}', AuthorController::class, 'destroy');
         $router->get('/authors/{id}/check-delete', AuthorController::class, 'checkDelete');
         $router->post('/authors/duplicate/{id}', AuthorController::class, 'duplicate');
+        $router->post('/authors/bulk-delete', [AuthorController::class, 'bulkDelete']);
 
 
 //products
@@ -264,10 +272,17 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/territories/{id}/check-deletable', [TerritoryController::class, 'checkDeletable']);
         $router->get('/territories/{id}/alternatives', [TerritoryController::class, 'getAlternatives']);
 
+        $router->post('/territories/bulk-delete', [TerritoryController::class, 'bulkDelete']);
+        $router->post('/territories/bulk-activate', [TerritoryController::class, 'bulkActivate']);
+        $router->post('/territories/bulk-deactivate', [TerritoryController::class, 'bulkDeactivate']);
+
         $router->get('/region-sets/{id}/pages', [RegionSetController::class, 'getPages']);
         $router->get('/region-sets/{id}/search-pages', [RegionSetController::class, 'searchAvailablePages']);
         $router->post('/region-sets/{id}/assign-pages', [RegionSetController::class, 'assignPages']);
         $router->post('/region-sets/{id}/unassign-pages', [RegionSetController::class, 'unassignPages']);
+        $router->post('/region-sets/bulk-delete', [RegionSetController::class, 'bulkDelete']);
+        $router->post('/region-sets/bulk-activate', [RegionSetController::class, 'bulkActivate']);
+        $router->post('/region-sets/bulk-deactivate', [RegionSetController::class, 'bulkDeactivate']);
 
 // Territory Pages
         $router->get('/territories/{id}/pages', [TerritoryController::class, 'getPages']);
@@ -290,6 +305,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/vouchers/{id}/duplicate', VoucherController::class, 'duplicate');
         $router->post('/vouchers/validate', VoucherController::class, 'validate');
         $router->post('/vouchers/{id}/apply', VoucherController::class, 'apply');
+        $router->post('/vouchers/bulk-status', [VoucherController::class, 'bulkUpdateStatus']);
+        $router->post('/vouchers/bulk-delete', [VoucherController::class, 'bulkDelete']);
 
          $router->post('/newsletter/signup', NewsletterController::class, 'signup');
          $router->post('/newsletter/confirm', NewsletterController::class, 'confirm');

@@ -580,4 +580,64 @@ class AuthorServiceTest extends FunctionalTestCase
 
         $this->assertInstanceOf(Author::class, $result);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $author1 = Mockery::mock(Author::class)->makePartial();
+        $author1->avatar = null;
+
+        $author2 = Mockery::mock(Author::class)->makePartial();
+        $author2->avatar = null;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->authorRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($author1);
+
+        $this->authorRepository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($author2);
+
+        $this->authorRepository->shouldReceive('getPagesByAuthorId')
+            ->twice()
+            ->andReturn(collect([]));
+
+        $author1->shouldReceive('delete')->once()->andReturn(true);
+        $author2->shouldReceive('delete')->once()->andReturn(true);
+
+        $result = $this->service->bulkDelete([1, 2]);
+
+        $this->assertCount(2, $result['deleted']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkDeleteFailsWhenPagesExist(): void
+    {
+        $author1 = Mockery::mock(Author::class)->makePartial();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->authorRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($author1);
+
+        $this->authorRepository->shouldReceive('getPagesByAuthorId')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([Mockery::mock(Page::class)]));
+
+        $result = $this->service->bulkDelete([1]);
+
+        $this->assertCount(0, $result['deleted']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertStringContainsString('associated pages', $result['failed'][0]['reason']);
+    }
 }

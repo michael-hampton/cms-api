@@ -8,6 +8,9 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
 use App\Repositories\OrderRepository;
+use App\Requests\BulkDeleteRequest;
+use App\Requests\BulkUpdateOrderStatus;
+use App\Requests\BulkUpdateVoucherStatus;
 use App\Requests\CreateOrderRequest;
 use App\Requests\UpdateOrderItemsRequest;
 use App\Requests\UpdateOrderRequest;
@@ -250,6 +253,24 @@ class OrderController extends Controller
 
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function bulkUpdateStatus(BulkUpdateOrderStatus $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->orderService->bulkUpdateStatus($data['ids'], $data['status']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk status update completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk update failed: ' . $e->getMessage()], 500);
         }
     }
 }

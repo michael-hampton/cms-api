@@ -148,4 +148,92 @@ class TerritoryService
     {
         return $this->repository->searchAvailablePages($territoryId, $query, $perPage, $page);
     }
+
+    public function bulkDelete(array $territoryIds): array
+    {
+        return $this->database->transaction(function() use ($territoryIds) {
+            $deleted = [];
+            $failed = [];
+
+            foreach ($territoryIds as $territoryId) {
+                try {
+                    $territory = $this->repository->find($territoryId);
+
+                    if (!$territory) {
+                        $failed[] = ['id' => $territoryId, 'reason' => 'Territory not found'];
+                        continue;
+                    }
+
+                    $pageCount = $territory->getPageCount();
+
+                    if ($pageCount > 0) {
+                        $failed[] = [
+                            'id' => $territoryId,
+                            'reason' => "Territory has {$pageCount} associated pages"
+                        ];
+                        continue;
+                    }
+
+                    if ($this->repository->delete($territoryId)) {
+                        $deleted[] = $territoryId;
+                    } else {
+                        $failed[] = ['id' => $territoryId, 'reason' => 'Delete failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $territoryId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'deleted' => $deleted,
+                'failed' => $failed,
+                'total' => count($territoryIds)
+            ];
+        });
+    }
+
+    public function bulkActivate(array $territoryIds): array
+    {
+        return $this->bulkUpdateActiveStatus($territoryIds, true);
+    }
+
+    public function bulkDeactivate(array $territoryIds): array
+    {
+        return $this->bulkUpdateActiveStatus($territoryIds, false);
+    }
+
+    private function bulkUpdateActiveStatus(array $territoryIds, bool $isActive): array
+    {
+        return $this->database->transaction(function() use ($territoryIds, $isActive) {
+            $updated = [];
+            $failed = [];
+
+            foreach ($territoryIds as $territoryId) {
+                try {
+                    $territory = $this->repository->find($territoryId);
+
+                    if (!$territory) {
+                        $failed[] = ['id' => $territoryId, 'reason' => 'Territory not found'];
+                        continue;
+                    }
+
+                    $updatedTerritory = $this->repository->update($territoryId, ['is_active' => $isActive]);
+
+                    if ($updatedTerritory) {
+                        $updated[] = $territoryId;
+                    } else {
+                        $failed[] = ['id' => $territoryId, 'reason' => 'Update failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $territoryId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'updated' => $updated,
+                'failed' => $failed,
+                'total' => count($territoryIds)
+            ];
+        });
+    }
 }

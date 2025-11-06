@@ -193,11 +193,12 @@ class TagServiceTest extends FunctionalTestCase
                 'seo_description' => 'PHP SEO Description',
                 'no_index' => true,
                 'canonical_url' => NULL,
-                'slug' => 'php-copy'
+                'slug' => 'php-copy',
+                'site_id' => 1
             ])
             ->andReturn($newTag);
 
-        $result = $this->service->duplicateTag(1);
+        $result = $this->service->duplicateTag(1, null, 1);
 
         $this->assertTrue($result);
     }
@@ -287,5 +288,62 @@ class TagServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Target tag not found');
 
         $this->service->mergeTags(1, 999);
+    }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $tag1 = Mockery::mock(Tag::class)->makePartial();
+        $tag2 = Mockery::mock(Tag::class)->makePartial();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($tag1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($tag2);
+
+        $this->repository->shouldReceive('getPagesByTagId')
+            ->twice()
+            ->andReturn(collect([]));
+
+        $tag1->shouldReceive('delete')->once()->andReturn(true);
+        $tag2->shouldReceive('delete')->once()->andReturn(true);
+
+        $result = $this->service->bulkDelete([1, 2]);
+
+        $this->assertCount(2, $result['deleted']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkDeleteFailsWhenPagesExist(): void
+    {
+        $tag = Mockery::mock(Tag::class)->makePartial();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($tag);
+
+        $this->repository->shouldReceive('getPagesByTagId')
+            ->with(1)
+            ->once()
+            ->andReturn(collect([Mockery::mock()]));
+
+        $result = $this->service->bulkDelete([1]);
+
+        $this->assertCount(0, $result['deleted']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertStringContainsString('associated pages', $result['failed'][0]['reason']);
     }
 }

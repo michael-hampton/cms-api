@@ -7,6 +7,8 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Repositories\VoucherRepository;
+use App\Requests\BulkDeleteRequest;
+use App\Requests\BulkUpdateVoucherStatus;
 use App\Requests\CreateVoucherRequest;
 use App\Requests\UpdateVoucherRequest;
 use App\Resources\VoucherResource;
@@ -192,6 +194,42 @@ class VoucherController extends Controller
             return $this->jsonResponse(['vouchers' => $vouchers->toArray()]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function bulkUpdateStatus(BulkUpdateVoucherStatus $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->voucherService->bulkUpdateStatus($data['ids'], $data['status']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk status update completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk update failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function bulkDelete(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->voucherService->bulkDelete($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
         }
     }
 }

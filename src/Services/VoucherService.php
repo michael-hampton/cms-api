@@ -227,4 +227,80 @@ class VoucherService
     {
         return $this->repository->updateExpiredVouchers();
     }
+
+    public function bulkUpdateStatus(array $voucherIds, string $status): array
+    {
+        return $this->database->transaction(function() use ($voucherIds, $status) {
+            $updated = [];
+            $failed = [];
+
+            foreach ($voucherIds as $voucherId) {
+                try {
+                    $voucher = $this->repository->find($voucherId);
+
+                    if (!$voucher) {
+                        $failed[] = ['id' => $voucherId, 'reason' => 'Voucher not found'];
+                        continue;
+                    }
+
+                    $updatedVoucher = $this->repository->update($voucherId, ['status' => $status]);
+
+                    if ($updatedVoucher) {
+                        $updated[] = $voucherId;
+                    } else {
+                        $failed[] = ['id' => $voucherId, 'reason' => 'Update failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $voucherId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'updated' => $updated,
+                'failed' => $failed,
+                'total' => count($voucherIds)
+            ];
+        });
+    }
+
+    public function bulkDelete(array $voucherIds): array
+    {
+        return $this->database->transaction(function() use ($voucherIds) {
+            $deleted = [];
+            $failed = [];
+
+            foreach ($voucherIds as $voucherId) {
+                try {
+                    $voucher = $this->repository->find($voucherId);
+
+                    if (!$voucher) {
+                        $failed[] = ['id' => $voucherId, 'reason' => 'Voucher not found'];
+                        continue;
+                    }
+
+                    if ($voucher->usage_count > 0) {
+                        $failed[] = [
+                            'id' => $voucherId,
+                            'reason' => "Voucher has been used {$voucher->usage_count} times"
+                        ];
+                        continue;
+                    }
+
+                    if ($this->repository->delete($voucherId)) {
+                        $deleted[] = $voucherId;
+                    } else {
+                        $failed[] = ['id' => $voucherId, 'reason' => 'Delete failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $voucherId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'deleted' => $deleted,
+                'failed' => $failed,
+                'total' => count($voucherIds)
+            ];
+        });
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
@@ -86,9 +87,9 @@ class TagService
         return $this->repository->getAlternatives($tagId);
     }
 
-    public function duplicateTag(int $tagId, ?string $newName = null): bool
+    public function duplicateTag(int $tagId, ?string $newName = null, ?int $siteId = null): bool
     {
-        return $this->database->transaction(function() use ($tagId, $newName) {
+        return $this->database->transaction(function() use ($tagId, $newName, $siteId) {
             $originalTag = $this->repository->find($tagId);
 
             if (!$originalTag) {
@@ -103,6 +104,7 @@ class TagService
                 'seo_description' => $originalTag->seo_description,
                 'no_index' => $originalTag->no_index ?? false,
                 'canonical_url' => null, // Don't copy canonical URL
+                'site_id' => $siteId ?? SiteContext::getId(),
             ];
 
             $baseName = $data['name'];
@@ -139,5 +141,48 @@ class TagService
         }
 
         return $this->repository->mergeTags($fromTagId, $toTagId);
+    }
+
+    public function bulkDelete(array $tagIds): array
+    {
+        return $this->database->transaction(function() use ($tagIds) {
+            $deleted = [];
+            $failed = [];
+
+            foreach ($tagIds as $tagId) {
+                try {
+                    $tag = $this->repository->find($tagId);
+
+                    if (!$tag) {
+                        $failed[] = ['id' => $tagId, 'reason' => 'Tag not found'];
+                        continue;
+                    }
+
+                    $pagesCount = $this->repository->getPagesByTagId($tagId)->count();
+
+                    if ($pagesCount > 0) {
+                        $failed[] = [
+                            'id' => $tagId,
+                            'reason' => "Tag has {$pagesCount} associated pages"
+                        ];
+                        continue;
+                    }
+
+                    if ($tag->delete()) {
+                        $deleted[] = $tagId;
+                    } else {
+                        $failed[] = ['id' => $tagId, 'reason' => 'Delete failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $tagId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'deleted' => $deleted,
+                'failed' => $failed,
+                'total' => count($tagIds)
+            ];
+        });
     }
 }

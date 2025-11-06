@@ -279,7 +279,7 @@ class ImageUploadServiceTest extends TestCase
 
         $this->fileSystem
             ->expects($this->atLeast(1))
-            ->method('realpath')
+            ->method('dirname')
             ->willReturn('/var/www/html');
 
         $this->fileSystem

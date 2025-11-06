@@ -349,4 +349,23 @@ class AuthorControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(404, $response);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $author1 = $this->createAuthor();
+        $author2 = $this->createAuthor();
+
+        $response = $this->postForSite('/api/authors/bulk-delete', [
+            'ids' => [$author1->id, $author2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+        $this->assertCount(0, $data['result']['failed']);
+
+        $this->assertNull(Author::find($author1->id));
+        $this->assertNull(Author::find($author2->id));
+    }
 }

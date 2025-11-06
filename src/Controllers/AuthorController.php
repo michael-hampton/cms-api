@@ -7,6 +7,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Models\Site;
 use App\Repositories\AuthorRepository;
+use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateAuthorRequest;
 use App\Requests\UpdateAuthorRequest;
 use App\Search\SearchCriteriaParser;
@@ -192,6 +193,24 @@ class AuthorController extends Controller
                 'success' => false,
                 'message' => 'Failed to duplicate author: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function bulkDelete(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->authorService->bulkDelete($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
         }
     }
 }

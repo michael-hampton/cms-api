@@ -1322,6 +1322,71 @@ class OrderServiceTest extends FunctionalTestCase
 //        );
     }
 
+    public function testBulkUpdateStatusSuccessfully(): void
+    {
+        $order1 = m::mock(Order::class)->makePartial();
+        $order1->status = 'pending';
+        $order1->completed_at = null;
+
+        $order2 = m::mock(Order::class)->makePartial();
+        $order2->status = 'pending';
+        $order2->completed_at = null;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->orderRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($order1);
+
+        $this->orderRepository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($order2);
+
+        $this->orderRepository->shouldReceive('update')
+            ->twice()
+            ->andReturn($order1, $order2);
+
+        $result = $this->service->bulkUpdateStatus([1, 2], 'shipped');
+
+        $this->assertCount(2, $result['updated']);
+        $this->assertCount(0, $result['failed']);
+        $this->assertEquals(2, $result['total']);
+    }
+
+    public function testBulkUpdateStatusHandlesNotFound(): void
+    {
+        $order1 = m::mock(Order::class)->makePartial();
+        $order1->status = 'pending';
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->orderRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($order1);
+
+        $this->orderRepository->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('update')
+            ->once()
+            ->andReturn($order1);
+
+        $result = $this->service->bulkUpdateStatus([1, 999], 'shipped');
+
+        $this->assertCount(1, $result['updated']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertEquals('Order not found', $result['failed'][0]['reason']);
+    }
+
 // Helper method to test private methods
     private function invokePrivateMethod($object, $methodName, array $parameters = [])
     {

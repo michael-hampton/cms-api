@@ -14,4 +14,5 @@ interface FileSystemInterface
     public function realpath(string $path): string|false;
     public function pathinfo(string $path, int $flags = PATHINFO_ALL): array|string;
     public function putContents(string $path, string $contents): int|false;
+    public function dirname($path);
 }

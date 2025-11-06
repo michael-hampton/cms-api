@@ -9,6 +9,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Validation\Validator;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
+use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateTagRequest;
 use App\Requests\UpdateTagRequest;
 use App\Search\SearchCriteriaParser;
@@ -228,6 +229,24 @@ class TagController extends Controller
                 'success' => false,
                 'message' => 'Failed to duplicate tag: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function bulkDelete(BulkDeleteRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $result = $this->tagService->bulkDelete($data['ids']);
+
+            return $this->resourceResponse([
+                'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
+                'result' => $result
+            ], 200);
+        } catch (ValidationException $e) {
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
+        } catch (\Exception $e) {
+            return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
         }
     }
 }

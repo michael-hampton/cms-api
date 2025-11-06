@@ -718,4 +718,74 @@ class VoucherControllerTest extends FunctionalTestCase
         $this->assertContains($brand3->id, $brandIds);
         $this->assertNotContains($brand1->id, $brandIds);
     }
+
+    public function testBulkUpdateStatusSuccessfully(): void
+    {
+        $voucher1 = $this->createVoucher(['status' => 'inactive']);
+        $voucher2 = $this->createVoucher(['status' => 'inactive']);
+
+        $response = $this->postForSite('/api/vouchers/bulk-status', [
+            'ids' => [$voucher1->id, $voucher2->id],
+            'status' => 'active'
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['updated']);
+
+        // Verify in database
+        $this->assertEquals('active', Voucher::find($voucher1->id)->status);
+        $this->assertEquals('active', Voucher::find($voucher2->id)->status);
+    }
+
+    public function testBulkUpdateStatusValidation(): void
+    {
+        $response = $this->postForSite('/api/vouchers/bulk-status', [
+            'ids' => [1, 2],
+            'status' => 'invalid_status'
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $voucher1 = $this->createVoucher(['usage_count' => 0]);
+        $voucher2 = $this->createVoucher(['usage_count' => 0]);
+
+        $response = $this->postForSite('/api/vouchers/bulk-delete', [
+            'ids' => [$voucher1->id, $voucher2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+
+        // Verify deletion
+        $this->assertNull(Voucher::find($voucher1->id));
+        $this->assertNull(Voucher::find($voucher2->id));
+    }
+
+    public function testBulkDeleteFailsWhenUsageExists(): void
+    {
+        $voucher1 = $this->createVoucher(['usage_count' => 0]);
+        $voucher2 = $this->createVoucher(['usage_count' => 5]);
+
+        $response = $this->postForSite('/api/vouchers/bulk-delete', [
+            'ids' => [$voucher1->id, $voucher2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertStringContainsString('used', $data['result']['failed'][0]['reason']);
+
+        // Verify voucher1 deleted, voucher2 still exists
+        $this->assertNull(Voucher::find($voucher1->id));
+        $this->assertNotNull(Voucher::find($voucher2->id));
+    }
 }

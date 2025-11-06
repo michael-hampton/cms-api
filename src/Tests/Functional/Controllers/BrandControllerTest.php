@@ -258,4 +258,41 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertEquals(0, $data['data']['no_index']);
         $this->assertNull($data['data']['canonical_url']);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $brand1 = $this->createBrand();
+        $brand2 = $this->createBrand();
+
+        $response = $this->postForSite('/api/brands/bulk-delete', [
+            'ids' => [$brand1->id, $brand2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+        $this->assertCount(0, $data['result']['failed']);
+
+        // Verify deletion
+        $this->assertNull(Brand::find($brand1->id));
+        $this->assertNull(Brand::find($brand2->id));
+    }
+
+    public function testBulkDeleteFailsWhenProductsExist(): void
+    {
+        $brand = $this->createBrand();
+        $this->createProduct(['brand_id' => $brand->id]);
+
+        $response = $this->postForSite('/api/brands/bulk-delete', [
+            'ids' => [$brand->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(0, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertStringContainsString('associated products', $data['result']['failed'][0]['reason']);
+    }
 }

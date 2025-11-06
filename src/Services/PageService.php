@@ -616,12 +616,12 @@ class PageService
         return $current;
     }
 
-    private function formatDateTime(?string $dateString): ?string
+    private function formatDateTime(string|DateTime|null $dateString): ?string
     {
         if (!$dateString) {
             return null;
         }
-        return (new DateTime($dateString))->format('Y-m-d H:i:s');
+        return is_string($dateString) ? (new DateTime($dateString))->format('Y-m-d H:i:s') : $dateString->format('Y-m-d H:i:s');
     }
 
     private function validateCompletePageData(array $data): void
@@ -1318,5 +1318,62 @@ class PageService
         if (!empty($errors) && count($errors) === count($relations)) {
             throw new \Exception('Failed to duplicate any page relations: ' . json_encode($errors));
         }
+    }
+
+    public function bulkDeletePages(array $pageIds): array
+    {
+        $results = [];
+
+        foreach ($pageIds as $pageId) {
+            try {
+                $this->deletePage($pageId);
+                $results[$pageId] = ['success' => true];
+            } catch (Exception $e) {
+                $results[$pageId] = [
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    public function bulkUpdateStatus(array $pageIds, string $status): array
+    {
+        if (!in_array($status, ['draft', 'published', 'archived'])) {
+            throw new \Exception('Invalid status value');
+        }
+
+        $results = [];
+
+        foreach ($pageIds as $pageId) {
+            try {
+                $updateData = [
+                    'id' => $pageId,
+                    'status' => $status,
+                    'forms' => [
+                        'meta' => ['status' => $status]
+                    ]
+                ];
+
+                if ($status === 'published') {
+                    $page = $this->pageRepository->find($pageId);
+                    if ($page && $page->status !== 'published') {
+                        $updateData['published_at'] = date('Y-m-d H:i:s');
+                    }
+                }
+
+                $this->updatePageWithAllData($pageId, $updateData, $this->siteId);
+                $results[$pageId] = ['success' => true];
+            } catch (Exception $e) {
+                $results[$pageId] = [
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        return $results;
     }
 }

@@ -323,4 +323,57 @@ class TagControllerTest extends FunctionalTestCase
 
         $this->assertEquals(404, $response->getStatusCode());
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $tag1 = $this->createTag();
+        $tag2 = $this->createTag();
+
+        $response = $this->postForSite('/api/tags/bulk-delete', [
+            'ids' => [$tag1->id, $tag2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+        $this->assertCount(0, $data['result']['failed']);
+
+        // Verify deletion
+        $this->assertNull(Tag::find($tag1->id));
+        $this->assertNull(Tag::find($tag2->id));
+    }
+
+    public function testBulkDeleteFailsWhenPagesExist(): void
+    {
+        $tag1 = $this->createTag();
+        $tag2 = $this->createTag();
+
+        $page = $this->createPage();
+        $this->attachTagToPage($page, $tag2);
+
+        $response = $this->postForSite('/api/tags/bulk-delete', [
+            'ids' => [$tag1->id, $tag2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertStringContainsString('associated pages', $data['result']['failed'][0]['reason']);
+
+        // Verify tag1 deleted, tag2 still exists
+        $this->assertNull(Tag::find($tag1->id));
+        $this->assertNotNull(Tag::find($tag2->id));
+    }
+
+    public function testBulkDeleteValidation(): void
+    {
+        $response = $this->postForSite('/api/tags/bulk-delete', [
+            'ids' => []
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
 }

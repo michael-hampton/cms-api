@@ -17,6 +17,7 @@ use App\Models\Tag;
 use App\Repositories\PageRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use DateTime;
 
 class PageRepositoryTest extends RepositoryTestCase
 {
@@ -760,7 +761,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals('Test Value', $customField->field_value);
     }
 
-    /** @test */
     public function test_sync_tags_removes_existing_and_adds_new(): void
     {
         // Arrange
@@ -786,5 +786,51 @@ class PageRepositoryTest extends RepositoryTestCase
 
         $count = $this->countRecords('page_tags', ['page_id' => $page->id]);
         $this->assertEquals(1, $count);
+    }
+
+    public function test_duplicate_metadata_casts_datetime_fields(): void
+    {
+        $sourcePage = $this->createPage();
+        $targetPage = $this->createPage();
+
+        $publishDate = new DateTime('2024-12-25 10:00:00');
+
+        PageMetadata::create([
+            'page_id' => $sourcePage->id,
+            'publish_date' => $publishDate->format('Y-m-d H:i:s'),
+            'featured' => 1
+        ]);
+
+        $this->repository->duplicateMetadata($sourcePage->id, $targetPage->id);
+
+        $metadata = PageMetadata::where('page_id', $targetPage->id)->first();
+
+        $this->assertNotNull($metadata);
+        $this->assertInstanceOf(DateTime::class, $metadata->publish_date);
+        $this->assertEquals('2024-12-25 10:00:00', $metadata->publish_date->format('Y-m-d H:i:s'));
+    }
+
+    public function test_duplicate_settings_casts_numeric_fields(): void
+    {
+        $sourcePage = $this->createPage();
+        $targetPage = $this->createPage();
+
+        PageSettings::create([
+            'page_id' => $sourcePage->id,
+            'menu_order' => '5',
+            'latitude' => '51.5074',
+            'price' => '99.99',
+            'recurring' => '1'
+        ]);
+
+        $this->repository->duplicateSettings($sourcePage->id, $targetPage->id);
+
+        $settings = PageSettings::where('page_id', $targetPage->id)->first();
+
+        $this->assertNotNull($settings);
+        $this->assertIsInt($settings->menu_order);
+        $this->assertEquals(5, $settings->menu_order);
+        $this->assertIsFloat($settings->latitude);
+        $this->assertEquals(51.5074, $settings->latitude);
     }
 }

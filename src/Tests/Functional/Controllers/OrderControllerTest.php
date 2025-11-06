@@ -519,4 +519,38 @@ class OrderControllerTest extends FunctionalTestCase
             ->count();
         $this->assertEquals(1, $memberCount);
     }
+
+    public function testBulkUpdateStatusSuccessfully(): void
+    {
+        $order1 = $this->createOrder(['status' => 'pending']);
+        $order2 = $this->createOrder(['status' => 'pending']);
+
+        $response = $this->postForSite('/api/orders/bulk-status', [
+            'ids' => [$order1->id, $order2->id],
+            'status' => 'processing'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['updated']);
+        $this->assertCount(0, $data['result']['failed']);
+
+        // Verify in database
+        $updatedOrder1 = Order::find($order1->id);
+        $updatedOrder2 = Order::find($order2->id);
+
+        $this->assertEquals('processing', $updatedOrder1->status);
+        $this->assertEquals('processing', $updatedOrder2->status);
+    }
+
+    public function testBulkUpdateStatusValidation(): void
+    {
+        $response = $this->postForSite('/api/orders/bulk-status', [
+            'ids' => [1, 2],
+            'status' => 'invalid_status'
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
 }

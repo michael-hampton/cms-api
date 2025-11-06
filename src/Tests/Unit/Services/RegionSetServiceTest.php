@@ -521,4 +521,96 @@ class RegionSetServiceTest extends FunctionalTestCase
 //        $this->assertTrue($result); // Should still return true even if pages don't exist
 //    }
 
+    public function testBulkDeleteSuccessfully()
+    {
+        $regionSet1 = Mockery::mock(RegionSet::class)->makePartial();
+        $regionSet1->shouldReceive('getTerritoryCount')->once()->andReturn(0);
+        $regionSet1->shouldReceive('getPageCount')->once()->andReturn(0);
+
+        $regionSet2 = Mockery::mock(RegionSet::class)->makePartial();
+        $regionSet2->shouldReceive('getTerritoryCount')->once()->andReturn(0);
+        $regionSet2->shouldReceive('getPageCount')->once()->andReturn(0);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($regionSet1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($regionSet2);
+
+        $this->repository->shouldReceive('delete')
+            ->twice()
+            ->andReturn(true);
+
+        $result = $this->service->bulkDelete([1, 2]);
+
+        $this->assertCount(2, $result['deleted']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkActivateSuccessfully()
+    {
+        $regionSet1 = Mockery::mock(RegionSet::class)->makePartial();
+        $regionSet2 = Mockery::mock(RegionSet::class)->makePartial();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($regionSet1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($regionSet2);
+
+        $this->repository->shouldReceive('update')
+            ->twice()
+            ->andReturn($regionSet1, $regionSet2);
+
+        $result = $this->service->bulkActivate([1, 2]);
+
+        $this->assertCount(2, $result['updated']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkDeactivateSuccessfully()
+    {
+        $regionSet1 = Mockery::mock(RegionSet::class)->makePartial();
+        $regionSet2 = Mockery::mock(RegionSet::class)->makePartial();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($regionSet1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($regionSet2);
+
+        $this->repository->shouldReceive('update')
+            ->twice()
+            ->andReturn($regionSet1, $regionSet2);
+
+        $result = $this->service->bulkDeactivate([1, 2]);
+
+        $this->assertCount(2, $result['updated']);
+        $this->assertCount(0, $result['failed']);
+    }
+
 }

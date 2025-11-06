@@ -375,4 +375,163 @@ class RegionSetControllerTest extends FunctionalTestCase
         $this->assertContains('European Page 2', $titles);
         $this->assertNotContains('Non-European Page', $titles);
     }
+
+    public function testBulkDeleteSuccessfully(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+
+        $response = $this->postForSite('/api/region-sets/bulk-delete', [
+            'ids' => [$regionSet1->id, $regionSet2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+
+        // Verify deletion
+        $this->assertNull(RegionSet::find($regionSet1->id));
+        $this->assertNull(RegionSet::find($regionSet2->id));
+    }
+
+    public function testBulkDeleteFailsWhenTerritoriesExist(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+
+        $this->createTerritory(['region_set_id' => $regionSet2->id]);
+
+        $response = $this->postForSite('/api/region-sets/bulk-delete', [
+            'ids' => [$regionSet1->id, $regionSet2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertStringContainsString('territories', $data['result']['failed'][0]['reason']);
+
+        // Verify regionSet1 deleted, regionSet2 still exists
+        $this->assertNull(RegionSet::find($regionSet1->id));
+        $this->assertNotNull(RegionSet::find($regionSet2->id));
+    }
+
+    public function testBulkDeleteFailsWhenPagesExist(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+
+        $page = $this->createPage();
+        $this->attachRegionSetToPage($page, $regionSet2);
+
+        $response = $this->postForSite('/api/region-sets/bulk-delete', [
+            'ids' => [$regionSet1->id, $regionSet2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertStringContainsString('pages', $data['result']['failed'][0]['reason']);
+    }
+
+    public function testBulkActivateSuccessfully(): void
+    {
+        $regionSet1 = $this->createRegionSet(['is_active' => false]);
+        $regionSet2 = $this->createRegionSet(['is_active' => false]);
+
+        $response = $this->postForSite('/api/region-sets/bulk-activate', [
+            'ids' => [$regionSet1->id, $regionSet2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['updated']);
+
+        // Verify activation
+        $this->assertTrue((bool)RegionSet::find($regionSet1->id)->is_active);
+        $this->assertTrue((bool)RegionSet::find($regionSet2->id)->is_active);
+    }
+
+    public function testBulkDeactivateSuccessfully(): void
+    {
+        $regionSet1 = $this->createRegionSet(['is_active' => true]);
+        $regionSet2 = $this->createRegionSet(['is_active' => true]);
+
+        $response = $this->postForSite('/api/region-sets/bulk-deactivate', [
+            'ids' => [$regionSet1->id, $regionSet2->id]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['updated']);
+
+        // Verify deactivation
+        $this->assertFalse((bool)RegionSet::find($regionSet1->id)->is_active);
+        $this->assertFalse((bool)RegionSet::find($regionSet2->id)->is_active);
+    }
+
+    public function testBulkActivateHandlesNotFound(): void
+    {
+        $regionSet = $this->createRegionSet(['is_active' => false]);
+
+        $response = $this->postForSite('/api/region-sets/bulk-activate', [
+            'ids' => [$regionSet->id, 9999]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['updated']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertEquals('Region set not found', $data['result']['failed'][0]['reason']);
+    }
+
+    public function testBulkDeactivateHandlesNotFound(): void
+    {
+        $regionSet = $this->createRegionSet(['is_active' => true]);
+
+        $response = $this->postForSite('/api/region-sets/bulk-deactivate', [
+            'ids' => [$regionSet->id, 9999]
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['result']['updated']);
+        $this->assertCount(1, $data['result']['failed']);
+        $this->assertEquals('Region set not found', $data['result']['failed'][0]['reason']);
+    }
+
+    public function testBulkDeleteValidation(): void
+    {
+        $response = $this->postForSite('/api/region-sets/bulk-delete', [
+            'ids' => []
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testBulkActivateValidation(): void
+    {
+        $response = $this->postForSite('/api/region-sets/bulk-activate', [
+            'ids' => 'not-an-array'
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testBulkDeactivateValidation(): void
+    {
+        $response = $this->postForSite('/api/region-sets/bulk-deactivate', [
+            'ids' => ['not', 'integers']
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
 }

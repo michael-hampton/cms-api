@@ -393,4 +393,94 @@ class TerritoryServiceTest extends TestCase
         $this->assertTrue($result);
         $this->assertEquals(2, $mockPage2->territory_id);
     }
+
+    public function testBulkDeleteSuccessfully()
+    {
+        $territory1 = Mockery::mock(Territory::class)->makePartial();
+        $territory1->shouldReceive('getPageCount')->once()->andReturn(0);
+
+        $territory2 = Mockery::mock(Territory::class)->makePartial();
+        $territory2->shouldReceive('getPageCount')->once()->andReturn(0);
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($territory1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($territory2);
+
+        $this->repository->shouldReceive('delete')
+            ->twice()
+            ->andReturn(true);
+
+        $result = $this->service->bulkDelete([1, 2]);
+
+        $this->assertCount(2, $result['deleted']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkActivateSuccessfully()
+    {
+        $territory1 = Mockery::mock(Territory::class)->makePartial();
+        $territory2 = Mockery::mock(Territory::class)->makePartial();
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($territory1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($territory2);
+
+        $this->repository->shouldReceive('update')
+            ->twice()
+            ->andReturn($territory1, $territory2);
+
+        $result = $this->service->bulkActivate([1, 2]);
+
+        $this->assertCount(2, $result['updated']);
+        $this->assertCount(0, $result['failed']);
+    }
+
+    public function testBulkDeactivateSuccessfully()
+    {
+        $territory1 = Mockery::mock(Territory::class)->makePartial();
+        $territory2 = Mockery::mock(Territory::class)->makePartial();
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($territory1);
+
+        $this->repository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($territory2);
+
+        $this->repository->shouldReceive('update')
+            ->twice()
+            ->andReturn($territory1, $territory2);
+
+        $result = $this->service->bulkDeactivate([1, 2]);
+
+        $this->assertCount(2, $result['updated']);
+        $this->assertCount(0, $result['failed']);
+    }
 }

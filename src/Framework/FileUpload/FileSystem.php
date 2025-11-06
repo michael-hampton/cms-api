@@ -60,4 +60,9 @@ class FileSystem implements FileSystemInterface
     {
         return file_put_contents($path, $contents);
     }
+
+    public function dirname($path)
+    {
+        return dirname($path);
+    }
 }

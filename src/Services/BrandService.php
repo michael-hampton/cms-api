@@ -6,6 +6,7 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Models\Brand;
 use App\Repositories\BrandRepository;
@@ -196,9 +197,9 @@ class BrandService
         });
     }
 
-    public function duplicateBrand(int $brandId, ?string $newName = null): Brand
+    public function duplicateBrand(int $brandId, ?string $newName = null, ?int $siteId = null): Brand
     {
-        return $this->database->transaction(function() use ($brandId, $newName) {
+        return $this->database->transaction(function() use ($brandId, $newName, $siteId) {
             $originalBrand = $this->brandRepository->find($brandId);
 
             if (!$originalBrand) {
@@ -213,6 +214,7 @@ class BrandService
                 'seo_title' => $originalBrand->seo_title,
                 'seo_description' => $originalBrand->seo_description,
                 'no_index' => $originalBrand->no_index ?? false,
+                'site_id' => $siteId ?? SiteContext::getId(),
                 'canonical_url' => null, // Don't copy canonical URL
             ];
 
@@ -227,6 +229,53 @@ class BrandService
             }
 
             return $this->brandRepository->create($data);
+        });
+    }
+
+    public function bulkDelete(array $brandIds): array
+    {
+        return $this->database->transaction(function() use ($brandIds) {
+            $deleted = [];
+            $failed = [];
+
+            foreach ($brandIds as $brandId) {
+                try {
+                    $brand = $this->brandRepository->find($brandId);
+
+                    if (!$brand) {
+                        $failed[] = ['id' => $brandId, 'reason' => 'Brand not found'];
+                        continue;
+                    }
+
+                    $productsCount = $this->brandRepository->getProductsByBrandId($brandId)->count();
+
+                    if ($productsCount > 0) {
+                        $failed[] = [
+                            'id' => $brandId,
+                            'reason' => "Brand has {$productsCount} associated products"
+                        ];
+                        continue;
+                    }
+
+                    if ($brand->logo) {
+                        $this->imageUploadService->delete($brand->logo);
+                    }
+
+                    if ($brand->delete()) {
+                        $deleted[] = $brandId;
+                    } else {
+                        $failed[] = ['id' => $brandId, 'reason' => 'Delete failed'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = ['id' => $brandId, 'reason' => $e->getMessage()];
+                }
+            }
+
+            return [
+                'deleted' => $deleted,
+                'failed' => $failed,
+                'total' => count($brandIds)
+            ];
         });
     }
 }
