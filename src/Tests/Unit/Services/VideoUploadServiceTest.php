@@ -303,4 +303,60 @@ class VideoUploadServiceTest extends TestCase
         $this->service->setThumbnailCount(15); // Should be capped at 10
     }
 
+    public function testUploadContinuesWhenThumbnailGenerationFails()
+    {
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(true);
+        $file->method('getMimeType')->willReturn('video/mp4');
+        $file->method('getSize')->willReturn(50 * 1024 * 1024);
+        $file->method('getClientOriginalName')->willReturn('test.mp4');
+        $file->method('getClientOriginalExtension')->willReturn('mp4');
+        $file->method('moveTo')->willReturn(true);
+
+        // Mock ffmpeg not available
+        $this->commandExecutor
+            ->expects($this->once())
+            ->method('commandExists')
+            ->with('ffprobe')
+            ->willReturn(false);
+
+        $this->fileSystem
+            ->method('realpath')
+            ->willReturn('/var/www/html');
+
+        $this->fileSystem
+            ->method('isDirectory')
+            ->willReturn(true);
+
+        $result = $this->service->upload($file);
+
+        // Upload should succeed even without thumbnails
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('path', $result);
+        $this->assertArrayHasKey('thumbnails', $result);
+        $this->assertEmpty($result['thumbnails']); // No thumbnails generated
+    }
+
+    public function testGenerateThumbnailsReturnsEmptyArrayWhenFFmpegUnavailable()
+    {
+        $this->commandExecutor
+            ->expects($this->once())
+            ->method('commandExists')
+            ->with('ffmpeg')
+            ->willReturn(false);
+
+        $result = $this->service->generateThumbnails('/path/to/video.mp4', 'video.mp4', 120);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    public function testGenerateThumbnailsReturnsEmptyArrayWhenDurationIsZero()
+    {
+        $result = $this->service->generateThumbnails('/path/to/video.mp4', 'video.mp4', 0);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
 }

@@ -29,12 +29,14 @@ class VideoService
 
     public function __construct(
         VideoRepository $videoRepository,
-        VideoUploadService $videoUploadService
+        VideoUploadService $videoUploadService,
+        ?string $appUrl = null,
     ) {
         $this->videoRepository = $videoRepository;
         $this->videoUploadService = $videoUploadService;
         $this->uploadPath = rtrim(config('upload.path', 'uploads'), '/');
-        $this->publicPath = rtrim(config('app.url', ''), '/') . '/uploads';
+        $appUrl = $appUrl ?? rtrim(config('app.url', ''), '/');
+        $this->publicPath = $appUrl . '/uploads';
     }
 
     /**
@@ -48,6 +50,10 @@ class VideoService
         // Upload video and generate thumbnails
         $uploadResult = $this->videoUploadService->upload($file);
 
+        $thumbnails = collect($uploadResult['thumbnails'])->map(function ($thumbnail) {
+            return $this->publicPath . str_replace('/uploads', '', $thumbnail);
+        })->toArray();
+
         // Create database record
         $videoData = [
             'filename' => $uploadResult['filename'],
@@ -59,7 +65,7 @@ class VideoService
             'duration' => $uploadResult['duration'],
             'width' => $uploadResult['width'],
             'height' => $uploadResult['height'],
-            'thumbnails' => json_encode($uploadResult['thumbnails']),
+            'thumbnails' => json_encode($thumbnails),
             'title' => $metadata['title'] ?? null,
             'description' => $metadata['description'] ?? null,
         ];

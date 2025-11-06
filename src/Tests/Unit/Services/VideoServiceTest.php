@@ -42,7 +42,8 @@ class VideoServiceTest extends TestCase
 
         $this->videoService = new VideoService(
             $this->videoRepository,
-            $this->videoUploadService
+            $this->videoUploadService,
+            'http://localhost'
         );
     }
 
@@ -87,7 +88,7 @@ class VideoServiceTest extends TestCase
             'duration' => 120.5,
             'width' => 1920,
             'height' => 1080,
-            'thumbnails' => '["\/tests\/uploads\/thumbnails\/path\/thumb_1.jpg"]',
+            'thumbnails' => '["http:\/\/localhost\/uploads\/tests\/thumbnails\/path\/thumb_1.jpg"]',
             'title' => 'My Video',
             'description' => 'A test video'
         ];

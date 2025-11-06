@@ -334,4 +334,47 @@ class VideoControllerTest extends FunctionalTestCase
             'content' => $content
         ];
     }
+
+    public function testUploadVideoGeneratesThumbnails()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        // Create a mock video file
+        $videoFile = $this->createVideoFile('test-with-thumbs.mp4', 'video/mp4');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'Video with Thumbnails',
+            'description' => 'Test video'
+        ], [
+            'video' => $videoFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertArrayHasKey('thumbnails', $data['data']);
+        $this->assertIsArray($data['data']['thumbnails']);
+        // Thumbnails may be empty in test environment if ffmpeg is not available
+    }
+
+    public function testUploadVideoSucceedsWithoutThumbnails()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $videoFile = $this->createVideoFile('test-no-thumbs.mp4', 'video/mp4');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'Video without Thumbnails'
+        ], [
+            'video' => $videoFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        // Upload should succeed even if thumbnail generation fails
+        $this->assertArrayHasKey('data', $data);
+        $this->assertArrayHasKey('id', $data['data']);
+    }
 }

@@ -128,17 +128,18 @@ class VideoUploadService
     protected function getMetadataWithFFprobe(string $filePath): array
     {
         try {
+            // Primary JSON metadata extraction
             $command = sprintf(
-                'ffprobe -v quiet -print_format json -show_format -show_streams %s',
+                'ffprobe -v error -show_entries format=duration:stream=codec_type,codec_name,width,height,bit_rate,avg_frame_rate -of json %s 2>&1',
                 escapeshellarg($filePath)
             );
 
-            $output = shell_exec($command);
-            if (!$output) {
-                return ['duration' => 0, 'width' => null, 'height' => null];
-            }
+            $output = [];
+            $returnCode = 0;
+            $this->commandExecutor->execute($command, $output, $returnCode);
 
-            $data = json_decode($output, true);
+            $jsonOutput = implode("\n", $output);
+            $data = json_decode($jsonOutput, true);
 
             $duration = (float)($data['format']['duration'] ?? 0);
             $width = null;
@@ -146,51 +147,147 @@ class VideoUploadService
             $bitrate = (int)($data['format']['bit_rate'] ?? 0);
             $codec = null;
 
-            if (isset($data['streams'])) {
+            if (isset($data['streams']) && is_array($data['streams'])) {
                 foreach ($data['streams'] as $stream) {
-                    if ($stream['codec_type'] === 'video') {
-                        $width = (int)($stream['width'] ?? 0);
-                        $height = (int)($stream['height'] ?? 0);
+                    if (($stream['codec_type'] ?? null) === 'video') {
+                        $width = (int)($stream['width'] ?? 0) ?: null;
+                        $height = (int)($stream['height'] ?? 0) ?: null;
                         $codec = $stream['codec_name'] ?? null;
+
+                        // Optional: try avg_frame_rate for fallback duration
+                        $fps = $stream['avg_frame_rate'] ?? null;
+                        if ($fps && $duration == 0) {
+                            // If avg_frame_rate is "25/1" and we can get frame count, calculate duration
+                            $frames = $this->getFrameCount($filePath);
+                            if ($frames && strpos($fps, '/') !== false) {
+                                [$num, $den] = array_map('floatval', explode('/', $fps));
+                                if ($num > 0 && $den > 0) {
+                                    $duration = $frames / ($num / $den);
+                                }
+                            }
+                        }
+
                         break;
                     }
                 }
             }
 
             return [
-                'duration' => $duration,
+                'duration' => round($duration, 3),
                 'width' => $width,
                 'height' => $height,
                 'bitrate' => $bitrate,
                 'codec' => $codec
             ];
         } catch (Exception $e) {
-            //silently fail
+            error_log("FFprobe metadata extraction failed: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    protected function getFrameCount(string $filePath): ?int
+    {
+        try {
+            $command = sprintf(
+                'ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 %s',
+                escapeshellarg($filePath)
+            );
+
+            $output = [];
+            $returnCode = 0;
+            $this->commandExecutor->execute($command, $output, $returnCode);
+
+            if ($returnCode === 0 && isset($output[0]) && is_numeric(trim($output[0]))) {
+                return (int)trim($output[0]);
+            }
+        } catch (Exception $e) {
+            error_log("FFprobe frame count extraction failed: " . $e->getMessage());
         }
 
-        return [];
+        return null;
+    }
+
+    protected function getMetadataWithFFmpeg(string $filePath): array
+    {
+        try {
+            // Use FFmpeg to get duration
+            $command = sprintf(
+                'ffmpeg -i %s 2>&1',
+                escapeshellarg($filePath)
+            );
+
+            $output = [];
+            $returnCode = 0;
+            $this->commandExecutor->execute($command, $output, $returnCode);
+
+            $outputText = implode("\n", $output);
+
+            $duration = 0;
+            $width = null;
+            $height = null;
+            $codec = null;
+
+            // Extract duration - format: Duration: HH:MM:SS.ms
+            if (preg_match('/Duration: (\d{2}):(\d{2}):(\d{2})\.(\d{2})/', $outputText, $matches)) {
+                $hours = (int)$matches[1];
+                $minutes = (int)$matches[2];
+                $seconds = (int)$matches[3];
+                $milliseconds = (int)$matches[4];
+
+                $duration = ($hours * 3600) + ($minutes * 60) + $seconds + ($milliseconds / 100);
+            }
+
+            // Extract resolution - format: 1920x1080
+            if (preg_match('/(\d{3,4})x(\d{3,4})/', $outputText, $matches)) {
+                $width = (int)$matches[1];
+                $height = (int)$matches[2];
+            }
+
+            // Extract codec
+            if (preg_match('/Video: (\w+)/', $outputText, $matches)) {
+                $codec = $matches[1];
+            }
+
+            return [
+                'duration' => $duration,
+                'width' => $width,
+                'height' => $height,
+                'bitrate' => null,
+                'codec' => $codec
+            ];
+        } catch (Exception $e) {
+            error_log("FFmpeg metadata extraction failed: " . $e->getMessage());
+            return [];
+        }
     }
 
     protected function getMetadataWithGetID3(string $filePath): array
     {
         try {
+            if (!class_exists('getID3')) {
+                return [];
+            }
+
             $getID3 = new \getID3();
             $fileInfo = $getID3->analyze($filePath);
 
             return [
                 'duration' => (float)($fileInfo['playtime_seconds'] ?? 0),
-                'width' => (int)($fileInfo['video']['resolution_x'] ?? 0),
-                'height' => (int)($fileInfo['video']['resolution_y'] ?? 0),
+                'width' => (int)($fileInfo['video']['resolution_x'] ?? 0) ?: null,
+                'height' => (int)($fileInfo['video']['resolution_y'] ?? 0) ?: null,
                 'bitrate' => (int)($fileInfo['bitrate'] ?? 0),
                 'codec' => $fileInfo['video']['codec'] ?? null
             ];
         } catch (Exception $e) {
-            return ['duration' => 0, 'width' => null, 'height' => null];
+            error_log("getID3 metadata extraction failed: " . $e->getMessage());
+            return [];
         }
     }
 
-    protected function generateThumbnails(string $videoPath, string $relativePath, float $duration): array
+    public function generateThumbnails(string $videoPath, string $relativePath, float $duration): array
     {
+
+        // Return empty array if duration is invalid or ffmpeg is not available
         if ($duration <= 0 || !$this->commandExecutor->commandExists('ffmpeg')) {
             return [];
         }
@@ -198,33 +295,47 @@ class VideoUploadService
         $thumbnails = [];
         $thumbnailDir = $this->getUploadPath() . '/thumbnails/' . dirname($relativePath);
 
-        if (!$this->fileSystem->isDirectory($thumbnailDir)) {
-            $this->fileSystem->makeDirectory($thumbnailDir, 0755, true);
-        }
-
-        $baseName = $this->fileSystem->pathinfo($relativePath, PATHINFO_FILENAME);
-        $interval = $duration / ($this->thumbnailCount + 1);
-
-        for ($i = 1; $i <= $this->thumbnailCount; $i++) {
-            $timestamp = $interval * $i;
-            $thumbnailFilename = $baseName . '_thumb_' . $i . '.jpg';
-            $thumbnailPath = $thumbnailDir . '/' . $thumbnailFilename;
-            $relativeThumbnailPath = 'thumbnails/' . dirname($relativePath) . '/' . $thumbnailFilename;
-
-            $command = sprintf(
-                'ffmpeg -ss %F -i %s -vframes 1 -q:v 2 -vf "scale=320:-1" %s 2>&1',
-                $timestamp,
-                escapeshellarg($videoPath),
-                escapeshellarg($thumbnailPath)
-            );
-
-            $output = [];
-            $returnCode = 0;
-            $this->commandExecutor->execute($command, $output, $returnCode);
-
-            if ($returnCode === 0 && $this->fileSystem->fileExists($thumbnailPath)) {
-                $thumbnails[] = '/' . $this->uploadPath . '/' . $relativeThumbnailPath;
+        try {
+            if (!$this->fileSystem->isDirectory($thumbnailDir)) {
+                $this->fileSystem->makeDirectory($thumbnailDir, 0755, true);
             }
+
+            $baseName = $this->fileSystem->pathinfo($relativePath, PATHINFO_FILENAME);
+
+            // Generate 8 thumbnails evenly spaced throughout the video
+            $thumbnailCount = 8;
+            $interval = $duration / ($thumbnailCount + 1);
+
+            for ($i = 1; $i <= $thumbnailCount; $i++) {
+                try {
+                    $timestamp = $interval * $i;
+                    $thumbnailFilename = $baseName . '_thumb_' . $i . '.jpg';
+                    $thumbnailPath = $thumbnailDir . '/' . $thumbnailFilename;
+                    $relativeThumbnailPath = 'thumbnails/' . dirname($relativePath) . '/' . $thumbnailFilename;
+
+                    $command = sprintf(
+                        'ffmpeg -ss %F -i %s -vframes 1 -q:v 2 -vf "scale=320:-1" %s 2>&1',
+                        $timestamp,
+                        escapeshellarg($videoPath),
+                        escapeshellarg($thumbnailPath)
+                    );
+
+                    $output = [];
+                    $returnCode = 0;
+                    $this->commandExecutor->execute($command, $output, $returnCode);
+
+                    if ($returnCode === 0 && $this->fileSystem->fileExists($thumbnailPath)) {
+                        $thumbnails[] = '/' . $this->uploadPath . '/' . $relativeThumbnailPath;
+                    }
+                } catch (Exception $e) {
+                    // Log error but continue generating other thumbnails
+                    error_log("Failed to generate thumbnail $i: " . $e->getMessage());
+                    continue;
+                }
+            }
+        } catch (Exception $e) {
+            // Log error but don't fail the upload
+            error_log("Thumbnail generation failed: " . $e->getMessage());
         }
 
         return $thumbnails;
