@@ -6,7 +6,6 @@ use App\Framework\FileUpload\CommandExecutorInterface;
 use App\Framework\FileUpload\FileSystemInterface;
 use App\Framework\Http\UploadedFile;
 use App\Services\VideoUploadService;
-use Exception;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -70,7 +69,7 @@ class VideoUploadServiceTest extends TestCase
 
         $file = $this->createMock(UploadedFile::class);
         $file->method('isValid')->willReturn(true);
-        $file->method('getMimeType')->willReturn('video/webm');
+        $file->method('getMimeType')->willReturn('video/jpeg');
 
         $this->service->upload($file);
     }
@@ -110,7 +109,7 @@ class VideoUploadServiceTest extends TestCase
 
         $this->fileSystem
             ->method('pathinfo')
-            ->willReturnCallback(function($path, $flags) {
+            ->willReturnCallback(function ($path, $flags) {
                 if ($flags === PATHINFO_FILENAME) {
                     return 'video';
                 }
@@ -153,7 +152,7 @@ class VideoUploadServiceTest extends TestCase
 
         $this->fileSystem
             ->method('pathinfo')
-            ->willReturnCallback(function($path, $flags = PATHINFO_ALL) {
+            ->willReturnCallback(function ($path, $flags = PATHINFO_ALL) {
                 $info = pathinfo($path);
                 if ($flags === PATHINFO_ALL) {
                     return $info;
@@ -289,7 +288,19 @@ class VideoUploadServiceTest extends TestCase
 
     public function testSettersAndGetters()
     {
-        $this->assertEquals(['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/mpeg'], $this->service->getAllowedMimeTypes());
+        $this->assertEquals(
+            [
+                'video/mp4',
+                'video/quicktime',
+                'video/x-msvideo',
+                'video/mpeg',
+                'video/webm',
+                'application/pdf',
+                'application/zip',
+                'application/x-zip-compressed'
+            ],
+            $this->service->getAllowedMimeTypes()
+        );
 
         $this->service->setAllowedMimeTypes(['video/mp4']);
         $this->assertEquals(['video/mp4'], $this->service->getAllowedMimeTypes());
@@ -357,6 +368,58 @@ class VideoUploadServiceTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertEmpty($result);
+    }
+
+    public function testUploadValidWebMVideo()
+    {
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(true);
+        $file->method('getMimeType')->willReturn('video/webm');
+        $file->method('getSize')->willReturn(50 * 1024 * 1024);
+        $file->method('getClientOriginalName')->willReturn('test.webm');
+        $file->method('getClientOriginalExtension')->willReturn('webm');
+        $file->method('moveTo')->willReturn(true);
+
+        $result = $this->service->upload($file);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('path', $result);
+        $this->assertArrayHasKey('filename', $result);
+    }
+
+    public function testUploadValidPDF()
+    {
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(true);
+        $file->method('getMimeType')->willReturn('application/pdf');
+        $file->method('getSize')->willReturn(5 * 1024 * 1024);
+        $file->method('getClientOriginalName')->willReturn('document.pdf');
+        $file->method('getClientOriginalExtension')->willReturn('pdf');
+        $file->method('moveTo')->willReturn(true);
+
+        $result = $this->service->upload($file);
+
+        $this->assertIsArray($result);
+        $this->assertEquals(0, $result['duration']);
+        $this->assertNull($result['width']);
+        $this->assertNull($result['height']);
+        $this->assertEmpty($result['thumbnails']);
+    }
+
+    public function testUploadValidZIP()
+    {
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(true);
+        $file->method('getMimeType')->willReturn('application/zip');
+        $file->method('getSize')->willReturn(10 * 1024 * 1024);
+        $file->method('getClientOriginalName')->willReturn('archive.zip');
+        $file->method('getClientOriginalExtension')->willReturn('zip');
+        $file->method('moveTo')->willReturn(true);
+
+        $result = $this->service->upload($file);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result['thumbnails']);
     }
 
 }

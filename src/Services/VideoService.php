@@ -19,7 +19,11 @@ class VideoService
         'video/mp4',
         'video/quicktime',
         'video/x-msvideo',
-        'video/mpeg'
+        'video/mpeg',
+        'video/webm',  // Add WebM
+        'application/pdf',  // Add PDF
+        'application/zip',  // Add ZIP
+        'application/x-zip-compressed'  // Alternative ZIP mime type
     ];
 
     private VideoRepository $videoRepository;
@@ -47,12 +51,18 @@ class VideoService
         // Validate file
         $this->validateUploadedFile($file);
 
+        $mimeType = $file->getMimeType();
+        $isVideo = str_starts_with($mimeType, 'video/');
+
         // Upload video and generate thumbnails
         $uploadResult = $this->videoUploadService->upload($file);
 
-        $thumbnails = collect($uploadResult['thumbnails'])->map(function ($thumbnail) {
-            return $this->publicPath . str_replace('/uploads', '', $thumbnail);
-        })->toArray();
+        $thumbnails = [];
+        if ($isVideo && !empty($uploadResult['thumbnails'])) {
+            $thumbnails = collect($uploadResult['thumbnails'])->map(function ($thumbnail) {
+                return $this->publicPath . str_replace('/uploads', '', $thumbnail);
+            })->toArray();
+        }
 
         // Create database record
         $videoData = [
@@ -60,11 +70,11 @@ class VideoService
             'original_name' => $file->getClientOriginalName(),
             'file_path' => 'videos/' . $uploadResult['path'],
             'url' => $this->publicPath . '/videos/' . $uploadResult['path'],
-            'mime_type' => $file->getMimeType(),
+            'mime_type' => $mimeType,
             'file_size' => $uploadResult['size'],
-            'duration' => $uploadResult['duration'],
-            'width' => $uploadResult['width'],
-            'height' => $uploadResult['height'],
+            'duration' => $isVideo ? $uploadResult['duration'] : 0,
+            'width' => $isVideo ? $uploadResult['width'] : null,
+            'height' => $isVideo ? $uploadResult['height'] : null,
             'thumbnails' => json_encode($thumbnails),
             'title' => $metadata['title'] ?? null,
             'description' => $metadata['description'] ?? null,

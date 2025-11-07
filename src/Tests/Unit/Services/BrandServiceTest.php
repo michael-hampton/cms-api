@@ -9,6 +9,8 @@ use App\Framework\Support\Collection;
 use App\Models\Brand;
 use App\Models\Product;
 use App\Repositories\BrandRepository;
+use App\Search\PaginatedResult;
+use App\Search\SearchCriteria;
 use App\Services\BrandService;
 use App\Services\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -471,6 +473,46 @@ class BrandServiceTest extends FunctionalTestCase
         $this->assertCount(0, $result['deleted']);
         $this->assertCount(1, $result['failed']);
         $this->assertStringContainsString('associated products', $result['failed'][0]['reason']);
+    }
+
+    public function testSearch()
+    {
+        $criteria = new SearchCriteria(
+            searchQuery: 'Nike',
+            page: 1,
+            perPage: 20
+        );
+
+        $result = new PaginatedResult([], 0, 1, 20);
+
+        $this->brandRepository->shouldReceive('search')
+            ->once()
+            ->with(Mockery::type(SearchCriteria::class))
+            ->andReturn($result);
+
+        $response = $this->service->search($criteria);
+
+        $this->assertInstanceOf(PaginatedResult::class, $response);
+    }
+
+    public function testGetAllBrands()
+    {
+        $result = $this->service->getAllBrands();
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $result);
+    }
+
+    public function testGetActiveBrands()
+    {
+        $brands = collect([Mockery::mock(Brand::class)]);
+
+        $this->brandRepository->shouldReceive('getActiveBrands')
+            ->once()
+            ->andReturn($brands);
+
+        $result = $this->service->getActiveBrands();
+
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $result);
+        $this->assertCount(1, $result);
     }
 
     protected function tearDown(): void

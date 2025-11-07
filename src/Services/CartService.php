@@ -35,7 +35,7 @@ class CartService
                 'product_id' => $item->product_id,
                 'product_name' => $product->name ?? 'Unknown',
                 'product_slug' => $product->slug ?? '',
-                'product_image' => $product->image_url ?? '',
+                'product_image' => $product->image ?? '',
                 'price' => $item->price,
                 'quantity' => $item->quantity,
                 'subtotal' => $item->subtotal,

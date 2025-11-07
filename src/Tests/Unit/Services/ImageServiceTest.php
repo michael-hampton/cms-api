@@ -815,4 +815,24 @@ class ImageServiceTest extends FunctionalTestCase
             'image_rights' => 'invalid_rights'
         ]);
     }
+
+    public function testCreateCategory()
+    {
+        $data = [
+            'name' => 'Nature Photos',
+            'description' => 'Photos of nature'
+        ];
+
+        // Test category creation with slug generation
+        $result = $this->service->createCategory($data);
+
+        $this->assertInstanceOf(ImageCategory::class, $result);
+    }
+
+    public function testGetCategories()
+    {
+        $result = $this->service->getCategories('main');
+
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $result);
+    }
 }

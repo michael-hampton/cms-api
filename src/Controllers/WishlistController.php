@@ -52,4 +52,15 @@ class WishlistController extends Controller
             'count' => $this->wishlistService->getCount(),
         ]));
     }
+
+    public function page()
+    {
+        $wishlistData = [
+            'items' => $this->wishlistService->getItems(),
+            'count' => $this->wishlistService->getCount(),
+        ];
+
+        return $this->view('wishlist/index', $wishlistData);
+    }
+
 }

@@ -33,6 +33,11 @@ class OrderItem extends Model
         return $this->belongsTo(Order::class, 'order_id', 'id', $relation);
     }
 
+    public function product($relation = false)
+    {
+        return $this->belongsTo(Product::class, 'product_id', 'id', $relation);
+    }
+
     public function getFormattedTotalAttribute(): string
     {
         $order = $this->order;

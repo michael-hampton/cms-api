@@ -377,4 +377,123 @@ class VideoControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('data', $data);
         $this->assertArrayHasKey('id', $data['data']);
     }
+
+    public function testUploadWebMVideoSuccessfully()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $videoFile = $this->createVideoFile('test-upload.webm', 'video/webm');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'My WebM Video',
+            'description' => 'This is a test WebM video'
+        ], [
+            'video' => $videoFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('test-upload.webm', $data['data']['name']);
+    }
+
+    public function testUploadPDFSuccessfully()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $pdfFile = $this->createVideoFile('document.pdf', 'application/pdf');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'My PDF Document'
+        ], [
+            'video' => $pdfFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('document.pdf', $data['data']['name']);
+        $this->assertEquals(0, $data['data']['duration']);
+    }
+
+    public function testUploadZIPSuccessfully()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $zipFile = $this->createVideoFile('archive.zip', 'application/zip');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'My Archive'
+        ], [
+            'video' => $zipFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('archive.zip', $data['data']['name']);
+    }
+
+    public function testUploadMOVVideoSuccessfully()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $videoFile = $this->createVideoFile('test-upload.mov', 'video/quicktime');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'My MOV Video',
+            'description' => 'This is a test MOV video'
+        ], [
+            'video' => $videoFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('test-upload.mov', $data['data']['name']);
+    }
+
+    public function testUploadAVIVideoSuccessfully()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $videoFile = $this->createVideoFile('test-upload.avi', 'video/x-msvideo');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'My AVI Video',
+            'description' => 'This is a test AVI video'
+        ], [
+            'video' => $videoFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('test-upload.avi', $data['data']['name']);
+    }
+
+    public function testUploadMPEGVideoSuccessfully()
+    {
+        $_ENV['APP_ENV'] = 'testing';
+
+        $videoFile = $this->createVideoFile('test-upload.mpeg', 'video/mpeg');
+
+        $response = $this->postForSite('/api/videos', [
+            'title' => 'My MPEG Video',
+            'description' => 'This is a test MPEG video'
+        ], [
+            'video' => $videoFile
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('test-upload.mpeg', $data['data']['name']);
+    }
 }

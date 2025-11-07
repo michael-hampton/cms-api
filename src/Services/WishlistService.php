@@ -36,7 +36,7 @@ class WishlistService
                 'product_id' => $item->product_id,
                 'product_name' => $product->name ?? 'Unknown',
                 'product_slug' => $product->slug ?? '',
-                'product_image' => $product->image_url ?? '',
+                'product_image' => $product->image ?? '',
                 'price' => $product->sale_price ?? $product->price,
                 'original_price' => $product->price ?? 0,
                 'discount_percentage' => $product->discount_percentage ?? 0,

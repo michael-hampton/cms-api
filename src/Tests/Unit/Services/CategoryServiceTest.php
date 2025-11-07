@@ -423,4 +423,21 @@ class CategoryServiceTest extends FunctionalTestCase
         $this->assertCount(1, $result['failed']);
         $this->assertStringContainsString('subcategories', $result['failed'][0]['reason']);
     }
+
+    public function testGetAlternativeCategories()
+    {
+        $alternatives = collect([
+            Mockery::mock(Category::class),
+            Mockery::mock(Category::class)
+        ]);
+
+        $this->categoryRepository->shouldReceive('getAlternatives')
+            ->with(1)
+            ->once()
+            ->andReturn($alternatives);
+
+        $result = $this->service->getAlternativeCategories(1);
+
+        $this->assertCount(2, $result);
+    }
 }

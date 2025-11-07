@@ -12,9 +12,21 @@ use Exception;
 class VideoUploadService
 {
     private string $uploadPath;
-    private array $allowedMimeTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/mpeg'];
+
+    private int $thumbnailCount = 8;
+
+    private array $allowedMimeTypes = [
+        'video/mp4',
+        'video/quicktime',
+        'video/x-msvideo',
+        'video/mpeg',
+        'video/webm',
+        'application/pdf',
+        'application/zip',
+        'application/x-zip-compressed'
+    ];
+
     private int $maxFileSize = 104857600; // 100MB
-    private int $thumbnailCount = 5;
     private FileSystemInterface $fileSystem;
     private CommandExecutorInterface $commandExecutor;
 
@@ -62,40 +74,45 @@ class VideoUploadService
         $destination = $fullPath . '/' . $filename;
         $relativePath = $dateFolder . '/' . $filename;
 
-//        if ($_ENV['APP_ENV'] === 'testing') {
-//            return [
-//                'path' => $relativePath,
-//                'filename' => $filename,
-//                'size' => $file->getSize(),
-//                'duration' => 0,
-//                'width' => 1920,
-//                'height' => 1080,
-//                'thumbnails' => [],
-//                'metadata' => []
-//            ];
-//        }
-
         if ($_ENV['APP_ENV'] !== 'testing' && !$file->moveTo($destination)) {
             throw new Exception('Failed to upload video file.');
         }
 
-        $metadata = $this->getVideoMetadata($destination);
-        $thumbnails = $this->generateThumbnails($destination, $relativePath, $metadata['duration'] ?? 0);
+        $mimeType = $file->getMimeType();
+        $isVideo = str_starts_with($mimeType, 'video/');
 
-        if ($oldVideoPath && $this->fileSystem->fileExists($this->getUploadPath() . '/' . $oldVideoPath)) {
-            $this->delete($oldVideoPath);
-        }
-
-        return [
+        $result = [
             'path' => $relativePath,
             'filename' => $filename,
             'size' => $file->getSize(),
-            'duration' => $metadata['duration'] ?? 0,
-            'width' => $metadata['width'] ?? null,
-            'height' => $metadata['height'] ?? null,
-            'thumbnails' => $thumbnails,
-            'metadata' => $metadata
+            'duration' => 0,
+            'width' => null,
+            'height' => null,
+            'thumbnails' => [],
+            'metadata' => []
         ];
+
+        if ($isVideo) {
+            try {
+                $metadata = $this->getVideoMetadata($destination);
+                $result['duration'] = $metadata['duration'];
+                $result['width'] = $metadata['width'];
+                $result['height'] = $metadata['height'];
+                $result['metadata'] = $metadata;
+
+                if ($metadata['duration'] > 0) {
+                    $result['thumbnails'] = $this->generateThumbnails(
+                        $destination,
+                        $filename,
+                        $metadata['duration']
+                    );
+                }
+            } catch (Exception $e) {
+                // Continue without metadata/thumbnails if extraction fails
+            }
+        }
+
+        return $result;
     }
 
     public function getVideoMetadata(string $filePath): array
@@ -296,17 +313,14 @@ class VideoUploadService
         $thumbnailDir = $this->getUploadPath() . '/thumbnails/' . dirname($relativePath);
 
         try {
-            if (!$this->fileSystem->isDirectory($thumbnailDir)) {
-                $this->fileSystem->makeDirectory($thumbnailDir, 0755, true);
-            }
+            $this->ensureDirectoryExists($thumbnailDir);
 
             $baseName = $this->fileSystem->pathinfo($relativePath, PATHINFO_FILENAME);
 
             // Generate 8 thumbnails evenly spaced throughout the video
-            $thumbnailCount = 8;
-            $interval = $duration / ($thumbnailCount + 1);
+            $interval = max(1, $duration / $this->thumbnailCount);
 
-            for ($i = 1; $i <= $thumbnailCount; $i++) {
+            for ($i = 1; $i <= $this->thumbnailCount; $i++) {
                 try {
                     $timestamp = $interval * $i;
                     $thumbnailFilename = $baseName . '_thumb_' . $i . '.jpg';
@@ -314,8 +328,8 @@ class VideoUploadService
                     $relativeThumbnailPath = 'thumbnails/' . dirname($relativePath) . '/' . $thumbnailFilename;
 
                     $command = sprintf(
-                        'ffmpeg -ss %F -i %s -vframes 1 -q:v 2 -vf "scale=320:-1" %s 2>&1',
-                        $timestamp,
+                        'ffmpeg -ss %s -i %s -vframes 1 -q:v 2 -vf scale=320:-1 %s 2>&1',
+                        escapeshellarg($timestamp),
                         escapeshellarg($videoPath),
                         escapeshellarg($thumbnailPath)
                     );

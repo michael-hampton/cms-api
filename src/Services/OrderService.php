@@ -41,7 +41,7 @@ class OrderService
     {
         $order = $this->orderRepository->findByOrderNumber($orderNumber);
         if ($order) {
-            $order->load(['items', 'user']);
+            $order->load(['items', 'user', 'item.product']);
         }
         return $order;
     }

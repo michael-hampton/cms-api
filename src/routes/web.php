@@ -2,6 +2,7 @@
 
 use App\Controllers\AuthorViewController;
 use App\Controllers\BlockController;
+use App\Controllers\CartController;
 use App\Controllers\CategoryPageController;
 use App\Controllers\CommentController;
 use App\Controllers\ContentController;
@@ -13,6 +14,7 @@ use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
+use App\Controllers\WishlistController;
 use App\Framework\Container;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\CheckPageMemberAccess;
@@ -108,6 +110,26 @@ $router->group(['middleware' => [RequireMemberAuth::class]], function($router) {
     $router->get('/member/change-password', [MemberAuthController::class, 'showChangePasswordForm'])
         ->name('member.change-password');
 });
+
+$router->get('/cart', [CartController::class, 'page']);
+$router->get('/wishlist', [WishlistController::class, 'page']);
+
+// API routes for Cart (JSON responses)
+$router->get('/api/{site}/cart', [CartController::class, 'index']);
+$router->post('/api/{site}/cart', [CartController::class, 'add']);
+$router->put('/api/{site}/cart/{id}', [CartController::class, 'update']);
+$router->delete('/api/{site}/cart/{id}', [CartController::class, 'remove']);
+$router->delete('/api/{site}/cart/clear', [CartController::class, 'clear']);
+
+$router->get('/checkout', [CartController::class, 'checkoutPage']);
+$router->post('/api/{site}/checkout/process', [CartController::class, 'processCheckout']);
+
+// API routes for Wishlist (JSON responses)
+$router->get('/api/{site}/wishlist', [WishlistController::class, 'index']);
+$router->post('/api/{site}/wishlist', [WishlistController::class, 'add']);
+$router->delete('/api/{site}/wishlist/{productId}', [WishlistController::class, 'remove']);
+
+$router->get('/order-confirmation', [CartController::class, 'orderConfirmation']);
 
 
 
