@@ -11,226 +11,405 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5568d3;
+            --secondary-color: #764ba2;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+            --border-color: #e5e7eb;
+            --bg-light: #f5f7fa;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f7fa;
+            background: var(--bg-light);
             min-height: 100vh;
+            color: var(--text-primary);
         }
 
         .header {
             background: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            padding: 0 20px;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .header-content {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 70px;
+            padding: 1rem 2rem;
         }
 
         .logo {
-            font-size: 24px;
+            font-size: 1.5rem;
             font-weight: 700;
-            color: #667eea;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .user-menu {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 1.5rem;
         }
 
         .user-info {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 0.75rem;
         }
 
         .avatar {
-            width: 40px;
-            height: 40px;
+            width: 2.5rem;
+            height: 2.5rem;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 600;
+            font-size: 1rem;
         }
 
         .user-name {
             font-weight: 500;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .btn-logout {
-            padding: 8px 20px;
-            background: #f0f0f0;
-            color: #666;
+            padding: 0.5rem 1.25rem;
+            background: var(--bg-light);
+            color: var(--text-secondary);
             border: none;
-            border-radius: 6px;
-            font-size: 14px;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
             cursor: pointer;
             text-decoration: none;
-            transition: background 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         .btn-logout:hover {
-            background: #e0e0e0;
+            background: #e5e7eb;
+            color: var(--text-primary);
         }
 
         .container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
         }
 
         .welcome-section {
             background: white;
-            border-radius: 10px;
-            padding: 40px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
         }
 
         .welcome-section h1 {
-            font-size: 32px;
-            color: #333;
-            margin-bottom: 10px;
+            font-size: 2rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
         }
 
         .welcome-section p {
-            color: #666;
-            font-size: 16px;
+            color: var(--text-secondary);
+            font-size: 1rem;
         }
 
         .message {
-            padding: 16px 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            font-size: 15px;
+            padding: 1rem 1.25rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.9375rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid var(--success-color);
         }
 
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 1.5rem;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 2px;
+        }
+
+        /* Dashboard Cards Grid */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
         }
 
         .dashboard-card {
             background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-radius: 1rem;
+            padding: 1.75rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            border: 2px solid transparent;
         }
 
         .dashboard-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-color);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.25rem;
         }
 
         .card-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 20px;
-            font-size: 24px;
+            font-size: 1.5rem;
+            flex-shrink: 0;
         }
 
-        .dashboard-card h3 {
-            font-size: 20px;
-            color: #333;
-            margin-bottom: 10px;
+        .card-icon.orders {
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
         }
 
-        .dashboard-card p {
-            color: #666;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 20px;
+        .card-icon.newsletters {
+            background: linear-gradient(135deg, #10b98120 0%, #059f6920 100%);
         }
 
-        .card-link {
-            color: #667eea;
-            text-decoration: none;
+        .card-icon.subscriptions {
+            background: linear-gradient(135deg, #f59e0b20 0%, #d9770620 100%);
+        }
+
+        .card-icon.addresses {
+            background: linear-gradient(135deg, #3b82f620 0%, #2563eb20 100%);
+        }
+
+        .card-icon.comments {
+            background: linear-gradient(135deg, #8b5cf620 0%, #7c3aed20 100%);
+        }
+
+        .card-icon.settings {
+            background: linear-gradient(135deg, #6b728020 0%, #4b556320 100%);
+        }
+
+        .card-content h3 {
+            font-size: 0.875rem;
             font-weight: 500;
-            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
         }
 
-        .card-link:hover {
-            text-decoration: underline;
+        .card-content p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-top: 0.5rem;
         }
 
-        .member-info {
+        .card-arrow {
+            color: var(--primary-color);
+            font-size: 1.25rem;
+            transition: transform 0.2s ease;
+        }
+
+        .dashboard-card:hover .card-arrow {
+            transform: translateX(4px);
+        }
+
+        /* Stats Cards Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
             background: white;
-            border-radius: 10px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            text-align: center;
         }
 
-        .member-info h2 {
-            font-size: 24px;
-            color: #333;
-            margin-bottom: 20px;
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
         }
 
-        .info-row {
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Recommended Pages Grid */
+        .pages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .page-card {
+            background: white;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .page-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .page-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(135deg, var(--primary-color)20 0%, var(--secondary-color)20 100%);
+        }
+
+        .page-content {
+            padding: 1.5rem;
+        }
+
+        .page-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .page-excerpt {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .page-meta {
             display: flex;
-            padding: 15px 0;
-            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
         }
 
-        .info-row:last-child {
-            border-bottom: none;
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
         }
 
-        .info-label {
-            flex: 0 0 150px;
-            color: #666;
-            font-weight: 500;
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
         }
 
-        .info-value {
-            color: #333;
+        .empty-state h3 {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
         }
 
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 500;
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
         }
 
-        .badge.basic {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
 
-        .badge.premium {
-            background: #fff3e0;
-            color: #f57c00;
-        }
+            .header-content {
+                padding: 1rem;
+            }
 
-        .badge.vip {
-            background: #f3e5f5;
-            color: #7b1fa2;
+            .welcome-section {
+                padding: 1.5rem;
+            }
+
+            .welcome-section h1 {
+                font-size: 1.5rem;
+            }
+
+            .dashboard-grid,
+            .stats-grid,
+            .pages-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .user-name {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -241,7 +420,7 @@
         <div class="user-menu">
             <div class="user-info">
                 <div class="avatar">
-                    <?= strtoupper(substr($member->firstName ?? 'M', 0, 1)) ?>
+                    <?= strtoupper(substr($member->first_name ?? 'M', 0, 1)) ?>
                 </div>
                 <span class="user-name"><?= htmlspecialchars($member->getDisplayName()) ?></span>
             </div>
@@ -254,69 +433,146 @@
 
 <div class="container">
     <?php if ($msg = message()): ?>
-        <div class="message success"><?= htmlspecialchars($msg) ?></div>
+        <div class="message success">
+            <span>✓</span>
+            <?= htmlspecialchars($msg) ?>
+        </div>
     <?php endif; ?>
 
     <div class="welcome-section">
-        <h1>Welcome back, <?= htmlspecialchars($member->firstName ?? 'Member') ?>!</h1>
-        <p>Good to see you again. Here's what's happening with your account.</p>
+        <h1>Welcome back, <?= htmlspecialchars($member->first_name ?? 'Member') ?>!</h1>
+        <p>Manage your account, track your orders, and explore exclusive content.</p>
     </div>
 
-    <div class="member-info">
-        <h2>Your Account Information</h2>
-        <div class="info-row">
-            <div class="info-label">Full Name:</div>
-            <div class="info-value"><?= htmlspecialchars($member->getFullName()) ?></div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Email:</div>
-            <div class="info-value"><?= htmlspecialchars($member->email) ?></div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Member Since:</div>
-            <div class="info-value">
-                <?php
-                // This would come from member creation date if available
-                echo date('F j, Y');
-                ?>
-            </div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Membership Roles:</div>
-            <div class="info-value">
-                <?php if (!empty($member->roles)): ?>
-                    <?php foreach ($member->roles as $role): ?>
-                        <span class="badge <?= strtolower($role) ?>"><?= htmlspecialchars(ucfirst($role)) ?></span>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <span class="badge basic">Basic Member</span>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
+    <h2 class="section-title">Quick Access</h2>
 
     <div class="dashboard-grid">
-        <div class="dashboard-card">
-            <div class="card-icon">📚</div>
-            <h3>Browse Content</h3>
-            <p>Explore exclusive member-only articles, resources, and content created just for you.</p>
-            <a href="/" class="card-link">View Content →</a>
+        <a href="/member/orders" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon orders">🛍️</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>My Orders</h3>
+                <p>View and track your order history and current shipments.</p>
+            </div>
+        </a>
+
+        <a href="/member/newsletters" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon newsletters">📧</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Newsletters</h3>
+                <p>Manage your newsletter subscriptions and preferences.</p>
+            </div>
+        </a>
+
+        <a href="/member/subscriptions" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon subscriptions">⭐</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Subscriptions</h3>
+                <p>View and manage your active subscriptions and membership plans.</p>
+            </div>
+        </a>
+
+        <a href="/member/addresses" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon addresses">📍</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Addresses</h3>
+                <p>Manage your shipping and billing addresses.</p>
+            </div>
+        </a>
+
+        <a href="/member/comments" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon comments">💬</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Comments</h3>
+                <p>View and manage your comments across the site.</p>
+            </div>
+        </a>
+
+        <a href="/member/settings" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon settings">⚙️</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Account Settings</h3>
+                <p>Update your password and account preferences.</p>
+            </div>
+        </a>
+    </div>
+
+    <h2 class="section-title">Your Activity</h2>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['orders'] ?></div>
+            <div class="stat-label">Total Orders</div>
         </div>
 
-        <div class="dashboard-card">
-            <div class="card-icon">⚙️</div>
-            <h3>Account Settings</h3>
-            <p>Update your profile information, change your password, and manage your preferences.</p>
-            <a href="/member/settings" class="card-link">Manage Settings →</a>
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['newsletters'] ?></div>
+            <div class="stat-label">Newsletters</div>
         </div>
 
-        <div class="dashboard-card">
-            <div class="card-icon">🔔</div>
-            <h3>Notifications</h3>
-            <p>Stay updated with the latest news, announcements, and personalized recommendations.</p>
-            <a href="/member/notifications" class="card-link">View Notifications →</a>
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['subscriptions'] ?></div>
+            <div class="stat-label">Active Subscriptions</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['addresses'] ?></div>
+            <div class="stat-label">Saved Addresses</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['comments'] ?></div>
+            <div class="stat-label">Comments Posted</div>
         </div>
     </div>
+
+    <h2 class="section-title">Recommended For You</h2>
+
+    <?php if ($recommendedPages->isEmpty()): ?>
+        <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <h3>No Recommendations Yet</h3>
+            <p>Check back soon for personalized content recommendations.</p>
+        </div>
+    <?php else: ?>
+        <div class="pages-grid">
+            <?php foreach ($recommendedPages as $page): ?>
+                <a href="/<?= htmlspecialchars($page->slug) ?>" class="page-card">
+                    <?php if ($page->listing_image_id): ?>
+                        <img src="/images/<?= $page->listing_image_id ?>" alt="<?= htmlspecialchars($page->title) ?>" class="page-image">
+                    <?php else: ?>
+                        <div class="page-image"></div>
+                    <?php endif; ?>
+                    <div class="page-content">
+                        <h3 class="page-title"><?= htmlspecialchars($page->title) ?></h3>
+                        <?php if ($page->listing_synopsis): ?>
+                            <p class="page-excerpt"><?= htmlspecialchars($page->listing_synopsis) ?></p>
+                        <?php endif; ?>
+                        <div class="page-meta">
+                            <span>📅 <?= date('M j, Y', strtotime($page->created_at)) ?></span>
+                        </div>
+                    </div>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 </div>
 </body>
 </html>

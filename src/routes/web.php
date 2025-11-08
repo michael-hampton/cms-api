@@ -8,9 +8,14 @@ use App\Controllers\CommentController;
 use App\Controllers\ContentController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
-use App\Controllers\MemberAddressController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
+use App\Controllers\Members\MemberAddressController;
+use App\Controllers\Members\MemberCommentsController;
+use App\Controllers\Members\MemberDashboardController;
+use App\Controllers\Members\MemberNewslettersController;
+use App\Controllers\Members\MemberOrdersController;
+use App\Controllers\Members\MemberSubscriptionsController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
@@ -147,6 +152,27 @@ $router->post('/member/addresses/{id}/set-default', [MemberAddressController::cl
 
 $router->get('/member/me', MemberController::class, 'me');
 
+$router->get('/member/dashboard', [MemberDashboardController::class, 'index']);
+
+// Member Orders Routes
+$router->get('/member/orders', [MemberOrdersController::class, 'index']);
+$router->get('/member/orders/{orderId}', [MemberOrdersController::class, 'show']);
+$router->post('/member/orders/{id}/cancel', [MemberOrdersController::class, 'cancel']);
+
+
+// Member Subscriptions Routes
+$router->get('/member/subscriptions', [MemberSubscriptionsController::class, 'index']);
+$router->post('/member/subscriptions/{id}/cancel', [MemberSubscriptionsController::class, 'cancel']);
+
+// Member Newsletters Routes
+$router->get('/member/newsletters', [MemberNewslettersController::class, 'index']);
+$router->post('/member/newsletters/unsubscribe', [MemberNewslettersController::class, 'unsubscribe']);
+
+// Member Comments Routes
+$router->get('/member/comments', [MemberCommentsController::class, 'index']);
+$router->delete('/member/comments/{id}', [MemberCommentsController::class, 'destroy']);
+
+$router->get('/member/settings', [MemberAuthController::class, 'showChangePasswordForm']);
 
 
 // Apply page member access check to content routes

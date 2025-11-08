@@ -139,4 +139,20 @@ class Member extends Model
             ->where('is_default', true)
             ->whereIn('type', ['billing', 'both']);
     }
+
+    public function subscriptions($relation = false)
+    {
+        return $this->hasMany(Subscription::class, 'member_id', 'id', $relation);
+    }
+
+    public function activeSubscription($relation = false)
+    {
+        return $this->hasOne(Subscription::class, 'member_id', 'id', $relation)
+            ->where('status', 'active');
+    }
+
+    public function comments($relation = false)
+    {
+        return $this->hasMany(Comment::class, 'email', 'email', $relation);
+    }
 }

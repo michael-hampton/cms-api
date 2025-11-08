@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Framework\Support\Collection;
 use App\Models\Subscriber;
 
 class SubscriberRepository extends Repository
@@ -29,6 +30,15 @@ class SubscriberRepository extends Repository
             ->toArray();
 
         return array_column($results, 'email');
+    }
+
+    public function getNewslettersForMember(string $email, ?int $siteId = null): Collection
+    {
+        $siteId = $siteId ?? $this->siteId;
+
+        return Subscriber::where('email', $email)
+            ->where('site_id', $siteId)
+            ->get();
     }
 
 //    public function create(array $data): Subscriber

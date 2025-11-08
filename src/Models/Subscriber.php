@@ -5,7 +5,15 @@ namespace App\Models;
 class Subscriber extends Model
 {
     protected $table = 'subscribers';
-    protected $fillable = ['email', 'confirmed', 'confirmation_token', 'unsubscribe_token', 'site_id', 'subscribed_at', 'unsubscribe_token'];
+    protected $fillable = [
+        'email',
+        'confirmed',
+        'confirmation_token',
+        'unsubscribe_token',
+        'subscribed_at',
+        'site_id'
+    ];
+
     protected $casts = [
         'confirmed' => 'boolean',
         'subscribed_at' => 'datetime'

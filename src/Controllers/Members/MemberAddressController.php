@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Controllers;
+namespace App\Controllers\Members;
 
+use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
