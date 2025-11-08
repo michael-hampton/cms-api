@@ -1,5 +1,6 @@
 <?php
 // API routes (return arrays -> converted to JSON)
+use App\Controllers\AddressController;
 use App\Controllers\AuthController;
 use App\Controllers\AuthorController;
 use App\Controllers\BlockController;
@@ -312,9 +313,18 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
          $router->post('/newsletter/confirm', NewsletterController::class, 'confirm');
          $router->post('/newsletter/unsubscribe', NewsletterController::class, 'unsubscribe');
          $router->get('/newsletter/subscribers', NewsletterController::class, 'getSubscribers');
+
+        $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
     });
 
     $router->post('/sites', [SiteController::class, 'create']);
+
+    $router->get('/addresses', [AddressController::class, 'index']);
+    $router->post('/addresses', [AddressController::class, 'store']);
+    $router->put('/addresses/{id}', [AddressController::class, 'update']);
+    $router->delete('/addresses/{id}', [AddressController::class, 'destroy']);
+    $router->post('/addresses/{id}/set-default', [AddressController::class, 'setDefault']);
+    $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
 });
 
 $router->post('/api/{siteName}/newsletter/web/signup', NewsletterController::class, 'signup');

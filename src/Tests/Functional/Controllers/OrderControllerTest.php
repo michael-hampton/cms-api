@@ -2,15 +2,16 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\User;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderControllerTest extends FunctionalTestCase
 {
     use CreatesTestData;
+
     private Member $testUser;
 
     protected function setUp(): void
@@ -30,7 +31,7 @@ class OrderControllerTest extends FunctionalTestCase
     // EXISTING TESTS (keeping for reference)
     public function testIndexReturnsOrdersList()
     {
-       $this->createOrder();
+        $this->createOrder();
 
         $response = $this->getForSite('/api/orders');
 
@@ -553,4 +554,248 @@ class OrderControllerTest extends FunctionalTestCase
 
         $this->assertEquals(422, $response->getStatusCode());
     }
+
+    public function testUpdateOrderWithAddressId()
+    {
+        $address = $this->createAddress(['member_id' => $this->testUser->id]);
+
+        $product = $this->createProduct();
+
+        $order = $this->createOrder(['user_id' => $this->testUser->id]);
+
+        $updateData = [
+            'shipping_address_id' => $address->id,
+            'status' => 'processing',
+            'items' => [
+                'product_id' => $product->id
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify update
+        $updatedOrder = Order::find($order->id);
+        $this->assertEquals($address->id, $updatedOrder->shipping_address_id);
+        $this->assertEquals('processing', $updatedOrder->status);
+    }
+
+    public function testUpdateOrderCreatesNewAddressFromData()
+    {
+        $order = $this->createOrder(['user_id' => $this->testUser->id]);
+        $product = $this->createProduct();
+
+        $updateData = [
+            'shipping_address' => [
+                'address_line_1' => '111 Updated St',
+                'city' => 'Updated City',
+                'state' => 'UC',
+                'postcode' => '11111',
+                'country' => 'US'
+            ],
+            'items' => [
+                'product_id' => $product->id
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify address was created
+        $updatedOrder = Order::find($order->id);
+        $this->assertNotNull($updatedOrder->shipping_address_id);
+
+        $address = Address::find($updatedOrder->shipping_address_id);
+        $this->assertNotNull($address);
+        $this->assertEquals($this->testUser->id, $address->member_id);
+        $this->assertEquals('111 Updated St', $address->address_line_1);
+    }
+
+    public function testUpdateOrderFailsWithInvalidAddressId()
+    {
+        $otherMember = $this->createMember();
+
+        $address = $this->createAddress(['member_id' => $otherMember->id]);
+
+        $order = $this->createOrder(['user_id' => $this->testUser->id]);
+
+        $product = $this->createProduct();
+
+        $updateData = [
+            'shipping_address_id' => $address->id,
+            'items' => [
+                'product_id' => $product->id
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('Invalid shipping address', $data['error']);
+    }
+
+    public function testDuplicateOrderCopiesLinkedAddresses()
+    {
+        $shippingAddress = $this->createAddress(['member_id' => $this->testUser->id]);
+
+        $billingAddress = $this->createAddress(['member_id' => $this->testUser->id, 'type' => 'billing']);
+
+        $originalOrder = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'shipping_address_id' => $shippingAddress->id,
+            'billing_address_id' => $billingAddress->id
+        ]);
+        $this->createOrderItem($originalOrder->id);
+
+        $response = $this->postForSite("/api/orders/{$originalOrder->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify new order uses same addresses
+        $duplicatedOrder = Order::find($data['data']['id']);
+        $this->assertEquals($shippingAddress->id, $duplicatedOrder->shipping_address_id);
+        $this->assertEquals($billingAddress->id, $duplicatedOrder->billing_address_id);
+        $this->assertNull($duplicatedOrder->shipping_address); // Should not have JSON address
+        $this->assertNull($duplicatedOrder->billing_address);
+    }
+
+    public function testDuplicateOrderCopiesJsonAddresses()
+    {
+        $originalOrder = $this->createOrder([
+            'user_id' => null, // Guest order
+            'customer_name' => 'Guest User',
+            'customer_email' => 'guest@example.com',
+            'shipping_address' => [
+                'address_line_1' => '123 Main St',
+                'city' => 'City',
+                'postcode' => '12345',
+                'country' => 'US'
+            ],
+            'billing_address' => [
+                'address_line_1' => '456 Oak Ave',
+                'city' => 'Town',
+                'postcode' => '67890',
+                'country' => 'US'
+            ]
+        ]);
+        $this->createOrderItem($originalOrder->id);
+
+        $response = $this->postForSite("/api/orders/{$originalOrder->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify JSON addresses were copied
+        $duplicatedOrder = Order::find($data['data']['id']);
+        $this->assertNull($duplicatedOrder->shipping_address_id);
+        $this->assertNull($duplicatedOrder->billing_address_id);
+        $this->assertNotNull($duplicatedOrder->shipping_address);
+        $this->assertNotNull($duplicatedOrder->billing_address);
+        $this->assertEquals('123 Main St', $duplicatedOrder->shipping_address['address_line_1']);
+        $this->assertEquals('456 Oak Ave', $duplicatedOrder->billing_address['address_line_1']);
+    }
+
+    public function testStoreCreatesOrderWithAddressIdForMember()
+    {
+        $member = $this->createMember();
+        $address = $this->createAddress(['member_id' => $member->id]);
+        $product = $this->createProduct();
+
+        $orderData = [
+            'user_id' => $member->id,
+            'shipping_address_id' => $address->id,
+            'status' => 'pending',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify order uses address_id, not JSON
+        $order = Order::find($data['data']['order']['id']);
+        $this->assertEquals($address->id, $order->shipping_address_id);
+        $this->assertNull($order->shipping_address);
+    }
+
+    public function testStoreThrowsExceptionWhenAddressDoesNotBelongToMember()
+    {
+        $member1 = $this->createMember();
+        $member2 = $this->createMember();
+        $address = $this->createAddress(['member_id' => $member2->id]);
+        $product = $this->createProduct();
+
+        $orderData = [
+            'user_id' => $member1->id,
+            'shipping_address_id' => $address->id,
+            'status' => 'pending',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('Invalid shipping address', $data['error']);
+    }
+
+    public function testStoreCreatesAddressFromDataWhenMemberExists()
+    {
+        $member = $this->createMember();
+        $product = $this->createProduct();
+
+        $orderData = [
+            'user_id' => $member->id,
+            'shipping_address' => [
+                'address_line_1' => '456 New St',
+                'city' => 'City',
+                'postcode' => '67890',
+                'country' => 'US'
+            ],
+            'status' => 'pending',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify address was created and linked
+        $order = Order::find($data['data']['order']['id']);
+        $this->assertNotNull($order->shipping_address_id);
+        $this->assertNull($order->shipping_address);
+
+        $address = Address::find($order->shipping_address_id);
+        $this->assertEquals($member->id, $address->member_id);
+        $this->assertEquals('456 New St', $address->address_line_1);
+    }
+
 }

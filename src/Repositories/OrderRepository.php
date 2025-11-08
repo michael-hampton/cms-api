@@ -105,6 +105,6 @@ class OrderRepository extends Repository
 
     public function getOrderById(int $orderId): ?Order
     {
-        return Order::with(['item', 'user'])->find($orderId);
+        return Order::with(['items', 'user', 'shippingAddress', 'billingAddress'])->find($orderId);
     }
 }

@@ -118,4 +118,25 @@ class Member extends Model
             ->where('password_reset_expires_at', '>', date('Y-m-d H:i:s'))
             ->first();
     }
+
+    // Add to Member model:
+
+    public function addresses($relation = false)
+    {
+        return $this->hasMany(Address::class, 'member_id', 'id', $relation);
+    }
+
+    public function defaultShippingAddress($relation = false)
+    {
+        return $this->hasOne(Address::class, 'member_id', 'id', $relation)
+            ->where('is_default', true)
+            ->whereIn('type', ['shipping', 'both']);
+    }
+
+    public function defaultBillingAddress($relation = false)
+    {
+        return $this->hasOne(Address::class, 'member_id', 'id', $relation)
+            ->where('is_default', true)
+            ->whereIn('type', ['billing', 'both']);
+    }
 }

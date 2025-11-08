@@ -3,18 +3,19 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\MemberRepository;
-use App\Repositories\OrderItemRepository;
-use App\Repositories\OrderRepository;
 use App\Services\CartService;
+use App\Services\OrderService;
 
 class CartController extends Controller
 {
     public function __construct(
-        private readonly CartService $cartService
-    ) {
+        private readonly CartService  $cartService,
+        private readonly OrderService $orderService
+    )
+    {
         parent::__construct();
     }
 
@@ -55,7 +56,12 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
 
         // Validate required fields
-        $required = ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
+        $required = ['first_name', 'last_name', 'email', 'phone'];
+
+        if (empty($data['saved_address'])) {
+            $required = array_merge($required, ['address', 'city', 'postal_code', 'country']);
+        }
+
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 return $this->resourceResponse([
@@ -80,18 +86,6 @@ class CartController extends Controller
         $shipping = $subtotal >= 100 ? 0 : 10; // Free shipping over $100
         $total = $subtotal + $tax + $shipping;
 
-        // Prepare shipping and billing addresses
-        $shippingAddress = [
-            'address' => $data['address'],
-            'address2' => $data['address2'] ?? '',
-            'city' => $data['city'],
-            'state' => $data['state'] ?? '',
-            'postal_code' => $data['postal_code'],
-            'country' => $data['country']
-        ];
-
-        $billingAddress = $shippingAddress; // Use same address for now
-
         // Prepare order data
         $orderData = [
             'customer_name' => $data['first_name'] . ' ' . $data['last_name'],
@@ -106,10 +100,30 @@ class CartController extends Controller
             'discount' => 0,
             'total' => $total,
             'currency' => 'USD',
-            'shipping_address' => $shippingAddress,
-            'billing_address' => $billingAddress,
-            'customer_notes' => $data['notes'] ?? ''
         ];
+
+        if ($data['saved_address']) {
+            $orderData['shipping_address_id'] = $data['saved_address'];
+        } else {
+            // Prepare shipping and billing addresses
+            $shippingAddress = [
+                'address' => $data['address'],
+                'address2' => $data['address2'] ?? '',
+                'city' => $data['city'],
+                'state' => $data['state'] ?? '',
+                'postal_code' => $data['postal_code'],
+                'country' => $data['country']
+            ];
+
+            $billingAddress = $shippingAddress; // Use same address for now
+
+            $orderData['shipping_address'] = $shippingAddress;
+            $orderData['billing_address'] = $billingAddress;
+        }
+
+        if (MemberAuth::check()) {
+            $orderData['user_id'] = MemberAuth::member()->id;
+        }
 
         // Prepare order items from cart
         $items = [];
@@ -128,13 +142,7 @@ class CartController extends Controller
 
         try {
             // Create order using OrderService
-            $orderService = new \App\Services\OrderService(
-                new OrderRepository(),
-                new OrderItemRepository(),
-                new MemberRepository()
-            );
-
-            $order = $orderService->createOrder($orderData, $items, $siteId);
+            $order = $this->orderService->createOrder($orderData, $items, $siteId);
 
             // Clear cart after successful order
             $this->cartService->clear();
@@ -209,20 +217,15 @@ class CartController extends Controller
         ]);
     }
 
-    public function orderConfirmation(Request $request) {
+    public function orderConfirmation(Request $request)
+    {
         $orderNumber = $request->query('order_id');
 
         if (!$orderNumber) {
             return $this->redirect('/');
         }
 
-        $orderService = new \App\Services\OrderService(
-            new OrderRepository(),
-            new OrderItemRepository(),
-            new MemberRepository()
-        );
-
-        $order = $orderService->getOrderByNumber($orderNumber);
+        $order = $this->orderService->getOrderByNumber($orderNumber);
 
         if (!$order) {
             return $this->redirect('/');

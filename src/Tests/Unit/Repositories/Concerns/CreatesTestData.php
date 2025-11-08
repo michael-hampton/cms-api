@@ -6,6 +6,7 @@ use App\Controllers\CustomFieldDefinitionController;
 use App\Factories\VoucherFactory;
 use App\Framework\Tests\Factories\HasFactories;
 use App\Framework\Tests\Factories\RelationshipFactory;
+use App\Models\Address;
 use App\Models\Author;
 use App\Models\Block;
 use App\Models\Brand;
@@ -383,6 +384,12 @@ trait CreatesTestData
     protected function createMerchant(array $overrides = []): Model
     {
         return $this->factory(Merchant::class)
+            ->create($overrides);
+    }
+
+    protected function createAddress(array $overrides = []): Model
+    {
+        return $this->factory(Address::class)
             ->create($overrides);
     }
 }

@@ -3,9 +3,11 @@
 namespace App\Tests\Unit\Services;
 
 use App\Framework\Database\Database;
+use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Repositories\AddressRepository;
 use App\Repositories\MemberRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderItemRepository;
@@ -21,12 +23,14 @@ class OrderServiceTest extends FunctionalTestCase
     private $memberRepository;
     private $databaseMock;
     private OrderService $service;
+    private $addressRepository;
 
     protected function setUp(): void
     {
         parent::setUp(); // Call parent setup if it exists
         // Use Mockery::mock() instead of $this->createMock()
         $this->orderRepository = m::mock(OrderRepository::class);
+        $this->addressRepository = m::mock(AddressRepository::class);
         $this->memberRepository = m::mock(MemberRepository::class);
         $this->orderItemRepository = m::mock(OrderItemRepository::class);
         $this->databaseMock = m::mock(Database::class);
@@ -35,6 +39,7 @@ class OrderServiceTest extends FunctionalTestCase
             $this->orderRepository,
             $this->orderItemRepository,
             $this->memberRepository,
+            $this->addressRepository,
             $this->databaseMock
         );
     }
@@ -81,7 +86,7 @@ class OrderServiceTest extends FunctionalTestCase
 
         $mockOrder->shouldReceive('load')
             ->once()
-            ->with(['items', 'user'])
+            ->with(['items', 'user', 'item.product'])
             ->andReturnSelf();
 
         $this->orderRepository->shouldReceive('findByOrderNumber')
@@ -131,6 +136,15 @@ class OrderServiceTest extends FunctionalTestCase
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
+
+        // ADD: Mock member lookup since user_id is provided
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
 
         $this->orderRepository->shouldReceive('findByOrderNumber')
             ->once()
@@ -185,6 +199,15 @@ class OrderServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        // ADD: Mock member lookup
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
         $this->orderRepository->shouldReceive('create')
             ->once()
             ->with(m::on(function ($data) {
@@ -238,6 +261,15 @@ class OrderServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        // ADD: Mock member lookup
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
         $this->orderRepository->shouldReceive('findByOrderNumber')
             ->once()
             ->andReturn(null);
@@ -245,11 +277,6 @@ class OrderServiceTest extends FunctionalTestCase
         $this->orderRepository->shouldReceive('create')
             ->once()
             ->with(m::on(function ($data) {
-                // subtotal = (2 * 50) + (1 * 30) = 130
-                // tax = 10 + 3 = 13
-                // shipping = 10
-                // discount = 5
-                // total = 130 + 13 + 10 - 5 = 148
                 return $data['subtotal'] == 130.00
                     && $data['tax'] == 13.00
                     && $data['total'] == 148.00;
@@ -301,6 +328,15 @@ class OrderServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        // ADD: Mock member lookup
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
         $this->orderRepository->shouldReceive('findByOrderNumber')
             ->once()
             ->andReturn(null);
@@ -310,7 +346,7 @@ class OrderServiceTest extends FunctionalTestCase
             ->andReturn($mockOrder);
 
         $this->orderItemRepository->shouldReceive('create')
-            ->times(3) // Should create 3 items
+            ->times(3)
             ->andReturn(m::mock(OrderItem::class));
 
         $this->orderRepository->shouldReceive('getOrderById')
@@ -1038,6 +1074,8 @@ class OrderServiceTest extends FunctionalTestCase
         $originalOrder->shipping_address = '123 Main St';
         $originalOrder->billing_address = '123 Main St';
         $originalOrder->payment_method = 'credit_card';
+        $originalOrder->shipping_address_id = null; // ADD THIS
+        $originalOrder->billing_address_id = null;  // ADD THIS
         $originalOrder->items = collect([]);
 
         $duplicatedOrder = m::mock(Order::class)->makePartial();
@@ -1059,6 +1097,11 @@ class OrderServiceTest extends FunctionalTestCase
         $this->orderRepository->shouldReceive('findByOrderNumber')
             ->once()
             ->andReturn(null);
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with($originalOrder->user_id)
+            ->andReturn(m::mock(Member::class));
 
         $this->orderRepository->shouldReceive('create')
             ->once()
@@ -1385,6 +1428,749 @@ class OrderServiceTest extends FunctionalTestCase
         $this->assertCount(1, $result['updated']);
         $this->assertCount(1, $result['failed']);
         $this->assertEquals('Order not found', $result['failed'][0]['reason']);
+    }
+
+    public function testCreateOrderWithShippingAddressId()
+    {
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $address = m::mock(Address::class)->makePartial();
+        $address->id = 10;
+        $address->member_id = 1;
+
+        $data = [
+            'user_id' => 1,
+            'shipping_address_id' => 10,
+            'status' => 'pending'
+        ];
+        $items = [
+            [
+                'product_name' => 'Product 1',
+                'quantity' => 1,
+                'unit_price' => 100.00
+            ]
+        ];
+        $siteId = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(10)
+            ->andReturn($address);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['shipping_address_id'] === 10
+                    && !isset($data['shipping_address']);
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderItemRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(m::mock(OrderItem::class));
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(1)
+            ->andReturn($mockOrder);
+
+        $result = $this->service->createOrder($data, $items, $siteId);
+
+        $this->assertSame($mockOrder, $result);
+    }
+
+    public function testCreateOrderThrowsExceptionForInvalidAddressId()
+    {
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $address = m::mock(Address::class)->makePartial();
+        $address->id = 10;
+        $address->member_id = 2; // Different member
+
+        $data = [
+            'user_id' => 1,
+            'shipping_address_id' => 10,
+            'status' => 'pending'
+        ];
+        $items = [
+            [
+                'product_name' => 'Product 1',
+                'quantity' => 1,
+                'unit_price' => 100.00
+            ]
+        ];
+        $siteId = 1;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(10)
+            ->andReturn($address);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid shipping address');
+
+        $this->service->createOrder($data, $items, $siteId);
+    }
+
+    public function testCreateOrderCreatesNewAddressFromData()
+    {
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $newAddress = m::mock(Address::class)->makePartial();
+        $newAddress->id = 20;
+
+        $data = [
+            'user_id' => 1,
+            'shipping_address' => [
+                'address_line_1' => '123 Main St',
+                'city' => 'City',
+                'postcode' => '12345',
+                'country' => 'US'
+            ],
+            'status' => 'pending'
+        ];
+        $items = [
+            [
+                'product_name' => 'Product 1',
+                'quantity' => 1,
+                'unit_price' => 100.00
+            ]
+        ];
+        $siteId = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('createAddressForMember')
+            ->once()
+            ->with(1, m::on(function ($addressData) {
+                return $addressData['address_line_1'] === '123 Main St'
+                    && $addressData['type'] === 'shipping'
+                    && $addressData['label'] === 'Order Address';
+            }))
+            ->andReturn($newAddress);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['shipping_address_id'] === 20
+                    && !isset($data['shipping_address']);
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderItemRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(m::mock(OrderItem::class));
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(1)
+            ->andReturn($mockOrder);
+
+        $result = $this->service->createOrder($data, $items, $siteId);
+
+        $this->assertSame($mockOrder, $result);
+    }
+
+    public function testUpdateOrderWithShippingAddressId()
+    {
+        $orderId = 1;
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $address = m::mock(Address::class)->makePartial();
+        $address->id = 10;
+        $address->member_id = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->status = 'pending';
+        $mockOrder->user_id = 1;
+        $mockOrder->completed_at = null;
+
+        $updatedOrder = m::mock(Order::class)->makePartial();
+        $updatedOrder->id = $orderId;
+
+        $data = [
+            'shipping_address_id' => 10,
+            'status' => 'processing'
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(10)
+            ->andReturn($address);
+
+        $this->orderRepository->shouldReceive('update')
+            ->once()
+            ->with($orderId, m::on(function ($updateData) {
+                return $updateData['shipping_address_id'] === 10
+                    && $updateData['shipping_address'] === null
+                    && $updateData['status'] === 'processing';
+            }))
+            ->andReturn($updatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($updatedOrder);
+
+        $result = $this->service->updateOrder($orderId, $data);
+
+        $this->assertSame($updatedOrder, $result);
+    }
+
+    public function testUpdateOrderWithNewAddressData()
+    {
+        $orderId = 1;
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $newAddress = m::mock(Address::class)->makePartial();
+        $newAddress->id = 20;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->status = 'pending';
+        $mockOrder->user_id = 1;
+
+        $updatedOrder = m::mock(Order::class)->makePartial();
+
+        $data = [
+            'shipping_address' => [
+                'address_line_1' => '999 New St',
+                'city' => 'New City',
+                'postcode' => '99999',
+                'country' => 'US'
+            ]
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('createAddressForMember')
+            ->once()
+            ->with(1, m::on(function ($addressData) {
+                return $addressData['address_line_1'] === '999 New St'
+                    && $addressData['type'] === 'shipping'
+                    && $addressData['label'] === 'Order Address (Updated)';
+            }))
+            ->andReturn($newAddress);
+
+        $this->orderRepository->shouldReceive('update')
+            ->once()
+            ->with($orderId, m::on(function ($updateData) {
+                return $updateData['shipping_address_id'] === 20
+                    && !isset($updateData['shipping_address']);
+            }))
+            ->andReturn($updatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($updatedOrder);
+
+        $result = $this->service->updateOrder($orderId, $data);
+
+        $this->assertSame($updatedOrder, $result);
+    }
+
+    public function testUpdateOrderKeepsJsonAddressForGuestOrder()
+    {
+        $orderId = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->status = 'pending';
+        $mockOrder->user_id = null; // Guest order
+
+        $updatedOrder = m::mock(Order::class)->makePartial();
+
+        $data = [
+            'shipping_address' => [
+                'address_line_1' => '123 Guest St',
+                'city' => 'City',
+                'postcode' => '12345',
+                'country' => 'US'
+            ]
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        // Should NOT create address or look up member
+        $this->memberRepository->shouldReceive('find')->never();
+        $this->addressRepository->shouldReceive('createAddressForMember')->never();
+
+        $this->orderRepository->shouldReceive('update')
+            ->once()
+            ->with($orderId, m::on(function ($updateData) {
+                return isset($updateData['shipping_address'])
+                    && is_array($updateData['shipping_address'])
+                    && $updateData['shipping_address']['address_line_1'] === '123 Guest St'
+                    && !isset($updateData['shipping_address_id']);
+            }))
+            ->andReturn($updatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($updatedOrder);
+
+        $result = $this->service->updateOrder($orderId, $data);
+
+        $this->assertSame($updatedOrder, $result);
+    }
+
+    public function testUpdateOrderWithBothShippingAndBillingAddresses()
+    {
+        $orderId = 1;
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $shippingAddress = m::mock(Address::class)->makePartial();
+        $shippingAddress->id = 10;
+        $shippingAddress->member_id = 1;
+
+        $billingAddress = m::mock(Address::class)->makePartial();
+        $billingAddress->id = 11;
+        $billingAddress->member_id = 1;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->status = 'pending';
+        $mockOrder->user_id = 1;
+
+        $updatedOrder = m::mock(Order::class)->makePartial();
+
+        $data = [
+            'shipping_address_id' => 10,
+            'billing_address_id' => 11
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('find')
+            ->with(10)
+            ->once()
+            ->andReturn($shippingAddress);
+
+        $this->addressRepository->shouldReceive('find')
+            ->with(11)
+            ->once()
+            ->andReturn($billingAddress);
+
+        $this->orderRepository->shouldReceive('update')
+            ->once()
+            ->with($orderId, m::on(function ($updateData) {
+                return $updateData['shipping_address_id'] === 10
+                    && $updateData['billing_address_id'] === 11
+                    && $updateData['shipping_address'] === null
+                    && $updateData['billing_address'] === null;
+            }))
+            ->andReturn($updatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($updatedOrder);
+
+        $result = $this->service->updateOrder($orderId, $data);
+
+        $this->assertSame($updatedOrder, $result);
+    }
+
+
+    public function testUpdateOrderThrowsExceptionForInvalidAddressId()
+    {
+        $orderId = 1;
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $address = m::mock(Address::class)->makePartial();
+        $address->id = 10;
+        $address->member_id = 2; // Different member
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->user_id = 1;
+        $mockOrder->status = 'pending';
+
+        $data = [
+            'shipping_address_id' => 10
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($member);
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(10)
+            ->andReturn($address);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid shipping address');
+
+        $this->service->updateOrder($orderId, $data);
+    }
+
+    public function testDuplicateOrderWithLinkedAddresses()
+    {
+        $orderId = 1;
+
+        $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->user_id = 10;
+        $originalOrder->status = 'completed';
+        $originalOrder->subtotal = 100.00;
+        $originalOrder->tax = 10.00;
+        $originalOrder->shipping = 5.00;
+        $originalOrder->discount = 0.00;
+        $originalOrder->total = 115.00;
+        $originalOrder->currency = 'USD';
+        $originalOrder->site_id = 1;
+        $originalOrder->payment_method = 'credit_card';
+        $originalOrder->shipping_address_id = 20;
+        $originalOrder->billing_address_id = 21;
+        $originalOrder->shipping_address = null;
+        $originalOrder->billing_address = null;
+        $originalOrder->items = collect([]);
+
+        $duplicatedOrder = m::mock(Order::class)->makePartial();
+        $duplicatedOrder->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->twice() // Once for duplicateOrder, once for createOrder
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($originalOrder);
+
+        // Mock member lookup in createOrder
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(10)
+            ->andReturn($member);
+
+        // Mock address validation in createOrder
+        $shippingAddress = m::mock(Address::class)->makePartial();
+        $shippingAddress->id = 20;
+        $shippingAddress->member_id = 10;
+
+        $billingAddress = m::mock(Address::class)->makePartial();
+        $billingAddress->id = 21;
+        $billingAddress->member_id = 10;
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(20)
+            ->andReturn($shippingAddress);
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(21)
+            ->andReturn($billingAddress);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['status'] === 'pending'
+                    && $data['payment_status'] === 'unpaid'
+                    && $data['shipping_address_id'] === 20
+                    && $data['billing_address_id'] === 21
+                    && !isset($data['shipping_address'])
+                    && !isset($data['billing_address']);
+            }))
+            ->andReturn($duplicatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(2)
+            ->andReturn($duplicatedOrder);
+
+        $result = $this->service->duplicateOrder($orderId);
+
+        $this->assertSame($duplicatedOrder, $result);
+    }
+
+    public function testDuplicateOrderWithMixedAddresses()
+    {
+        $orderId = 1;
+
+        $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->user_id = 10;
+        $originalOrder->status = 'completed';
+        $originalOrder->subtotal = 100.00;
+        $originalOrder->tax = 10.00;
+        $originalOrder->shipping = 5.00;
+        $originalOrder->discount = 0.00;
+        $originalOrder->total = 115.00;
+        $originalOrder->currency = 'USD';
+        $originalOrder->site_id = 1;
+        $originalOrder->payment_method = 'credit_card';
+        $originalOrder->shipping_address_id = 20; // Linked
+        $originalOrder->billing_address_id = null;
+        $originalOrder->shipping_address = null;
+        $originalOrder->billing_address = [ // JSON
+            'address_line_1' => '456 Oak Ave',
+            'city' => 'Town',
+            'postcode' => '67890',
+            'country' => 'US'
+        ];
+        $originalOrder->items = collect([]);
+
+        $duplicatedOrder = m::mock(Order::class)->makePartial();
+        $duplicatedOrder->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($originalOrder);
+
+        // Mock member lookup
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
+
+        $this->memberRepository->shouldReceive('find')
+            ->once()
+            ->with(10)
+            ->andReturn($member);
+
+        // Mock shipping address validation (linked)
+        $shippingAddress = m::mock(Address::class)->makePartial();
+        $shippingAddress->id = 20;
+        $shippingAddress->member_id = 10;
+
+        $this->addressRepository->shouldReceive('find')
+            ->once()
+            ->with(20)
+            ->andReturn($shippingAddress);
+
+        $this->addressRepository->shouldReceive('createAddressForMember')
+            ->once()
+            ->with(10, m::on(function ($addressData) {
+                return $addressData['address_line_1'] === '456 Oak Ave'
+                    && $addressData['type'] === 'billing'
+                    && $addressData['label'] === 'Order Billing Address';
+            }))
+            ->andReturn($shippingAddress);
+
+        // No address validation needed for billing (it's JSON)
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['billing_address_id'] === 20;
+            }))
+            ->andReturn($duplicatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(2)
+            ->andReturn($duplicatedOrder);
+
+        $result = $this->service->duplicateOrder($orderId);
+
+        $this->assertSame($duplicatedOrder, $result);
+    }
+
+    public function testDuplicateOrderWithJsonAddresses()
+    {
+        $orderId = 1;
+
+        $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->user_id = null; // Guest order
+        $originalOrder->status = 'completed';
+        $originalOrder->subtotal = 100.00;
+        $originalOrder->tax = 10.00;
+        $originalOrder->shipping = 5.00;
+        $originalOrder->discount = 0.00;
+        $originalOrder->total = 115.00;
+        $originalOrder->currency = 'USD';
+        $originalOrder->site_id = 1;
+        $originalOrder->payment_method = 'credit_card';
+        $originalOrder->shipping_address_id = null;
+        $originalOrder->billing_address_id = null;
+        $originalOrder->shipping_address = [
+            'address_line_1' => '123 Main St',
+            'city' => 'City',
+            'postcode' => '12345',
+            'country' => 'US'
+        ];
+        $originalOrder->billing_address = [
+            'address_line_1' => '456 Oak Ave',
+            'city' => 'Town',
+            'postcode' => '67890',
+            'country' => 'US'
+        ];
+        $originalOrder->items = collect([]);
+
+        $duplicatedOrder = m::mock(Order::class)->makePartial();
+        $duplicatedOrder->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with($orderId)
+            ->andReturn($originalOrder);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['status'] === 'pending'
+                    && $data['payment_status'] === 'unpaid'
+                    && !isset($data['shipping_address_id'])
+                    && !isset($data['billing_address_id'])
+                    && is_array($data['shipping_address'])
+                    && $data['shipping_address']['address_line_1'] === '123 Main St'
+                    && is_array($data['billing_address'])
+                    && $data['billing_address']['address_line_1'] === '456 Oak Ave';
+            }))
+            ->andReturn($duplicatedOrder);
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(2)
+            ->andReturn($duplicatedOrder);
+
+        $result = $this->service->duplicateOrder($orderId);
+
+        $this->assertSame($duplicatedOrder, $result);
     }
 
 // Helper method to test private methods

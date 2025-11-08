@@ -8,6 +8,7 @@ use App\Models\Member;
 use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Repositories\AddressRepository;
 use App\Repositories\MemberRepository;
 use App\Repositories\OrderItemRepository;
 use App\Repositories\OrderRepository;
@@ -21,6 +22,7 @@ class OrderService
         private readonly OrderRepository     $orderRepository,
         private readonly OrderItemRepository $orderItemRepository,
         private readonly MemberRepository             $memberRepository,
+        private readonly AddressRepository $addressRepository,
         ?Database                            $database = null
     )
     {
@@ -53,6 +55,51 @@ class OrderService
             if (empty($data['user_id']) && !empty($data['customer_email'])) {
                 $member = $this->createOrGetMember($data, $siteId);
                 $data['user_id'] = !empty($member) ? $member->id : null;
+            } elseif (!empty($data['user_id'])) {
+                $member = $this->memberRepository->find($data['user_id']);
+            }
+
+            // Handle shipping address
+            if (isset($data['shipping_address_id'])) {
+                // Address ID provided, verify it belongs to the member
+                if ($member) {
+                    $address = $this->addressRepository->find($data['shipping_address_id']);
+                    if (!$address || $address->member_id !== $member->id) {
+                        throw new Exception("Invalid shipping address");
+                    }
+                }
+            } elseif (isset($data['shipping_address']) && is_array($data['shipping_address']) && !empty(array_filter($data['shipping_address']))) {
+                // Address data provided, create new address if member exists
+                if ($member) {
+                    $addressData = $data['shipping_address'];
+                    $addressData['type'] = 'shipping';
+                    $addressData['label'] = 'Order Address';
+
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $data['shipping_address_id'] = $newAddress->id;
+                    unset($data['shipping_address']); // Remove JSON data
+                }
+                // For guest orders, keep shipping_address as JSON
+            }
+
+            // Handle billing address
+            if (isset($data['billing_address_id'])) {
+                if ($member) {
+                    $address = $this->addressRepository->find($data['billing_address_id']);
+                    if (!$address || $address->member_id !== $member->id) {
+                        throw new Exception("Invalid billing address");
+                    }
+                }
+            } elseif (isset($data['billing_address']) && is_array($data['billing_address']) && !empty(array_filter($data['billing_address']))) {
+                if ($member) {
+                    $addressData = $data['billing_address'];
+                    $addressData['type'] = 'billing';
+                    $addressData['label'] = 'Order Billing Address';
+
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $data['billing_address_id'] = $newAddress->id;
+                    unset($data['billing_address']);
+                }
             }
 
             // Remove customer fields from order data as they're not part of orders table
@@ -138,6 +185,57 @@ class OrderService
 
             if (!$order) {
                 throw new Exception("Order not found");
+            }
+
+            $member = null;
+            if ($order->user_id) {
+                $member = $this->memberRepository->find($order->user_id);
+            }
+
+            // Handle shipping address update
+            if (isset($data['shipping_address_id'])) {
+                // Verify address belongs to member
+                if ($member) {
+                    $address = $this->addressRepository->find($data['shipping_address_id']);
+                    if (!$address || $address->member_id !== $member->id) {
+                        throw new Exception("Invalid shipping address");
+                    }
+                }
+                // Clear JSON address if using address_id
+                $data['shipping_address'] = null;
+            } elseif (isset($data['shipping_address']) && is_array($data['shipping_address']) && !empty(array_filter($data['shipping_address']))) {
+                // Address data provided, create new address if member exists
+                if ($member) {
+                    $addressData = $data['shipping_address'];
+                    $addressData['type'] = 'shipping';
+                    $addressData['label'] = 'Order Address (Updated)';
+
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $data['shipping_address_id'] = $newAddress->id;
+                    unset($data['shipping_address']); // Remove JSON data
+                }
+                // For guest orders, keep shipping_address as JSON
+            }
+
+            // Handle billing address update
+            if (isset($data['billing_address_id'])) {
+                if ($member) {
+                    $address = $this->addressRepository->find($data['billing_address_id']);
+                    if (!$address || $address->member_id !== $member->id) {
+                        throw new Exception("Invalid billing address");
+                    }
+                }
+                $data['billing_address'] = null;
+            } elseif (isset($data['billing_address']) && is_array($data['billing_address']) && !empty(array_filter($data['billing_address']))) {
+                if ($member) {
+                    $addressData = $data['billing_address'];
+                    $addressData['type'] = 'billing';
+                    $addressData['label'] = 'Order Billing Address (Updated)';
+
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $data['billing_address_id'] = $newAddress->id;
+                    unset($data['billing_address']);
+                }
             }
 
             // Handle status transitions
@@ -275,6 +373,21 @@ class OrderService
                 'payment_method' => $originalOrder->payment_method,
                 'payment_status' => 'unpaid'
             ];
+
+            // Handle address duplication
+            if ($originalOrder->shipping_address_id) {
+                // If original order has linked address, use the same address
+                $data['shipping_address_id'] = $originalOrder->shipping_address_id;
+            } elseif ($originalOrder->shipping_address) {
+                // If original order has JSON address, copy it
+                $data['shipping_address'] = $originalOrder->shipping_address;
+            }
+
+            if ($originalOrder->billing_address_id) {
+                $data['billing_address_id'] = $originalOrder->billing_address_id;
+            } elseif ($originalOrder->billing_address) {
+                $data['billing_address'] = $originalOrder->billing_address;
+            }
 
             $items = [];
             foreach ($originalOrder->items as $item) {

@@ -15,7 +15,7 @@ class CreateOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => 'integer|exists:users,id',
+            'user_id' => 'integer|exists:members,id',
             'order_number' => 'string|max:255',
             'status' => 'string|in:pending,processing,completed,cancelled,refunded',
             'shipping' => 'numeric|min:0',
@@ -23,6 +23,8 @@ class CreateOrderRequest extends FormRequest
             'currency' => 'string|max:3',
             'customer_notes' => 'string|max:5000',
             'admin_notes' => 'string|max:5000',
+            'shipping_address_id' => 'nullable|integer',
+            'billing_address_id' => 'nullable|integer',
             'shipping_address' => 'array',
             'billing_address' => 'array',
             'payment_method' => 'string|max:255',
@@ -48,12 +50,15 @@ class CreateOrderRequest extends FormRequest
 
                 // Validate addresses if provided
                 $shippingAddress = $request->input('shipping_address');
-                if ($shippingAddress && !$this->validateAddress($shippingAddress)) {
+                $shippingAddressId = $request->input('shipping_address_id');
+                $billingAddressId = $request->input('billing_address_id');
+
+                if (empty($shippingAddressId) && !empty($shippingAddress) && !$this->validateAddress($shippingAddress)) {
                     throw new ValidationException('Invalid shipping address format');
                 }
 
                 $billingAddress = $request->input('billing_address');
-                if ($billingAddress && !$this->validateAddress($billingAddress)) {
+                if (empty($billingAddressId) && !empty($billingAddress) && !$this->validateAddress($billingAddress)) {
                     throw new ValidationException('Invalid billing address format');
                 }
             }

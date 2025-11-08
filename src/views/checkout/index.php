@@ -578,6 +578,58 @@
                 font-size: 1.5rem;
             }
         }
+
+        .saved-address-card {
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .saved-address-card:hover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .saved-address-card input[type="radio"] {
+            flex-shrink: 0;
+        }
+
+        .saved-address-card .address-details {
+            flex: 1;
+        }
+
+        .saved-address-card .address-details strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .saved-address-card .badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-header .section-title {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -628,6 +680,7 @@
     </div>
 </div>
 
+
 <!-- Main Content -->
 <main>
     <div class="container">
@@ -655,6 +708,10 @@
         </div>
 
         <div id="alert-container"></div>
+
+        <div class="login-prompt">
+            <p>Already have an account? <a href="/member/login?redirect=/checkout">Login</a> to use saved addresses</p>
+        </div>
 
         <div class="checkout-layout">
             <!-- Checkout Form -->
@@ -697,9 +754,25 @@
                         </div>
                     </div>
 
+                    <div class="form-section" id="saved-addresses-section" style="display: none;">
+                        <h2 class="section-title">Saved Addresses</h2>
+                        <div id="saved-addresses-list"></div>
+                        <button type="button" onclick="showNewAddressForm()" class="btn btn-secondary">
+                            Use Different Address
+                        </button>
+                    </div>
+
                     <!-- Shipping Address -->
-                    <div class="form-section">
-                        <h2 class="section-title">Shipping Address</h2>
+                    <div class="form-section" id="shipping-address-form">
+                        <div class="section-header"
+                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h2 class="section-title" style="margin-bottom: 0; padding-bottom: 0; border: none;">
+                                Shipping Address</h2>
+                            <button type="button" id="back-to-saved-btn" onclick="showSavedAddresses()"
+                                    class="btn btn-secondary" style="display: none; width: auto; padding: 0.5rem 1rem;">
+                                ← Back to Saved Addresses
+                            </button>
+                        </div>
                         <div class="form-group full-width">
                             <label class="form-label">
                                 Address <span class="required">*</span>
@@ -902,6 +975,224 @@
 <script>
     const SITE = 'test-mike';
     const API_BASE = '/api/' + SITE;
+
+    async function checkLoginStatus() {
+        try {
+            const response = await fetch(`/member/me`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.member) {
+                    isLoggedIn = true;
+                    currentMember = data.member;
+                    loadSavedAddresses();
+                }
+            }
+        } catch (error) {
+            console.log('Not logged in');
+        }
+    }
+
+    async function loadSavedAddresses() {
+        try {
+            const response = await fetch(`/member/${currentMember.id}/addresses?type=shipping`);
+            const data = await response.json();
+
+            if (data.items && data.items.length > 0) {
+                displaySavedAddresses(data.items);
+            }
+        } catch (error) {
+            console.error('Failed to load saved addresses:', error);
+        }
+    }
+
+    function displaySavedAddresses(addresses) {
+        const container = document.getElementById('saved-addresses-list');
+        const section = document.getElementById('saved-addresses-section');
+
+        container.innerHTML = addresses.map(addr => `
+        <label class="saved-address-card" for="addr-${addr.id}">
+            <input type="radio" name="saved_address" value="${addr.id}" id="addr-${addr.id}"
+                   onchange="selectAddress(${addr.id})">
+            <div class="address-details">
+                <strong>${addr.label || 'Address'}</strong>
+                <p>${addr.formatted}</p>
+            </div>
+            ${addr.is_default ? '<span class="badge">Default</span>' : ''}
+        </label>
+    `).join('');
+
+        section.style.display = 'block';
+
+        // Hide manual form initially when saved addresses are loaded
+        const shippingForm = document.getElementById('shipping-address-form');
+        if (shippingForm) {
+            shippingForm.style.display = 'none';
+        }
+
+        // Ensure back button is hidden
+        const backBtn = document.getElementById('back-to-saved-btn');
+        if (backBtn) {
+            backBtn.style.display = 'none';
+        }
+    }
+
+    function selectAddress(addressId) {
+        selectedAddressId = addressId;
+        // Hide the manual shipping address form
+        const shippingForm = document.getElementById('shipping-address-form');
+
+        if (shippingForm) {
+            shippingForm.style.display = 'none';
+        }
+    }
+
+    function showNewAddressForm() {
+        selectedAddressId = null;
+
+        // Hide the saved addresses section
+        const savedAddressesSection = document.getElementById('saved-addresses-section');
+        if (savedAddressesSection) {
+            savedAddressesSection.style.display = 'none';
+        }
+
+        // Show the manual shipping address form
+        const shippingForm = document.getElementById('shipping-address-form');
+        if (shippingForm) {
+            shippingForm.style.display = 'block';
+        }
+
+        // Show the back button
+        const backBtn = document.getElementById('back-to-saved-btn');
+        if (backBtn) {
+            backBtn.style.display = 'block';
+        }
+
+        // Uncheck all saved address radios
+        document.querySelectorAll('[name="saved_address"]').forEach(radio => radio.checked = false);
+    }
+
+    function showSavedAddresses() {
+        selectedAddressId = null;
+
+        // Show the saved addresses section
+        const savedAddressesSection = document.getElementById('saved-addresses-section');
+        if (savedAddressesSection) {
+            savedAddressesSection.style.display = 'block';
+        }
+
+        // Hide the manual shipping address form
+        const shippingForm = document.getElementById('shipping-address-form');
+        if (shippingForm) {
+            shippingForm.style.display = 'none';
+        }
+
+        // Hide the back button
+        const backBtn = document.getElementById('back-to-saved-btn');
+        if (backBtn) {
+            backBtn.style.display = 'none';
+        }
+
+        // Uncheck all saved address radios
+        document.querySelectorAll('[name="saved_address"]').forEach(radio => radio.checked = false);
+    }
+
+    // Update place order handler
+    // Place order
+    document.getElementById('place-order-btn').addEventListener('click', async function () {
+        const form = document.getElementById('checkout-form');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        console.log('data', data);
+
+        // Clear previous errors
+        document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
+        document.getElementById('alert-container').innerHTML = '';
+
+        // Add selected address ID if applicable
+        if (selectedAddressId) {
+            data.shipping_address_id = selectedAddressId;
+            // Remove manual address fields
+            delete data.address;
+            delete data.address2;
+            delete data.city;
+            delete data.state;
+            delete data.postal_code;
+            delete data.country;
+        }
+
+        // Validate required fields (skip address fields if using saved address)
+        const required = selectedAddressId
+            ? ['first_name', 'last_name', 'email', 'phone']
+            : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
+
+        let hasErrors = false;
+
+        for (const field of required) {
+            if (!data[field] || data[field].trim() === '') {
+                const errorEl = document.getElementById(`error-${field}`);
+                if (errorEl) {
+                    errorEl.textContent = 'This field is required';
+                }
+                hasErrors = true;
+            }
+        }
+
+        // Validate card details if card payment is selected
+        if (data.payment_method === 'card') {
+            if (!data.card_number || data.card_number.replace(/\s/g, '').length < 13) {
+                hasErrors = true;
+                showAlert('Please enter a valid card number', 'error');
+            }
+            if (!data.card_expiry || !/^\d{2}\/\d{2}$/.test(data.card_expiry)) {
+                hasErrors = true;
+                showAlert('Please enter a valid expiry date (MM/YY)', 'error');
+            }
+            if (!data.card_cvv || data.card_cvv.length < 3) {
+                hasErrors = true;
+                showAlert('Please enter a valid CVV', 'error');
+            }
+        }
+
+        if (hasErrors) {
+            return;
+        }
+
+        // Show loading
+        document.getElementById('loading-overlay').classList.add('show');
+        this.disabled = true;
+
+        try {
+            const response = await fetch(`${API_BASE}/checkout/process`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Redirect to success page
+                window.location.href = `/order-confirmation?order_id=${result.order_id}`;
+            } else {
+                showAlert(result.message || 'Failed to process order', 'error');
+            }
+        } catch (error) {
+            console.error('Checkout error:', error);
+            showAlert('An error occurred. Please try again.', 'error');
+        } finally {
+            document.getElementById('loading-overlay').classList.remove('show');
+            this.disabled = false;
+        }
+    });
+
+    // Initialize on page load
+    let isLoggedIn = false;
+    let currentMember = null;
+    let selectedAddressId = null;
+    checkLoginStatus();
 
     // Payment method selection
     document.querySelectorAll('.payment-method').forEach(method => {

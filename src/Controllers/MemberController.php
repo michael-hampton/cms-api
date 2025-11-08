@@ -2,6 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\Auth;
+use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\MemberRepository;
@@ -34,5 +37,10 @@ class MemberController extends Controller
                 'message' => 'Failed to search members'
             ], 500);
         }
+    }
+
+    public function me(): JsonResponse
+    {
+        return $this->resourceResponse(['member' => MemberAuth::member()]);
     }
 }

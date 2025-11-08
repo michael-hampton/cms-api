@@ -8,7 +8,9 @@ use App\Controllers\CommentController;
 use App\Controllers\ContentController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
+use App\Controllers\MemberAddressController;
 use App\Controllers\MemberAuthController;
+use App\Controllers\MemberController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
@@ -130,6 +132,20 @@ $router->post('/api/{site}/wishlist', [WishlistController::class, 'add']);
 $router->delete('/api/{site}/wishlist/{productId}', [WishlistController::class, 'remove']);
 
 $router->get('/order-confirmation', [CartController::class, 'orderConfirmation']);
+
+$router->get('/member/addresses', [MemberAddressController::class, 'index']);
+$router->get('/member/addresses/search', [MemberAddressController::class, 'search']);
+$router->get('/member/addresses/create', [MemberAddressController::class, 'create']);
+$router->get('/member/{memberId}/addresses', [MemberAddressController::class, 'show']);
+$router->post('/member/addresses', [MemberAddressController::class, 'store']);
+$router->get('/member/addresses/{id}/edit', [MemberAddressController::class, 'edit']);
+$router->put('/member/addresses/{id}', [MemberAddressController::class, 'update']);
+$router->delete('/member/addresses/{id}', [MemberAddressController::class, 'destroy']);
+$router->post('/member/addresses/{id}', [MemberAddressController::class, 'update']); // If you don't support PUT
+$router->post('/member/addresses/{id}/delete', [MemberAddressController::class, 'destroy']);
+$router->post('/member/addresses/{id}/set-default', [MemberAddressController::class, 'setDefault']);
+
+$router->get('/member/me', MemberController::class, 'me');
 
 
 

@@ -20,6 +20,8 @@ class Order extends Model
         'total',
         'currency',
         'customer_notes',
+        'shipping_address_id',
+        'billing_address_id',
         'admin_notes',
         'shipping_address',
         'billing_address',
@@ -148,5 +150,31 @@ class Order extends Model
     public function getCustomerEmailAttribute()
     {
         return $this->user ? $this->user->email : '';
+    }
+
+    public function shippingAddress($relation = false)
+    {
+        return $this->belongsTo(Address::class, 'shipping_address_id', 'id', $relation);
+    }
+
+    public function billingAddress($relation = false)
+    {
+        return $this->belongsTo(Address::class, 'billing_address_id', 'id', $relation);
+    }
+
+    public function getShippingAddressDataAttribute(): ?array
+    {
+        if ($this->relationLoaded('shippingAddress') && $this->shippingAddress) {
+            return $this->shippingAddress->toArray();
+        }
+        return $this->shipping_address;
+    }
+
+    public function getBillingAddressDataAttribute(): ?array
+    {
+        if ($this->relationLoaded('billingAddress') && $this->billingAddress) {
+            return $this->billingAddress->toArray();
+        }
+        return $this->billing_address;
     }
 }
