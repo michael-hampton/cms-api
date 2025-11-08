@@ -25,15 +25,7 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_get_addresses_for_member_returns_addresses(): void
     {
         // Arrange
-        $address1 = Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'shipping',
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US',
-            'is_default' => true,
-        ]);
+        $address1 = $this->createAddress([ 'member_id' => $this->testMember->id]);
 
         $address2 = Address::create([
             'member_id' => $this->testMember->id,
@@ -55,32 +47,9 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_get_shipping_addresses_for_member_filters_correctly(): void
     {
         // Arrange
-        Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'shipping',
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US',
-        ]);
-
-        Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'billing',
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US',
-        ]);
-
-        Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'both',
-            'address_line_1' => '789 Pine Rd',
-            'city' => 'Village',
-            'postcode' => '11111',
-            'country' => 'US',
-        ]);
+        $this->createAddress([ 'member_id' => $this->testMember->id]);
+        $this->createAddress([ 'member_id' => $this->testMember->id, 'type' => 'billing']);
+        $this->createAddress([ 'member_id' => $this->testMember->id, 'type' => 'both']);
 
         // Act
         $addresses = $this->repository->getShippingAddressesForMember($this->testMember->id);
@@ -95,23 +64,8 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_get_billing_addresses_for_member_filters_correctly(): void
     {
         // Arrange
-        Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'billing',
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US',
-        ]);
-
-        Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'both',
-            'address_line_1' => '789 Pine Rd',
-            'city' => 'Village',
-            'postcode' => '11111',
-            'country' => 'US',
-        ]);
+        $this->createAddress([ 'member_id' => $this->testMember->id, 'type' => 'billing']);
+        $this->createAddress([ 'member_id' => $this->testMember->id, 'type' => 'both']);
 
         // Act
         $addresses = $this->repository->getBillingAddressesForMember($this->testMember->id);
@@ -125,26 +79,8 @@ class AddressRepositoryTest extends RepositoryTestCase
 
     public function test_get_default_shipping_address_returns_correct_address(): void
     {
-        // Arrange
-        Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'shipping',
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US',
-            'is_default' => false,
-        ]);
-
-        $defaultAddress = Address::create([
-            'member_id' => $this->testMember->id,
-            'type' => 'shipping',
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US',
-            'is_default' => true,
-        ]);
+        $this->createAddress([ 'member_id' => $this->testMember->id, 'is_default' => false]);
+        $defaultAddress = $this->createAddress([ 'member_id' => $this->testMember->id, 'is_default' => true]);
 
         // Act
         $address = $this->repository->getDefaultShippingAddress($this->testMember->id);
@@ -157,13 +93,9 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_get_default_billing_address_returns_correct_address(): void
     {
         // Arrange
-        $defaultAddress = Address::create([
+        $defaultAddress = $this->createAddress([
             'member_id' => $this->testMember->id,
             'type' => 'billing',
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US',
             'is_default' => true,
         ]);
 
@@ -178,23 +110,15 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_set_default_address_updates_correctly(): void
     {
         // Arrange
-        $address1 = Address::create([
+        $address1 = $this->createAddress([
             'member_id' => $this->testMember->id,
             'type' => 'shipping',
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US',
             'is_default' => true,
         ]);
 
-        $address2 = Address::create([
+        $address2 = $this->createAddress([
             'member_id' => $this->testMember->id,
             'type' => 'shipping',
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US',
             'is_default' => false,
         ]);
 
@@ -214,22 +138,10 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_set_default_address_fails_for_wrong_member(): void
     {
         // Arrange
-        $otherMember = Member::create([
-            'site_id' => $this->siteId,
-            'email' => 'other@example.com',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
-            'first_name' => 'Other',
-            'last_name' => 'User',
-            'is_active' => true,
-        ]);
+        $otherMember = $this->createMember();
 
-        $address = Address::create([
+        $address = $this->createAddress([
             'member_id' => $otherMember->id,
-            'type' => 'shipping',
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US',
         ]);
 
         // Act
@@ -257,13 +169,8 @@ class AddressRepositoryTest extends RepositoryTestCase
     public function test_create_address_for_member_does_not_set_default_when_others_exist(): void
     {
         // Arrange
-        Address::create([
+        $this->createAddress([
             'member_id' => $this->testMember->id,
-            'type' => 'shipping',
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US',
             'is_default' => true,
         ]);
 
