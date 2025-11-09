@@ -160,4 +160,9 @@ class MemberAuth
         $member = self::member();
         return $member ? $member->id : null;
     }
+
+    public static function setMember(?AuthenticatedMember $member): void
+    {
+        self::$member = $member;
+    }
 }

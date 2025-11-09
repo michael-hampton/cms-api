@@ -304,6 +304,12 @@ class SiteContext
         return "/assets/sites/{$siteSlug}/{$path}";
     }
 
+    public static function slug(): string
+    {
+        return self::$currentSite?->slug ?? 'default';
+
+    }
+
     /**
      * Get site-specific CSS file
      */

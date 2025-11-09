@@ -413,6 +413,10 @@
         }
     </style>
 </head>
+
+<?php
+$site = \App\Framework\Support\SiteContext::slug();
+?>
 <body>
 <header class="header">
     <div class="header-content">
@@ -447,7 +451,7 @@
     <h2 class="section-title">Quick Access</h2>
 
     <div class="dashboard-grid">
-        <a href="/member/orders" class="dashboard-card">
+        <a href="/<?= $site ?>/member/orders" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon orders">🛍️</div>
                 <div class="card-arrow">→</div>
@@ -458,7 +462,7 @@
             </div>
         </a>
 
-        <a href="/member/newsletters" class="dashboard-card">
+        <a href="/<?= $site ?>/member/newsletters" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon newsletters">📧</div>
                 <div class="card-arrow">→</div>
@@ -469,7 +473,7 @@
             </div>
         </a>
 
-        <a href="/member/subscriptions" class="dashboard-card">
+        <a href="/<?= $site ?>/member/subscriptions" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon subscriptions">⭐</div>
                 <div class="card-arrow">→</div>
@@ -480,7 +484,7 @@
             </div>
         </a>
 
-        <a href="/member/addresses" class="dashboard-card">
+        <a href="/<?= $site ?>/member/addresses" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon addresses">📍</div>
                 <div class="card-arrow">→</div>
@@ -491,7 +495,7 @@
             </div>
         </a>
 
-        <a href="/member/comments" class="dashboard-card">
+        <a href="/<?= $site ?>/member/comments" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon comments">💬</div>
                 <div class="card-arrow">→</div>
@@ -502,7 +506,7 @@
             </div>
         </a>
 
-        <a href="/member/settings" class="dashboard-card">
+        <a href="/<?= $site ?>/member/settings" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon settings">⚙️</div>
                 <div class="card-arrow">→</div>
@@ -510,6 +514,28 @@
             <div class="card-content">
                 <h3>Account Settings</h3>
                 <p>Update your password and account preferences.</p>
+            </div>
+        </a>
+
+        <a href="/<?= $site ?>/member/reading-history" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon" style="background: linear-gradient(135deg, #ec489920 0%, #f5717620 100%);">📚</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Reading History</h3>
+                <p>View pages you've read and track your reading progress.</p>
+            </div>
+        </a>
+
+        <a href="/<?= $site ?>/member/liked-pages" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon" style="background: linear-gradient(135deg, #ef444420 0%, #dc262620 100%);">❤️</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Liked Pages</h3>
+                <p>Access your collection of liked pages and content.</p>
             </div>
         </a>
     </div>
@@ -532,14 +558,24 @@
             <div class="stat-label">Active Subscriptions</div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['addresses'] ?></div>
-            <div class="stat-label">Saved Addresses</div>
-        </div>
+<!--        <div class="stat-card">-->
+<!--            <div class="stat-number">--><?php //= $stats['addresses'] ?><!--</div>-->
+<!--            <div class="stat-label">Saved Addresses</div>-->
+<!--        </div>-->
 
         <div class="stat-card">
             <div class="stat-number"><?= $stats['comments'] ?></div>
             <div class="stat-label">Comments Posted</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['pages_read'] ?></div>
+            <div class="stat-label">Pages Read</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-number"><?= $stats['likes'] ?></div>
+            <div class="stat-label">Pages Liked</div>
         </div>
     </div>
 

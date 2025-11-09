@@ -14,6 +14,8 @@ $cssFile = asset(SiteContext::css(), 'css');
     <meta data-site-name="<?= SiteContext::get()->slug?>">
 
     <script>
+        site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+
         // Newsletter signup functionality
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('newsletter-form');

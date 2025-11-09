@@ -403,10 +403,10 @@
         <div class="header-content">
             <a href="/" class="logo"><?= htmlspecialchars($site->name) ?></a>
             <nav class="nav">
-                <a href="/member/dashboard">Dashboard</a>
-                <a href="/member/addresses">Addresses</a>
-                <a href="/member/change-password">Change Password</a>
-                <a href="/member/logout">Logout</a>
+                <a href="/<?= $site->slug ?>/member/dashboard">Dashboard</a>
+                <a href="/<?= $site->slug ?>/member/addresses">Addresses</a>
+                <a href="/<?= $site->slug ?>/member/change-password">Change Password</a>
+                <a href="/<?= $site->slug ?>/member/logout">Logout</a>
             </nav>
         </div>
     </div>
@@ -624,9 +624,13 @@
     </div>
 </div>
 
+<?php
+$site = \App\Framework\Support\SiteContext::get();
+?>
+
 <script>
     const SITE = '<?= $site->slug ?? 'default' ?>';
-    const API_BASE = '/api'
+    const API_BASE = '/api/' + SITE;
     const MEMBER_ID = <?= $member->id ?>;
 
     let editingAddressId = null;
@@ -645,7 +649,7 @@
         document.getElementById('modal-title').textContent = 'Edit Address';
 
         try {
-            const response = await fetch(`/member/addresses/search?member_id=${MEMBER_ID}`);
+            const response = await fetch(`/${SITE}/member/addresses/search?member_id=${MEMBER_ID}`);
             const data = await response.json();
 
             const address = data.items.find(a => a.id === id);
@@ -698,8 +702,8 @@
 
         try {
             const url = editingAddressId
-                ? `/member/addresses/${editingAddressId}`
-                : `/member/addresses`;
+                ? `/${SITE}/member/addresses/${editingAddressId}`
+                : `/${SITE}/member/addresses`;
 
             const method = editingAddressId ? 'PUT' : 'POST';
 
@@ -736,7 +740,7 @@
         }
 
         try {
-            const response = await fetch(`/member/addresses/${id}`, {
+            const response = await fetch(`/${SITE}/member/addresses/${id}`, {
                 method: 'DELETE'
             });
 
@@ -754,7 +758,7 @@
 
     async function setDefault(id) {
         try {
-            const response = await fetch(`/member/addresses/${id}/set-default`, {
+            const response = await fetch(`/${SITE}/member/addresses/${id}/set-default`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -776,7 +780,7 @@
 
     async function loadAddresses() {
         try {
-            const response = await fetch(`/member/addresses/search?member_id=${MEMBER_ID}`);
+            const response = await fetch(`/${SITE}/member/addresses/search?member_id=${MEMBER_ID}`);
             const data = await response.json();
 
             if (!data.success || !data.items) {

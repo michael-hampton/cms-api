@@ -52,13 +52,14 @@ class OrderRepository extends Repository
             $query->limit($limit);
         }
 
-        return $query->get();
+        return $this->applySiteFilter($query)->get();
     }
 
     public function getRecentOrders(?int $limit = 10): Collection
     {
-        return Order::orderBy('created_at', 'desc')
-            ->limit($limit)
+        $query = Order::orderBy('created_at', 'desc');
+
+        return $this->applySiteFilter($query)->limit($limit)
             ->get();
     }
 
@@ -71,7 +72,7 @@ class OrderRepository extends Repository
             $query->limit($limit);
         }
 
-        return $query->get();
+        return $this->applySiteFilter($query)->get();
     }
 
     public function getTotalRevenue(?string $startDate = null, ?string $endDate = null): float
@@ -87,7 +88,7 @@ class OrderRepository extends Repository
             $query->where('completed_at', '<=', $endDate);
         }
 
-        $orders = $query->get();
+        $orders = $this->applySiteFilter($query)->get();
 
         return $orders->sum('total');
     }
@@ -100,7 +101,7 @@ class OrderRepository extends Repository
             $query->where('status', $status);
         }
 
-        return $query->count();
+        return $this->applySiteFilter($query)->count();
     }
 
     public function getOrderById(int $orderId): ?Order

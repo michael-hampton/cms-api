@@ -36,30 +36,16 @@ $hasSidebar = !empty($sidebarBlocks);
                     <!-- Page Header -->
                     <?php if ($page->page_type !== 'custom'): ?>
                         <header class="page-header">
-                            <h1 class="page-title"><?= htmlspecialchars($page->title) ?></h1>
+                            @include('page-title')
 
                             <div class="page-meta">
                                 <!-- Categories -->
-                                <?php if (!empty($page->categories)): ?>
-                                    <div class="page-categories">
-                                        <?php foreach ($page->categories as $index => $category): ?>
-                                            <a href="/category/<?= urlencode($category->slug) ?>" class="category-badge">
-                                                <?= htmlspecialchars($category->name) ?>
-                                            </a>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
+                                @include('categories')
 
                                 <!-- Tags -->
-                                <?php if (!empty($page->tags)): ?>
-                                    <div class="page-tags">
-                                        <?php foreach ($page->tags as $tag): ?>
-                                            <a href="/tags/<?= urlencode($tag->slug) ?>" class="tag-badge">
-                                                #<?= htmlspecialchars($tag->name) ?>
-                                            </a>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
+                                @include('tags')
+
+                                @include('page-actions')
                             </div>
                         </header>
                     <?php endif; ?>
@@ -79,7 +65,7 @@ $hasSidebar = !empty($sidebarBlocks);
                     @include('comments')
 
                     <!-- Social Sharing -->
-                    @include('links)
+                    @include('links')
                 </article>
 
                 <!-- Sidebar -->

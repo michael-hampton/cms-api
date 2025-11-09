@@ -369,4 +369,46 @@ class Page extends Model
 
         return $member->hasAnyRole($allowedRoles);
     }
+
+    // Add these methods to App\Models\Page.php
+
+    public function views($relation = false)
+    {
+        return $this->hasMany(PageView::class, 'page_id', 'id', $relation);
+    }
+
+    public function likes($relation = false)
+    {
+        return $this->hasMany(PageLike::class, 'page_id', 'id', $relation);
+    }
+
+    public function likedByMembers($relation = false)
+    {
+        return $this->belongsToMany(
+            Member::class,
+            'page_likes',
+            'page_id',
+            'member_id',
+            $relation
+        )->withPivot('liked_at');
+    }
+
+    public function getLikeCount(): int
+    {
+        return PageLike::getLikeCount($this->id);
+    }
+
+    public function getTotalViewCount(): int
+    {
+        return PageView::getTotalViewCount($this->id);
+    }
+
+    public function isLikedBy(?int $memberId, int $siteId): bool
+    {
+        if (!$memberId) {
+            return false;
+        }
+
+        return PageLike::isLikedBy($this->id, $memberId, $siteId);
+    }
 }

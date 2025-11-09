@@ -3,16 +3,20 @@
 namespace App\Tests\Unit\Services;
 
 use App\Framework\Authorization\AuthenticationService;
+use App\Framework\Support\Collection;
 use App\Models\PageGrid;
 use App\Models\Territory;
 use App\Models\User;
 use App\Repositories\PageGridRepository;
 use App\Services\PageGridService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 
 class PageGridServiceTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected PageGridService $service;
     protected $repositoryMock;
     private $authenticationService;
@@ -969,6 +973,207 @@ class PageGridServiceTest extends FunctionalTestCase
         ]);
 
         $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testCreatePageGridWithPages()
+    {
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $data = [
+            'title' => 'Test Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'page_ids' => [$page->id]
+        ];
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+        $this->repositoryMock->expects('slugExists')->andReturn(false);
+
+        $expectedGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $expectedGrid->id = 1;
+
+        $this->repositoryMock->shouldReceive('create')
+            ->once()
+            ->andReturn($expectedGrid);
+
+        $expectedGrid->shouldReceive('pages')
+            ->once()
+            ->with(true)
+            ->andReturnSelf();
+
+        $expectedGrid->shouldReceive('sync')
+            ->once()
+            ->with([$page->id]);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->createPageGrid($data);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testUpdatePageGridPages()
+    {
+        $existingGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $existingGrid->id = 1;
+        $existingGrid->title = 'Test Grid';
+
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->twice()
+            ->andReturn($existingGrid);
+
+        $this->repositoryMock
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($existingGrid);
+
+        $existingGrid->shouldReceive('pages')
+            ->once()
+            ->with(true)
+            ->andReturnSelf();
+
+        $existingGrid->shouldReceive('sync')
+            ->once()
+            ->with([$page->id]);
+
+        $result = $this->service->updatePageGrid(1, [
+            'page_ids' => [$page->id]
+        ]);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testDuplicatePageGridCopiesPageAssignments()
+    {
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $original = Mockery::mock(PageGrid::class)->makePartial();
+        $original->id = 1;
+        $original->title = 'Original';
+
+        $duplicate = Mockery::mock(PageGrid::class)->makePartial();
+        $duplicate->id = 2;
+        $duplicate->title = 'Original (Copy)';
+
+        $pagesRelation = Mockery::mock();
+        $pagesRelation->shouldReceive('pluck')
+            ->with('id')
+            ->andReturn(collect([$page->id]));
+
+        $original->shouldReceive('pages')
+            ->once()
+            ->andReturn($pagesRelation);
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($original);
+
+        $this->repositoryMock
+            ->shouldReceive('duplicate')
+            ->with(1)
+            ->once()
+            ->andReturn($duplicate);
+
+        $this->authenticationService->shouldReceive('check')->andReturn(false);
+
+        $duplicate->shouldReceive('pages')
+            ->once()
+            ->with(true)
+            ->andReturnSelf();
+
+        $duplicate->shouldReceive('sync')
+            ->once()
+            ->with([$page->id]);
+
+        $duplicate->shouldReceive('toArray')
+            ->once()
+            ->andReturn(['id' => 2, 'title' => 'Original (Copy)']);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->duplicatePageGrid(1);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testAssignPages()
+    {
+        $page1 = $this->createPage(['title' => 'Page 1']);
+        $page2 = $this->createPage(['title' => 'Page 2']);
+
+        $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $pageGrid->id = 1;
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($pageGrid);
+
+        $pageGrid->shouldReceive('pages')
+            ->once()
+            ->with(true)
+            ->andReturnSelf();
+
+        $pageGrid->shouldReceive('sync')
+            ->once()
+            ->with([$page1->id, $page2->id]);
+
+        $pageGrid->shouldReceive('fresh')
+            ->once()
+            ->andReturn($pageGrid);
+
+        $this->repositoryMock->shouldReceive('logHistory')
+            ->once()
+            ->andReturn(true);
+
+        $this->authenticationService->shouldReceive('check')->andReturn(true);
+
+        $this->authenticationService->shouldReceive('getUserId')->andReturn(1);
+
+        $result = $this->service->assignPages(1, [$page1->id, $page2->id]);
+
+        $this->assertInstanceOf(PageGrid::class, $result);
+    }
+
+    public function testGetAssignedPages()
+    {
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
+        $pageGrid->id = 1;
+
+        $pagesRelation = Mockery::mock();
+        $pagesRelation->shouldReceive('get')
+            ->once()
+            ->andReturn(collect([$page]));
+
+        $pageGrid->shouldReceive('pages')
+            ->once()
+            ->andReturn($pagesRelation);
+
+        $this->repositoryMock
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($pageGrid);
+
+        $result = $this->service->getAssignedPages(1);
+
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertCount(1, $result);
     }
 
 }

@@ -408,4 +408,56 @@ class PageGridController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Assign pages to grid
+     */
+    public function assignPages(Request $request, int $id): JsonResponse
+    {
+        try {
+            $pageIds = $request->input('page_ids', []);
+
+            if (!is_array($pageIds)) {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'page_ids must be an array',
+                ], 400);
+            }
+
+            $pageGrid = $this->pageGridService->assignPages($id, $pageIds);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Pages assigned successfully',
+                'data' => $pageGrid->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Failed to assign pages',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get assigned pages for a grid
+     */
+    public function getAssignedPages(int $id): JsonResponse
+    {
+        try {
+            $pages = $this->pageGridService->getAssignedPages($id);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $pages->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Failed to get assigned pages',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

@@ -34,31 +34,15 @@ $hasSidebar = !empty($sidebarBlocks);
 
                     <!-- Page Header -->
                     <div class="page-header">
-                        <h1 class="page-title"><?= htmlspecialchars($page->title) ?></h1>
+                        @include('page-title')
+
                         <!-- Categories -->
-                        <?php if (!empty($page->categories)): ?>
-                            <div class="page-categories">
-                                <span class="categories-label">Categories:</span>
-                                <?php foreach ($page->categories as $index => $category): ?>
-                                <a href="/category/<?= urlencode($category->slug) ?>" class="category-link">
-                                    <?= htmlspecialchars($category->name) ?>
-                                    </a><?= $index < count($page->categories) - 1 ? ', ' : '' ?>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
+                        @include('categories')
 
                         <!-- Tags -->
-                        <?php if ($page->tags): ?>
-                            <div class="page-tags">
-                                <?php foreach ($page->tags as $tag): ?>
-                                    <span class="tag-badge">
-                                        <a href="/tags/<?= urlencode($tag->slug) ?>" class="tag-link">
-                                             <?= htmlspecialchars($tag->name) ?>
-                                        </a>
-                                    </span>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
+                        @include('tags')
+
+                        @include('page-actions')
                     </div>
 
                     <!-- Main Content Blocks -->

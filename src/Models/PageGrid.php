@@ -195,6 +195,17 @@ class PageGrid extends Model
         );
     }
 
+    public function pages($relation = false)
+    {
+        return $this->belongsToMany(
+            Page::class,
+            'page_grid_pages',
+            'page_grid_id',
+            'page_id',
+            $relation
+        );
+    }
+
     public function hasTerritory(int $territoryId): bool
     {
         return $this->territories()->where('territory_id', $territoryId)->exists();

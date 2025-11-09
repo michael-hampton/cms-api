@@ -124,9 +124,8 @@ class CommentRepository extends Repository
 
     public function countApprovedCommentsByEmail(string $email): int
     {
-        return Comment::where('email', $email)
-            ->where('status', 'approved')
-            ->count();
+        return $this->applySiteFilter(Comment::where('email', $email)
+            ->where('status', 'approved'))->count();
     }
 
     public function countCommentsByPage(int $pageId, ?string $status = null): int

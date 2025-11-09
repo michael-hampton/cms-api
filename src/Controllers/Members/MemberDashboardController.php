@@ -10,7 +10,9 @@ use App\Repositories\CommentRepository;
 use App\Repositories\MemberRepository;
 use App\Repositories\NewsletterRepository;
 use App\Repositories\OrderRepository;
+use App\Repositories\PageLikeRepository;
 use App\Repositories\PageRepository;
+use App\Repositories\PageViewRepository;
 use App\Repositories\SubscriberRepository;
 use App\Repositories\SubscriptionRepository;
 
@@ -23,7 +25,9 @@ class MemberDashboardController extends Controller
         private CommentRepository $commentRepository,
         private MemberRepository $memberRepository,
         private PageRepository $pageRepository,
-        private NewsletterRepository $newsletterRepository
+        private NewsletterRepository $newsletterRepository,
+        private PageViewRepository $pageViewRepository,
+        private PageLikeRepository $pageLikeRepository
     ) {
         parent::__construct();
     }
@@ -43,7 +47,9 @@ class MemberDashboardController extends Controller
             'subscriptions' => $this->subscriptionRepository->countActiveSubscriptions($member->id, $siteId),
             'newsletters' => $this->getNewsletterCount($member->email, $siteId),
             'addresses' => Address::where('member_id', $member->id)->count(),
-            'comments' => $this->commentRepository->countApprovedCommentsByEmail($member->email)
+            'comments' => $this->commentRepository->countApprovedCommentsByEmail($member->email),
+            'pages_read' => $this->pageViewRepository->getUniquePagesViewedByMember($member->id, $siteId),
+            'likes' => $this->pageLikeRepository->getMemberLikeCount($member->id, $siteId)
         ];
 
         // Get recommended pages

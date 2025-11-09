@@ -94,6 +94,6 @@ class Territory extends Model
 
     public function getPageGridCount(): int
     {
-        return PageGridTerritory::where('territory_id', $this->id)->get()->count();
+        return PageGridPage::where('territory_id', $this->id)->get()->count();
     }
 }

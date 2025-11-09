@@ -13,9 +13,12 @@ use App\Controllers\MemberController;
 use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberDashboardController;
+use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
+use App\Controllers\Members\MemberReadingHistoryController;
 use App\Controllers\Members\MemberSubscriptionsController;
+use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
@@ -67,10 +70,13 @@ $router->post('/contact', EstateWebsiteController::class, 'submitContact');
 $router->get('/property/{id}', EstateWebsiteController::class, 'property');
 $router->get('/category/{slug}', CategoryPageController::class, 'show');
 $router->post('/event-signup', EventController::class, 'signup');
-$router->post('/comments', CommentController::class, 'store');
+$router->post('/{site}/comments', CommentController::class, 'store');
 
 $router->get('/authors/{slug}', AuthorViewController::class, 'show');
 $router->get('/tags/{slug}', TagViewController::class, 'show');
+
+$router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);
+$router->get('/{site}/member/liked-pages', [MemberLikedPagesController::class, 'index']);
 
 $router->get('/shop', ProductListController::class, 'index');
 $router->get('/shop/details/{slug}', ProductDetailController::class, 'show');
@@ -138,41 +144,43 @@ $router->delete('/api/{site}/wishlist/{productId}', [WishlistController::class, 
 
 $router->get('/order-confirmation', [CartController::class, 'orderConfirmation']);
 
-$router->get('/member/addresses', [MemberAddressController::class, 'index']);
-$router->get('/member/addresses/search', [MemberAddressController::class, 'search']);
-$router->get('/member/addresses/create', [MemberAddressController::class, 'create']);
-$router->get('/member/{memberId}/addresses', [MemberAddressController::class, 'show']);
-$router->post('/member/addresses', [MemberAddressController::class, 'store']);
-$router->get('/member/addresses/{id}/edit', [MemberAddressController::class, 'edit']);
-$router->put('/member/addresses/{id}', [MemberAddressController::class, 'update']);
-$router->delete('/member/addresses/{id}', [MemberAddressController::class, 'destroy']);
-$router->post('/member/addresses/{id}', [MemberAddressController::class, 'update']); // If you don't support PUT
-$router->post('/member/addresses/{id}/delete', [MemberAddressController::class, 'destroy']);
-$router->post('/member/addresses/{id}/set-default', [MemberAddressController::class, 'setDefault']);
+$router->get('/{site}/member/addresses', [MemberAddressController::class, 'index']);
+$router->get('/{site}/member/addresses/search', [MemberAddressController::class, 'search']);
+$router->get('/{site}/member/addresses/create', [MemberAddressController::class, 'create']);
+$router->get('/{site}/member/{memberId}/addresses', [MemberAddressController::class, 'show']);
+$router->post('/{site}/member/addresses', [MemberAddressController::class, 'store']);
+$router->get('/{site}/member/addresses/{id}/edit', [MemberAddressController::class, 'edit']);
+$router->put('/{site}/member/addresses/{id}', [MemberAddressController::class, 'update']);
+$router->delete('/{site}/member/addresses/{id}', [MemberAddressController::class, 'destroy']);
+$router->post('/{site}/member/addresses/{id}', [MemberAddressController::class, 'update']); // If you don't support PUT
+$router->post('/{site}/member/addresses/{id}/delete', [MemberAddressController::class, 'destroy']);
+$router->post('/{site}/member/addresses/{id}/set-default', [MemberAddressController::class, 'setDefault']);
 
 $router->get('/member/me', MemberController::class, 'me');
 
-$router->get('/member/dashboard', [MemberDashboardController::class, 'index']);
+$router->post('/{site}/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
+
+$router->get('/{site}/member/dashboard', [MemberDashboardController::class, 'index']);
 
 // Member Orders Routes
-$router->get('/member/orders', [MemberOrdersController::class, 'index']);
-$router->get('/member/orders/{orderId}', [MemberOrdersController::class, 'show']);
-$router->post('/member/orders/{id}/cancel', [MemberOrdersController::class, 'cancel']);
+$router->get('/{site}/member/orders', [MemberOrdersController::class, 'index']);
+$router->get('/{site}/member/orders/{orderId}', [MemberOrdersController::class, 'show']);
+$router->post('/{site}/member/orders/{id}/cancel', [MemberOrdersController::class, 'cancel']);
 
 
 // Member Subscriptions Routes
-$router->get('/member/subscriptions', [MemberSubscriptionsController::class, 'index']);
-$router->post('/member/subscriptions/{id}/cancel', [MemberSubscriptionsController::class, 'cancel']);
+$router->get('/{site}/member/subscriptions', [MemberSubscriptionsController::class, 'index']);
+$router->post('/{site}/member/subscriptions/{id}/cancel', [MemberSubscriptionsController::class, 'cancel']);
 
 // Member Newsletters Routes
-$router->get('/member/newsletters', [MemberNewslettersController::class, 'index']);
-$router->post('/member/newsletters/unsubscribe', [MemberNewslettersController::class, 'unsubscribe']);
+$router->get('/{site}/member/newsletters', [MemberNewslettersController::class, 'index']);
+$router->post('/{site}/member/newsletters/unsubscribe', [MemberNewslettersController::class, 'unsubscribe']);
 
 // Member Comments Routes
-$router->get('/member/comments', [MemberCommentsController::class, 'index']);
-$router->delete('/member/comments/{id}', [MemberCommentsController::class, 'destroy']);
+$router->get('/{site}/member/comments', [MemberCommentsController::class, 'index']);
+$router->delete('/{site}/member/comments/{id}', [MemberCommentsController::class, 'destroy']);
 
-$router->get('/member/settings', [MemberAuthController::class, 'showChangePasswordForm']);
+$router->get('/{site}/member/settings', [MemberAuthController::class, 'showChangePasswordForm']);
 
 
 // Apply page member access check to content routes
@@ -180,5 +188,5 @@ $router->get('/{slug}', [ContentController::class, 'show'])
     ->middleware([CheckPageMemberAccess::class]);
 
 $router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
-    ->middleware([CheckPageMemberAccess::class]);
-    //->where('regionSlug', 'asia-pacific|europe|americas');
+    ->middleware([CheckPageMemberAccess::class])
+    ->where('regionSlug', 'asia-pacific|europe|americas');

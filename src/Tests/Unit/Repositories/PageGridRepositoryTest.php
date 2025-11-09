@@ -334,4 +334,31 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertInstanceOf(\App\Framework\Support\Collection::class, $history);
         $this->assertCount(0, $history);
     }
+
+    public function test_find_loads_pages_relationship(): void
+    {
+        $grid = $this->createPageGrid();
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $grid->pages(true)->attach($page->id);
+
+        $found = $this->repository->find($grid->id, ['pages']);
+
+        $this->assertNotNull($found);
+        $this->assertTrue($found->relationLoaded('pages'));
+        $this->assertCount(1, $found->pages);
+    }
+
+    public function test_duplicate_does_not_copy_page_assignments(): void
+    {
+        $original = $this->createPageGrid();
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $original->pages(true)->attach($page->id);
+
+        $duplicate = $this->repository->duplicate($original->id);
+
+        $this->assertNotNull($duplicate);
+        $this->assertCount(0, $duplicate->pages);
+    }
 }

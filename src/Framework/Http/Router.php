@@ -21,6 +21,7 @@ class Router
     private array $namedRoutes = [];
     private string $lastHttpMethod;
     private string $lastPath;
+    private array $paramPatterns = [];
 
     public function __construct(Container $container)
     {
@@ -537,24 +538,22 @@ class Router
     /**
      * Match route with parameters
      */
-    private function matchRoute(string $routePath, string $requestPath, &$params = []): bool
+    private function matchRoute(string $routePath, string $requestPath, &$params): bool
     {
-        $params = [];
+        $method = $this->lastHttpMethod ?? 'GET';
+        $patterns = $this->paramPatterns[$method][$routePath] ?? [];
 
-        // Convert route pattern to regex
-        $pattern = preg_replace('/\{([^}]+)\}/', '([^/]+)', $routePath);
-        $pattern = '#^' . $pattern . '$#';
+        // Build regex dynamically using `where()` patterns
+        $regex = preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($patterns) {
+            $param = $matches[1];
+            $pattern = $patterns[$param] ?? '[^/]+';
+            return '(' . $pattern . ')';
+        }, $routePath);
 
-        if (preg_match($pattern, $requestPath, $matches)) {
-            // Extract parameter names from route
+        if (preg_match('#^' . $regex . '$#', $requestPath, $matches)) {
+            array_shift($matches);
             preg_match_all('/\{([^}]+)\}/', $routePath, $paramNames);
-
-            // Map parameter values
-            for ($i = 1; $i < count($matches); $i++) {
-                $paramName = $paramNames[1][$i - 1];
-                $params[$paramName] = $matches[$i];
-            }
-
+            $params = array_combine($paramNames[1], $matches);
             return true;
         }
 
@@ -602,5 +601,17 @@ class Router
     public function getNamedRoutes(): array
     {
         return $this->namedRoutes;
+    }
+
+    public function where(string $param, string $pattern): self
+    {
+        if (!isset($this->lastHttpMethod) || !isset($this->lastPath)) {
+            throw new \LogicException('Cannot call where() before defining a route.');
+        }
+
+        // Store parameter regex for the last added route
+        $this->paramPatterns[$this->lastHttpMethod][$this->lastPath][$param] = $pattern;
+
+        return $this;
     }
 }

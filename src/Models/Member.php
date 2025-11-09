@@ -155,4 +155,38 @@ class Member extends Model
     {
         return $this->hasMany(Comment::class, 'email', 'email', $relation);
     }
+
+    // Add these methods to App\Models\Member.php
+
+    public function pageViews($relation = false)
+    {
+        return $this->hasMany(PageView::class, 'member_id', 'id', $relation);
+    }
+
+    public function pageLikes($relation = false)
+    {
+        return $this->hasMany(PageLike::class, 'member_id', 'id', $relation);
+    }
+
+    public function likedPages($relation = false)
+    {
+        return $this->belongsToMany(
+            Page::class,
+            'page_likes',
+            'member_id',
+            'page_id',
+            $relation
+        );
+    }
+
+    public function viewedPages($relation = false)
+    {
+        return $this->belongsToMany(
+            Page::class,
+            'page_views',
+            'member_id',
+            'page_id',
+            $relation
+        );
+    }
 }

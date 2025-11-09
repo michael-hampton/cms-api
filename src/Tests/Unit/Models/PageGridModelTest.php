@@ -2,12 +2,16 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Framework\Support\Collection;
 use App\Models\PageGrid;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageGridModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected PageGrid $pageGrid;
 
     protected function setUp(): void
@@ -399,5 +403,56 @@ class PageGridModelTest extends FunctionalTestCase
         $this->assertEquals('Updated Page 1', $this->pageGrid->items[0]['title']);
         $this->assertTrue($this->pageGrid->items[0]['featured']);
         $this->assertEquals(1, $this->pageGrid->items[0]['id']);
+    }
+
+    public function testPagesRelationship()
+    {
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true
+        ]);
+
+        $relation = $pageGrid->pages();
+
+        $this->assertInstanceOf(Collection::class, $relation);
+    }
+
+    public function testCanAttachPagesToGrid()
+    {
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true
+        ]);
+
+        $page = $this->createPage(['title' => 'Test Page']);
+
+        $pageGrid->pages(true)->attach($page->id);
+
+        $this->assertCount(1, $pageGrid->pages);
+        $this->assertEquals($page->id, $pageGrid->pages->first()->id);
+    }
+
+    public function testCanSyncPagesWithGrid()
+    {
+        $pageGrid = PageGrid::create([
+            'title' => 'Test Grid',
+            'slug' => 'test-grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'is_active' => true
+        ]);
+
+        $page1 = $this->createPage(['title' => 'Page 1']);
+        $page2 = $this->createPage(['title' => 'Page 2']);
+
+        $pageGrid->pages(true)->sync([$page1->id, $page2->id]);
+
+        $this->assertCount(2, $pageGrid->pages);
     }
 }

@@ -587,6 +587,7 @@ function formatCommentDate($date)
     </style>
 
     <script>
+        site = '<?= \App\Framework\Support\SiteContext::slug()?>';
         // Enhanced Comment Form Functionality
         (function () {
             const form = document.getElementById('comment-form');
@@ -623,7 +624,7 @@ function formatCommentDate($date)
                 messageDiv.style.display = 'none';
 
                 try {
-                    const response = await fetch('/comments', {
+                    const response = await fetch('/' + site + '/comments', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

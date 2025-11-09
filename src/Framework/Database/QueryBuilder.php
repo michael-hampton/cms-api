@@ -65,6 +65,27 @@ class QueryBuilder
         return $this;
     }
 
+    // Add to QueryBuilder.php
+
+    public function countDistinct(string $column): int
+    {
+        $originalSelects = $this->selects;
+        $originalOrders = $this->orders;
+
+        // Use raw SQL for COUNT(DISTINCT column)
+        $this->selects = ["COUNT(DISTINCT {$column}) as count"];
+        $this->orders = [];
+
+        [$sql, $params] = $this->toSql();
+        $stmt = $this->database->query($sql, $params);
+        $result = $stmt->fetch();
+
+        $this->selects = $originalSelects;
+        $this->orders = $originalOrders;
+
+        return (int)($result['count'] ?? 0);
+    }
+
     public function distinct(): self
     {
         if (!in_array('DISTINCT', $this->selects)) {

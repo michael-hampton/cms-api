@@ -43,7 +43,8 @@ class PageGridService
     {
         return $this->database->transaction(function () use ($data) {
             $territoryIds = $data['territory_ids'] ?? [];
-            unset($data['territory_ids']);
+            $pageIds = $data['page_ids'] ?? []; // Add this
+            unset($data['territory_ids'], $data['page_ids']);;
 
             // Auto-generate slug if not provided
             if (empty($data['slug']) && !empty($data['title'])) {
@@ -85,6 +86,11 @@ class PageGridService
 
             if (!empty($territoryIds)) {
                 $pageGrid->syncTerritories($territoryIds);
+            }
+
+            // Add page syncing
+            if (!empty($pageIds)) {
+                $pageGrid->pages(true)->sync($pageIds);
             }
 
             $this->logHistory($pageGrid->id, 'created', ['data' => $data]);
@@ -143,7 +149,8 @@ class PageGridService
             }
 
             $territoryIds = $data['territory_ids'] ?? null;
-            unset($data['territory_ids']);
+            $pageIds = $data['page_ids'] ?? null; // Add this
+            unset($data['territory_ids'], $data['page_ids']);
 
             // Handle migration from 'pages' to 'items'
             if (isset($data['pages']) && !isset($data['items'])) {
@@ -178,6 +185,10 @@ class PageGridService
 
             if ($territoryIds !== null) {
                 $pageGrid->syncTerritories($territoryIds);
+            }
+
+            if ($pageIds !== null) {
+                $pageGrid->pages(true)->sync($pageIds);
             }
 
             if (!empty($changes)) {
@@ -247,6 +258,11 @@ class PageGridService
                 // Set creator if authenticated
                 if ($this->authenticationService->check()) {
                     $duplicate->update(['created_by' => $this->authenticationService->getUserId()]);
+                }
+
+                $originalPageIds = $original->pages()->pluck('id')->toArray();
+                if (!empty($originalPageIds)) {
+                    $duplicate->pages(true)->sync($originalPageIds);
                 }
 
                 $items = $duplicate->items;
@@ -423,5 +439,35 @@ class PageGridService
 
             return $pageGrid->fresh();
         });
+    }
+
+    public function assignPages(int $id, array $pageIds): PageGrid
+    {
+        return $this->database->transaction(function () use ($id, $pageIds) {
+            $pageGrid = $this->repository->find($id);
+
+            if (!$pageGrid) {
+                throw new \Exception('Page grid not found');
+            }
+
+            $pageGrid->pages(true)->sync($pageIds);
+
+            $this->logHistory($id, 'pages_updated', [
+                'page_count' => count($pageIds)
+            ]);
+
+            return $pageGrid->fresh();
+        });
+    }
+
+    public function getAssignedPages(int $id): Collection
+    {
+        $pageGrid = $this->repository->find($id);
+
+        if (!$pageGrid) {
+            throw new \Exception('Page grid not found');
+        }
+
+        return $pageGrid->pages()->get();
     }
 }

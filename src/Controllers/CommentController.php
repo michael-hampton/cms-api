@@ -5,6 +5,7 @@ namespace App\Controllers;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Requests\CreateCommentRequest;
 use App\Services\CommentService;
 
@@ -19,7 +20,9 @@ class CommentController extends Controller
     public function store(CreateCommentRequest $request)
     {
         try {
-            $comment = $this->commentService->createComment($request->validated());
+            $data = $request->validated();
+            $data['site_id'] = SiteContext::getId();
+            $comment = $this->commentService->createComment($data);
 
             return $this->resourceResponse([
                 'success' => true,

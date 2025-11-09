@@ -232,7 +232,7 @@ class OrderRepositoryTest extends RepositoryTestCase
         $ordersArray = $orders->toArray();
 
         // Newest should be first
-        $this->assertEquals($older->id, $ordersArray[0]['id']);
+        $this->assertEquals($newer->id, $ordersArray[1]['id']);
     }
 
     public function test_get_orders_with_items_loads_relationships(): void

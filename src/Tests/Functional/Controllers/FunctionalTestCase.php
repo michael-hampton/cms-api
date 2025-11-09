@@ -3,10 +3,13 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\ApiApplication;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
 use App\Framework\Migration\MigrationRunner;
+use App\Framework\Session\Session;
+use App\Models\Member;
 use App\Models\Site;
 use App\Models\User;
 use PHPUnit\Framework\TestCase;
@@ -76,6 +79,12 @@ abstract class FunctionalTestCase extends TestCase
         $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
         $this->siteSlug = $site->slug;
         $this->siteId = $site->id;
+    }
+
+    protected function actingAsMember(Member $member): void
+    {
+        Session::put('member_id', $member->id);
+        Session::put('member_authenticated', true);
     }
 
     /**

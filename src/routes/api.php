@@ -1,37 +1,38 @@
 <?php
 // API routes (return arrays -> converted to JSON)
-use App\Controllers\Members\AddressController;
-use App\Controllers\Members\AuthController;
-use App\Controllers\Members\AuthorController;
-use App\Controllers\Members\BlockController;
-use App\Controllers\Members\BrandController;
-use App\Controllers\Members\CartController;
-use App\Controllers\Members\CategoryController;
-use App\Controllers\Members\CommentController;
-use App\Controllers\Members\CustomFieldDefinitionController;
-use App\Controllers\Members\EstateWebsiteController;
-use App\Controllers\Members\ImageController;
-use App\Controllers\Members\MemberController;
-use App\Controllers\Members\MenuController;
-use App\Controllers\Members\MenuItemController;
-use App\Controllers\Members\NewsletterController;
-use App\Controllers\Members\OrderController;
-use App\Controllers\Members\PageController;
-use App\Controllers\Members\PageGridController;
-use App\Controllers\Members\PageHistoryController;
-use App\Controllers\Members\PreviewController;
-use App\Controllers\Members\ProductController;
-use App\Controllers\Members\ProductListController;
-use App\Controllers\Members\RegionSetController;
-use App\Controllers\Members\ReviewController;
-use App\Controllers\Members\SearchController;
-use App\Controllers\Members\SiteController;
-use App\Controllers\Members\TagController;
-use App\Controllers\Members\TerritoryController;
-use App\Controllers\Members\UserController;
-use App\Controllers\Members\VideoController;
-use App\Controllers\Members\VoucherController;
-use App\Controllers\Members\WishlistController;
+use App\Controllers\AddressController;
+use App\Controllers\AuthController;
+use App\Controllers\AuthorController;
+use App\Controllers\BlockController;
+use App\Controllers\BrandController;
+use App\Controllers\CartController;
+use App\Controllers\CategoryController;
+use App\Controllers\CommentController;
+use App\Controllers\CustomFieldDefinitionController;
+use App\Controllers\EstateWebsiteController;
+use App\Controllers\ImageController;
+use App\Controllers\MemberController;
+use App\Controllers\MenuController;
+use App\Controllers\MenuItemController;
+use App\Controllers\NewsletterController;
+use App\Controllers\OrderController;
+use App\Controllers\PageController;
+use App\Controllers\PageGridController;
+use App\Controllers\PageHistoryController;
+use App\Controllers\PageLikeController;
+use App\Controllers\PreviewController;
+use App\Controllers\ProductController;
+use App\Controllers\ProductListController;
+use App\Controllers\RegionSetController;
+use App\Controllers\ReviewController;
+use App\Controllers\SearchController;
+use App\Controllers\SiteController;
+use App\Controllers\TagController;
+use App\Controllers\TerritoryController;
+use App\Controllers\UserController;
+use App\Controllers\VideoController;
+use App\Controllers\VoucherController;
+use App\Controllers\WishlistController;
 use App\Framework\Authorization\AuthenticateWithToken;
 
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
@@ -217,6 +218,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/page-grids/{id}/duplicate', PageGridController::class, 'duplicate');
         $router->post('/page-grids/{id}/toggle-active', PageGridController::class, 'toggleActive');
 
+        // In your routes file, add these:
+        $router->post('/page-grids/{id}/assign-pages', [PageGridController::class, 'assignPages']);
+        $router->get('/page-grids/{id}/assigned-pages', [PageGridController::class, 'getAssignedPages']);
+
         $router->post('/page-grids/{id}/pages', PageGridController::class, 'addPage');
         $router->delete('/page-grids/{id}/pages/{pageIndex}', PageGridController::class, 'removePage');
         $router->put('/page-grids/{id}/pages/{pageIndex}', PageGridController::class, 'updatePage');
@@ -315,6 +320,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
          $router->get('/newsletter/subscribers', NewsletterController::class, 'getSubscribers');
 
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
+
+        $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
+        $router->get('/pages/like-status/{pageId}', [PageLikeController::class, 'status']);
+
+// Member routes for viewing history and liked pages
+//        $router->get('/member/reading-history', [MemberReadingHistoryController::class, 'index']);
+//        $router->get('/member/liked-pages', [MemberLikedPagesController::class, 'index']);
     });
 
     $router->post('/sites', [SiteController::class, 'create']);

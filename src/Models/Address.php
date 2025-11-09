@@ -18,7 +18,8 @@ class Address extends Model
         'city',
         'state',
         'postcode',
-        'country'
+        'country',
+        'site_id'
     ];
 
     protected $casts = [

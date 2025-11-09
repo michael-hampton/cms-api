@@ -3,7 +3,7 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\PageGrid;
-use App\Models\PageGridTerritory;
+use App\Models\PageGridPage;
 use App\Models\Territory;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -1191,7 +1191,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertTrue($responseData['success']);
 
         $pageGrid = PageGrid::find($responseData['data']['id']);
-        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
+        $territoryIds = PageGridPage::where('page_grid_id', $pageGrid->id)
             ->get()
             ->pluck('territory_id');
 
@@ -1213,7 +1213,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
 
-        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
+        $territoryIds = PageGridPage::where('page_grid_id', $pageGrid->id)
             ->get()
             ->pluck('territory_id');
 
@@ -1236,7 +1236,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
 
-        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
+        $territoryIds = PageGridPage::where('page_grid_id', $pageGrid->id)
             ->get()
             ->pluck('territory_id');
 

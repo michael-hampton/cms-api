@@ -77,6 +77,7 @@ class MemberAddressController extends Controller
             $member = MemberAuth::member();
             $data = $request->validated();
             $data['member_id'] = $member->id;
+            $data['site_id'] = SiteContext::getId();
 
             $this->addressRepository->createAddressForMember($member->id, $data);
 
@@ -110,7 +111,7 @@ class MemberAddressController extends Controller
     public function update(int $id, UpdateAddressRequest $request)
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/member/login');
+            return $this->errorResponse('Unauthorized', 401);
         }
 
         try {
@@ -118,19 +119,15 @@ class MemberAddressController extends Controller
             $address = $this->addressRepository->find($id);
 
             if (!$address || $address->member_id !== $member->id) {
-                return $this->redirect('/member/addresses')
-                    ->withErrors(['message' => 'Address not found']);
+                return $this->jsonResponse(['message' => 'Address not found']);
             }
 
             $data = $request->validated();
             $this->addressRepository->update($id, $data);
 
-            return $this->redirect('/member/addresses')
-                ->with('message', 'Address updated successfully');
+            return $this->jsonResponse(['message', 'Address updated successfully']);
         } catch (Exception $e) {
-            return $this->back()
-                ->withErrors(['message' => 'Failed to update address'])
-                ->withInput();
+            return $this->jsonResponse(['message' => 'Failed to update address']);
         }
     }
 
