@@ -1838,5 +1838,10 @@ $merchants = json_encode(array_map(function($m) {
 
 @js('product-reviews.js')
 @js('product-detail.js')
+
+@include('components/price-alert')
+
+@css('price-alert.css')
+@js('price-alert.js')
 </body>
 </html>

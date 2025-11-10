@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Session\Session;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
@@ -104,7 +105,7 @@ class WishlistService
 
     protected function getUserId(): ?int
     {
-        $authId = auth()->id();
+        $authId = MemberAuth::id();
         // Return null for guest users (don't use default value of 1)
         return $authId ?: null;
     }

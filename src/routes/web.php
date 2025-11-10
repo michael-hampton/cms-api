@@ -6,6 +6,7 @@ use App\Controllers\CartController;
 use App\Controllers\CategoryPageController;
 use App\Controllers\CommentController;
 use App\Controllers\ContentController;
+use App\Controllers\DealsController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
 use App\Controllers\MemberAuthController;
@@ -18,6 +19,7 @@ use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
 use App\Controllers\Members\MemberReadingHistoryController;
 use App\Controllers\Members\MemberSubscriptionsController;
+use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
@@ -181,6 +183,11 @@ $router->get('/{site}/member/comments', [MemberCommentsController::class, 'index
 $router->delete('/{site}/member/comments/{id}', [MemberCommentsController::class, 'destroy']);
 
 $router->get('/{site}/member/settings', [MemberAuthController::class, 'showChangePasswordForm']);
+
+$router->get('/{siteName}/deals', [DealsController::class, 'index']);
+
+$router->get('/{site}/member/wishlist', [MemberWishlistController::class, 'index']);
+
 
 
 // Apply page member access check to content routes

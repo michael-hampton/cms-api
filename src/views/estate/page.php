@@ -125,6 +125,19 @@ $hasSidebar = !empty($sidebarBlocks);
         <?php endif; ?>
     </div>
 
+    <script>
+        const site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+    </script>
+
+    <?php if (!empty($todaysDeals)): ?>
+        <div class="page-deals-section">
+            @include('components/deals-carousel')
+        </div>
+
+        @css('deals-carousel.css')
+        @js('deals-carousel.js')
+    <?php endif; ?>
+
   @include('authors')
 </main>
 

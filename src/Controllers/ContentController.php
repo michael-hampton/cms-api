@@ -98,6 +98,9 @@ class ContentController extends Controller
 
         $data['pageGridHtml'] = $pageGridHtml;
 
+        $dealsService = new \App\Services\DealsService();
+        $data['todaysDeals'] = $dealsService->getTodaysDeals(10);
+
         // Fallback to default theme if theme view doesn't exist
         if (!$this->viewExists($viewPath)) {
             $viewPath = "estate/page";

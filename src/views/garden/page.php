@@ -81,6 +81,14 @@ $hasSidebar = !empty($sidebarBlocks);
         <?php endif; ?>
 
         @include('authors')
+
+        <?php if (!empty($todaysDeals)): ?>
+            <div class="page-deals-section">
+                <?php include('components/deals-carousel.php'); ?>
+            </div>
+            @css('deals-carousel.css')
+            @js('deals-carousel.js')
+        <?php endif; ?>
     </div>
 </main>
 

@@ -22,6 +22,7 @@ class WishlistControllerTest extends FunctionalTestCase
         $this->assertJsonResponse($response);
 
         $data = json_decode($response->getContent(), true);
+
         $this->assertEmpty($data['items']);
         $this->assertEquals(0, $data['count']);
     }

@@ -17,7 +17,8 @@
                 </div>
                 <nav class="main-nav">
                     <a href="/">Home</a>
-                    <a href="/products" class="active">Shop</a>
+                    <a href="/shop" class="active">Shop</a>
+                    <a href="/deals">Today's Deals</a>
                     <a href="/about">About</a>
                     <a href="/contact">Contact</a>
                 </nav>

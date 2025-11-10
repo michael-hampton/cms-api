@@ -9,6 +9,7 @@ use App\Controllers\CartController;
 use App\Controllers\CategoryController;
 use App\Controllers\CommentController;
 use App\Controllers\CustomFieldDefinitionController;
+use App\Controllers\DealsController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
 use App\Controllers\MemberController;
@@ -411,6 +412,14 @@ $router->post('/comments', [CommentController::class, 'store']);
 $router->put('/comments/{commentId}/moderate', [CommentController::class, 'moderate']);
 $router->get('/pages/{pageId}/comments', [CommentController::class, 'index']);
 $router->delete('/comments/{commentId}', [CommentController::class, 'destroy']);
+
+// Deals routes
+$router->post('/api/deals/refresh', [DealsController::class, 'refresh']);
+$router->get('/api/deals/carousel', [DealsController::class, 'carousel']);
+$router->get('/api/{siteName}/deals/filtered', [DealsController::class, 'filtered']);
+
+// Price alerts
+$router->post('/api/price-alerts', [DealsController::class, 'createPriceAlert']);
 
 
 

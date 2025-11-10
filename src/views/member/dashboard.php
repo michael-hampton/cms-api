@@ -538,6 +538,17 @@ $site = \App\Framework\Support\SiteContext::slug();
                 <p>Access your collection of liked pages and content.</p>
             </div>
         </a>
+
+        <a href="/<?= $site ?>/member/wishlist" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon orders">🛍️</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>My Favorites</h3>
+                <p>View and track your order history and current shipments.</p>
+            </div>
+        </a>
     </div>
 
     <h2 class="section-title">Your Activity</h2>
