@@ -9,13 +9,15 @@ use App\Models\PageGrid;
 use App\Models\Territory;
 use App\Parsers\PageGridRenderer;
 use App\Repositories\CommentRepository;
+use App\Repositories\PageGridRepository;
 use App\Services\BlockParserService;
 
 class RegionContentController extends Controller
 {
     public function __construct(
         private readonly BlockParserService $blockParserService,
-        private readonly CommentRepository  $commentRepository
+        private readonly CommentRepository  $commentRepository,
+        private readonly PageGridRepository $pageGridRepository  // ADD THIS
     ) {
         parent::__construct();
     }
@@ -40,12 +42,7 @@ class RegionContentController extends Controller
             ->first();
 
         // Get page grid for this territory
-        $pageGrid = PageGrid::where('is_active', true)
-            ->whereHas('territories', function($query) use ($territory) {
-                $query->where('territories.id', $territory->id);
-            })
-            ->where('site_id', $siteId)
-            ->first();
+        $pageGrid = $this->pageGridRepository->getActiveGridForTerritory($territory->id);
 
         $pageGridHtml = null;
         if ($pageGrid) {

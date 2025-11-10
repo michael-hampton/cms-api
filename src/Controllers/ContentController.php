@@ -12,6 +12,7 @@ use App\Models\PageView;
 use App\Models\Site;
 use App\Parsers\PageGridRenderer;
 use App\Repositories\CommentRepository;
+use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
 use App\Services\BlockParserService;
 use App\Services\Url\UrlResolutionResult;
@@ -21,7 +22,8 @@ class ContentController extends Controller
     public function __construct(
         private readonly BlockParserService $blockParserService,
         private readonly CommentRepository  $commentRepository,
-        private readonly PageViewRepository $pageViewRepository
+        private readonly PageViewRepository $pageViewRepository,
+        private readonly PageGridRepository $pageGridRepository,
     ) {
         parent::__construct();
     }
@@ -86,12 +88,7 @@ class ContentController extends Controller
         $theme = SiteContext::getTheme();
         $viewPath = "{$theme}/page";
 
-        $pageGrid = PageGrid::where('is_active', true)
-            ->whereHas('pages', function($query) use ($page) {
-                $query->where('pages.id', $page->id);
-            })
-            ->where('site_id', $siteId)
-            ->first();
+        $pageGrid = $this->pageGridRepository->getActiveGridForPage($page->id);
 
         $pageGridHtml = null;
         if ($pageGrid) {

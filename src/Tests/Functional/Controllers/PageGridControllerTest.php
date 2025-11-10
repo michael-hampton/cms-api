@@ -4,6 +4,7 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\PageGrid;
 use App\Models\PageGridPage;
+use App\Models\PageGridTerritory;
 use App\Models\Territory;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -1020,6 +1021,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('items', $data['data']);
         $items = $data['data']['items'];
+
         $this->assertCount(3, $items);
 
         $types = array_column($items, 'type');
@@ -1191,7 +1193,7 @@ class PageGridControllerTest extends FunctionalTestCase
         $this->assertTrue($responseData['success']);
 
         $pageGrid = PageGrid::find($responseData['data']['id']);
-        $territoryIds = PageGridPage::where('page_grid_id', $pageGrid->id)
+        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
             ->get()
             ->pluck('territory_id');
 
@@ -1213,7 +1215,7 @@ class PageGridControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
 
-        $territoryIds = PageGridPage::where('page_grid_id', $pageGrid->id)
+        $territoryIds = PageGridTerritory::where('page_grid_id', $pageGrid->id)
             ->get()
             ->pluck('territory_id');
 
@@ -1241,6 +1243,393 @@ class PageGridControllerTest extends FunctionalTestCase
             ->pluck('territory_id');
 
         $this->assertCount(0, $territoryIds);
+    }
+
+    public function testCanCreatePageGridWithAssignedPages()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        $data = [
+            'title' => 'Test Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'page_ids' => [$page1->id, $page2->id],
+            'is_active' => true
+        ];
+
+        $response = $this->postForSite('/api/page-grids', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $pageGrid = PageGrid::find($responseData['data']['id']);
+        $assignedPageIds = array_column($pageGrid->pages()->toArray(), 'id' );
+
+        $this->assertCount(2, $assignedPageIds);
+        $this->assertContains($page1->id, $assignedPageIds);
+        $this->assertContains($page2->id, $assignedPageIds);
+    }
+
+    public function testCanUpdatePageGridAssignedPages()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $page3 = $this->createPage();
+
+        $pageGrid = $this->createPageGrid();
+
+        // Initially assign page1
+        $pageGrid->pages(true)->attach($page1->id);
+
+        // Update to assign page2 and page3
+        $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'page_ids' => [$page2->id, $page3->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $pageGrid = $pageGrid->fresh();
+        $assignedPageIds = array_column($pageGrid->pages()->toArray(), 'id' );
+
+        $this->assertCount(2, $assignedPageIds);
+        $this->assertNotContains($page1->id, $assignedPageIds);
+        $this->assertContains($page2->id, $assignedPageIds);
+        $this->assertContains($page3->id, $assignedPageIds);
+    }
+
+    public function testCanRemoveAllAssignedPages()
+    {
+        $page = $this->createPage();
+
+        $pageGrid = $this->createPageGrid();
+        $pageGrid->pages(true)->attach($page->id);
+
+        $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", [
+            'page_ids' => []
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $pageGrid = $pageGrid->fresh();
+        $this->assertCount(0, $pageGrid->pages);
+    }
+
+    public function testCanAssignPagesToExistingGrid()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        $pageGrid = $this->createPageGrid();
+
+        $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/assign-pages", [
+            'page_ids' => [$page1->id, $page2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEquals('Pages assigned successfully', $data['message']);
+
+        $pageGrid = $pageGrid->fresh();
+        $assignedPageIds = array_column($pageGrid->pages()->toArray(), 'id' );
+
+        $this->assertCount(2, $assignedPageIds);
+        $this->assertContains($page1->id, $assignedPageIds);
+        $this->assertContains($page2->id, $assignedPageIds);
+    }
+
+    public function testCanGetAssignedPagesForGrid()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        $pageGrid = $this->createPageGrid();
+        $pageGrid->pages(true)->sync([$page1->id, $page2->id]);
+
+        $response = $this->getForSite("/api/page-grids/{$pageGrid->id}/assigned-pages");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['data']);
+
+        $pageIds = array_column($data['data'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertContains($page2->id, $pageIds);
+    }
+
+    public function testCannotAssignPagesWithInvalidPageIds()
+    {
+        $pageGrid = $this->createPageGrid();
+
+        $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/assign-pages", [
+            'page_ids' => 'not-an-array'
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertEquals('page_ids must be an array', $data['message']);
+    }
+
+    public function testAssignPagesReturns404ForNonExistentGrid()
+    {
+        $response = $this->postForSite("/api/page-grids/999999/assign-pages", [
+            'page_ids' => [1, 2]
+        ]);
+
+        $this->assertEquals(500, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('Page grid not found', $data['error']);
+    }
+
+    public function testGetAssignedPagesReturns404ForNonExistentGrid()
+    {
+        $response = $this->getForSite("/api/page-grids/999999/assigned-pages");
+
+        $this->assertEquals(500, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function testDuplicatePageGridCopiesAssignedPages()
+    {
+        $page1 = $this->createPage(['title' => 'Page 1', 'slug' => 'page-1']);
+        $page2 = $this->createPage(['title' => 'Page 2', 'slug' => 'page-2']);
+
+        $pageGrid = $this->createPageGrid(['title' => 'Original Grid', 'slug' => 'original-grid']);
+        $pageGrid->pages(true)->sync([$page1->id, $page2->id]);
+
+        $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $duplicate = PageGrid::where('slug', 'original-grid-copy')->first();
+        $this->assertNotNull($duplicate);
+
+        $duplicatePageIds = array_column($duplicate->pages()->toArray(), 'id' );
+        $this->assertCount(2, $duplicatePageIds);
+        $this->assertContains($page1->id, $duplicatePageIds);
+        $this->assertContains($page2->id, $duplicatePageIds);
+    }
+
+    public function testDuplicateHistoryIncludesAssignedPageCount()
+    {
+        $page = $this->createPage(['title' => 'Test Page', 'slug' => 'test-page']);
+
+        $pageGrid = $this->createPageGrid(['title' => 'Original Grid', 'slug' => 'original-grid']);
+        $pageGrid->pages(true)->attach($page->id);
+
+        $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $duplicate = PageGrid::find($data['data']['id']);
+
+        $historyResponse = $this->getForSite("/api/page-grids/{$duplicate->id}/history");
+        $historyData = json_decode($historyResponse->getContent(), true);
+
+        $this->assertGreaterThan(0, count($historyData['data']));
+
+        $createdHistory = $historyData['data'][0];
+        $this->assertEquals('created', $createdHistory['action']);
+
+        $changes = json_decode($createdHistory['changes'], true);
+        $this->assertArrayHasKey('assigned_pages', $changes);
+        $this->assertEquals(1, $changes['assigned_pages']);
+    }
+
+    public function testCanAssignSamePageToMultipleGrids()
+    {
+        $page = $this->createPage(['title' => 'Shared Page', 'slug' => 'shared-page']);
+
+        $grid1 = $this->createPageGrid(['title' => 'Grid 1', 'slug' => 'grid-1']);
+        $grid2 = $this->createPageGrid(['title' => 'Grid 2', 'slug' => 'grid-2']);
+
+        // Assign page to first grid
+        $response1 = $this->postForSite("/api/page-grids/{$grid1->id}/assign-pages", [
+            'page_ids' => [$page->id]
+        ]);
+        $this->assertEquals(200, $response1->getStatusCode());
+
+        // Assign same page to second grid
+        $response2 = $this->postForSite("/api/page-grids/{$grid2->id}/assign-pages", [
+            'page_ids' => [$page->id]
+        ]);
+        $this->assertEquals(200, $response2->getStatusCode());
+
+        // Verify both grids have the page assigned
+        $grid1 = $grid1->fresh();
+        $grid2 = $grid2->fresh();
+
+        $this->assertCount(1, $grid1->pages);
+        $this->assertCount(1, $grid2->pages);
+        $this->assertEquals($page->id, $grid1->pages->first()->id);
+        $this->assertEquals($page->id, $grid2->pages->first()->id);
+    }
+
+    public function testListPageGridsIncludesAssignedPagesData()
+    {
+        $page = $this->createPage(['title' => 'Test Page', 'slug' => 'test-page']);
+
+        $pageGrid = $this->createPageGrid(['title' => 'Test Grid', 'slug' => 'test-grid']);
+        $pageGrid->pages(true)->attach($page->id);
+
+        $response = $this->getForSite('/api/page-grids');
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+
+        $testGrid = collect($data['items'])->firstWhere('slug', 'test-grid');
+        $this->assertNotNull($testGrid);
+        $this->assertArrayHasKey('pages', $testGrid);
+        $this->assertCount(1, $testGrid['pages']);
+    }
+
+    public function testShowPageGridIncludesAssignedPagesData()
+    {
+        $page = $this->createPage(['title' => 'Test Page', 'slug' => 'test-page']);
+
+        $pageGrid = $this->createPageGrid();
+        $pageGrid->pages(true)->attach($page->id);
+
+        $response = $this->getForSite("/api/page-grids/{$pageGrid->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('pages', $data['data']);
+        $this->assertCount(1, $data['data']['pages']);
+        $this->assertEquals($page->id, $data['data']['pages'][0]['id']);
+        $this->assertEquals($page->title, $data['data']['pages'][0]['title']);
+    }
+
+    public function testCanUpdateGridWithBothPagesAndPageIds()
+    {
+        $page = $this->createPage(['title' => 'Test Page', 'slug' => 'test-page']);
+
+        $pageGrid = $this->createPageGrid([
+            'items' => [
+                ['type' => 'page', 'title' => 'Item Page 1', 'slug' => 'item-page-1']
+            ]
+        ]);
+
+        $updateData = [
+            'title' => 'Updated Grid',
+            'page_ids' => [$page->id],
+            'pages' => [
+                ['type' => 'page', 'title' => 'Item Page 1', 'slug' => 'item-page-1'],
+                ['type' => 'author', 'name' => 'New Author', 'slug' => 'new-author']
+            ]
+        ];
+
+        $response = $this->putForSite("/api/page-grids/{$pageGrid->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $pageGrid = $pageGrid->fresh();
+
+        // Check items array
+        $this->assertCount(2, $pageGrid->items);
+
+        // Check assigned pages relationship
+        $assignedPages = array_column($pageGrid->pages()->toArray(), 'id' );
+        $this->assertCount(1, $assignedPages);
+        $this->assertContains($page->id, $assignedPages);
+    }
+
+    public function testCanCreateGridWithEmptyPageIds()
+    {
+        $data = [
+            'title' => 'Test Grid',
+            'layout' => 'grid',
+            'columns' => 3,
+            'page_ids' => [],
+            'is_active' => true
+        ];
+
+        $response = $this->postForSite('/api/page-grids', $data);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $pageGrid = PageGrid::find($responseData['data']['id']);
+        $this->assertCount(0, $pageGrid->pages);
+    }
+
+    public function testAssignPagesUpdatesHistoryLog()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+
+        $pageGrid = $this->createPageGrid();
+
+        $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/assign-pages", [
+            'page_ids' => [$page1->id, $page2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $historyResponse = $this->getForSite("/api/page-grids/{$pageGrid->id}/history");
+        $historyData = json_decode($historyResponse->getContent(), true);
+
+        $this->assertGreaterThan(0, count($historyData['data']));
+
+        $latestHistory = $historyData['data'][0];
+        $this->assertEquals('pages_updated', $latestHistory['action']);
+
+        $changes = json_decode($latestHistory['changes'], true);
+        $this->assertArrayHasKey('page_count', $changes);
+        $this->assertEquals(2, $changes['page_count']);
+    }
+
+    public function testCanReassignPagesToGrid()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $page3 = $this->createPage();
+
+        $pageGrid = $this->createPageGrid();
+
+        // First assignment
+        $this->postForSite("/api/page-grids/{$pageGrid->id}/assign-pages", [
+            'page_ids' => [$page1->id, $page2->id]
+        ]);
+
+        // Reassignment
+        $response = $this->postForSite("/api/page-grids/{$pageGrid->id}/assign-pages", [
+            'page_ids' => [$page2->id, $page3->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $pageGrid = $pageGrid->fresh();
+        $assignedPageIds = array_column($pageGrid->pages()->toArray(), 'id' );
+
+        $this->assertCount(2, $assignedPageIds);
+        $this->assertNotContains($page1->id, $assignedPageIds);
+        $this->assertContains($page2->id, $assignedPageIds);
+        $this->assertContains($page3->id, $assignedPageIds);
     }
 
     protected function slugify(string $text): string

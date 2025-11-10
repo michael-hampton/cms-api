@@ -30,7 +30,8 @@ class Order extends Model
         'completed_at',
         'cancelled_at',
         'site_id',
-        'created_at'
+        'created_at',
+        'voucher_code'
     ];
 
     protected $casts = [

@@ -72,9 +72,10 @@ class AddressRepository extends Repository
         return $this->update($addressId, ['is_default' => true]) !== null;
     }
 
-    public function createAddressForMember(int $memberId, array $data): Address
+    public function createAddressForMember(int $memberId, array $data, int $siteId): Address
     {
         $data['member_id'] = $memberId;
+        $data['site_id'] = $siteId;
 
         // If this is the first address, make it default
         $existingCount = Address::where('member_id', $memberId)

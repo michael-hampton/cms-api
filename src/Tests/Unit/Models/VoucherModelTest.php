@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Voucher;
+use App\Models\VoucherRedemption;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -253,5 +254,154 @@ class VoucherModelTest extends FunctionalTestCase
         $voucher->products(true)->attach($product1->id);
 
         $this->assertFalse($voucher->isApplicableToProduct($product2->id));
+    }
+
+    public function test_has_been_used_by_user_returns_true_when_user_redeemed()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $user = $this->createMember();
+
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->assertTrue($voucher->hasBeenUsedByUser($user->id));
+    }
+
+    public function test_has_been_used_by_user_returns_false_when_user_not_redeemed()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $user = $this->createUser();
+
+        $this->assertFalse($voucher->hasBeenUsedByUser($user->id));
+    }
+
+    public function test_has_been_used_by_user_returns_false_when_user_id_is_null()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $this->assertFalse($voucher->hasBeenUsedByUser(null));
+    }
+
+    public function test_get_user_usage_count_returns_correct_count()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $user = $this->createMember();
+
+        // Create 3 redemptions
+        for ($i = 0; $i < 3; $i++) {
+            VoucherRedemption::create([
+                'voucher_id' => $voucher->id,
+                'member_id' => $user->id,
+                'discount_amount' => 10.00,
+                'redeemed_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+
+        $this->assertEquals(3, $voucher->getUserUsageCount($user->id));
+    }
+
+    public function test_get_user_usage_count_returns_zero_when_no_redemptions()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $user = $this->createMember();
+
+        $this->assertEquals(0, $voucher->getUserUsageCount($user->id));
+    }
+
+    public function test_get_user_usage_count_returns_zero_when_user_id_is_null()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $this->assertEquals(0, $voucher->getUserUsageCount(null));
+    }
+
+    public function test_get_user_usage_count_only_counts_specific_user()
+    {
+        $voucher = Voucher::create([
+            'code' => 'TEST10',
+            'name' => 'Test',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $user1 = $this->createMember();
+        $user2 = $this->createMember();
+
+        // User 1 uses twice
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user1->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user1->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // User 2 uses once
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user2->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->assertEquals(2, $voucher->getUserUsageCount($user1->id));
+        $this->assertEquals(1, $voucher->getUserUsageCount($user2->id));
     }
 }

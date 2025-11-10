@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\ProductVoucher;
 use App\Models\Voucher;
+use App\Models\VoucherRedemption;
 use App\Repositories\VoucherRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -752,6 +753,216 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $voucher = Voucher::find($voucher->id);
         $this->assertCount(1, $voucher->products);
         $this->assertEquals($product->id, $voucher->products->first()->id);
+    }
+
+    public function test_create_redemption_creates_record(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $userId = $this->createMember()->id;
+        $discountAmount = 15.50;
+
+        // Act
+        $result = $this->repository->createRedemption($voucher->id, $userId, $discountAmount);
+
+        // Assert
+        $this->assertTrue($result);
+
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->where('member_id', $userId)
+            ->first();
+
+        $this->assertNotNull($redemption);
+        $this->assertEquals($discountAmount, $redemption->discount_amount);
+        $this->assertNull($redemption->order_id);
+    }
+
+    public function test_create_redemption_with_order_id(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $userId = $this->createMember()->id;
+        $orderId = $this->createOrder()->id;
+        $discountAmount = 20.00;
+
+        // Act
+        $result = $this->repository->createRedemption($voucher->id, $userId, $discountAmount, $orderId);
+
+        // Assert
+        $this->assertTrue($result);
+
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->where('member_id', $userId)
+            ->first();
+
+        $this->assertNotNull($redemption);
+        $this->assertEquals($orderId, $redemption->order_id);
+    }
+
+    public function test_create_redemption_allows_null_user_id(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $discountAmount = 10.00;
+
+        // Act
+        $result = $this->repository->createRedemption($voucher->id, null, $discountAmount);
+
+        // Assert
+        $this->assertTrue($result);
+
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->whereNull('member_id')
+            ->first();
+
+        $this->assertNotNull($redemption);
+    }
+
+    public function test_create_redemption_returns_false_on_failure(): void
+    {
+        // Act - invalid voucher ID
+        $result = $this->repository->createRedemption(99999, 1, 10.00);
+
+        // Assert
+        $this->assertFalse($result);
+    }
+
+    public function test_get_redemptions_by_voucher_returns_all_redemptions(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $user1 = $this->createMember();
+        $user2 = $this->createMember();
+
+        $this->repository->createRedemption($voucher->id, $user1->id, 10.00);
+        $this->repository->createRedemption($voucher->id, $user2->id, 15.00);
+        $this->repository->createRedemption($voucher->id, null, 20.00);
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByVoucher($voucher->id);
+
+        // Assert
+        $this->assertCount(3, $redemptions);
+    }
+
+    public function test_get_redemptions_by_voucher_orders_by_date_desc(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+        $user = $this->createMember();
+
+        // Create redemptions with different timestamps
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s', strtotime('-2 days'))
+        ]);
+
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user->id,
+            'discount_amount' => 15.00,
+            'redeemed_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByVoucher($voucher->id);
+
+        // Assert
+        $this->assertEquals(15.00, $redemptions->first()->discount_amount);
+    }
+
+    public function test_get_redemptions_by_voucher_returns_empty_collection_when_none(): void
+    {
+        // Arrange
+        $voucher = $this->createVoucher();
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByVoucher($voucher->id);
+
+        // Assert
+        $this->assertCount(0, $redemptions);
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $redemptions);
+    }
+
+    public function test_get_redemptions_by_user_returns_all_user_redemptions(): void
+    {
+        // Arrange
+        $user = $this->createMember();
+        $voucher1 = $this->createVoucher();
+        $voucher2 = $this->createVoucher();
+        $voucher3 = $this->createVoucher();
+
+        $this->repository->createRedemption($voucher1->id, $user->id, 10.00);
+        $this->repository->createRedemption($voucher2->id, $user->id, 15.00);
+        $this->repository->createRedemption($voucher3->id, $user->id, 20.00);
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByUser($user->id);
+
+        // Assert
+        $this->assertCount(3, $redemptions);
+    }
+
+    public function test_get_redemptions_by_user_only_returns_users_redemptions(): void
+    {
+        // Arrange
+        $user1 = $this->createMember();
+        $user2 = $this->createMember();
+        $voucher = $this->createVoucher();
+
+        $this->repository->createRedemption($voucher->id, $user1->id, 10.00);
+        $this->repository->createRedemption($voucher->id, $user2->id, 15.00);
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByUser($user1->id);
+
+        // Assert
+        $this->assertCount(1, $redemptions);
+
+        $this->assertEquals($user1->id, $redemptions->first()->member_id);
+    }
+
+    public function test_get_redemptions_by_user_orders_by_date_desc(): void
+    {
+        // Arrange
+        $user = $this->createMember();
+        $voucher1 = $this->createVoucher();
+        $voucher2 = $this->createVoucher();
+
+        VoucherRedemption::create([
+            'voucher_id' => $voucher1->id,
+            'member_id' => $user->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s', strtotime('-2 days'))
+        ]);
+
+        VoucherRedemption::create([
+            'voucher_id' => $voucher2->id,
+            'member_id' => $user->id,
+            'discount_amount' => 15.00,
+            'redeemed_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByUser($user->id);
+
+        // Assert
+        $this->assertEquals(15.00, $redemptions->first()->discount_amount);
+    }
+
+    public function test_get_redemptions_by_user_returns_empty_collection_when_none(): void
+    {
+        // Arrange
+        $user = $this->createUser();
+
+        // Act
+        $redemptions = $this->repository->getRedemptionsByUser($user->id);
+
+        // Assert
+        $this->assertCount(0, $redemptions);
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $redemptions);
     }
 
 }

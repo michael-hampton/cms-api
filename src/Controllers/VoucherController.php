@@ -156,7 +156,7 @@ class VoucherController extends Controller
     {
         try {
             $code = $request->get('code');
-            $orderValue = (float) $request->get('order_value', 0);
+            $orderValue = (float)$request->get('order_value', 0);
             $userId = $request->get('user_id', null);
             $productId = $request->get('product_id', null);
 
@@ -172,10 +172,15 @@ class VoucherController extends Controller
         }
     }
 
-    public function apply(int $id, string $siteName): JsonResponse
+    public function apply(int $id, Request $request): JsonResponse
     {
         try {
-            $result = $this->voucherService->applyVoucher($id);
+            $result = $this->voucherService->applyVoucher(
+                $id,
+                $request->input('user_id') ?? null,
+                $request->input('discount_amount') ?? null,
+                $request->input('order_id') ?? null
+            );
 
             if (!$result) {
                 return $this->errorResponse('Failed to apply voucher', 500);
@@ -230,6 +235,16 @@ class VoucherController extends Controller
             return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
         } catch (\Exception $e) {
             return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function redemptions(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $redemptions = $this->voucherRepository->getRedemptionsByVoucher($id);
+            return $this->jsonResponse(['redemptions' => $redemptions->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 }

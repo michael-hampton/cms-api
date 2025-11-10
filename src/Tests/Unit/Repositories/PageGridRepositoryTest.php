@@ -361,4 +361,176 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($duplicate);
         $this->assertCount(0, $duplicate->pages);
     }
+
+    public function test_get_active_grid_for_page_returns_grid_when_no_dates_set(): void
+    {
+        // Arrange
+        $grid = $this->createPageGrid(['start_date' => null, 'end_date' => null]);
+        $page = $this->createPage(['title' => 'Test Page']);
+        $grid->pages(true)->attach($page->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForPage($page->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($grid->id, $found->id);
+    }
+
+    public function test_get_active_grid_for_page_returns_grid_when_within_date_range(): void
+    {
+        // Arrange
+        $yesterday = date('Y-m-d H:i:s', strtotime('-1 day'));
+        $tomorrow = date('Y-m-d H:i:s', strtotime('+1 day'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => $yesterday,
+            'end_date' => $tomorrow
+        ]);
+        $page = $this->createPage(['title' => 'Test Page']);
+        $grid->pages(true)->attach($page->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForPage($page->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($grid->id, $found->id);
+    }
+
+    public function test_get_active_grid_for_page_returns_null_when_before_start_date(): void
+    {
+        // Arrange
+        $tomorrow = date('Y-m-d H:i:s', strtotime('+1 day'));
+        $nextWeek = date('Y-m-d H:i:s', strtotime('+7 days'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => $tomorrow,
+            'end_date' => $nextWeek
+        ]);
+        $page = $this->createPage(['title' => 'Test Page']);
+        $grid->pages(true)->attach($page->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForPage($page->id);
+
+        // Assert
+        $this->assertNull($found);
+    }
+
+    public function test_get_active_grid_for_page_returns_null_when_after_end_date(): void
+    {
+        // Arrange
+        $lastWeek = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $yesterday = date('Y-m-d H:i:s', strtotime('-1 day'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => $lastWeek,
+            'end_date' => $yesterday
+        ]);
+        $page = $this->createPage(['title' => 'Test Page']);
+        $grid->pages(true)->attach($page->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForPage($page->id);
+
+        // Assert
+        $this->assertNull($found);
+    }
+
+    public function test_get_active_grid_for_page_returns_grid_with_only_start_date(): void
+    {
+        // Arrange
+        $yesterday = date('Y-m-d H:i:s', strtotime('-1 day'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => $yesterday,
+            'end_date' => null
+        ]);
+        $page = $this->createPage(['title' => 'Test Page']);
+        $grid->pages(true)->attach($page->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForPage($page->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($grid->id, $found->id);
+    }
+
+    public function test_get_active_grid_for_page_returns_grid_with_only_end_date(): void
+    {
+        // Arrange
+        $tomorrow = date('Y-m-d H:i:s', strtotime('+1 day'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => null,
+            'end_date' => $tomorrow
+        ]);
+        $page = $this->createPage(['title' => 'Test Page']);
+        $grid->pages(true)->attach($page->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForPage($page->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($grid->id, $found->id);
+    }
+
+    public function test_get_active_grid_for_territory_returns_grid_when_no_dates_set(): void
+    {
+        // Arrange
+        $grid = $this->createPageGrid(['start_date' => null, 'end_date' => null]);
+        $territory = $this->createTerritory(['name' => 'Test Territory']);
+        $grid->territories(true)->attach($territory->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForTerritory($territory->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($grid->id, $found->id);
+    }
+
+    public function test_get_active_grid_for_territory_returns_grid_when_within_date_range(): void
+    {
+        // Arrange
+        $yesterday = date('Y-m-d H:i:s', strtotime('-1 day'));
+        $tomorrow = date('Y-m-d H:i:s', strtotime('+1 day'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => $yesterday,
+            'end_date' => $tomorrow
+        ]);
+        $territory = $this->createTerritory(['name' => 'Test Territory']);
+        $grid->territories(true)->attach($territory->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForTerritory($territory->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($grid->id, $found->id);
+    }
+
+    public function test_get_active_grid_for_territory_returns_null_when_outside_date_range(): void
+    {
+        // Arrange
+        $lastWeek = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $yesterday = date('Y-m-d H:i:s', strtotime('-1 day'));
+
+        $grid = $this->createPageGrid([
+            'start_date' => $lastWeek,
+            'end_date' => $yesterday
+        ]);
+        $territory = $this->createTerritory(['name' => 'Test Territory']);
+        $grid->territories(true)->attach($territory->id);
+
+        // Act
+        $found = $this->repository->getActiveGridForTerritory($territory->id);
+
+        // Assert
+        $this->assertNull($found);
+    }
 }

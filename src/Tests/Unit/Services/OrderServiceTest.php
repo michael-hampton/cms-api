@@ -1590,7 +1590,7 @@ class OrderServiceTest extends FunctionalTestCase
                 return $addressData['address_line_1'] === '123 Main St'
                     && $addressData['type'] === 'shipping'
                     && $addressData['label'] === 'Order Address';
-            }))
+            }), $this->siteId)
             ->andReturn($newAddress);
 
         $this->orderRepository->shouldReceive('findByOrderNumber')
@@ -1728,7 +1728,7 @@ class OrderServiceTest extends FunctionalTestCase
                 return $addressData['address_line_1'] === '999 New St'
                     && $addressData['type'] === 'shipping'
                     && $addressData['label'] === 'Order Address (Updated)';
-            }))
+            }), $this->siteId)
             ->andReturn($newAddress);
 
         $this->orderRepository->shouldReceive('update')
@@ -1744,7 +1744,7 @@ class OrderServiceTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($updatedOrder);
 
-        $result = $this->service->updateOrder($orderId, $data);
+        $result = $this->service->updateOrder($orderId, $data, $this->siteId);
 
         $this->assertSame($updatedOrder, $result);
     }
@@ -2074,7 +2074,7 @@ class OrderServiceTest extends FunctionalTestCase
                 return $addressData['address_line_1'] === '456 Oak Ave'
                     && $addressData['type'] === 'billing'
                     && $addressData['label'] === 'Order Billing Address';
-            }))
+            }), $this->siteId)
             ->andReturn($shippingAddress);
 
         // No address validation needed for billing (it's JSON)

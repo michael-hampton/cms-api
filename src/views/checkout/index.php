@@ -915,6 +915,38 @@
                     <?php endforeach; ?>
                 </div>
 
+                <div class="voucher-section" style="margin: 1.5rem 0; padding: 1.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Voucher Code</h4>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="voucher-input" placeholder="Enter code"
+                               style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
+                        <button onclick="applyVoucher()" class="btn btn-secondary"
+                                style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply</button>
+                    </div>
+                    <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                    <div id="applied-voucher" style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong id="voucher-code-display" style="color: #065f46;"></strong>
+                                <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
+                                    Discount: <span id="voucher-discount-display"></span>
+                                </p>
+                            </div>
+                            <button onclick="removeVoucher()" style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
+                    <span>Discount:</span>
+                    <span id="discount-amount">-$0.00</span>
+                </div>
+
                 <?php
                 $subtotal = $total;
                 $tax = $subtotal * 0.1;
@@ -976,6 +1008,15 @@
     const SITE = 'test-mike';
     const API_BASE = '/api/' + SITE;
 
+    const INITIAL_SUBTOTAL = parseFloat(document.getElementById('subtotal').textContent.replace('$', ''));
+    const INITIAL_SHIPPING = parseFloat(document.getElementById('shipping').textContent.replace('$', '') || '0');
+    const INITIAL_TAX = parseFloat(document.getElementById('tax').textContent.replace('$', ''));
+
+    let isLoggedIn = false;
+    let currentMember = null;
+    let selectedAddressId = null;
+    let appliedVoucher = null;
+
     async function checkLoginStatus() {
         try {
             const response = await fetch(`/member/me`);
@@ -994,7 +1035,7 @@
 
     async function loadSavedAddresses() {
         try {
-            const response = await fetch(`/member/${currentMember.id}/addresses?type=shipping`);
+            const response = await fetch(`${SITE}/member/${currentMember.id}/addresses?type=shipping`);
             const data = await response.json();
 
             if (data.items && data.items.length > 0) {
@@ -1038,7 +1079,6 @@
 
     function selectAddress(addressId) {
         selectedAddressId = addressId;
-        // Hide the manual shipping address form
         const shippingForm = document.getElementById('shipping-address-form');
 
         if (shippingForm) {
@@ -1049,25 +1089,21 @@
     function showNewAddressForm() {
         selectedAddressId = null;
 
-        // Hide the saved addresses section
         const savedAddressesSection = document.getElementById('saved-addresses-section');
         if (savedAddressesSection) {
             savedAddressesSection.style.display = 'none';
         }
 
-        // Show the manual shipping address form
         const shippingForm = document.getElementById('shipping-address-form');
         if (shippingForm) {
             shippingForm.style.display = 'block';
         }
 
-        // Show the back button
         const backBtn = document.getElementById('back-to-saved-btn');
         if (backBtn) {
             backBtn.style.display = 'block';
         }
 
-        // Uncheck all saved address radios
         document.querySelectorAll('[name="saved_address"]').forEach(radio => radio.checked = false);
     }
 
@@ -1109,10 +1145,8 @@
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         document.getElementById('alert-container').innerHTML = '';
 
-        // Add selected address ID if applicable
         if (selectedAddressId) {
             data.shipping_address_id = selectedAddressId;
-            // Remove manual address fields
             delete data.address;
             delete data.address2;
             delete data.city;
@@ -1121,7 +1155,6 @@
             delete data.country;
         }
 
-        // Validate required fields (skip address fields if using saved address)
         const required = selectedAddressId
             ? ['first_name', 'last_name', 'email', 'phone']
             : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
@@ -1138,7 +1171,6 @@
             }
         }
 
-        // Validate card details if card payment is selected
         if (data.payment_method === 'card') {
             if (!data.card_number || data.card_number.replace(/\s/g, '').length < 13) {
                 hasErrors = true;
@@ -1156,6 +1188,12 @@
 
         if (hasErrors) {
             return;
+        }
+
+        if (appliedVoucher) {
+            data.voucher_code = appliedVoucher.code;
+            data.voucher_id = appliedVoucher.voucher_id;
+            data.discount_amount = appliedVoucher.discount;
         }
 
         // Show loading
@@ -1187,12 +1225,6 @@
             this.disabled = false;
         }
     });
-
-    // Initialize on page load
-    let isLoggedIn = false;
-    let currentMember = null;
-    let selectedAddressId = null;
-    checkLoginStatus();
 
     // Payment method selection
     document.querySelectorAll('.payment-method').forEach(method => {
@@ -1346,7 +1378,102 @@
         }
     }
 
-    // Initialize
+    function checkForAppliedVoucher() {
+        const savedVoucher = sessionStorage.getItem('appliedVoucher');
+        if (savedVoucher) {
+            appliedVoucher = JSON.parse(savedVoucher);
+            displayAppliedVoucher();
+            sessionStorage.removeItem('appliedVoucher');
+        }
+    }
+
+    function displayAppliedVoucher() {
+        if (appliedVoucher) {
+            document.getElementById('voucher-code-display').textContent = appliedVoucher.code;
+            document.getElementById('voucher-discount-display').textContent = '$' + appliedVoucher.discount.toFixed(2);
+            document.getElementById('applied-voucher').style.display = 'block';
+            document.getElementById('discount-row').style.display = 'flex';
+            document.getElementById('discount-amount').textContent = '-$' + appliedVoucher.discount.toFixed(2);
+            updateTotals();
+        }
+    }
+
+    async function applyVoucher() {
+        const code = document.getElementById('voucher-input').value.trim();
+        const messageEl = document.getElementById('voucher-message');
+
+        if (!code) {
+            messageEl.textContent = 'Please enter a voucher code';
+            messageEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/vouchers/validate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: code,
+                    order_value: INITIAL_SUBTOTAL
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.data.valid) {
+                appliedVoucher = {
+                    code: code,
+                    discount: data.data.discount,
+                    voucher_id: data.data.voucher_id
+                };
+
+                displayAppliedVoucher();
+                document.getElementById('voucher-input').value = '';
+                messageEl.textContent = '';
+                showAlert('Voucher applied successfully!', 'success');
+            } else {
+                messageEl.textContent = data.data.message;
+                messageEl.style.color = 'var(--danger-color)';
+            }
+        } catch (error) {
+            console.error('Error applying voucher:', error);
+            messageEl.textContent = 'Failed to apply voucher';
+            messageEl.style.color = 'var(--danger-color)';
+        }
+    }
+
+    function removeVoucher() {
+        appliedVoucher = null;
+        document.getElementById('applied-voucher').style.display = 'none';
+        document.getElementById('discount-row').style.display = 'none';
+        updateTotals();
+        showAlert('Voucher removed', 'success');
+    }
+
+    function updateTotals() {
+        const discount = appliedVoucher ? appliedVoucher.discount : 0;
+        const tax = (INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING) * 0.1;
+        const total = INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING + tax;
+
+        document.getElementById('subtotal').textContent = '$' + INITIAL_SUBTOTAL.toFixed(2);
+        if (appliedVoucher) {
+            document.getElementById('discount-amount').textContent = '-$' + discount.toFixed(2);
+        }
+        document.getElementById('shipping').textContent = INITIAL_SHIPPING > 0 ? '$' + INITIAL_SHIPPING.toFixed(2) : 'Free';
+        document.getElementById('tax').textContent = '$' + tax.toFixed(2);
+        document.getElementById('total').textContent = '$' + total.toFixed(2);
+    }
+
+    // Update the place order button click handler to include voucher
+    // Modify the existing place order handler to add:
+    if (appliedVoucher) {
+        data.voucher_code = appliedVoucher.code;
+        data.voucher_id = appliedVoucher.voucher_id;
+        data.discount_amount = appliedVoucher.discount;
+    }
+
+    checkLoginStatus();
+    checkForAppliedVoucher();
     loadWishlistCount();
 </script>
 </body>

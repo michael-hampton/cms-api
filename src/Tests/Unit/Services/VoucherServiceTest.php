@@ -333,15 +333,45 @@ class VoucherServiceTest extends FunctionalTestCase
     public function testApplyVoucher()
     {
         $voucherId = 1;
+        $userId = 123;
+        $discountAmount = 15.50;
 
         $this->repository->shouldReceive('incrementUsageCount')
             ->once()
             ->with($voucherId)
             ->andReturn(true);
 
-        $result = $this->service->applyVoucher($voucherId);
+        $this->repository->shouldReceive('createRedemption')
+            ->once()
+            ->with($voucherId, $userId, $discountAmount, null)
+            ->andReturn(true);
+
+        $result = $this->service->applyVoucher($voucherId, $userId, $discountAmount);
 
         $this->assertTrue($result);
+    }
+
+    public function testValidateVoucherChecksPerUserLimit()
+    {
+        $code = 'LIMITED';
+        $userId = 123;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->per_user_limit = 2;
+        $voucher->status = 'active';
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('getUserUsageCount')->with($userId)->andReturn(2);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->with($code)
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, 100, $userId);
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('already used', $result['message']);
     }
 
     public function testUpdateExpiredVouchers()
@@ -854,5 +884,155 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertCount(0, $result['deleted']);
         $this->assertCount(1, $result['failed']);
         $this->assertStringContainsString('used', $result['failed'][0]['reason']);
+    }
+
+    public function testApplyVoucherCreatesRedemption()
+    {
+        $voucherId = 1;
+        $userId = 123;
+        $discountAmount = 15.50;
+        $orderId = 456;
+
+        $this->repository->shouldReceive('incrementUsageCount')
+            ->once()
+            ->with($voucherId)
+            ->andReturn(true);
+
+        $this->repository->shouldReceive('createRedemption')
+            ->once()
+            ->with($voucherId, $userId, $discountAmount, $orderId)
+            ->andReturn(true);
+
+        $result = $this->service->applyVoucher($voucherId, $userId, $discountAmount, $orderId);
+
+        $this->assertTrue($result);
+    }
+
+    public function testApplyVoucherWithoutUserOrOrder()
+    {
+        $voucherId = 1;
+
+        $this->repository->shouldReceive('incrementUsageCount')
+            ->once()
+            ->with($voucherId)
+            ->andReturn(true);
+
+        $this->repository->shouldReceive('createRedemption')
+            ->once()
+            ->with($voucherId, null, 0.0, null)
+            ->andReturn(true);
+
+        $result = $this->service->applyVoucher($voucherId);
+
+        $this->assertTrue($result);
+    }
+
+    public function testApplyVoucherDoesNotCreateRedemptionWhenAmountIsZero()
+    {
+        $voucherId = 1;
+        $userId = 123;
+
+        $this->repository->shouldReceive('incrementUsageCount')
+            ->once()
+            ->with($voucherId)
+            ->andReturn(true);
+
+        $this->repository->shouldNotReceive('createRedemption');
+
+        $result = $this->service->applyVoucher($voucherId, $userId, 0);
+
+        $this->assertTrue($result);
+    }
+
+    public function testApplyVoucherDoesNotCreateRedemptionWhenIncrementFails()
+    {
+        $voucherId = 1;
+        $userId = 123;
+        $discountAmount = 10.00;
+
+        $this->repository->shouldReceive('incrementUsageCount')
+            ->once()
+            ->with($voucherId)
+            ->andReturn(false);
+
+        $this->repository->shouldNotReceive('createRedemption');
+
+        $result = $this->service->applyVoucher($voucherId, $userId, $discountAmount);
+
+        $this->assertFalse($result);
+    }
+
+    public function testValidateVoucherAllowsUsageWithinLimit()
+    {
+        $code = 'LIMITED';
+        $userId = 123;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->per_user_limit = 3;
+        $voucher->status = 'active';
+        $voucher->minimum_order_value = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('getUserUsageCount')->with($userId)->andReturn(1);
+        $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->with($code)
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, 100, $userId);
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testValidateVoucherSkipsPerUserLimitWhenNoUserId()
+    {
+        $code = 'LIMITED';
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->per_user_limit = 1;
+        $voucher->status = 'active';
+        $voucher->minimum_order_value = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldNotReceive('getUserUsageCount');
+        $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->with($code)
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, 100, null);
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testValidateVoucherSkipsPerUserLimitWhenNotSet()
+    {
+        $code = 'UNLIMITED';
+        $userId = 123;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->per_user_limit = null;
+        $voucher->status = 'active';
+        $voucher->minimum_order_value = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldNotReceive('getUserUsageCount');
+        $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->with($code)
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucher($code, 100, $userId);
+
+        $this->assertTrue($result['valid']);
     }
 }

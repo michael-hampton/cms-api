@@ -4,6 +4,7 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\Product;
 use App\Models\Voucher;
+use App\Models\VoucherRedemption;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class VoucherControllerTest extends FunctionalTestCase
@@ -393,6 +394,35 @@ class VoucherControllerTest extends FunctionalTestCase
         // Verify usage count increased
         $updatedVoucher = Voucher::find($voucher->id);
         $this->assertEquals(1, $updatedVoucher->usage_count);
+    }
+
+    public function testApplyVoucherForMember()
+    {
+        $member = $this->createMember();
+
+        $voucher = $this->createVoucher();
+
+        // Add user_id and discount_amount to request
+        $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply', [
+            'user_id' => $member->id,
+            'discount_amount' => 10.00
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Voucher applied successfully', $data['data']['message']);
+
+        // Verify usage count increased
+        $updatedVoucher = Voucher::find($voucher->id);
+        $this->assertEquals(1, $updatedVoucher->usage_count);
+
+        // Verify redemption was created
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->where('member_id', $member->id)
+            ->first();
+        $this->assertNotNull($redemption);
+        $this->assertEquals(10.00, $redemption->discount_amount);
     }
 
     public function testActiveReturnsOnlyActiveVouchers()
@@ -787,5 +817,166 @@ class VoucherControllerTest extends FunctionalTestCase
         // Verify voucher1 deleted, voucher2 still exists
         $this->assertNull(Voucher::find($voucher1->id));
         $this->assertNotNull(Voucher::find($voucher2->id));
+    }
+
+    public function testApplyVoucherWithUserId()
+    {
+        $voucher = $this->createVoucher(['status' => 'active']);
+        $user = $this->createMember();
+
+        $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply', [
+            'user_id' => $user->id,
+            'discount_amount' => 15.50
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Voucher applied successfully', $data['data']['message']);
+
+        // Verify usage count increased
+        $updatedVoucher = Voucher::find($voucher->id);
+        $this->assertEquals(1, $updatedVoucher->usage_count);
+
+        // Verify redemption was created
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->where('member_id', $user->id)
+            ->first();
+        $this->assertNotNull($redemption);
+        $this->assertEquals(15.50, $redemption->discount_amount);
+    }
+
+    public function testApplyVoucherWithoutUserId()
+    {
+        $voucher = $this->createVoucher(['status' => 'active']);
+
+        $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply', [
+            'discount_amount' => 10.00
+        ]);
+
+        $this->assertResponseOk($response);
+
+        // Verify redemption was created without user_id
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->whereNull('member_id')
+            ->first();
+        $this->assertNotNull($redemption);
+    }
+
+    public function testApplyVoucherWithOrderId()
+    {
+        $voucher = $this->createVoucher(['status' => 'active']);
+        $user = $this->createMember();
+        $order = $this->createOrder();
+
+        $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply', [
+            'user_id' => $user->id,
+            'discount_amount' => 20.00,
+            'order_id' => $order->id
+        ]);
+
+        $this->assertResponseOk($response);
+
+        // Verify redemption was created with order_id
+        $redemption = VoucherRedemption::where('voucher_id', $voucher->id)
+            ->where('order_id', $order->id)
+            ->first();
+        $this->assertNotNull($redemption);
+    }
+
+    public function testValidateVoucherChecksPerUserLimit()
+    {
+        $voucher = $this->createVoucher([
+            'code' => 'LIMITED2',
+            'status' => 'active',
+            'per_user_limit' => 2
+        ]);
+
+        $user = $this->createMember();
+
+        // Use voucher twice
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Try to use it a third time
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'LIMITED2',
+            'order_value' => 100,
+            'user_id' => $user->id
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['data']['valid']);
+        $this->assertStringContainsString('already used', $data['data']['message']);
+    }
+
+    public function testValidateVoucherAllowsUsageWithinPerUserLimit()
+    {
+        $voucher = $this->createVoucher([
+            'code' => 'LIMITED',
+            'status' => 'active',
+            'per_user_limit' => 3
+        ]);
+        $user = $this->createMember();
+
+        // Use voucher once
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Try to use it again (should work)
+        $response = $this->postForSite('/api/vouchers/validate', [
+            'code' => 'LIMITED',
+            'order_value' => 100,
+            'member_id' => $user->id
+        ]);
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['valid']);
+    }
+
+    public function testGetRedemptions()
+    {
+        $voucher = $this->createVoucher();
+        $user1 = $this->createMember();
+        $user2 = $this->createMember();
+
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user1->id,
+            'discount_amount' => 10.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+        VoucherRedemption::create([
+            'voucher_id' => $voucher->id,
+            'member_id' => $user2->id,
+            'discount_amount' => 15.00,
+            'redeemed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $response = $this->getForSite('/api/vouchers/' . $voucher->id . '/redemptions');
+
+        $this->assertResponseOk($response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('redemptions', $data['data']);
+        $this->assertCount(2, $data['data']['redemptions']);
     }
 }

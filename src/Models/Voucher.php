@@ -146,4 +146,31 @@ class Voucher extends Model
 
         return false;
     }
+
+    public function redemptions($returnRelation = false)
+    {
+        return $this->hasMany(VoucherRedemption::class, 'voucher_id', $returnRelation);
+    }
+
+    public function hasBeenUsedByUser(?int $userId): bool
+    {
+        if (!$userId) {
+            return false;
+        }
+
+        return $this->redemptions()
+            ->where('member_id', $userId)
+            ->count() > 0;
+    }
+
+    public function getUserUsageCount(?int $userId): int
+    {
+        if (!$userId) {
+            return 0;
+        }
+
+        return $this->redemptions()
+            ->where('member_id', $userId)
+            ->count();
+    }
 }

@@ -31,7 +31,7 @@ class PageGridService
 
     public function getPageGrid(int $id): ?Model
     {
-        return $this->repository->find($id);
+        return $this->repository->find($id, ['territories', 'pages', 'items']);
     }
 
     public function getPageGridBySlug(string $slug): ?PageGrid
@@ -272,7 +272,8 @@ class PageGridService
                     'data' => $duplicate->toArray(),
                     'duplicated_from' => $original->id,
                     'items_count' => count($items ?? []),
-                    'item_types' => $this->getItemTypeCounts($items ?? [])
+                    'item_types' => $this->getItemTypeCounts($items ?? []),
+                    'assigned_pages' => count($originalPageIds)
                 ]);
             }
 
@@ -468,6 +469,6 @@ class PageGridService
             throw new \Exception('Page grid not found');
         }
 
-        return $pageGrid->pages()->get();
+        return $pageGrid->pages();
     }
 }

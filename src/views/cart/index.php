@@ -636,6 +636,39 @@
                         <span>Total:</span>
                         <span id="total">$<?= number_format($finalTotal, 2) ?></span>
                     </div>
+
+                    <div class="voucher-section" style="margin: 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                        <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Have a voucher code?</h4>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="voucher-input" placeholder="Enter code"
+                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
+                            <button onclick="applyVoucher(<?= $total ?>)" class="btn btn-secondary"
+                                    style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply</button>
+                        </div>
+                        <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                        <div id="applied-voucher" style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong id="voucher-code-display" style="color: #065f46;"></strong>
+                                    <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
+                                        Discount: <span id="voucher-discount-display"></span>
+                                    </p>
+                                </div>
+                                <button onclick="removeVoucher()" style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
+                        <span>Discount:</span>
+                        <span id="discount-amount">-$0.00</span>
+                    </div>
+
                     <button class="btn btn-primary" onclick="proceedToCheckout()">
                         Proceed to Checkout
                     </button>
@@ -660,10 +693,9 @@
 <script>
     const SITE = 'test-mike';
     const API_BASE = '/api/' + SITE;
-
     let cartData = null;
+    let appliedVoucher = null;
 
-    // Show toast notification
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toast');
         toast.textContent = message;
@@ -673,90 +705,144 @@
         }, 3000);
     }
 
-    // Format currency
     function formatCurrency(amount) {
         return '$' + parseFloat(amount).toFixed(2);
     }
 
-    // Load cart data
     async function loadCart() {
         const loading = document.getElementById('loading-container');
         const empty = document.getElementById('empty-container');
         const cartContainer = document.getElementById('cart-container');
 
-         loading.style.display = 'flex';
-         empty.style.display = 'none';
-         cartContainer.style.display = 'none';
+        loading.style.display = 'flex';
+        empty.style.display = 'none';
+        cartContainer.style.display = 'none';
 
         try {
             const response = await fetch(`${API_BASE}/cart`);
             cartData = await response.json();
 
             if (!cartData.items || cartData.items.length === 0) {
-                 loading.style.display = 'none';
-                 empty.style.display = 'block';
+                loading.style.display = 'none';
+                empty.style.display = 'block';
                 updateCartCount(0);
                 return;
             }
 
             renderCart();
-             loading.style.display = 'none';
-             cartContainer.style.display = 'grid';
+            loading.style.display = 'none';
+            cartContainer.style.display = 'grid';
         } catch (error) {
             console.error('Error loading cart:', error);
             showToast('Failed to load cart', 'error');
-             loading.style.display = 'none';
-             empty.style.display = 'block';
+            loading.style.display = 'none';
+            empty.style.display = 'block';
         }
     }
 
-    // Render cart items
     function renderCart() {
         const itemsList = document.getElementById('cart-items-list');
-        itemsList.innerHTML = cartData.items.map(item => {
-            return `
-                    <div class="cart-item" data-item-id="${item.id}">
-                        <img src="${item.product_image || '/images/placeholder.jpg'}" alt="${item.product_name}" class="item-image">
-                        <div class="item-details">
-                            <a href="/shop/details/${item.product_slug}" class="item-name">${item.product_name}</a>
-                            <div class="item-price">
-                                <span class="sale-price">${formatCurrency(item.price)}</span>
-                            </div>
-                            <div class="quantity-controls">
-                                <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity - 1})">-</button>
-                                <input type="number" class="qty-input" value="${item.quantity}" min="1" onchange="updateQuantity(${item.id}, this.value)" />
-                                <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity + 1})">+</button>
-                            </div>
-                        </div>
-                        <div class="item-actions">
-                            <div class="item-subtotal">${formatCurrency(item.subtotal)}</div>
-                            <button class="remove-btn" onclick="removeItem(${item.id})">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                </svg>
-                            </button>
-                        </div>
+        itemsList.innerHTML = cartData.items.map(item => `
+            <div class="cart-item" data-item-id="${item.id}">
+                <img src="${item.product_image || '/images/placeholder.jpg'}" alt="${item.product_name}" class="item-image">
+                <div class="item-details">
+                    <a href="/shop/details/${item.product_slug}" class="item-name">${item.product_name}</a>
+                    <div class="item-price">
+                        <span class="sale-price">${formatCurrency(item.price)}</span>
                     </div>
-                `;
-        }).join('');
+                    <div class="quantity-controls">
+                        <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity - 1})">-</button>
+                        <input type="number" class="qty-input" value="${item.quantity}" min="1" onchange="updateQuantity(${item.id}, this.value)" />
+                        <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity + 1})">+</button>
+                    </div>
+                </div>
+                <div class="item-actions">
+                    <div class="item-subtotal">${formatCurrency(item.subtotal)}</div>
+                    <button class="remove-btn" onclick="removeItem(${item.id})">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
 
         updateSummary();
         updateCartCount(cartData.count);
         document.getElementById('items-count').textContent = cartData.items.length;
     }
 
-    // Update summary
     function updateSummary() {
         const subtotal = cartData.total;
-        const tax = subtotal * 0.1; // 10% tax
-        const total = subtotal + tax;
+        const discount = appliedVoucher ? appliedVoucher.discount : 0;
+        const tax = (subtotal - discount) * 0.1;
+        const total = subtotal - discount + tax;
 
         document.getElementById('subtotal').textContent = formatCurrency(subtotal);
+        if (appliedVoucher) {
+            document.getElementById('discount-amount').textContent = '-' + formatCurrency(discount);
+        }
         document.getElementById('tax').textContent = formatCurrency(tax);
         document.getElementById('total').textContent = formatCurrency(total);
     }
 
-    // Update quantity
+    async function applyVoucher() {
+        const code = document.getElementById('voucher-input').value.trim();
+        const messageEl = document.getElementById('voucher-message');
+
+        if (!code) {
+            messageEl.textContent = 'Please enter a voucher code';
+            messageEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/vouchers/validate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: code,
+                    order_value: cartData.total
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.data.valid) {
+                appliedVoucher = {
+                    code: code,
+                    discount: data.data.discount,
+                    voucher_id: data.data.voucher_id
+                };
+
+                document.getElementById('voucher-code-display').textContent = code;
+                document.getElementById('voucher-discount-display').textContent = formatCurrency(data.data.discount);
+                document.getElementById('applied-voucher').style.display = 'block';
+                document.getElementById('voucher-input').value = '';
+                document.getElementById('discount-row').style.display = 'flex';
+
+                messageEl.textContent = '';
+                updateSummary();
+                showToast('Voucher applied successfully!');
+            } else {
+                messageEl.textContent = data.data.message;
+                messageEl.style.color = 'var(--danger-color)';
+            }
+        } catch (error) {
+            console.error('Error applying voucher:', error);
+            messageEl.textContent = 'Failed to apply voucher';
+            messageEl.style.color = 'var(--danger-color)';
+        }
+    }
+
+    function removeVoucher() {
+        appliedVoucher = null;
+        document.getElementById('applied-voucher').style.display = 'none';
+        document.getElementById('discount-row').style.display = 'none';
+        updateSummary();
+        showToast('Voucher removed');
+    }
+
     async function updateQuantity(itemId, quantity) {
         quantity = parseInt(quantity);
         if (quantity < 1) quantity = 1;
@@ -772,10 +858,9 @@
 
             if (data.success) {
                 await loadCart();
-                document.getElementById('items-count').textContent = data.items?.length || 0;
                 showToast('Cart updated');
             } else {
-                showToast(data.data.message || 'Failed to update quantity', 'error');
+                showToast(data.message || 'Failed to update quantity', 'error');
             }
         } catch (error) {
             console.error('Error updating quantity:', error);
@@ -783,7 +868,6 @@
         }
     }
 
-    // Remove item
     async function removeItem(itemId) {
         if (!confirm('Remove this item from cart?')) return;
 
@@ -796,11 +880,9 @@
 
             if (data.success) {
                 await loadCart();
-                const newCount = data.items?.length || 0;
-                document.getElementById('items-count').textContent = newCount.toString();
                 showToast('Item removed from cart');
             } else {
-                showToast(data.data.message || 'Failed to remove item', 'error');
+                showToast(data.message || 'Failed to remove item', 'error');
             }
         } catch (error) {
             console.error('Error removing item:', error);
@@ -808,7 +890,6 @@
         }
     }
 
-    // Clear cart
     async function clearCart() {
         if (!confirm('Clear all items from cart?')) return;
 
@@ -820,11 +901,10 @@
             const data = await response.json();
 
             if (data.success) {
-                alert('yes')
                 await loadCart();
                 showToast('Cart cleared');
             } else {
-                showToast(data.data.message || 'Failed to clear cart', 'error');
+                showToast(data.message || 'Failed to clear cart', 'error');
             }
         } catch (error) {
             console.error('Error clearing cart:', error);
@@ -832,17 +912,17 @@
         }
     }
 
-    // Update cart count
     function updateCartCount(count) {
         document.getElementById('cart-count').textContent = count;
     }
 
-    // Proceed to checkout
     function proceedToCheckout() {
-        showToast('Checkout coming soon!');
+        if (appliedVoucher) {
+            sessionStorage.setItem('appliedVoucher', JSON.stringify(appliedVoucher));
+        }
+        window.location.href = '/checkout';
     }
 
-    // Load wishlist count
     async function loadWishlistCount() {
         try {
             const response = await fetch(`${API_BASE}/wishlist`);
@@ -852,6 +932,11 @@
             console.error('Error loading wishlist count:', error);
         }
     }
+
+    // Initialize
+    loadCart();
+    loadWishlistCount();
 </script>
+
 </body>
 </html>

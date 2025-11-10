@@ -120,4 +120,60 @@ class PageGridRepository extends Repository
             ->orderBy('created_at', 'desc')
             ->get();
     }
+
+    /**
+     * Get active page grid for a specific page with optional date filtering
+     */
+    public function getActiveGridForPage(int $pageId, ?string $startDate = null, ?string $endDate = null): ?PageGrid
+    {
+        $query = $this->model
+            ->where('is_active', true)
+            ->whereHas('pages', function($q) use ($pageId) {
+                $q->where('pages.id', $pageId);
+            });
+
+        // Apply date filters
+        $query = $this->applyDateFilters($query, $startDate, $endDate);
+
+        return $query->first();
+    }
+
+    /**
+     * Get active page grid for a territory with optional date filtering
+     */
+    public function getActiveGridForTerritory(int $territoryId, ?string $startDate = null, ?string $endDate = null): ?PageGrid
+    {
+        $query = $this->model
+            ->where('is_active', true)
+            ->whereHas('territories', function($q) use ($territoryId) {
+                $q->where('territories.id', $territoryId);
+            });
+
+        // Apply date filters
+        $query = $this->applyDateFilters($query, $startDate, $endDate);
+
+        return $query->first();
+    }
+
+    /**
+     * Apply date filtering to query
+     */
+    private function applyDateFilters($query, ?string $startDate, ?string $endDate)
+    {
+        $now = date('Y-m-d H:i:s');
+
+        // If start_date is set, it must be <= now
+        $query->where(function($q) use ($now) {
+            $q->whereNull('start_date')
+                ->orWhere('start_date', '<=', $now);
+        });
+
+        // If end_date is set, it must be >= now
+        $query->where(function($q) use ($now) {
+            $q->whereNull('end_date')
+                ->orWhere('end_date', '>=', $now);
+        });
+
+        return $query;
+    }
 }

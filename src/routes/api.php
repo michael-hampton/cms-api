@@ -311,6 +311,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/vouchers/{id}/duplicate', VoucherController::class, 'duplicate');
         $router->post('/vouchers/validate', VoucherController::class, 'validate');
         $router->post('/vouchers/{id}/apply', VoucherController::class, 'apply');
+        $router->get('/vouchers/{id}/redemptions', VoucherController::class, 'redemptions');
         $router->post('/vouchers/bulk-status', [VoucherController::class, 'bulkUpdateStatus']);
         $router->post('/vouchers/bulk-delete', [VoucherController::class, 'bulkDelete']);
 
@@ -338,6 +339,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
     $router->post('/addresses/{id}/set-default', [AddressController::class, 'setDefault']);
     $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
 });
+
+$router->post('/api/{siteName}/vouchers/validate', VoucherController::class, 'validate');
+$router->post('/api/{siteName}/vouchers/{id}/apply', VoucherController::class, 'apply');
 
 $router->post('/api/{siteName}/newsletter/web/signup', NewsletterController::class, 'signup');
 

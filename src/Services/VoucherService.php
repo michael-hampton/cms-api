@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Models\Voucher;
 use App\Repositories\VoucherRepository;
@@ -190,6 +191,19 @@ class VoucherService
             ];
         }
 
+        // Check per-user limit
+        if ($userId && $voucher->per_user_limit) {
+            $userUsageCount = $voucher->getUserUsageCount($userId);
+
+            if ($userUsageCount >= $voucher->per_user_limit) {
+                return [
+                    'valid' => false,
+                    'message' => 'You have already used this voucher the maximum number of times',
+                    'discount' => 0
+                ];
+            }
+        }
+
         // Check if voucher applies to specific product
         if ($productId && !$voucher->isApplicableToProduct($productId)) {
             return [
@@ -218,9 +232,15 @@ class VoucherService
         ];
     }
 
-    public function applyVoucher(int $voucherId): bool
+    public function applyVoucher(int $voucherId, ?int $userId = null, float $discountAmount = 0, ?int $orderId = null): bool
     {
-        return $this->repository->incrementUsageCount($voucherId);
+        $success = $this->repository->incrementUsageCount($voucherId);
+
+        if ($success && $discountAmount > 0) {
+            $this->repository->createRedemption($voucherId, $userId, $discountAmount, $orderId);
+        }
+
+        return $success;
     }
 
     public function updateExpiredVouchers(): int

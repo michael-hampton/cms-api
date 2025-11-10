@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Framework\Support\Collection;
 use App\Models\Voucher;
+use App\Models\VoucherRedemption;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -149,5 +150,35 @@ class VoucherRepository extends Repository
         if ($voucher) {
             $voucher->products(true)->sync(array_unique($productIds));
         }
+    }
+
+    public function createRedemption(int $voucherId, ?int $userId, float $discountAmount, ?int $orderId = null): bool
+    {
+        try {
+            VoucherRedemption::create([
+                'voucher_id' => $voucherId,
+                'member_id' => $userId,
+                'order_id' => $orderId,
+                'discount_amount' => $discountAmount,
+                'redeemed_at' => date('Y-m-d H:i:s')
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function getRedemptionsByVoucher(int $voucherId): Collection
+    {
+        return VoucherRedemption::where('voucher_id', $voucherId)
+            ->orderBy('redeemed_at', 'desc')
+            ->get();
+    }
+
+    public function getRedemptionsByUser(int $userId): Collection
+    {
+        return VoucherRedemption::where('member_id', $userId)
+            ->orderBy('redeemed_at', 'desc')
+            ->get();
     }
 }

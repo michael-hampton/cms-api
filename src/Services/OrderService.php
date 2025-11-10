@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Order;
@@ -75,7 +76,7 @@ class OrderService
                     $addressData['type'] = 'shipping';
                     $addressData['label'] = 'Order Address';
 
-                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
                     $data['shipping_address_id'] = $newAddress->id;
                     unset($data['shipping_address']); // Remove JSON data
                 }
@@ -96,7 +97,7 @@ class OrderService
                     $addressData['type'] = 'billing';
                     $addressData['label'] = 'Order Billing Address';
 
-                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
                     $data['billing_address_id'] = $newAddress->id;
                     unset($data['billing_address']);
                 }
@@ -178,9 +179,10 @@ class OrderService
         ];
     }
 
-    public function updateOrder(int $id, array $data): Order
+    public function updateOrder(int $id, array $data, ?int $siteId = null): Order
     {
-        return $this->database->transaction(function () use ($id, $data) {
+        return $this->database->transaction(function () use ($id, $data, $siteId) {
+            $siteId = $siteId ?? SiteContext::getId();
             $order = $this->orderRepository->find($id);
 
             if (!$order) {
@@ -210,7 +212,7 @@ class OrderService
                     $addressData['type'] = 'shipping';
                     $addressData['label'] = 'Order Address (Updated)';
 
-                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
                     $data['shipping_address_id'] = $newAddress->id;
                     unset($data['shipping_address']); // Remove JSON data
                 }
@@ -232,7 +234,7 @@ class OrderService
                     $addressData['type'] = 'billing';
                     $addressData['label'] = 'Order Billing Address (Updated)';
 
-                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData);
+                    $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
                     $data['billing_address_id'] = $newAddress->id;
                     unset($data['billing_address']);
                 }

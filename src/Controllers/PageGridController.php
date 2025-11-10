@@ -37,7 +37,7 @@ class PageGridController extends Controller
             $config = SearchConfigurationFactory::create('page_grid');
             $searchEngine = new SearchEngine($config);
 
-            $result = $searchEngine->search( PageGrid::with(['territories']), $criteria);
+            $result = $searchEngine->search( PageGrid::with(['territories', 'pages']), $criteria);
 
             $collection = new PaginatedResourceCollection($result, PageGridResource::class);
 
@@ -95,7 +95,7 @@ class PageGridController extends Controller
 
             return $this->resourceResponse([
                 'success' => true,
-                'data' => $pageGrid->toArray(),
+                'data' => PageGridResource::make($pageGrid)->toArray(),
             ]);
         } catch (\Exception $e) {
             echo $e->getMessage();

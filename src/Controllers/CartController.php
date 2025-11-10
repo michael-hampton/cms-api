@@ -1,5 +1,4 @@
 <?php
-// App/Controllers/Api/CartController.php
 
 namespace App\Controllers;
 
@@ -7,13 +6,16 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Services\CartService;
+use App\Services\CheckoutService;
 use App\Services\OrderService;
+use App\Services\VoucherService;
 
 class CartController extends Controller
 {
     public function __construct(
-        private readonly CartService  $cartService,
-        private readonly OrderService $orderService
+        private readonly CartService     $cartService,
+        private readonly OrderService    $orderService,
+        private readonly CheckoutService $checkoutService
     )
     {
         parent::__construct();
@@ -55,110 +57,10 @@ class CartController extends Controller
         $data = $request->all();
         $siteId = SiteContext::getId();
 
-        // Validate required fields
-        $required = ['first_name', 'last_name', 'email', 'phone'];
+        $result = $this->checkoutService->processCheckout($data, $siteId);
 
-        if (empty($data['saved_address'])) {
-            $required = array_merge($required, ['address', 'city', 'postal_code', 'country']);
-        }
-
-        foreach ($required as $field) {
-            if (empty($data[$field])) {
-                return $this->resourceResponse([
-                    'success' => false,
-                    'message' => ucfirst(str_replace('_', ' ', $field)) . ' is required'
-                ], 400);
-            }
-        }
-
-        // Get cart items
-        $cartItems = $this->cartService->getItems();
-        if (empty($cartItems)) {
-            return $this->resourceResponse([
-                'success' => false,
-                'message' => 'Cart is empty'
-            ], 400);
-        }
-
-        // Calculate totals
-        $subtotal = $this->cartService->getTotal();
-        $tax = $subtotal * 0.1; // 10% tax
-        $shipping = $subtotal >= 100 ? 0 : 10; // Free shipping over $100
-        $total = $subtotal + $tax + $shipping;
-
-        // Prepare order data
-        $orderData = [
-            'customer_name' => $data['first_name'] . ' ' . $data['last_name'],
-            'customer_email' => $data['email'],
-            'customer_phone' => $data['phone'],
-            'status' => 'pending',
-            'payment_status' => 'unpaid',
-            'payment_method' => $data['payment_method'] ?? 'card',
-            'subtotal' => $subtotal,
-            'tax' => $tax,
-            'shipping' => $shipping,
-            'discount' => 0,
-            'total' => $total,
-            'currency' => 'USD',
-        ];
-
-        if ($data['saved_address']) {
-            $orderData['shipping_address_id'] = $data['saved_address'];
-        } else {
-            // Prepare shipping and billing addresses
-            $shippingAddress = [
-                'address' => $data['address'],
-                'address2' => $data['address2'] ?? '',
-                'city' => $data['city'],
-                'state' => $data['state'] ?? '',
-                'postal_code' => $data['postal_code'],
-                'country' => $data['country']
-            ];
-
-            $billingAddress = $shippingAddress; // Use same address for now
-
-            $orderData['shipping_address'] = $shippingAddress;
-            $orderData['billing_address'] = $billingAddress;
-        }
-
-        if (MemberAuth::check()) {
-            $orderData['user_id'] = MemberAuth::member()->id;
-        }
-
-        // Prepare order items from cart
-        $items = [];
-        foreach ($cartItems as $cartItem) {
-            $items[] = [
-                'product_id' => $cartItem['product_id'],
-                'product_name' => $cartItem['product_name'],
-                'product_sku' => $cartItem['product_sku'] ?? '',
-                'quantity' => $cartItem['quantity'],
-                'unit_price' => $cartItem['price'],
-                'subtotal' => $cartItem['subtotal'],
-                'tax' => 0,
-                'total' => $cartItem['subtotal']
-            ];
-        }
-
-        try {
-            // Create order using OrderService
-            $order = $this->orderService->createOrder($orderData, $items, $siteId);
-
-            // Clear cart after successful order
-            $this->cartService->clear();
-
-            return $this->resourceResponse([
-                'success' => true,
-                'message' => 'Order placed successfully',
-                'order_id' => $order->order_number,
-                'total' => $total
-            ]);
-        } catch (\Exception $e) {
-            return $this->resourceResponse([
-                'success' => false,
-                'message' => 'Failed to create order: ' . $e->getMessage()
-            ], 500);
-        }
+        $statusCode = $result['success'] ? 200 : 400;
+        return $this->resourceResponse($result, $statusCode);
     }
 
     public function add(Request $request)
