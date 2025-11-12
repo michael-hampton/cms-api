@@ -66,6 +66,8 @@ $hasSidebar = !empty($sidebarBlocks);
                         <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
                     <?php endforeach; ?>
 
+                    @include('product-section')
+
                     @include('comments')
 
                     <?php if ($page->gallery_slides): ?>

@@ -8,12 +8,16 @@ use App\Models\Category;
 use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageCustomField;
+use App\Models\PageProduct;
 use App\Models\Site;
 use App\Models\Tag;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -351,5 +355,64 @@ class PageModelTest extends FunctionalTestCase
         $this->assertIsArray($fresh->resolved_images);
         $this->assertEquals($cropOverrides, $fresh->crop_overrides);
         $this->assertEquals($resolvedImages, $fresh->resolved_images);
+    }
+
+    public function test_page_has_products_relationship(): void
+    {
+        $page = $this->createPage();
+        $product1 = $this->createProduct(['name' => 'Product 1']);
+        $product2 = $this->createProduct(['name' => 'Product 2']);
+
+        PageProduct::create([
+            'page_id' => $page->id,
+            'product_id' => $product1->id,
+            'sort_order' => 0,
+            'site_id' => $this->siteId
+        ]);
+        PageProduct::create([
+            'page_id' => $page->id,
+            'product_id' => $product2->id,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+
+        $products = $page->products();
+        $products = $products->toArray();
+
+        $this->assertCount(2, $products);
+        $this->assertEquals('Product 1', $products[0]['name']);
+        $this->assertEquals('Product 2', $products[1]['name']);
+    }
+
+    public function test_page_products_ordered_by_sort_order(): void
+    {
+        $page = $this->createPage();
+        $product1 = $this->createProduct(['name' => 'Product 1']);
+        $product2 = $this->createProduct(['name' => 'Product 2']);
+        $product3 = $this->createProduct(['name' => 'Product 3']);
+
+        PageProduct::create([
+            'page_id' => $page->id,
+            'product_id' => $product2->id,
+            'sort_order' => 1,
+            'site_id' => $this->siteId
+        ]);
+        PageProduct::create([
+            'page_id' => $page->id,
+            'product_id' => $product3->id,
+            'sort_order' => 2,
+            'site_id' => $this->siteId
+        ]);
+        PageProduct::create([
+            'page_id' => $page->id,
+            'product_id' => $product1->id,
+            'sort_order' => 0,
+            'site_id' => $this->siteId
+        ]);
+
+        $products = $page->products();
+
+        $this->assertEquals('Product 1', $products->first()->name);
+        $this->assertEquals('Product 3', $products->last()->name);
     }
 }

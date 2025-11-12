@@ -191,7 +191,8 @@ class BrandControllerTest extends FunctionalTestCase
         $brand = $this->createBrand(['logo' => 'logos/adidas.png']);
 
         // Create dummy logo file
-        $logoPath = 'uploads/logos/adidas.png';
+        $logoPath = 'logos/adidas.png';
+        $logoPath = getcwd() . '/' . $logoPath;
         @mkdir(dirname($logoPath), 0755, true);
         file_put_contents($logoPath, 'dummy logo content');
 

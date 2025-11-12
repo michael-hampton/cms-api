@@ -1291,4 +1291,47 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertEquals(422, $response->getStatusCode());
     }
+
+    public function testStoreWithProducts()
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Page with Products'],
+                'meta' => [
+                    'slug' => 'page-with-products',
+                    'status' => 'draft',
+                ],
+                'tags' => [
+                    'products' => [$product1->id, $product2->id]
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['data']['page']['products']);
+    }
+
+    public function testDuplicatePageClonesProducts()
+    {
+        $product = $this->createProduct();
+        $page = $this->createPage();
+
+        $this->attachProductToPage($page, $product);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['data']['page']['products']);
+    }
 }

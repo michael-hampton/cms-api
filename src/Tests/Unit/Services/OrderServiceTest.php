@@ -11,6 +11,7 @@ use App\Repositories\AddressRepository;
 use App\Repositories\MemberRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderItemRepository;
+use App\Services\OrderCalculationService;
 use App\Services\OrderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m; // Import Mockery with a simple alias
@@ -24,6 +25,7 @@ class OrderServiceTest extends FunctionalTestCase
     private $databaseMock;
     private OrderService $service;
     private $addressRepository;
+    private $orderCalculationService;
 
     protected function setUp(): void
     {
@@ -31,6 +33,7 @@ class OrderServiceTest extends FunctionalTestCase
         // Use Mockery::mock() instead of $this->createMock()
         $this->orderRepository = m::mock(OrderRepository::class);
         $this->addressRepository = m::mock(AddressRepository::class);
+        $this->orderCalculationService = m::mock(OrderCalculationService::class);
         $this->memberRepository = m::mock(MemberRepository::class);
         $this->orderItemRepository = m::mock(OrderItemRepository::class);
         $this->databaseMock = m::mock(Database::class);
@@ -40,6 +43,7 @@ class OrderServiceTest extends FunctionalTestCase
             $this->orderItemRepository,
             $this->memberRepository,
             $this->addressRepository,
+            $this->orderCalculationService,
             $this->databaseMock
         );
     }
@@ -137,6 +141,17 @@ class OrderServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 0.00,
+                'discount' => 0.00,
+                'total' => 110.00
+            ]);
+
         // ADD: Mock member lookup since user_id is provided
         $member = m::mock(Member::class)->makePartial();
         $member->id = 1;
@@ -224,6 +239,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($mockOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 0.00,
+                'discount' => 0.00,
+                'total' => 110.00
+            ]);
+
         $result = $this->service->createOrder($data, $items, $siteId);
 
         $this->assertSame($mockOrder, $result);
@@ -282,6 +308,20 @@ class OrderServiceTest extends FunctionalTestCase
                     && $data['total'] == 148.00;
             }))
             ->andReturn($mockOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::on(function($orderData) {
+                return $orderData['shipping'] == 10.00
+                    && $orderData['discount'] == 5.00;
+            }))
+            ->andReturn([
+                'subtotal' => 130.00,
+                'tax' => 13.00,
+                'shipping' => 10.00,
+                'discount' => 5.00,
+                'total' => 148.00
+            ]);
 
         $this->orderItemRepository->shouldReceive('create')
             ->twice()
@@ -353,6 +393,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 135.00,
+                'tax' => 13.50,
+                'shipping' => 0.00,
+                'discount' => 0.00,
+                'total' => 148.50
+            ]);
 
         $result = $this->service->createOrder($data, $items, $siteId);
 
@@ -596,6 +647,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($updatedOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, ['shipping' => 10, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 10.00,
+                'discount' => 0.00,
+                'total' => 120.00
+            ]);
+
         $result = $this->service->updateOrderItems($orderId, $items);
 
         $this->assertSame($updatedOrder, $result);
@@ -655,6 +717,17 @@ class OrderServiceTest extends FunctionalTestCase
                     && $data['tax'] == 8.00
                     && $data['total'] == 143.00;
             }));
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, ['shipping' => 10.00, 'discount' => 5.00])
+            ->andReturn([
+                'subtotal' => 130.00,
+                'tax' => 8.00,
+                'shipping' => 10.00,
+                'discount' => 5.00,
+                'total' => 143.00
+            ]);
 
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()
@@ -1115,6 +1188,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($duplicatedOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 5.00,
+                'discount' => 0.00,
+                'total' => 115.00
+            ]);
+
         $result = $this->service->duplicateOrder($orderId);
 
         $this->assertSame($duplicatedOrder, $result);
@@ -1270,6 +1354,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($mockOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 10.00,
+                'discount' => 0.00,
+                'total' => 120.00
+            ]);
+
         $result = $this->service->createOrder($data, $items, $siteId);
 
         $this->assertSame($mockOrder, $result);
@@ -1332,6 +1427,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 50.00,
+                'tax' => 5.00,
+                'shipping' => 0.00,
+                'discount' => 0.00,
+                'total' => 55.00
+            ]);
 
         $result = $this->service->createOrder($data, $items, $siteId);
 
@@ -1493,6 +1599,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($mockOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 0.00,
+                'discount' => 0.00,
+                'total' => 110.00
+            ]);
+
         $result = $this->service->createOrder($data, $items, $siteId);
 
         $this->assertSame($mockOrder, $result);
@@ -1613,6 +1730,17 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with($items, m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 0.00,
+                'discount' => 0.00,
+                'total' => 110.00
+            ]);
 
         $result = $this->service->createOrder($data, $items, $siteId);
 
@@ -1999,6 +2127,17 @@ class OrderServiceTest extends FunctionalTestCase
             }))
             ->andReturn($duplicatedOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with(m::any(), m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 5.00,
+                'discount' => 0.00,
+                'total' => 115.00
+            ]);
+
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()
             ->with(2)
@@ -2090,6 +2229,17 @@ class OrderServiceTest extends FunctionalTestCase
             }))
             ->andReturn($duplicatedOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with(m::any(), m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 5.00,
+                'discount' => 0.00,
+                'total' => 115.00
+            ]);
+
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()
             ->with(2)
@@ -2162,6 +2312,17 @@ class OrderServiceTest extends FunctionalTestCase
                     && $data['billing_address']['address_line_1'] === '456 Oak Ave';
             }))
             ->andReturn($duplicatedOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with(m::any(), m::any())
+            ->andReturn([
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'shipping' => 5.00,
+                'discount' => 0.00,
+                'total' => 115.00
+            ]);
 
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()

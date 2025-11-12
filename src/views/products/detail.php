@@ -1808,6 +1808,13 @@ $merchants = json_encode(array_map(function($m) {
             `;
             }
 
+            // NEW: Update price alert button with variant info
+            const priceAlertBtn = document.querySelector('.price-alert-trigger');
+            if (priceAlertBtn) {
+                const currentPrice = variantSalePrice && variantSalePrice < variantPrice ? variantSalePrice : variantPrice;
+                priceAlertBtn.setAttribute('onclick', `openPriceAlert(<?= $product->id ?>, ${variantId}, null, ${currentPrice})`);
+            }
+
             // Update merchant prices for this variant
             updateMerchantPrices(variantId);
 

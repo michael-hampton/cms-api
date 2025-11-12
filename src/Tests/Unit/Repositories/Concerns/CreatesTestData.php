@@ -24,6 +24,7 @@ use App\Models\PageCustomField;
 use App\Models\PageGrid;
 use App\Models\PageHistory;
 use App\Models\PageMetadata;
+use App\Models\PageProduct;
 use App\Models\PageRegionSet;
 use App\Models\PageSeo;
 use App\Models\PageSettings;
@@ -390,6 +391,17 @@ trait CreatesTestData
     protected function createAddress(array $overrides = []): Model
     {
         return $this->factory(Address::class)
+            ->forSite($this->siteId)
             ->create($overrides);
+    }
+
+    protected function attachProductToPage(Page $page, Product $product): void
+    {
+        PageProduct::create([
+            'page_id' => $page->id,
+            'product_id' => $product->id,
+            'sort_order' => 0,
+            'site_id' => $this->siteId
+        ]);
     }
 }

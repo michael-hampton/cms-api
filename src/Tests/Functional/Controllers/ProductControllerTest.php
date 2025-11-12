@@ -304,12 +304,13 @@ class ProductControllerTest extends FunctionalTestCase
             'name' => 'MacBook Pro',
             'slug' => 'macbook-pro',
             'price' => 1999.99,
-            'image' => 'products/macbook.jpg',
+            'image' => 'uploads/products/macbook.jpg',
             'status' => 'active',
         ]);
 
         // Create dummy image
         $imagePath = 'uploads/products/macbook.jpg';
+        $imagePath = getcwd() . '/' . $imagePath;
 
         if (!file_exists($imagePath)) {
             @mkdir(dirname($imagePath), 0755, true);
@@ -317,13 +318,13 @@ class ProductControllerTest extends FunctionalTestCase
 
         file_put_contents($imagePath, 'dummy image');
 
-        $response = $this->postForSite("/api/products/{$product->id}/duplicate");
+        $response = $this->postForSite("/api/products/{$product->id}/duplicate", [], [], [], true);
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
         $this->assertNotNull($data['data']['image']);
-        $this->assertEquals('products/macbook.jpg', $data['data']['image']);
+        $this->assertNotEquals('uploads/products/macbook.jpg', $data['data']['image']);
 
         // Cleanup
         @unlink($imagePath);

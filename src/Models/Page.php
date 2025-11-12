@@ -411,4 +411,15 @@ class Page extends Model
 
         return PageLike::isLikedBy($this->id, $memberId, $siteId);
     }
+
+    public function products(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            Product::class,
+            'page_products',
+            'page_id',
+            'product_id',
+            $relation
+        );
+    }
 }

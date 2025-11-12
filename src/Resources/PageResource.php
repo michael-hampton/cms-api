@@ -48,6 +48,7 @@ class PageResource extends JsonResource
             'contributors' => $this->whenLoaded('contributors'),
             'regionSets' => $this->whenLoaded('regionSets'),
             'territories' => $this->whenLoaded('territories'),
+            'products' => $this->whenLoaded('products'),
         ];
     }
 }

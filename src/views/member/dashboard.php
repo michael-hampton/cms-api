@@ -553,6 +553,7 @@ $site = \App\Framework\Support\SiteContext::slug();
 
     <h2 class="section-title">Your Activity</h2>
 
+    <?php if(!empty($stats)): ?>
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-number"><?= $stats['orders'] ?></div>
@@ -589,10 +590,11 @@ $site = \App\Framework\Support\SiteContext::slug();
             <div class="stat-label">Pages Liked</div>
         </div>
     </div>
+    <?php endif; ?>
 
     <h2 class="section-title">Recommended For You</h2>
 
-    <?php if ($recommendedPages->isEmpty()): ?>
+    <?php if ($recommendedPages && $recommendedPages?->isEmpty()): ?>
         <div class="empty-state">
             <div class="empty-state-icon">📄</div>
             <h3>No Recommendations Yet</h3>

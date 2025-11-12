@@ -11,6 +11,7 @@ use App\Framework\Validation\Validator;
 use App\Models\Category;
 use App\Repositories\CategoryRepository;
 use App\Requests\BulkDeleteRequest;
+use App\Requests\CreateCategoryRequest;
 use App\Requests\UpdateCategoryRequest;
 use App\Search\SearchCriteriaParser;
 use App\Services\CategoryService;
@@ -68,7 +69,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function store(BulkDeleteRequest $request, string $siteName): JsonResponse
+    public function store(CreateCategoryRequest $request, string $siteName): JsonResponse
     {
         try {
             $category = $this->categoryRepository->create($request->validated());

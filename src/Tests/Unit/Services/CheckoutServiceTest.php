@@ -7,6 +7,7 @@ use App\Framework\Authorization\MemberAuthWrapper;
 use App\Models\Member;
 use App\Services\CartService;
 use App\Services\CheckoutService;
+use App\Services\OrderCalculationService;
 use App\Services\OrderService;
 use App\Services\ShippingService;
 use App\Services\VoucherService;
@@ -22,12 +23,14 @@ class CheckoutServiceTest extends FunctionalTestCase
     private $shippingService;
     private CheckoutService $service;
     private $memberAuthWrapper;
+    private $orderCalculationService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->cartService = m::mock(CartService::class);
+        $this->orderCalculationService = m::mock(OrderCalculationService::class);
         $this->memberAuthWrapper = m::mock(MemberAuthWrapper::class);
         $this->orderService = m::mock(OrderService::class);
         $this->voucherService = m::mock(VoucherService::class);
@@ -38,7 +41,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             $this->orderService,
             $this->voucherService,
             $this->shippingService,
-            $this->memberAuthWrapper
+            $this->memberAuthWrapper,
+            $this->orderCalculationService
         );
     }
 
@@ -208,6 +212,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($member);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+
         $result = $this->service->processCheckout($data, 1);
 
         $this->assertTrue($result['success']);
@@ -269,6 +278,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 15, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 15.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+
         $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
@@ -320,6 +334,11 @@ class CheckoutServiceTest extends FunctionalTestCase
                     && $orderData['total'] === 165.00;
             }), m::any(), 1)
             ->andReturn($mockOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 150, 'shipping' => 0, 'discount' => 0])
+            ->andReturn(['subtotal' => 150.00, 'shipping' => 0.00, 'discount' => 0, 'tax' => 15.00, 'total' => 165.00]);
 
         $this->memberAuthWrapper->shouldReceive('check')
             ->once()
@@ -383,6 +402,11 @@ class CheckoutServiceTest extends FunctionalTestCase
                     && $orderData['voucher_code'] == 'SAVE10';
             }), m::any(), 1)
             ->andReturn($mockOrder);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 10])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 10.00, 'tax' => 10.00, 'total' => 110.00]);
 
         $this->voucherService->shouldReceive('applyVoucher')
             ->once()
@@ -452,6 +476,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+
         $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
@@ -504,6 +533,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+
         $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
@@ -551,6 +585,11 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->orderService->shouldReceive('createOrder')
             ->once()
             ->andThrow(new \Exception('Database error'));
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -609,6 +648,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($member);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 200, 'shipping' => 0, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 20.00, 'total' => 121.00]);
+
         $result = $this->service->processCheckout($data, 1);
 
         $this->assertTrue($result['success']);
@@ -652,6 +696,11 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->memberAuthWrapper->shouldReceive('member')
             ->once()
             ->andReturn($member);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);

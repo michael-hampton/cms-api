@@ -48,7 +48,7 @@ class ContentController extends Controller
         // Load page relationships
         $page->load([
             'blocks', 'categories', 'tags', 'metadata',
-            'seo', 'settings', 'social', 'customFields', 'authors'
+            'seo', 'settings', 'social', 'customFields', 'authors', 'products'
         ]);
 
         $member = MemberAuth::member();

@@ -24,6 +24,7 @@ class OrderService
         private readonly OrderItemRepository $orderItemRepository,
         private readonly MemberRepository             $memberRepository,
         private readonly AddressRepository $addressRepository,
+        private readonly OrderCalculationService $calculationService,
         ?Database                            $database = null
     )
     {
@@ -427,26 +428,7 @@ class OrderService
 
     private function calculateTotals(array $items, array $orderData): array
     {
-        $subtotal = 0;
-        $totalTax = 0;
-
-        foreach ($items as $item) {
-            $itemSubtotal = $item['unit_price'] * $item['quantity'];
-            $itemTax = $item['tax'] ?? 0;
-
-            $subtotal += $itemSubtotal;
-            $totalTax += $itemTax;
-        }
-
-        $shipping = $orderData['shipping'] ?? 0;
-        $discount = $orderData['discount'] ?? 0;
-        $total = $subtotal + $totalTax + $shipping - $discount;
-
-        return [
-            'subtotal' => $subtotal,
-            'tax' => $totalTax,
-            'total' => $total
-        ];
+        return $this->calculationService->calculateOrderTotals($items, $orderData);
     }
 
     private function handleStatusChange(Order $order, string $newStatus): void

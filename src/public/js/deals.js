@@ -17,7 +17,6 @@ let allBrands = [];
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    alert('here')
     loadStaticData();
     loadDeals();
 });
@@ -42,23 +41,38 @@ function switchTab(tab) {
     currentFilters.tab = tab;
     currentFilters.page = 1;
 
-    // Apply tab-specific filters
-    if (tab === 'under25') {
+    // NEW: Clear all filters when switching to "all"
+    if (tab === 'all') {
+        // Reset form inputs
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+        document.getElementById('min-price').value = '';
+        document.getElementById('max-price').value = '';
+        document.getElementById('custom-discount').value = '';
+
+        // Reset filter object
+        currentFilters.rating = [];
+        currentFilters.category = [];
+        currentFilters.brand = [];
+        currentFilters.minPrice = null;
+        currentFilters.maxPrice = null;
+        currentFilters.discount = null;
+        delete currentFilters.hasVoucher;
+    }
+    // Apply tab-specific filters for other tabs
+    else if (tab === 'under25') {
         currentFilters.maxPrice = 25;
         document.getElementById('max-price').value = 25;
     } else if (tab === 'over50') {
         currentFilters.discount = 50;
         document.querySelector('input[name="discount"][value="50"]').checked = true;
     } else if (tab === 'vouchers') {
-        // Special handling for vouchers tab
         currentFilters.hasVoucher = true;
     } else if (tab.startsWith('cat-')) {
         const categoryId = tab.replace('cat-', '');
         currentFilters.category = [categoryId];
-        document.querySelector(`input[name="category[]"][value="${categoryId}"]`).checked = true;
-    } else {
-        // Reset tab-specific filters for "all"
-        delete currentFilters.hasVoucher;
+        const checkbox = document.querySelector(`input[name="category[]"][value="${categoryId}"]`);
+        if (checkbox) checkbox.checked = true;
     }
 
     loadDeals();
@@ -170,7 +184,15 @@ function showMoreFilters(type) {
     const list = type === 'category' ? allCategories : allBrands;
     const container = document.getElementById(`${type}-list`);
 
-    if (!container) return;
+    if (!container) {
+        console.error(`Container not found: ${type}-list`);
+        return;
+    }
+
+    if (!list || list.length === 0) {
+        console.error(`No data available for: ${type}`);
+        return;
+    }
 
     container.innerHTML = list.map(item => `
         <label class="filter-option">
@@ -180,10 +202,13 @@ function showMoreFilters(type) {
         </label>
     `).join('');
 
-    // Remove "Show More" button
-    const btn = container.nextElementSibling;
-    if (btn && btn.classList.contains('show-more')) {
-        btn.remove();
+    // Find and remove "Show More" button - it might be sibling or in parent
+    const parentSection = container.closest('.filter-section');
+    if (parentSection) {
+        const showMoreBtn = parentSection.querySelector('.show-more');
+        if (showMoreBtn) {
+            showMoreBtn.remove();
+        }
     }
 }
 
@@ -244,23 +269,46 @@ async function loadDeals() {
 
 function createDealTile(deal) {
     return `
-        <div class="deal-tile" onclick="window.location.href='/products/${deal.slug}'">
+        <div class="deal-tile">
             <div class="deal-tile-badge">${deal.discount_percentage}% OFF</div>
             
-            <img src="${deal.image}" alt="${deal.title}" class="deal-tile-image">
+            <button class="deal-tile-wishlist-btn ${deal.in_wishlist ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist(${deal.id}, this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+            </button>
             
-            <a href="/products/${deal.slug}" class="deal-tile-title">${deal.title}</a>
+            <a href="/shop/details/${deal.slug}">
+                <img src="${deal.image}" alt="${deal.title}" class="deal-tile-image">
+            </a>
             
-            ${deal.rating > 0 ? `
-                <div class="deal-tile-rating">
-                    <div class="stars" style="--rating: ${deal.rating}"></div>
-                    <span class="count">(${deal.review_count})</span>
+            <div style="padding: 1rem">
+            
+                <a href="/shop/details/${deal.slug}" class="deal-tile-title">${deal.title}</a>
+                
+                ${deal.rating > 0 ? `
+                    <div class="deal-tile-rating">
+                        <div class="stars" style="--rating: ${deal.rating}"></div>
+                        <span class="count">(${deal.review_count})</span>
+                    </div>
+                ` : ''}
+                
+                <div class="deal-tile-prices">
+                    <span class="deal-tile-was">Was £${parseFloat(deal.original_price).toFixed(2)}</span>
+                    <span class="deal-tile-now">£${parseFloat(deal.sale_price).toFixed(2)}</span>
                 </div>
-            ` : ''}
-            
-            <div class="deal-tile-prices">
-                <span class="deal-tile-was">Was £${parseFloat(deal.original_price).toFixed(2)}</span>
-                <span class="deal-tile-now">£${parseFloat(deal.sale_price).toFixed(2)}</span>
+                
+                <div class="deal-tile-actions">
+                    <button class="deal-tile-add-cart" onclick="event.stopPropagation(); addToCart(${deal.id})">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        Add
+                    </button>
+                    <button class="deal-cta" onclick="window.location.href='/shop/details/${deal.slug}'">View</button>
+                </div>
             </div>
         </div>
     `;
@@ -339,4 +387,130 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
+}
+
+async function subscribeDealAlert() {
+    const email = document.getElementById('deal-alert-email').value;
+
+    if (!email || !isValidEmail(email)) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/deal-alerts/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast(data.message, 'success');
+            document.getElementById('deal-alert-email').value = '';
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error subscribing:', error);
+        showToast('Failed to subscribe. Please try again.', 'error');
+    }
+}
+
+// Add these functions to deals.js
+
+async function toggleWishlist(productId, button) {
+    try {
+        const isInWishlist = button.classList.contains('active');
+        const url = isInWishlist
+            ? `/api/${site}/wishlist/${productId}`
+            : `/api/${site}/wishlist`;
+
+        const method = isInWishlist ? 'DELETE' : 'POST';
+        const body = isInWishlist ? null : JSON.stringify({ product_id: productId });
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: body
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            button.classList.toggle('active');
+            showToast(data.message, 'success');
+
+            // Update wishlist count if available
+            updateWishlistCount(data.count);
+        } else {
+            showToast(data.message || 'Failed to update wishlist', 'error');
+        }
+    } catch (error) {
+        console.error('Error toggling wishlist:', error);
+        showToast('Failed to update wishlist. Please try again.', 'error');
+    }
+}
+
+async function addToCart(productId) {
+    try {
+        const response = await fetch(`/api/${site}/cart`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                product_id: productId,
+                quantity: 1
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast('Added to cart!', 'success');
+
+            // Update cart count if available
+            updateCartCount(data.count);
+        } else {
+            showToast(data.message || 'Failed to add to cart', 'error');
+        }
+    } catch (error) {
+        console.error('Error adding to cart:', error);
+        showToast('Failed to add to cart. Please try again.', 'error');
+    }
+}
+
+function updateWishlistCount(count) {
+    const wishlistCountEl = document.querySelector('.wishlist-count');
+    if (wishlistCountEl) {
+        wishlistCountEl.textContent = count;
+        if (count > 0) {
+            wishlistCountEl.style.display = 'inline-block';
+        } else {
+            wishlistCountEl.style.display = 'none';
+        }
+    }
+}
+
+function updateCartCount(count) {
+    const cartCountEl = document.querySelector('.cart-count');
+    if (cartCountEl) {
+        cartCountEl.textContent = count;
+        if (count > 0) {
+            cartCountEl.style.display = 'inline-block';
+        } else {
+            cartCountEl.style.display = 'none';
+        }
+    }
+}
+
+function isValidEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
 }

@@ -19,11 +19,19 @@ class VoucherServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(VoucherRepository::class);
         $this->service = new VoucherService($this->databaseMock, $this->repository);
+    }
 
-        parent::setUp();
+    protected function tearDown(): void
+    {
+        // Close all Mockery mocks
+        Mockery::close();
+
+        parent::tearDown();
     }
 
     public function testCreateVoucher()
@@ -917,10 +925,7 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($voucherId)
             ->andReturn(true);
 
-        $this->repository->shouldReceive('createRedemption')
-            ->once()
-            ->with($voucherId, null, 0.0, null)
-            ->andReturn(true);
+        $this->repository->shouldNotReceive('createRedemption');
 
         $result = $this->service->applyVoucher($voucherId);
 

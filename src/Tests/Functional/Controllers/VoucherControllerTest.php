@@ -384,7 +384,7 @@ class VoucherControllerTest extends FunctionalTestCase
     {
         $voucher = $this->createVoucher();
 
-        $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply');
+        $response = $this->postForSite('/api/vouchers/' . $voucher->id . '/apply', ['discount_amount' => 10.00]);
 
         $this->assertResponseOk($response);
 

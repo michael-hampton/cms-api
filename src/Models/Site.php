@@ -27,7 +27,8 @@ class Site extends Model
         'instagram_url',
         'twitter_url',
         'linkedin_url',
-        'settings'
+        'settings',
+        'url_handle'
     ];
 
     protected $casts = [

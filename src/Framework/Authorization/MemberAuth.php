@@ -9,7 +9,7 @@ use App\Models\Member;
 
 class MemberAuth
 {
-    private static ?AuthenticatedMember $member = null;
+    public static ?AuthenticatedMember $member = null;
 
     public static function attempt(array $credentials, ?int $siteId = null): bool
     {

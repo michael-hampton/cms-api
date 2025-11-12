@@ -6,6 +6,7 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Repositories\BrandRepository;
 use App\Repositories\CategoryRepository;
+use App\Services\DealAlertService;
 use App\Services\DealsService;
 use App\Services\PriceAlertService;
 
@@ -14,6 +15,7 @@ class DealsController extends Controller
     public function __construct(
         private readonly DealsService $dealsService,
         private readonly PriceAlertService $priceAlertService,
+        private readonly DealAlertService $dealAlertService,
         private readonly CategoryRepository $categoryRepository,
         private readonly BrandRepository $brandRepository,
     ) {
@@ -24,8 +26,11 @@ class DealsController extends Controller
     {
         $deals = $this->dealsService->getTodaysDeals();
 
+        $dealsService = new DealsService();
+
         return $this->view('deals/index', [
             'deals' => $deals,
+            'todaysDeals' => $dealsService->getTodaysDeals(10),
             'categories' => $this->categoryRepository->getActive()->toArray(),
             'brands' => $this->brandRepository->getActiveBrands()->toArray()
         ]);
@@ -54,6 +59,33 @@ class DealsController extends Controller
     {
         $data = $request->all();
         $result = $this->priceAlertService->createAlert($data);
+        return $this->resourceResponse($result);
+    }
+
+    public function subscribeDealAlert(Request $request)
+    {
+        $data = $request->all();
+
+        $result = $this->dealAlertService->subscribe($data);
+        return $this->resourceResponse($result);
+    }
+
+    public function verifyDealAlert(Request $request)
+    {
+        $token = $request->query('token');
+        $result = $this->dealAlertService->verify($token);
+
+        if ($result['success']) {
+            return $this->view('deal-alerts/verified', $result);
+        }
+
+        return $this->view('deal-alerts/error', $result);
+    }
+
+    public function unsubscribeDealAlert(Request $request)
+    {
+        $email = $request->input('email');
+        $result = $this->dealAlertService->unsubscribe($email);
         return $this->resourceResponse($result);
     }
 }

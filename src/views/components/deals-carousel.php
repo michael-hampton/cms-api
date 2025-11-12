@@ -16,7 +16,7 @@
 
     .deals-carousel-header h2 {
         font-size: 1.75rem;
-        color: #232f3e;
+        color: #0f1111;
         margin: 0;
     }
 
@@ -25,8 +25,8 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.5rem 1rem;
-        background: #ff9900;
-        color: #fff;
+        background: #ffa41c;
+        color: #0f1111;
         border: none;
         border-radius: 4px;
         cursor: pointer;
@@ -35,7 +35,7 @@
     }
 
     .refresh-deals-btn:hover {
-        background: #fa8900;
+        background: #ff8f00;
     }
 
     .deals-carousel {
@@ -87,11 +87,10 @@
     }
 
     .deal-card {
-        flex: 0 0 250px;
+        flex: 0 0 300px;
         background: #fff;
         border: 1px solid #e7e7e7;
         border-radius: 4px;
-        padding: 1rem;
         position: relative;
         transition: transform 0.2s, box-shadow 0.2s;
     }
@@ -105,7 +104,7 @@
         position: absolute;
         top: 10px;
         right: 10px;
-        background: #c45500;
+        background: #cc0c39;
         color: #fff;
         padding: 0.25rem 0.75rem;
         border-radius: 4px;
@@ -122,11 +121,12 @@
     .deal-image {
         width: 100%;
         height: 200px;
-        object-fit: contain;
+        object-fit: cover;
     }
 
     .deal-content {
         text-align: left;
+        padding: 1rem;
     }
 
     .deal-title {
@@ -187,7 +187,7 @@
 
     .now-price {
         display: block;
-        color: #b12704;
+        color: #cc0c39;
         font-size: 1.5rem;
         font-weight: 700;
     }
@@ -195,7 +195,7 @@
     .deal-cta {
         width: 100%;
         padding: 0.5rem;
-        background: #ff9900;
+        background: #ffa41c;
         color: #0f1111;
         border: none;
         border-radius: 4px;
@@ -205,7 +205,7 @@
     }
 
     .deal-cta:hover {
-        background: #fa8900;
+        background: #ff8f00;
     }
 
     .carousel-dots {
@@ -225,7 +225,7 @@
     }
 
     .carousel-dot.active {
-        background: #ff9900;
+        background: #ffa41c;
     }
 </style>
 
@@ -242,7 +242,7 @@
     </div>
 
     <div class="deals-carousel" id="deals-carousel">
-        <button class="carousel-arrow carousel-arrow-left" onclick="scrollCarousel(-1)">
+        <button class="carousel-arrow carousel-arrow-left" onclick="event.stopPropagation(); scrollCarousel(-1)">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
@@ -254,7 +254,7 @@
             <?php endforeach; ?>
         </div>
 
-        <button class="carousel-arrow carousel-arrow-right" onclick="scrollCarousel(1)">
+        <button class="carousel-arrow carousel-arrow-right" onclick="event.stopPropagation(); scrollCarousel(1)">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <polyline points="9 18 15 12 9 6"></polyline>
             </svg>

@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Repositories\AddressRepository;
 use App\Requests\CreateAddressRequest;
 use App\Requests\UpdateAddressRequest;
@@ -43,8 +44,9 @@ class AddressController extends Controller
         try {
             $data = $request->validated();
             $memberId = $data['member_id'];
+            $siteId = $data['site_id'] ?? Sitecontext::getId();
 
-            $address = $this->addressRepository->createAddressForMember($memberId, $data);
+            $address = $this->addressRepository->createAddressForMember($memberId, $data, $siteId);
 
             return $this->resourceResponse(['address' => $address->toArray()], 201);
         } catch (ValidationException $exception) {

@@ -9,54 +9,53 @@ use App\Models\ProductVariant;
 use App\Models\ProductMerchant;
 use App\Models\Category;
 use App\Models\Brand;
+use App\Repositories\DealsRepository;
 
 class DealsService
 {
-    public function getTodaysDeals(int $limit = 20): array
+    private DealsRepository $repository;
+
+    public function __construct(?DealsRepository $repository = null)
     {
-        $siteId = SiteContext::getId();
+        $this->repository = $repository ?? new DealsRepository();
+    }
+
+    public function getTodaysDeals(int $limit = 20, ?int $siteId = null): array
+    {
+        $siteId = $siteId ?? SiteContext::getId();
         $today = date('Y-m-d');
 
         // Get featured deals first
-        $featuredDeals = FeaturedDeal::where('site_id', $siteId)
-            ->where('featured_date', $today)
-            ->where('is_active', true)
-            ->orderBy('position')
-            ->limit($limit)
-            ->get();
+        $featuredDeals = $this->repository->getFeaturedDealsByDate($siteId, $today, $limit);
 
-        if ($featuredDeals->isEmpty()) {
+        if (empty($featuredDeals)) {
             // Auto-generate deals based on discount rules
-            return $this->generateDefaultDeals($limit);
+            return $this->generateDefaultDeals($limit, [], $siteId);
         }
 
         return $this->enrichDealsData($featuredDeals);
     }
 
-    private function generateDefaultDeals(int $limit, array $filters = []): array
+    private function generateDefaultDeals(int $limit, array $filters = [], ?int $siteId = null): array
     {
-        $siteId = SiteContext::getId();
+        $siteId = $siteId ?? SiteContext::getId();
 
-        // Build base query
-        $query = Product::where('site_id', $siteId)
-            ->where('is_active', true)
-            ->whereNotNull('sale_price');
-            //->where('sale_price', '<', 'price');
+        $minPrice = $filters['minPrice'] ?? null;
+        $maxPrice = $filters['maxPrice'] ?? null;
 
-        // Apply default price range unless overridden
-        if (!isset($filters['minPrice']) && !isset($filters['maxPrice'])) {
-            $query->whereBetween('sale_price', [10, 300]);
-        }
-
-        $query->with(['variants.merchants', 'merchants', 'images', 'brand', 'category', 'approvedReviews']);
-
-        $products = $query->get();
+        $products = $this->repository->getProductsForDeals($siteId, $minPrice, $maxPrice);
 
         $deals = [];
-        foreach ($products as $product) {
-            $bestDeal = $this->getBestDealForProduct($product);
-            if ($bestDeal) {
-                $deals[] = $bestDeal;
+        foreach ($products as $productData) {
+            $product = $this->repository->findProductById($productData['id']);
+
+            if ($product) {
+
+                $bestDeal = $this->getBestDealForProduct($product);
+
+                if ($bestDeal) {
+                    $deals[] = $bestDeal;
+                }
             }
         }
 
@@ -68,7 +67,8 @@ class DealsService
 
     private function getBestDealForProduct($product): ?array
     {
-        $bestPrice = $product->sale_price ?? $product->price;
+        $bestPrice = $product->sale_price > 0 ? $product->sale_price : $product->price;
+
         $originalPrice = $product->price;
         $source = 'product';
         $variantId = null;
@@ -155,8 +155,7 @@ class DealsService
     {
         $deals = [];
         foreach ($featuredDeals as $deal) {
-            $product = Product::with(['variants.merchants', 'merchants', 'images', 'brand', 'category', 'approvedReviews'])
-                ->find($deal->product_id);
+            $product = $this->repository->findProductById($deal['product_id']);
 
             if (!$product) continue;
 
@@ -168,27 +167,23 @@ class DealsService
         return $deals;
     }
 
-    public function refreshTodaysDeals(): array
+    public function refreshTodaysDeals(?int $siteId = null): array
     {
-        $siteId = SiteContext::getId();
+        $siteId = $siteId ?? SiteContext::getId();
         $today = date('Y-m-d');
 
         // Deactivate old featured deals
-        FeaturedDeal::where('site_id', $siteId)
-            ->where('featured_date', '<', $today)
-            ->update(['is_active' => false]);
+        $this->repository->deactivateOldFeaturedDeals($siteId, $today);
 
         // Deactivate current day deals
-        FeaturedDeal::where('site_id', $siteId)
-            ->where('featured_date', $today)
-            ->update(['is_active' => false]);
+        $this->repository->deactivateFeaturedDealsByDate($siteId, $today);
 
         // Generate new deals
-        $deals = $this->generateDefaultDeals(20);
+        $deals = $this->generateDefaultDeals(20, [], $siteId);
 
         // Save as featured deals
         foreach ($deals as $index => $deal) {
-            FeaturedDeal::create([
+            $this->repository->createFeaturedDeal([
                 'product_id' => $deal['product_id'],
                 'variant_id' => $deal['variant_id'],
                 'merchant_id' => $deal['merchant_id'],
@@ -202,14 +197,9 @@ class DealsService
         return $deals;
     }
 
-    public function getFilteredDeals(array $filters): array
+    public function getFilteredDeals(array $filters, ?int $siteId = null): array
     {
-        $siteId = SiteContext::getId();
-
-        // Start with base query
-        $query = Product::where('site_id', $siteId)
-            ->where('is_active', true)
-            ->with(['variants.merchants', 'merchants', 'images', 'brand', 'category', 'approvedReviews']);
+        $siteId = $siteId ?? SiteContext::getId();
 
         // Apply tab-specific filters
         if (isset($filters['tab'])) {
@@ -231,55 +221,35 @@ class DealsService
             }
         }
 
-        // Category filter
-        if (!empty($filters['category'])) {
-            $query->whereIn('category_id', $filters['category']);
-        }
-
-        // Brand filter
-        if (!empty($filters['brand'])) {
-            $query->whereIn('brand_id', $filters['brand']);
-        }
-
-        // Price range filter
-        if (isset($filters['minPrice']) || isset($filters['maxPrice'])) {
-            if (isset($filters['minPrice'])) {
-                $query->where('sale_price', '>=', $filters['minPrice']);
-            }
-            if (isset($filters['maxPrice'])) {
-                $query->where('sale_price', '<=', $filters['maxPrice']);
-            }
-        }
-
-        // Voucher filter
-        if (!empty($filters['hasVoucher'])) {
-            $query->whereHas('activeVouchers');
-        }
-
-        // Get all products that match filters
-        $products = $query->get();
+        $products = $this->repository->getFilteredProducts($siteId, $filters);
 
         // Build deals array
         $deals = [];
-        foreach ($products as $product) {
-            $bestDeal = $this->getBestDealForProduct($product);
-            if ($bestDeal) {
-                // Apply rating filter
-                if (!empty($filters['rating'])) {
-                    $minRating = min($filters['rating']);
-                    if ($bestDeal['rating'] < $minRating) {
-                        continue;
-                    }
-                }
+        foreach ($products as $productData) {
+            $product = $this->repository->findProductById($productData['id']);
 
-                // Apply discount filter
-                if (isset($filters['discount'])) {
-                    if ($bestDeal['discount_percentage'] < $filters['discount']) {
-                        continue;
-                    }
-                }
+            if ($product) {
 
-                $deals[] = $bestDeal;
+                $bestDeal = $this->getBestDealForProduct($product);
+
+                if ($bestDeal) {
+                    // Apply rating filter
+                    if (!empty($filters['rating'])) {
+                        $minRating = min($filters['rating']);
+                        if ($bestDeal['rating'] < $minRating) {
+                            continue;
+                        }
+                    }
+
+                    // Apply discount filter
+                    if (isset($filters['discount'])) {
+                        if ($bestDeal['discount_percentage'] < $filters['discount']) {
+                            continue;
+                        }
+                    }
+
+                    $deals[] = $bestDeal;
+                }
             }
         }
 
@@ -288,8 +258,13 @@ class DealsService
         [$sortField, $sortDir] = explode(':', $sortBy);
 
         usort($deals, function($a, $b) use ($sortField, $sortDir) {
-            $aVal = $a[$sortField === 'price' ? 'sale_price' : $sortField] ?? 0;
-            $bVal = $b[$sortField === 'price' ? 'sale_price' : $sortField] ?? 0;
+            // Map 'discount' to 'discount_percentage' field
+            if ($sortField === 'discount') {
+                $sortField = 'discount_percentage';
+            }
+
+            $aVal = $sortField === 'price' ? ($a['sale_price'] ?? 0) : ($a[$sortField] ?? 0);
+            $bVal = $sortField === 'price' ? ($b['sale_price'] ?? 0) : ($b[$sortField] ?? 0);
 
             $result = $aVal <=> $bVal;
             return $sortDir === 'desc' ? -$result : $result;

@@ -329,16 +329,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 // Member routes for viewing history and liked pages
 //        $router->get('/member/reading-history', [MemberReadingHistoryController::class, 'index']);
 //        $router->get('/member/liked-pages', [MemberLikedPagesController::class, 'index']);
+
+        $router->get('/addresses', [AddressController::class, 'index']);
+        $router->post('/addresses', [AddressController::class, 'store']);
+        $router->put('/addresses/{id}', [AddressController::class, 'update']);
+        $router->delete('/addresses/{id}', [AddressController::class, 'destroy']);
+        $router->post('/addresses/{id}/set-default', [AddressController::class, 'setDefault']);
+        $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
     });
 
     $router->post('/sites', [SiteController::class, 'create']);
-
-    $router->get('/addresses', [AddressController::class, 'index']);
-    $router->post('/addresses', [AddressController::class, 'store']);
-    $router->put('/addresses/{id}', [AddressController::class, 'update']);
-    $router->delete('/addresses/{id}', [AddressController::class, 'destroy']);
-    $router->post('/addresses/{id}/set-default', [AddressController::class, 'setDefault']);
-    $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
 });
 
 $router->post('/api/{siteName}/vouchers/validate', VoucherController::class, 'validate');
@@ -420,6 +420,7 @@ $router->get('/api/{siteName}/deals/filtered', [DealsController::class, 'filtere
 
 // Price alerts
 $router->post('/api/price-alerts', [DealsController::class, 'createPriceAlert']);
+$router->post('/api/deal-alerts/subscribe', [DealsController::class, 'subscribeDealAlert']);
 
 
 

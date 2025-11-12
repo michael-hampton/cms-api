@@ -60,7 +60,7 @@ class PageGridServiceTest extends FunctionalTestCase
 
         $this->repositoryMock
             ->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['territories', 'pages', 'items'])
             ->once()
             ->andReturn($expectedGrid);
 
@@ -1155,14 +1155,17 @@ class PageGridServiceTest extends FunctionalTestCase
         $pageGrid = Mockery::mock(PageGrid::class)->makePartial();
         $pageGrid->id = 1;
 
-        $pagesRelation = Mockery::mock();
-        $pagesRelation->shouldReceive('get')
+        $collection = Mockery::mock(Collection::class);
+        $collection->items = [$page];
+
+
+        $collection->shouldReceive('count')
             ->once()
-            ->andReturn(collect([$page]));
+            ->andReturn(1);
 
         $pageGrid->shouldReceive('pages')
             ->once()
-            ->andReturn($pagesRelation);
+            ->andReturn($collection);
 
         $this->repositoryMock
             ->shouldReceive('find')

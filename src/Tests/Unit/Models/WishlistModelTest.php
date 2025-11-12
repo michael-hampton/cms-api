@@ -6,9 +6,12 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\Wishlist;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class WishlistModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected Wishlist $wishlist;
 
     protected function setUp(): void
@@ -76,8 +79,8 @@ class WishlistModelTest extends FunctionalTestCase
 
     public function testCreateWishlist()
     {
-        $product = Product::create(['name' => 'Test Product', 'price' => 99.99, 'site_id' => 1]);;
-        $user = User::create(['name' => 'John', 'email' => '<EMAIL>', 'password' => '<PASSWORD>', 'site_id' => 1]);;
+        $product = $this->createProduct();
+        $user =$this->createMember();
 
         $wishlist = Wishlist::create([
             'session_id' => 'wishlist_session',

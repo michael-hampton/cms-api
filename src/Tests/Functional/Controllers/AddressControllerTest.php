@@ -27,7 +27,7 @@ class AddressControllerTest extends FunctionalTestCase
             'member_id' => $this->testMember->id,
         ]);
 
-        $response = $this->get("/api/addresses?member_id={$this->testMember->id}");
+        $response = $this->getForSite("/api/addresses?member_id={$this->testMember->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -37,7 +37,7 @@ class AddressControllerTest extends FunctionalTestCase
 
     public function testIndexRequiresMemberId()
     {
-        $response = $this->get("/api/addresses");
+        $response = $this->getForSite("/api/addresses");
 
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -46,7 +46,7 @@ class AddressControllerTest extends FunctionalTestCase
 
     public function testIndexReturnsEmptyArrayWhenNoAddresses()
     {
-        $response = $this->get("/api/addresses?member_id={$this->testMember->id}");
+        $response = $this->getForSite("/api/addresses?member_id={$this->testMember->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -67,7 +67,7 @@ class AddressControllerTest extends FunctionalTestCase
             'country' => 'US',
         ];
 
-        $response = $this->post('/api/addresses', $addressData);
+        $response = $this->postForSite('/api/addresses', $addressData);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -88,7 +88,7 @@ class AddressControllerTest extends FunctionalTestCase
             // Missing required fields
         ];
 
-        $response = $this->post('/api/addresses', $addressData);
+        $response = $this->postForSite('/api/addresses', $addressData);
 
         $this->assertEquals(422, $response->getStatusCode());
     }
@@ -104,7 +104,7 @@ class AddressControllerTest extends FunctionalTestCase
             'country' => 'US',
         ];
 
-        $response = $this->post('/api/addresses', $addressData);
+        $response = $this->postForSite('/api/addresses', $addressData);
 
         $this->assertEquals(422, $response->getStatusCode());
     }
@@ -119,7 +119,7 @@ class AddressControllerTest extends FunctionalTestCase
             'country' => 'US',
         ];
 
-        $response = $this->post('/api/addresses', $addressData);
+        $response = $this->postForSite('/api/addresses', $addressData);
 
         $this->assertEquals(422, $response->getStatusCode());
     }
@@ -133,7 +133,7 @@ class AddressControllerTest extends FunctionalTestCase
             'city' => 'New City',
         ];
 
-        $response = $this->put("/api/addresses/{$address->id}", $updateData);
+        $response = $this->putForSite("/api/addresses/{$address->id}", $updateData);
 
         $this->assertEquals(200, $response->getStatusCode());
 
@@ -149,7 +149,7 @@ class AddressControllerTest extends FunctionalTestCase
             'address_line_1' => '456 Oak Ave',
         ];
 
-        $response = $this->put("/api/addresses/99999", $updateData);
+        $response = $this->putForSite("/api/addresses/99999", $updateData);
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -162,7 +162,7 @@ class AddressControllerTest extends FunctionalTestCase
             'type' => 'invalid_type',
         ];
 
-        $response = $this->put("/api/addresses/{$address->id}", $updateData);
+        $response = $this->putForSite("/api/addresses/{$address->id}", $updateData);
 
         $this->assertEquals(422, $response->getStatusCode());
     }
@@ -171,7 +171,7 @@ class AddressControllerTest extends FunctionalTestCase
     {
         $address = $this->createAddress(['member_id' => $this->testMember->id]);
 
-        $response = $this->delete("/api/addresses/{$address->id}");
+        $response = $this->deleteForSite("/api/addresses/{$address->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
 
@@ -182,7 +182,7 @@ class AddressControllerTest extends FunctionalTestCase
 
     public function testDestroyReturns404ForNonExistentAddress()
     {
-        $response = $this->delete("/api/addresses/99999");
+        $response = $this->deleteForSite("/api/addresses/99999");
 
         $this->assertEquals(404, $response->getStatusCode());
     }
@@ -194,7 +194,7 @@ class AddressControllerTest extends FunctionalTestCase
 
         $address2 = $this->createAddress(['member_id' => $this->testMember->id]);
 
-        $response = $this->post("/api/addresses/{$address2->id}/set-default", [
+        $response = $this->postForSite("/api/addresses/{$address2->id}/set-default", [
             'member_id' => $this->testMember->id
         ]);
 
@@ -212,7 +212,7 @@ class AddressControllerTest extends FunctionalTestCase
     {
         $address = $this->createAddress(['member_id' => $this->testMember->id]);
 
-        $response = $this->post("/api/addresses/{$address->id}/set-default", []);
+        $response = $this->postForSite("/api/addresses/{$address->id}/set-default", []);
 
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -224,7 +224,7 @@ class AddressControllerTest extends FunctionalTestCase
         $address = $this->createAddress([ 'member_id' => $this->testMember->id]);
 
         // Try to set default using other member's ID
-        $response = $this->post("/api/addresses/{$address->id}/set-default", [
+        $response = $this->postForSite("/api/addresses/{$address->id}/set-default", [
             'member_id' => $this->otherMember->id
         ]);
 
@@ -233,7 +233,7 @@ class AddressControllerTest extends FunctionalTestCase
 
     public function testSetDefaultFailsForNonExistentAddress()
     {
-        $response = $this->post("/api/addresses/99999/set-default", [
+        $response = $this->postForSite("/api/addresses/99999/set-default", [
             'member_id' => $this->testMember->id
         ]);
 
@@ -247,13 +247,13 @@ class AddressControllerTest extends FunctionalTestCase
         $this->createAddress(['member_id' => $this->testMember->id, 'type' => 'both']);
 
         // Test shipping addresses
-        $response = $this->get("/api/members/{$this->testMember->id}/addresses?type=shipping");
+        $response = $this->getForSite("/api/members/{$this->testMember->id}/addresses?type=shipping");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(2, $data['items']); // shipping and both
 
         // Test billing addresses
-        $response = $this->get("/api/members/{$this->testMember->id}/addresses?type=billing");
+        $response = $this->getForSite("/api/members/{$this->testMember->id}/addresses?type=billing");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(2, $data['items']); // billing and both
@@ -265,7 +265,7 @@ class AddressControllerTest extends FunctionalTestCase
 
         $this->createAddress(['member_id' => $this->testMember->id, 'type' => 'billing']);
 
-        $response = $this->get("/api/members/{$this->testMember->id}/addresses");
+        $response = $this->getForSite("/api/members/{$this->testMember->id}/addresses");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(2, $data['items']);
@@ -276,7 +276,7 @@ class AddressControllerTest extends FunctionalTestCase
         $this->createAddress(['member_id' => $this->testMember->id]);
         $this->createAddress(['member_id' => $this->otherMember->id]);
 
-        $response = $this->get("/api/members/{$this->testMember->id}/addresses");
+        $response = $this->getForSite("/api/members/{$this->testMember->id}/addresses");
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertCount(1, $data['items']);
@@ -294,7 +294,7 @@ class AddressControllerTest extends FunctionalTestCase
             'country' => 'US',
         ];
 
-        $response = $this->post('/api/addresses', $addressData);
+        $response = $this->postForSite('/api/addresses', $addressData);
 
         $this->assertEquals(201, $response->getStatusCode());
 
@@ -317,7 +317,7 @@ class AddressControllerTest extends FunctionalTestCase
             'country' => 'US',
         ];
 
-        $response = $this->post('/api/addresses', $addressData);
+        $response = $this->postForSite('/api/addresses', $addressData);
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -334,7 +334,7 @@ class AddressControllerTest extends FunctionalTestCase
             'type' => 'both',
         ];
 
-        $response = $this->put("/api/addresses/{$address->id}", $updateData);
+        $response = $this->putForSite("/api/addresses/{$address->id}", $updateData);
 
         $this->assertEquals(200, $response->getStatusCode());
 
@@ -348,7 +348,7 @@ class AddressControllerTest extends FunctionalTestCase
 
         $address2 = $this->createAddress(['member_id' => $this->testMember->id]);
 
-        $response = $this->delete("/api/addresses/{$address1->id}");
+        $response = $this->deleteForSite("/api/addresses/{$address1->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
 

@@ -11,7 +11,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testIndexReturnsAuthorsList()
     {
-       $this->createAuthor();
+        $this->createAuthor();
 
         $response = $this->getForSite('/api/authors');
 
@@ -83,7 +83,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testStoreValidatesUniqueEmail()
     {
-      $this->createAuthor(['email' => 'john@example.com']);
+        $this->createAuthor(['email' => 'john@example.com']);
 
         $response = $this->postForSite('/api/authors', [
             'name' => 'Jane Doe',
@@ -187,8 +187,8 @@ class AuthorControllerTest extends FunctionalTestCase
 
     public function testGetActiveReturnsOnlyActiveAuthors()
     {
-       $this->createAuthor(['status' => 'active', 'name' => 'Active Author']);
-       $this->createAuthor(['status' => 'inactive']);
+        $this->createAuthor(['status' => 'active', 'name' => 'Active Author']);
+        $this->createAuthor(['status' => 'inactive']);
 
         $response = $this->getForSite('/api/authors/active');
 
@@ -320,12 +320,12 @@ class AuthorControllerTest extends FunctionalTestCase
     public function testDuplicateAuthorWithAvatar(): void
     {
         // Create author with avatar
-        $author = $this->createAuthor(['avatar' => 'avatars/bob.jpg']);
+        $author = $this->createAuthor(['avatar' => 'uploads/avatars/bob.jpg']);
 
         // Create dummy avatar file
         $avatarPath = 'uploads/avatars/bob.jpg';
-        @mkdir(dirname($avatarPath), 0755, true);
-        file_put_contents($avatarPath, 'dummy image content');
+
+        $this->createFile($avatarPath);
 
         $response = $this->postForSite("/api/authors/duplicate/{$author->id}", [], [], [], true);
 
@@ -338,9 +338,6 @@ class AuthorControllerTest extends FunctionalTestCase
 
         // Cleanup
         @unlink($avatarPath);
-        if (isset($data['data']['avatar'])) {
-            @unlink('uploads/' . $data['data']['avatar']);
-        }
     }
 
     public function testDuplicateNonExistentAuthor(): void

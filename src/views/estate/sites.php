@@ -84,7 +84,7 @@
                 <?php else: ?>
                     <p>No description available.</p>
                 <?php endif; ?>
-                <a href="<?= htmlspecialchars($site->slug) ?>/home" target="_blank">Visit Website</a>
+                <a href="<?= htmlspecialchars($site->slug) ?>/<?= $site->url_handle ?>" target="_blank">Visit Website</a>
             </div>
         <?php endforeach; ?>
     </div>

@@ -178,7 +178,7 @@ class VoucherController extends Controller
             $result = $this->voucherService->applyVoucher(
                 $id,
                 $request->input('user_id') ?? null,
-                $request->input('discount_amount') ?? null,
+                $request->input('discount_amount') ?? 0,
                 $request->input('order_id') ?? null
             );
 

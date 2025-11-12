@@ -54,8 +54,6 @@ class OrderControllerTest extends FunctionalTestCase
         $this->assertEquals('completed', $data['items'][0]['status']);
     }
 
-    // NEW FUNCTIONAL TESTS
-
     public function testStoreCreatesOrderWithItems()
     {
         $orderData = [

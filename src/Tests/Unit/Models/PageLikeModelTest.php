@@ -81,7 +81,7 @@ class PageLikeModelTest extends FunctionalTestCase
         PageLike::toggle($this->page->id, $this->member->id, $this->site->id);
         PageLike::toggle($page2->id, $this->member->id, $this->site->id);
 
-        $count = PageLike::getMemberLikeCount($this->member->id);
+        $count = PageLike::getMemberLikeCount($this->member->id, $this->site->id);
         $this->assertEquals(2, $count);
     }
 

@@ -46,6 +46,6 @@ class PageSettings extends Model
         if ($this->sale_price !== null && $this->sale_price > 0) {
             return (float) $this->sale_price;
         }
-        return $this->price ? (float) $this->price : null;
+        return $this->price > 0 ? (float) $this->price : null;
     }
 }

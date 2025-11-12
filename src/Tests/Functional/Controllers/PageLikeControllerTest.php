@@ -126,7 +126,7 @@ class PageLikeControllerTest extends FunctionalTestCase
         $response = $this->postForSite("/api/pages/like/{$page2->id}");
 
 
-        $likeCount = PageLike::getMemberLikeCount($this->member->id);
+        $likeCount = PageLike::getMemberLikeCount($this->member->id, $this->siteId);
         $this->assertEquals(2, $likeCount);
     }
 }

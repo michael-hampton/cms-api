@@ -160,7 +160,7 @@ class AddressRepositoryTest extends RepositoryTestCase
             'city' => 'City',
             'postcode' => '12345',
             'country' => 'US',
-        ]);
+        ], $this->siteId);
 
         // Assert
         $this->assertTrue($address->is_default);
@@ -181,7 +181,7 @@ class AddressRepositoryTest extends RepositoryTestCase
             'city' => 'Town',
             'postcode' => '67890',
             'country' => 'US',
-        ]);
+        ], $this->siteId);
 
         // Assert
         $this->assertFalse($address->is_default);

@@ -30,6 +30,9 @@ class WishlistServiceTest extends FunctionalTestCase
 
     protected function tearDown(): void
     {
+        // Clean up session
+        unset($_SESSION['wishlist_session_id']);
+
         Mockery::close();
         parent::tearDown();
     }

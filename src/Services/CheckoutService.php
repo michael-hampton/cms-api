@@ -12,7 +12,8 @@ class CheckoutService
         private readonly OrderService $orderService,
         private readonly VoucherService $voucherService,
         private readonly ShippingService $shippingService,
-        private readonly MemberAuthWrapper $memberAuthWrapper
+        private readonly MemberAuthWrapper $memberAuthWrapper,
+        private readonly OrderCalculationService $calculationService // ADD THIS
     ) {}
 
     public function processCheckout(array $data, int $siteId): array
@@ -100,11 +101,8 @@ class CheckoutService
     private function calculateTotals(array $cartItems, array $data): array
     {
         $subtotal = $this->cartService->getTotal();
-
-        // Calculate shipping
         $shipping = $this->shippingService->calculateShipping($subtotal, $data);
 
-        // Handle voucher discount
         $discount = 0;
         $voucherCode = null;
         $voucherId = null;
@@ -115,21 +113,20 @@ class CheckoutService
             $voucherId = (int) $data['voucher_id'];
         }
 
-        // Calculate tax (10% of subtotal - discount + shipping)
-        $taxableAmount = $subtotal - $discount + $shipping;
-        $tax = $taxableAmount * 0.1;
+        // Use shared calculation service
+        $calculatedTotals = $this->calculationService->calculateOrderTotals(
+            [], // No items needed, we have subtotal
+            [
+                'subtotal' => $subtotal,
+                'shipping' => $shipping,
+                'discount' => $discount
+            ]
+        );
 
-        $total = $subtotal - $discount + $shipping + $tax;
-
-        return [
-            'subtotal' => $subtotal,
-            'shipping' => $shipping,
-            'discount' => $discount,
-            'tax' => $tax,
-            'total' => $total,
+        return array_merge($calculatedTotals, [
             'voucher_code' => $voucherCode,
             'voucher_id' => $voucherId
-        ];
+        ]);
     }
 
     private function prepareOrderData(array $data, array $totals, int $siteId): array

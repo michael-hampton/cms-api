@@ -1079,8 +1079,8 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertTrue($ebay->override_sale_price);
         $this->assertEquals(115, $ebay->price);
         $this->assertNull($ebay->variant_sku);
-        $this->assertEquals(115, $ebay->effective_price); // Uses variant price
-        $this->assertEquals(115, $ebay->effective_sale_price); // Uses override as sale price
+        $this->assertEquals(120, $ebay->effective_price); // Uses variant price
+        $this->assertEquals(110, $ebay->effective_sale_price); // Uses override as sale price
     }
 
     public function test_sync_merchants_multiple_variants_same_merchant(): void

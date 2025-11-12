@@ -61,6 +61,8 @@ $hasSidebar = !empty($sidebarBlocks);
                         <?php endforeach; ?>
                     </div>
 
+                    @include('product-section')
+
                     <!-- Blog Comments -->
                     @include('comments')
 
@@ -89,6 +91,19 @@ $hasSidebar = !empty($sidebarBlocks);
                     Go Home
                 </a>
             </div>
+        <?php endif; ?>
+
+        <script>
+            const site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+        </script>
+
+        <?php if (!empty($todaysDeals)): ?>
+            <div class="page-deals-section">
+                @include('components/deals-carousel')
+            </div>
+
+            @css('deals-carousel.css')
+            @js('deals-carousel.js')
         <?php endif; ?>
 
         @include('authors')

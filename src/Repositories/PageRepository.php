@@ -14,12 +14,14 @@ use App\Models\PageAuthor;
 use App\Models\PageCategory;
 use App\Models\PageCustomField;
 use App\Models\PageMetadata;
+use App\Models\PageProduct;
 use App\Models\PageRegionSet;
 use App\Models\PageSeo;
 use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Models\PageTag;
 use App\Models\PageTerritory;
+use App\Models\Product;
 use App\Models\RegionSet;
 use App\Models\Tag;
 use App\Models\Territory;
@@ -65,7 +67,8 @@ class PageRepository extends Repository
             'pageAuthors',
             'pageAuthors.author',
             'regionSets',
-            'territories'
+            'territories',
+            'products'
         ]);;
         return $this->searchEngine->search($query, $criteria);
     }
@@ -179,7 +182,7 @@ class PageRepository extends Repository
             'blocks', 'categories', 'tags', 'metadata',
             'seo', 'settings', 'social', 'customFields',
             'customFields.customFieldDefinition',
-            'authors', 'pageAuthors', 'pageAuthors.author', 'regionSets', 'territories'
+            'authors', 'pageAuthors', 'pageAuthors.author', 'regionSets', 'territories', 'products'
         ])->find($pageId);
     }
 
@@ -612,5 +615,52 @@ class PageRepository extends Repository
     {
         PageTag::where('page_id', $pageId)->delete();
         return PageTag::create(['page_id' => $pageId, 'tag_id' => $reassignTagId]);
+    }
+
+    public function duplicateProducts(int $sourcePageId, int $targetPageId): void
+    {
+        $products = PageProduct::where('page_id', $sourcePageId)
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($products as $product) {
+            PageProduct::create([
+                'page_id' => $targetPageId,
+                'product_id' => $product->product_id,
+                'sort_order' => $product->sort_order,
+                'site_id' => $product->site_id
+            ]);
+        }
+    }
+
+    public function duplicateProductsToSite(int $sourcePageId, int $targetPageId, int $targetSiteId): void
+    {
+        $pageProducts = PageProduct::with(['product'])
+            ->where('page_id', $sourcePageId)
+            ->get();
+
+        foreach ($pageProducts as $pageProduct) {
+            $sourceProduct = $pageProduct->product;
+            if (!$sourceProduct) continue;
+
+            // Check if product with same slug exists in target site
+            $targetProduct = Product::where('slug', $sourceProduct->slug)
+                ->where('site_id', $targetSiteId)
+                ->first();
+
+            if (!$targetProduct) {
+                // Product doesn't exist in target site, could either:
+                // 1. Skip it
+                // 2. Create a reference/clone (implementation depends on requirements)
+                continue;
+            }
+
+            PageProduct::create([
+                'page_id' => $targetPageId,
+                'product_id' => $targetProduct->id,
+                'sort_order' => $pageProduct->sort_order,
+                'site_id' => $targetSiteId
+            ]);
+        }
     }
 }

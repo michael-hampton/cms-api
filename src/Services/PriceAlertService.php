@@ -7,13 +7,24 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ProductMerchant;
 use App\Framework\Support\SiteContext;
+use App\Repositories\PriceAlertRepository;
+use App\Repositories\ProductRepository;
 
 class PriceAlertService
 {
+    private PriceAlertRepository $repository;
+    private ProductRepository $productRepository;
+
+    public function __construct(?PriceAlertRepository $repository = null, ?ProductRepository $productRepository = null)
+    {
+        $this->repository = $repository ?? new PriceAlertRepository();
+        $this->productRepository = $productRepository ?? new ProductRepository();
+    }
+
     public function createAlert(array $data): array
     {
         // Validate product exists
-        $product = Product::find($data['product_id']);
+        $product = $this->productRepository->find($data['product_id']);
         if (!$product) {
             return ['success' => false, 'message' => 'Product not found'];
         }
@@ -44,14 +55,14 @@ class PriceAlertService
         }
 
         // Check for duplicate active alerts
-        $existingAlert = PriceAlert::where('email', $data['email'])
-            ->where('product_id', $data['product_id'])
-            ->where('is_triggered', false)
-            ->first();
+        $existingAlert = $this->repository->findActiveAlertByEmailAndProduct(
+            $data['email'],
+            $data['product_id']
+        );
 
         if ($existingAlert) {
             // Update existing alert
-            $existingAlert->update([
+            $this->repository->update($existingAlert, [
                 'variant_id' => $data['variant_id'] ?? null,
                 'merchant_id' => $data['merchant_id'] ?? null,
                 'target_price' => $data['target_price'],
@@ -67,7 +78,7 @@ class PriceAlertService
         }
 
         // Create new alert
-        $alert = PriceAlert::create([
+        $alert = $this->repository->create([
             'user_id' => $data['user_id'] ?? null,
             'email' => $data['email'],
             'product_id' => $data['product_id'],
@@ -92,15 +103,13 @@ class PriceAlertService
 
         // If specific variant requested
         if ($variantId) {
-            $variant = ProductVariant::find($variantId);
+            $variant = $this->repository->findVariant($variantId);
             if ($variant) {
-                $bestPrice = $variant->sale_price ?? $variant->price;
+                $bestPrice = $variant->sale_price > 0 ? $variant->sale_price : $variant->price;
 
                 // If specific merchant requested for this variant
                 if ($merchantId) {
-                    $merchant = ProductMerchant::where('variant_id', $variantId)
-                        ->where('merchant_id', $merchantId)
-                        ->first();
+                    $merchant = $this->repository->findMerchantForVariant($merchantId, $variantId);
 
                     if ($merchant && $merchant->effective_sale_price) {
                         $bestPrice = $merchant->effective_sale_price;
@@ -109,10 +118,7 @@ class PriceAlertService
             }
         } elseif ($merchantId) {
             // Specific merchant but no variant
-            $merchant = ProductMerchant::where('product_id', $product->id)
-                ->where('merchant_id', $merchantId)
-                ->whereNull('variant_id')
-                ->first();
+            $merchant = $this->productRepository->findMerchantForProduct($product->id, $merchantId);
 
             if ($merchant && $merchant->effective_sale_price) {
                 $bestPrice = $merchant->effective_sale_price;
@@ -124,14 +130,15 @@ class PriceAlertService
 
     public function checkAlerts(): int
     {
-        $alerts = PriceAlert::where('is_triggered', false)
-            ->where('is_notified', false)
-            ->get();
+        $alerts = $this->repository->getUntriggeredAlerts();
 
         $triggeredCount = 0;
 
-        foreach ($alerts as $alert) {
-            $product = Product::with(['variants.merchants', 'merchants'])->find($alert->product_id);
+        foreach ($alerts as $alertData) {
+            $alert = $this->repository->findById($alertData['id']);
+            if (!$alert) continue;
+
+            $product = $this->repository->getProductWithVariantMerchant($alert->product_id);
 
             if (!$product) {
                 continue;
@@ -144,7 +151,7 @@ class PriceAlertService
             );
 
             if ($currentPrice <= $alert->target_price) {
-                $alert->update([
+                $this->repository->update($alert, [
                     'is_triggered' => true,
                     'triggered_at' => date('Y-m-d H:i:s'),
                     'current_price' => $currentPrice
@@ -156,7 +163,7 @@ class PriceAlertService
                 $triggeredCount++;
             } else {
                 // Update current price even if not triggered
-                $alert->update(['current_price' => $currentPrice]);
+                $this->repository->update($alert, ['current_price' => $currentPrice]);
             }
         }
 
@@ -166,8 +173,9 @@ class PriceAlertService
     private function sendPriceAlert($alert, $newPrice): bool
     {
         try {
-            $product = Product::find($alert->product_id);
+            $product = $this->productRepository->find($alert->product_id);
             if (!$product) {
+                die('no');
                 return false;
             }
 
@@ -228,7 +236,7 @@ class PriceAlertService
             $sent = mail($alert->email, $subject, $htmlMessage, $headers);
 
             if ($sent) {
-                $alert->update([
+                $this->repository->update($alert, [
                     'is_notified' => true,
                     'notified_at' => date('Y-m-d H:i:s')
                 ]);
@@ -243,37 +251,27 @@ class PriceAlertService
 
     public function getUserAlerts(int $userId): array
     {
-        return PriceAlert::where('user_id', $userId)
-            ->with('product')
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->toArray();
+        return $this->repository->getUserAlerts($userId);
     }
 
     public function deleteAlert(int $alertId, ?int $userId = null): bool
     {
-        $query = PriceAlert::where('id', $alertId);
-
-        if ($userId) {
-            $query->where('user_id', $userId);
-        }
-
-        $alert = $query->first();
+        $alert = $this->repository->findById($alertId, $userId);
 
         if (!$alert) {
             return false;
         }
 
-        return $alert->delete();
+        return $this->repository->delete($alert);
     }
 
     public function getAlertStats(): array
     {
         return [
-            'total_alerts' => PriceAlert::count(),
-            'active_alerts' => PriceAlert::where('is_triggered', false)->count(),
-            'triggered_alerts' => PriceAlert::where('is_triggered', true)->where('is_notified', false)->count(),
-            'notified_alerts' => PriceAlert::where('is_notified', true)->count(),
+            'total_alerts' => $this->repository->getTotalCount(),
+            'active_alerts' => $this->repository->getActiveCount(),
+            'triggered_alerts' => $this->repository->getTriggeredCount(),
+            'notified_alerts' => $this->repository->getNotifiedCount(),
         ];
     }
 }

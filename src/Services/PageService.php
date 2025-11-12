@@ -20,6 +20,7 @@ use App\Repositories\PageAuthorRepository;
 use App\Repositories\PageCategoryRepository;
 use App\Repositories\PageCustomFieldRepository;
 use App\Repositories\PageMetadataRepository;
+use App\Repositories\PageProductRepository;
 use App\Repositories\PageRegionSetRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\PageSeoRepository;
@@ -52,6 +53,7 @@ class PageService
         private PageAuthorRepository      $pageAuthorRepository,
         private PageRegionSetRepository   $pageRegionSetRepository,
         private PageTerritoryRepository   $pageTerritoryRepository,
+        private PageProductRepository     $pageProductRepository,
         ?int                              $siteId = null
     )
     {
@@ -546,6 +548,10 @@ class PageService
             $this->tagRepository->syncTags($pageId, $tagsForm['tags'], $siteId);
         }
 
+        if (isset($tagsForm['products']) && is_array($tagsForm['products'])) {
+            $this->pageProductRepository->syncProducts($pageId, $tagsForm['products'], $siteId);
+        }
+
         $customFieldsData = $tagsForm['customFields'] ?? $tagsForm['custom_fields'] ?? [];
 
         if (!empty($customFieldsData) && is_array($customFieldsData)) {
@@ -732,6 +738,7 @@ class PageService
             'pageAuthors' => 'duplicatePageAuthors',
             'regionSets' => 'duplicateRegionSets',
             'territories' => 'duplicateTerritories',
+            'products' => 'duplicateProducts',
         ];
 
         $errors = [];
@@ -740,14 +747,16 @@ class PageService
             try {
                 $this->pageRepository->$method($sourcePageId, $targetPageId);
             } catch (\Exception $e) {
-                // Log the error but continue with other relations
-                error_log(sprintf(
-                    'Failed to duplicate %s for page %d to %d: %s',
-                    $relationType,
-                    $sourcePageId,
-                    $targetPageId,
-                    $e->getMessage()
-                ));
+                if ($_ENV['APP_ENV'] !== 'testing') {
+                    // Log the error but continue with other relations
+                    error_log(sprintf(
+                        'Failed to duplicate %s for page %d to %d: %s',
+                        $relationType,
+                        $sourcePageId,
+                        $targetPageId,
+                        $e->getMessage()
+                    ));
+                }
 
                 $errors[$relationType] = $e->getMessage();
             }
@@ -861,12 +870,14 @@ class PageService
                 return $this->getCompletePageData($targetPage->id);
             });
         } catch (\Exception $e) {
-            error_log(sprintf(
-                'Failed to merge page %d into %d: %s',
-                $sourcePageId,
-                $targetPageId,
-                $e->getMessage()
-            ));
+            if ($_ENV['APP_ENV'] !== 'testing') {
+                error_log(sprintf(
+                    'Failed to merge page %d into %d: %s',
+                    $sourcePageId,
+                    $targetPageId,
+                    $e->getMessage()
+                ));
+            }
 
             throw new \Exception("Failed to merge pages: {$e->getMessage()}", 0, $e);
         }
@@ -889,7 +900,8 @@ class PageService
             'regionSets',
             'territories',
             'pageAuthors',
-            'customFields'
+            'customFields',
+            'products'
         ];;
 
         foreach ($appendableRelations as $relation) {
@@ -897,7 +909,6 @@ class PageService
             try {
                 $this->pageRepository->$method($sourcePageId, $targetPageId);
             } catch (\Exception $e) {
-                error_log("Failed to merge {$relation}: {$e->getMessage()}");
                 throw $e;
             }
         }
@@ -934,7 +945,7 @@ class PageService
             return;
         }
 
-        $updates = match($strategy) {
+        $updates = match ($strategy) {
             'replace' => $this->buildReplaceUpdates($sourcePage),
             'append' => $this->buildAppendUpdates($sourcePage, $targetPage),
             default => []
@@ -1292,6 +1303,7 @@ class PageService
             'pageAuthors' => 'duplicatePageAuthorsToSite',
             'regionSets' => 'duplicateRegionSetsToSite',
             'territories' => 'duplicateTerritoriesToSite',
+            'products' => 'duplicateProductsToSite',
         ];
 
         $errors = [];
@@ -1300,14 +1312,16 @@ class PageService
             try {
                 $this->pageRepository->$method($sourcePageId, $targetPageId, $targetSiteId);
             } catch (\Exception $e) {
-                // Log the error but continue with other relations
-                error_log(sprintf(
-                    'Failed to clone %s for page %d to site %d: %s',
-                    $relationType,
-                    $sourcePageId,
-                    $targetPageId,
-                    $e->getMessage()
-                ));
+                if ($_ENV['APP_ENV'] !== 'testing') {
+                    // Log the error but continue with other relations
+                    error_log(sprintf(
+                        'Failed to clone %s for page %d to site %d: %s',
+                        $relationType,
+                        $sourcePageId,
+                        $targetPageId,
+                        $e->getMessage()
+                    ));
+                }
 
                 $errors[$relationType] = $e->getMessage();
             }

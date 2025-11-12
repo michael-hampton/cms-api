@@ -41,12 +41,6 @@ try {
     $response->send();
     exit;
 } catch (Throwable $e) {
-    echo '<pre>';
-    print_r($e);
-    echo '<pre>';
-    print_r(debug_backtrace());;
-    echo $e->getMessage();
-    die('here5 error');
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([

@@ -14,6 +14,9 @@ class DealsCarousel {
         this.totalItems = this.track.children.length;
         this.maxIndex = Math.max(0, this.totalItems - this.itemsPerView);
 
+        this.autoSlideInterval = null;
+        this.autoSlideDelay = 5000; // 5 seconds
+
         this.init();
     }
 
@@ -22,8 +25,16 @@ class DealsCarousel {
         this.updateArrows();
 
         // Event listeners
-        this.leftArrow?.addEventListener('click', () => this.scroll(-1));
-        this.rightArrow?.addEventListener('click', () => this.scroll(1));
+        this.leftArrow?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.scroll(-1);
+        });
+        this.rightArrow?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.scroll(1);
+        });
 
         // Touch support
         let startX = 0;
@@ -46,6 +57,8 @@ class DealsCarousel {
             this.maxIndex = Math.max(0, this.totalItems - this.itemsPerView);
             this.scrollToIndex(Math.min(this.currentIndex, this.maxIndex));
         });
+
+        this.startAutoSlide();
     }
 
     calculateItemsPerView() {
@@ -55,8 +68,10 @@ class DealsCarousel {
     }
 
     scroll(direction) {
+        this.stopAutoSlide();
         const newIndex = Math.max(0, Math.min(this.maxIndex, this.currentIndex + direction));
         this.scrollToIndex(newIndex);
+        this.startAutoSlide();
     }
 
     scrollToIndex(index) {
@@ -109,6 +124,22 @@ class DealsCarousel {
             this.rightArrow.style.pointerEvents = this.currentIndex >= this.maxIndex ? 'none' : 'auto';
         }
     }
+
+    startAutoSlide() {
+        this.autoSlideInterval = setInterval(() => {
+            if (this.currentIndex >= this.maxIndex) {
+                this.scrollToIndex(0);
+            } else {
+                this.scroll(1);
+            }
+        }, this.autoSlideDelay);
+    }
+
+    stopAutoSlide() {
+        if (this.autoSlideInterval) {
+            clearInterval(this.autoSlideInterval);
+        }
+    }
 }
 
 // Global functions for inline handlers
@@ -141,36 +172,52 @@ async function refreshDeals() {
         if (data.deals && data.deals.length > 0) {
             // Rebuild carousel with new deals
             track.innerHTML = data.deals.map(deal => `
-                <div class="deal-card">
-                    <div class="deal-badge">
-                        <span>${deal.discount_percentage}% OFF</span>
-                    </div>
-                    
-                    <a href="/shop/details/${deal.slug}" class="deal-image-link">
-                        <img src="${deal.image}" alt="${deal.title}" class="deal-image">
-                    </a>
-                    
-                    <div class="deal-content">
-                        <h3 class="deal-title">
-                            <a href="/shop/details/${deal.slug}">${deal.title}</a>
-                        </h3>
-                        
-                        ${deal.rating > 0 ? `
-                            <div class="deal-rating">
-                                <div class="stars" style="--rating: ${deal.rating}"></div>
-                                <span class="review-count">(${deal.review_count})</span>
-                            </div>
-                        ` : ''}
-                        
-                        <div class="deal-prices">
-                            <span class="was-price">Was £${parseFloat(deal.original_price).toFixed(2)}</span>
-                            <span class="now-price">£${parseFloat(deal.sale_price).toFixed(2)}</span>
-                        </div>
-                        
-                        <button class="deal-cta" onclick="viewDeal('${deal.slug}')">View Deal</button>
-                    </div>
+    <div class="deal-card">
+        <div class="deal-badge">
+            <span>${deal.discount_percentage}% OFF</span>
+        </div>
+        
+        <button class="deal-wishlist-btn ${deal.in_wishlist ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist(${deal.id}, this)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+        </button>
+        
+        <a href="/shop/details/${deal.slug}" class="deal-image-link">
+            <img src="${deal.image}" alt="${deal.title}" class="deal-image">
+        </a>
+        
+        <div class="deal-content">
+            <h3 class="deal-title">
+                <a href="/shop/details/${deal.slug}">${deal.title}</a>
+            </h3>
+            
+            ${deal.rating > 0 ? `
+                <div class="deal-rating">
+                    <div class="stars" style="--rating: ${deal.rating}"></div>
+                    <span class="review-count">(${deal.review_count})</span>
                 </div>
-            `).join('');
+            ` : ''}
+            
+            <div class="deal-prices">
+                <span class="was-price">Was £${parseFloat(deal.original_price).toFixed(2)}</span>
+                <span class="now-price">£${parseFloat(deal.sale_price).toFixed(2)}</span>
+            </div>
+            
+            <div class="deal-actions">
+                <button class="deal-add-cart" onclick="event.stopPropagation(); addToCart(${deal.id})">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    Add to Cart
+                </button>
+                <button class="deal-cta" onclick="window.location.href='/shop/details/${deal.slug}'">View Deal</button>
+            </div>
+        </div>
+    </div>
+`).join('');
 
             // Reinitialize carousel
             window.dealsCarousel = new DealsCarousel('#deals-carousel');

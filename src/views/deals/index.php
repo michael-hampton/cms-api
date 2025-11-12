@@ -15,8 +15,10 @@
         <div class="container">
             <!-- Hero Section with Carousel -->
             <section class="deals-hero">
-                 @include ('components/deals-carousel.php')
+                 @include ('components/deals-carousel')
             </section>
+
+            @include ('components/deal-alert-subscribe')
 
             <!-- Deals Tabs -->
             <div class="deals-tabs">

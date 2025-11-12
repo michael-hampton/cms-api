@@ -10,6 +10,8 @@ use App\Models\Member;
 
 class AddressFactory extends Factory
 {
+    use HasSiteId;
+
     protected function model(): string
     {
         return Address::class;
@@ -17,13 +19,13 @@ class AddressFactory extends Factory
 
     protected function definition(): array
     {
-        return [
+        return $this->withSiteId([
             'member_id' => uniqid(),
             'type' => 'shipping',
             'address_line_1' => '123 Main St',
             'city' => 'City',
             'postcode' => '12345',
             'country' => 'US',
-        ];
+        ]);
     }
 }

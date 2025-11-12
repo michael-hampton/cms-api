@@ -9,6 +9,7 @@ use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
+use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\Site;
 use App\Models\User;
@@ -27,6 +28,8 @@ abstract class FunctionalTestCase extends TestCase
     {
         $_ENV['APP_ENV'] = 'testing';
         putenv('APP_ENV=testing'); // optional, for functions using getenv()
+
+        ini_set('log_errors', 0);
 
         // Use test database configuration
         $testConfig = [
@@ -645,6 +648,19 @@ abstract class FunctionalTestCase extends TestCase
 
         $stmt = $this->database->query($sql, $bindings);
         return (int) $stmt->fetch()['count'];
+    }
+
+    protected function createFile(string $filePath)
+    {
+        $filePath = getcwd() . '/' . $filePath;
+
+        if(!is_dir(dirname($filePath))){
+            mkdir(dirname($filePath), 0755, true);
+        }
+
+        if (!file_exists($filePath)) {
+            file_put_contents($filePath, 'dummy image content');
+        }
     }
 
 }

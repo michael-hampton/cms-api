@@ -86,7 +86,7 @@ class ProductMerchant extends Model
             return $this->variant->sale_price;
         }
 
-        return $this->sale_price ?? $this->price;
+        return $this->sale_price > 0 ? $this->sale_price : $this->price;
     }
 
     /**

@@ -19,6 +19,7 @@ use App\Repositories\PageAuthorRepository;
 use App\Repositories\PageCategoryRepository;
 use App\Repositories\PageCustomFieldRepository;
 use App\Repositories\PageMetadataRepository;
+use App\Repositories\PageProductRepository;
 use App\Repositories\PageRegionSetRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\PageSeoRepository;
@@ -56,12 +57,16 @@ class PageServiceTest extends FunctionalTestCase
     private $pageAuthorRepository;
     private $pageRegionSetRepository;
     private $pageTerritoryRepository;
+    private $pageProductRepository;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        ini_set('log_errors', 0);
+
         $this->pageRepository = Mockery::mock(PageRepository::class);
+        $this->pageProductRepository = Mockery::mock(PageProductRepository::class);
         $this->blockRepository = Mockery::mock(BlockRepository::class);
         $this->blockParserService = Mockery::mock(BlockParserService::class);
         $this->metadataRepository = Mockery::mock(PageMetadataRepository::class);
@@ -95,6 +100,7 @@ class PageServiceTest extends FunctionalTestCase
             $this->pageAuthorRepository,
             $this->pageRegionSetRepository,
             $this->pageTerritoryRepository,
+            $this->pageProductRepository,
             $this->siteId
         );
     }
@@ -269,6 +275,7 @@ class PageServiceTest extends FunctionalTestCase
     public function testDuplicatePageReturnsNullForNonexistent()
     {
         $this->pageRepository->shouldReceive('getCompletePageData')->with(999)->andReturn(null);
+        // Verify products are duplicated during merge
 
         $result = $this->service->duplicatePage(999);
 
@@ -611,6 +618,7 @@ class PageServiceTest extends FunctionalTestCase
         $newPage = $this->createMockPage(2);
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
 
         $this->service->duplicatePage(1);
@@ -656,6 +664,10 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicateTags')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateCustomFields')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateAccessRoles')->andThrow(new \Exception('Failed'));
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->andThrow(new \Exception('Failed'));
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->andThrow(new \Exception('Failed'));
+        $this->pageRepository->shouldReceive('duplicateTerritories')->andThrow(new \Exception('Failed'));
+        $this->pageRepository->shouldReceive('duplicateProducts')->andThrow(new \Exception('Failed'));
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Failed to duplicate any page relations');
@@ -677,13 +689,13 @@ class PageServiceTest extends FunctionalTestCase
         $this->setDuplicationExpectations();
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
 
-        set_error_handler(function ($errno, $errstr) {
-            return true;
-        });
+//        set_error_handler(function ($errno, $errstr) {
+//            return true;
+//        });
 
         $result = $this->service->duplicatePage(1);
 
-        restore_error_handler();
+        //restore_error_handler();
 
         $this->assertNotNull($result);
     }
@@ -1277,6 +1289,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicatePageAuthorsToSite')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateRegionSetsToSite')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateProductsToSite')->with(1, 2, 2)->once();
 
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
 
@@ -1311,6 +1324,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicatePageAuthorsToSite')->once();
         $this->pageRepository->shouldReceive('duplicateRegionSetsToSite')->once();
         $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')->once();
+        $this->pageRepository->shouldReceive('duplicateProductsToSite')->once();
 
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
 
@@ -1584,6 +1598,8 @@ class PageServiceTest extends FunctionalTestCase
             ->with(1, 2)->once()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateCustomFields')
             ->with(1, 2)->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateProducts')
+            ->with(1, 2)->once()->andReturn(true);
 
         $this->pageRepository->shouldReceive('duplicateBlocks')->byDefault()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateMetadata')->byDefault()->andReturn(true);
@@ -1684,6 +1700,8 @@ class PageServiceTest extends FunctionalTestCase
             ->with($sourcePageId, $targetPageId, $targetSiteId)->once();
         $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')
             ->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateProductsToSite')
+            ->with($sourcePageId, $targetPageId, $targetSiteId)->once();
     }
 
     private function setupMergeSettingsExpectations(): void
@@ -1749,5 +1767,71 @@ class PageServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Invalid status value');
 
         $this->service->bulkUpdateStatus([1, 2], 'invalid-status');
+    }
+
+    public function testProcessTagsFormSyncsProducts()
+    {
+        $this->expectNotToPerformAssertions();
+
+        $tagsForm = [
+            'categories' => [1, 2],
+            'tags' => [3, 4],
+            'products' => [5, 6, 7]
+        ];
+
+        $this->categoryRepository->shouldReceive('syncCategories')->once()->with(1, [1, 2], $this->siteId);
+        $this->tagRepository->shouldReceive('syncTags')->once()->with(1, [3, 4], $this->siteId);
+        $this->pageProductRepository->shouldReceive('syncProducts')->once()->with(1, [5, 6, 7], $this->siteId);
+
+        $this->invokePrivateMethod('processTagsForm', 1, $tagsForm, $this->siteId);
+    }
+
+    public function testDuplicatePageClonesProducts()
+    {
+        $originalPage = $this->createMockPage(1);
+        $newPage = $this->createMockPage(2);
+
+        $this->setupDuplicatePageExpectations($originalPage, $newPage);
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+
+        $result = $this->service->duplicatePage(1);
+        $this->assertInstanceOf(Page::class, $result);
+    }
+
+    public function testClonePageToSiteClonesProducts()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $sourcePage->site_id = 1;
+        $newPage = $this->createMockPage(2);
+        $newPage->site_id = 2;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
+        $this->pageRepository->shouldReceive('slugExistsInSite')->andReturn(false);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
+        $this->pageHistory->shouldReceive('logPageClonedToSite')->once();
+
+        $this->setupCloneToSiteExpectations(1, 2, 2);
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
+
+        $result = $this->service->clonePageToSite(1, 2);
+        $this->assertNotNull($result);
+    }
+
+    public function testMergePagesWithProducts()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $targetPage = $this->createMockPage(2);
+
+        $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setDuplicationExpectations();
+
+        $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(0);
+        $this->blockRepository->shouldReceive('getBlocksForPage')->with(1)->andReturn(collect([]));
+        $this->customFieldRepository->shouldReceive('getCustomFieldsForPage')->andReturn(collect([]));
+        $this->pageRepository->shouldReceive('delete')->with(1)->andReturn(true);
+
+        $result = $this->service->mergePages(1, 2);
+        $this->assertNotNull($result);
     }
 }

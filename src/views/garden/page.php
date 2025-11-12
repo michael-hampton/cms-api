@@ -56,6 +56,8 @@ $hasSidebar = !empty($sidebarBlocks);
                         <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
                     <?php endforeach; ?>
 
+                    @include('product-section')
+
                     <!-- Blog Comments Section -->
                     @include('comments')
 

@@ -50,11 +50,13 @@ $hasSidebar = !empty($sidebarBlocks);
                         <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
                     <?php endforeach; ?>
 
+                    @include('product-section')
+
                     <!-- Blog Comments Section -->
                     @include('comments')
 
                     <!-- Social Media Links -->
-                    @include('links)
+                    @include('links')
                 </div>
 
                 <!-- Sidebar -->
@@ -72,6 +74,19 @@ $hasSidebar = !empty($sidebarBlocks);
                 <p>The page you're looking for doesn't exist.</p>
                 <a href="/" class="btn btn-primary">Go Home</a>
             </div>
+        <?php endif; ?>
+
+        <script>
+            const site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+        </script>
+
+        <?php if (!empty($todaysDeals)): ?>
+            <div class="page-deals-section">
+                @include('components/deals-carousel')
+            </div>
+
+            @css('deals-carousel.css')
+            @js('deals-carousel.js')
         <?php endif; ?>
 
         @include('authors')

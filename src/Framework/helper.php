@@ -15,6 +15,13 @@ if (!function_exists('auth')) {
     }
 }
 
+if (!function_exists('url')) {
+    function url(string $path): ?string
+    {
+        return $path;
+    }
+}
+
 if (!function_exists('message')) {
     function message(): ?string
     {
