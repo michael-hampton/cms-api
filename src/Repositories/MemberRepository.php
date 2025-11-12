@@ -80,4 +80,51 @@ class MemberRepository extends Repository
     {
         return $this->where('email', $email)->first();
     }
+
+    /**
+     * Update member account details
+     * Handles email uniqueness validation and email verification reset
+     */
+    public function updateAccountDetails(int $memberId, array $data): ?Member
+    {
+        $member = $this->find($memberId);
+
+        if (!$member) {
+            return null;
+        }
+
+        // Check if email is changing and if it's unique
+        if (isset($data['email']) && $data['email'] !== $member->email) {
+            $existing = $this->where('email', $data['email'])
+                ->where('id', '!=', $memberId)
+                ->first();
+
+            if ($existing) {
+                throw new \InvalidArgumentException('Email address is already in use.');
+            }
+
+            // Reset email verification when email changes
+            $data['email_verified_at'] = null;
+        }
+
+        // Only allow updating specific fields
+        $allowedFields = ['first_name', 'last_name', 'display_name', 'email', 'email_verified_at'];
+        $updateData = array_intersect_key($data, array_flip($allowedFields));
+
+        return $this->update($memberId, $updateData);
+    }
+
+    /**
+     * Check if email is available for a member (excluding their own)
+     */
+    public function isEmailAvailable(string $email, ?int $excludeMemberId = null): bool
+    {
+        $query = $this->where('email', $email);
+
+        if ($excludeMemberId) {
+            $query->where('id', '!=', $excludeMemberId);
+        }
+
+        return $query->first() === null;
+    }
 }

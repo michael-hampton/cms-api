@@ -74,6 +74,9 @@ $router->get('/category/{slug}', CategoryPageController::class, 'show');
 $router->post('/event-signup', EventController::class, 'signup');
 $router->post('/{site}/comments', CommentController::class, 'store');
 
+$router->get('/{site}/member/account-details', [MemberController::class, 'accountDetails']);
+$router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
+
 $router->get('/authors/{slug}', AuthorViewController::class, 'show');
 $router->get('/tags/{slug}', TagViewController::class, 'show');
 

@@ -326,4 +326,163 @@ class MemberRepositoryTest extends RepositoryTestCase
 
         $this->assertCount(5, $members);
     }
+
+    public function test_it_can_update_account_details(): void
+    {
+        $member = $this->createMember([
+            'email' => 'old@example.com',
+            'first_name' => 'Old',
+            'last_name' => 'Name',
+            'display_name' => 'OldDisplay'
+        ]);
+
+        $updated = $this->repository->updateAccountDetails($member->id, [
+            'first_name' => 'New',
+            'last_name' => 'Name',
+            'display_name' => 'NewDisplay'
+        ]);
+
+        $this->assertNotNull($updated);
+        $this->assertEquals('New', $updated->first_name);
+        $this->assertEquals('Name', $updated->last_name);
+        $this->assertEquals('NewDisplay', $updated->display_name);
+        $this->assertEquals('old@example.com', $updated->email);
+    }
+
+    public function test_updating_email_resets_verification(): void
+    {
+        $member = $this->createMember([
+            'email' => 'old@example.com',
+            'email_verified_at' => now()
+        ]);
+
+        $this->assertNotNull($member->email_verified_at);
+
+        $updated = $this->repository->updateAccountDetails($member->id, [
+            'email' => 'new@example.com'
+        ]);
+
+        // Refresh from database to get the actual updated values
+        $updated = $updated->fresh();
+
+        $this->assertEquals('new@example.com', $updated->email);
+        $this->assertNull($updated->email_verified_at);
+    }
+
+    public function test_updating_email_to_same_email_keeps_verification(): void
+    {
+        $verifiedAt = now();
+        $member = $this->createMember([
+            'email' => 'test@example.com',
+            'email_verified_at' => $verifiedAt
+        ]);
+
+        $updated = $this->repository->updateAccountDetails($member->id, [
+            'email' => 'test@example.com',
+            'first_name' => 'NewName'
+        ]);
+
+        $this->assertEquals('test@example.com', $updated->email);
+        $this->assertNotNull($updated->email_verified_at);
+    }
+
+    public function test_update_account_details_throws_exception_for_duplicate_email(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Email address is already in use.');
+
+        $member1 = $this->createMember(['email' => 'first@example.com']);
+        $member2 = $this->createMember(['email' => 'second@example.com']);
+
+        $this->repository->updateAccountDetails($member2->id, [
+            'email' => 'first@example.com'
+        ]);
+    }
+
+    public function test_update_account_details_only_updates_allowed_fields(): void
+    {
+        $member = $this->createMember([
+            'email' => 'test@example.com',
+            'first_name' => 'Test',
+            'is_active' => true,
+            'password' => password_hash('password123', PASSWORD_DEFAULT)
+        ]);
+
+        $updated = $this->repository->updateAccountDetails($member->id, [
+            'first_name' => 'Updated',
+            'is_active' => false, // Should be ignored
+            'password' => 'hackAttempt', // Should be ignored
+            'site_id' => 999 // Should be ignored
+        ]);
+
+        $this->assertEquals('Updated', $updated->first_name);
+        $this->assertTrue($updated->is_active); // Unchanged
+        $this->assertNotEquals('hackAttempt', $updated->password); // Unchanged
+    }
+
+    public function test_update_account_details_returns_null_for_nonexistent_member(): void
+    {
+        $result = $this->repository->updateAccountDetails(99999, [
+            'first_name' => 'Test'
+        ]);
+
+        $this->assertNull($result);
+    }
+
+    public function test_is_email_available_returns_true_for_available_email(): void
+    {
+        $this->createMember(['email' => 'taken@example.com']);
+
+        $available = $this->repository->isEmailAvailable('available@example.com');
+
+        $this->assertTrue($available);
+    }
+
+    public function test_is_email_available_returns_false_for_taken_email(): void
+    {
+        $this->createMember(['email' => 'taken@example.com']);
+
+        $available = $this->repository->isEmailAvailable('taken@example.com');
+
+        $this->assertFalse($available);
+    }
+
+    public function test_is_email_available_excludes_current_member(): void
+    {
+        $member = $this->createMember(['email' => 'test@example.com']);
+
+        $available = $this->repository->isEmailAvailable('test@example.com', $member->id);
+
+        $this->assertTrue($available);
+    }
+
+    public function test_is_email_available_checks_other_members(): void
+    {
+        $member1 = $this->createMember(['email' => 'first@example.com']);
+        $member2 = $this->createMember(['email' => 'second@example.com']);
+
+        $available = $this->repository->isEmailAvailable('second@example.com', $member1->id);
+
+        $this->assertFalse($available);
+    }
+
+    public function test_update_account_details_with_partial_data(): void
+    {
+        $member = $this->createMember([
+            'email' => 'test@example.com',
+            'first_name' => 'Original',
+            'last_name' => 'Name',
+            'display_name' => 'OriginalDisplay'
+        ]);
+
+        $updated = $this->repository->updateAccountDetails($member->id, [
+            'first_name' => 'Updated'
+            // Only updating first_name, others should remain unchanged
+        ]);
+
+        $this->assertEquals('Updated', $updated->first_name);
+        $this->assertEquals('Name', $updated->last_name);
+        $this->assertEquals('OriginalDisplay', $updated->display_name);
+        $this->assertEquals('test@example.com', $updated->email);
+    }
 }

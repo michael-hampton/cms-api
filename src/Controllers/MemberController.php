@@ -13,6 +13,7 @@ class MemberController extends Controller
 {
     public function __construct(private readonly MemberRepository $memberRepository)
     {
+        parent::__construct();
     }
 
     public function search(Request $request, string $siteName)
@@ -42,5 +43,44 @@ class MemberController extends Controller
     public function me(): JsonResponse
     {
         return $this->resourceResponse(['member' => MemberAuth::member()]);
+    }
+
+    public function accountDetails()
+    {
+        $site = SiteContext::get();
+        $member = MemberAuth::member();
+
+        // Get fresh member instance with relationships
+        $memberWithRelations = $this->memberRepository
+            ->find($member->id, ['roles', 'addresses', 'subscriptions']);
+
+        return $this->view('member/account-details', [
+            'site' => $site,
+            'member' => $memberWithRelations ?? $member,
+            'pageTitle' => 'Account Details'
+        ]);
+    }
+
+    public function updateAccountDetails(Request $request)
+    {
+        try {
+            $site = SiteContext::get();
+            $member = MemberAuth::member();
+
+            $data = $request->only(['first_name', 'last_name', 'display_name', 'email']);
+
+            $updatedMember = $this->memberRepository->updateAccountDetails($member->id, $data);
+
+            if (!$updatedMember) {
+                return $this->back();
+            }
+
+            return $this->redirect("/{$site->slug}/member/account-details");
+
+        } catch (\InvalidArgumentException $e) {
+            return $this->back();
+        } catch (\Exception $e) {
+            return $this->back();
+        }
     }
 }

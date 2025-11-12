@@ -415,7 +415,6 @@
 </head>
 
 <?php
-$site = \App\Framework\Support\SiteContext::slug();
 ?>
 <body>
 <header class="header">
@@ -451,7 +450,7 @@ $site = \App\Framework\Support\SiteContext::slug();
     <h2 class="section-title">Quick Access</h2>
 
     <div class="dashboard-grid">
-        <a href="/<?= $site ?>/member/orders" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/orders" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon orders">🛍️</div>
                 <div class="card-arrow">→</div>
@@ -462,7 +461,7 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/newsletters" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/newsletters" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon newsletters">📧</div>
                 <div class="card-arrow">→</div>
@@ -473,7 +472,7 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/subscriptions" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/subscriptions" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon subscriptions">⭐</div>
                 <div class="card-arrow">→</div>
@@ -484,7 +483,7 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/addresses" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/addresses" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon addresses">📍</div>
                 <div class="card-arrow">→</div>
@@ -495,7 +494,7 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/comments" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/comments" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon comments">💬</div>
                 <div class="card-arrow">→</div>
@@ -506,18 +505,29 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/settings" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/account-details" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon" style="background: linear-gradient(135deg, #6b728020 0%, #4b556320 100%);">👤</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Account Details</h3>
+                <p>View and update your personal information and account status.</p>
+            </div>
+        </a>
+
+        <a href="/<?= $site->slug ?>/member/settings" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon settings">⚙️</div>
                 <div class="card-arrow">→</div>
             </div>
             <div class="card-content">
-                <h3>Account Settings</h3>
-                <p>Update your password and account preferences.</p>
+                <h3>Security Settings</h3>
+                <p>Update your password and security preferences.</p>
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/reading-history" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/reading-history" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon" style="background: linear-gradient(135deg, #ec489920 0%, #f5717620 100%);">📚</div>
                 <div class="card-arrow">→</div>
@@ -528,7 +538,7 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/liked-pages" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/liked-pages" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon" style="background: linear-gradient(135deg, #ef444420 0%, #dc262620 100%);">❤️</div>
                 <div class="card-arrow">→</div>
@@ -539,7 +549,7 @@ $site = \App\Framework\Support\SiteContext::slug();
             </div>
         </a>
 
-        <a href="/<?= $site ?>/member/wishlist" class="dashboard-card">
+        <a href="/<?= $site->slug ?>/member/wishlist" class="dashboard-card">
             <div class="card-header">
                 <div class="card-icon orders">🛍️</div>
                 <div class="card-arrow">→</div>
@@ -594,16 +604,10 @@ $site = \App\Framework\Support\SiteContext::slug();
 
     <h2 class="section-title">Recommended For You</h2>
 
-    <?php if ($recommendedPages && $recommendedPages?->isEmpty()): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">📄</div>
-            <h3>No Recommendations Yet</h3>
-            <p>Check back soon for personalized content recommendations.</p>
-        </div>
-    <?php else: ?>
+    <?php if (isset($recommendedPages) && !$recommendedPages?->isEmpty()): ?>
         <div class="pages-grid">
             <?php foreach ($recommendedPages as $page): ?>
-                <a href="/<?= htmlspecialchars($page->slug) ?>" class="page-card">
+                <a href="/<?= $site->slug ?>/<?= htmlspecialchars($page->slug) ?>" class="page-card">
                     <?php if ($page->listing_image_id): ?>
                         <img src="/images/<?= $page->listing_image_id ?>" alt="<?= htmlspecialchars($page->title) ?>" class="page-image">
                     <?php else: ?>
@@ -615,11 +619,17 @@ $site = \App\Framework\Support\SiteContext::slug();
                             <p class="page-excerpt"><?= htmlspecialchars($page->listing_synopsis) ?></p>
                         <?php endif; ?>
                         <div class="page-meta">
-                            <span>📅 <?= date('M j, Y', strtotime($page->created_at)) ?></span>
+                            <span>📅 <?= $page->created_at->format('M j, Y') ?></span>
                         </div>
                     </div>
                 </a>
             <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <h3>No Recommendations Yet</h3>
+            <p>Check back soon for personalized content recommendations.</p>
         </div>
     <?php endif; ?>
 </div>
