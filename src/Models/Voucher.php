@@ -2,8 +2,13 @@
 
 namespace App\Models;
 
-class Voucher extends Model
+use App\Models\Concerns\HasCloneHistory;
+
+class
+Voucher extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'vouchers';
 
     protected $fillable = [
@@ -20,7 +25,8 @@ class Voucher extends Model
         'per_user_limit',
         'starts_at',
         'expires_at',
-        'status'
+        'status',
+        'clone_history'
     ];
 
     protected $casts = [
@@ -33,6 +39,7 @@ class Voucher extends Model
         'per_user_limit' => 'integer',
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
+        'clone_history' => 'array',
     ];
 
     public function isValid(): bool

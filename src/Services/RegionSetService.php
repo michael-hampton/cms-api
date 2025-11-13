@@ -179,6 +179,10 @@ class RegionSetService
                 }
             }
 
+            // Add clone history
+            $originalRegionSet->addCloneRecord('cloned_to', $newRegionSet->id, null);
+            $newRegionSet->addCloneRecord('cloned_from', $originalRegionSet->id, null);
+
             return $newRegionSet;
         });
     }

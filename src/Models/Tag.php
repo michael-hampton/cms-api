@@ -4,9 +4,12 @@ namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
+use App\Models\Concerns\HasCloneHistory;
 
 class Tag extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'tags';
     protected $fillable = [
         'name',
@@ -22,14 +25,16 @@ class Tag extends Model
         'seo_title',
         'seo_description',
         'no_index',
-        'canonical_url'
+        'canonical_url',
+        'clone_history'
     ];
 
     protected $casts = [
         'usage_count' => 'integer',
         'is_featured' => 'boolean',
         'meta' => 'json',
-        'no_index' => 'boolean'
+        'no_index' => 'boolean',
+        'clone_history' => 'array',
     ];
 
     public static function boot()

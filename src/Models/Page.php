@@ -8,10 +8,21 @@ use App\Framework\Database\Relations\BelongsToManyHandler;
 use App\Framework\Database\Relations\HasManyHandler;
 use App\Framework\Database\Relations\RelationBuilder;
 use App\Framework\Support\Collection;
+use App\Models\Concerns\HasCloneHistory;
 
 class Page extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'pages';
+
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PUBLISHED = 'published';
+    public const STATUS_ARCHIVED = 'archived';
+    public const STATUS_SCHEDULED = 'scheduled';
+    public const STATUS_WAITING_APPROVAL = 'waiting_approval';
+    public const STATUS_PRIVATE = 'private';
+    public const STATUS_ON_HOLD = 'on_hold';
 
     protected $fillable = [
         'title',
@@ -42,7 +53,11 @@ class Page extends Model
         'hero_video_url',
         'crop_overrides',
         'resolved_images',
-        'gallery_slides'
+        'gallery_slides',
+        'clone_history',
+        'requires_approval',
+        'approved_by',
+        'approved_at',
     ];
 
     protected $alwaysInclude = [
@@ -74,6 +89,9 @@ class Page extends Model
         'crop_overrides' => 'json',
         'resolved_images' => 'json',
         'listing_use_as_hero' => 'boolean',
+        'clone_history' => 'array',
+        'requires_approval' => 'boolean',
+        'approved_at' => 'datetime',
     ];
 
     public function blocks(bool $relation = false)
@@ -421,5 +439,142 @@ class Page extends Model
             'product_id',
             $relation
         );
+    }
+
+    /**
+     * Check if page requires approval before publishing
+     */
+    public function requiresApproval(): bool
+    {
+        return $this->requires_approval === true;
+    }
+
+    /**
+     * Check if page is approved
+     */
+    public function isApproved(): bool
+    {
+        return $this->approved_by !== null && $this->approved_at !== null;
+    }
+
+    /**
+     * Check if page is waiting for approval
+     */
+    public function isWaitingApproval(): bool
+    {
+        return $this->status === self::STATUS_WAITING_APPROVAL;
+    }
+
+    /**
+     * Check if page is private
+     */
+    public function isPrivate(): bool
+    {
+        return $this->status === self::STATUS_PRIVATE;
+    }
+
+    /**
+     * Check if page is on hold
+     */
+    public function isOnHold(): bool
+    {
+        return $this->status === self::STATUS_ON_HOLD;
+    }
+
+    /**
+     * Check if status can be changed to target status
+     */
+    public function canTransitionTo(string $targetStatus): bool
+    {
+        $allowedTransitions = [
+            self::STATUS_DRAFT => [
+                self::STATUS_PUBLISHED,
+                self::STATUS_WAITING_APPROVAL,
+                self::STATUS_PRIVATE,
+                self::STATUS_ON_HOLD,
+                self::STATUS_ARCHIVED
+            ],
+            self::STATUS_WAITING_APPROVAL => [
+                self::STATUS_PUBLISHED, // Only after approval
+                self::STATUS_DRAFT,
+                self::STATUS_ON_HOLD,
+                self::STATUS_ARCHIVED
+            ],
+            self::STATUS_PUBLISHED => [
+                self::STATUS_DRAFT,
+                self::STATUS_PRIVATE,
+                self::STATUS_ON_HOLD,
+                self::STATUS_ARCHIVED
+            ],
+            self::STATUS_PRIVATE => [
+                self::STATUS_DRAFT,
+                self::STATUS_PUBLISHED,
+                self::STATUS_WAITING_APPROVAL,
+                self::STATUS_ON_HOLD,
+                self::STATUS_ARCHIVED
+            ],
+            self::STATUS_ON_HOLD => [
+                self::STATUS_DRAFT,
+                self::STATUS_WAITING_APPROVAL,
+                self::STATUS_PUBLISHED,
+                self::STATUS_PRIVATE,
+                self::STATUS_ARCHIVED
+            ],
+            self::STATUS_ARCHIVED => [
+                self::STATUS_DRAFT,
+                self::STATUS_ON_HOLD
+            ],
+            self::STATUS_SCHEDULED => [
+                self::STATUS_PUBLISHED,
+                self::STATUS_DRAFT,
+                self::STATUS_ARCHIVED
+            ]
+        ];
+
+        return in_array($targetStatus, $allowedTransitions[$this->status] ?? []);
+    }
+
+    /**
+     * Approve page for publishing
+     */
+    public function approve(int $userId): void
+    {
+        $this->approved_by = $userId;
+        $this->approved_at = date('Y-m-d H:i:s');
+        $this->save();
+    }
+
+    /**
+     * Remove approval
+     */
+    public function removeApproval(): void
+    {
+        $this->approved_by = null;
+        $this->approved_at = null;
+        $this->save();
+    }
+
+    /**
+     * Relationship to user who approved
+     */
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Get all valid statuses
+     */
+    public static function getValidStatuses(): array
+    {
+        return [
+            self::STATUS_DRAFT,
+            self::STATUS_PUBLISHED,
+            self::STATUS_ARCHIVED,
+            self::STATUS_SCHEDULED,
+            self::STATUS_WAITING_APPROVAL,
+            self::STATUS_PRIVATE,
+            self::STATUS_ON_HOLD,
+        ];
     }
 }

@@ -13,11 +13,14 @@ use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
 use App\Services\TagService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class TagServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
+
     protected $repository;
     protected $service;
     private $databaseMock;
@@ -144,16 +147,14 @@ class TagServiceTest extends FunctionalTestCase
 
     public function testDuplicateTagSuccessfully(): void
     {
-        $originalTag = new Tag([
-            'id' => 1,
-            'name' => 'PHP',
-            'description' => 'PHP related',
-            'slug' => 'php',
-            'seo_title' => 'PHP SEO Title',
-            'seo_description' => 'PHP SEO Description',
-            'no_index' => true,
-            'canonical_url' => 'https://example.com/php'
-        ]);
+        $originalTag = Mockery::mock(Tag::class)->makePartial();
+        $originalTag->id = 1;
+        $originalTag->name = 'PHP';
+        $originalTag->description = 'PHP related';
+        $originalTag->status = 'inactive';
+        $originalTag->seo_title = 'PHP SEO Title';
+        $originalTag->seo_description = 'PHP SEO Description';
+        $originalTag->site_id = 1;
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -172,15 +173,10 @@ class TagServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
-        $newTag = new Tag([
-            'id' => 2,
-            'name' => 'PHP (Copy)',
-            'slug' => 'php-copy',
-            'seo_title' => 'PHP SEO Title',
-            'seo_description' => 'PHP SEO Description',
-            'no_index' => true,
-            'canonical_url' => null
-        ]);
+        $newTag = Mockery::mock(Tag::class)->makePartial();
+        $newTag->id = 2;
+
+        $this->setCloneHistoryExpectations($originalTag, $newTag, 1, 2);
 
         $this->repository
             ->shouldReceive('create')
@@ -191,16 +187,16 @@ class TagServiceTest extends FunctionalTestCase
                 'status' => 'inactive',
                 'seo_title' => 'PHP SEO Title',
                 'seo_description' => 'PHP SEO Description',
-                'no_index' => true,
-                'canonical_url' => NULL,
                 'slug' => 'php-copy',
-                'site_id' => 1
+                'site_id' => 1,
+                'canonical_url' => null,
+                'no_index' => false,
             ])
             ->andReturn($newTag);
 
         $result = $this->service->duplicateTag(1, null, 1);
 
-        $this->assertTrue($result);
+        $this->assertInstanceOf(Tag::class, $result);
     }
 
     public function testDuplicateTagThrowsExceptionWhenNotFound(): void
@@ -226,8 +222,12 @@ class TagServiceTest extends FunctionalTestCase
     {
         $fromTagId = 1;
         $toTagId = 2;
-        $fromTag = Mockery::mock(Tag::class);
-        $toTag = Mockery::mock(Tag::class);
+        $fromTag = Mockery::mock(Tag::class)->makePartial();
+        $fromTag->id = $fromTagId;
+        $toTag = Mockery::mock(Tag::class)->makePartial();
+        $toTag->id = $toTagId;
+
+        $this->setCloneHistoryExpectations($fromTag, $toTag, $fromTagId, $toTagId, 'merged');
 
         $this->repository->shouldReceive('find')
             ->with($fromTagId)

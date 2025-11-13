@@ -308,4 +308,100 @@ class PageController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    public function approve(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id'); // Get from authenticated user
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $page = $this->pageService->approvePage($id, $userId);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
+        }
+    }
+
+    public function reject(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id');
+            $reason = $request->get('reason');
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $page = $this->pageService->rejectPage($id, $userId, $reason);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
+        }
+    }
+
+    public function putOnHold(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id');
+            $reason = $request->get('reason');
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $page = $this->pageService->putPageOnHold($id, $userId, $reason);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
+        }
+    }
+
+    public function makePrivate(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id');
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $page = $this->pageService->makePagePrivate($id, $userId);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
+        }
+    }
+
+    public function bulkApprove(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $ids = $request->get('ids', []);
+            $userId = $request->get('user_id');
+
+            if (empty($ids)) {
+                return $this->errorResponse('No page IDs provided', 422);
+            }
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $results = $this->pageService->bulkApprovePages($ids, $userId);
+
+            return $this->jsonResponse([
+                'message' => 'Pages processed for approval',
+                'results' => $results
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
 }

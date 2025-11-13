@@ -3,19 +3,33 @@
 namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
+use App\Models\Concerns\HasCloneHistory;
 
 class Author extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'authors';
 
     protected $fillable = [
-        'name', 'slug', 'email', 'bio', 'avatar', 'website',
-        'twitter', 'linkedin', 'facebook', 'status', 'site_id'
+        'name',
+        'slug',
+        'email',
+        'bio',
+        'avatar',
+        'website',
+        'twitter',
+        'linkedin',
+        'facebook',
+        'status',
+        'site_id',
+        'clone_history'
     ];
 
     protected $casts = [
         'created_at' => 'date',
-        'updated_at' => 'date'
+        'updated_at' => 'date',
+        'clone_history' => 'array',
     ];
 
     public function pages($relation = false)

@@ -20,12 +20,13 @@ use App\Services\ImageUploadService;
 use App\Services\ProductService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class ProductServiceTest extends FunctionalTestCase
 {
-    use CreatesTestData;
+    use CreatesTestData, HasSiteHistory;
 
     protected $repository;
     protected $imageUploadService;
@@ -312,7 +313,6 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertCount(1, $result);
     }
 
-    /** @test */
     public function testItCanGetProductsOnSale()
     {
         $products = collect([
@@ -330,18 +330,12 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductSuccessfully(): void
     {
-        $originalProduct = new Product([
-            'id' => 1,
-            'name' => 'iPhone 15',
-            'description' => 'Latest iPhone',
-            'image' => 'products/iphone15.jpg',
-            'price' => 999.99,
-            'sale_price' => 899.99,
-            'brand_id' => 5,
-            'category_id' => 10,
-            'slug' => 'iphone-15',
-            'site_id' => 1,
-        ]);
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->name = 'iPhone 15';
+        $originalProduct->site_id = 1;
+        $originalProduct->price = 999.99;
+        $originalProduct->image = 'products/iphone15.jpg';
 
         $this->repository
             ->shouldReceive('find')
@@ -361,11 +355,11 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn('products/iphone15-copy.jpg');
 
-        $newProduct = new Product([
-            'id' => 2,
-            'name' => 'iPhone 15 (Copy)',
-            'slug' => 'iphone-15-copy',
-        ]);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->name = 'iPhone 15 (Copy)';
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2);
 
         $this->repository
             ->shouldReceive('create')
@@ -386,13 +380,10 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithoutImage(): void
     {
-        $originalProduct = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'image' => null,
-            'slug' => 'product',
-            'site_id' => 1,
-        ]);
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->site_id = 1;
+        $originalProduct->name = 'product';
 
         $this->repository
             ->shouldReceive('find')
@@ -406,15 +397,19 @@ class ProductServiceTest extends FunctionalTestCase
             ->with('product-copy', 1)
             ->andReturn(null);
 
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
         $this->imageUploadService
             ->shouldNotReceive('duplicate');
 
         $this->repository
             ->shouldReceive('create')
             ->once()
-            ->andReturn(new Product(['id' => 2]));
+            ->andReturn($newProduct);
 
         $this->setDuplicateExpectations();
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2);
 
         $result = $this->service->duplicateProduct(1);
 
@@ -423,13 +418,11 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductHandlesImageDuplicationFailure(): void
     {
-        $originalProduct = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'image' => 'products/test.jpg',
-            'slug' => 'product',
-            'site_id' => 1,
-        ]);
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->site_id = 1;
+        $originalProduct->name = 'Product';
+        $originalProduct->image = 'products/test.jpg';
 
         $this->repository
             ->shouldReceive('find')
@@ -448,13 +441,18 @@ class ProductServiceTest extends FunctionalTestCase
             ->with('product-copy', 1)
             ->andReturn(null);
 
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2);
+
         $this->repository
             ->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function($data) {
                 return $data['image'] === null;
             }))
-            ->andReturn(new Product(['id' => 2]));
+            ->andReturn($newProduct);
 
         $this->setDuplicateExpectations();
 
@@ -945,18 +943,11 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithBasicData()
     {
-        $original = new Product([
-            'id' => 1,
-            'name' => 'Original Product',
-            'description' => 'Description',
-            'price' => 99.99,
-            'sale_price' => 79.99,
-            'brand_id' => 5,
-            'category_id' => 10,
-            'slug' => 'original-product',
-            'image' => null,
-            'site_id' => 1
-        ]);
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Original Product';
+        $original->site_id = 1;
+        $original->price = 99.99;
 
         $this->repository->shouldReceive('find')
             ->with(1)
@@ -968,7 +959,11 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
-        $newProduct = new Product(['id' => 2, 'name' => 'Original Product (Copy)']);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+        $newProduct->name = 'Original Product (Copy)';
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
 
         $this->repository->shouldReceive('create')
             ->once()
@@ -992,17 +987,19 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithCustomName()
     {
-        $original = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'slug' => 'product',
-            'site_id' => 1
-        ]);
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->site_id = 1;
+        $original->name = 'Product';
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
         $this->repository->shouldReceive('findBySlugAndSite')->with('custom-name', 1)->andReturn(null);
 
-        $newProduct = new Product(['id' => 2, 'name' => 'Custom Name']);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+        $newProduct->name = 'Custom Name';
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
 
         $this->repository->shouldReceive('create')
             ->once()
@@ -1023,13 +1020,11 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithImage()
     {
-        $original = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'slug' => 'product',
-            'image' => 'products/original.jpg',
-            'site_id' => 1
-        ]);
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->site_id = 1;
+        $original->name = 'Product';
+        $original->image = 'products/original.jpg';
 
         $this->repository->shouldReceive('find')
             ->with(1)
@@ -1044,7 +1039,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn('products/original-copy.jpg');
 
-        $newProduct = new Product(['id' => 2]);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
 
         $this->repository->shouldReceive('create')
             ->once()
@@ -1065,7 +1063,10 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithAllRelations()
     {
-        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => 1]);
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Product';
+        $original->site_id = 1;
 
         $images = new Collection([
             new ProductImage(['url' => 'img1.jpg', 'alt' => 'Alt 1', 'is_primary' => true, 'sort_order' => 0]),
@@ -1089,7 +1090,11 @@ class ProductServiceTest extends FunctionalTestCase
             ->with('product-copy', 1)
             ->andReturn(null);
 
-        $newProduct = new Product(['id' => 2]);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);;
+
         $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->with(1)->andReturn($images);
@@ -1132,7 +1137,10 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductHandlesSlugCollision()
     {
-        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => 1]);;
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Product';
+        $original->site_id = 1;
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
 
@@ -1154,7 +1162,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->with('product-copy-2', 1)
             ->andReturn(null);
 
-        $newProduct = new Product(['id' => 2, 'slug' => 'product-copy-2']);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
 
         $this->repository->shouldReceive('create')
             ->once()
@@ -1499,20 +1510,22 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductToAnotherSite(): void
     {
-        $originalProduct = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'site_id' => 1,
-            'slug' => 'product'
-        ]);
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Product';
+        $original->site_id = 1;
 
-        $this->repository->shouldReceive('find')->with(1)->andReturn($originalProduct);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($original);
 
         $this->repository->shouldReceive('findBySlugAndSite')
             ->with('product-copy', 2)
             ->andReturn(null);
 
-        $newProduct = new Product(['id' => 2, 'site_id' => 2]);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+        $newProduct->site_id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2, 'cloned', 1, 2);
 
         $this->repository->shouldReceive('create')
             ->once()
@@ -1530,14 +1543,22 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithSelectiveRelations(): void
     {
-        $originalProduct = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => $this->siteId]);;
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Product';
+        $original->site_id = 1;
 
         $images = new Collection([new ProductImage(['url' => 'img.jpg'])]);
         $merchants = new Collection([new ProductMerchant(['name' => 'Amazon'])]);
 
-        $this->repository->shouldReceive('find')->andReturn($originalProduct);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
+
+        $this->repository->shouldReceive('find')->andReturn($original);
         $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
-        $this->repository->shouldReceive('create')->andReturn(new Product(['id' => 2]));
+        $this->repository->shouldReceive('create')->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->andReturn($images);
         $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn($merchants);
@@ -1693,7 +1714,10 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithVariantImages()
     {
-        $original = new Product(['id' => 1, 'name' => 'Product', 'slug' => 'product', 'site_id' => $this->siteId]);;
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Product';
+        $original->site_id = 1;
 
         $variantImage1 = new ProductImage(['url' => 'var-img1.jpg', 'alt' => 'Var 1', 'is_primary' => true, 'sort_order' => 0]);
         $variantImage2 = new ProductImage(['url' => 'var-img2.jpg', 'alt' => 'Var 2', 'is_primary' => false, 'sort_order' => 1]);
@@ -1711,7 +1735,10 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
         $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
 
-        $newProduct = new Product(['id' => 2]);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
         $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
@@ -1974,12 +2001,10 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testDuplicateProductWithVariantMerchants()
     {
-        $original = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'slug' => 'product',
-            'site_id' => $this->siteId
-        ]);
+        $original = Mockery::mock(Product::class)->makePartial();
+        $original->id = 1;
+        $original->name = 'Product';
+        $original->site_id = 1;
 
         $variant = new ProductVariant([
             'id' => 1,
@@ -2008,7 +2033,10 @@ class ProductServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('find')->with(1)->andReturn($original);
         $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
 
-        $newProduct = new Product(['id' => 2]);
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->setCloneHistoryExpectations($original, $newProduct, 1, 2);
         $this->repository->shouldReceive('create')->once()->andReturn($newProduct);
 
         $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));

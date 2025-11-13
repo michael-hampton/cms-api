@@ -8,11 +8,14 @@ use App\Models\Voucher;
 use App\Repositories\VoucherRepository;
 use App\Services\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class VoucherServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
+
     private $databaseMock;
     private $repository;
     private $service;
@@ -177,11 +180,15 @@ class VoucherServiceTest extends FunctionalTestCase
     {
         $voucherId = 1;
         $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $originalVoucher->id = $voucherId;
         $originalVoucher->code = 'ORIGINAL';
         $originalVoucher->status = 'inactive';
 
         $newVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $newVoucher->id = 2;
         $newVoucher->status = 'inactive';
+
+        $this->setCloneHistoryExpectations($originalVoucher, $newVoucher, 1, 2);
 
         $this->repository->shouldReceive('find')
             ->once()
@@ -225,8 +232,12 @@ class VoucherServiceTest extends FunctionalTestCase
         $newCode = 'CUSTOM';
 
         $originalVoucher = Mockery::mock(Voucher::class)->makePartial();
+        $originalVoucher->id = $voucherId;
         $newVoucher = Mockery::mock(Voucher::class)->makePartial();
         $newVoucher->code = $newCode;
+        $newVoucher->id = 2;
+
+        $this->setCloneHistoryExpectations($originalVoucher, $newVoucher, 1, 2);
 
         $this->repository->shouldReceive('find')
             ->once()
@@ -470,6 +481,8 @@ class VoucherServiceTest extends FunctionalTestCase
         $newVoucher = Mockery::mock(Voucher::class)->makePartial();
         $newVoucher->id = 2;
 
+        $this->setCloneHistoryExpectations($originalVoucher, $newVoucher, 1, 2);
+
         $newVoucher->shouldReceive('products->sync')
             ->once()
             ->with([1, 2]);
@@ -689,6 +702,8 @@ class VoucherServiceTest extends FunctionalTestCase
         $newVoucher = Mockery::mock(Voucher::class)->makePartial();
         $newVoucher->id = 2;
 
+        $this->setCloneHistoryExpectations($originalVoucher, $newVoucher, 1, 2);
+
         $newVoucher->shouldReceive('categories->sync')
             ->once()
             ->with([1, 2]);
@@ -738,6 +753,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $newVoucher = Mockery::mock(Voucher::class)->makePartial();
         $newVoucher->id = 2;
+
+        $this->setCloneHistoryExpectations($originalVoucher, $newVoucher, 1, 2);
 
         $newVoucher->shouldReceive('brands->sync')
             ->once()

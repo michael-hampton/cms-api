@@ -12,11 +12,14 @@ use App\Repositories\AuthorRepository;
 use App\Services\AuthorService;
 use App\Services\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class AuthorServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
+
     private $authorRepository;
     private $imageUploadService;
     private $databaseMock;
@@ -194,8 +197,10 @@ class AuthorServiceTest extends FunctionalTestCase
         // Mock source and target authors
         $sourceAuthor = Mockery::mock(Author::class)->makePartial();
         $sourceAuthor->avatar = '/uploads/source.jpg';
+        $sourceAuthor->id = 1;
 
         $targetAuthor = Mockery::mock(Author::class)->makePartial();
+        $targetAuthor->id = 2;
 
         // Mock page that belongs to source author
         $page = Mockery::mock(Page::class)->makePartial();
@@ -222,6 +227,8 @@ class AuthorServiceTest extends FunctionalTestCase
             ->with(1)
             ->once()
             ->andReturn(collect([$page]));
+
+        $this->setCloneHistoryExpectations($sourceAuthor, $targetAuthor, 1, 2, 'merged');
 
         // Image deletion for source author avatar
         $this->imageUploadService->shouldReceive('delete')
@@ -540,12 +547,10 @@ class AuthorServiceTest extends FunctionalTestCase
 
     public function testDuplicateAuthorHandlesAvatarDuplicationFailure(): void
     {
-        $originalAuthor = new Author([
-            'id' => 1,
-            'name' => 'John Doe',
-            'avatar' => 'avatars/john.jpg',
-            'slug' => 'john-doe'
-        ]);
+        $originalAuthor = Mockery::mock(Author::class)->makePartial();
+        $originalAuthor->id = 1;
+        $originalAuthor->name = 'John Doe';
+        $originalAuthor->avatar = 'avatars/john.jpg';
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -568,13 +573,18 @@ class AuthorServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
+        $newAuthor = Mockery::mock(Author::class)->makePartial();
+        $newAuthor->id = 2;
+
         $this->authorRepository
             ->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function($data) {
                 return $data['avatar'] === null;
             }))
-            ->andReturn(new Author(['id' => 2]));
+            ->andReturn($newAuthor);
+
+        $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
 
         $result = $this->service->duplicateAuthor(1);
 

@@ -488,6 +488,15 @@ class ProductService
         // Create duplicated product
         $newProduct = $this->repository->create($data);
 
+        // Add clone history
+        if ($targetSiteId && $targetSiteId !== $originalProduct->site_id) {
+            $originalProduct->addCloneRecord('cloned_to', $newProduct->id, $targetSiteId);
+            $newProduct->addCloneRecord('cloned_from', $originalProduct->id, $originalProduct->site_id);
+        } else {
+            $originalProduct->addCloneRecord('cloned_to', $newProduct->id, null);
+            $newProduct->addCloneRecord('cloned_from', $originalProduct->id, null);
+        }
+
         // Duplicate related data
         $this->duplicateProductRelations($originalProduct->id, $newProduct->id, $cloneRelations);
 

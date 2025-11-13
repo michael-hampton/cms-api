@@ -187,6 +187,10 @@ class BrandService
                 $product->save();
             }
 
+            // Add merge history
+            $targetBrand->addCloneRecord('merged_from', $sourceBrand->id, null);
+            $sourceBrand->addCloneRecord('merged_to', $targetBrand->id, null);
+
             if ($sourceBrand->logo) {
                 $this->imageUploadService->delete($sourceBrand->logo);
             }
@@ -205,6 +209,8 @@ class BrandService
             if (!$originalBrand) {
                 throw new \Exception("Brand not found");
             }
+
+            $targetSiteId = $siteId ?? SiteContext::getId();
 
             $data = [
                 'name' => $newName ?? ($originalBrand->name . ' (Copy)'),
@@ -228,7 +234,18 @@ class BrandService
                 }
             }
 
-            return $this->brandRepository->create($data);
+            $newBrand = $this->brandRepository->create($data);
+
+            // Add clone history with site information
+            if ($targetSiteId !== $originalBrand->site_id) {
+                $originalBrand->addCloneRecord('cloned_to', $newBrand->id, $targetSiteId);
+                $newBrand->addCloneRecord('cloned_from', $originalBrand->id, $originalBrand->site_id);
+            } else {
+                $originalBrand->addCloneRecord('cloned_to', $newBrand->id, null);
+                $newBrand->addCloneRecord('cloned_from', $originalBrand->id, null);
+            }
+
+            return $newBrand;
         });
     }
 

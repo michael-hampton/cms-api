@@ -57,7 +57,12 @@ class AutoDiscovery
             if ($fqcnFromPath && (class_exists($fqcnFromPath) || interface_exists($fqcnFromPath) || trait_exists($fqcnFromPath))) {
                 try {
                     $ref = new ReflectionClass($fqcnFromPath);
-                    if ($ref->getFileName() && realpath($ref->getFileName()) === realpath($path) && !$ref->isAbstract() && !$ref->isInterface()) {
+                    if ($ref->getFileName() &&
+                        realpath($ref->getFileName()) === realpath($path) &&
+                        !$ref->isAbstract() &&
+                        !$ref->isInterface() &&
+                        !$ref->isTrait()
+                    ) {
                         $found[] = $fqcnFromPath;
                         continue;
                     }
@@ -73,7 +78,13 @@ class AutoDiscovery
                 if (class_exists($fqcn) || interface_exists($fqcn) || trait_exists($fqcn)) {
                     try {
                         $ref = new ReflectionClass($fqcn);
-                        if ($ref->getFileName() && realpath($ref->getFileName()) === realpath($path) && !$ref->isAbstract() && !$ref->isInterface()) {
+                        if (
+                            $ref->getFileName() &&
+                            realpath($ref->getFileName()) === realpath($path) &&
+                            !$ref->isAbstract() &&
+                            !$ref->isInterface() &&
+                            !$ref->isTrait()
+                        ) {
                             $found[] = $fqcn;
                         }
                     } catch (\ReflectionException $e) {
@@ -96,7 +107,10 @@ class AutoDiscovery
                 foreach ($new as $c) {
                     try {
                         $ref = new ReflectionClass($c);
-                        if (realpath($ref->getFileName()) === realpath($path) && !$ref->isAbstract() && !$ref->isInterface()) {
+                        if (realpath($ref->getFileName()) === realpath($path) &&
+                            !$ref->isAbstract() &&
+                            !$ref->isTrait() &&
+                            !$ref->isInterface()) {
                             $found[] = $c;
                         }
                     } catch (\ReflectionException $e) {

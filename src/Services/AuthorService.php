@@ -183,6 +183,10 @@ class AuthorService
                 $page->save();
             }
 
+            // Add merge history
+            $targetAuthor->addCloneRecord('merged_from', $sourceAuthor->id, null);
+            $sourceAuthor->addCloneRecord('merged_to', $targetAuthor->id, null);
+
             // Delete source author's avatar
             if ($sourceAuthor->avatar) {
                 $this->imageUploadService->delete($sourceAuthor->avatar);
@@ -237,7 +241,13 @@ class AuthorService
                 }
             }
 
-            return $this->authorRepository->create($data);
+            $newAuthor = $this->authorRepository->create($data);
+
+            // Add clone history
+            $originalAuthor->addCloneRecord('cloned_to', $newAuthor->id, null);
+            $newAuthor->addCloneRecord('cloned_from', $originalAuthor->id, null);
+
+            return $newAuthor;
         });
     }
 

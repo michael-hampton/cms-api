@@ -14,11 +14,14 @@ use App\Search\SearchCriteria;
 use App\Services\BrandService;
 use App\Services\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class BrandServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
+
     private $brandRepository;
     private $imageUploadService;
     private $databaseMock;
@@ -224,8 +227,12 @@ class BrandServiceTest extends FunctionalTestCase
     {
         $sourceBrand = Mockery::mock(Brand::class)->makePartial();
         $sourceBrand->logo = '/uploads/source.png';
+        $sourceBrand->id = 1;
 
         $targetBrand = Mockery::mock(Brand::class)->makePartial();
+        $targetBrand->id = 2;
+
+        $this->setCloneHistoryExpectations($sourceBrand, $targetBrand, 1, 2, 'merged');
 
         $product = Mockery::mock(Product::class)->makePartial();
         $product->shouldReceive('save')->once();
@@ -379,12 +386,9 @@ class BrandServiceTest extends FunctionalTestCase
 
     public function testDuplicateBrandWithoutLogo(): void
     {
-        $originalBrand = new Brand([
-            'id' => 1,
-            'name' => 'Nike',
-            'logo' => null,
-            'slug' => 'nike'
-        ]);
+        $originalBrand = Mockery::mock(Brand::class)->makePartial();
+        $originalBrand->id = 1;
+        $originalBrand->name = 'Nike';
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -405,10 +409,15 @@ class BrandServiceTest extends FunctionalTestCase
         $this->imageUploadService
             ->shouldNotReceive('duplicate');
 
+        $newBrand = Mockery::mock(Brand::class)->makePartial();
+        $newBrand->id = 2;
+
+        $this->setCloneHistoryExpectations($originalBrand, $newBrand, 1, 2);
+
         $this->brandRepository
             ->shouldReceive('create')
             ->once()
-            ->andReturn(new Brand(['id' => 2]));
+            ->andReturn($newBrand);
 
         $result = $this->service->duplicateBrand(1);
 

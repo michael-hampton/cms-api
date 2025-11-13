@@ -57,6 +57,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
 
+        // Approval workflow routes
+        $router->post('/pages/{id}/approve', PageController::class, 'approve');
+        $router->post('/pages/{id}/reject', PageController::class, 'reject');
+        $router->post('/pages/{id}/put-on-hold', PageController::class, 'putOnHold');
+        $router->post('/pages/{id}/make-private', PageController::class, 'makePrivate');
+        $router->post('/pages/bulk-approve', PageController::class, 'bulkApprove');
+
         $router->get('/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;
 
         // Categories API

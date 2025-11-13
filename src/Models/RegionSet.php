@@ -4,18 +4,28 @@ namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
+use App\Models\Concerns\HasCloneHistory;
 
 class RegionSet extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'region_sets';
 
     protected $fillable = [
-        'name', 'slug', 'description', 'is_active', 'sort_order', 'site_id'
+        'name',
+        'slug',
+        'description',
+        'is_active',
+        'sort_order',
+        'site_id',
+        'clone_history'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'sort_order' => 'integer'
+        'sort_order' => 'integer',
+        'clone_history' => 'array',
     ];
 
     protected $hidden = ['deleted_at'];

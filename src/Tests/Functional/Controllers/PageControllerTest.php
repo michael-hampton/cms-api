@@ -1334,4 +1334,31 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertCount(1, $data['data']['page']['products']);
     }
+
+    public function testApprovePageSuccessfully()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval', 'requires_approval' => true]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/approve", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('published', $data['data']['page']['status']);
+        $this->assertNotNull($data['data']['page']['approved_by']);
+        $this->assertNotNull($data['data']['page']['approved_at']);
+    }
+
+    public function testApprovePageReturns400IfNotWaitingApproval()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/approve", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
 }

@@ -132,6 +132,10 @@ class CategoryService
                 throw new \Exception("Failed to create duplicate category");
             }
 
+            // Add clone history
+            $originalCategory->addCloneRecord('cloned_to', $newCategory->id, null);
+            $newCategory->addCloneRecord('cloned_from', $originalCategory->id, null);
+
             // Duplicate child categories recursively
             $children = $originalCategory->children();
             foreach ($children as $child) {

@@ -62,6 +62,73 @@ class PageHistoryService
         );
     }
 
+    public function logPageWaitingApproval(Page $page): PageHistory
+    {
+        return $this->logPageAction(
+            $page->id,
+            'waiting_approval',
+            'Page submitted for approval',
+            null,
+            true
+        );
+    }
+
+    public function logPageApproved(Page $page, int $userId): PageHistory
+    {
+        return $this->logPageAction(
+            $page->id,
+            'approved',
+            'Page submitted for approval',
+            [
+                'approved_by' => $userId,
+                'approved_at' => date('Y-m-d H:i:s')
+            ],
+            true
+        );
+    }
+
+    public function logPageRejected(Page $page, int $userId, ?string $reason = null): PageHistory
+    {
+        return $this->logPageAction(
+            $page->id,
+            'rejected',
+            'Page Rejected',
+            [
+                'rejected_by' => $userId,
+                'rejected_at' => date('Y-m-d H:i:s'),
+                'reason' => $reason
+            ],
+            true
+        );
+    }
+
+    public function logPagePutOnHold(Page $page, int $userId, ?string $reason = null): PageHistory
+    {
+        return $this->logPageAction(
+            $page->id,
+            'on_hold',
+            'Page put on hold for review',
+            [
+                'user_id' => $userId,
+                'reason' => $reason
+            ],
+            true
+        );
+    }
+
+    public function logPageMadePrivate(Page $page, int $userId): PageHistory
+    {
+        return $this->logPageAction(
+            $page->id,
+            'made_private',
+            'Page made private',
+            [
+                'user_id' => $userId
+            ],
+            true
+        );
+    }
+
     public function logPageUpdated(int $pageId, array $oldData, array $newData): PageHistory
     {
         $changes = $this->comparePageData($oldData, $newData);

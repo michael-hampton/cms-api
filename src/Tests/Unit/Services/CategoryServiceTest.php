@@ -10,11 +10,13 @@ use App\Models\PageCategory;
 use App\Repositories\CategoryRepository;
 use App\Services\CategoryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class CategoryServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
     private CategoryRepository $categoryRepository;
     private Database $databaseMock;
     private CategoryService $service;
@@ -187,11 +189,9 @@ class CategoryServiceTest extends FunctionalTestCase
 
     public function testDuplicateCategoryWithSlugConflict(): void
     {
-        $originalCategory = new Category([
-            'id' => 1,
-            'name' => 'Technology',
-            'slug' => 'technology'
-        ]);
+        $originalCategory = Mockery::mock(Category::class)->makePartial();
+        $originalCategory->id = 1;
+        $originalCategory->name = 'Technology';
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -204,12 +204,18 @@ class CategoryServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($originalCategory);
 
+        $newCategory = Mockery::mock(Category::class)->makePartial();
+        $newCategory->name = 'Technology (Copy)';
+        $newCategory->id = 2;
+
+        $this->setCloneHistoryExpectations($originalCategory, $newCategory, 1, 2);
+
         // First call returns existing category, second returns null
         $this->categoryRepository
             ->shouldReceive('findBySlug')
             ->with('technology-copy')
             ->once()
-            ->andReturn(new Category(['id' => 99]));
+            ->andReturn($newCategory);
 
         $this->categoryRepository
             ->shouldReceive('findBySlug')
@@ -223,7 +229,7 @@ class CategoryServiceTest extends FunctionalTestCase
             ->with(Mockery::on(function($data) {
                 return $data['slug'] === 'technology-copy-1';
             }))
-            ->andReturn(new Category(['id' => 2]));
+            ->andReturn($newCategory);
 
         $result = $this->service->duplicateCategory(1);
 
@@ -320,11 +326,11 @@ class CategoryServiceTest extends FunctionalTestCase
             ->shouldReceive('findBySlug')
             ->andReturn(null);
 
-        $newParent = new Category([
-            'id' => 10,
-            'name' => 'Technology (Copy)',
-            'slug' => 'technology-copy'
-        ]);
+        $newParent = Mockery::mock(Category::class)->makePartial();
+        $newParent->id = 10;
+        $newParent->name = 'Technology (Copy)';
+
+        $this->setCloneHistoryExpectations($mockCategory, $newParent, 1, 10);
 
         $this->categoryRepository
             ->shouldReceive('create')

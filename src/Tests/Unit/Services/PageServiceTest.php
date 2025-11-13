@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Block;
 use App\Models\CustomFieldDefinition;
+use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageCustomField;
 use App\Models\PageHistory;
@@ -32,13 +33,14 @@ use App\Services\PageHistoryService;
 use App\Services\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Exception;
 use Mockery;
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 
 class PageServiceTest extends FunctionalTestCase
 {
-    use CreatesTestData;
+    use CreatesTestData, HasSiteHistory;
 
     private $pageRepository;
     private $blockRepository;
@@ -149,6 +151,7 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturn($newPage);
 
         $this->setDuplicationExpectations();
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
 
         $result = $this->service->duplicatePage(1);
@@ -260,6 +263,11 @@ class PageServiceTest extends FunctionalTestCase
         ];
 
         $existingPage = $this->createMockPage(1, 'Updated Page');
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($existingPage);
 
         $this->setupTransaction();
         $this->pageHistory->shouldReceive('logPageUpdated')->once()->with(1, Mockery::type('array'), Mockery::type('array'));
@@ -467,6 +475,7 @@ class PageServiceTest extends FunctionalTestCase
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
         $this->setDuplicationExpectations();
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
 
         $result = $this->service->duplicatePage(1);
@@ -497,6 +506,7 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturn($newPage);
 
         $this->setDuplicationExpectations();
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
 
         $result = $this->service->duplicatePage(1);
@@ -518,6 +528,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->setupTransaction();
         $this->pageRepository->shouldReceive('create')->with(Mockery::subset(['status' => 'draft']))->andReturn($newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setDuplicationExpectations();
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
 
@@ -532,6 +543,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
         $this->pageRepository->shouldReceive('duplicateMetadata')->with(1, 2)->once();
@@ -545,6 +557,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
@@ -557,6 +570,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
@@ -570,6 +584,7 @@ class PageServiceTest extends FunctionalTestCase
         $newPage = $this->createMockPage(2);
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
 
         $this->service->duplicatePage(1);
@@ -582,6 +597,7 @@ class PageServiceTest extends FunctionalTestCase
         $newPage = $this->createMockPage(2);
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
 
         $this->service->duplicatePage(1);
@@ -594,6 +610,7 @@ class PageServiceTest extends FunctionalTestCase
         $newPage = $this->createMockPage(2);
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
 
         $this->service->duplicatePage(1);
@@ -606,6 +623,7 @@ class PageServiceTest extends FunctionalTestCase
         $newPage = $this->createMockPage(2);
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
 
         $this->service->duplicatePage(1);
@@ -619,6 +637,7 @@ class PageServiceTest extends FunctionalTestCase
 
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
 
         $this->service->duplicatePage(1);
@@ -638,6 +657,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicateMetadata')->once();
         $this->pageRepository->shouldReceive('duplicateSeo')->andThrow(new \Exception('SEO duplication failed'));
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setDuplicationExpectations();
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
 
@@ -654,6 +674,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->andReturn($originalPage);
         $this->setupTransaction();
         $this->pageRepository->shouldReceive('create')->andReturn($newPage);
+
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
 
         $this->pageRepository->shouldReceive('duplicateBlocks')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateMetadata')->andThrow(new \Exception('Failed'));
@@ -686,6 +708,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('create')->andReturn($newPage);
         $this->pageRepository->shouldReceive('duplicateBlocks')->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->andThrow(new \Exception('Metadata error'));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setDuplicationExpectations();
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
 
@@ -735,6 +758,7 @@ class PageServiceTest extends FunctionalTestCase
         $sourcePage = $this->createMockPage(1, 'Source Page');
         $targetPage = $this->createMockPage(2, 'Target Page');
 
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setupMergePageExpectations($sourcePage, $targetPage);
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(5);
 
@@ -776,6 +800,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->setupTransaction();
 
         $this->blockRepository->shouldReceive('deletePageBlocks')->with(2)->once();
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
 
         $customFields = collect([]);
@@ -796,6 +821,7 @@ class PageServiceTest extends FunctionalTestCase
         $targetPage = $this->createMockPage(2, 'Target Page');
 
         $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(3);
@@ -824,6 +850,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->twice()->andReturn($targetPage);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
@@ -872,6 +899,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->twice()->andReturn($targetPage);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(0);
@@ -906,6 +934,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->twice()->andReturn($targetPage);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(3);
@@ -940,6 +969,7 @@ class PageServiceTest extends FunctionalTestCase
         $targetPage = $this->createMockPage(2);
 
         $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(0);
         $this->blockRepository->shouldReceive('getBlocksForPage')->with(1)->andReturn(collect([]));
@@ -970,6 +1000,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->twice()->andReturn($targetPage);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
         $this->setDuplicationExpectations();
 
         $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
@@ -1103,6 +1134,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
@@ -1148,6 +1180,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
@@ -1160,6 +1193,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
@@ -1185,6 +1219,7 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturn($newPage);
 
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once()->with(1, 2, 2);
+        $this->setCloneHistoryExpectations($sourcePage, $newPage, 1, 2, 'cloned', 1, 2);
         $this->setupCloneToSiteExpectations(1, 2, 2);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
 
@@ -1219,6 +1254,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('slugExistsInSite')->with('test-page', 2)->once()->andReturn(true);
         $this->pageRepository->shouldReceive('slugExistsInSite')->with('test-page-1', 2)->once()->andReturn(false);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $newPage, 1, 2, 'cloned', 1, 2);
 
         $this->pageRepository->shouldReceive('create')
             ->once()
@@ -1247,6 +1283,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('slugExistsInSite')->andReturn(false);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $newPage, 1, 2, 'cloned', 1, 2);
 
         $this->pageRepository->shouldReceive('create')
             ->once()
@@ -1274,6 +1311,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('slugExistsInSite')->andReturn(false);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $newPage, 1, 2, 'cloned', 1, 2);
+
         $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once()->with(1, 2, 2);
 
@@ -1308,6 +1347,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($sourcePage);
         $this->pageRepository->shouldReceive('slugExistsInSite')->andReturn(false);
         $this->setupTransaction();
+        $this->setCloneHistoryExpectations($sourcePage, $newPage, 1, 2, 'cloned', 1, 2);
+
         $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once();
 
@@ -1431,6 +1472,11 @@ class PageServiceTest extends FunctionalTestCase
         ];
 
         $existingPage = $this->createMockPage(1, 'Updated Page');
+
+        $this->pageRepository->expects('find')
+            ->with(1)
+            ->once()
+            ->andReturn($existingPage);
 
         $this->setupTransaction();
         $this->pageHistory->shouldReceive('logPageUpdated')->once()->with(1, Mockery::type('array'), Mockery::type('array'));
@@ -1737,8 +1783,8 @@ class PageServiceTest extends FunctionalTestCase
         $page2 = $this->createPage(['status' => 'draft']);
 
         $this->pageRepository->shouldReceive('find')
-            ->times(2)
-            ->andReturn($page1, $page2);
+            ->times(4)
+            ->andReturn($page1, $page2, $page1, $page2);
 
         $this->setupTransaction();
         $this->setupTransaction();
@@ -1791,6 +1837,7 @@ class PageServiceTest extends FunctionalTestCase
         $originalPage = $this->createMockPage(1);
         $newPage = $this->createMockPage(2);
 
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
         $this->setupDuplicatePageExpectations($originalPage, $newPage);
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
@@ -1812,6 +1859,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once();
 
         $this->setupCloneToSiteExpectations(1, 2, 2);
+        $this->setCloneHistoryExpectations($sourcePage, $newPage, 1, 2, 'cloned', 1, 2);
         $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
 
         $result = $this->service->clonePageToSite(1, 2);
@@ -1826,6 +1874,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->setupMergePageExpectations($sourcePage, $targetPage);
         $this->setDuplicationExpectations();
 
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
+
         $this->blockRepository->shouldReceive('getMaxOrder')->with(2)->andReturn(0);
         $this->blockRepository->shouldReceive('getBlocksForPage')->with(1)->andReturn(collect([]));
         $this->customFieldRepository->shouldReceive('getCustomFieldsForPage')->andReturn(collect([]));
@@ -1833,5 +1883,200 @@ class PageServiceTest extends FunctionalTestCase
 
         $result = $this->service->mergePages(1, 2);
         $this->assertNotNull($result);
+    }
+
+    public function testPublishPageWithApprovalRequiredGoesToWaitingApproval()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->requires_approval = true;
+        $page->id = 1;
+        $page->status = 'draft';
+
+        $this->pageRepository->shouldReceive('find')->with($page->id)->andReturn($page);
+        $this->pageRepository->shouldReceive('getCompletePageData')->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
+        $this->pageHistory->shouldReceive('logPageWaitingApproval')->once();
+        $this->pageHistory->shouldReceive('logPageUpdated')->once();
+
+        $requestData = [
+            'id' => $page->id,
+            'status' => 'published',
+            'forms' => ['meta' => ['status' => 'published']],
+            'site_id' => $this->siteId
+        ];
+
+        $result = $this->service->updatePageWithAllData($page->id, $requestData, $this->siteId);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testPublishPageWithoutApprovalRequiredPublishes()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->requires_approval = false;
+        $page->id = 1;
+        $page->status = 'draft';
+
+        $this->pageRepository->shouldReceive('find')->with($page->id)->andReturn($page);
+        $this->pageRepository->shouldReceive('getCompletePageData')->twice()->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
+        $this->pageHistory->shouldReceive('logPagePublished')->once();
+
+        $requestData = [
+            'id' => $page->id,
+            'status' => 'published',
+            'forms' => ['meta' => ['status' => 'published']],
+            'site_id' => $this->siteId
+        ];
+
+        $result = $this->service->updatePageWithAllData($page->id, $requestData, $this->siteId);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testApprovePageSuccessfully()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->status = 'waiting_approval';
+        $page->requires_approval = true;
+
+        $page->shouldReceive('isWaitingApproval')->andReturn(true);
+        $page->shouldReceive('approve')->once()->with(1);
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
+        $this->pageHistory->shouldReceive('logPageApproved')->once();
+        $this->pageHistory->shouldReceive('logPagePublished')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->once()->andReturn($page);
+
+        $result = $this->service->approvePage(1, 1);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testApprovePageThrowsExceptionIfNotWaitingApproval()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->status = 'draft';
+
+        $page->shouldReceive('isWaitingApproval')->andReturn(false);
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage("Page is not waiting for approval");
+
+        $this->service->approvePage(1, 1);
+    }
+
+    public function testRejectPageSuccessfully()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->status = 'waiting_approval';
+
+        $page->shouldReceive('isWaitingApproval')->andReturn(true);
+        $page->shouldReceive('removeApproval')->once();
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
+        $this->pageHistory->shouldReceive('logPageRejected')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->once()->andReturn($page);
+
+        $result = $this->service->rejectPage(1, 1, 'Not ready for publishing');
+
+        $this->assertNotNull($result);
+    }
+
+    public function testPutPageOnHold()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->status = 'draft';
+
+        $page->shouldReceive('canTransitionTo')->with('on_hold')->andReturn(true);
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
+        $this->pageHistory->shouldReceive('logPagePutOnHold')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->once()->andReturn($page);
+
+        $result = $this->service->putPageOnHold(1, 1, 'Needs more review');
+
+        $this->assertNotNull($result);
+    }
+
+    public function testMakePagePrivate()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->status = 'draft';
+
+        $page->shouldReceive('canTransitionTo')->with('private')->andReturn(true);
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
+        $this->pageHistory->shouldReceive('logPageMadePrivate')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->once()->andReturn($page);
+
+        $result = $this->service->makePagePrivate(1, 1);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testCannotTransitionFromArchivedToPublished()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->status = 'archived';
+
+        $this->assertFalse($page->canTransitionTo('published'));
+    }
+
+    public function testCanTransitionFromWaitingApprovalToDraft()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->status = 'waiting_approval';
+
+        $this->assertTrue($page->canTransitionTo('draft'));
+    }
+
+    public function testBulkApprovePages()
+    {
+        $page1 = Mockery::mock(Page::class)->makePartial();
+        $page1->id = 1;
+        $page1->status = 'waiting_approval';
+        $page1->shouldReceive('isWaitingApproval')->andReturn(true);
+        $page1->shouldReceive('approve')->once();
+
+        $page2 = Mockery::mock(Page::class)->makePartial();
+        $page2->id = 2;
+        $page2->status = 'waiting_approval';
+        $page2->shouldReceive('isWaitingApproval')->andReturn(true);
+        $page2->shouldReceive('approve')->once();
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page1);
+        $this->pageRepository->shouldReceive('find')->with(2)->andReturn($page2);
+
+        $this->setupTransaction();
+        $this->setupTransaction();
+
+        $this->pageRepository->shouldReceive('update')->twice()->andReturn($page1, $page2);
+        $this->pageHistory->shouldReceive('logPageApproved')->twice();
+        $this->pageHistory->shouldReceive('logPagePublished')->twice();
+        $this->pageRepository->shouldReceive('getCompletePageData')->twice()->andReturn($page1, $page2);
+
+        $results = $this->service->bulkApprovePages([1, 2], 1);
+
+        $this->assertCount(2, $results);
+        $this->assertTrue($results[1]['success']);
+        $this->assertTrue($results[2]['success']);
     }
 }

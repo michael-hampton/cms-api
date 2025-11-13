@@ -3,19 +3,30 @@
 namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
+use App\Models\Concerns\HasCloneHistory;
 
 class Territory extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'territories';
 
     protected $fillable = [
-        'name', 'code', 'region_set_id', 'is_active', 'sort_order', 'site_id', 'slug'
+        'name',
+        'code',
+        'region_set_id',
+        'is_active',
+        'sort_order',
+        'site_id',
+        'slug',
+        'clone_history'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'sort_order' => 'integer',
-        'region_set_id' => 'integer'
+        'region_set_id' => 'integer',
+        'clone_history' => 'array',
     ];
 
     protected $hidden = ['deleted_at'];

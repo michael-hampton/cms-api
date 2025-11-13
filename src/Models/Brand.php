@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasCloneHistory;
+
 class Brand extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'brands';
 
     protected $fillable = [
@@ -17,14 +21,16 @@ class Brand extends Model
         'seo_title',
         'seo_description',
         'no_index',
-        'canonical_url'
+        'canonical_url',
+        'clone_history'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'no_index' => 'boolean'
+        'no_index' => 'boolean',
+        'clone_history' => 'array',
     ];
 
     public function products()

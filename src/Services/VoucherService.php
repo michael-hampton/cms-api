@@ -7,11 +7,14 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
+use App\Models\Concerns\HasCloneHistory;
 use App\Models\Voucher;
 use App\Repositories\VoucherRepository;
 
 class VoucherService
 {
+    use HasCloneHistory;
+
     private Database $database;
     protected VoucherRepository $repository;
 
@@ -156,6 +159,10 @@ class VoucherService
             if (!empty($brandIds)) {
                 $newVoucher->brands(true)->sync($brandIds);
             }
+
+            // Add clone history
+            $originalVoucher->addCloneRecord('cloned_to', $newVoucher->id, null);
+            $newVoucher->addCloneRecord('cloned_from', $originalVoucher->id, null);
 
             return $newVoucher;
         });

@@ -14,11 +14,14 @@ use App\Repositories\OrderItemRepository;
 use App\Services\OrderCalculationService;
 use App\Services\OrderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery as m; // Import Mockery with a simple alias
 use PHPUnit\Framework\TestCase;
 
 class OrderServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
+
     private $orderRepository;
     private $orderItemRepository;
     private $memberRepository;
@@ -1135,6 +1138,7 @@ class OrderServiceTest extends FunctionalTestCase
         $orderId = 1;
 
         $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->id = 1;
         $originalOrder->user_id = 10;
         $originalOrder->status = 'completed';
         $originalOrder->subtotal = 100.00;
@@ -1152,9 +1156,11 @@ class OrderServiceTest extends FunctionalTestCase
         $originalOrder->items = collect([]);
 
         $duplicatedOrder = m::mock(Order::class)->makePartial();
-        $duplicatedOrder->id = 1;
+        $duplicatedOrder->id = 2;
 
-        $duplicatedOrder->shouldReceive('relationLoaded')->once();
+        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);
+
+        $duplicatedOrder->shouldReceive('relationLoaded')->atLeast()->once();
 
         $this->databaseMock->shouldReceive('transaction')
             ->twice()
@@ -2053,6 +2059,7 @@ class OrderServiceTest extends FunctionalTestCase
         $orderId = 1;
 
         $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->id = 1;
         $originalOrder->user_id = 10;
         $originalOrder->status = 'completed';
         $originalOrder->subtotal = 100.00;
@@ -2071,6 +2078,8 @@ class OrderServiceTest extends FunctionalTestCase
 
         $duplicatedOrder = m::mock(Order::class)->makePartial();
         $duplicatedOrder->id = 2;
+
+        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);
 
         $this->databaseMock->shouldReceive('transaction')
             ->twice() // Once for duplicateOrder, once for createOrder
@@ -2153,6 +2162,7 @@ class OrderServiceTest extends FunctionalTestCase
         $orderId = 1;
 
         $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->id = 1;
         $originalOrder->user_id = 10;
         $originalOrder->status = 'completed';
         $originalOrder->subtotal = 100.00;
@@ -2176,6 +2186,8 @@ class OrderServiceTest extends FunctionalTestCase
 
         $duplicatedOrder = m::mock(Order::class)->makePartial();
         $duplicatedOrder->id = 2;
+
+        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);;
 
         $this->databaseMock->shouldReceive('transaction')
             ->twice()
@@ -2255,6 +2267,7 @@ class OrderServiceTest extends FunctionalTestCase
         $orderId = 1;
 
         $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->id = 1;
         $originalOrder->user_id = null; // Guest order
         $originalOrder->status = 'completed';
         $originalOrder->subtotal = 100.00;
@@ -2283,6 +2296,8 @@ class OrderServiceTest extends FunctionalTestCase
 
         $duplicatedOrder = m::mock(Order::class)->makePartial();
         $duplicatedOrder->id = 2;
+
+        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);
 
         $this->databaseMock->shouldReceive('transaction')
             ->twice()

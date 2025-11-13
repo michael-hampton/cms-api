@@ -7,6 +7,7 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
+use App\Models\Model;
 use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
 
@@ -87,7 +88,7 @@ class TagService
         return $this->repository->getAlternatives($tagId);
     }
 
-    public function duplicateTag(int $tagId, ?string $newName = null, ?int $siteId = null): bool
+    public function duplicateTag(int $tagId, ?string $newName = null, ?int $siteId = null): Model
     {
         return $this->database->transaction(function() use ($tagId, $newName, $siteId) {
             $originalTag = $this->repository->find($tagId);
@@ -95,6 +96,8 @@ class TagService
             if (!$originalTag) {
                 throw new \Exception("Tag not found");
             }
+
+            $targetSiteId = $siteId ?? SiteContext::getId();
 
             $data = [
                 'name' => $newName ?? ($originalTag->name . ' (Copy)'),
@@ -120,7 +123,16 @@ class TagService
 
             $newTag = $this->repository->create($data);
 
-            return $newTag !== null;
+            // Add clone history with site information
+            if ($targetSiteId !== $originalTag->site_id) {
+                $originalTag->addCloneRecord('cloned_to', $newTag->id, $targetSiteId);
+                $newTag->addCloneRecord('cloned_from', $originalTag->id, $originalTag->site_id);
+            } else {
+                $originalTag->addCloneRecord('cloned_to', $newTag->id, null);
+                $newTag->addCloneRecord('cloned_from', $originalTag->id, null);
+            }
+
+            return $newTag;
         });
     }
 
@@ -139,6 +151,10 @@ class TagService
         if (!$toTag) {
             throw new \Exception('Target tag not found');
         }
+
+        // Add merge history before merging
+        $toTag->addCloneRecord('merged_from', $fromTag->id, null);
+        $fromTag->addCloneRecord('merged_to', $toTag->id, null);
 
         return $this->repository->mergeTags($fromTagId, $toTagId);
     }

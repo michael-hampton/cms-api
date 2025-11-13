@@ -4,9 +4,12 @@ namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
+use App\Models\Concerns\HasCloneHistory;
 
 class Order extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'orders';
 
     protected $fillable = [
@@ -31,7 +34,8 @@ class Order extends Model
         'cancelled_at',
         'site_id',
         'created_at',
-        'voucher_code'
+        'voucher_code',
+        'clone_history'
     ];
 
     protected $casts = [
@@ -45,7 +49,8 @@ class Order extends Model
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'clone_history' => 'array',
     ];
 
     protected $dates = ['deleted_at'];

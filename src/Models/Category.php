@@ -4,9 +4,12 @@ namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
+use App\Models\Concerns\HasCloneHistory;
 
 class Category extends Model
 {
+    use HasCloneHistory;
+
     protected $table = 'categories';
     protected $fillable = [
         'name',
@@ -24,14 +27,16 @@ class Category extends Model
         'seo_title',
         'seo_description',
         'no_index',
-        'canonical_url'
+        'canonical_url',
+        'clone_history'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'sort_order' => 'integer',
         'meta' => 'json',
-        'no_index' => 'boolean'
+        'no_index' => 'boolean',
+        'clone_history' => 'array',
     ];
 
     public function parent(): ?Model

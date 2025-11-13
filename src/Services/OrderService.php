@@ -406,7 +406,13 @@ class OrderService
                 ];
             }
 
-            return $this->createOrder($data, $items, $originalOrder->site_id);
+            $newOrder = $this->createOrder($data, $items, $originalOrder->site_id);
+
+            // Add clone history
+            $originalOrder->addCloneRecord('cloned_to', $newOrder->id, null);
+            $newOrder->addCloneRecord('cloned_from', $originalOrder->id, null);
+
+            return $newOrder;
         });
     }
 

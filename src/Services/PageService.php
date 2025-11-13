@@ -225,7 +225,187 @@ class PageService
 
     public function updatePageWithAllData(int $pageId, array $requestData, int $siteId): Page
     {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
+        }
+
+        // Extract new status if being changed
+        $newStatus = $requestData['status'] ?? $requestData['forms']['meta']['status'] ?? null;
+
+        if ($newStatus) {
+            $newStatus = strtolower($newStatus);
+
+            // Validate status transition
+            if (strtolower($page->status) !== $newStatus && !$page->canTransitionTo($newStatus)) {
+                throw new \Exception("Cannot change status from {$page->status} to {$newStatus}");
+            }
+
+            // Handle publishing with approval workflow
+            if ($newStatus === Page::STATUS_PUBLISHED) {
+                $this->handlePublishAttempt($page, $requestData);
+            }
+        }
+
         return $this->createOrUpdatePageWithAllData($requestData, $siteId);
+    }
+
+    /**
+     * Handle publish attempt - check if approval is needed
+     */
+    private function handlePublishAttempt(Page $page, array &$requestData): void
+    {
+        // If page requires approval and is not approved yet
+        if ($page->requiresApproval() && !$page->isApproved()) {
+            // Change status to waiting_approval instead
+            $requestData['status'] = Page::STATUS_WAITING_APPROVAL;
+
+            if (isset($requestData['forms']['meta'])) {
+                $requestData['forms']['meta']['status'] = Page::STATUS_WAITING_APPROVAL;
+            }
+
+            // Log that approval is needed
+            $this->historyService->logPageWaitingApproval($page);
+        }
+    }
+
+    /**
+     * Approve a page for publishing
+     */
+    public function approvePage(int $pageId, int $userId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
+        }
+
+        if (!$page->isWaitingApproval()) {
+            throw new \Exception("Page is not waiting for approval");
+        }
+
+        return $this->database->transaction(function () use ($page, $userId) {
+            // Mark as approved
+            $page->approve($userId);
+
+            // Change status to published
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => Page::STATUS_PUBLISHED,
+                'published_at' => date('Y-m-d H:i:s')
+            ]);
+
+            // Log approval
+            $this->historyService->logPageApproved($page, $userId);
+            $this->historyService->logPagePublished($page->id);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
+
+    /**
+     * Reject approval request
+     */
+    public function rejectPage(int $pageId, int $userId, ?string $reason = null): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
+        }
+
+        if (!$page->isWaitingApproval()) {
+            throw new \Exception("Page is not waiting for approval");
+        }
+
+        return $this->database->transaction(function () use ($page, $userId, $reason) {
+            // Remove approval if it was there
+            $page->removeApproval();
+
+            // Change status back to draft
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => Page::STATUS_DRAFT
+            ]);
+
+            // Log rejection
+            $this->historyService->logPageRejected($page, $userId, $reason);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
+
+    /**
+     * Set page to on hold
+     */
+    public function putPageOnHold(int $pageId, int $userId, ?string $reason = null): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
+        }
+
+        if (!$page->canTransitionTo(Page::STATUS_ON_HOLD)) {
+            throw new \Exception("Cannot put page on hold from current status");
+        }
+
+        return $this->database->transaction(function () use ($page, $userId, $reason) {
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => Page::STATUS_ON_HOLD
+            ]);
+
+            $this->historyService->logPagePutOnHold($page, $userId, $reason);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
+
+    /**
+     * Set page to private
+     */
+    public function makePagePrivate(int $pageId, int $userId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
+        }
+
+        if (!$page->canTransitionTo(Page::STATUS_PRIVATE)) {
+            throw new \Exception("Cannot make page private from current status");
+        }
+
+        return $this->database->transaction(function () use ($page, $userId) {
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => Page::STATUS_PRIVATE
+            ]);
+
+            $this->historyService->logPageMadePrivate($page, $userId);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
+
+    /**
+     * Bulk approve pages
+     */
+    public function bulkApprovePages(array $pageIds, int $userId): array
+    {
+        $results = [];
+
+        foreach ($pageIds as $pageId) {
+            try {
+                $this->approvePage($pageId, $userId);
+                $results[$pageId] = ['success' => true];
+            } catch (\Exception $e) {
+                $results[$pageId] = [
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        return $results;
     }
 
     public function deletePage(int $pageId): bool
@@ -292,6 +472,7 @@ class PageService
             'forms.listing.imageId' => 'listing_image_id',
             'forms.listing.useAsHero' => 'listing_use_as_hero',
             'forms.meta.content_type' => 'page_type',
+            'requires_approval' => 'requires_approval',
         ];
 
         foreach ($fieldMappings as $path => $field) {
@@ -710,6 +891,10 @@ class PageService
 
             $newPage = $this->pageRepository->create($pageData);
 
+            // Add clone history to both pages
+            $originalPage->addCloneRecord('cloned_to', $newPage->id, null);
+            $newPage->addCloneRecord('cloned_from', $originalPage->id, null);
+
             // Duplicate all relations using repository methods
             $this->duplicatePageRelations($originalPage->id, $newPage->id);
 
@@ -863,6 +1048,12 @@ class PageService
                 if (!empty($options['merge_content'])) {
                     $this->mergePageContent($sourcePage, $targetPage, $options);
                 }
+
+                // Add merge history to target page before deleting source
+                $targetPage->addCloneRecord('merged_from', $sourcePage->id, null);
+
+                // Add merge history to source page
+                $sourcePage->addCloneRecord('merged_to', $targetPage->id, null);
 
                 // Delete source page
                 $this->pageRepository->delete($sourcePage->id);
@@ -1258,6 +1449,10 @@ class PageService
             ];
 
             $newPage = $this->pageRepository->create($pageData);
+
+            // Add clone history with site information
+            $sourcePage->addCloneRecord('cloned_to', $newPage->id, $targetSiteId);
+            $newPage->addCloneRecord('cloned_from', $sourcePage->id, $sourcePage->site_id);
 
             // Clone all relations to the new site
             $this->clonePageRelationsToSite($sourcePage->id, $newPage->id, $targetSiteId);

@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
+use App\Models\Concerns\HasCloneHistory;
 
 class Product extends Model
 {
+    use HasCloneHistory;
+
     protected $fillable = [
         'name',
         'description',
@@ -20,7 +23,8 @@ class Product extends Model
         'deleted_at',
         'slug',
         'site_id',
-        'is_active'
+        'is_active',
+        'clone_history',
     ];
 
     protected $casts = [
@@ -29,6 +33,7 @@ class Product extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'clone_history' => 'array',
     ];
 
     protected $table = 'products';

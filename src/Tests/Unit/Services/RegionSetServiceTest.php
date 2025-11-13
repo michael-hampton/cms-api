@@ -14,11 +14,14 @@ use App\Repositories\RegionSetRepository;
 use App\Repositories\TerritoryRepository;
 use App\Services\RegionSetService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class RegionSetServiceTest extends FunctionalTestCase
 {
+    use HasSiteHistory;
+
     private $databaseMock;
     private $repository;
     private $territoryRepository;
@@ -282,6 +285,8 @@ class RegionSetServiceTest extends FunctionalTestCase
         $mockNewRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockNewRegionSet->id = 2;
 
+        $this->setCloneHistoryExpectations($mockOriginalRegionSet, $mockNewRegionSet, 1, 2);
+
         $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
@@ -387,6 +392,8 @@ class RegionSetServiceTest extends FunctionalTestCase
         // Mock new region set result
         $mockNewRegionSet = Mockery::mock(RegionSet::class)->makePartial();
         $mockNewRegionSet->id = 2;
+
+        $this->setCloneHistoryExpectations($mockOriginalRegionSet, $mockNewRegionSet, 1, 2);
 
         // Transaction wrapper
         $this->databaseMock->shouldReceive('transaction')
