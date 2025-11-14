@@ -226,6 +226,142 @@ class PageHistoryServiceTest extends FunctionalTestCase
         $this->service->restoreFromHistory(1);
     }
 
+    public function testLogPageWaitingApproval()
+    {
+        $page = $this->createMockPage(1, 'Test Page');
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($page);
+
+        $this->historyRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                return $data['page_id'] === 1
+                    && $data['action'] === 'waiting_approval'
+                    && $data['description'] === 'Page submitted for approval';
+            }))
+            ->andReturn(new PageHistory());
+
+        $result = $this->service->logPageWaitingApproval($page);
+
+        $this->assertInstanceOf(PageHistory::class, $result);
+    }
+
+    public function testLogPageApproved()
+    {
+        $page = $this->createMockPage(1, 'Test Page');
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($page);
+
+        $this->historyRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                $changes = is_string($data['changes'])
+                    ? json_decode($data['changes'], true)
+                    : $data['changes'];
+
+                return $data['page_id'] === 1
+                    && $data['action'] === 'approved'
+                    && isset($changes['approved_by'])
+                    && $changes['approved_by'] === 1;
+            }))
+            ->andReturn(new PageHistory());
+
+        $result = $this->service->logPageApproved($page, 1);
+
+        $this->assertInstanceOf(PageHistory::class, $result);
+    }
+
+    public function testLogPageRejected()
+    {
+        $page = $this->createMockPage(1, 'Test Page');
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($page);
+
+        $this->historyRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                $changes = is_string($data['changes'])
+                    ? json_decode($data['changes'], true)
+                    : $data['changes'];
+
+                return $data['page_id'] === 1
+                    && $data['action'] === 'rejected'
+                    && isset($changes['rejected_by'])
+                    && $changes['rejected_by'] === 1
+                    && isset($changes['reason'])
+                    && $changes['reason'] === 'Not ready';
+            }))
+            ->andReturn(new PageHistory());
+
+        $result = $this->service->logPageRejected($page, 1, 'Not ready');
+
+        $this->assertInstanceOf(PageHistory::class, $result);
+    }
+
+    public function testLogPagePutOnHold()
+    {
+        $page = $this->createMockPage(1, 'Test Page');
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($page);
+
+        $this->historyRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                $changes = is_string($data['changes'])
+                    ? json_decode($data['changes'], true)
+                    : $data['changes'];
+
+                return $data['page_id'] === 1
+                    && $data['action'] === 'on_hold'
+                    && isset($changes['user_id'])
+                    && isset($changes['reason']);
+            }))
+            ->andReturn(new PageHistory());
+
+        $result = $this->service->logPagePutOnHold($page, 1, 'Legal review');
+
+        $this->assertInstanceOf(PageHistory::class, $result);
+    }
+
+    public function testLogPageMadePrivate()
+    {
+        $page = $this->createMockPage(1, 'Test Page');
+
+        $this->pageRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($page);
+
+        $this->historyRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function($data) {
+                $changes = is_string($data['changes'])
+                    ? json_decode($data['changes'], true)
+                    : $data['changes'];
+
+                return $data['page_id'] === 1
+                    && $data['action'] === 'made_private'
+                    && isset($changes['user_id']);
+            }))
+            ->andReturn(new PageHistory());
+
+        $result = $this->service->logPageMadePrivate($page, 1);
+
+        $this->assertInstanceOf(PageHistory::class, $result);
+    }
+
     private function createMockPage(int $id, string $title): Page
     {
         $page = Mockery::mock(Page::class)->makePartial();

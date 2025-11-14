@@ -16,19 +16,15 @@ use App\Repositories\TerritoryRepository;
 class RegionSetService
 {
     private Database $database;
-    protected RegionSetRepository $repository;
-    protected TerritoryRepository $territoryRepository;
 
     public function __construct(
-        Database $database,
-        RegionSetRepository $repository,
-        TerritoryRepository $territoryRepository,
-        private readonly PageRepository $pageRepository,
+        Database                                 $database,
+        private readonly RegionSetRepository     $repository,
+        private readonly TerritoryRepository     $territoryRepository,
+        private readonly PageRepository          $pageRepository,
         private readonly PageRegionSetRepository $pageRegionSetRepository
     ) {
         $this->database = $database ?? Database::getInstance();
-        $this->repository = $repository;
-        $this->territoryRepository = $territoryRepository;
     }
 
     public function create(array $data): RegionSet
@@ -131,62 +127,6 @@ class RegionSetService
         return $this->repository->getAlternatives($regionSetId);
     }
 
-    public function duplicate(int $regionSetId, ?string $newName = null): RegionSet
-    {
-        return $this->database->transaction(function () use ($regionSetId, $newName) {
-            $originalRegionSet = $this->repository->findWithRelations($regionSetId);
-
-            if (!$originalRegionSet) {
-                throw new \Exception("Region set not found");
-            }
-
-            $data = [
-                'name' => $newName ?? ($originalRegionSet->name . ' (Copy)'),
-                'description' => $originalRegionSet->description,
-                'is_active' => false,
-                'site_id' => $originalRegionSet->site_id
-            ];
-
-            $data['slug'] = $this->generateUniqueSlug($data['name']);
-            $newRegionSet = $this->repository->create($data);
-
-
-            // Duplicate territories
-            $territories = $originalRegionSet->territories;
-
-            if ($territories) {
-                foreach ($territories as $territory) {
-                    // Generate unique code by checking if it exists
-                    $newCode = $territory->code . '-copy';
-                    $counter = 1;
-
-                    while ($this->territoryRepository->findByCode($newCode, $territory->site_id)) {
-                        $newCode = $territory->code . '-copy-' . $counter;
-                        $counter++;
-                    }
-
-                    $newSlug = $this->territoryRepository->generateUniqueSlug($territory->name, $territory->site_id);
-
-                    $this->territoryRepository->create([
-                        'name' => $territory->name,
-                        'slug' => $newSlug,
-                        'code' => $newCode,
-                        'region_set_id' => $newRegionSet->id,
-                        'is_active' => $territory->is_active,
-                        'sort_order' => $territory->sort_order,
-                        'site_id' => $territory->site_id
-                    ]);
-                }
-            }
-
-            // Add clone history
-            $originalRegionSet->addCloneRecord('cloned_to', $newRegionSet->id, null);
-            $newRegionSet->addCloneRecord('cloned_from', $originalRegionSet->id, null);
-
-            return $newRegionSet;
-        });
-    }
-
     public function reorder(array $orderedIds): bool
     {
         return $this->repository->reorderRegionSets($orderedIds);
@@ -258,94 +198,5 @@ class RegionSetService
     public function searchAvailablePages(int $regionSetId, string $query, int $perPage = 20, int $page = 1): array
     {
         return $this->repository->searchAvailablePages($regionSetId, $query, $perPage, $page);
-    }
-
-    public function bulkDelete(array $regionSetIds): array
-    {
-        return $this->database->transaction(function() use ($regionSetIds) {
-            $deleted = [];
-            $failed = [];
-
-            foreach ($regionSetIds as $regionSetId) {
-                try {
-                    $regionSet = $this->repository->find($regionSetId);
-
-                    if (!$regionSet) {
-                        $failed[] = ['id' => $regionSetId, 'reason' => 'Region set not found'];
-                        continue;
-                    }
-
-                    $territoryCount = $regionSet->getTerritoryCount();
-                    $pageCount = $regionSet->getPageCount();
-
-                    if ($territoryCount > 0 || $pageCount > 0) {
-                        $failed[] = [
-                            'id' => $regionSetId,
-                            'reason' => "Region set has {$territoryCount} territories and {$pageCount} pages"
-                        ];
-                        continue;
-                    }
-
-                    if ($this->repository->delete($regionSetId)) {
-                        $deleted[] = $regionSetId;
-                    } else {
-                        $failed[] = ['id' => $regionSetId, 'reason' => 'Delete failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $regionSetId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'deleted' => $deleted,
-                'failed' => $failed,
-                'total' => count($regionSetIds)
-            ];
-        });
-    }
-
-    public function bulkActivate(array $regionSetIds): array
-    {
-        return $this->bulkUpdateActiveStatus($regionSetIds, true);
-    }
-
-    public function bulkDeactivate(array $regionSetIds): array
-    {
-        return $this->bulkUpdateActiveStatus($regionSetIds, false);
-    }
-
-    private function bulkUpdateActiveStatus(array $regionSetIds, bool $isActive): array
-    {
-        return $this->database->transaction(function() use ($regionSetIds, $isActive) {
-            $updated = [];
-            $failed = [];
-
-            foreach ($regionSetIds as $regionSetId) {
-                try {
-                    $regionSet = $this->repository->find($regionSetId);
-
-                    if (!$regionSet) {
-                        $failed[] = ['id' => $regionSetId, 'reason' => 'Region set not found'];
-                        continue;
-                    }
-
-                    $updatedRegionSet = $this->repository->update($regionSetId, ['is_active' => $isActive]);
-
-                    if ($updatedRegionSet) {
-                        $updated[] = $regionSetId;
-                    } else {
-                        $failed[] = ['id' => $regionSetId, 'reason' => 'Update failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $regionSetId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'updated' => $updated,
-                'failed' => $failed,
-                'total' => count($regionSetIds)
-            ];
-        });
     }
 }

@@ -15,13 +15,8 @@ class VoucherService
 {
     use HasCloneHistory;
 
-    private Database $database;
-    protected VoucherRepository $repository;
-
-    public function __construct(Database $database, VoucherRepository $repository)
+    public function __construct(private readonly Database $database, private readonly VoucherRepository $repository)
     {
-        $this->database = $database ?? Database::getInstance();
-        $this->repository = $repository;
     }
 
     public function create(array $data): Voucher
@@ -97,75 +92,6 @@ class VoucherService
     public function getAlternativeVouchers(int $voucherId): Collection
     {
         return $this->repository->getAlternatives($voucherId);
-    }
-
-    public function duplicateVoucher(int $voucherId, ?string $newCode = null): ?Voucher
-    {
-        return $this->database->transaction(function() use ($voucherId, $newCode) {
-            $originalVoucher = $this->repository->find($voucherId);
-
-            if (!$originalVoucher) {
-                throw new \Exception("Voucher not found");
-            }
-
-            $data = [
-                'name' => $originalVoucher->name . ' (Copy)',
-                'description' => $originalVoucher->description,
-                'type' => $originalVoucher->type,
-                'value' => $originalVoucher->value,
-                'minimum_order_value' => $originalVoucher->minimum_order_value,
-                'maximum_discount' => $originalVoucher->maximum_discount,
-                'usage_limit' => $originalVoucher->usage_limit,
-                'usage_count' => 0,
-                'per_user_limit' => $originalVoucher->per_user_limit,
-                'starts_at' => $originalVoucher->starts_at?->format('Y-m-d H:i:s'),
-                'expires_at' => $originalVoucher->expires_at?->format('Y-m-d H:i:s'),
-                'status' => 'inactive',
-                'site_id' => $originalVoucher->site_id,
-            ];
-
-            // Generate unique code
-            if ($newCode) {
-                $code = strtoupper(trim($newCode));
-            } else {
-                $baseCode = $originalVoucher->code;
-                $code = $baseCode;
-                $counter = 1;
-
-                while ($this->repository->findByCode($code)) {
-                    $code = $baseCode . $counter;
-                    $counter++;
-                }
-            }
-
-            $data['code'] = $code;
-
-            $newVoucher = $this->repository->create($data);
-
-            // Duplicate product associations
-            $productIds = $originalVoucher->products()?->pluck('id')->toArray();
-            if (!empty($productIds)) {
-                $newVoucher->products(true)->sync($productIds);
-            }
-
-            // Duplicate category associations
-            $categoryIds = $originalVoucher->categories()?->pluck('id')->toArray();
-            if (!empty($categoryIds)) {
-                $newVoucher->categories(true)->sync($categoryIds);
-            }
-
-            // Duplicate brand associations
-            $brandIds = $originalVoucher->brands()?->pluck('id')->toArray();
-            if (!empty($brandIds)) {
-                $newVoucher->brands(true)->sync($brandIds);
-            }
-
-            // Add clone history
-            $originalVoucher->addCloneRecord('cloned_to', $newVoucher->id, null);
-            $newVoucher->addCloneRecord('cloned_from', $originalVoucher->id, null);
-
-            return $newVoucher;
-        });
     }
 
     public function validateVoucher(string $code, float $orderValue, ?int $userId = null, ?int $productId = null): array
@@ -253,81 +179,5 @@ class VoucherService
     public function updateExpiredVouchers(): int
     {
         return $this->repository->updateExpiredVouchers();
-    }
-
-    public function bulkUpdateStatus(array $voucherIds, string $status): array
-    {
-        return $this->database->transaction(function() use ($voucherIds, $status) {
-            $updated = [];
-            $failed = [];
-
-            foreach ($voucherIds as $voucherId) {
-                try {
-                    $voucher = $this->repository->find($voucherId);
-
-                    if (!$voucher) {
-                        $failed[] = ['id' => $voucherId, 'reason' => 'Voucher not found'];
-                        continue;
-                    }
-
-                    $updatedVoucher = $this->repository->update($voucherId, ['status' => $status]);
-
-                    if ($updatedVoucher) {
-                        $updated[] = $voucherId;
-                    } else {
-                        $failed[] = ['id' => $voucherId, 'reason' => 'Update failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $voucherId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'updated' => $updated,
-                'failed' => $failed,
-                'total' => count($voucherIds)
-            ];
-        });
-    }
-
-    public function bulkDelete(array $voucherIds): array
-    {
-        return $this->database->transaction(function() use ($voucherIds) {
-            $deleted = [];
-            $failed = [];
-
-            foreach ($voucherIds as $voucherId) {
-                try {
-                    $voucher = $this->repository->find($voucherId);
-
-                    if (!$voucher) {
-                        $failed[] = ['id' => $voucherId, 'reason' => 'Voucher not found'];
-                        continue;
-                    }
-
-                    if ($voucher->usage_count > 0) {
-                        $failed[] = [
-                            'id' => $voucherId,
-                            'reason' => "Voucher has been used {$voucher->usage_count} times"
-                        ];
-                        continue;
-                    }
-
-                    if ($this->repository->delete($voucherId)) {
-                        $deleted[] = $voucherId;
-                    } else {
-                        $failed[] = ['id' => $voucherId, 'reason' => 'Delete failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $voucherId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'deleted' => $deleted,
-                'failed' => $failed,
-                'total' => count($voucherIds)
-            ];
-        });
     }
 }

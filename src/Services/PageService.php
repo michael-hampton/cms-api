@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PageStatus;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
@@ -37,24 +38,24 @@ class PageService
     private ?int $siteId;
 
     public function __construct(
-        private PageRepository            $pageRepository,
-        private BlockRepository           $blockRepository,
-        private BlockParserService        $blockParserService,
-        private PageMetadataRepository    $metadataRepository,
-        private PageSeoRepository         $seoRepository,
-        private PageSettingsRepository    $settingsRepository,
-        private PageSocialRepository      $socialRepository,
-        private PageCategoryRepository    $categoryRepository,
-        private PageCustomFieldRepository $customFieldRepository,
-        private PageTagRepository         $tagRepository,
-        private AccessRoleRepository      $accessRoleRepository,
-        private Database                  $database,
-        private PageHistoryService        $historyService,
-        private PageAuthorRepository      $pageAuthorRepository,
-        private PageRegionSetRepository   $pageRegionSetRepository,
-        private PageTerritoryRepository   $pageTerritoryRepository,
-        private PageProductRepository     $pageProductRepository,
-        ?int                              $siteId = null
+        private readonly PageRepository            $pageRepository,
+        private readonly BlockRepository           $blockRepository,
+        private readonly BlockParserService        $blockParserService,
+        private readonly PageMetadataRepository    $metadataRepository,
+        private readonly PageSeoRepository         $seoRepository,
+        private readonly PageSettingsRepository    $settingsRepository,
+        private readonly PageSocialRepository      $socialRepository,
+        private readonly PageCategoryRepository    $categoryRepository,
+        private readonly PageCustomFieldRepository $customFieldRepository,
+        private readonly PageTagRepository         $tagRepository,
+        private readonly AccessRoleRepository      $accessRoleRepository,
+        private readonly Database                  $database,
+        private readonly PageHistoryService        $historyService,
+        private readonly PageAuthorRepository      $pageAuthorRepository,
+        private readonly PageRegionSetRepository   $pageRegionSetRepository,
+        private readonly PageTerritoryRepository   $pageTerritoryRepository,
+        private readonly PageProductRepository     $pageProductRepository,
+        ?int                                       $siteId = null
     )
     {
         $this->siteId = $siteId ?? SiteContext::getId();
@@ -220,7 +221,34 @@ class PageService
 
     public function createPageWithAllData(array $requestData, int $siteId): Page
     {
-        return $this->createOrUpdatePageWithAllData($requestData, $siteId);
+        // Check if the page requires approval and is being created as published
+        $status = $requestData['status'] ?? $requestData['forms']['meta']['status'] ?? 'draft';
+        $requiresApproval = $requestData['requires_approval'] ?? false;
+
+        // Convert status to lowercase for comparison
+        $status = strtolower($status);
+
+        if(!isset($requestData['status'])) {
+            $requestData['status'] = $status;
+        }
+
+        // If trying to publish and requires approval, force to waiting_approval
+        if ($status === 'published' && $requiresApproval) {
+            $requestData['status'] = PageStatus::WAITING_APPROVAL->value;
+
+            if (isset($requestData['forms']['meta'])) {
+                $requestData['forms']['meta']['status'] = PageStatus::WAITING_APPROVAL->value;
+            }
+        }
+
+        $page = $this->createOrUpdatePageWithAllData($requestData, $siteId);
+
+        // Log waiting approval if that's the status
+        if ($page->status === PageStatus::WAITING_APPROVAL->value) {
+            $this->historyService->logPageWaitingApproval($page);
+        }
+
+        return $page;
     }
 
     public function updatePageWithAllData(int $pageId, array $requestData, int $siteId): Page
@@ -243,7 +271,7 @@ class PageService
             }
 
             // Handle publishing with approval workflow
-            if ($newStatus === Page::STATUS_PUBLISHED) {
+            if ($newStatus === PageStatus::PUBLISHED->value) {
                 $this->handlePublishAttempt($page, $requestData);
             }
         }
@@ -258,11 +286,12 @@ class PageService
     {
         // If page requires approval and is not approved yet
         if ($page->requiresApproval() && !$page->isApproved()) {
+
             // Change status to waiting_approval instead
-            $requestData['status'] = Page::STATUS_WAITING_APPROVAL;
+            $requestData['status'] = PageStatus::WAITING_APPROVAL->value;
 
             if (isset($requestData['forms']['meta'])) {
-                $requestData['forms']['meta']['status'] = Page::STATUS_WAITING_APPROVAL;
+                $requestData['forms']['meta']['status'] = PageStatus::WAITING_APPROVAL->value;
             }
 
             // Log that approval is needed
@@ -291,7 +320,7 @@ class PageService
 
             // Change status to published
             $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => Page::STATUS_PUBLISHED,
+                'status' => PageStatus::PUBLISHED->value,
                 'published_at' => date('Y-m-d H:i:s')
             ]);
 
@@ -324,7 +353,7 @@ class PageService
 
             // Change status back to draft
             $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => Page::STATUS_DRAFT
+                'status' => Pagestatus::DRAFT->value,
             ]);
 
             // Log rejection
@@ -345,13 +374,13 @@ class PageService
             throw new \Exception("Page not found");
         }
 
-        if (!$page->canTransitionTo(Page::STATUS_ON_HOLD)) {
+        if (!$page->canTransitionTo(Pagestatus::ON_HOLD)) {
             throw new \Exception("Cannot put page on hold from current status");
         }
 
         return $this->database->transaction(function () use ($page, $userId, $reason) {
             $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => Page::STATUS_ON_HOLD
+                'status' => Pagestatus::ON_HOLD->value,
             ]);
 
             $this->historyService->logPagePutOnHold($page, $userId, $reason);
@@ -371,41 +400,19 @@ class PageService
             throw new \Exception("Page not found");
         }
 
-        if (!$page->canTransitionTo(Page::STATUS_PRIVATE)) {
+        if (!$page->canTransitionTo(Pagestatus::PRIVATE)) {
             throw new \Exception("Cannot make page private from current status");
         }
 
         return $this->database->transaction(function () use ($page, $userId) {
             $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => Page::STATUS_PRIVATE
+                'status' => Pagestatus::PRIVATE->value,
             ]);
 
             $this->historyService->logPageMadePrivate($page, $userId);
 
             return $this->getCompletePageData($updatedPage->id);
         });
-    }
-
-    /**
-     * Bulk approve pages
-     */
-    public function bulkApprovePages(array $pageIds, int $userId): array
-    {
-        $results = [];
-
-        foreach ($pageIds as $pageId) {
-            try {
-                $this->approvePage($pageId, $userId);
-                $results[$pageId] = ['success' => true];
-            } catch (\Exception $e) {
-                $results[$pageId] = [
-                    'success' => false,
-                    'error' => $e->getMessage()
-                ];
-            }
-        }
-
-        return $results;
     }
 
     public function deletePage(int $pageId): bool
@@ -856,104 +863,6 @@ class PageService
         }
     }
 
-    /**
-     * Duplicate a page with all its relations
-     */
-    public function duplicatePage(int $pageId): ?Page
-    {
-        $originalPage = $this->getCompletePageData($pageId);
-        if (!$originalPage) {
-            return null;
-        }
-
-        return $this->database->transaction(function () use ($originalPage, $pageId) {
-            $pageData = [
-                'title' => $originalPage->title . ' (Copy)',
-                'slug' => $originalPage->slug . '-copy-' . time(),
-                'status' => 'draft',
-                'meta_title' => $originalPage->meta_title,
-                'meta_description' => $originalPage->meta_description,
-                'site_id' => $originalPage->site_id,
-                'listing_synopsis' => $originalPage->listing_synopsis,
-                'listing_title' => $originalPage->listing_title,
-                'listing_label' => $originalPage->listing_label,
-                'listing_image_id' => $originalPage->listing_image_id,
-                'listing_use_as_hero' => $originalPage->listing_use_as_hero,
-                'hero_type' => $originalPage->hero_type,
-                'hero_image_id' => $originalPage->hero_image_id,
-                'hero_video_url' => $originalPage->hero_video_url,
-                'crop_overrides' => $originalPage->crop_overrides,
-                'resolved_images' => $originalPage->resolved_images,
-                'page_type' => $originalPage->page_type,
-                'gallery_slides' => $originalPage->gallery_slides, // ADD THIS
-
-            ];
-
-            $newPage = $this->pageRepository->create($pageData);
-
-            // Add clone history to both pages
-            $originalPage->addCloneRecord('cloned_to', $newPage->id, null);
-            $newPage->addCloneRecord('cloned_from', $originalPage->id, null);
-
-            // Duplicate all relations using repository methods
-            $this->duplicatePageRelations($originalPage->id, $newPage->id);
-
-            $this->historyService->logPageDuplicated($pageId, $newPage->id);
-
-            return $this->getCompletePageData($newPage->id);
-        });
-    }
-
-    /**
-     * Duplicate all relations from source to target page
-     * This method orchestrates the duplication of all page relations
-     */
-    private function duplicatePageRelations(int $sourcePageId, int $targetPageId): void
-    {
-        $relations = [
-            'blocks' => 'duplicateBlocks',
-            'metadata' => 'duplicateMetadata',
-            'seo' => 'duplicateSeo',
-            'settings' => 'duplicateSettings',
-            'social' => 'duplicateSocial',
-            'categories' => 'duplicateCategories',
-            'tags' => 'duplicateTags',
-            'customFields' => 'duplicateCustomFields',
-            'accessRoles' => 'duplicateAccessRoles',
-            'pageAuthors' => 'duplicatePageAuthors',
-            'regionSets' => 'duplicateRegionSets',
-            'territories' => 'duplicateTerritories',
-            'products' => 'duplicateProducts',
-        ];
-
-        $errors = [];
-
-        foreach ($relations as $relationType => $method) {
-            try {
-                $this->pageRepository->$method($sourcePageId, $targetPageId);
-            } catch (\Exception $e) {
-                if ($_ENV['APP_ENV'] !== 'testing') {
-                    // Log the error but continue with other relations
-                    error_log(sprintf(
-                        'Failed to duplicate %s for page %d to %d: %s',
-                        $relationType,
-                        $sourcePageId,
-                        $targetPageId,
-                        $e->getMessage()
-                    ));
-                }
-
-                $errors[$relationType] = $e->getMessage();
-            }
-        }
-
-        // If critical relations failed, you might want to throw
-        // For now, we'll allow partial duplication to succeed
-        if (!empty($errors) && count($errors) === count($relations)) {
-            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($errors));
-        }
-    }
-
     public function searchPages(string $query, string $category = '', string $tag = '', string $status = 'published', $limit = null): Collection
     {
         $options = [
@@ -999,369 +908,6 @@ class PageService
         return [];
     }
 
-    public function bulkUpdatePages(array $pageIds, array $updateData, int $siteId): array
-    {
-        $results = [];
-        foreach ($pageIds as $pageId) {
-            try {
-                $results[$pageId] = $this->updatePageWithAllData($pageId, $updateData, $siteId);
-            } catch (Exception $e) {
-                $results[$pageId] = ['error' => $e->getMessage()];
-            }
-        }
-        return $results;
-    }
-
-    /**
-     * Merge source page into target page, then delete source
-     *
-     * @param int $sourcePageId Page to merge from (will be deleted)
-     * @param int $targetPageId Page to merge into (will be kept)
-     * @param array $options Merge options (e.g., which relations to merge, conflict resolution)
-     * @return Page The merged target page
-     * @throws Exception
-     */
-    public function mergePages(int $sourcePageId, int $targetPageId, array $options = []): Page
-    {
-        if ($sourcePageId === $targetPageId) {
-            throw new \Exception("Cannot merge a page with itself");
-        }
-
-        $sourcePage = $this->getCompletePageData($sourcePageId);
-        $targetPage = $this->getCompletePageData($targetPageId);
-
-        if (!$sourcePage || !$targetPage) {
-            throw new \Exception("Source or target page not found");
-        }
-
-        try {
-            return $this->database->transaction(function () use ($sourcePage, $targetPage, $options) {
-
-                // Merge relations based on strategy
-                $this->mergePageRelations(
-                    $sourcePage->id,
-                    $targetPage->id,
-                    $options['strategy'] ?? 'append'
-                );
-
-                // Optionally merge main page data
-                if (!empty($options['merge_content'])) {
-                    $this->mergePageContent($sourcePage, $targetPage, $options);
-                }
-
-                // Add merge history to target page before deleting source
-                $targetPage->addCloneRecord('merged_from', $sourcePage->id, null);
-
-                // Add merge history to source page
-                $sourcePage->addCloneRecord('merged_to', $targetPage->id, null);
-
-                // Delete source page
-                $this->pageRepository->delete($sourcePage->id);
-
-                return $this->getCompletePageData($targetPage->id);
-            });
-        } catch (\Exception $e) {
-            if ($_ENV['APP_ENV'] !== 'testing') {
-                error_log(sprintf(
-                    'Failed to merge page %d into %d: %s',
-                    $sourcePageId,
-                    $targetPageId,
-                    $e->getMessage()
-                ));
-            }
-
-            throw new \Exception("Failed to merge pages: {$e->getMessage()}", 0, $e);
-        }
-    }
-
-    /**
-     * Merge relations from source to target page
-     *
-     * @param int $sourcePageId
-     * @param int $targetPageId
-     * @param string $strategy 'append', 'replace', or 'keep_target'
-     */
-    private function mergePageRelations(int $sourcePageId, int $targetPageId, string $strategy): void
-    {
-        // Many-to-many relations can be appended
-        $appendableRelations = [
-            'categories',
-            'tags',
-            'accessRoles',
-            'regionSets',
-            'territories',
-            'pageAuthors',
-            'customFields',
-            'products'
-        ];;
-
-        foreach ($appendableRelations as $relation) {
-            $method = 'duplicate' . ucfirst($relation);
-            try {
-                $this->pageRepository->$method($sourcePageId, $targetPageId);
-            } catch (\Exception $e) {
-                throw $e;
-            }
-        }
-
-        // Blocks - append with reordering
-        $this->mergeBlocks($sourcePageId, $targetPageId, $strategy);
-
-        // One-to-one relations - strategy dependent
-        if ($strategy === 'replace') {
-            $this->replaceOneToOneRelations($sourcePageId, $targetPageId);
-        } elseif ($strategy === 'append') {
-            // For settings/metadata, we might want to merge specific fields
-            $this->mergeSettings($sourcePageId, $targetPageId);
-        }
-
-        // 'keep_target' strategy: do nothing for one-to-one relations
-
-        // Custom fields - merge or append
-        $this->mergeCustomFields($sourcePageId, $targetPageId);
-
-        // Merge listing and hero data based on strategy
-        $this->mergeListingAndHeroData($sourcePageId, $targetPageId, $strategy);
-    }
-
-    /**
-     * Merge listing and hero data from source to target based on strategy
-     */
-    private function mergeListingAndHeroData(int $sourcePageId, int $targetPageId, string $strategy): void
-    {
-        $sourcePage = $this->pageRepository->find($sourcePageId);
-        $targetPage = $this->pageRepository->find($targetPageId);
-
-        if (!$sourcePage || !$targetPage) {
-            return;
-        }
-
-        $updates = match ($strategy) {
-            'replace' => $this->buildReplaceUpdates($sourcePage),
-            'append' => $this->buildAppendUpdates($sourcePage, $targetPage),
-            default => []
-        };
-
-        if (!empty($updates)) {
-            $this->pageRepository->update($targetPageId, $updates);
-        }
-    }
-
-    /**
-     * Build updates for replace strategy - copy all fields from source
-     */
-    private function buildReplaceUpdates(Page $sourcePage): array
-    {
-        $fields = [
-            'listing_synopsis',
-            'listing_title',
-            'listing_label',
-            'listing_image_id',
-            'listing_use_as_hero',
-            'hero_type',
-            'hero_image_id',
-            'hero_video_url',
-            'crop_overrides',
-            'resolved_images',
-        ];
-
-        return collect($fields)
-            ->mapWithKeys(fn($field) => [$field => $sourcePage->$field])
-            ->all();
-    }
-
-    /**
-     * Build updates for append strategy - only fill empty fields
-     */
-    private function buildAppendUpdates(Page $sourcePage, Page $targetPage): array
-    {
-        $updates = [];
-
-        // Simple scalar fields - only update if target is empty
-        $scalarFields = [
-            //'listing_synopsis',
-            'listing_title',
-            'listing_label',
-            'listing_image_id',
-            'hero_type',
-            'hero_image_id',
-            'hero_video_url',
-        ];
-
-        foreach ($scalarFields as $field) {
-            if (in_array($targetPage->$field, ['', null, 0]) && $sourcePage->$field !== '') {
-                $updates[$field] = $sourcePage->$field;
-            }
-        }
-
-        // JSON fields - merge intelligently
-        $updates = array_merge($updates, $this->mergeJsonFields($sourcePage, $targetPage));
-
-        return $updates;
-    }
-
-    /**
-     * Merge JSON fields intelligently, combining arrays
-     */
-    private function mergeJsonFields(Page $sourcePage, Page $targetPage): array
-    {
-        $updates = [];
-
-        // Crop overrides - target takes precedence over source
-        if (is_array($sourcePage->crop_overrides)) {
-            $sourceOverrides = [...$sourcePage->crop_overrides] ?? [];
-            $targetOverrides = [...$targetPage->crop_overrides] ?? [];
-            $merged = array_merge($sourceOverrides, $targetOverrides);
-
-            if (!empty($merged)) {
-                $updates['crop_overrides'] = json_encode($merged);
-            }
-        }
-
-        // Resolved images - target takes precedence over source
-        if (is_array($sourcePage->resolved_images)) {
-            $sourceImages = [...$sourcePage->resolved_images] ?? [];
-            $targetImages = [...$targetPage->resolved_images] ?? [];
-            $merged = array_merge($sourceImages, $targetImages);
-
-            if (!empty($merged)) {
-                $updates['resolved_images'] = json_encode($merged);
-            }
-        }
-
-        return $updates;
-    }
-
-    /**
-     * Merge blocks from source to target, reordering as needed
-     */
-    private function mergeBlocks(int $sourcePageId, int $targetPageId, string $strategy): void
-    {
-        if ($strategy === 'replace') {
-            // Delete target blocks, copy source blocks
-            $this->blockRepository->deletePageBlocks($targetPageId);
-            $this->pageRepository->duplicateBlocks($sourcePageId, $targetPageId);
-        } else {
-
-            // Append: get max order from target, then copy source blocks with offset
-            $maxOrder = $this->blockRepository->getMaxOrder($targetPageId) ?? 0;
-
-            // Use Block model instead of raw query
-            $sourceBlocks = $this->blockRepository->getBlocksForPage($sourcePageId);
-
-            foreach ($sourceBlocks as $block) {
-                $this->blockRepository->create([
-                    'page_id' => $targetPageId,
-                    'type' => $block->type,
-                    'data' => $block->data,
-                    'order' => $maxOrder + $block->order
-                ]);
-            }
-        }
-    }
-
-    /**
-     * Replace target's one-to-one relations with source's
-     */
-    private function replaceOneToOneRelations(int $sourcePageId, int $targetPageId): void
-    {
-        $relations = [
-            'Metadata' => PageMetadata::class,
-            'Seo' => PageSeo::class,
-            'Settings' => PageSettings::class,
-            'Social' => PageSocial::class
-        ];
-
-        foreach ($relations as $relation => $modelClass) {
-            // Delete existing using model
-            $modelClass::where('page_id', $targetPageId)->delete();
-
-            // Copy from source
-            $method = 'duplicate' . $relation;
-            $this->pageRepository->$method($sourcePageId, $targetPageId);
-        }
-    }
-
-    /**
-     * Merge settings intelligently (e.g., keep non-null values)
-     */
-    private function mergeSettings(int $sourcePageId, int $targetPageId): void
-    {
-        $sourceSettings = PageSettings::where('page_id', $sourcePageId)->first();
-
-        if (!$sourceSettings) {
-            return;
-        }
-
-        $targetSettings = PageSettings::where('page_id', $targetPageId)->first();
-
-        if (!$targetSettings) {
-            // No target settings, just copy
-            $this->pageRepository->duplicateSettings($sourcePageId, $targetPageId);
-            return;
-        }
-
-        // Merge: prefer target values, but fill in gaps from source
-        $sourceData = $sourceSettings->toArray();
-        $targetData = $targetSettings->toArray();
-
-        $merged = $targetData;
-        foreach ($sourceData as $key => $value) {
-            if ($key !== 'id' && $key !== 'page_id' && empty($merged[$key]) && !empty($value)) {
-                $merged[$key] = $value;
-            }
-        }
-
-        unset($merged['id']);
-        $merged['page_id'] = $targetPageId;
-
-        PageSettings::where('page_id', $targetPageId)->update($merged);
-    }
-
-    /**
-     * Merge custom fields (append unique keys)
-     */
-    private function mergeCustomFields(int $sourcePageId, int $targetPageId): void
-    {
-        $sourceFields = $this->customFieldRepository->getCustomFieldsForPage($sourcePageId);
-
-        $customFields = $this->customFieldRepository->getCustomFieldsForPage($targetPageId);
-
-        $existingKeys = $customFields->pluck('custom_field_definition_id')->all();
-
-        foreach ($sourceFields as $field) {
-            // Only add if key doesn't exist on target
-            if (!in_array($field->custom_field_definition_id, $existingKeys)) {
-                $data = $field->toArray();
-                unset($data['id']);
-                $data['page_id'] = $targetPageId;
-                $this->customFieldRepository->create($data);
-            }
-        }
-    }
-
-    /**
-     * Optionally merge content from source into target
-     */
-    private function mergePageContent(Page $sourcePage, Page $targetPage, array $options): void
-    {
-        $updates = [];
-
-        if (!empty($options['append_title'])) {
-            $updates['title'] = $targetPage->title . ' & ' . $sourcePage->title;
-        }
-
-        if (!empty($options['merge_descriptions'])) {
-            $updates['meta_description'] = trim(
-                ($targetPage->meta_description ?? '') . ' ' . ($sourcePage->meta_description ?? '')
-            );
-        }
-
-        if (!empty($updates)) {
-            $this->pageRepository->update($targetPage->id, $updates);
-        }
-    }
-
     public function publishPage(int $pageId): Page
     {
         $page = $this->pageRepository->find($pageId);
@@ -1405,184 +951,26 @@ class PageService
         return $page;
     }
 
-    /**
-     * Clone page to a different site
-     *
-     * @param int $pageId Source page ID
-     * @param int $targetSiteId Target site ID
-     * @param string|null $newTitle Optional new title
-     * @return Page The cloned page in the target site
-     * @throws Exception
-     */
-    public function clonePageToSite(int $pageId, int $targetSiteId, ?string $newTitle = null): Page
+    public function makePageInternal(int $pageId, int $userId): Page
     {
-        $sourcePage = $this->getCompletePageData($pageId);
-        if (!$sourcePage) {
-            throw new \Exception("Source page not found");
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
         }
 
-        if ($sourcePage->site_id === $targetSiteId) {
-            throw new \Exception("Source and target site cannot be the same");
+        if (!$page->canTransitionTo(PageStatus::INTERNAL)) {
+            throw new \Exception("Cannot make page internal from current status");
         }
 
-        return $this->database->transaction(function () use ($sourcePage, $targetSiteId, $newTitle) {
-            $pageData = [
-                'title' => $newTitle ?? ($sourcePage->title . ' (Copy)'),
-                'slug' => $this->generateUniqueSlug($sourcePage->slug, $targetSiteId),
-                'status' => 'draft',
-                'meta_title' => $sourcePage->meta_title,
-                'meta_description' => $sourcePage->meta_description,
-                'subtitle' => $sourcePage->subtitle,
-                'site_id' => $targetSiteId,
-                'listing_synopsis' => $sourcePage->listing_synopsis,
-                'listing_title' => $sourcePage->listing_title,
-                'listing_dek_label' => $sourcePage->listing_dek_label,
-                'listing_image_id' => $sourcePage->listing_image_id,
-                'listing_use_as_hero' => $sourcePage->listing_use_as_hero,
-                'hero_type' => $sourcePage->hero_type,
-                'hero_image_id' => $sourcePage->hero_image_id,
-                'hero_video_url' => $sourcePage->hero_video_url,
-                'crop_overrides' => $sourcePage->crop_overrides,
-                'resolved_images' => $sourcePage->resolved_images,
-                'page_type' => $sourcePage->page_type,
-                'gallery_slides' => $sourcePage->gallery_slides,
-            ];
+        return $this->database->transaction(function () use ($page, $userId) {
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => PageStatus::INTERNAL->value,
+            ]);
 
-            $newPage = $this->pageRepository->create($pageData);
+            $this->historyService->logPageMadeInternal($page, $userId);
 
-            // Add clone history with site information
-            $sourcePage->addCloneRecord('cloned_to', $newPage->id, $targetSiteId);
-            $newPage->addCloneRecord('cloned_from', $sourcePage->id, $sourcePage->site_id);
-
-            // Clone all relations to the new site
-            $this->clonePageRelationsToSite($sourcePage->id, $newPage->id, $targetSiteId);
-
-            $this->historyService->logPageClonedToSite($sourcePage->id, $newPage->id, $targetSiteId);
-
-            return $this->getCompletePageData($newPage->id);
+            return $this->getCompletePageData($updatedPage->id);
         });
-    }
-
-    /**
-     * Generate a unique slug for the target site
-     */
-    private function generateUniqueSlug(string $baseSlug, int $targetSiteId): string
-    {
-        $slug = $baseSlug;
-        $counter = 1;
-
-        while ($this->pageRepository->slugExistsInSite($slug, $targetSiteId)) {
-            $slug = $baseSlug . '-' . $counter;
-            $counter++;
-        }
-
-        return $slug;
-    }
-
-    /**
-     * Duplicate all relations from source to target page
-     * This method orchestrates the duplication of all page relations
-     */
-    private function clonePageRelationsToSite(int $sourcePageId, int $targetPageId, int $targetSiteId): void
-    {
-        $relations = [
-            'blocks' => 'duplicateBlocks',
-            'metadata' => 'duplicateMetadata',
-            'seo' => 'duplicateSeo',
-            'settings' => 'duplicateSettings',
-            'social' => 'duplicateSocial',
-            'categories' => 'duplicateCategoriesToSite',
-            'tags' => 'duplicateTagsToSite',
-            'customFields' => 'duplicateCustomFieldsToSite',
-            'accessRoles' => 'duplicateAccessRoles',
-            'pageAuthors' => 'duplicatePageAuthorsToSite',
-            'regionSets' => 'duplicateRegionSetsToSite',
-            'territories' => 'duplicateTerritoriesToSite',
-            'products' => 'duplicateProductsToSite',
-        ];
-
-        $errors = [];
-
-        foreach ($relations as $relationType => $method) {
-            try {
-                $this->pageRepository->$method($sourcePageId, $targetPageId, $targetSiteId);
-            } catch (\Exception $e) {
-                if ($_ENV['APP_ENV'] !== 'testing') {
-                    // Log the error but continue with other relations
-                    error_log(sprintf(
-                        'Failed to clone %s for page %d to site %d: %s',
-                        $relationType,
-                        $sourcePageId,
-                        $targetPageId,
-                        $e->getMessage()
-                    ));
-                }
-
-                $errors[$relationType] = $e->getMessage();
-            }
-        }
-
-        // If critical relations failed, you might want to throw
-        // For now, we'll allow partial duplication to succeed
-        if (!empty($errors) && count($errors) === count($relations)) {
-            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($errors));
-        }
-    }
-
-    public function bulkDeletePages(array $pageIds): array
-    {
-        $results = [];
-
-        foreach ($pageIds as $pageId) {
-            try {
-                $this->deletePage($pageId);
-                $results[$pageId] = ['success' => true];
-            } catch (Exception $e) {
-                $results[$pageId] = [
-                    'success' => false,
-                    'error' => $e->getMessage()
-                ];
-            }
-        }
-
-        return $results;
-    }
-
-    public function bulkUpdateStatus(array $pageIds, string $status): array
-    {
-        if (!in_array($status, ['draft', 'published', 'archived'])) {
-            throw new \Exception('Invalid status value');
-        }
-
-        $results = [];
-
-        foreach ($pageIds as $pageId) {
-            try {
-                $updateData = [
-                    'id' => $pageId,
-                    'status' => $status,
-                    'forms' => [
-                        'meta' => ['status' => $status]
-                    ]
-                ];
-
-                if ($status === 'published') {
-                    $page = $this->pageRepository->find($pageId);
-                    if ($page && $page->status !== 'published') {
-                        $updateData['published_at'] = date('Y-m-d H:i:s');
-                    }
-                }
-
-                $this->updatePageWithAllData($pageId, $updateData, $this->siteId);
-                $results[$pageId] = ['success' => true];
-            } catch (Exception $e) {
-                $results[$pageId] = [
-                    'success' => false,
-                    'error' => $e->getMessage()
-                ];
-            }
-        }
-
-        return $results;
     }
 }

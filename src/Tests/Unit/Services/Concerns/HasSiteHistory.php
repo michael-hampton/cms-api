@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Services\Concerns;
 
 use App\Models\Model;
-use App\Models\Page;
 
 trait HasSiteHistory
 {

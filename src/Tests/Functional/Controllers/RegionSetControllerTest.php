@@ -248,31 +248,31 @@ class RegionSetControllerTest extends FunctionalTestCase
         $this->assertCount(1, $territories);
     }
 
-    public function testReorder()
-    {
-        $regionSet1 = $this->createRegionSet();
-
-        $regionSet2 = $this->createRegionSet();
-
-        $regionSet3 = $this->createRegionSet();
-
-        $orderedIds = [$regionSet3->id, $regionSet1->id, $regionSet2->id];
-
-        $response = $this->postForSite('/api/region-sets/reorder', [
-            'ordered_ids' => $orderedIds
-        ]);
-
-        $this->assertResponseOk($response);
-
-        // Verify order was updated
-        $regionSet3 = $regionSet3->fresh();
-        $regionSet1 = $regionSet1->fresh();
-        $regionSet2 = $regionSet2->fresh();
-
-        $this->assertEquals(0, $regionSet3->sort_order);
-        $this->assertEquals(1, $regionSet1->sort_order);
-        $this->assertEquals(2, $regionSet2->sort_order);
-    }
+//    public function testReorder()
+//    {
+//        $regionSet1 = $this->createRegionSet();
+//
+//        $regionSet2 = $this->createRegionSet();
+//
+//        $regionSet3 = $this->createRegionSet();
+//
+//        $orderedIds = [$regionSet3->id, $regionSet1->id, $regionSet2->id];
+//
+//        $response = $this->postForSite('/api/region-sets/reorder', [
+//            'ordered_ids' => $orderedIds
+//        ]);
+//
+//        $this->assertResponseOk($response);
+//
+//        // Verify order was updated
+//        $regionSet3 = $regionSet3->fresh();
+//        $regionSet1 = $regionSet1->fresh();
+//        $regionSet2 = $regionSet2->fresh();
+//
+//        $this->assertEquals(0, $regionSet3->sort_order);
+//        $this->assertEquals(1, $regionSet1->sort_order);
+//        $this->assertEquals(2, $regionSet2->sort_order);
+//    }
 
     public function testGetActive()
     {

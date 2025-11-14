@@ -3,13 +3,14 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\User;
+use App\Models\OrderHistory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testOrderHasCorrectTable()
     {
         $order = new Order();
@@ -143,5 +144,54 @@ class OrderModelTest extends FunctionalTestCase
 
         $this->assertArrayHasKey('can_be_cancelled', $array);
         $this->assertTrue($array['can_be_cancelled']);
+    }
+
+    public function testCanTransitionToReturnsTrueForValidTransitions()
+    {
+        $order = new Order(['status' => 'pending']);
+
+        $this->assertTrue($order->canTransitionTo('processing'));
+        $this->assertTrue($order->canTransitionTo('cancelled'));
+        $this->assertTrue($order->canTransitionTo('on_hold'));
+    }
+
+    public function testCanTransitionToReturnsFalseForInvalidTransitions()
+    {
+        $order = new Order(['status' => 'completed']);
+
+        $this->assertFalse($order->canTransitionTo('pending'));
+        $this->assertFalse($order->canTransitionTo('processing'));
+        $this->assertTrue($order->canTransitionTo('refunded')); // Only valid transition
+    }
+
+    public function testCannotTransitionFromCancelled()
+    {
+        $order = new Order(['status' => 'cancelled']);
+
+        $this->assertFalse($order->canTransitionTo('pending'));
+        $this->assertFalse($order->canTransitionTo('processing'));
+        $this->assertFalse($order->canTransitionTo('completed'));
+    }
+
+    public function testChangeStatusUpdatesStatusAndLogsHistory()
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+        $member = $this->createMember();
+
+        $result = $order->changeStatus('processing', $member->id, 'Starting to process order');
+
+        $this->assertTrue($result);
+        $this->assertEquals('processing', $order->status);
+
+    }
+
+    public function testChangeStatusThrowsExceptionForInvalidTransition()
+    {
+        $order = $this->createOrder(['status' => 'completed']);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot transition from completed to pending');
+
+        $order->changeStatus('pending');
     }
 }

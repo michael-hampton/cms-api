@@ -26,8 +26,9 @@ class EmailVerificationService
     {
         $site = SiteContext::get();
         $verificationUrl = $this->buildVerificationUrl($token);
+        $name = $site->name ?? 'Your Website';
 
-        $subject = "Verify your email for {$site->name}";
+        $subject = "Verify your email for {$name}";
         $body = $this->buildVerificationEmailBody($member, $verificationUrl, $site);
 
         // Use your email service
@@ -84,6 +85,11 @@ class EmailVerificationService
     private function getEmailHeaders(): string
     {
         $site = SiteContext::get();
+
+        if (empty($site)) {
+            return '';
+        }
+
         $fromEmail = $site->email ?? 'noreply@example.com';
 
         return "From: {$site->name} <{$fromEmail}>\r\n" .

@@ -160,9 +160,11 @@ class DealAlertService
                 </html>
             ";
 
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
             $headers = "MIME-Version: 1.0\r\n";
             $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-            $headers .= "From: Deal Alerts <noreply@" . $_SERVER['HTTP_HOST'] . ">\r\n";
+            $headers .= "From: Deal Alerts <noreply@" . $host . ">\r\n";
 
             return mail($alert->email, $subject, $htmlMessage, $headers);
         } catch (\Exception $e) {

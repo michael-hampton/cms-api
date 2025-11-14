@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use App\Actions\CloneProduct;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -140,7 +142,9 @@ class ProductController extends Controller
                 'specifications' => $data['clone_specifications'] ?? true,
             ];
 
-            $duplicatedProduct = $this->productService->duplicateProduct(
+            $duplicateProduct = Container::getInstance()->make(CloneProduct::class);
+
+            $duplicatedProduct = $duplicateProduct->handle(
                 $id,
                 $newName,
                 $targetSiteId,

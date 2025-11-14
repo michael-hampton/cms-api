@@ -18,9 +18,9 @@ class AuthorService
     private Database $database;
 
     public function __construct(
-        private AuthorRepository $authorRepository,
-        private ImageUploadService $imageUploadService,
-        ?Database $database = null
+        private readonly AuthorRepository   $authorRepository,
+        private readonly ImageUploadService $imageUploadService,
+        ?Database                           $database = null
     ) {
         $this->database = $database ?? Database::getInstance();
     }
@@ -161,44 +161,6 @@ class AuthorService
         return $this->authorRepository->getAlternatives($authorId);
     }
 
-    public function mergeAuthors(int $sourceAuthorId, int $targetAuthorId): bool
-    {
-        if ($sourceAuthorId === $targetAuthorId) {
-            throw new Exception("Cannot merge an author with itself");
-        }
-
-        return $this->database->transaction(function() use ($sourceAuthorId, $targetAuthorId) {
-            $sourceAuthor = $this->authorRepository->find($sourceAuthorId);
-            $targetAuthor = $this->authorRepository->find($targetAuthorId);
-
-            if (!$sourceAuthor || !$targetAuthor) {
-                throw new Exception("One or both authors not found");
-            }
-
-            // Reassign all pages from source to target
-            $pages = $this->authorRepository->getPagesByAuthorId($sourceAuthorId);
-
-            foreach ($pages as $page) {
-                $page->author_id = $targetAuthorId;
-                $page->save();
-            }
-
-            // Add merge history
-            $targetAuthor->addCloneRecord('merged_from', $sourceAuthor->id, null);
-            $sourceAuthor->addCloneRecord('merged_to', $targetAuthor->id, null);
-
-            // Delete source author's avatar
-            if ($sourceAuthor->avatar) {
-                $this->imageUploadService->delete($sourceAuthor->avatar);
-            }
-
-            // Delete source author
-            $this->authorRepository->delete($sourceAuthorId);
-
-            return true;
-        });
-    }
-
     public function searchAuthors(string $query, ?int $limit = null): Collection
     {
         return $this->authorRepository->searchAuthors($query, $limit);
@@ -207,94 +169,5 @@ class AuthorService
     private function generateSlug(string $name): string
     {
         return Str::slug($name, [$this->authorRepository, 'findBySlug']);
-    }
-
-    public function duplicateAuthor(int $authorId, ?string $newName = null): Author
-    {
-        return $this->database->transaction(function() use ($authorId, $newName) {
-            $originalAuthor = $this->authorRepository->find($authorId);
-
-            if (!$originalAuthor) {
-                throw new \Exception("Author not found");
-            }
-
-            $data = [
-                'name' => $newName ?? ($originalAuthor->name . ' (Copy)'),
-                'email' => null, // Email must be unique, so clear it
-                'bio' => $originalAuthor->bio,
-                'site_id' => SiteContext::getId(),
-                'website' => $originalAuthor->website,
-                'social_links' => $originalAuthor->social_links,
-                'status' => 'inactive', // Set to inactive for review
-            ];
-
-            // Generate unique slug
-            $data['slug'] = $this->generateSlug($data['name']);
-
-            // Handle avatar duplication
-            if ($originalAuthor->avatar) {
-                try {
-                    $data['avatar'] = $this->imageUploadService->duplicate($originalAuthor->avatar);
-                } catch (\Exception $e) {
-                    // If duplication fails, just skip the avatar
-                    $data['avatar'] = null;
-                }
-            }
-
-            $newAuthor = $this->authorRepository->create($data);
-
-            // Add clone history
-            $originalAuthor->addCloneRecord('cloned_to', $newAuthor->id, null);
-            $newAuthor->addCloneRecord('cloned_from', $originalAuthor->id, null);
-
-            return $newAuthor;
-        });
-    }
-
-    public function bulkDelete(array $authorIds): array
-    {
-        return $this->database->transaction(function() use ($authorIds) {
-            $deleted = [];
-            $failed = [];
-
-            foreach ($authorIds as $authorId) {
-                try {
-                    $author = $this->authorRepository->find($authorId);
-
-                    if (!$author) {
-                        $failed[] = ['id' => $authorId, 'reason' => 'Author not found'];
-                        continue;
-                    }
-
-                    $pagesCount = $this->authorRepository->getPagesByAuthorId($authorId)->count();
-
-                    if ($pagesCount > 0) {
-                        $failed[] = [
-                            'id' => $authorId,
-                            'reason' => "Author has {$pagesCount} associated pages"
-                        ];
-                        continue;
-                    }
-
-                    if ($author->avatar) {
-                        $this->imageUploadService->delete($author->avatar);
-                    }
-
-                    if ($author->delete()) {
-                        $deleted[] = $authorId;
-                    } else {
-                        $failed[] = ['id' => $authorId, 'reason' => 'Delete failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $authorId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'deleted' => $deleted,
-                'failed' => $failed,
-                'total' => count($authorIds)
-            ];
-        });
     }
 }

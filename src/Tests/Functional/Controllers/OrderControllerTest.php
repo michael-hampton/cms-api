@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
+use App\Models\OrderHistory;
 use App\Models\OrderItem;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -261,7 +262,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testRefundChangesOrderStatusAndPaymentStatus()
     {
-        $order = $this->createOrder();
+        $order = $this->createOrder(['status' => 'completed']);
 
         $refundData = [
             'reason' => 'Product defect'
@@ -795,5 +796,247 @@ class OrderControllerTest extends FunctionalTestCase
         $this->assertEquals($member->id, $address->member_id);
         $this->assertEquals('456 New St', $address->address_line_1);
     }
+
+    public function testShowReturnsOrderWithHistory()
+    {
+        $order = $this->createOrder(['order_number' => 'ORD-TEST-001']);
+
+        OrderHistory::create([
+            'order_id' => $order->id,
+            'action' => 'created',
+            'changes' => ['new_data' => []],
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $response = $this->getForSite("/api/orders/{$order->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('history', $data['data']['order']);
+        $this->assertCount(1, $data['data']['order']['history']);
+    }
+
+    public function testCreateOrderLogsHistory()
+    {
+        $orderData = [
+            'user_id' => $this->testUser->id,
+            'status' => 'pending',
+            'items' => [
+                [
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $orderId = $data['data']['order']['id'];
+
+        // Verify history was created
+        $history = OrderHistory::where('order_id', $orderId)->get();
+        $this->assertGreaterThan(0, $history->count());
+        $this->assertEquals('created', $history->first()->action);
+    }
+
+    public function testStoreFailsWithInvalidStatus()
+    {
+        $orderData = [
+            'user_id' => $this->testUser->id,
+            'status' => 'invalid_status',
+            'items' => [
+                [
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsString('Validation failed', $data['error']);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('status', $data['errors']);
+    }
+
+    public function testUpdateFailsWithInvalidStatusTransition()
+    {
+        $order = $this->createOrder(['status' => 'completed']);
+        $product = $this->createProduct();
+
+        $updateData = [
+            'status' => 'pending', // Invalid: can't go from completed to pending
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('Cannot transition', $data['error']);
+    }
+
+    public function testUpdateSucceedsWithValidStatusTransition()
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+        $product = $this->createProduct();
+
+        $updateData = [
+            'status' => 'processing', // Valid transition
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('processing', $data['data']['order']['status']);
+    }
+
+    public function testUpdateAllowsSameStatus()
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+        $product = $this->createProduct();
+
+        $updateData = [
+            'status' => 'pending', // Same status should be allowed
+            'admin_notes' => 'Updated notes',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('pending', $data['data']['order']['status']);
+    }
+
+    public function testDuplicateOrderCreatesOrderWithPendingStatusRegardlessOfOriginal()
+    {
+        $originalOrder = $this->createOrder(['status' => 'completed']);
+        $this->createOrderItem($originalOrder->id);
+
+        $response = $this->postForSite("/api/orders/{$originalOrder->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('pending', $data['data']['status']);
+        $this->assertEquals('unpaid', $data['data']['payment_status']);
+    }
+
+    public function testCreateOrderLogsHistoryWithUserContext()
+    {
+        $orderData = [
+            'user_id' => $this->testUser->id,
+            'status' => 'pending',
+            'items' => [
+                [
+                    'product_name' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/orders', $orderData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $orderId = $data['data']['order']['id'];
+
+        // Verify history was created
+        $history = OrderHistory::where('order_id', $orderId)
+            ->where('action', 'created')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('created', $history->action);
+        $this->assertNotNull($history->changes['new_data']);
+    }
+
+    public function testUpdateOrderLogsHistory()
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+        $product = $this->createProduct();
+
+        $updateData = [
+            'status' => 'processing',
+            'admin_notes' => 'Updated notes',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'quantity' => 1,
+                    'unit_price' => 100.00
+                ]
+            ]
+        ];
+
+        $response = $this->putForSite("/api/orders/{$order->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify history was created
+        $history = OrderHistory::where('order_id', $order->id)
+            ->where('action', 'updated')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertNotEmpty($history->changes);
+    }
+
+    public function testCancelOrderLogsHistory()
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+
+        $cancelData = [
+            'reason' => 'Customer requested cancellation'
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/cancel", $cancelData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify history was created
+        $history = OrderHistory::where('order_id', $order->id)
+            ->where('action', 'cancelled')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('Customer requested cancellation', $history->notes);
+    }
+
 
 }

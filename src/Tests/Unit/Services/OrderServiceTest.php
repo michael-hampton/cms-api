@@ -6,17 +6,20 @@ use App\Framework\Database\Database;
 use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
+use App\Models\OrderHistory;
 use App\Models\OrderItem;
 use App\Repositories\AddressRepository;
 use App\Repositories\MemberRepository;
-use App\Repositories\OrderRepository;
 use App\Repositories\OrderItemRepository;
+use App\Repositories\OrderRepository;
 use App\Services\OrderCalculationService;
+use App\Services\OrderHistoryService;
 use App\Services\OrderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
-use Mockery as m; // Import Mockery with a simple alias
-use PHPUnit\Framework\TestCase;
+use Mockery as m;
+
+// Import Mockery with a simple alias
 
 class OrderServiceTest extends FunctionalTestCase
 {
@@ -30,6 +33,8 @@ class OrderServiceTest extends FunctionalTestCase
     private $addressRepository;
     private $orderCalculationService;
 
+    private $historyService;
+
     protected function setUp(): void
     {
         parent::setUp(); // Call parent setup if it exists
@@ -40,6 +45,7 @@ class OrderServiceTest extends FunctionalTestCase
         $this->memberRepository = m::mock(MemberRepository::class);
         $this->orderItemRepository = m::mock(OrderItemRepository::class);
         $this->databaseMock = m::mock(Database::class);
+        $this->historyService = m::mock(OrderHistoryService::class); // ADD THIS
 
         $this->service = new OrderService(
             $this->orderRepository,
@@ -47,7 +53,8 @@ class OrderServiceTest extends FunctionalTestCase
             $this->memberRepository,
             $this->addressRepository,
             $this->orderCalculationService,
-            $this->databaseMock
+            $this->historyService,
+            $this->databaseMock,
         );
     }
 
@@ -144,6 +151,11 @@ class OrderServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 1)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
             ->with($items, m::any())
@@ -216,6 +228,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
+
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 1)
+            ->andReturn(m::mock(OrderHistory::class));
 
         // ADD: Mock member lookup
         $member = m::mock(Member::class)->makePartial();
@@ -299,6 +316,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($member);
 
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 1)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('findByOrderNumber')
             ->once()
             ->andReturn(null);
@@ -380,6 +402,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($member);
 
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 1)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('findByOrderNumber')
             ->once()
             ->andReturn(null);
@@ -439,7 +466,7 @@ class OrderServiceTest extends FunctionalTestCase
         $data = ['status' => 'completed'];
 
         $mockOrder = m::mock(Order::class)->makePartial();
-        $mockOrder->status = 'pending';
+        $mockOrder->status = 'processing';
         $mockOrder->completed_at = null;
 
         $updatedOrder = m::mock(Order::class)->makePartial();
@@ -465,6 +492,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with($orderId)
             ->andReturn($updatedOrder);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $result = $this->service->updateOrder($orderId, $data);
 
@@ -492,6 +524,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with($orderId)
             ->andReturn($mockOrder);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -532,6 +569,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($mockOrder);
 
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('update')
             ->once()
             ->with($orderId, m::on(function ($updateData) {
@@ -555,7 +597,7 @@ class OrderServiceTest extends FunctionalTestCase
         $data = ['status' => 'completed'];
 
         $mockOrder = m::mock(Order::class)->makePartial();
-        $mockOrder->status = 'pending';
+        $mockOrder->status = 'processing';
         $mockOrder->completed_at = null;
 
         $this->databaseMock->shouldReceive('transaction')
@@ -637,6 +679,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(m::any())
             ->andReturn(m::mock(OrderItem::class));
 
+        $this->historyService->shouldReceive('logItemsUpdated')
+            ->once()
+            ->with($orderId, null)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('update')
             ->once()
             ->with($orderId, m::on(function ($data) {
@@ -709,6 +756,11 @@ class OrderServiceTest extends FunctionalTestCase
         $this->orderItemRepository->shouldReceive('create')
             ->twice()
             ->andReturn(m::mock(OrderItem::class));
+
+        $this->historyService->shouldReceive('logItemsUpdated')
+            ->once()
+            ->with($orderId, null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -793,6 +845,7 @@ class OrderServiceTest extends FunctionalTestCase
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->admin_notes = '';
         $mockOrder->shouldReceive('canBeCancelled')
+            ->atLeast()
             ->once()
             ->andReturn(true);
 
@@ -808,6 +861,16 @@ class OrderServiceTest extends FunctionalTestCase
             ->twice()
             ->with($orderId)
             ->andReturn($mockOrder);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
+        $this->historyService->shouldReceive('logCancelled')
+            ->once()
+            ->with($orderId, null, $reason)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -835,6 +898,7 @@ class OrderServiceTest extends FunctionalTestCase
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->admin_notes = '';
         $mockOrder->shouldReceive('canBeCancelled')
+            ->atLeast()
             ->once()
             ->andReturn(true);
 
@@ -850,6 +914,16 @@ class OrderServiceTest extends FunctionalTestCase
             ->twice()
             ->with($orderId)
             ->andReturn($mockOrder);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
+        $this->historyService->shouldReceive('logCancelled')
+            ->once()
+            ->with($orderId, null, null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -878,6 +952,7 @@ class OrderServiceTest extends FunctionalTestCase
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->admin_notes = 'Previous note';
         $mockOrder->shouldReceive('canBeCancelled')
+            ->atLeast()
             ->once()
             ->andReturn(true);
 
@@ -893,6 +968,16 @@ class OrderServiceTest extends FunctionalTestCase
             ->twice()
             ->with($orderId)
             ->andReturn($mockOrder);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
+        $this->historyService->shouldReceive('logCancelled')
+            ->once()
+            ->with($orderId, null, $reason)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -946,6 +1031,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($completedOrder);
 
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $result = $this->service->completeOrder($orderId);
 
         $this->assertSame($completedOrder, $result);
@@ -992,6 +1082,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($mockOrder);
 
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('update')
             ->once()
             ->with($orderId, m::on(function ($data) use ($reason) {
@@ -1030,6 +1125,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->twice()
             ->with($orderId)
             ->andReturn($mockOrder);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -1113,102 +1213,6 @@ class OrderServiceTest extends FunctionalTestCase
         $this->assertFalse($result);
     }
 
-
-    public function testDuplicateOrderThrowsExceptionWhenOrderNotFound()
-    {
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->with(999)
-            ->andReturn(null);
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Order not found');
-
-        $this->service->duplicateOrder(999);
-    }
-
-    public function testDuplicateOrderCreatesNewOrderWithPendingStatus()
-    {
-        $orderId = 1;
-
-        $originalOrder = m::mock(Order::class)->makePartial();
-        $originalOrder->id = 1;
-        $originalOrder->user_id = 10;
-        $originalOrder->status = 'completed';
-        $originalOrder->subtotal = 100.00;
-        $originalOrder->tax = 10.00;
-        $originalOrder->shipping = 5.00;
-        $originalOrder->discount = 0.00;
-        $originalOrder->total = 115.00;
-        $originalOrder->currency = 'USD';
-        $originalOrder->site_id = 1;
-        $originalOrder->shipping_address = '123 Main St';
-        $originalOrder->billing_address = '123 Main St';
-        $originalOrder->payment_method = 'credit_card';
-        $originalOrder->shipping_address_id = null; // ADD THIS
-        $originalOrder->billing_address_id = null;  // ADD THIS
-        $originalOrder->items = collect([]);
-
-        $duplicatedOrder = m::mock(Order::class)->makePartial();
-        $duplicatedOrder->id = 2;
-
-        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);
-
-        $duplicatedOrder->shouldReceive('relationLoaded')->atLeast()->once();
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->twice()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->with($orderId)
-            ->andReturn($originalOrder);
-
-        $this->orderRepository->shouldReceive('findByOrderNumber')
-            ->once()
-            ->andReturn(null);
-
-        $this->memberRepository->shouldReceive('find')
-            ->once()
-            ->with($originalOrder->user_id)
-            ->andReturn(m::mock(Member::class));
-
-        $this->orderRepository->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) {
-                return $data['status'] === 'pending'
-                    && $data['payment_status'] === 'unpaid';
-            }))
-            ->andReturn($duplicatedOrder);
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->andReturn($duplicatedOrder);
-
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with([], m::any())
-            ->andReturn([
-                'subtotal' => 100.00,
-                'tax' => 10.00,
-                'shipping' => 5.00,
-                'discount' => 0.00,
-                'total' => 115.00
-            ]);
-
-        $result = $this->service->duplicateOrder($orderId);
-
-        $this->assertSame($duplicatedOrder, $result);
-    }
 
     public function testGetOrdersByStatusReturnsOrders()
     {
@@ -1355,6 +1359,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(m::mock(OrderItem::class));
 
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 123)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()
             ->with(1)
@@ -1403,6 +1412,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
+
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 456)
+            ->andReturn(m::mock(OrderHistory::class));
 
         // Mock Member::findByEmail to return existing member
         $this->memberRepository->shouldReceive('findByEmail')
@@ -1477,70 +1491,7 @@ class OrderServiceTest extends FunctionalTestCase
 //        );
     }
 
-    public function testBulkUpdateStatusSuccessfully(): void
-    {
-        $order1 = m::mock(Order::class)->makePartial();
-        $order1->status = 'pending';
-        $order1->completed_at = null;
 
-        $order2 = m::mock(Order::class)->makePartial();
-        $order2->status = 'pending';
-        $order2->completed_at = null;
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(fn($callback) => $callback());
-
-        $this->orderRepository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($order1);
-
-        $this->orderRepository->shouldReceive('find')
-            ->with(2)
-            ->once()
-            ->andReturn($order2);
-
-        $this->orderRepository->shouldReceive('update')
-            ->twice()
-            ->andReturn($order1, $order2);
-
-        $result = $this->service->bulkUpdateStatus([1, 2], 'shipped');
-
-        $this->assertCount(2, $result['updated']);
-        $this->assertCount(0, $result['failed']);
-        $this->assertEquals(2, $result['total']);
-    }
-
-    public function testBulkUpdateStatusHandlesNotFound(): void
-    {
-        $order1 = m::mock(Order::class)->makePartial();
-        $order1->status = 'pending';
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(fn($callback) => $callback());
-
-        $this->orderRepository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($order1);
-
-        $this->orderRepository->shouldReceive('find')
-            ->with(999)
-            ->once()
-            ->andReturn(null);
-
-        $this->orderRepository->shouldReceive('update')
-            ->once()
-            ->andReturn($order1);
-
-        $result = $this->service->bulkUpdateStatus([1, 999], 'shipped');
-
-        $this->assertCount(1, $result['updated']);
-        $this->assertCount(1, $result['failed']);
-        $this->assertEquals('Order not found', $result['failed'][0]['reason']);
-    }
 
     public function testCreateOrderWithShippingAddressId()
     {
@@ -1578,6 +1529,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($member);
+
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 1)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->addressRepository->shouldReceive('find')
             ->once()
@@ -1720,6 +1676,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with(1, m::any(), 1)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('create')
             ->once()
             ->with(m::on(function ($data) {
@@ -1797,6 +1758,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(10)
             ->andReturn($address);
 
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $this->orderRepository->shouldReceive('update')
             ->once()
             ->with($orderId, m::on(function ($updateData) {
@@ -1855,6 +1821,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($member);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->addressRepository->shouldReceive('createAddressForMember')
             ->once()
@@ -1932,6 +1903,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($updatedOrder);
 
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
+
         $result = $this->service->updateOrder($orderId, $data);
 
         $this->assertSame($updatedOrder, $result);
@@ -1987,6 +1963,11 @@ class OrderServiceTest extends FunctionalTestCase
             ->with(11)
             ->once()
             ->andReturn($billingAddress);
+
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->with($orderId, m::any(), m::any(), null)
+            ->andReturn(m::mock(OrderHistory::class));
 
         $this->orderRepository->shouldReceive('update')
             ->once()
@@ -2054,300 +2035,79 @@ class OrderServiceTest extends FunctionalTestCase
         $this->service->updateOrder($orderId, $data);
     }
 
-    public function testDuplicateOrderWithLinkedAddresses()
+    public function testUpdateOrderWithInvalidTransitionThrowsException(): void
     {
         $orderId = 1;
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->status = 'completed';
 
-        $originalOrder = m::mock(Order::class)->makePartial();
-        $originalOrder->id = 1;
-        $originalOrder->user_id = 10;
-        $originalOrder->status = 'completed';
-        $originalOrder->subtotal = 100.00;
-        $originalOrder->tax = 10.00;
-        $originalOrder->shipping = 5.00;
-        $originalOrder->discount = 0.00;
-        $originalOrder->total = 115.00;
-        $originalOrder->currency = 'USD';
-        $originalOrder->site_id = 1;
-        $originalOrder->payment_method = 'credit_card';
-        $originalOrder->shipping_address_id = 20;
-        $originalOrder->billing_address_id = 21;
-        $originalOrder->shipping_address = null;
-        $originalOrder->billing_address = null;
-        $originalOrder->items = collect([]);
-
-        $duplicatedOrder = m::mock(Order::class)->makePartial();
-        $duplicatedOrder->id = 2;
-
-        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);
+        $mockOrder->shouldReceive('canTransitionTo')
+            ->once()
+            ->with('pending')
+            ->andReturn(false);
 
         $this->databaseMock->shouldReceive('transaction')
-            ->twice() // Once for duplicateOrder, once for createOrder
+            ->once()
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->orderRepository->shouldReceive('getOrderById')
+        $this->orderRepository->shouldReceive('find')
             ->once()
             ->with($orderId)
-            ->andReturn($originalOrder);
+            ->andReturn($mockOrder);
 
-        // Mock member lookup in createOrder
-        $member = m::mock(Member::class)->makePartial();
-        $member->id = 10;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot transition from completed to pending');
+
+        $this->service->updateOrder($orderId, ['status' => 'pending']);
+    }
+
+    public function testUpdateOrderAllowsSameStatus(): void
+    {
+        $orderId = 1;
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->status = 'pending';
+        $mockOrder->user_id = 1;
+
+        $updatedOrder = m::mock(Order::class)->makePartial();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
 
         $this->memberRepository->shouldReceive('find')
             ->once()
-            ->with(10)
-            ->andReturn($member);
+            ->with(1)
+            ->andReturn(m::mock(Member::class));
 
-        // Mock address validation in createOrder
-        $shippingAddress = m::mock(Address::class)->makePartial();
-        $shippingAddress->id = 20;
-        $shippingAddress->member_id = 10;
+        // Should NOT call canTransitionTo when status is the same
+        $mockOrder->shouldReceive('canTransitionTo')->never();
 
-        $billingAddress = m::mock(Address::class)->makePartial();
-        $billingAddress->id = 21;
-        $billingAddress->member_id = 10;
-
-        $this->addressRepository->shouldReceive('find')
+        $this->orderRepository->shouldReceive('update')
             ->once()
-            ->with(20)
-            ->andReturn($shippingAddress);
-
-        $this->addressRepository->shouldReceive('find')
-            ->once()
-            ->with(21)
-            ->andReturn($billingAddress);
-
-        $this->orderRepository->shouldReceive('findByOrderNumber')
-            ->once()
-            ->andReturn(null);
-
-        $this->orderRepository->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) {
-                return $data['status'] === 'pending'
-                    && $data['payment_status'] === 'unpaid'
-                    && $data['shipping_address_id'] === 20
-                    && $data['billing_address_id'] === 21
-                    && !isset($data['shipping_address'])
-                    && !isset($data['billing_address']);
-            }))
-            ->andReturn($duplicatedOrder);
-
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with(m::any(), m::any())
-            ->andReturn([
-                'subtotal' => 100.00,
-                'tax' => 10.00,
-                'shipping' => 5.00,
-                'discount' => 0.00,
-                'total' => 115.00
-            ]);
+            ->andReturn($updatedOrder);
 
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()
-            ->with(2)
-            ->andReturn($duplicatedOrder);
+            ->andReturn($updatedOrder);
 
-        $result = $this->service->duplicateOrder($orderId);
+        $this->historyService->shouldReceive('logUpdated')
+            ->once()
+            ->andReturn(m::mock(OrderHistory::class));
 
-        $this->assertSame($duplicatedOrder, $result);
+        $result = $this->service->updateOrder($orderId, ['status' => 'pending']);
+
+        $this->assertSame($updatedOrder, $result);
     }
 
-    public function testDuplicateOrderWithMixedAddresses()
-    {
-        $orderId = 1;
-
-        $originalOrder = m::mock(Order::class)->makePartial();
-        $originalOrder->id = 1;
-        $originalOrder->user_id = 10;
-        $originalOrder->status = 'completed';
-        $originalOrder->subtotal = 100.00;
-        $originalOrder->tax = 10.00;
-        $originalOrder->shipping = 5.00;
-        $originalOrder->discount = 0.00;
-        $originalOrder->total = 115.00;
-        $originalOrder->currency = 'USD';
-        $originalOrder->site_id = 1;
-        $originalOrder->payment_method = 'credit_card';
-        $originalOrder->shipping_address_id = 20; // Linked
-        $originalOrder->billing_address_id = null;
-        $originalOrder->shipping_address = null;
-        $originalOrder->billing_address = [ // JSON
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US'
-        ];
-        $originalOrder->items = collect([]);
-
-        $duplicatedOrder = m::mock(Order::class)->makePartial();
-        $duplicatedOrder->id = 2;
-
-        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);;
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->twice()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->with($orderId)
-            ->andReturn($originalOrder);
-
-        // Mock member lookup
-        $member = m::mock(Member::class)->makePartial();
-        $member->id = 10;
-
-        $this->memberRepository->shouldReceive('find')
-            ->once()
-            ->with(10)
-            ->andReturn($member);
-
-        // Mock shipping address validation (linked)
-        $shippingAddress = m::mock(Address::class)->makePartial();
-        $shippingAddress->id = 20;
-        $shippingAddress->member_id = 10;
-
-        $this->addressRepository->shouldReceive('find')
-            ->once()
-            ->with(20)
-            ->andReturn($shippingAddress);
-
-        $this->addressRepository->shouldReceive('createAddressForMember')
-            ->once()
-            ->with(10, m::on(function ($addressData) {
-                return $addressData['address_line_1'] === '456 Oak Ave'
-                    && $addressData['type'] === 'billing'
-                    && $addressData['label'] === 'Order Billing Address';
-            }), $this->siteId)
-            ->andReturn($shippingAddress);
-
-        // No address validation needed for billing (it's JSON)
-
-        $this->orderRepository->shouldReceive('findByOrderNumber')
-            ->once()
-            ->andReturn(null);
-
-        $this->orderRepository->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) {
-                return $data['billing_address_id'] === 20;
-            }))
-            ->andReturn($duplicatedOrder);
-
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with(m::any(), m::any())
-            ->andReturn([
-                'subtotal' => 100.00,
-                'tax' => 10.00,
-                'shipping' => 5.00,
-                'discount' => 0.00,
-                'total' => 115.00
-            ]);
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->with(2)
-            ->andReturn($duplicatedOrder);
-
-        $result = $this->service->duplicateOrder($orderId);
-
-        $this->assertSame($duplicatedOrder, $result);
-    }
-
-    public function testDuplicateOrderWithJsonAddresses()
-    {
-        $orderId = 1;
-
-        $originalOrder = m::mock(Order::class)->makePartial();
-        $originalOrder->id = 1;
-        $originalOrder->user_id = null; // Guest order
-        $originalOrder->status = 'completed';
-        $originalOrder->subtotal = 100.00;
-        $originalOrder->tax = 10.00;
-        $originalOrder->shipping = 5.00;
-        $originalOrder->discount = 0.00;
-        $originalOrder->total = 115.00;
-        $originalOrder->currency = 'USD';
-        $originalOrder->site_id = 1;
-        $originalOrder->payment_method = 'credit_card';
-        $originalOrder->shipping_address_id = null;
-        $originalOrder->billing_address_id = null;
-        $originalOrder->shipping_address = [
-            'address_line_1' => '123 Main St',
-            'city' => 'City',
-            'postcode' => '12345',
-            'country' => 'US'
-        ];
-        $originalOrder->billing_address = [
-            'address_line_1' => '456 Oak Ave',
-            'city' => 'Town',
-            'postcode' => '67890',
-            'country' => 'US'
-        ];
-        $originalOrder->items = collect([]);
-
-        $duplicatedOrder = m::mock(Order::class)->makePartial();
-        $duplicatedOrder->id = 2;
-
-        $this->setCloneHistoryExpectations($originalOrder, $duplicatedOrder, 1, 2);
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->twice()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->with($orderId)
-            ->andReturn($originalOrder);
-
-        $this->orderRepository->shouldReceive('findByOrderNumber')
-            ->once()
-            ->andReturn(null);
-
-        $this->orderRepository->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) {
-                return $data['status'] === 'pending'
-                    && $data['payment_status'] === 'unpaid'
-                    && !isset($data['shipping_address_id'])
-                    && !isset($data['billing_address_id'])
-                    && is_array($data['shipping_address'])
-                    && $data['shipping_address']['address_line_1'] === '123 Main St'
-                    && is_array($data['billing_address'])
-                    && $data['billing_address']['address_line_1'] === '456 Oak Ave';
-            }))
-            ->andReturn($duplicatedOrder);
-
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with(m::any(), m::any())
-            ->andReturn([
-                'subtotal' => 100.00,
-                'tax' => 10.00,
-                'shipping' => 5.00,
-                'discount' => 0.00,
-                'total' => 115.00
-            ]);
-
-        $this->orderRepository->shouldReceive('getOrderById')
-            ->once()
-            ->with(2)
-            ->andReturn($duplicatedOrder);
-
-        $result = $this->service->duplicateOrder($orderId);
-
-        $this->assertSame($duplicatedOrder, $result);
-    }
 
 // Helper method to test private methods
     private function invokePrivateMethod($object, $methodName, array $parameters = [])

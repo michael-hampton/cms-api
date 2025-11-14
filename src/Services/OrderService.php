@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
-use App\Models\Member;
 use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -20,12 +19,13 @@ class OrderService
     private Database $database;
 
     public function __construct(
-        private readonly OrderRepository     $orderRepository,
-        private readonly OrderItemRepository $orderItemRepository,
-        private readonly MemberRepository             $memberRepository,
-        private readonly AddressRepository $addressRepository,
+        private readonly OrderRepository         $orderRepository,
+        private readonly OrderItemRepository     $orderItemRepository,
+        private readonly MemberRepository        $memberRepository,
+        private readonly AddressRepository       $addressRepository,
         private readonly OrderCalculationService $calculationService,
-        ?Database                            $database = null
+        private readonly OrderHistoryService     $historyService,
+        ?Database                                $database = null
     )
     {
         $this->database = $database ?? Database::getInstance();
@@ -72,7 +72,7 @@ class OrderService
                 }
             } elseif (isset($data['shipping_address']) && is_array($data['shipping_address']) && !empty(array_filter($data['shipping_address']))) {
                 // Address data provided, create new address if member exists
-                if ($member) {
+                if (isset($member)) {
                     $addressData = $data['shipping_address'];
                     $addressData['type'] = 'shipping';
                     $addressData['label'] = 'Order Address';
@@ -93,7 +93,7 @@ class OrderService
                     }
                 }
             } elseif (isset($data['billing_address']) && is_array($data['billing_address']) && !empty(array_filter($data['billing_address']))) {
-                if ($member) {
+                if (isset($member)) {
                     $addressData = $data['billing_address'];
                     $addressData['type'] = 'billing';
                     $addressData['label'] = 'Order Billing Address';
@@ -122,6 +122,8 @@ class OrderService
 
             // Create order
             $order = $this->orderRepository->create($data);
+
+            $this->historyService->logCreated($order->id, $data, $data['user_id'] ?? null);
 
             // Create order items
             foreach ($items as $item) {
@@ -180,14 +182,20 @@ class OrderService
         ];
     }
 
-    public function updateOrder(int $id, array $data, ?int $siteId = null): Order
+    public function updateOrder(int $id, array $data, ?int $siteId = null, ?int $userId = null): Order
     {
-        return $this->database->transaction(function () use ($id, $data, $siteId) {
+        return $this->database->transaction(function () use ($id, $data, $siteId, $userId) {
             $siteId = $siteId ?? SiteContext::getId();
             $order = $this->orderRepository->find($id);
 
             if (!$order) {
                 throw new Exception("Order not found");
+            }
+
+            $oldData = $order->toArray();
+
+            if (isset($data['status']) && $data['status'] !== $order->status) {
+                $this->validateStatusTransition($order, $data['status']);
             }
 
             $member = null;
@@ -252,13 +260,15 @@ class OrderService
                 throw new Exception("Failed to update order");
             }
 
+            $this->historyService->logUpdated($id, $oldData, $data, $userId);
+
             return $this->getOrderById($id);
         });
     }
 
-    public function updateOrderItems(int $orderId, array $items): Order
+    public function updateOrderItems(int $orderId, array $items, ?int $userId = null): Order
     {
-        return $this->database->transaction(function () use ($orderId, $items) {
+        return $this->database->transaction(function () use ($orderId, $items, $userId) {
             $order = $this->orderRepository->find($orderId);
 
             if (!$order) {
@@ -277,13 +287,15 @@ class OrderService
             $calculatedTotals = $this->calculateTotals($items, $order->toArray());
             $this->orderRepository->update($orderId, $calculatedTotals);
 
+            $this->historyService->logItemsUpdated($orderId, $userId);
+
             return $this->getOrderById($orderId);
         });
     }
 
-    public function cancelOrder(int $orderId, ?string $reason = null): Order
+    public function cancelOrder(int $orderId, ?string $reason = null, ?int $userId = null): Order
     {
-        return $this->database->transaction(function () use ($orderId, $reason) {
+        return $this->database->transaction(function () use ($orderId, $reason, $userId) {
             $order = $this->orderRepository->find($orderId);
 
             if (!$order) {
@@ -304,7 +316,11 @@ class OrderService
                     . "Cancellation reason: " . $reason;
             }
 
-            return $this->updateOrder($orderId, $updateData);
+            $updatedOrder = $this->updateOrder($orderId, $updateData);
+
+            $this->historyService->logCancelled($orderId, $userId, $reason);
+
+            return $updatedOrder;
         });
     }
 
@@ -353,68 +369,7 @@ class OrderService
         });
     }
 
-    public function duplicateOrder(int $orderId): Order
-    {
-        return $this->database->transaction(function () use ($orderId) {
-            $originalOrder = $this->getOrderById($orderId);
 
-            if (!$originalOrder) {
-                throw new Exception("Order not found");
-            }
-
-            $data = [
-                'user_id' => $originalOrder->user_id,
-                'status' => 'pending',
-                'subtotal' => $originalOrder->subtotal,
-                'tax' => $originalOrder->tax,
-                'shipping' => $originalOrder->shipping,
-                'discount' => $originalOrder->discount,
-                'total' => $originalOrder->total,
-                'currency' => $originalOrder->currency,
-                'shipping_address' => $originalOrder->shipping_address,
-                'billing_address' => $originalOrder->billing_address,
-                'payment_method' => $originalOrder->payment_method,
-                'payment_status' => 'unpaid'
-            ];
-
-            // Handle address duplication
-            if ($originalOrder->shipping_address_id) {
-                // If original order has linked address, use the same address
-                $data['shipping_address_id'] = $originalOrder->shipping_address_id;
-            } elseif ($originalOrder->shipping_address) {
-                // If original order has JSON address, copy it
-                $data['shipping_address'] = $originalOrder->shipping_address;
-            }
-
-            if ($originalOrder->billing_address_id) {
-                $data['billing_address_id'] = $originalOrder->billing_address_id;
-            } elseif ($originalOrder->billing_address) {
-                $data['billing_address'] = $originalOrder->billing_address;
-            }
-
-            $items = [];
-            foreach ($originalOrder->items as $item) {
-                $items[] = [
-                    'product_name' => $item->product_name,
-                    'product_sku' => $item->product_sku,
-                    'quantity' => $item->quantity,
-                    'unit_price' => $item->unit_price,
-                    'subtotal' => $item->subtotal,
-                    'tax' => $item->tax,
-                    'total' => $item->total,
-                    'metadata' => $item->metadata
-                ];
-            }
-
-            $newOrder = $this->createOrder($data, $items, $originalOrder->site_id);
-
-            // Add clone history
-            $originalOrder->addCloneRecord('cloned_to', $newOrder->id, null);
-            $newOrder->addCloneRecord('cloned_from', $originalOrder->id, null);
-
-            return $newOrder;
-        });
-    }
 
     private function createOrderItem(int $orderId, array $itemData): OrderItem
     {
@@ -479,40 +434,12 @@ class OrderService
         return $this->orderRepository->getTotalRevenue($startDate, $endDate);
     }
 
-    public function bulkUpdateStatus(array $orderIds, string $status): array
+
+
+    private function validateStatusTransition(Order $order, string $newStatus): void
     {
-        return $this->database->transaction(function() use ($orderIds, $status) {
-            $updated = [];
-            $failed = [];
-
-            foreach ($orderIds as $orderId) {
-                try {
-                    $order = $this->orderRepository->find($orderId);
-
-                    if (!$order) {
-                        $failed[] = ['id' => $orderId, 'reason' => 'Order not found'];
-                        continue;
-                    }
-
-                    $this->handleStatusChange($order, $status);
-
-                    $updatedOrder = $this->orderRepository->update($orderId, ['status' => $status]);
-
-                    if ($updatedOrder) {
-                        $updated[] = $orderId;
-                    } else {
-                        $failed[] = ['id' => $orderId, 'reason' => 'Update failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $orderId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'updated' => $updated,
-                'failed' => $failed,
-                'total' => count($orderIds)
-            ];
-        });
+        if (!$order->canTransitionTo($newStatus)) {
+            throw new \Exception("Cannot transition from {$order->status} to {$newStatus}");
+        }
     }
 }

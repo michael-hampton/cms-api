@@ -2,6 +2,13 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkApprovePages;
+use App\Actions\BulkDeletePages;
+use App\Actions\BulkUpdatePage;
+use App\Actions\BulkUpdatePageStatus;
+use App\Actions\ClonePage;
+use App\Actions\ClonePageToSite;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -212,7 +219,9 @@ class PageController extends Controller
             $pageIds = $request->get('page_ids', []);
             $updateData = $request->get('data', []);
 
-            $results = $this->pageService->bulkUpdatePages($pageIds, $updateData, $request->get('site_id'));;
+            $handler = Container::getInstance()->make(BulkUpdatePage::class);
+
+            $results = $handler->handle($pageIds, $updateData, $request->get('site_id'));;
 
             return $this->jsonResponse(['results' => $results]);
         } catch (ValidationException $e) {
@@ -229,7 +238,9 @@ class PageController extends Controller
     public function duplicate(int $id, string $siteName): JsonResponse
     {
         try {
-            $newPage = $this->pageService->duplicatePage($id);
+            $handler = Container::getInstance()->make(ClonePage::class);
+
+            $newPage = $handler->handle($id);
 
             if (!$newPage) {
                 return $this->errorResponse('Page not found', 404);
@@ -252,7 +263,9 @@ class PageController extends Controller
 
             $newTitle = $request->get('title', null);
 
-            $newPage = $this->pageService->clonePageToSite($id, $targetSiteId, $newTitle);
+            $handler = Container::getInstance()->make(ClonePageToSite::class);
+
+            $newPage = $handler->handle($id, $targetSiteId, $newTitle);
 
             if (!$newPage) {
                 return $this->errorResponse('Page not found', 404);
@@ -273,7 +286,9 @@ class PageController extends Controller
                 return $this->errorResponse('No page IDs provided', 422);
             }
 
-            $results = $this->pageService->bulkDeletePages($ids);
+            $handler = Container::getInstance()->make(BulkDeletePages::class);
+
+            $results = $handler->handle($ids);
 
             return $this->jsonResponse([
                 'message' => 'Pages deleted successfully',
@@ -298,7 +313,9 @@ class PageController extends Controller
                 return $this->errorResponse('Status is required', 422);
             }
 
-            $results = $this->pageService->bulkUpdateStatus($ids, $status);
+            $handler = Container::getInstance()->make(BulkUpdatePageStatus::class);
+
+            $results = $handler->handle($ids, $status);
 
             return $this->jsonResponse([
                 'message' => 'Pages updated successfully',
@@ -393,7 +410,9 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
-            $results = $this->pageService->bulkApprovePages($ids, $userId);
+            $handler = Container::getInstance()->make(BulkApprovePages::class);
+
+            $results = $handler->handle($ids, $userId);
 
             return $this->jsonResponse([
                 'message' => 'Pages processed for approval',
@@ -401,6 +420,23 @@ class PageController extends Controller
             ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function makeInternal(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id');
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $page = $this->pageService->makePageInternal($id, $userId);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
         }
     }
 

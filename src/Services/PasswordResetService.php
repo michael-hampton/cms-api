@@ -26,8 +26,9 @@ class PasswordResetService
     {
         $site = SiteContext::get();
         $resetUrl = $this->buildResetUrl($token);
+        $name = $site->name ?? 'Your Website';
 
-        $subject = "Reset your password for {$site->name}";
+        $subject = "Reset your password for {$name}";
         $body = $this->buildResetEmailBody($member, $resetUrl, $site);
 
         mail($member->email, $subject, $body, $this->getEmailHeaders());
@@ -86,9 +87,10 @@ class PasswordResetService
     private function getEmailHeaders(): string
     {
         $site = SiteContext::get();
+        $name = $site->name ?? 'Your Website';
         $fromEmail = $site->email ?? 'noreply@example.com';
 
-        return "From: {$site->name} <{$fromEmail}>\r\n" .
+        return "From: {$name} <{$fromEmail}>\r\n" .
             "Content-Type: text/html; charset=UTF-8\r\n";
     }
 }

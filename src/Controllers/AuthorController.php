@@ -2,6 +2,10 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkDeleteAuthor;
+use App\Actions\CloneAuthor;
+use App\Actions\MergeAuthor;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -18,7 +22,10 @@ class AuthorController extends Controller
 {
     private AuthorService $authorService;
 
-    public function __construct(AuthorService $authorService, private AuthorRepository $authorRepository)
+    public function __construct(
+        AuthorService                     $authorService,
+        private readonly AuthorRepository $authorRepository
+    )
     {
         $this->authorService = $authorService;
         parent::__construct();
@@ -142,7 +149,9 @@ class AuthorController extends Controller
                 return $this->errorResponse('Both source and target author IDs are required', 400);
             }
 
-            $result = $this->authorService->mergeAuthors((int)$sourceId, (int)$targetId);
+            $mergeAuthor = Container::getInstance()->make(MergeAuthor::class);
+
+            $result = $mergeAuthor->handle((int)$sourceId, (int)$targetId);
 
             return $this->successResponse('Authors merged successfully');
 
@@ -169,13 +178,15 @@ class AuthorController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request): JsonResponse
     {
         try {
             $data = $request->all();
             $newName = $data['name'] ?? null;
 
-            $duplicatedAuthor = $this->authorService->duplicateAuthor($id, $newName);
+            $cloneAuthor = Container::getInstance()->make(CloneAuthor::class);
+
+            $duplicatedAuthor = $cloneAuthor->handle($id, $newName);
 
             return $this->jsonResponse(
              $duplicatedAuthor->toArray()
@@ -201,7 +212,9 @@ class AuthorController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->authorService->bulkDelete($data['ids']);
+            $bulkDeleteAuthor = Container::getInstance()->make(BulkDeleteAuthor::class);
+
+            $result = $bulkDeleteAuthor->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),

@@ -2,6 +2,10 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkDeleteBrand;
+use App\Actions\CloneBrand;
+use App\Actions\MergeBrand;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -136,7 +140,9 @@ class BrandController extends Controller
             $sourceBrandId = $request->get('source_brand_id');
             $targetBrandId = $request->get('target_brand_id');
 
-            $result = $this->brandService->mergeBrands($sourceBrandId, $targetBrandId);
+            $mergeBrand = Container::getInstance()->make(MergeBrand::class);
+
+            $result = $mergeBrand->handle($sourceBrandId, $targetBrandId);
 
             return $this->successResponse('Brands merged successfully');
         } catch (Exception $e) {
@@ -162,7 +168,9 @@ class BrandController extends Controller
             $data = $request->all();
             $newName = $data['name'] ?? null;
 
-            $duplicatedBrand = $this->brandService->duplicateBrand($id, $newName);
+            $cloneBrand = Container::getInstance()->make(CloneBrand::class);
+
+            $duplicatedBrand = $cloneBrand->handle($id, $newName);
 
             return $this->jsonResponse($duplicatedBrand->toArray(), 201);
 
@@ -186,7 +194,9 @@ class BrandController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->brandService->bulkDelete($data['ids']);
+            $bulkDeleteBrand = Container::getInstance()->make(BulkDeleteBrand::class);
+
+            $result = $bulkDeleteBrand->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),

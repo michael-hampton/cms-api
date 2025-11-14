@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Enums\PageStatus;
 use App\Models\Author;
 use App\Models\Block;
 use App\Models\Category;
@@ -414,5 +415,214 @@ class PageModelTest extends FunctionalTestCase
 
         $this->assertEquals('Product 1', $products->first()->name);
         $this->assertEquals('Product 3', $products->last()->name);
+    }
+
+    public function testPageStatusIsEnum()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'draft',
+        ]);
+
+        $this->assertEquals(PageStatus::DRAFT->value, $page->status);
+    }
+
+    public function testRequiresApproval()
+    {
+        $page = $this->createPage(['status' => 'draft', 'requires_approval' => true]);
+
+        $this->assertTrue($page->requiresApproval());
+    }
+
+    public function testDoesNotRequireApproval()
+    {
+        $page = $this->createPage(['status' => 'draft', 'requires_approval' => false]);
+
+        $this->assertFalse($page->requiresApproval());
+    }
+
+    public function testIsApproved()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval', 'approved_by' => 1, 'approved_at' => date('Y-m-d H:i:s')]);;
+
+        $this->assertTrue($page->isApproved());
+    }
+
+    public function testIsNotApproved()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval']);
+
+        $this->assertFalse($page->isApproved());
+    }
+
+    public function testIsWaitingApproval()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval']);
+
+        $this->assertTrue($page->isWaitingApproval());
+    }
+
+    public function testIsPrivate()
+    {
+        $page = $this->createPage(['status' => 'private']);
+
+        $this->assertTrue($page->isPrivate());
+    }
+
+    public function testIsOnHold()
+    {
+        $page = $this->createPage(['status' => 'on_hold']);
+
+        $this->assertTrue($page->isOnHold());
+    }
+
+    public function testCanTransitionFromDraftToPublished()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::PUBLISHED));
+        $this->assertTrue($page->canTransitionTo('published'));
+    }
+
+    public function testCanTransitionFromDraftToWaitingApproval()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::WAITING_APPROVAL));
+    }
+
+    public function testCannotTransitionFromArchivedToPublished()
+    {
+        $page = $this->createPage(['status' => 'archived']);
+
+        $this->assertFalse($page->canTransitionTo(PageStatus::PUBLISHED));
+    }
+
+    public function testCanTransitionFromArchivedToDraft()
+    {
+        $page = $this->createPage(['status' => 'archived']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::DRAFT));
+    }
+
+    public function testCanTransitionFromWaitingApprovalToPublished()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::PUBLISHED));
+    }
+
+    public function testCanTransitionFromPublishedToPrivate()
+    {
+        $page = $this->createPage(['status' => 'published']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::PRIVATE));
+    }
+
+    public function testApprovePage()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval']);
+
+        $page->approve(1);
+
+        $this->assertEquals(1, $page->approved_by);
+        $this->assertNotNull($page->approved_at);
+    }
+
+    public function testRemoveApproval()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval', 'approved_by' => 1, 'approved_at' => date('Y-m-d H:i:s')]);
+
+        $page->removeApproval();
+
+        $this->assertNull($page->approved_by);
+        $this->assertNull($page->approved_at);
+    }
+
+    public function testGetValidStatuses()
+    {
+        $statuses = Page::getValidStatuses();
+
+        $this->assertIsArray($statuses);
+        $this->assertContains('draft', $statuses);
+        $this->assertContains('published', $statuses);
+        $this->assertContains('waiting_approval', $statuses);
+        $this->assertContains('private', $statuses);
+        $this->assertContains('on_hold', $statuses);
+        $this->assertCount(7, $statuses);
+    }
+
+    public function testScopeWaitingApproval()
+    {
+        $this->createPage(['status' => 'draft', 'title' => 'Draft']);
+        $this->createPage(['status' => 'waiting_approval', 'title' => 'Waiting']);
+
+        $waiting = Page::byStatus(PageStatus::WAITING_APPROVAL->value)->get();
+
+        $this->assertCount(1, $waiting);
+        $this->assertEquals('Waiting', $waiting->first()->title);
+    }
+
+    public function testScopePrivate()
+    {
+        $this->createPage(['status' => 'draft', 'title' => 'Draft']);
+        $this->createPage(['status' => 'private', 'title' => 'Private']);
+
+        $private = Page::byStatus('private')->get();
+
+        $this->assertCount(1, $private);
+        $this->assertEquals('Private', $private->first()->title);
+    }
+
+    public function testScopeOnHold()
+    {
+        $this->createPage(['status' => 'draft', 'title' => 'Draft']);
+        $this->createPage(['status' => 'on_hold', 'title' => 'On Hold']);
+
+        $onHold = Page::byStatus(PageStatus::ON_HOLD->value)->get();
+
+        $this->assertCount(1, $onHold);
+        $this->assertEquals('On Hold', $onHold->first()->title);
+    }
+
+    public function testIsInternal()
+    {
+        $page = $this->createPage(['status' => 'internal']);
+
+        $this->assertTrue($page->isInternal());
+    }
+
+    public function testCanTransitionFromDraftToInternal()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::INTERNAL));
+    }
+
+    public function testCanTransitionFromInternalToPublished()
+    {
+        $page = $this->createPage(['status' => 'internal']);
+
+        $this->assertTrue($page->canTransitionTo(PageStatus::PUBLISHED));
+    }
+
+    public function testGetValidStatusesIncludesInternal()
+    {
+        $statuses = Page::getValidStatuses();
+
+        $this->assertContains('internal', $statuses);
+        $this->assertCount(8, $statuses); // Updated count
+    }
+
+    public function testScopeInternal()
+    {
+        $this->createPage(['status' => 'draft', 'title' => 'Draft']);
+        $this->createPage(['status' => 'internal', 'title' => 'Internal']);
+
+        $internal = Page::byStatus('internal')->get();
+
+        $this->assertCount(1, $internal);
+        $this->assertEquals('Internal', $internal->first()->title);
     }
 }

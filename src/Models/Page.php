@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PageStatus;
 use App\Framework\Authorization\AuthenticatedMember;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Database\Relations\BelongsToManyHandler;
@@ -15,14 +16,6 @@ class Page extends Model
     use HasCloneHistory;
 
     protected $table = 'pages';
-
-    public const STATUS_DRAFT = 'draft';
-    public const STATUS_PUBLISHED = 'published';
-    public const STATUS_ARCHIVED = 'archived';
-    public const STATUS_SCHEDULED = 'scheduled';
-    public const STATUS_WAITING_APPROVAL = 'waiting_approval';
-    public const STATUS_PRIVATE = 'private';
-    public const STATUS_ON_HOLD = 'on_hold';
 
     protected $fillable = [
         'title',
@@ -462,7 +455,7 @@ class Page extends Model
      */
     public function isWaitingApproval(): bool
     {
-        return $this->status === self::STATUS_WAITING_APPROVAL;
+        return $this->status === PageStatus::WAITING_APPROVAL->value;
     }
 
     /**
@@ -470,7 +463,7 @@ class Page extends Model
      */
     public function isPrivate(): bool
     {
-        return $this->status === self::STATUS_PRIVATE;
+        return $this->status === PageStatus::PRIVATE->value;
     }
 
     /**
@@ -478,60 +471,77 @@ class Page extends Model
      */
     public function isOnHold(): bool
     {
-        return $this->status === self::STATUS_ON_HOLD;
+        return $this->status === PageStatus::ON_HOLD->value;;
     }
 
     /**
      * Check if status can be changed to target status
      */
-    public function canTransitionTo(string $targetStatus): bool
+    public function canTransitionTo(PageStatus|string $targetStatus): bool
     {
+        if (is_string($targetStatus)) {
+            $targetStatus = PageStatus::from($targetStatus);
+        }
+
         $allowedTransitions = [
-            self::STATUS_DRAFT => [
-                self::STATUS_PUBLISHED,
-                self::STATUS_WAITING_APPROVAL,
-                self::STATUS_PRIVATE,
-                self::STATUS_ON_HOLD,
-                self::STATUS_ARCHIVED
+            PageStatus::DRAFT->value => [
+                PageStatus::PUBLISHED,
+                PageStatus::WAITING_APPROVAL,
+                PageStatus::PRIVATE,
+                PageStatus::ON_HOLD,
+                PageStatus::ARCHIVED,
+                PageStatus::INTERNAL
             ],
-            self::STATUS_WAITING_APPROVAL => [
-                self::STATUS_PUBLISHED, // Only after approval
-                self::STATUS_DRAFT,
-                self::STATUS_ON_HOLD,
-                self::STATUS_ARCHIVED
+            PageStatus::WAITING_APPROVAL->value => [
+                PageStatus::PUBLISHED, // Only after approval
+                PageStatus::DRAFT,
+                PageStatus::ON_HOLD,
+                PageStatus::ARCHIVED
             ],
-            self::STATUS_PUBLISHED => [
-                self::STATUS_DRAFT,
-                self::STATUS_PRIVATE,
-                self::STATUS_ON_HOLD,
-                self::STATUS_ARCHIVED
+            PageStatus::PUBLISHED->value => [
+                PageStatus::DRAFT,
+                PageStatus::PRIVATE,
+                PageStatus::ON_HOLD,
+                PageStatus::ARCHIVED
             ],
-            self::STATUS_PRIVATE => [
-                self::STATUS_DRAFT,
-                self::STATUS_PUBLISHED,
-                self::STATUS_WAITING_APPROVAL,
-                self::STATUS_ON_HOLD,
-                self::STATUS_ARCHIVED
+            PageStatus::PRIVATE->value => [
+                PageStatus::DRAFT,
+                PageStatus::PUBLISHED,
+                PageStatus::WAITING_APPROVAL,
+                PageStatus::ON_HOLD,
+                PageStatus::ARCHIVED
             ],
-            self::STATUS_ON_HOLD => [
-                self::STATUS_DRAFT,
-                self::STATUS_WAITING_APPROVAL,
-                self::STATUS_PUBLISHED,
-                self::STATUS_PRIVATE,
-                self::STATUS_ARCHIVED
+            PageStatus::ON_HOLD->value => [
+                PageStatus::DRAFT,
+                PageStatus::WAITING_APPROVAL,
+                PageStatus::PUBLISHED,
+                PageStatus::PRIVATE,
+                PageStatus::ARCHIVED
             ],
-            self::STATUS_ARCHIVED => [
-                self::STATUS_DRAFT,
-                self::STATUS_ON_HOLD
+            PageStatus::INTERNAL->value => [  // NEW
+                PageStatus::DRAFT,
+                PageStatus::WAITING_APPROVAL,
+                PageStatus::PUBLISHED,
+                PageStatus::PRIVATE,
+                PageStatus::ON_HOLD,
+                PageStatus::ARCHIVED
             ],
-            self::STATUS_SCHEDULED => [
-                self::STATUS_PUBLISHED,
-                self::STATUS_DRAFT,
-                self::STATUS_ARCHIVED
+            PageStatus::ARCHIVED->value => [
+                PageStatus::DRAFT,
+                PageStatus::ON_HOLD
+            ],
+            PageStatus::SCHEDULED->value => [
+                PageStatus::PUBLISHED,
+                PageStatus::DRAFT,
+                PageStatus::ARCHIVED
             ]
         ];
 
-        return in_array($targetStatus, $allowedTransitions[$this->status] ?? []);
+        $currentStatusValue = $this->status instanceof PageStatus
+            ? $this->status->value
+            : $this->status;
+
+        return in_array($targetStatus, $allowedTransitions[$currentStatusValue] ?? []);
     }
 
     /**
@@ -568,13 +578,19 @@ class Page extends Model
     public static function getValidStatuses(): array
     {
         return [
-            self::STATUS_DRAFT,
-            self::STATUS_PUBLISHED,
-            self::STATUS_ARCHIVED,
-            self::STATUS_SCHEDULED,
-            self::STATUS_WAITING_APPROVAL,
-            self::STATUS_PRIVATE,
-            self::STATUS_ON_HOLD,
+            PageStatus::DRAFT->value,
+            PageStatus::PUBLISHED->value,
+            PageStatus::ARCHIVED->value,
+            PageStatus::SCHEDULED->value,
+            PageStatus::WAITING_APPROVAL->value,
+            PageStatus::PRIVATE->value,
+            PageStatus::ON_HOLD->value,
+            PageStatus::INTERNAL->value,
         ];
+    }
+
+    public function isInternal(): bool
+    {
+        return $this->status === PageStatus::INTERNAL->value;
     }
 }

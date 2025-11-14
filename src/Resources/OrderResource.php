@@ -19,13 +19,21 @@ class OrderResource extends JsonResource
             'discount' => $this->getAttribute('discount'),
             'total' => $this->getAttribute('total'),
             'customer_notes' => $this->getAttribute('customer_notes'),
-            'shipping_address' => is_string($this->getAttribute('shipping_address')) ? json_decode($this->getAttribute('shipping_address'), true) : $this->getAttribute('shipping_address'),
-            'billing_address' => is_string($this->getAttribute('billing_address')) ? json_decode($this->getAttribute('billing_address'), true) : $this->getAttribute('billing_address'),
             'payment_status' => $this->getAttribute('payment_status'),
             'items' => $this->getAttribute('items'),
             'customer_name' => $this->getAttribute('customer_name'),
             'customer_email' => $this->getAttribute('customer_email'),
             'customer_phone' => $this->getAttribute('customer_phone'),
+            'history' => $this->getAttribute('history'),
+            'created_at' => $this->getAttribute('created_at')->format('Y-m-d H:i:s'),
+            'shipping_address' => $this->when(
+                !empty($this->shippingAddress),
+                AddressResource::make($this->shippingAddress)->toArray()
+            ),
+            'billing_address' => $this->when(
+                !empty($this->billingAddress),
+                AddressResource::make($this->billingAddress)->toArray()
+            ),
         ];
     }
 }

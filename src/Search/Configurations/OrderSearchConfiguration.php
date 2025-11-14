@@ -38,7 +38,7 @@ class OrderSearchConfiguration extends SearchConfiguration implements SearchConf
             ->addSort(new SortSpecification('payment_status', 'payment_status'))
             ->addSort(new SortSpecification('total', 'total'))
             ->addSort(new SortSpecification('subtotal', 'subtotal'))
-            ->addSort(new SortSpecification('date_created', 'created_at'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
             ->addSort(new SortSpecification('date_updated', 'updated_at'))
             ->addSort(new SortSpecification('date_completed', 'completed_at'))
             ->addSort(new SortSpecification('date_cancelled', 'cancelled_at'));

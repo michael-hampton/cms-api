@@ -2,6 +2,12 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkActivateRegionSets;
+use App\Actions\BulkDeactivateRegionSets;
+use App\Actions\BulkDeleteRegionSet;
+use App\Actions\CloneProduct;
+use App\Actions\CloneRegionSet;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -132,8 +138,9 @@ class RegionSetController extends Controller
     public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
+            $cloneRegionSet = Container::getInstance()->make(CloneRegionSet::class);
             $newName = $request->get('name');
-            $newRegionSet = $this->service->duplicate($id, $newName);
+            $newRegionSet = $cloneRegionSet->handle($id, $newName);
 
             return $this->jsonResponse(['region_set' => $newRegionSet->toArrayWithRelations()], 201);
         } catch (Exception $e) {
@@ -242,7 +249,9 @@ class RegionSetController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->service->bulkDelete($data['ids']);
+            $bulkDeleteRegionSet = Container::getInstance()->make(BulkDeleteRegionSet::class);
+
+            $result = $bulkDeleteRegionSet->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
@@ -259,8 +268,9 @@ class RegionSetController extends Controller
     {
         try {
             $data = $request->validated();
+            $handler = Container::getInstance()->make(BulkActivateRegionSets::class);
 
-            $result = $this->service->bulkActivate($data['ids']);
+            $result = $handler->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk activate completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
@@ -278,7 +288,9 @@ class RegionSetController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->service->bulkDeactivate($data['ids']);
+            $handler = Container::getInstance()->make(BulkDeactivateRegionSets::class);
+
+            $result = $handler->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk deactivate completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),

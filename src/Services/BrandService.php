@@ -18,9 +18,9 @@ class BrandService
     private Database $database;
 
     public function __construct(
-        private BrandRepository $brandRepository,
-        private ImageUploadService $imageUploadService,
-        ?Database $database = null
+        private readonly BrandRepository    $brandRepository,
+        private readonly ImageUploadService $imageUploadService,
+        ?Database                           $database = null
     ) {
         $this->database = $database ?? Database::getInstance();
     }
@@ -164,135 +164,5 @@ class BrandService
     public function getAlternativeBrands(int $brandId): Collection
     {
         return $this->brandRepository->getAlternatives($brandId);
-    }
-
-    public function mergeBrands(int $sourceBrandId, int $targetBrandId): bool
-    {
-        if ($sourceBrandId === $targetBrandId) {
-            throw new \Exception("Cannot merge a brand with itself");
-        }
-
-        return $this->database->transaction(function() use ($sourceBrandId, $targetBrandId) {
-            $sourceBrand = $this->brandRepository->find($sourceBrandId);
-            $targetBrand = $this->brandRepository->find($targetBrandId);
-
-            if (!$sourceBrand || !$targetBrand) {
-                throw new \Exception("One or both brands not found");
-            }
-
-            $products = $this->brandRepository->getProductsByBrandId($sourceBrandId);
-
-            foreach ($products as $product) {
-                $product->brand_id = $targetBrandId;
-                $product->save();
-            }
-
-            // Add merge history
-            $targetBrand->addCloneRecord('merged_from', $sourceBrand->id, null);
-            $sourceBrand->addCloneRecord('merged_to', $targetBrand->id, null);
-
-            if ($sourceBrand->logo) {
-                $this->imageUploadService->delete($sourceBrand->logo);
-            }
-
-            $this->brandRepository->delete($sourceBrandId);
-
-            return true;
-        });
-    }
-
-    public function duplicateBrand(int $brandId, ?string $newName = null, ?int $siteId = null): Brand
-    {
-        return $this->database->transaction(function() use ($brandId, $newName, $siteId) {
-            $originalBrand = $this->brandRepository->find($brandId);
-
-            if (!$originalBrand) {
-                throw new \Exception("Brand not found");
-            }
-
-            $targetSiteId = $siteId ?? SiteContext::getId();
-
-            $data = [
-                'name' => $newName ?? ($originalBrand->name . ' (Copy)'),
-                'description' => $originalBrand->description,
-                'website' => $originalBrand->website,
-                'status' => 'inactive',
-                'seo_title' => $originalBrand->seo_title,
-                'seo_description' => $originalBrand->seo_description,
-                'no_index' => $originalBrand->no_index ?? false,
-                'site_id' => $siteId ?? SiteContext::getId(),
-                'canonical_url' => null, // Don't copy canonical URL
-            ];
-
-            $data['slug'] = Str::slug($data['name'], [$this->brandRepository, 'findBySlug']);
-
-            if ($originalBrand->logo) {
-                try {
-                    $data['logo'] = $this->imageUploadService->duplicate($originalBrand->logo);
-                } catch (\Exception $e) {
-                    $data['logo'] = null;
-                }
-            }
-
-            $newBrand = $this->brandRepository->create($data);
-
-            // Add clone history with site information
-            if ($targetSiteId !== $originalBrand->site_id) {
-                $originalBrand->addCloneRecord('cloned_to', $newBrand->id, $targetSiteId);
-                $newBrand->addCloneRecord('cloned_from', $originalBrand->id, $originalBrand->site_id);
-            } else {
-                $originalBrand->addCloneRecord('cloned_to', $newBrand->id, null);
-                $newBrand->addCloneRecord('cloned_from', $originalBrand->id, null);
-            }
-
-            return $newBrand;
-        });
-    }
-
-    public function bulkDelete(array $brandIds): array
-    {
-        return $this->database->transaction(function() use ($brandIds) {
-            $deleted = [];
-            $failed = [];
-
-            foreach ($brandIds as $brandId) {
-                try {
-                    $brand = $this->brandRepository->find($brandId);
-
-                    if (!$brand) {
-                        $failed[] = ['id' => $brandId, 'reason' => 'Brand not found'];
-                        continue;
-                    }
-
-                    $productsCount = $this->brandRepository->getProductsByBrandId($brandId)->count();
-
-                    if ($productsCount > 0) {
-                        $failed[] = [
-                            'id' => $brandId,
-                            'reason' => "Brand has {$productsCount} associated products"
-                        ];
-                        continue;
-                    }
-
-                    if ($brand->logo) {
-                        $this->imageUploadService->delete($brand->logo);
-                    }
-
-                    if ($brand->delete()) {
-                        $deleted[] = $brandId;
-                    } else {
-                        $failed[] = ['id' => $brandId, 'reason' => 'Delete failed'];
-                    }
-                } catch (\Exception $e) {
-                    $failed[] = ['id' => $brandId, 'reason' => $e->getMessage()];
-                }
-            }
-
-            return [
-                'deleted' => $deleted,
-                'failed' => $failed,
-                'total' => count($brandIds)
-            ];
-        });
     }
 }

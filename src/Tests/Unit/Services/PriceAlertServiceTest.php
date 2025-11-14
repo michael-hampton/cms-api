@@ -468,7 +468,7 @@ class PriceAlertServiceTest extends FunctionalTestCase
 
         $this->mockRepository->shouldReceive('update')
             ->once()
-            ->with($alert->id, m::on(function ($arg) {
+            ->with($alert, m::on(function ($arg) {
                 return $arg['is_notified'] === true && isset($arg['notified_at']);
             }))
             ->andReturn(true);

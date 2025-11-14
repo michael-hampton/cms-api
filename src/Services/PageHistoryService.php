@@ -186,6 +186,15 @@ class PageHistoryService
         );
     }
 
+    public function logPageMadeInternal(Page $page, int $userId): PageHistory
+    {
+        return $this->logPageAction($page->id, 'made_internal', 'Made Internal', [
+            'user_id' => $userId,
+            'previous_status' => $page->status,
+            'new_status' => 'internal'
+        ]);
+    }
+
     public function getPageHistory(int $pageId, int $limit = 50): Collection
     {
         return $this->historyRepository->getPageHistory($pageId, $limit);

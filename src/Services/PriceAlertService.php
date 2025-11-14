@@ -228,10 +228,12 @@ class PriceAlertService
                 </html>
             ";
 
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
             // Send email (implement based on your email service)
             $headers = "MIME-Version: 1.0\r\n";
             $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-            $headers .= "From: Price Alerts <noreply@" . $_SERVER['HTTP_HOST'] . ">\r\n";
+            $headers .= "From: Price Alerts <noreply@" . $host . ">\r\n";
 
             $sent = mail($alert->email, $subject, $htmlMessage, $headers);
 

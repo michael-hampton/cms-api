@@ -2,6 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkDeleteVoucher;
+use App\Actions\CloneVoucher;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -140,7 +143,8 @@ class VoucherController extends Controller
     {
         try {
             $newCode = $request->get('code', null);
-            $newVoucher = $this->voucherService->duplicateVoucher($id, $newCode);
+            $handler = Container::getInstance()->make(CloneVoucher::class);
+            $newVoucher = $handler->handle($id, $newCode);
 
             if (!$newVoucher) {
                 return $this->errorResponse('Voucher not found', 404);
@@ -207,7 +211,9 @@ class VoucherController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->voucherService->bulkUpdateStatus($data['ids'], $data['status']);
+            $handler = Container::getInstance()->make(\App\Actions\BulkUpdateVoucherStatus::class);
+
+            $result = $handler->handle($data['ids'], $data['status']);
 
             return $this->resourceResponse([
                 'message' => "Bulk status update completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
@@ -225,7 +231,9 @@ class VoucherController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->voucherService->bulkDelete($data['ids']);
+            $handler = Container::getInstance()->make(BulkDeleteVoucher::class);
+
+            $result = $handler->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),

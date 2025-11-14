@@ -27,13 +27,15 @@ class OrderRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Order::with(['items', 'user']);
+        $query = Order::with(['items', 'user', 'billingAddress', 'shippingAddress']);
         return $this->searchEngine->search($query, $criteria);
     }
 
     public function findByOrderNumber(string $orderNumber): ?Order
     {
-        return $this->where('order_number', $orderNumber)->first();
+        return Order::where('order_number', $orderNumber)
+            ->with(['items', 'user', 'history']) // ADD 'history'
+            ->first();
     }
 
     public function getByStatus(string $status): Collection
@@ -104,8 +106,9 @@ class OrderRepository extends Repository
         return $this->applySiteFilter($query)->count();
     }
 
-    public function getOrderById(int $orderId): ?Order
+    public function getOrderById(int $id): ?Order
     {
-        return Order::with(['items', 'user', 'shippingAddress', 'billingAddress'])->find($orderId);
+        return Order::with(['items', 'user', 'item.product', 'history']) // ADD 'history'
+        ->find($id);
     }
 }

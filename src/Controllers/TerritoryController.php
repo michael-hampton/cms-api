@@ -2,6 +2,11 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkActivateTerritories;
+use App\Actions\BulkDeactivateTerritories;
+use App\Actions\BulkDeleteTag;
+use App\Actions\BulkDeleteTerritories;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -252,7 +257,10 @@ class TerritoryController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->service->bulkDelete($data['ids']);
+            $bulkDelete = Container::getInstance()->make(BulkDeleteTerritories::class);
+
+
+            $result = $bulkDelete->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
@@ -270,7 +278,9 @@ class TerritoryController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->service->bulkActivate($data['ids']);
+            $handler = Container::getInstance()->make(BulkActivateTerritories::class);
+
+            $result = $handler->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk activate completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),
@@ -288,7 +298,9 @@ class TerritoryController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->service->bulkDeactivate($data['ids']);
+            $handler = Container::getInstance()->make(BulkDeactivateTerritories::class);
+
+            $result = $handler->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk deactivate completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),

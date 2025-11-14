@@ -73,9 +73,7 @@ class RegionSetRepository extends Repository
 
     public function reorderRegionSets(array $orderedIds): bool
     {
-        $this->database->beginTransaction();
-
-        try {
+        return $this->database->transaction(function () use ($orderedIds) {
             foreach ($orderedIds as $index => $id) {
                 $regionSet = $this->find($id);
 
@@ -89,12 +87,8 @@ class RegionSetRepository extends Repository
                 }
             }
 
-            $this->database->commit();
             return true;
-        } catch (\Exception $e) {
-            $this->database->rollBack();
-            throw $e;
-        }
+        });
     }
 
     public function searchAvailablePages(int $regionSetId, string $query, int $perPage = 20, int $page = 1, ?int $siteId = null): array

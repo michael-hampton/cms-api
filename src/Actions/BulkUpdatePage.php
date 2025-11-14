@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Actions;
+
+use App\Services\PageService;
+use Exception;
+
+class BulkUpdatePage
+{
+    public function __construct(private readonly PageService $pageService)
+    {
+
+    }
+
+    public function handle(array $pageIds, array $updateData, int $siteId): array
+    {
+        $results = [];
+        foreach ($pageIds as $pageId) {
+            try {
+                $results[$pageId] = $this->pageService->updatePageWithAllData($pageId, $updateData, $siteId);
+            } catch (Exception $e) {
+                $results[$pageId] = ['error' => $e->getMessage()];
+            }
+        }
+        return $results;
+    }
+}

@@ -4,7 +4,6 @@ namespace App\Tests\Unit\Services;
 
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
-use App\Models\Brand;
 use App\Models\Page;
 use App\Models\RegionSet;
 use App\Models\Territory;
@@ -16,7 +15,6 @@ use App\Services\RegionSetService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
 class RegionSetServiceTest extends FunctionalTestCase
 {
@@ -271,47 +269,7 @@ class RegionSetServiceTest extends FunctionalTestCase
         $this->assertEquals($expectedResult, $result);
     }
 
-    public function testDuplicateRegionSet()
-    {
-        $regionSetId = 1;
-        $newName = 'Europe Copy';
 
-        $mockOriginalRegionSet = Mockery::mock(RegionSet::class)->makePartial();
-        $mockOriginalRegionSet->id = $regionSetId;
-        $mockOriginalRegionSet->name = 'Europe';
-        $mockOriginalRegionSet->description = 'European region';
-        $mockOriginalRegionSet->site_id = 1;
-
-        $mockNewRegionSet = Mockery::mock(RegionSet::class)->makePartial();
-        $mockNewRegionSet->id = 2;
-
-        $this->setCloneHistoryExpectations($mockOriginalRegionSet, $mockNewRegionSet, 1, 2);
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->repository->shouldReceive('findWithRelations')
-            ->once()
-            ->with($regionSetId)
-            ->andReturn($mockOriginalRegionSet);
-
-        $this->repository->shouldReceive('findBySlug')
-            ->once()
-            ->andReturn(null);
-
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($mockNewRegionSet);
-
-        $mockOriginalRegionSet->territories = collect([]);
-
-        $result = $this->service->duplicate($regionSetId, $newName);
-
-        $this->assertInstanceOf(RegionSet::class, $result);
-    }
 
     public function testReorder()
     {
@@ -362,89 +320,6 @@ class RegionSetServiceTest extends FunctionalTestCase
         $result = $service->assignPages($regionSetId, $pageIds, 1);
 
         $this->assertTrue($result);
-    }
-
-    public function testDuplicateRegionSetWithUniqueCodeCheck()
-    {
-        $regionSetId = 1;
-        $newName = 'Europe Copy';
-
-        // Use Mockery for both to handle dynamic props and relations
-        $mockOriginalRegionSet = Mockery::mock(RegionSet::class)->makePartial();
-        $mockOriginalRegionSet->id = $regionSetId;
-        $mockOriginalRegionSet->name = 'Europe';
-        $mockOriginalRegionSet->description = 'European region';
-        $mockOriginalRegionSet->site_id = 1;
-        $mockOriginalRegionSet->code = 'TEST';
-
-        $mockTerritory = Mockery::mock(Territory::class)->makePartial();
-        $mockTerritory->name = 'United Kingdom';
-        $mockTerritory->code = 'GB';
-        $mockTerritory->is_active = true;
-        $mockTerritory->sort_order = 0;
-        $mockTerritory->site_id = 1;
-
-        // Return territories relation
-        $mockOriginalRegionSet
-            ->shouldReceive('territories')
-            ->andReturn(collect([$mockTerritory]));
-
-        // Mock new region set result
-        $mockNewRegionSet = Mockery::mock(RegionSet::class)->makePartial();
-        $mockNewRegionSet->id = 2;
-
-        $this->setCloneHistoryExpectations($mockOriginalRegionSet, $mockNewRegionSet, 1, 2);
-
-        // Transaction wrapper
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->repository->shouldReceive('findWithRelations')
-            ->once()
-            ->with($regionSetId)
-            ->andReturn($mockOriginalRegionSet);
-
-        $this->repository->shouldReceive('findBySlug')
-            ->once()
-            ->with('europe-copy')
-            ->andReturn(null);
-
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->with(['name' => 'Europe Copy', 'description' => 'European region', 'is_active' => false, 'site_id' => 1, 'slug' => 'europe-copy'])
-            ->andReturn($mockNewRegionSet);
-
-        $this->territoryRepository->shouldReceive('findByCode')
-            ->once()
-            ->with('GB-copy', 1)
-            ->andReturn(null);
-
-        $this->territoryRepository->shouldReceive('generateUniqueSlug')
-            ->once()
-            ->with('United Kingdom', 1)
-            ->andReturn('united-kingdom');
-
-        $this->territoryRepository->shouldReceive('create')
-            ->once()
-            ->with([
-                'name' => 'United Kingdom',
-                'slug' => 'united-kingdom',
-                'code' => 'GB-copy',
-                'region_set_id' => 2,
-                'is_active' => true,
-                'sort_order' => 0,
-                'site_id' => 1
-            ])
-            ->andReturn($mockTerritory);
-
-        // Act
-        $result = $this->service->duplicate($regionSetId, $newName);
-
-        // Assert
-        $this->assertInstanceOf(RegionSet::class, $result);
     }
 
     public function testUnassignPagesFromRegionSet()
@@ -527,97 +402,4 @@ class RegionSetServiceTest extends FunctionalTestCase
 //
 //        $this->assertTrue($result); // Should still return true even if pages don't exist
 //    }
-
-    public function testBulkDeleteSuccessfully()
-    {
-        $regionSet1 = Mockery::mock(RegionSet::class)->makePartial();
-        $regionSet1->shouldReceive('getTerritoryCount')->once()->andReturn(0);
-        $regionSet1->shouldReceive('getPageCount')->once()->andReturn(0);
-
-        $regionSet2 = Mockery::mock(RegionSet::class)->makePartial();
-        $regionSet2->shouldReceive('getTerritoryCount')->once()->andReturn(0);
-        $regionSet2->shouldReceive('getPageCount')->once()->andReturn(0);
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(fn($callback) => $callback());
-
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($regionSet1);
-
-        $this->repository->shouldReceive('find')
-            ->with(2)
-            ->once()
-            ->andReturn($regionSet2);
-
-        $this->repository->shouldReceive('delete')
-            ->twice()
-            ->andReturn(true);
-
-        $result = $this->service->bulkDelete([1, 2]);
-
-        $this->assertCount(2, $result['deleted']);
-        $this->assertCount(0, $result['failed']);
-    }
-
-    public function testBulkActivateSuccessfully()
-    {
-        $regionSet1 = Mockery::mock(RegionSet::class)->makePartial();
-        $regionSet2 = Mockery::mock(RegionSet::class)->makePartial();
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(fn($callback) => $callback());
-
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($regionSet1);
-
-        $this->repository->shouldReceive('find')
-            ->with(2)
-            ->once()
-            ->andReturn($regionSet2);
-
-        $this->repository->shouldReceive('update')
-            ->twice()
-            ->andReturn($regionSet1, $regionSet2);
-
-        $result = $this->service->bulkActivate([1, 2]);
-
-        $this->assertCount(2, $result['updated']);
-        $this->assertCount(0, $result['failed']);
-    }
-
-    public function testBulkDeactivateSuccessfully()
-    {
-        $regionSet1 = Mockery::mock(RegionSet::class)->makePartial();
-        $regionSet2 = Mockery::mock(RegionSet::class)->makePartial();
-
-        $this->databaseMock->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(fn($callback) => $callback());
-
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($regionSet1);
-
-        $this->repository->shouldReceive('find')
-            ->with(2)
-            ->once()
-            ->andReturn($regionSet2);
-
-        $this->repository->shouldReceive('update')
-            ->twice()
-            ->andReturn($regionSet1, $regionSet2);
-
-        $result = $this->service->bulkDeactivate([1, 2]);
-
-        $this->assertCount(2, $result['updated']);
-        $this->assertCount(0, $result['failed']);
-    }
-
 }

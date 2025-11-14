@@ -2,7 +2,12 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkDeleteRegionSet;
+use App\Actions\BulkDeleteTag;
+use App\Actions\CloneTag;
+use App\Actions\MergeTag;
 use App\Exceptions\CannotDeleteException;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
@@ -168,7 +173,9 @@ class TagController extends Controller
             $fromTagId = $request->get('from_tag_id');
             $toTagId = $request->get('to_tag_id');
 
-            $deletedCount = $this->tagService->mergeTags($fromTagId, $toTagId);
+            $mergeTags = Container::getInstance()->make(MergeTag::class);
+
+            $deletedCount = $mergeTags->handle($fromTagId, $toTagId);
             return $this->successResponse("merged successfully");
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
@@ -201,7 +208,9 @@ class TagController extends Controller
             $data = $request->all();
             $newName = $data['name'] ?? null;
 
-            $success = $this->tagService->duplicateTag($id, $newName);
+            $cloneTag = Container::getInstance()->make(CloneTag::class);
+
+            $success = $cloneTag->handle($id, $newName);
 
             if ($success) {
                 // Fetch the newly created tag
@@ -237,7 +246,9 @@ class TagController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->tagService->bulkDelete($data['ids']);
+            $bulkDelete = Container::getInstance()->make(BulkDeleteTag::class);
+
+            $result = $bulkDelete->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),

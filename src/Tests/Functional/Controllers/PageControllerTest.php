@@ -1361,4 +1361,578 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertEquals(400, $response->getStatusCode());
     }
+
+    public function testRejectPageSuccessfully()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval', 'requires_approval' => true]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/reject", [
+            'user_id' => 1,
+            'reason' => 'Content needs revision'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('draft', $data['data']['page']['status']);
+        $this->assertNull($data['data']['page']['approved_by']);
+        $this->assertNull($data['data']['page']['approved_at']);
+    }
+
+    public function testPutPageOnHoldSuccessfully()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/put-on-hold", [
+            'user_id' => 1,
+            'reason' => 'Waiting for legal review'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('on_hold', $data['data']['page']['status']);
+    }
+
+    public function testMakePagePrivateSuccessfully()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/make-private", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('private', $data['data']['page']['status']);
+    }
+
+    public function testPublishPageWithApprovalRequiredGoesToWaitingApproval()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'requires_approval' => true,
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'published']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Should be waiting_approval, not published
+        $this->assertEquals('waiting_approval', $data['data']['page']['status']);
+    }
+
+    public function testPublishPageWithoutApprovalRequiredPublishes()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'requires_approval' => false,
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'published']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('published', $data['data']['page']['status']);
+    }
+
+    public function testBulkApprovePages()
+    {
+        $page1 = Page::create([
+            'title' => 'Test Page 1',
+            'slug' => 'test-page-1',
+            'status' => 'waiting_approval',
+            'requires_approval' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = Page::create([
+            'title' => 'Test Page 2',
+            'slug' => 'test-page-2',
+            'status' => 'waiting_approval',
+            'requires_approval' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite('/api/pages/bulk-approve', [
+            'ids' => [$page1->id, $page2->id],
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('results', $data['data']);
+        $this->assertTrue($data['data']['results'][$page1->id]['success']);
+        $this->assertTrue($data['data']['results'][$page2->id]['success']);
+
+        // Verify both pages are now published
+        $updatedPage1 = Page::find($page1->id);
+        $updatedPage2 = Page::find($page2->id);
+
+        $this->assertEquals('published', $updatedPage1->status);
+        $this->assertEquals('published', $updatedPage2->status);
+        $this->assertNotNull($updatedPage1->approved_by);
+        $this->assertNotNull($updatedPage2->approved_by);
+    }
+
+    public function testBulkApproveReturns422WithoutUserID()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'waiting_approval',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite('/api/pages/bulk-approve', [
+            'ids' => [$page->id]
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkApproveReturns422WithoutIds()
+    {
+        $response = $this->postForSite('/api/pages/bulk-approve', [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testFilterByWaitingApprovalStatus()
+    {
+        $this->createPage(['status' => 'draft']);
+        Page::create([
+            'title' => 'Waiting Page',
+            'slug' => 'waiting-page',
+            'status' => 'waiting_approval',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite('/api/pages?status=waiting_approval');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('waiting_approval', $data['items'][0]['status']);
+    }
+
+    public function testFilterByPrivateStatus()
+    {
+        $this->createPage(['status' => 'draft']);
+        Page::create([
+            'title' => 'Private Page',
+            'slug' => 'private-page',
+            'status' => 'private',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite('/api/pages?status=private');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('private', $data['items'][0]['status']);
+    }
+
+    public function testFilterByOnHoldStatus()
+    {
+        $this->createPage(['status' => 'draft']);
+        Page::create([
+            'title' => 'On Hold Page',
+            'slug' => 'on-hold-page',
+            'status' => 'on_hold',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite('/api/pages?status=on_hold');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('on_hold', $data['items'][0]['status']);
+    }
+
+    public function testApproveCreatesHistoryEntry()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'waiting_approval',
+            'requires_approval' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/approve", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify approval history entry
+        $approvalHistory = PageHistory::where('page_id', $page->id)
+            ->where('action', 'approved')
+            ->first();
+
+        $this->assertNotNull($approvalHistory);
+        $this->assertEquals(1, $approvalHistory->changes['approved_by']);
+
+        // Verify publish history entry
+        $publishHistory = PageHistory::where('page_id', $page->id)
+            ->where('action', 'published')
+            ->first();
+
+        $this->assertNotNull($publishHistory);
+    }
+
+    public function testRejectCreatesHistoryEntry()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'waiting_approval',
+            'requires_approval' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/reject", [
+            'user_id' => 1,
+            'reason' => 'Needs more work'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify rejection history entry
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'rejected')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals(1, $history->changes['rejected_by']);
+        $this->assertEquals('Needs more work', $history->changes['reason']);
+    }
+
+    public function testOnHoldCreatesHistoryEntry()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/put-on-hold", [
+            'user_id' => 1,
+            'reason' => 'Legal review needed'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify on hold history entry
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'on_hold')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals(1, $history->changes['user_id']);
+        $this->assertEquals('Legal review needed', $history->changes['reason']);
+    }
+
+    public function testMakePrivateCreatesHistoryEntry()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/make-private", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify private history entry
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'made_private')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals(1, $history->changes['user_id']);
+    }
+
+    public function testCannotApproveAlreadyPublishedPage()
+    {
+        $page = $this->createPage(['status' => 'published']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/approve", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('not waiting for approval', $data['error']);
+    }
+
+    public function testCannotRejectDraftPage()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/reject", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testUpdateFromWaitingApprovalToDraft()
+    {
+        $page = $this->createPage(['status' => 'waiting_approval']);
+
+        $updateData = [
+            'id' => $page->id,
+            'status' => 'draft',
+            'forms' => [
+                'main' => ['title' => 'Test Page'],
+                'meta' => ['slug' => 'test-page', 'status' => 'draft']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('draft', $data['data']['page']['status']);
+    }
+
+    public function testCannotTransitionFromArchivedToPublished()
+    {
+        $page = $this->createPage(['status' => 'archived']);
+
+        $updateData = [
+            'id' => $page->id,
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'Test Page'],
+                'meta' => ['slug' => 'test-page', 'status' => 'published']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('Cannot change status', $data['error']);
+    }
+
+    public function testDuplicatePageCopiesRequiresApprovalFlag()
+    {
+        $page = $this->createPage(['requires_approval' => true, 'status' => 'published']);;
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['data']['page']['requires_approval']);
+        $this->assertEquals('draft', $data['data']['page']['status']);
+    }
+
+    public function testCloneToSiteCopiesRequiresApprovalFlag()
+    {
+        $page = $this->createPage(['requires_approval' => true, 'status' => 'published']);;
+
+        $newSite = $this->createSite();
+
+        $response = $this->postForSite("/api/pages/{$page->id}/clone-to-site", [
+            'target_site_id' => $newSite->id
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['data']['page']['requires_approval']);
+        $this->assertEquals('draft', $data['data']['page']['status']);
+    }
+
+    public function testBulkApproveHandlesPartialFailures()
+    {
+        $waitingPage = $this->createPage(['status' => 'waiting_approval']);
+        $draftPage = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite('/api/pages/bulk-approve', [
+            'ids' => [$waitingPage->id, $draftPage->id],
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Waiting page should succeed
+        $this->assertTrue($data['data']['results'][$waitingPage->id]['success']);
+
+        // Draft page should fail
+        $this->assertFalse($data['data']['results'][$draftPage->id]['success']);
+        $this->assertArrayHasKey('error', $data['data']['results'][$draftPage->id]);
+    }
+
+    public function testStoreWithRequiresApprovalAndPublishedStatusCreatesWaitingApprovalPage()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'requires_approval' => true,
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'published']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('waiting_approval', $data['data']['page']['status']);
+        $this->assertTrue($data['data']['page']['requires_approval']);
+
+        // Verify history entries
+        $pageId = $data['data']['page']['id'];
+
+        $createdHistory = PageHistory::where('page_id', $pageId)
+            ->where('action', 'created')
+            ->first();
+        $this->assertNotNull($createdHistory);
+
+        $waitingHistory = PageHistory::where('page_id', $pageId)
+            ->where('action', 'waiting_approval')
+            ->first();
+        $this->assertNotNull($waitingHistory);
+    }
+
+    public function testStoreWithRequiresApprovalAndDraftStatusCreatesDraftPage()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'requires_approval' => true,
+            'status' => 'draft',
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'draft']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('draft', $data['data']['page']['status']);
+        $this->assertTrue($data['data']['page']['requires_approval']);
+    }
+
+    public function testStoreWithoutRequiresApprovalPublishesImmediately()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'requires_approval' => false,
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'published']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('published', $data['data']['page']['status']);
+        $this->assertFalse($data['data']['page']['requires_approval']);
+    }
+
+    public function testUpdateDraftWithRequiresApprovalToPublishedGoesToWaitingApproval()
+    {
+        $page = $this->createPage(['status' => 'draft', 'requires_approval' => true]);
+
+        $updateData = [
+            'id' => $page->id,
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'Draft Page'],
+                'meta' => ['slug' => 'draft-page', 'status' => 'published']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('waiting_approval', $data['data']['page']['status']);
+    }
+
+    public function testMakePageInternalSuccessfully()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/make-internal", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('internal', $data['data']['page']['status']);
+    }
+
+    public function testFilterByInternalStatus()
+    {
+        $this->createPage(['status' => 'draft']);
+
+        $this->createPage(['status' => 'internal']);
+
+        $response = $this->getForSite('/api/pages?status=internal');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('internal', $data['items'][0]['status']);
+    }
+
+    public function testMakeInternalCreatesHistoryEntry()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/make-internal", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify internal history entry
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'made_internal')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals(1, $history->changes['user_id']);
+    }
 }

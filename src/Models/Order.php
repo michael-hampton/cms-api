@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\OrderStatus;
 use App\Framework\Database\QueryBuilder;
-use App\Framework\Support\Collection;
 use App\Models\Concerns\HasCloneHistory;
 
 class Order extends Model
@@ -44,8 +44,6 @@ class Order extends Model
         'shipping' => 'float',
         'discount' => 'float',
         'total' => 'float',
-        'shipping_address' => 'json',
-        'billing_address' => 'json',
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'created_at' => 'datetime',
@@ -127,7 +125,7 @@ class Order extends Model
 
     public function getFormattedTotalAttribute(): string
     {
-        return $this->currency . ' ' . number_format($this->total, 2);
+        return $this->currency . ' ' . number_format($this->total ?? 0, 2);
     }
 
     public function toArray(): array
@@ -143,6 +141,10 @@ class Order extends Model
 
         if ($this->relationLoaded('user')) {
             $data['user'] = $this->user ? $this->user : null;
+        }
+
+        if ($this->relationLoaded('history')) {
+            $data['history'] = $this->history->toArray();
         }
 
         return $data;
@@ -182,5 +184,52 @@ class Order extends Model
             return $this->billingAddress->toArray();
         }
         return $this->billing_address;
+    }
+
+    public function canTransitionTo(OrderStatus|string $targetStatus): bool
+    {
+        if (!$this->status) {
+            return true;
+        }
+
+        if (is_string($targetStatus)) {
+            $targetStatus = OrderStatus::from($targetStatus);
+        }
+
+        $currentStatus = OrderStatus::from($this->status);
+
+
+
+        return $currentStatus->canTransitionTo($targetStatus);
+    }
+
+    public function changeStatus(OrderStatus|string $newStatus, ?int $userId = null, ?string $notes = null): bool
+    {
+        if (is_string($newStatus)) {
+            $newStatus = OrderStatus::from($newStatus);
+        }
+
+        if (!$this->canTransitionTo($newStatus)) {
+            throw new \Exception("Cannot transition from {$this->status} to {$newStatus->value}");
+        }
+
+        $oldStatus = $this->status;
+        $this->status = $newStatus->value;
+
+        // Set timestamps for specific statuses
+        if ($newStatus === OrderStatus::COMPLETED && !$this->completed_at) {
+            $this->completed_at = date('Y-m-d H:i:s');
+        }
+
+        if ($newStatus === OrderStatus::CANCELLED && !$this->cancelled_at) {
+            $this->cancelled_at = date('Y-m-d H:i:s');
+        }
+
+        return $this->save();
+    }
+
+    public function history($relation = false)
+    {
+        return $this->hasMany(OrderHistory::class, 'order_id', 'id', $relation);
     }
 }

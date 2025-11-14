@@ -2,6 +2,10 @@
 
 namespace App\Controllers;
 
+use App\Actions\CloneCategory;
+use App\Actions\CloneOrder;
+use App\Exceptions\InvalidOrderStatusException;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -22,8 +26,8 @@ use Exception;
 class OrderController extends Controller
 {
     public function __construct(
-        private OrderService    $orderService,
-        private OrderRepository $orderRepository
+        private readonly OrderService    $orderService,
+        private readonly OrderRepository $orderRepository
     )
     {
         parent::__construct();
@@ -193,7 +197,9 @@ class OrderController extends Controller
     public function duplicate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $duplicatedOrder = $this->orderService->duplicateOrder($id);
+            $cloneOrder = Container::getInstance()->make(CloneOrder::class);
+
+            $duplicatedOrder = $cloneOrder->handle($id);
 
             return $this->jsonResponse($duplicatedOrder->toArray(), 201);
 
@@ -261,7 +267,9 @@ class OrderController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->orderService->bulkUpdateStatus($data['ids'], $data['status']);
+            $bulkUpdateStatus = Container::getInstance()->make(\App\Actions\BulkUpdateOrderStatus::class);
+
+            $result = $bulkUpdateStatus->handle($data['ids'], $data['status']);
 
             return $this->resourceResponse([
                 'message' => "Bulk status update completed. Updated: " . count($result['updated']) . ", Failed: " . count($result['failed']),

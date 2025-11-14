@@ -2,8 +2,12 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkDeleteBrand;
+use App\Actions\BulkDeleteCategory;
+use App\Actions\CloneCategory;
 use App\Exceptions\CannotDeleteException;
 use App\Exceptions\CategoryAssignmentException;
+use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -156,7 +160,9 @@ class CategoryController extends Controller
             $data = $request->all();
             $newName = $data['name'] ?? null;
 
-            $success = $this->categoryService->duplicateCategory($id, $newName);
+            $cloneCategory = Container::getInstance()->make(CloneCategory::class);
+
+            $success = $cloneCategory->handle($id, $newName);
 
             if ($success) {
                 // Fetch the newly created category
@@ -193,7 +199,9 @@ class CategoryController extends Controller
         try {
             $data = $request->validated();
 
-            $result = $this->categoryService->bulkDelete($data['ids']);
+            $bulkDeleteCategory = Container::getInstance()->make(BulkDeleteCategory::class);
+
+            $result = $bulkDeleteCategory->handle($data['ids']);
 
             return $this->resourceResponse([
                 'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),

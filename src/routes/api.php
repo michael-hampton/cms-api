@@ -62,6 +62,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/{id}/reject', PageController::class, 'reject');
         $router->post('/pages/{id}/put-on-hold', PageController::class, 'putOnHold');
         $router->post('/pages/{id}/make-private', PageController::class, 'makePrivate');
+        $router->post('/pages/{id}/make-internal', PageController::class, 'makeInternal');
         $router->post('/pages/bulk-approve', PageController::class, 'bulkApprove');
 
         $router->get('/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;
