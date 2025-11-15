@@ -197,7 +197,7 @@ class OrderController extends Controller
 
             $results = $cloneOrder->handle($id);
 
-            return $this->resourceResponse($results, 201);
+            return $this->jsonResponse($results, 201);
 
         } catch (Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

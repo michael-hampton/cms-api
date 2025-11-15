@@ -14,4 +14,9 @@ class MemberAuthWrapper
     {
         return MemberAuth::member();
     }
+
+    public function memberId()
+    {
+        return MemberAuth::id();
+    }
 }

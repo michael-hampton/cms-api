@@ -17,6 +17,7 @@ class BulkUpdatePage
         $results = [];
         foreach ($pageIds as $pageId) {
             try {
+                $updateData['id'] = $pageId;
                 $results[$pageId] = $this->pageService->updatePageWithAllData($pageId, $updateData, $siteId);
             } catch (Exception $e) {
                 $results[$pageId] = ['error' => $e->getMessage()];

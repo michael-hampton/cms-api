@@ -2,8 +2,7 @@
 
 namespace App\Services;
 
-use App\Framework\Authorization\AuthenticationService;
-use App\Models\Review;
+use App\Framework\Authorization\MemberAuthWrapper;
 use App\Repositories\ProductRepository;
 use App\Repositories\ReviewHelpfulRepository;
 use App\Repositories\ReviewRepository;
@@ -14,7 +13,7 @@ class ReviewService
         private readonly ReviewRepository $reviewRepository,
         private readonly ReviewHelpfulRepository $reviewHelpfulRepository,
         private readonly ProductRepository $productRepository,
-        private readonly AuthenticationService $authService
+        private readonly MemberAuthWrapper $authService
     ) {}
 
     protected function getSessionId(): string
@@ -56,7 +55,7 @@ class ReviewService
 
     public function createReview(int $productId, array $data): array
     {
-        $userId = $this->authService->getUserId();
+        $userId = $this->authService->memberId();
 
         if (!$userId) {
             return ['success' => false, 'message' => 'You must be logged in to submit a review'];
@@ -102,7 +101,7 @@ class ReviewService
 
     public function updateReview(int $reviewId, array $data): array
     {
-        $userId = $this->authService->getUserId();
+        $userId = $this->authService->memberId();
 
         if (!$userId) {
             return ['success' => false, 'message' => 'You must be logged in'];
@@ -138,7 +137,7 @@ class ReviewService
 
     public function deleteReview(int $reviewId): array
     {
-        $userId = $this->authService->getUserId();
+        $userId = $this->authService->memberId();
 
         if (!$userId) {
             return ['success' => false, 'message' => 'You must be logged in'];
@@ -165,7 +164,7 @@ class ReviewService
     public function markReviewHelpful(int $reviewId, bool $isHelpful): array
     {
         $sessionId = $this->getSessionId();
-        $userId = $this->authService->getUserId();
+        $userId = $this->authService->memberId();
 
         $review = $this->reviewRepository->find($reviewId);
         if (!$review) {
@@ -279,7 +278,7 @@ class ReviewService
 
     public function canUserReview(int $productId): array
     {
-        $userId = $this->authService->getUserId();
+        $userId = $this->authService->memberId();
 
         if (!$userId) {
             return [

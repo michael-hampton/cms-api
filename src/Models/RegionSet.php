@@ -3,12 +3,12 @@
 namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
-use App\Framework\Support\Collection;
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\TracksCreator;
 
 class RegionSet extends Model
 {
-    use HasCloneHistory;
+    use HasCloneHistory, TracksCreator;
 
     protected $table = 'region_sets';
 

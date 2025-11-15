@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use App\Framework\Support\Str;
+use App\Models\Concerns\TracksCreator;
 
 class PageGrid extends Model
 {
+    use TracksCreator;
+
     protected $fillable = [
         'title',
         'subtitle',

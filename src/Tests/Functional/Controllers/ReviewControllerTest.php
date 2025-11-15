@@ -2,49 +2,39 @@
 
 namespace App\Tests\Functional\Controllers;
 
-use App\Framework\Authorization\Auth;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Session\Session;
-use App\Models\Product; // Assumed to exist
-use App\Models\Review;  // Assumed to exist
-use App\Models\User;    // Used for authentication
+use App\Models\Review;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+
+// Assumed to exist
+// Assumed to exist
+
+// Used for authentication
 
 class ReviewControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private int $productId;
     private int $otherProductId;
-    private $user;
+    private $member;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         // Ensure we have a product to review (mocking the Product model creation)
-        $product = Product::create([
-            'name' => 'Test Product',
-            'slug' => 'test-product',
-            'site_id' => $this->siteId,
-            'price' => 10.99
-        ]);
+        $product = $this->createProduct();
         $this->productId = $product->id;
 
-        $otherProduct = Product::create([
-            'name' => 'Other Product',
-            'slug' => 'other-product',
-            'site_id' => $this->siteId,
-            'price' => 10.99
-        ]);
+        $otherProduct = $this->createProduct();
         $this->otherProductId = $otherProduct->id;
 
-        Auth::$user = null;
+        $this->member = $this->createMember();
 
-        $this->user = User::create([
-            'name' => 'Test User',
-            'email' => 'test@test.com',
-            'password' => 'password',
-        ]);
-
-        Session::put('authenticated', true);
-        Session::put('user_id', $this->user->id);;
+        Session::put('member_id', $this->member->id);
+        Session::put('member_authenticated', true);
 
     }
 
@@ -62,7 +52,7 @@ class ReviewControllerTest extends FunctionalTestCase
         // Arrange: Create a review for the test product
         Review::create([
             'product_id' => $this->productId,
-            'user_id' => $this->user->id,
+            'user_id' => $this->member->id,
             'rating' => 5,
             'comment' => 'Great product!',
             'author_name' => 'Test User',
@@ -72,7 +62,7 @@ class ReviewControllerTest extends FunctionalTestCase
         // Create a review for another product (should not be returned)
         Review::create([
             'product_id' => $this->otherProductId,
-            'user_id' => $this->user->id,
+            'user_id' => $this->member->id,
             'rating' => 1,
             'comment' => 'Bad product!',
             'author_name' => 'Test User',
@@ -100,7 +90,7 @@ class ReviewControllerTest extends FunctionalTestCase
         for ($i = 1; $i <= 3; $i++) {
             Review::create([
                 'product_id' => $this->productId,
-                'user_id' => $this->user->id,
+                'user_id' => $this->member->id,
                 'rating' => 4,
                 'comment' => "Review {$i}",
                 'author_name' => 'User',
@@ -177,9 +167,6 @@ class ReviewControllerTest extends FunctionalTestCase
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertStringContainsString('logged in', $data['message']);
-
-        // Re-authenticate for cleanup tearDown
-        $this->actingAs($this->user);
     }
 
     // --- PUT /api/reviews/{reviewId} ---
@@ -189,7 +176,7 @@ class ReviewControllerTest extends FunctionalTestCase
         // Arrange: Create a review by the authenticated user
         $review = Review::create([
             'product_id' => $this->productId,
-            'user_id' => $this->user->id,
+            'user_id' => $this->member->id,
             'rating' => 3,
             'comment' => 'Initial comment',
             'author_name' => 'Test User',
@@ -231,12 +218,7 @@ class ReviewControllerTest extends FunctionalTestCase
     public function testUpdateReturnsErrorIfNotAuthor()
     {
         // Arrange: Create a review by a DIFFERENT user
-        $otherUser = User::create([
-            'name' => 'Other User',
-            'email' => 'other@example.com',
-            'password' => 'hashed',
-            'site_id' => $this->siteId,
-        ]);
+        $otherUser = $this->createMember();
         $review = Review::create([
             'product_id' => $this->productId,
             'user_id' => $otherUser->id,
@@ -263,7 +245,7 @@ class ReviewControllerTest extends FunctionalTestCase
         // Arrange: Create a review by the authenticated user
         $review = Review::create([
             'product_id' => $this->productId,
-            'user_id' => $this->user->id,
+            'user_id' => $this->member->id,
             'rating' => 3,
             'comment' => 'To be deleted',
             'author_name' => 'Test User',
@@ -288,7 +270,7 @@ class ReviewControllerTest extends FunctionalTestCase
         // Arrange: Create a review (user is irrelevant since we unauthenticate)
         $review = Review::create([
             'product_id' => $this->productId,
-            'user_id' => $this->user->id,
+            'user_id' => $this->member->id,
             'rating' => 3,
             'site_id' => $this->siteId
         ]);
@@ -299,9 +281,6 @@ class ReviewControllerTest extends FunctionalTestCase
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertStringContainsString('You must be logged in', $data['message']);
-
-        // Re-authenticate for cleanup tearDown
-        $this->actingAs($this->user);
     }
 
     // --- POST /api/reviews/{reviewId}/helpful ---
@@ -401,7 +380,7 @@ class ReviewControllerTest extends FunctionalTestCase
         // Arrange: User has already reviewed
         Review::create([
             'product_id' => $this->productId,
-            'user_id' => $this->user->id,
+            'user_id' => $this->member->id,
             'rating' => 5,
             'site_id' => $this->siteId
         ]);
@@ -430,14 +409,11 @@ class ReviewControllerTest extends FunctionalTestCase
 
         $this->assertFalse($data['can_review']);
         $this->assertEquals('You must be logged in to submit a review', $data['reason']);
-
-        // Re-authenticate for cleanup tearDown
-        $this->actingAs($this->authenticatedUser);
     }
 
     private function clearUser()
     {
         Session::flush();
-        Auth::$user = null;
+        MemberAuth::$member = null;
     }
 }

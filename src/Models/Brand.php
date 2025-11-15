@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\TracksCreator;
 
 class Brand extends Model
 {
-    use HasCloneHistory;
+    use HasCloneHistory, TracksCreator;
 
     protected $table = 'brands';
 

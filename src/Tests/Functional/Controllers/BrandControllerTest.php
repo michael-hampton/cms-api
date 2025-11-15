@@ -3,7 +3,6 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Brand;
-use App\Models\Product;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class BrandControllerTest extends FunctionalTestCase
@@ -181,9 +180,9 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('Nike (Copy)', $data['data']['name']);
-        $this->assertEquals('Sports brand', $data['data']['description']);
-        $this->assertNotEquals($brand->slug, $data['data']['slug']);
+        $this->assertEquals('Nike (Copy)', $data['data']['brand']['name']);
+        $this->assertEquals('Sports brand', $data['data']['brand']['description']);
+        $this->assertNotEquals($brand->slug, $data['data']['brand']['slug']);
     }
 
     public function testDuplicateBrandWithLogo(): void
@@ -201,8 +200,8 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertNotNull($data['data']['logo']);
-        $this->assertNotEquals('logos/adidas.png', $data['data']['logo']);
+        $this->assertNotNull($data['data']['brand']['logo']);
+        $this->assertNotEquals('logos/adidas.png', $data['data']['brand']['logo']);
 
         // Cleanup
         @unlink($logoPath);
@@ -225,14 +224,14 @@ class BrandControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Verify brand was duplicated
-        $this->assertEquals('Apple (Copy)', $data['data']['name']);
+        $this->assertEquals('Apple (Copy)', $data['data']['brand']['name']);
 
         // Verify products still belong to original brand
         $originalBrand = Brand::find($brand->id);
         $this->assertEquals(2, $originalBrand->products()->count());
 
         // Verify new brand has no products
-        $newBrand = Brand::find($data['data']['id']);
+        $newBrand = Brand::find($data['data']['brand']['id']);
         $this->assertEquals(0, $newBrand->products()->count());
     }
 
@@ -253,11 +252,11 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('Nike (Copy)', $data['data']['name']);
-        $this->assertEquals('Nike SEO Title', $data['data']['seo_title']);
-        $this->assertEquals('Nike SEO Description', $data['data']['seo_description']);
-        $this->assertEquals(0, $data['data']['no_index']);
-        $this->assertNull($data['data']['canonical_url']);
+        $this->assertEquals('Nike (Copy)', $data['data']['brand']['name']);
+        $this->assertEquals('Nike SEO Title', $data['data']['brand']['seo_title']);
+        $this->assertEquals('Nike SEO Description', $data['data']['brand']['seo_description']);
+        $this->assertEquals(0, $data['data']['brand']['no_index']);
+        $this->assertNull($data['data']['brand']['canonical_url']);
     }
 
     public function testBulkDeleteSuccessfully(): void

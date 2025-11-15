@@ -23,7 +23,6 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Event;
 use App\Framework\Support\Serializable;
 use BadMethodCallException;
-use DateTime;
 
 abstract class Model
 {
@@ -81,6 +80,15 @@ abstract class Model
 
     public function __construct(array $attributes = [], $database = null)
     {
+        // Boot traits on first instantiation
+        static $booted = [];
+        $class = static::class;
+
+        if (!isset($booted[$class])) {
+            static::bootTraits();
+            $booted[$class] = true;
+        }
+
         $this->database = $database ?? Database::getInstance();
         $this->relationManager = new EagerLoader(
             new RelationshipAnalyzer(),
@@ -1313,6 +1321,25 @@ abstract class Model
         }
 
         return $instance;
+    }
+
+    /**
+     * Boot all of the bootable traits on the model
+     */
+    protected static function bootTraits(): void
+    {
+        $class = static::class;
+
+        $booted = [];
+
+        foreach (class_uses_recursive($class) as $trait) {
+            $method = 'boot' . class_basename($trait);
+
+            if (method_exists($class, $method) && !in_array($method, $booted)) {
+                forward_static_call([$class, $method]);
+                $booted[] = $method;
+            }
+        }
     }
 
 }

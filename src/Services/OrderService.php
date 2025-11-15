@@ -80,6 +80,8 @@ class OrderService
                     $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
                     $data['shipping_address_id'] = $newAddress->id;
                     unset($data['shipping_address']); // Remove JSON data
+                } else {
+                    $data['shipping_address'] = json_encode($data['shipping_address']);
                 }
                 // For guest orders, keep shipping_address as JSON
             }
@@ -102,6 +104,14 @@ class OrderService
                     $data['billing_address_id'] = $newAddress->id;
                     unset($data['billing_address']);
                 }
+            }
+
+            if (!empty($data['billing_address']) && is_array($data['billing_address'])) {
+                $data['billing_address'] = json_encode($data['billing_address']);
+            }
+
+            if (!empty($data['shipping_address']) && is_array($data['shipping_address'])) {
+                $data['shipping_address'] = json_encode($data['shipping_address']);
             }
 
             // Remove customer fields from order data as they're not part of orders table

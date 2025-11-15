@@ -172,7 +172,7 @@ class BrandController extends Controller
 
             $results = $cloneBrand->handle($id, $newName);
 
-            return $this->resourceResponse($results, 201);
+            return $this->jsonResponse($results, 201);
 
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

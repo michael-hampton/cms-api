@@ -13,13 +13,9 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
-use App\Framework\Support\SiteContext;
-use App\Models\Page;
-use App\Models\PageHistory;
 use App\Parsers\BlockRegistry;
 use App\Repositories\PageRepository;
 use App\Resources\PageResource;
-use App\Search\PaginatedResult;
 use App\Search\SearchCriteriaParser;
 use App\Services\PageService;
 use Exception;
@@ -240,13 +236,13 @@ class PageController extends Controller
         try {
             $handler = Container::getInstance()->make(ClonePage::class);
 
-            $newPage = $handler->handle($id);
+            $results = $handler->handle($id);
 
-            if (!$newPage) {
+            if (!$results) {
                 return $this->errorResponse('Page not found', 404);
             }
 
-            return $this->jsonResponse(['page' => $newPage->toArrayWithRelations()], 201);
+            return $this->jsonResponse($results, 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -265,13 +261,13 @@ class PageController extends Controller
 
             $handler = Container::getInstance()->make(ClonePageToSite::class);
 
-            $newPage = $handler->handle($id, $targetSiteId, $newTitle);
+            $results = $handler->handle($id, $targetSiteId, $newTitle);
 
-            if (!$newPage) {
+            if (!$results) {
                 return $this->errorResponse('Page not found', 404);
             }
 
-            return $this->jsonResponse(['page' => $newPage->toArrayWithRelations()], 201);
+            return $this->jsonResponse($results, 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 404);
         }

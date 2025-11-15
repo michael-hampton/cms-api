@@ -291,11 +291,11 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('iPhone 15 (Copy)', $data['data']['name']);
-        $this->assertEquals('Latest iPhone', $data['data']['description']);
-        $this->assertEquals(999.99, $data['data']['price']);
-        $this->assertEquals(899.99, $data['data']['sale_price']);
-        $this->assertNotEquals($product->slug, $data['data']['slug']);
+        $this->assertEquals('iPhone 15 (Copy)', $data['data']['product']['name']);
+        $this->assertEquals('Latest iPhone', $data['data']['product']['description']);
+        $this->assertEquals(999.99, $data['data']['product']['price']);
+        $this->assertEquals(899.99, $data['data']['product']['sale_price']);
+        $this->assertNotEquals($product->slug, $data['data']['product']['slug']);
     }
 
     public function testDuplicateProductWithImage(): void
@@ -312,7 +312,7 @@ class ProductControllerTest extends FunctionalTestCase
         $imagePath = 'uploads/products/macbook.jpg';
         $imagePath = getcwd() . '/' . $imagePath;
 
-        if (!file_exists($imagePath)) {
+        if (!is_dir(dirname($imagePath))) {
             @mkdir(dirname($imagePath), 0755, true);
         }
 
@@ -323,8 +323,8 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertNotNull($data['data']['image']);
-        $this->assertNotEquals('uploads/products/macbook.jpg', $data['data']['image']);
+        $this->assertNotNull($data['data']['product']['image']);
+        $this->assertNotEquals('uploads/products/macbook.jpg', $data['data']['product']['image']);
 
         // Cleanup
         @unlink($imagePath);
@@ -347,7 +347,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('AirPods Pro v2', $data['data']['name']);
+        $this->assertEquals('AirPods Pro v2', $data['data']['product']['name']);
     }
 
     public function testDuplicateProductWithBrandAndCategory(): void
@@ -371,8 +371,8 @@ class ProductControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Verify relationships are maintained
-        $this->assertEquals($brand->id, $data['data']['brand_id']);
-        $this->assertEquals($category->id, $data['data']['category_id']);
+        $this->assertEquals($brand->id, $data['data']['product']['brand_id']);
+        $this->assertEquals($category->id, $data['data']['product']['category_id']);
     }
 
     public function testItCanCreateProductWithAllRelations()
@@ -649,8 +649,8 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('iPhone 15 Site 2', $data['data']['name']);
-        $this->assertEquals($site2->id, $data['data']['site_id']);
+        $this->assertEquals('iPhone 15 Site 2', $data['data']['product']['name']);
+        $this->assertEquals($site2->id, $data['data']['product']['site_id']);
     }
 
     public function testDuplicateProductToSameSite(): void
@@ -667,7 +667,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals($site->id, $data['data']['site_id']);
+        $this->assertEquals($site->id, $data['data']['product']['site_id']);
     }
 
     public function testDuplicateProductWithSelectiveRelations(): void
@@ -710,7 +710,7 @@ class ProductControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
-        $newProductId = $data['data']['id'];
+        $newProductId = $data['data']['product']['id'];
 
         $newProduct = Product::with(['images', 'merchants', 'variants', 'specifications'])->find($newProductId);
 
@@ -832,7 +832,7 @@ class ProductControllerTest extends FunctionalTestCase
         $imagePath1 = 'uploads/products/red-front.jpg';
         $imagePath2 = 'uploads/products/red-back.jpg';
 
-        if (!@file_exists($imagePath1)) {
+        if (!is_dir(dirname($imagePath1))) {
             @mkdir(dirname($imagePath1), 0755, true);
         }
 
@@ -848,7 +848,7 @@ class ProductControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
-        $newProductId = $data['data']['id'];
+        $newProductId = $data['data']['product']['id'];
 
         $newProduct = Product::with(['variants.images'])->find($newProductId);
 
@@ -1411,7 +1411,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
 
         $data = json_decode($response->getContent(), true);
-        $newProductId = $data['data']['id'];
+        $newProductId = $data['data']['product']['id'];
 
         $newProduct = Product::with(['variants', 'merchants.variant'])->find($newProductId);
 

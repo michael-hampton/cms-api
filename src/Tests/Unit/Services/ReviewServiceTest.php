@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Framework\Authorization\AuthenticationService;
+use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Support\Collection;
 use App\Models\Product;
 use App\Models\Review;
@@ -20,7 +20,7 @@ class ReviewServiceTest extends TestCase
     protected ReviewHelpfulRepository $reviewHelpfulRepository;
     protected ProductRepository $productRepository;
     protected ReviewService $reviewService;
-    protected AuthenticationService $authService;
+    protected MemberAuthWrapper $authService;
 
     protected function setUp(): void
     {
@@ -30,7 +30,7 @@ class ReviewServiceTest extends TestCase
         $this->reviewRepository = Mockery::mock(ReviewRepository::class);
         $this->reviewHelpfulRepository = Mockery::mock(ReviewHelpfulRepository::class);
         $this->productRepository = Mockery::mock(ProductRepository::class);
-        $this->authService = Mockery::mock(AuthenticationService::class); // <-- NEW
+        $this->authService = Mockery::mock(MemberAuthWrapper::class); // <-- NEW
 
         // Instantiate the service with mocked dependencies
         $this->reviewService = new ReviewService(
@@ -58,7 +58,7 @@ class ReviewServiceTest extends TestCase
     private function mockAuthUserId(?int $userId): void
     {
         // Use shouldReceive on the AuthService mock
-        $this->authService->shouldReceive('getUserId')->andReturn($userId);
+        $this->authService->shouldReceive('memberId')->andReturn($userId);
     }
 
     /**

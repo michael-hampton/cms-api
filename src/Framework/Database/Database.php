@@ -214,6 +214,8 @@ class Database
             return $insertId;
 
         } catch (Exception $e) {
+            echo $e->getMessage();
+            echo $sql;
             Logger::error('Insert operation failed', [
                 'table' => $table,
                 'error' => $e->getMessage()

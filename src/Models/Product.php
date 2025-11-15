@@ -4,10 +4,11 @@ namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\TracksCreator;
 
 class Product extends Model
 {
-    use HasCloneHistory;
+    use HasCloneHistory, TracksCreator;
 
     protected $fillable = [
         'name',
@@ -25,6 +26,8 @@ class Product extends Model
         'site_id',
         'is_active',
         'clone_history',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [

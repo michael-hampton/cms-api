@@ -2,7 +2,6 @@
 
 namespace App\Tests\Functional\Controllers;
 
-use App\Models\Product;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -327,6 +326,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(201, $response);
 
         $data = json_decode($response->getContent(), true);
+
         $this->assertEquals('CUSTOM', $data['data']['voucher']['code']);
     }
 

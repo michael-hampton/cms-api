@@ -2,7 +2,6 @@
 
 namespace App\Tests\Functional\Controllers;
 
-use App\Models\Page;
 use App\Models\PageTag;
 use App\Models\Tag;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -366,6 +365,33 @@ class TagControllerTest extends FunctionalTestCase
         // Verify tag1 deleted, tag2 still exists
         $this->assertNull(Tag::find($tag1->id));
         $this->assertNotNull(Tag::find($tag2->id));
+    }
+
+    public function testIndexFiltersForFeaturedTags()
+    {
+        $this->createTag(['name' => 'Featured 1', 'is_featured' => true]);
+        $this->createTag(['name' => 'Regular 1', 'is_featured' => false]);
+        $this->createTag(['name' => 'Featured 2', 'is_featured' => true]);
+
+        $response = $this->getForSite('/api/tags?is_featured=true');
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(2, $data['items']);
+
+        foreach ($data['items'] as $tag) {
+            $this->assertTrue($tag['is_featured']);
+        }
+    }
+
+    public function testIndexReturnsAllTagsWhenFeaturedFilterNotSet()
+    {
+        $this->createTag(['is_featured' => true]);
+        $this->createTag(['is_featured' => false]);
+
+        $response = $this->getForSite('/api/tags');
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(2, $data['items']);
     }
 
     public function testBulkDeleteValidation(): void

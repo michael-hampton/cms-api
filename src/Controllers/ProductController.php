@@ -151,7 +151,7 @@ class ProductController extends Controller
                 $cloneRelations
             );
 
-            return $this->resourceResponse($results, 201);
+            return $this->jsonResponse($results, 201);
 
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

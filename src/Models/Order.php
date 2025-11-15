@@ -5,10 +5,11 @@ namespace App\Models;
 use App\Enums\OrderStatus;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\TracksCreator;
 
 class Order extends Model
 {
-    use HasCloneHistory;
+    use HasCloneHistory, TracksCreator;
 
     protected $table = 'orders';
 
@@ -49,6 +50,8 @@ class Order extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'clone_history' => 'array',
+        'shipping_address' => 'array',
+        'billing_address' => 'array',
     ];
 
     protected $dates = ['deleted_at'];

@@ -287,7 +287,7 @@ class AuthorControllerTest extends FunctionalTestCase
 
         // Verify response structure
         $this->assertArrayHasKey('data', $data);
-        $duplicated = $data['data'];
+        $duplicated = $data['data']['author'];
 
         // Verify duplicated author data
         $this->assertEquals('John Doe (Copy)', $duplicated['name']);
@@ -313,8 +313,8 @@ class AuthorControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('Jane Smith - Editor', $data['data']['name']);
-        $this->assertEquals('jane-smith-editor', $data['data']['slug']);
+        $this->assertEquals('Jane Smith - Editor', $data['data']['author']['name']);
+        $this->assertEquals('jane-smith-editor', $data['data']['author']['slug']);
     }
 
     public function testDuplicateAuthorWithAvatar(): void
@@ -333,8 +333,8 @@ class AuthorControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Verify avatar was duplicated
-        $this->assertNotNull($data['data']['avatar']);
-        $this->assertNotEquals('avatars/bob.jpg', $data['data']['avatar']);
+        $this->assertNotNull($data['data']['author']['avatar']);
+        $this->assertNotEquals('avatars/bob.jpg', $data['data']['author']['avatar']);
 
         // Cleanup
         @unlink($avatarPath);

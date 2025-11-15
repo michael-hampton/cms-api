@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
-use App\Framework\Database\Database;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
+use App\Models\Concerns\TracksCreator;
 
 class Image extends Model
 {
+    use TracksCreator;
+
     protected $table = 'images';
 
     protected $fillable = [

@@ -150,7 +150,7 @@ class VoucherController extends Controller
                 return $this->errorResponse('Voucher not found', 404);
             }
 
-            return $this->resourceResponse($results, 201);
+            return $this->jsonResponse($results, 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

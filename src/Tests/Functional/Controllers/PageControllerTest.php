@@ -7,19 +7,9 @@ use App\Models\Block;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\PageAuthor;
-use App\Models\PageCategory;
 use App\Models\PageHistory;
-use App\Models\PageMetadata;
-use App\Models\PageRegionSet;
-use App\Models\PageSeo;
-use App\Models\PageSettings;
-use App\Models\PageSocial;
-use App\Models\PageTag;
-use App\Models\PageTerritory;
-use App\Models\RegionSet;
 use App\Models\Site;
 use App\Models\Tag;
-use App\Models\Territory;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageControllerTest extends FunctionalTestCase
@@ -166,6 +156,7 @@ class PageControllerTest extends FunctionalTestCase
         $page1 = $this->createPage();
         $page2 = $this->createPage();
         $response = $this->postForSite('/api/pages/bulk-update', [
+            'title' => 'Updated Title',
             'site_id' => $this->siteId,
             'page_ids' => [$page1->id, $page2->id],
             'data' => ['forms' => ['meta' => ['status' => 'published']]]
@@ -1934,5 +1925,89 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertNotNull($history);
         $this->assertEquals(1, $history->changes['user_id']);
+    }
+
+    public function testStoreCreatesNewPageWithCreator()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'New Page'],
+                'meta' => ['slug' => 'new-page', 'status' => 'draft', 'author' => 1],
+                'seo' => ['meta_title' => 'Page Title', 'meta_description' => 'Description']
+            ],
+            'blocks' => [['type' => 'text', 'paragraphs' => ['Hello World', 'type' => 'text'], 'order' => 1]]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('New Page', $data['data']['page']['title']);
+        $this->assertEquals(1, $data['data']['page']['created_by']);
+        $this->assertEquals(1, $data['data']['page']['updated_by']);
+    }
+
+    public function testUpdateModifiesExistingPageWithUpdater()
+    {
+        $page = $this->createPage();
+
+        $updateData = [
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'Updated Title'],
+                'meta' => ['slug' => 'updated']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Updated Title', $data['data']['page']['title']);
+        $this->assertEquals(1, $data['data']['page']['created_by']); // Original creator
+        $this->assertEquals(1, $data['data']['page']['updated_by']); // New updater
+    }
+
+    public function testDuplicatePageSetsNewCreator()
+    {
+        $page = $this->createPage();
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsString('Copy', $data['data']['page']['title']);
+        $this->assertEquals('draft', $data['data']['page']['status']);
+
+        // Duplicated page should have the current user as creator
+        $this->assertEquals(1, $data['data']['page']['created_by']);
+        $this->assertEquals(1, $data['data']['page']['updated_by']);
+    }
+
+    public function testCloneToSiteSetsNewCreator()
+    {
+        $sourcePage = $this->createPage();
+
+        $newSite = $this->createSite();
+        $targetSiteId = $newSite->id;
+
+        $response = $this->postForSite("/api/pages/{$sourcePage->id}/clone-to-site", [
+            'target_site_id' => $targetSiteId
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals($targetSiteId, $data['data']['page']['site_id']);
+        $this->assertEquals('draft', $data['data']['page']['status']);
+
+        // Cloned page should have the current user as creator
+        $this->assertEquals(1, $data['data']['page']['created_by']);
+        $this->assertEquals(1, $data['data']['page']['updated_by']);
     }
 }

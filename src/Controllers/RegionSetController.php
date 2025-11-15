@@ -5,7 +5,6 @@ namespace App\Controllers;
 use App\Actions\BulkActivateRegionSets;
 use App\Actions\BulkDeactivateRegionSets;
 use App\Actions\BulkDeleteRegionSet;
-use App\Actions\CloneProduct;
 use App\Actions\CloneRegionSet;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
@@ -13,12 +12,10 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
-use App\Models\Page;
 use App\Repositories\PageRepository;
 use App\Repositories\RegionSetRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Resources\PageResource;
-use App\Resources\RegionSetResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\RegionSetService;
 use Exception;
@@ -140,9 +137,9 @@ class RegionSetController extends Controller
         try {
             $cloneRegionSet = Container::getInstance()->make(CloneRegionSet::class);
             $newName = $request->get('name');
-            $newRegionSet = $cloneRegionSet->handle($id, $newName);
+            $result = $cloneRegionSet->handle($id, $newName);
 
-            return $this->jsonResponse(['region_set' => $newRegionSet->toArrayWithRelations()], 201);
+            return $this->jsonResponse($result, 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

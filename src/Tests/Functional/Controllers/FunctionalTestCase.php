@@ -3,13 +3,11 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\ApiApplication;
-use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
-use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\Site;
 use App\Models\User;
@@ -23,6 +21,7 @@ abstract class FunctionalTestCase extends TestCase
     protected int $siteId;
     protected ?User $authenticatedUser = null;
     protected ?string $authToken = null;
+    private int $currentUserId;
 
     protected function setUp(): void
     {
@@ -661,6 +660,12 @@ abstract class FunctionalTestCase extends TestCase
         if (!file_exists($filePath)) {
             file_put_contents($filePath, 'dummy image content');
         }
+    }
+
+    protected function setAuthenticatedUser(int $userId): void
+    {
+        $this->currentUserId = $userId;
+        $_SESSION['user_id'] = $userId;
     }
 
 }

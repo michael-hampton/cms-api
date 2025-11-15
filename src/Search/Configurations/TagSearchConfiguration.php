@@ -2,6 +2,7 @@
 
 namespace App\Search\Configurations;
 
+use App\Search\Filters\BooleanFilter;
 use App\Search\HasSite;
 use App\Search\SearchConfiguration;
 use App\Search\SortSpecification;
@@ -11,6 +12,8 @@ class TagSearchConfiguration extends SearchConfiguration implements SearchConfig
     use HasSite;
     public function configure(): void
     {
+        $this->addFilter(new BooleanFilter('is_featured', 'is_featured'));
+
         // Sorts only (no filters)
         $this->addSort(new SortSpecification('name', 'name'))
             ->addSort(new SortSpecification('date', 'created_at'))

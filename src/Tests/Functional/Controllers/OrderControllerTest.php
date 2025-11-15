@@ -293,14 +293,14 @@ class OrderControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Verify new order was created with pending status
-        $this->assertNotEquals($originalOrder->id, $data['data']['id']);
-        $this->assertNotEquals($originalOrder->order_number, $data['data']['order_number']);
-        $this->assertEquals('pending', $data['data']['status']);
-        $this->assertEquals('unpaid', $data['data']['payment_status']);
-        $this->assertEquals($originalOrder->user_id, $data['data']['user_id']);
+        $this->assertNotEquals($originalOrder->id, $data['data']['order']['id']);
+        $this->assertNotEquals($originalOrder->order_number, $data['data']['order']['order_number']);
+        $this->assertEquals('pending', $data['data']['order']['status']);
+        $this->assertEquals('unpaid', $data['data']['order']['payment_status']);
+        $this->assertEquals($originalOrder->user_id, $data['data']['order']['user_id']);
 
         // Verify items were copied
-        $duplicatedOrder = Order::find($data['data']['id']);
+        $duplicatedOrder = Order::find($data['data']['order']['id']);
         $this->assertNotNull($duplicatedOrder);
         $items = OrderItem::where('order_id', $duplicatedOrder->id)->get();
         $this->assertCount(1, $items);
@@ -656,7 +656,7 @@ class OrderControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Verify new order uses same addresses
-        $duplicatedOrder = Order::find($data['data']['id']);
+        $duplicatedOrder = Order::find($data['data']['order']['id']);
         $this->assertEquals($shippingAddress->id, $duplicatedOrder->shipping_address_id);
         $this->assertEquals($billingAddress->id, $duplicatedOrder->billing_address_id);
         $this->assertNull($duplicatedOrder->shipping_address); // Should not have JSON address
@@ -669,18 +669,18 @@ class OrderControllerTest extends FunctionalTestCase
             'user_id' => null, // Guest order
             'customer_name' => 'Guest User',
             'customer_email' => 'guest@example.com',
-            'shipping_address' => [
+            'shipping_address' => json_encode([
                 'address_line_1' => '123 Main St',
                 'city' => 'City',
                 'postcode' => '12345',
                 'country' => 'US'
-            ],
-            'billing_address' => [
+            ]),
+            'billing_address' => json_encode([
                 'address_line_1' => '456 Oak Ave',
                 'city' => 'Town',
                 'postcode' => '67890',
                 'country' => 'US'
-            ]
+            ])
         ]);
         $this->createOrderItem($originalOrder->id);
 
@@ -690,7 +690,7 @@ class OrderControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         // Verify JSON addresses were copied
-        $duplicatedOrder = Order::find($data['data']['id']);
+        $duplicatedOrder = Order::find($data['data']['order']['id']);
         $this->assertNull($duplicatedOrder->shipping_address_id);
         $this->assertNull($duplicatedOrder->billing_address_id);
         $this->assertNotNull($duplicatedOrder->shipping_address);
@@ -951,8 +951,8 @@ class OrderControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('pending', $data['data']['status']);
-        $this->assertEquals('unpaid', $data['data']['payment_status']);
+        $this->assertEquals('pending', $data['data']['order']['status']);
+        $this->assertEquals('unpaid', $data['data']['order']['payment_status']);
     }
 
     public function testCreateOrderLogsHistoryWithUserContext()

@@ -5,15 +5,14 @@ namespace App\Models;
 use App\Enums\PageStatus;
 use App\Framework\Authorization\AuthenticatedMember;
 use App\Framework\Database\QueryBuilder;
-use App\Framework\Database\Relations\BelongsToManyHandler;
 use App\Framework\Database\Relations\HasManyHandler;
-use App\Framework\Database\Relations\RelationBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\TracksCreator;
 
 class Page extends Model
 {
-    use HasCloneHistory;
+    use HasCloneHistory, TracksCreator;
 
     protected $table = 'pages';
 
@@ -51,6 +50,8 @@ class Page extends Model
         'requires_approval',
         'approved_by',
         'approved_at',
+        'created_by',
+        'updated_by',
     ];
 
     protected $alwaysInclude = [

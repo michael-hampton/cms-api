@@ -304,47 +304,96 @@ if (!function_exists('accessDenied')) {
 
         return $html;
     }
+}
 
-    if (!function_exists('route')) {
-        function route(string $name, array $params = []): string
-        {
-            $router = Container::getInstance()->resolve(Router::class);
-            return $router->route($name, $params);
-        }
-    }
-
-    if (!function_exists('method_field')) {
-        function method_field(string $method): string
-        {
-            return '<input type="hidden" name="_method" value="' . strtoupper($method) . '">';
-        }
-    }
-
-    if (!function_exists('now_datetime')) {
-        /**
-         * Return the current DateTime instance
-         *
-         * @param string|null $timezone Optional timezone, e.g., 'UTC' or 'America/New_York'
-         * @return \DateTime
-         */
-        function now_datetime(?string $timezone = null): \DateTime
-        {
-            if ($timezone) {
-                return new \DateTime('now', new \DateTimeZone($timezone));
-            }
-
-            return new \DateTime('now');
-        }
-    }
-
-    /**
-     * Return the current date-time as a formatted string
-     */
-    if (!function_exists('now')) {
-        function now(string $format = 'Y-m-d H:i:s', ?string $timezone = null): string
-        {
-            return now_datetime($timezone)->format($format);
-        }
+if (!function_exists('route')) {
+    function route(string $name, array $params = []): string
+    {
+        $router = Container::getInstance()->resolve(Router::class);
+        return $router->route($name, $params);
     }
 }
+
+if (!function_exists('method_field')) {
+    function method_field(string $method): string
+    {
+        return '<input type="hidden" name="_method" value="' . strtoupper($method) . '">';
+    }
+}
+
+if (!function_exists('now_datetime')) {
+    /**
+     * Return the current DateTime instance
+     *
+     * @param string|null $timezone Optional timezone, e.g., 'UTC' or 'America/New_York'
+     * @return \DateTime
+     */
+    function now_datetime(?string $timezone = null): \DateTime
+    {
+        if ($timezone) {
+            return new \DateTime('now', new \DateTimeZone($timezone));
+        }
+
+        return new \DateTime('now');
+    }
+}
+
+/**
+ * Return the current date-time as a formatted string
+ */
+if (!function_exists('now')) {
+    function now(string $format = 'Y-m-d H:i:s', ?string $timezone = null): string
+    {
+        return now_datetime($timezone)->format($format);
+    }
+}
+
+if (!function_exists('trait_uses')) {
+    /**
+     * Get all traits used by a class
+     */
+    function trait_uses($class): array
+    {
+        if (is_object($class)) {
+            $class = get_class($class);
+        }
+
+        $traits = [];
+
+        // Get traits from the class
+        do {
+            $traits = array_merge(class_uses($class) ?: [], $traits);
+        } while ($class = get_parent_class($class));
+
+        // Get traits from traits recursively
+        foreach ($traits as $trait => $same) {
+            $traits = array_merge(class_uses($trait) ?: [], $traits);
+        }
+
+        return array_unique($traits);
+    }
+}
+
+if (!function_exists('class_uses_recursive')) {
+    function class_uses_recursive($class): array
+    {
+        if (is_object($class)) {
+            $class = get_class($class);
+        }
+
+        $results = [];
+
+        foreach (array_reverse(class_parents($class)) + [$class => $class] as $class) {
+            $results += trait_uses($class);
+        }
+
+        foreach ($results as $trait) {
+            $results += trait_uses($trait);
+        }
+
+        return array_unique($results);
+    }
+}
+
+
 

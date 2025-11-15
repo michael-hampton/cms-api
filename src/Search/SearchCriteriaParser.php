@@ -10,7 +10,7 @@ class SearchCriteriaParser
         'status', 'visibility', 'page_type', 'author',
         'featured', 'categories', 'tag', 'parent',
         'template', 'role', 'is_active', 'site_id', 'region_set_id',
-        'territory_id', 'merchant', 'brands'
+        'territory_id', 'merchant', 'brands', 'is_featured'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria
