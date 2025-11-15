@@ -7,13 +7,7 @@ use App\Framework\Database\Database;
 use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
-use App\Models\OrderHistory;
-use App\Repositories\AddressRepository;
-use App\Repositories\MemberRepository;
-use App\Repositories\OrderItemRepository;
 use App\Repositories\OrderRepository;
-use App\Services\OrderCalculationService;
-use App\Services\OrderHistoryService;
 use App\Services\OrderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -107,7 +101,7 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         $result = $this->service->handle($orderId);
 
-        $this->assertSame($duplicatedOrder, $result);
+        $this->assertSame($duplicatedOrder, $result['order']);
     }
 
     public function testDuplicateOrderWithMixedAddresses()
@@ -170,7 +164,7 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         $result = $this->service->handle($orderId);
 
-        $this->assertSame($duplicatedOrder, $result);
+        $this->assertSame($duplicatedOrder, $result['order']);
     }
 
     public function testDuplicateOrderWithJsonAddresses()
@@ -227,7 +221,7 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         $result = $this->service->handle($orderId);
 
-        $this->assertSame($duplicatedOrder, $result);
+        $this->assertSame($duplicatedOrder, $result['order']);
     }
 
     public function testDuplicateOrderWithInvalidOriginalStatusStillCreatesOrder(): void
@@ -278,7 +272,7 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         $result = $this->service->handle($orderId);
 
-        $this->assertSame($duplicatedOrder, $result);
+        $this->assertSame($duplicatedOrder, $result['order']);
     }
 
     public function testDuplicateOrderWithLinkedAddresses()
@@ -338,7 +332,48 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         $result = $this->service->handle($orderId);
 
-        $this->assertSame($duplicatedOrder, $result);
+        $this->assertSame($duplicatedOrder, $result['order']);
+    }
+
+    public function testCloneOrderReturnsDetailedResults()
+    {
+        $originalOrder = m::mock(Order::class)->makePartial();
+        $originalOrder->id = 1;
+        $originalOrder->user_id = 10;
+        $originalOrder->status = 'completed';
+        $originalOrder->subtotal = 100.00;
+        $originalOrder->tax = 10.00;
+        $originalOrder->shipping = 5.00;
+        $originalOrder->discount = 0.00;
+        $originalOrder->total = 115.00;
+        $originalOrder->currency = 'USD';
+        $originalOrder->site_id = 1;
+        $originalOrder->payment_method = 'credit_card';
+        $originalOrder->shipping_address_id = 20;
+        $originalOrder->billing_address = ['address_line_1' => '123 Main'];
+        $originalOrder->items = collect([
+            (object)['product_name' => 'Product 1', 'quantity' => 2],
+            (object)['product_name' => 'Product 2', 'quantity' => 1],
+        ]);
+
+        $newOrder = m::mock(Order::class)->makePartial();
+        $newOrder->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->orderRepository->shouldReceive('getOrderById')->with(1)->andReturn($originalOrder);
+        $this->orderService->shouldReceive('createOrder')->andReturn($newOrder);
+        $this->setCloneHistoryExpectations($originalOrder, $newOrder, 1, 2);
+
+        $result = $this->service->handle(1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('order', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('original_order_id', $result);
+        $this->assertContains('shipping_address_linked', $result['results']['success']);
+        $this->assertContains('billing_address_json', $result['results']['success']);
+        $this->assertContains('order_created', $result['results']['success']);
+        $this->assertEquals(2, $result['results']['items_cloned']);
     }
 
     protected function tearDown(): void

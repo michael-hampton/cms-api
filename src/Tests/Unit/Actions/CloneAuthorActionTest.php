@@ -6,7 +6,6 @@ use App\Actions\CloneAuthor;
 use App\Framework\Database\Database;
 use App\Models\Author;
 use App\Repositories\AuthorRepository;
-use App\Services\AuthorService;
 use App\Services\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -83,7 +82,7 @@ class CloneAuthorActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1, 'Jane Smith');
 
-        $this->assertEquals('Jane Smith', $result->name);
+        $this->assertEquals('Jane Smith', $result['author']->name);
     }
 
     public function testDuplicateAuthorThrowsExceptionWhenNotFound(): void
@@ -148,6 +147,59 @@ class CloneAuthorActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Author::class, $result);
+        $this->assertInstanceOf(Author::class, $result['author']);
+    }
+
+    public function testCloneAuthorReturnsDetailedResults()
+    {
+        $originalAuthor = Mockery::mock(Author::class)->makePartial();
+        $originalAuthor->id = 1;
+        $originalAuthor->name = 'John Doe';
+        $originalAuthor->avatar = 'avatars/john.jpg';
+
+        $newAuthor = Mockery::mock(Author::class)->makePartial();
+        $newAuthor->id = 2;
+        $newAuthor->name = 'John Doe (Copy)';
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->authorRepository->shouldReceive('find')->with(1)->andReturn($originalAuthor);
+        $this->authorRepository->shouldReceive('findBySlug')->andReturn(null);
+        $this->imageUploadService->shouldReceive('duplicate')->andReturn('avatars/john-copy.jpg');
+        $this->authorRepository->shouldReceive('create')->andReturn($newAuthor);
+        $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
+
+        $result = $this->service->handle(1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('author', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('original_author_id', $result);
+        $this->assertContains('avatar', $result['results']['success']);
+        $this->assertContains('author_created', $result['results']['success']);
+        $this->assertContains('clone_history', $result['results']['success']);
+    }
+
+    public function testCloneAuthorTracksAvatarFailure()
+    {
+        $originalAuthor = Mockery::mock(Author::class)->makePartial();
+        $originalAuthor->id = 1;
+        $originalAuthor->name = 'John Doe';
+        $originalAuthor->avatar = 'avatars/john.jpg';
+
+        $newAuthor = Mockery::mock(Author::class)->makePartial();
+        $newAuthor->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->authorRepository->shouldReceive('find')->with(1)->andReturn($originalAuthor);
+        $this->authorRepository->shouldReceive('findBySlug')->andReturn(null);
+        $this->imageUploadService->shouldReceive('duplicate')->andThrow(new \Exception('File not found'));
+        $this->authorRepository->shouldReceive('create')->andReturn($newAuthor);
+        $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
+
+        $result = $this->service->handle(1);
+
+        $this->assertCount(1, $result['results']['failed']);
+        $this->assertEquals('avatar', $result['results']['failed'][0]['field']);
+        $this->assertContains('author_created', $result['results']['success']);
     }
 }

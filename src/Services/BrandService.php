@@ -6,7 +6,6 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
-use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Models\Brand;
 use App\Repositories\BrandRepository;
@@ -64,6 +63,8 @@ class BrandService
             if (empty($data['slug'])) {
                 $data['slug'] = Str::slug($data['name'], [$this->brandRepository, 'findBySlug']);
             }
+
+            $data['no_index'] = $data['no_index'] ?? false;
 
             $data['site_id'] = $siteId;
 

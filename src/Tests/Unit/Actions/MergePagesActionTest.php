@@ -28,7 +28,6 @@ use App\Repositories\PageTagRepository;
 use App\Repositories\PageTerritoryRepository;
 use App\Services\BlockParserService;
 use App\Services\PageHistoryService;
-use App\Services\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -160,7 +159,9 @@ class MergePagesActionTest extends FunctionalTestCase
 
         $result = $this->service->mergePages(1, 2, ['strategy' => 'append']);
 
-        $this->assertSame($targetPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(10, $result['results']['success']);;
     }
 
     public function testMergePagesWithReplaceStrategy()
@@ -185,7 +186,9 @@ class MergePagesActionTest extends FunctionalTestCase
 
         $result = $this->service->mergePages(1, 2, ['strategy' => 'replace']);
 
-        $this->assertSame($targetPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(13, $result['results']['success']);;
     }
 
     public function testMergePagesWithKeepTargetStrategy()
@@ -212,7 +215,9 @@ class MergePagesActionTest extends FunctionalTestCase
 
         $result = $this->service->mergePages(1, 2, ['strategy' => 'keep_target']);
 
-        $this->assertSame($targetPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(9, $result['results']['success']);;
     }
 
     public function testMergePagesDeletesSourceAfterSuccess()
@@ -233,7 +238,9 @@ class MergePagesActionTest extends FunctionalTestCase
 
         $result = $this->service->mergePages(1, 2);
 
-        $this->assertSame($targetPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(10, $result['results']['success']);;
     }
 
     public function testMergePagesRollsBackOnFailure()
@@ -402,7 +409,9 @@ class MergePagesActionTest extends FunctionalTestCase
 
         $result = $this->service->mergePages(1, 2);
 
-        $this->assertSame($targetPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(10, $result['results']['success']);;
     }
 
     public function testMergeJsonFieldsCombinesArrays()
@@ -586,6 +595,164 @@ class MergePagesActionTest extends FunctionalTestCase
         ];
         return $collection;
     }
+
+    public function testMergePagesWithSelectiveRelations()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $targetPage = $this->createMockPage(2);
+
+        $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
+
+        // Only these relations should be called
+        $this->pageRepository->shouldReceive('duplicateCategories')->once();
+        $this->pageRepository->shouldReceive('duplicateTags')->once();
+
+        // These should NOT be called
+        $this->pageRepository->shouldReceive('duplicateProducts')->never();
+        $this->pageRepository->shouldReceive('duplicateTerritories')->never();
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->never();
+
+        // Still needed for other operations
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->once();
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->once();
+        $this->pageRepository->shouldReceive('duplicateCustomFields')->once();
+
+        $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
+        $this->blockRepository->shouldReceive('getBlocksForPage')->andReturn(collect([]));
+        $this->customFieldRepository->shouldReceive('getCustomFieldsForPage')->andReturn(collect([]));
+        $this->pageRepository->shouldReceive('delete')->with(1)->andReturn(true);
+
+        $result = $this->service->mergePages(1, 2, [
+            'strategy' => 'append',
+            'relations' => [
+                'categories' => true,
+                'tags' => true,
+                'products' => false,
+                'territories' => false,
+                'pageAuthors' => false,
+            ]
+        ]);
+
+        $this->assertArrayHasKey('results', $result);
+        $this->assertContains('categories', $result['results']['success']);
+        $this->assertContains('tags', $result['results']['success']);
+        $this->assertContains('products', $result['results']['skipped']);
+        $this->assertContains('territories', $result['results']['skipped']);
+        $this->assertContains('pageAuthors', $result['results']['skipped']);
+    }
+
+    public function testMergePagesReturnsDetailedResults()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $targetPage = $this->createMockPage(2);
+
+        $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
+        $this->setDuplicationExpectations();
+
+        $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
+        $this->blockRepository->shouldReceive('getBlocksForPage')->andReturn(collect([]));
+        $this->customFieldRepository->shouldReceive('getCustomFieldsForPage')->andReturn(collect([]));
+        $this->pageRepository->shouldReceive('delete')->with(1)->andReturn(true);
+
+        $result = $this->service->mergePages(1, 2);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('page', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('source_page_id', $result);
+        $this->assertArrayHasKey('target_page_id', $result);
+        $this->assertEquals(1, $result['source_page_id']);
+        $this->assertEquals(2, $result['target_page_id']);
+    }
+
+    public function testMergePagesWithAllRelationsDisabled()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $targetPage = $this->createMockPage(2);
+
+        $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
+
+        // No relation methods should be called
+        $this->pageRepository->shouldReceive('duplicateCategories')->never();
+        $this->pageRepository->shouldReceive('duplicateTags')->never();
+        $this->pageRepository->shouldReceive('duplicateProducts')->never();
+        $this->pageRepository->shouldReceive('duplicateTerritories')->never();
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->never();
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->never();
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->never();
+        $this->pageRepository->shouldReceive('duplicateCustomFields')->never();
+
+        $customFieldCollection = $this->createCustomFieldCollection();
+
+        $this->blockRepository->shouldReceive('getMaxOrder')->never();
+        $this->pageRepository->shouldReceive('delete')->with(1)->andReturn(true);
+
+        $customFieldCollection = $this->createCustomFieldCollection();
+
+        // Add this line:
+//        $customFieldCollection->shouldReceive('pluck')
+//            ->with('custom_field_definition_id')
+//            ->andReturn(collect([1]));
+//
+//        $this->customFieldRepository->shouldReceive('getCustomFieldsForPage')->once()
+//            ->andReturn($customFieldCollection);
+//
+//        $this->setDuplicationExpectations();
+
+
+        $result = $this->service->mergePages(1, 2, [
+            'strategy' => 'append',
+            'relations' => [
+                'categories' => false,
+                'tags' => false,
+                'products' => false,
+                'territories' => false,
+                'pageAuthors' => false,
+                'accessRoles' => false,
+                'regionSets' => false,
+                'customFields' => false,
+                'blocks' => false,
+                'settings' => false,
+            ]
+        ]);
+
+        $this->assertCount(0, $result['results']['success']);
+        $this->assertGreaterThan(0, count($result['results']['skipped']));
+    }
+
+    public function testMergePagesWithPartialRelationFailure()
+    {
+        $sourcePage = $this->createMockPage(1);
+        $targetPage = $this->createMockPage(2);
+
+        $this->setupMergePageExpectations($sourcePage, $targetPage);
+        $this->setCloneHistoryExpectations($sourcePage, $targetPage, 1, 2, 'merged');
+
+        $this->pageRepository->shouldReceive('duplicateCategories')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateTags')->once()->andThrow(new \Exception('Tag merge failed'));
+        $this->pageRepository->shouldReceive('duplicateProducts')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateTerritories')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateCustomFields')->once()->andReturn(true);
+
+        $this->blockRepository->shouldReceive('getMaxOrder')->andReturn(0);
+        $this->blockRepository->shouldReceive('getBlocksForPage')->andReturn(collect([]));
+        $this->customFieldRepository->shouldReceive('getCustomFieldsForPage')->andReturn(collect([]));
+        $this->pageRepository->shouldReceive('delete')->with(1)->andReturn(true);
+
+        $result = $this->service->mergePages(1, 2);
+
+        $this->assertContains('categories', $result['results']['success']);
+        $this->assertContains('products', $result['results']['success']);
+        $this->assertCount(1, $result['results']['failed']);
+        $this->assertEquals('tags', $result['results']['failed'][0]['relation']);
+    }
+
 
     private function setDuplicationExpectations(): void
     {

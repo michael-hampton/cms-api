@@ -13,7 +13,6 @@ use App\Models\ProductVariant;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductViewRepository;
 use App\Services\ImageUploadService;
-use App\Services\ProductService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -90,8 +89,8 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
-        $this->assertEquals('iPhone 15 (Copy)', $result->name);
+        $this->assertInstanceOf(Product::class, $result['product']);
+        $this->assertEquals('iPhone 15 (Copy)', $result['product']->name);
     }
 
     public function testDuplicateProductWithoutImage(): void
@@ -115,6 +114,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $newProduct = Mockery::mock(Product::class)->makePartial();
         $newProduct->id = 2;
+        $newProduct->name = 'product';
 
         $this->imageUploadService
             ->shouldNotReceive('duplicate');
@@ -129,7 +129,8 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
+        $this->assertEquals('product', $result['product']->name);
     }
 
     public function testDuplicateProductHandlesImageDuplicationFailure(): void
@@ -174,7 +175,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductWithBasicData()
@@ -218,7 +219,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertEquals('Original Product (Copy)', $result->name);
+        $this->assertEquals('Original Product (Copy)', $result['product']->name);
     }
 
     public function testDuplicateProductWithCustomName()
@@ -251,7 +252,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1, 'Custom Name');
 
-        $this->assertEquals('Custom Name', $result->name);
+        $this->assertEquals('Custom Name', $result['product']->name);
     }
 
     public function testDuplicateProductWithImage()
@@ -294,7 +295,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductWithAllRelations()
@@ -368,7 +369,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductHandlesSlugCollision()
@@ -417,7 +418,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductThrowsExceptionWhenNotFound()
@@ -463,7 +464,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1, 'Product Copy', 2);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductWithSelectiveRelations(): void
@@ -507,7 +508,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1, null, null, $cloneRelations);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductWithVariantImages()
@@ -565,7 +566,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     public function testDuplicateProductWithVariantMerchants()
@@ -634,7 +635,7 @@ class CloneProductActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Product::class, $result);
+        $this->assertInstanceOf(Product::class, $result['product']);
     }
 
     private function setDuplicateExpectations() {
@@ -661,6 +662,157 @@ class CloneProductActionTest extends FunctionalTestCase
             ->with(1)
             ->once()
             ->andReturn(collect([]));
+    }
+
+    public function testCloneProductReturnsDetailedResults()
+    {
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->name = 'iPhone';
+        $originalProduct->site_id = 1;
+        $originalProduct->image = 'products/iphone.jpg';
+
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($originalProduct);
+        $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
+        $this->imageUploadService->shouldReceive('duplicate')->andReturn('products/iphone-copy.jpg');
+        $this->repository->shouldReceive('create')->andReturn($newProduct);
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2);
+        $this->setDuplicateExpectations();
+
+        $result = $this->service->handle(1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('product', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('original_product_id', $result);
+        $this->assertArrayHasKey('cross_site', $result);
+        $this->assertContains('main_image', $result['results']['success']);
+        $this->assertContains('product_created', $result['results']['success']);
+        $this->assertArrayHasKey('relations', $result['results']);
+    }
+
+    public function testCloneProductTracksRelationResults()
+    {
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->name = 'Product';
+        $originalProduct->site_id = 1;
+
+        $images = new Collection([
+            new ProductImage(['url' => 'img1.jpg', 'alt' => 'Alt 1']),
+            new ProductImage(['url' => 'img2.jpg', 'alt' => 'Alt 2']),
+        ]);
+
+        $merchants = new Collection([
+            ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 99.99],
+        ]);
+
+        $variants = new Collection([
+            new ProductVariant(['sku' => 'VAR-001', 'price' => 100]),
+        ]);
+
+        $specifications = new Collection([
+            new ProductSpecification(['key' => 'Weight', 'value' => '1kg']),
+            new ProductSpecification(['key' => 'Color', 'value' => 'Red']),
+        ]);
+
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($originalProduct);
+        $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
+        $this->repository->shouldReceive('create')->andReturn($newProduct);
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2);
+
+        $this->repository->shouldReceive('getImages')->with(1)->andReturn($images);
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->with(1)->andReturn($merchants);
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn($variants);
+        $this->repository->shouldReceive('getSpecifications')->with(1)->andReturn($specifications);
+
+        // One image fails
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->with('img1.jpg')->andReturn('img1-copy.jpg');
+        $this->imageUploadService->shouldReceive('duplicate')
+            ->with('img2.jpg')->andReturn(null);
+
+        $this->repository->shouldReceive('syncImages')->once();
+        $this->repository->shouldReceive('syncMerchants')->once();
+        $this->repository->shouldReceive('syncVariants')->once()->andReturn([1]);
+        $this->repository->shouldReceive('syncSpecifications')->once();
+
+        $result = $this->service->handle(1);
+
+        $this->assertEquals(1, $result['results']['relations']['images']['cloned']);
+        $this->assertEquals(1, $result['results']['relations']['images']['failed']);
+        $this->assertEquals(1, $result['results']['relations']['merchants']['cloned']); //todo here
+        $this->assertEquals(1, $result['results']['relations']['variants']['cloned']);
+        $this->assertEquals(2, $result['results']['relations']['specifications']['cloned']);
+    }
+
+    public function testCloneProductWithSelectiveRelations()
+    {
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->name = 'Product';
+        $originalProduct->site_id = 1;
+
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+
+        $images = new Collection([new ProductImage(['url' => 'img.jpg'])]);
+        $merchants = new Collection([['name' => 'Amazon']]);
+
+        $this->repository->shouldReceive('find')->andReturn($originalProduct);
+        $this->repository->shouldReceive('findBySlugAndSite')->andReturn(null);
+        $this->repository->shouldReceive('create')->andReturn($newProduct);
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2);
+
+        $this->repository->shouldReceive('getImages')->andReturn($images);
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn($merchants);
+        $this->repository->shouldReceive('getVariants')->never();
+        $this->repository->shouldReceive('getSpecifications')->never();
+
+        $this->imageUploadService->shouldReceive('duplicate')->andReturn('img-copy.jpg');
+        $this->repository->shouldReceive('syncImages')->once();
+        $this->repository->shouldReceive('syncMerchants')->once();
+
+        $result = $this->service->handle(1, null, null, [
+            'images' => true,
+            'merchants' => true,
+            'variants' => false,
+            'specifications' => false,
+        ]);
+
+        $this->assertGreaterThan(0, $result['results']['relations']['images']['cloned']);
+        $this->assertGreaterThan(0, $result['results']['relations']['merchants']['cloned']);
+        $this->assertEquals(0, $result['results']['relations']['variants']['cloned']);
+        $this->assertEquals(0, $result['results']['relations']['specifications']['cloned']); //todo here
+    }
+
+    public function testCloneProductCrossSiteTracking()
+    {
+        $originalProduct = Mockery::mock(Product::class)->makePartial();
+        $originalProduct->id = 1;
+        $originalProduct->name = 'Product';
+        $originalProduct->site_id = 1;
+
+        $newProduct = Mockery::mock(Product::class)->makePartial();
+        $newProduct->id = 2;
+        $newProduct->site_id = 2;
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($originalProduct);
+        $this->repository->shouldReceive('findBySlugAndSite')->with(Mockery::any(), 2)->andReturn(null);
+        $this->repository->shouldReceive('create')->andReturn($newProduct);
+        $this->setCloneHistoryExpectations($originalProduct, $newProduct, 1, 2, 'cloned', 1, 2);
+        $this->setDuplicateExpectations();
+
+        $result = $this->service->handle(1, 'Product Copy', 2);
+
+        $this->assertTrue($result['cross_site']);
+        $this->assertContains('cross_site_clone_history', $result['results']['success']);
     }
 
     protected function tearDown(): void

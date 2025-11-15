@@ -7,7 +7,6 @@ use App\Framework\Database\Database;
 use App\Models\Tag;
 use App\Repositories\PageRepository;
 use App\Repositories\TagRepository;
-use App\Services\TagService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
@@ -59,7 +58,33 @@ class MergeTagsActionTest extends FunctionalTestCase
 
         $result = $this->service->handle($fromTagId, $toTagId);
 
-        $this->assertTrue($result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertEquals(1, $result['source_tag_id']);
+        $this->assertEquals(2, $result['target_tag_id']);
+    }
+
+    public function testMergeTagsReturnsDetailedResults(): void
+    {
+        $fromTag = Mockery::mock(Tag::class)->makePartial();
+        $fromTag->id = 1;
+        $toTag = Mockery::mock(Tag::class)->makePartial();
+        $toTag->id = 2;
+
+        $this->setCloneHistoryExpectations($fromTag, $toTag, 1, 2, 'merged');
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($fromTag);
+        $this->repository->shouldReceive('find')->with(2)->andReturn($toTag);
+        $this->repository->shouldReceive('mergeTags')->with(1, 2)->andReturn(true);
+
+        $result = $this->service->handle(1, 2);
+
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('success', $result['results']);
+        $this->assertArrayHasKey('failed', $result['results']);
+        $this->assertContains('merge_history', $result['results']['success']);
+        $this->assertContains('tags_merged', $result['results']['success']);
+        $this->assertCount(0, $result['results']['failed']);
     }
 
     public function testMergeTagsThrowsExceptionForSameTag(): void
@@ -101,6 +126,96 @@ class MergeTagsActionTest extends FunctionalTestCase
         $this->expectExceptionMessage('Target tag not found');
 
         $this->service->handle(1, 999);
+    }
+
+    public function testMergeTagsHandlesMergeFailure(): void
+    {
+        $fromTag = Mockery::mock(Tag::class)->makePartial();
+        $fromTag->id = 1;
+        $toTag = Mockery::mock(Tag::class)->makePartial();
+        $toTag->id = 2;
+
+        $this->setCloneHistoryExpectations($fromTag, $toTag, 1, 2, 'merged');
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($fromTag);
+        $this->repository->shouldReceive('find')->with(2)->andReturn($toTag);
+        $this->repository->shouldReceive('mergeTags')->with(1, 2)->andReturn(false);
+
+        $result = $this->service->handle(1, 2);
+
+        $this->assertFalse($result['success']);
+        $this->assertCount(1, $result['results']['failed']);
+        $this->assertEquals('merge_tags', $result['results']['failed'][0]['operation']);
+    }
+
+    public function testMergeTagsHandlesMergeException(): void
+    {
+        $fromTag = Mockery::mock(Tag::class)->makePartial();
+        $fromTag->id = 1;
+        $toTag = Mockery::mock(Tag::class)->makePartial();
+        $toTag->id = 2;
+
+        $this->setCloneHistoryExpectations($fromTag, $toTag, 1, 2, 'merged');
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($fromTag);
+        $this->repository->shouldReceive('find')->with(2)->andReturn($toTag);
+        $this->repository->shouldReceive('mergeTags')
+            ->with(1, 2)
+            ->andThrow(new \Exception('Database error'));
+
+        $result = $this->service->handle(1, 2);
+
+        $this->assertFalse($result['success']);
+        $this->assertCount(1, $result['results']['failed']);
+        $this->assertEquals('merge_tags', $result['results']['failed'][0]['operation']);
+        $this->assertEquals('Database error', $result['results']['failed'][0]['error']);
+    }
+
+    public function testMergeTagsHandlesMergeHistoryFailure(): void
+    {
+        $fromTag = Mockery::mock(Tag::class)->makePartial();
+        $fromTag->id = 1;
+        // Don't expect this to be called since toTag throws first
+        $fromTag->shouldReceive('addCloneRecord')->never();
+
+        $toTag = Mockery::mock(Tag::class)->makePartial();
+        $toTag->id = 2;
+        $toTag->shouldReceive('addCloneRecord')
+            ->once() // This is called first and throws
+            ->andThrow(new \Exception('History write failed'));
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($fromTag);
+        $this->repository->shouldReceive('find')->with(2)->andReturn($toTag);
+        $this->repository->shouldReceive('mergeTags')->with(1, 2)->andReturn(true);
+
+        $result = $this->service->handle(1, 2);
+
+        $this->assertTrue($result['success']); // Merge still succeeds
+        $this->assertCount(1, $result['results']['failed']); // Only 1 failure recorded
+        $this->assertEquals('merge_history', $result['results']['failed'][0]['operation']);
+        $this->assertEquals('History write failed', $result['results']['failed'][0]['error']);
+    }
+
+    public function testMergeTagsSuccessfullyWithAllOperations(): void
+    {
+        $fromTag = Mockery::mock(Tag::class)->makePartial();
+        $fromTag->id = 1;
+        $toTag = Mockery::mock(Tag::class)->makePartial();
+        $toTag->id = 2;
+
+        $this->setCloneHistoryExpectations($fromTag, $toTag, 1, 2, 'merged');
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($fromTag);
+        $this->repository->shouldReceive('find')->with(2)->andReturn($toTag);
+        $this->repository->shouldReceive('mergeTags')->with(1, 2)->andReturn(true);
+
+        $result = $this->service->handle(1, 2);
+
+        $this->assertTrue($result['success']);
+        $this->assertCount(2, $result['results']['success']);
+        $this->assertContains('merge_history', $result['results']['success']);
+        $this->assertContains('tags_merged', $result['results']['success']);
+        $this->assertCount(0, $result['results']['failed']);
     }
 
     protected function tearDown(): void

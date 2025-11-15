@@ -6,7 +6,6 @@ use App\Actions\CloneBrand;
 use App\Framework\Database\Database;
 use App\Models\Brand;
 use App\Repositories\BrandRepository;
-use App\Services\BrandService;
 use App\Services\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -105,7 +104,7 @@ class CloneBrandActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1, null, 1);
 
-        $this->assertEquals('Nike (Copy)', $result->name);
+        $this->assertEquals('Nike (Copy)', $result['brand']->name);
     }
 
     public function testDuplicateBrandWithoutLogo(): void
@@ -145,7 +144,64 @@ class CloneBrandActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertInstanceOf(Brand::class, $result);
+        $this->assertInstanceOf(Brand::class, $result['brand']);
+    }
+
+    public function testCloneBrandReturnsDetailedResults()
+    {
+        $originalBrand = Mockery::mock(Brand::class)->makePartial();
+        $originalBrand->id = 1;
+        $originalBrand->name = 'Nike';
+        $originalBrand->site_id = 1;
+        $originalBrand->logo = 'logos/nike.png';
+
+
+        $newBrand = Mockery::mock(Brand::class)->makePartial();
+        $newBrand->id = 2;
+        $newBrand->site_id = 1;
+
+        $this->setCloneHistoryExpectations($originalBrand, $newBrand, 1, 2);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->brandRepository->shouldReceive('find')->with(1)->andReturn($originalBrand);
+        $this->brandRepository->shouldReceive('findBySlug')->andReturn(null);
+        $this->brandRepository->shouldReceive('create')->andReturn($newBrand);
+
+        $this->imageUploadService->shouldReceive('duplicate')->andReturn('logos/nike-copy.png');
+
+        $result = $this->service->handle(1, null, 1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('brand', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('original_brand_id', $result);
+        $this->assertArrayHasKey('cross_site', $result);
+        $this->assertFalse($result['cross_site']);
+        $this->assertContains('logo', $result['results']['success']);
+        $this->assertContains('brand_created', $result['results']['success']);
+    }
+
+    public function testCloneBrandCrossSiteTracking()
+    {
+        $originalBrand = Mockery::mock(Brand::class)->makePartial();
+        $originalBrand->id = 1;
+        $originalBrand->name = 'Nike';
+        $originalBrand->site_id = 1;
+
+        $newBrand = Mockery::mock(Brand::class)->makePartial();
+        $newBrand->id = 2;
+        $newBrand->site_id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->brandRepository->shouldReceive('find')->with(1)->andReturn($originalBrand);
+        $this->brandRepository->shouldReceive('findBySlug')->andReturn(null);
+        $this->brandRepository->shouldReceive('create')->andReturn($newBrand);
+        $this->setCloneHistoryExpectations($originalBrand, $newBrand, 1, 2, 'cloned', 1, 2);
+
+        $result = $this->service->handle(1, null, 2);
+
+        $this->assertTrue($result['cross_site']);
+        $this->assertContains('cross_site_clone_history', $result['results']['success']);
     }
 
     protected function tearDown(): void

@@ -5,7 +5,6 @@ namespace App\Actions;
 use App\Framework\Database\Database;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
-use App\Models\Author;
 use App\Repositories\AuthorRepository;
 use App\Services\ImageUploadService;
 
@@ -20,7 +19,8 @@ class CloneAuthor
     ) {
         $this->database = $database ?? Database::getInstance();
     }
-    public function handle(int $authorId, ?string $newName = null): Author
+
+    public function handle(int $authorId, ?string $newName = null): array
     {
         return $this->database->transaction(function() use ($authorId, $newName) {
             $originalAuthor = $this->authorRepository->find($authorId);
@@ -28,6 +28,8 @@ class CloneAuthor
             if (!$originalAuthor) {
                 throw new \Exception("Author not found");
             }
+
+            $results = ['success' => [], 'failed' => [], 'warnings' => []];
 
             $data = [
                 'name' => $newName ?? ($originalAuthor->name . ' (Copy)'),
@@ -46,19 +48,26 @@ class CloneAuthor
             if ($originalAuthor->avatar) {
                 try {
                     $data['avatar'] = $this->imageUploadService->duplicate($originalAuthor->avatar);
+                    $results['success'][] = 'avatar';
                 } catch (\Exception $e) {
-                    // If duplication fails, just skip the avatar
                     $data['avatar'] = null;
+                    $results['failed'][] = ['field' => 'avatar', 'error' => $e->getMessage()];
                 }
             }
 
             $newAuthor = $this->authorRepository->create($data);
+            $results['success'][] = 'author_created';
 
             // Add clone history
             $originalAuthor->addCloneRecord('cloned_to', $newAuthor->id, null);
             $newAuthor->addCloneRecord('cloned_from', $originalAuthor->id, null);
+            $results['success'][] = 'clone_history';
 
-            return $newAuthor;
+            return [
+                'author' => $newAuthor,
+                'results' => $results,
+                'original_author_id' => $authorId
+            ];
         });
     }
 

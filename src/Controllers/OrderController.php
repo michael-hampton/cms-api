@@ -2,9 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Actions\CloneCategory;
 use App\Actions\CloneOrder;
-use App\Exceptions\InvalidOrderStatusException;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
@@ -12,9 +10,7 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
 use App\Repositories\OrderRepository;
-use App\Requests\BulkDeleteRequest;
 use App\Requests\BulkUpdateOrderStatus;
-use App\Requests\BulkUpdateVoucherStatus;
 use App\Requests\CreateOrderRequest;
 use App\Requests\UpdateOrderItemsRequest;
 use App\Requests\UpdateOrderRequest;
@@ -199,9 +195,9 @@ class OrderController extends Controller
         try {
             $cloneOrder = Container::getInstance()->make(CloneOrder::class);
 
-            $duplicatedOrder = $cloneOrder->handle($id);
+            $results = $cloneOrder->handle($id);
 
-            return $this->jsonResponse($duplicatedOrder->toArray(), 201);
+            return $this->resourceResponse($results, 201);
 
         } catch (Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

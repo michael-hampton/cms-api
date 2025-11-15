@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Models\Voucher;
 use App\Repositories\VoucherRepository;
 
 class CloneVoucher
@@ -12,9 +11,17 @@ class CloneVoucher
     {
     }
 
-    public function handle(int $voucherId, ?string $newCode = null): ?Voucher
+    public function handle(int $voucherId, ?string $newCode = null): array
     {
         return $this->database->transaction(function() use ($voucherId, $newCode) {
+            $results = [
+                'success' => [],
+                'failed' => [],
+                'products_associated' => 0,
+                'categories_associated' => 0,
+                'brands_associated' => 0
+            ];
+
             $originalVoucher = $this->repository->find($voucherId);
 
             if (!$originalVoucher) {
@@ -53,31 +60,79 @@ class CloneVoucher
 
             $data['code'] = $code;
 
-            $newVoucher = $this->repository->create($data);
+            try {
+                $newVoucher = $this->repository->create($data);
+                $results['success'][] = 'voucher_created';
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'create_voucher',
+                    'error' => $e->getMessage()
+                ];
+                throw $e;
+            }
 
             // Duplicate product associations
-            $productIds = $originalVoucher->products()?->pluck('id')->toArray();
-            if (!empty($productIds)) {
-                $newVoucher->products(true)->sync($productIds);
+            try {
+                $productIds = $originalVoucher->products()?->pluck('id')->toArray();
+                if (!empty($productIds)) {
+                    $newVoucher->products(true)->sync($productIds);
+                    $results['products_associated'] = count($productIds);
+                    $results['success'][] = 'products_associated';
+                }
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'associate_products',
+                    'error' => $e->getMessage()
+                ];
             }
 
             // Duplicate category associations
-            $categoryIds = $originalVoucher->categories()?->pluck('id')->toArray();
-            if (!empty($categoryIds)) {
-                $newVoucher->categories(true)->sync($categoryIds);
+            try {
+                $categoryIds = $originalVoucher->categories()?->pluck('id')->toArray();
+                if (!empty($categoryIds)) {
+                    $newVoucher->categories(true)->sync($categoryIds);
+                    $results['categories_associated'] = count($categoryIds);
+                    $results['success'][] = 'categories_associated';
+                }
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'associate_categories',
+                    'error' => $e->getMessage()
+                ];
             }
 
             // Duplicate brand associations
-            $brandIds = $originalVoucher->brands()?->pluck('id')->toArray();
-            if (!empty($brandIds)) {
-                $newVoucher->brands(true)->sync($brandIds);
+            try {
+                $brandIds = $originalVoucher->brands()?->pluck('id')->toArray();
+                if (!empty($brandIds)) {
+                    $newVoucher->brands(true)->sync($brandIds);
+                    $results['brands_associated'] = count($brandIds);
+                    $results['success'][] = 'brands_associated';
+                }
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'associate_brands',
+                    'error' => $e->getMessage()
+                ];
             }
 
             // Add clone history
-            $originalVoucher->addCloneRecord('cloned_to', $newVoucher->id, null);
-            $newVoucher->addCloneRecord('cloned_from', $originalVoucher->id, null);
+            try {
+                $originalVoucher->addCloneRecord('cloned_to', $newVoucher->id, null);
+                $newVoucher->addCloneRecord('cloned_from', $originalVoucher->id, null);
+                $results['success'][] = 'clone_history';
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'clone_history',
+                    'error' => $e->getMessage()
+                ];
+            }
 
-            return $newVoucher;
+            return [
+                'voucher' => $newVoucher,
+                'results' => $results,
+                'original_voucher_id' => $voucherId
+            ];
         });
     }
 }

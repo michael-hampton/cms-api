@@ -170,9 +170,9 @@ class BrandController extends Controller
 
             $cloneBrand = Container::getInstance()->make(CloneBrand::class);
 
-            $duplicatedBrand = $cloneBrand->handle($id, $newName);
+            $results = $cloneBrand->handle($id, $newName);
 
-            return $this->jsonResponse($duplicatedBrand->toArray(), 201);
+            return $this->resourceResponse($results, 201);
 
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

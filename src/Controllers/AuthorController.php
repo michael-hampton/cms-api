@@ -186,11 +186,9 @@ class AuthorController extends Controller
 
             $cloneAuthor = Container::getInstance()->make(CloneAuthor::class);
 
-            $duplicatedAuthor = $cloneAuthor->handle($id, $newName);
+            $results = $cloneAuthor->handle($id, $newName);
 
-            return $this->jsonResponse(
-             $duplicatedAuthor->toArray()
-            , 201);
+            return $this->resourceResponse($results, 201);
 
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

@@ -7,7 +7,6 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Category;
 use App\Repositories\CategoryRepository;
-use App\Services\CategoryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
@@ -82,7 +81,7 @@ class CloneCategoryActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertTrue($result);
+        $this->assertEquals('Technology (Copy)', $result['category']->name);
     }
 
     public function testDuplicateCategoryWithSlugConflict(): void
@@ -131,7 +130,7 @@ class CloneCategoryActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertTrue($result);
+        $this->assertEquals('Technology (Copy)', $result['category']->name);
     }
 
     public function testDuplicateCategoryWithChildren(): void
@@ -195,7 +194,71 @@ class CloneCategoryActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertTrue($result);
+        $this->assertEquals('Technology (Copy)', $result['category']->name);
+    }
+
+    public function testCloneCategoryReturnsDetailedResults()
+    {
+        $originalCategory = Mockery::mock(Category::class)->makePartial();
+        $originalCategory->id = 1;
+        $originalCategory->name = 'Technology';
+
+        $newCategory = Mockery::mock(Category::class)->makePartial();
+        $newCategory->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->categoryRepository->shouldReceive('find')->with(1)->andReturn($originalCategory);
+        $this->categoryRepository->shouldReceive('findBySlug')->andReturn(null);
+        $this->categoryRepository->shouldReceive('create')->andReturn($newCategory);
+        $this->setCloneHistoryExpectations($originalCategory, $newCategory, 1, 2);
+
+        $originalCategory->shouldReceive('children')->andReturn(collect([]));
+
+        $result = $this->service->handle(1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('category', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('original_category_id', $result);
+        $this->assertContains('category_created', $result['results']['success']);
+        $this->assertContains('clone_history', $result['results']['success']);
+        $this->assertEquals(0, $result['results']['children_cloned']);
+    }
+
+    public function testCloneCategoryTracksChildrenCloning()
+    {
+        $parentCategory = Mockery::mock(Category::class)->makePartial();
+        $parentCategory->id = 1;
+        $parentCategory->name = 'Parent';
+
+        $child1 = Mockery::mock(Category::class)->makePartial();
+        $child1->id = 2;
+        $child1->name = 'Child 1';
+
+        $child2 = Mockery::mock(Category::class)->makePartial();
+        $child2->id = 3;
+        $child2->name = 'Child 2';
+
+        $newParent = Mockery::mock(Category::class)->makePartial();
+        $newParent->id = 10;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->categoryRepository->shouldReceive('find')->with(1)->andReturn($parentCategory);
+        $this->categoryRepository->shouldReceive('findBySlug')->andReturn(null);
+        $this->categoryRepository->shouldReceive('create')->times(3)->andReturn(
+            $newParent,
+            new Category(['id' => 11]),
+            new Category(['id' => 12])
+        );
+        $this->setCloneHistoryExpectations($parentCategory, $newParent, 1, 10);
+
+        $parentCategory->shouldReceive('children')->once()->andReturn(collect([$child1, $child2]));
+        $child1->shouldReceive('children')->once()->andReturn(collect([]));
+        $child2->shouldReceive('children')->once()->andReturn(collect([]));
+
+        $result = $this->service->handle(1);
+
+        $this->assertEquals(2, $result['results']['children_cloned']);
     }
 
     protected function tearDown(): void

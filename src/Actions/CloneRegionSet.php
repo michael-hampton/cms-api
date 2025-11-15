@@ -4,7 +4,6 @@ namespace App\Actions;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Str;
-use App\Models\RegionSet;
 use App\Repositories\RegionSetRepository;
 use App\Repositories\TerritoryRepository;
 
@@ -20,9 +19,15 @@ class CloneRegionSet
         $this->database = $database ?? Database::getInstance();
     }
 
-    public function handle(int $regionSetId, ?string $newName = null): RegionSet
+    public function handle(int $regionSetId, ?string $newName = null): array
     {
         return $this->database->transaction(function () use ($regionSetId, $newName) {
+            $results = [
+                'success' => [],
+                'failed' => [],
+                'territories_cloned' => 0
+            ];
+
             $originalRegionSet = $this->repository->findWithRelations($regionSetId);
 
             if (!$originalRegionSet) {
@@ -37,42 +42,78 @@ class CloneRegionSet
             ];
 
             $data['slug'] = $this->generateUniqueSlug($data['name']);
-            $newRegionSet = $this->repository->create($data);
 
+            try {
+                $newRegionSet = $this->repository->create($data);
+                $results['success'][] = 'region_set_created';
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'create_region_set',
+                    'error' => $e->getMessage()
+                ];
+                throw $e;
+            }
 
             // Duplicate territories
             $territories = $originalRegionSet->territories;
 
             if ($territories) {
                 foreach ($territories as $territory) {
-                    // Generate unique code by checking if it exists
-                    $newCode = $territory->code . '-copy';
-                    $counter = 1;
+                    try {
+                        // Generate unique code by checking if it exists
+                        $newCode = $territory->code . '-copy';
+                        $counter = 1;
 
-                    while ($this->territoryRepository->findByCode($newCode, $territory->site_id)) {
-                        $newCode = $territory->code . '-copy-' . $counter;
-                        $counter++;
+                        while ($this->territoryRepository->findByCode($newCode, $territory->site_id)) {
+                            $newCode = $territory->code . '-copy-' . $counter;
+                            $counter++;
+                        }
+
+                        $newSlug = $this->territoryRepository->generateUniqueSlug($territory->name, $territory->site_id);
+
+                        $this->territoryRepository->create([
+                            'name' => $territory->name,
+                            'slug' => $newSlug,
+                            'code' => $newCode,
+                            'region_set_id' => $newRegionSet->id,
+                            'is_active' => $territory->is_active,
+                            'sort_order' => $territory->sort_order,
+                            'site_id' => $territory->site_id
+                        ]);
+
+                        $results['territories_cloned']++;
+                    } catch (\Exception $e) {
+                        $results['failed'][] = [
+                            'operation' => 'clone_territory',
+                            'territory_id' => $territory->id,
+                            'territory_name' => $territory->name,
+                            'error' => $e->getMessage()
+                        ];
                     }
+                }
 
-                    $newSlug = $this->territoryRepository->generateUniqueSlug($territory->name, $territory->site_id);
-
-                    $this->territoryRepository->create([
-                        'name' => $territory->name,
-                        'slug' => $newSlug,
-                        'code' => $newCode,
-                        'region_set_id' => $newRegionSet->id,
-                        'is_active' => $territory->is_active,
-                        'sort_order' => $territory->sort_order,
-                        'site_id' => $territory->site_id
-                    ]);
+                if ($results['territories_cloned'] > 0) {
+                    $results['success'][] = 'territories_cloned';
                 }
             }
 
             // Add clone history
-            $originalRegionSet->addCloneRecord('cloned_to', $newRegionSet->id, null);
-            $newRegionSet->addCloneRecord('cloned_from', $originalRegionSet->id, null);
+            try {
+                $originalRegionSet->addCloneRecord('cloned_to', $newRegionSet->id, null);
+                $newRegionSet->addCloneRecord('cloned_from', $originalRegionSet->id, null);
+                $results['success'][] = 'clone_history';
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'operation' => 'clone_history',
+                    'error' => $e->getMessage()
+                ];
+            }
 
-            return $newRegionSet;
+            return [
+                'region_set' => $newRegionSet,
+                'results' => $results,
+                'original_region_set_id' => $regionSetId
+            ];
         });
     }
 

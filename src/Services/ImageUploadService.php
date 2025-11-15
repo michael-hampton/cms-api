@@ -160,7 +160,7 @@ class ImageUploadService
         return $this;
     }
 
-    public function duplicate(string $originalPath): string
+    public function duplicate(string $originalPath): ?string
     {
         $fullOriginalPath = $this->getFullPath($originalPath);
 

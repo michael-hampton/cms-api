@@ -27,7 +27,7 @@ class ClonePageToSite
      * @return Page The cloned page in the target site
      * @throws Exception
      */
-    public function handle(int $pageId, int $targetSiteId, ?string $newTitle = null): Page
+    public function handle(int $pageId, int $targetSiteId, ?string $newTitle = null, array $options = []): array
     {
         $sourcePage = $this->pageRepository->getCompletePageData($pageId);
         if (!$sourcePage) {
@@ -38,7 +38,26 @@ class ClonePageToSite
             throw new \Exception("Source and target site cannot be the same");
         }
 
-        return $this->database->transaction(function () use ($sourcePage, $targetSiteId, $newTitle) {
+        // Set default relations - all enabled by default
+        $defaultRelations = [
+            'categories' => true,
+            'tags' => true,
+            'accessRoles' => true,
+            'regionSets' => true,
+            'territories' => true,
+            'pageAuthors' => true,
+            'customFields' => true,
+            'products' => true,
+            'blocks' => true,
+            'metadata' => true,
+            'seo' => true,
+            'settings' => true,
+            'social' => true,
+        ];
+
+        $options['relations'] = array_merge($defaultRelations, $options['relations'] ?? []);
+
+        return $this->database->transaction(function () use ($sourcePage, $targetSiteId, $newTitle, $options) {
             $pageData = [
                 'title' => $newTitle ?? ($sourcePage->title . ' (Copy)'),
                 'slug' => $this->generateUniqueSlug($sourcePage->slug, $targetSiteId),
@@ -71,11 +90,22 @@ class ClonePageToSite
             $newPage->addCloneRecord('cloned_from', $sourcePage->id, $sourcePage->site_id);
 
             // Clone all relations to the new site
-            $this->clonePageRelationsToSite($sourcePage->id, $newPage->id, $targetSiteId);
+            $relationResults = $this->clonePageRelationsToSite(
+                $sourcePage->id,
+                $newPage->id,
+                $targetSiteId,
+                $options['relations']
+            );
 
             $this->historyService->logPageClonedToSite($sourcePage->id, $newPage->id, $targetSiteId);
 
-            return $this->pageRepository->getCompletePageData($newPage->id);
+            return [
+                'page' => $this->pageRepository->getCompletePageData($newPage->id),
+                'results' => $relationResults,
+                'original_page_id' => $sourcePage->id,
+                'original_site_id' => $sourcePage->site_id,
+                'target_site_id' => $targetSiteId,
+            ];
         });
     }
 
@@ -99,9 +129,14 @@ class ClonePageToSite
      * Duplicate all relations from source to target page
      * This method orchestrates the duplication of all page relations
      */
-    private function clonePageRelationsToSite(int $sourcePageId, int $targetPageId, int $targetSiteId): void
+    private function clonePageRelationsToSite(
+        int   $sourcePageId,
+        int   $targetPageId,
+        int   $targetSiteId,
+        array $relations
+    ): array
     {
-        $relations = [
+        $relationMethods = [
             'blocks' => 'duplicateBlocks',
             'metadata' => 'duplicateMetadata',
             'seo' => 'duplicateSeo',
@@ -117,14 +152,24 @@ class ClonePageToSite
             'products' => 'duplicateProductsToSite',
         ];
 
-        $errors = [];
+        $results = [
+            'success' => [],
+            'failed' => [],
+            'skipped' => []
+        ];
 
-        foreach ($relations as $relationType => $method) {
+        foreach ($relationMethods as $relationType => $method) {
+            // Check if this relation should be cloned
+            if (!($relations[$relationType] ?? false)) {
+                $results['skipped'][] = $relationType;
+                continue;
+            }
+
             try {
                 $this->pageRepository->$method($sourcePageId, $targetPageId, $targetSiteId);
+                $results['success'][] = $relationType;
             } catch (\Exception $e) {
                 if ($_ENV['APP_ENV'] !== 'testing') {
-                    // Log the error but continue with other relations
                     error_log(sprintf(
                         'Failed to clone %s for page %d to site %d: %s',
                         $relationType,
@@ -134,14 +179,18 @@ class ClonePageToSite
                     ));
                 }
 
-                $errors[$relationType] = $e->getMessage();
+                $results['failed'][] = [
+                    'relation' => $relationType,
+                    'error' => $e->getMessage()
+                ];
             }
         }
 
         // If critical relations failed, you might want to throw
-        // For now, we'll allow partial duplication to succeed
-        if (!empty($errors) && count($errors) === count($relations)) {
-            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($errors));
+        if (!empty($results['failed']) && count($results['failed']) === count($relationMethods)) {
+            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($results['failed']));
         }
+
+        return $results;
     }
 }

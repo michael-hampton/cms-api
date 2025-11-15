@@ -38,11 +38,31 @@ class MergePages
      * @return Page The merged target page
      * @throws Exception
      */
-    public function mergePages(int $sourcePageId, int $targetPageId, array $options = []): Page
+    public function mergePages(int $sourcePageId, int $targetPageId, array $options = []): array
     {
         if ($sourcePageId === $targetPageId) {
             throw new \Exception("Cannot merge a page with itself");
         }
+
+        // Set default relations - all enabled by default
+        $defaultRelations = [
+            'categories' => true,
+            'tags' => true,
+            'accessRoles' => true,
+            'regionSets' => true,
+            'territories' => true,
+            'pageAuthors' => true,
+            'customFields' => true,
+            'products' => true,
+            'blocks' => true,
+            'metadata' => true,
+            'seo' => true,
+            'settings' => true,
+            'social' => true,
+        ];
+
+        // Merge user-provided relations config with defaults
+        $options['relations'] = array_merge($defaultRelations, $options['relations'] ?? []);
 
         $sourcePage = $this->pageRepository->getCompletePageData($sourcePageId);
         $targetPage = $this->pageRepository->getCompletePageData($targetPageId);
@@ -55,10 +75,11 @@ class MergePages
             return $this->database->transaction(function () use ($sourcePage, $targetPage, $options) {
 
                 // Merge relations based on strategy
-                $this->mergePageRelations(
+                $relationResults = $this->mergePageRelations(
                     $sourcePage->id,
                     $targetPage->id,
-                    $options['strategy'] ?? 'append'
+                    $options['strategy'] ?? 'append',
+                    $options['relations']
                 );
 
                 // Optionally merge main page data
@@ -75,7 +96,12 @@ class MergePages
                 // Delete source page
                 $this->pageRepository->delete($sourcePage->id);
 
-                return $this->pageRepository->getCompletePageData($targetPage->id);
+                return [
+                    'page' => $this->pageRepository->getCompletePageData($targetPage->id),
+                    'results' => $relationResults,
+                    'source_page_id' => $sourcePage->id,
+                    'target_page_id' => $targetPage->id,
+                ];
             });
         } catch (\Exception $e) {
             if ($_ENV['APP_ENV'] !== 'testing') {
@@ -91,6 +117,7 @@ class MergePages
         }
     }
 
+
     /**
      * Merge relations from source to target page
      *
@@ -98,47 +125,144 @@ class MergePages
      * @param int $targetPageId
      * @param string $strategy 'append', 'replace', or 'keep_target'
      */
-    private function mergePageRelations(int $sourcePageId, int $targetPageId, string $strategy): void
+    private function mergePageRelations(
+        int    $sourcePageId,
+        int    $targetPageId,
+        string $strategy,
+        array  $relations
+    ): array
     {
-        // Many-to-many relations can be appended
-        $appendableRelations = [
-            'categories',
-            'tags',
-            'accessRoles',
-            'regionSets',
-            'territories',
-            'pageAuthors',
-            'customFields',
-            'products'
-        ];;
+        $results = [
+            'success' => [],
+            'failed' => [],
+            'skipped' => []
+        ];
 
-        foreach ($appendableRelations as $relation) {
-            $method = 'duplicate' . ucfirst($relation);
+        // Many-to-many relations that can be appended
+        $appendableRelations = [
+            'categories' => 'duplicateCategories',
+            'tags' => 'duplicateTags',
+            'accessRoles' => 'duplicateAccessRoles',
+            'regionSets' => 'duplicateRegionSets',
+            'territories' => 'duplicateTerritories',
+            'pageAuthors' => 'duplicatePageAuthors',
+            'customFields' => 'duplicateCustomFields',
+            'products' => 'duplicateProducts'
+        ];
+
+        foreach ($appendableRelations as $relation => $method) {
+            // Check if this relation should be merged
+            if (!($relations[$relation] ?? false)) {
+                $results['skipped'][] = $relation;
+                continue;
+            }
+
             try {
                 $this->pageRepository->$method($sourcePageId, $targetPageId);
+                $results['success'][] = $relation;
             } catch (\Exception $e) {
-                throw $e;
+                $results['failed'][] = [
+                    'relation' => $relation,
+                    'error' => $e->getMessage()
+                ];
+
+                if ($_ENV['APP_ENV'] !== 'testing') {
+                    error_log(sprintf(
+                        'Failed to merge %s from page %d to %d: %s',
+                        $relation,
+                        $sourcePageId,
+                        $targetPageId,
+                        $e->getMessage()
+                    ));
+                }
             }
         }
 
-        // Blocks - append with reordering
-        $this->mergeBlocks($sourcePageId, $targetPageId, $strategy);
-
-        // One-to-one relations - strategy dependent
-        if ($strategy === 'replace') {
-            $this->replaceOneToOneRelations($sourcePageId, $targetPageId);
-        } elseif ($strategy === 'append') {
-            // For settings/metadata, we might want to merge specific fields
-            $this->mergeSettings($sourcePageId, $targetPageId);
+        // Blocks - always merge if enabled (structural content)
+        if ($relations['blocks'] ?? false) {
+            try {
+                $this->mergeBlocks($sourcePageId, $targetPageId, $strategy);
+                $results['success'][] = 'blocks';
+            } catch (\Exception $e) {
+                $results['failed'][] = [
+                    'relation' => 'blocks',
+                    'error' => $e->getMessage()
+                ];
+            }
+        } else {
+            $results['skipped'][] = 'blocks';
         }
 
-        // 'keep_target' strategy: do nothing for one-to-one relations
+        // One-to-one relations - strategy dependent
+        $oneToOneRelations = ['metadata', 'seo', 'settings', 'social'];
 
-        // Custom fields - merge or append
-        $this->mergeCustomFields($sourcePageId, $targetPageId);
+        if ($strategy === 'replace') {
+            foreach ($oneToOneRelations as $relation) {
+                if (!($relations[$relation] ?? false)) {
+                    $results['skipped'][] = $relation;
+                    continue;
+                }
+
+                try {
+                    $this->replaceOneToOneRelation($sourcePageId, $targetPageId, $relation);
+                    $results['success'][] = $relation;
+                } catch (\Exception $e) {
+                    $results['failed'][] = [
+                        'relation' => $relation,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+        } elseif ($strategy === 'append') {
+            // For settings/metadata, merge specific fields if enabled
+            if ($relations['settings'] ?? false) {
+                try {
+                    $this->mergeSettings($sourcePageId, $targetPageId);
+                    $results['success'][] = 'settings';
+                } catch (\Exception $e) {
+                    $results['failed'][] = [
+                        'relation' => 'settings',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            } else {
+                $results['skipped'][] = 'settings';
+            }
+        }
+
+        if ($relations['customFields'] ?? false) {
+            $this->mergeCustomFields($sourcePageId, $targetPageId);
+        }
 
         // Merge listing and hero data based on strategy
-        $this->mergeListingAndHeroData($sourcePageId, $targetPageId, $strategy);
+        try {
+            $this->mergeListingAndHeroData($sourcePageId, $targetPageId, $strategy);
+        } catch (\Exception $e) {
+        }
+
+        return $results;
+    }
+
+    private function replaceOneToOneRelation(int $sourcePageId, int $targetPageId, string $relation): void
+    {
+        $modelMap = [
+            'metadata' => PageMetadata::class,
+            'seo' => PageSeo::class,
+            'settings' => PageSettings::class,
+            'social' => PageSocial::class
+        ];
+
+        $modelClass = $modelMap[$relation] ?? null;
+        if (!$modelClass) {
+            throw new \Exception("Unknown relation: {$relation}");
+        }
+
+        // Delete existing
+        $modelClass::where('page_id', $targetPageId)->delete();
+
+        // Copy from source
+        $method = 'duplicate' . ucfirst($relation);
+        $this->pageRepository->$method($sourcePageId, $targetPageId);
     }
 
     /**

@@ -1130,3 +1130,444 @@ body {
 .show-more-btn:not(.expanded)::before {
     content: 'Show ';
 }
+
+/* ============================================
+   3D FLIP CARD STYLES
+   ============================================ */
+
+/* Product Card Flip Container */
+.product-card {
+    position: relative;
+    perspective: 1000px;
+    transform-style: preserve-3d;
+    min-height: 400px;
+}
+
+.product-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+    transform-style: preserve-3d;
+}
+
+.product-card.flipped .product-card-inner {
+    transform: rotateY(180deg);
+}
+
+.product-card-front,
+.product-card-back {
+    position: relative;
+    width: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.product-card-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transform: rotateY(180deg);
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Flip Button on Front */
+.btn-flip {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s;
+}
+
+.btn-flip:hover {
+    background: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-flip svg {
+    width: 20px;
+    height: 20px;
+    color: #2563eb;
+}
+
+/* Card Back Layout */
+.card-back-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+}
+
+.card-back-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 0.5rem;
+}
+
+.btn-flip-back {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    flex-shrink: 0;
+}
+
+.btn-flip-back:hover {
+    background: #f1f5f9;
+    border-color: #2563eb;
+}
+
+.btn-flip-back svg {
+    width: 18px;
+    height: 18px;
+    color: #64748b;
+}
+
+.btn-flip-back:hover svg {
+    color: #2563eb;
+}
+
+.card-back-content {
+    padding: 1rem;
+    flex: 1;
+}
+
+/* Product Description */
+.back-section {
+    margin-bottom: 1.5rem;
+}
+
+.back-section:last-child {
+    margin-bottom: 0;
+}
+
+.back-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.product-description {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #475569;
+}
+
+/* Stock Indicator */
+.stock-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.stock-indicator.in-stock {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.stock-indicator.low-stock {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.stock-indicator.out-of-stock {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.stock-indicator .stock-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* Variants Selector */
+.variants-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 0.5rem;
+}
+
+.variant-option {
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #fff;
+}
+
+.variant-option:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.variant-option.selected {
+    border-color: #2563eb;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 500;
+}
+
+.variant-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f8f9fa;
+}
+
+/* Price History Chart */
+.price-chart-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.price-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.price-stat {
+    text-align: center;
+}
+
+.price-stat-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.price-stat-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.price-stat-value.current {
+    color: #2563eb;
+}
+
+.price-stat-value.low {
+    color: #059669;
+}
+
+.price-stat-value.high {
+    color: #dc2626;
+}
+
+.price-chart {
+    width: 100%;
+    height: 80px;
+    background: #fff;
+    border-radius: 6px;
+    padding: 0.5rem;
+    position: relative;
+}
+
+.price-chart-line {
+    width: 100%;
+    height: 100%;
+}
+
+/* Comparison Feature */
+.comparison-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.comparison-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.comparison-item:last-child {
+    border-bottom: none;
+}
+
+.comparison-label {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+.comparison-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+.comparison-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.comparison-badge.better {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.comparison-badge.worse {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.comparison-badge.average {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Card Back Actions */
+.card-back-actions {
+    padding: 1rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 0.5rem;
+    background: #fff;
+    position: sticky;
+    bottom: 0;
+}
+
+.btn-back-action {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-add-cart-back {
+    background: #2563eb;
+    color: #fff;
+}
+
+.btn-add-cart-back:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-view-details {
+    background: #fff;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+
+.btn-view-details:hover {
+    background: #eff6ff;
+}
+
+/* Prevent scroll on body when card is flipped */
+body.card-flipped {
+    overflow: hidden;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    .product-card {
+        min-height: 380px;
+    }
+
+    .btn-flip {
+        width: 32px;
+        height: 32px;
+    }
+
+    .btn-flip svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .card-back-header {
+        padding: 0.75rem;
+    }
+
+    .card-back-title {
+        font-size: 0.875rem;
+    }
+
+    .card-back-content {
+        padding: 0.75rem;
+    }
+
+    .back-section {
+        margin-bottom: 1rem;
+    }
+
+    .variants-grid {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    }
+
+    .price-stats {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+    }
+
+    .card-back-actions {
+        padding: 0.75rem;
+        flex-direction: column;
+    }
+
+    .btn-back-action {
+        width: 100%;
+    }
+}

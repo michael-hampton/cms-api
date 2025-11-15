@@ -22,7 +22,6 @@ use App\Repositories\PageTagRepository;
 use App\Repositories\PageTerritoryRepository;
 use App\Services\BlockParserService;
 use App\Services\PageHistoryService;
-use App\Services\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -118,7 +117,9 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertSame($newPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(13, $result['results']['success']);;
     }
 
     public function testDuplicatePageReturnsNullForNonexistent()
@@ -156,7 +157,9 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1);
 
-        $this->assertSame($newPage, $result);
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(13, $result['results']['success']);;
     }
 
     public function testDuplicatePageCreatesPageWithCopyInTitle()
@@ -409,7 +412,10 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
         $result = $this->service->handle(1);
-        $this->assertInstanceOf(Page::class, $result);
+
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(13, $result['results']['success']);;
     }
 
     #[DoesNotPerformAssertions]
@@ -491,7 +497,184 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
 
         $result = $this->service->handle(1);
-        $this->assertInstanceOf(Page::class, $result);
+
+        $this->assertNotEmpty($result['results']['success']);
+        $this->assertEmpty($result['results']['failed']);
+        $this->assertCount(13, $result['results']['success']);
+    }
+
+    public function testClonePageWithSelectiveRelations()
+    {
+        $originalPage = $this->createMockPage(1);
+        $newPage = $this->createMockPage(2);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->andReturn($originalPage);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->andReturn($newPage);
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+
+        // Only these should be called
+        $this->pageRepository->shouldReceive('duplicateBlocks')->once();
+        $this->pageRepository->shouldReceive('duplicateMetadata')->once();
+        $this->pageRepository->shouldReceive('duplicateCategories')->once();
+
+        // These should NOT be called
+        $this->pageRepository->shouldReceive('duplicateProducts')->never();
+        $this->pageRepository->shouldReceive('duplicateTags')->never();
+        $this->pageRepository->shouldReceive('duplicateTerritories')->never();
+
+        // Still needed
+        $this->pageRepository->shouldReceive('duplicateSeo')->once();
+        $this->pageRepository->shouldReceive('duplicateSettings')->once();
+        $this->pageRepository->shouldReceive('duplicateSocial')->once();
+        $this->pageRepository->shouldReceive('duplicateCustomFields')->once();
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->once();
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->once();
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->once();
+
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
+
+        $result = $this->service->handle(1, [
+            'relations' => [
+                'blocks' => true,
+                'metadata' => true,
+                'categories' => true,
+                'products' => false,
+                'tags' => false,
+                'territories' => false,
+            ]
+        ]);
+
+        $this->assertArrayHasKey('results', $result);
+        $this->assertContains('blocks', $result['results']['success']);
+        $this->assertContains('categories', $result['results']['success']);
+        $this->assertContains('products', $result['results']['skipped']);
+        $this->assertContains('tags', $result['results']['skipped']);
+    }
+
+    public function testClonePageReturnsDetailedResults()
+    {
+        $originalPage = $this->createMockPage(1);
+        $newPage = $this->createMockPage(2);
+
+        $this->setupDuplicatePageExpectations($originalPage, $newPage);
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once();
+
+        $result = $this->service->handle(1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('page', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertArrayHasKey('original_page_id', $result);
+        $this->assertArrayHasKey('success', $result['results']);
+        $this->assertArrayHasKey('failed', $result['results']);
+        $this->assertArrayHasKey('skipped', $result['results']);
+        $this->assertEquals(1, $result['original_page_id']);
+    }
+
+    public function testClonePageWithAllRelationsDisabled()
+    {
+        $originalPage = $this->createMockPage(1);
+        $newPage = $this->createMockPage(2);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->andReturn($originalPage);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->andReturn($newPage);
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+
+        // No duplication methods should be called
+        $this->pageRepository->shouldReceive('duplicateBlocks')->never();
+        $this->pageRepository->shouldReceive('duplicateMetadata')->never();
+        $this->pageRepository->shouldReceive('duplicateSeo')->never();
+        $this->pageRepository->shouldReceive('duplicateSettings')->never();
+        $this->pageRepository->shouldReceive('duplicateSocial')->never();
+        $this->pageRepository->shouldReceive('duplicateCategories')->never();
+        $this->pageRepository->shouldReceive('duplicateTags')->never();
+        $this->pageRepository->shouldReceive('duplicateCustomFields')->never();
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->never();
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->never();
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->never();
+        $this->pageRepository->shouldReceive('duplicateTerritories')->never();
+        $this->pageRepository->shouldReceive('duplicateProducts')->never();
+
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
+
+        $result = $this->service->handle(1, [
+            'relations' => [
+                'blocks' => false,
+                'metadata' => false,
+                'seo' => false,
+                'settings' => false,
+                'social' => false,
+                'categories' => false,
+                'tags' => false,
+                'customFields' => false,
+                'accessRoles' => false,
+                'pageAuthors' => false,
+                'regionSets' => false,
+                'territories' => false,
+                'products' => false,
+            ]
+        ]);
+
+        $this->assertCount(0, $result['results']['success']);
+        $this->assertEquals(13, count($result['results']['skipped']));
+    }
+
+    public function testClonePageDefaultsToAllRelationsEnabled()
+    {
+        $originalPage = $this->createMockPage(1);
+        $newPage = $this->createMockPage(2);
+
+        $this->setupDuplicatePageExpectations($originalPage, $newPage);
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once();
+
+        $result = $this->service->handle(1); // No options passed
+
+        // All relations should be in success (13 total)
+        $this->assertGreaterThanOrEqual(13, count($result['results']['success']));
+        $this->assertCount(0, $result['results']['skipped']);
+    }
+
+    public function testClonePageTracksMultipleFailures()
+    {
+        $originalPage = $this->createMockPage(1);
+        $newPage = $this->createMockPage(2);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->andReturn($originalPage);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->andReturn($newPage);
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+
+        // Multiple failures
+        $this->pageRepository->shouldReceive('duplicateBlocks')->once()->andThrow(new \Exception('Blocks failed'));
+        $this->pageRepository->shouldReceive('duplicateMetadata')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateSeo')->once()->andThrow(new \Exception('SEO failed'));
+        $this->pageRepository->shouldReceive('duplicateSettings')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateSocial')->once()->andThrow(new \Exception('Social failed'));
+        $this->pageRepository->shouldReceive('duplicateCategories')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateTags')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateCustomFields')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateAccessRoles')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicatePageAuthors')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateRegionSets')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateTerritories')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateProducts')->once()->andReturn(true);
+
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->andReturn($newPage);
+
+        $result = $this->service->handle(1);
+
+        $this->assertCount(3, $result['results']['failed']);
+        $this->assertEquals('blocks', $result['results']['failed'][0]['relation']);
+        $this->assertEquals('seo', $result['results']['failed'][1]['relation']);
+        $this->assertEquals('social', $result['results']['failed'][2]['relation']);
+        $this->assertGreaterThan(0, count($result['results']['success']));
     }
 
     private function createMockPage(int $id, string $title = 'Test'): Page

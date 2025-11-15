@@ -144,14 +144,14 @@ class ProductController extends Controller
 
             $duplicateProduct = Container::getInstance()->make(CloneProduct::class);
 
-            $duplicatedProduct = $duplicateProduct->handle(
+            $results = $duplicateProduct->handle(
                 $id,
                 $newName,
                 $targetSiteId,
                 $cloneRelations
             );
 
-            return $this->jsonResponse($duplicatedProduct->toArray(), 201);
+            return $this->resourceResponse($results, 201);
 
         } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'not found') !== false) {

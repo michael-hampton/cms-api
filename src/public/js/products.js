@@ -173,6 +173,7 @@
     }
 
     // Render products
+    // Replace the renderProducts function with this updated version
     function renderProducts(products) {
         if (!products || products.length === 0) {
             showEmptyState();
@@ -182,42 +183,83 @@
         hideEmptyState();
 
         elements.productsGrid.innerHTML = products.map(product => `
-            <div class="product-card">
-                <a href="/shop/details/${product.slug}" class="product-image">
-                    <img src="${product.image || '/images/placeholder.jpg'}" 
-                         alt="${escapeHtml(product.name)}">
-                    ${product.discount_percentage > 0 ? `
-                        <span class="badge-sale">-${product.discount_percentage}%</span>
-                    ` : ''}
-                </a>
-                <div class="product-content">
-                    <h3 class="product-name">
-                        <a href="/shop/details/${product.slug}">${escapeHtml(product.name)}</a>
-                    </h3>
-                    <div class="product-price">
-                        ${product.sale_price && product.sale_price < product.price ? `
-                            <span class="price-sale">$${formatPrice(product.sale_price)}</span>
-                            <span class="price-original">$${formatPrice(product.price)}</span>
-                        ` : `
-                            <span class="price-current">$${formatPrice(product.price)}</span>
-                        `}
+        <div class="product-card" data-product-id="${product.id}">
+            <div class="product-card-inner">
+                <!-- FRONT OF CARD -->
+                <div class="product-card-front">
+                    <button class="btn-flip" data-product-id="${product.id}" title="View details">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <a href="/shop/details/${product.slug}" class="product-image">
+                        <img src="${product.image || '/images/placeholder.jpg'}" 
+                             alt="${escapeHtml(product.name)}">
+                        ${product.discount_percentage > 0 ? `
+                            <span class="badge-sale">-${product.discount_percentage}%</span>
+                        ` : ''}
+                    </a>
+                    
+                    <div class="product-content">
+                        <h3 class="product-name">
+                            <a href="/shop/details/${product.slug}">${escapeHtml(product.name)}</a>
+                        </h3>
+                        <div class="product-price">
+                            ${product.sale_price && product.sale_price < product.price ? `
+                                <span class="price-sale">$${formatPrice(product.sale_price)}</span>
+                                <span class="price-original">$${formatPrice(product.price)}</span>
+                            ` : `
+                                <span class="price-current">$${formatPrice(product.price)}</span>
+                            `}
+                        </div>
+                        <div class="product-actions">
+                            <button class="btn-add-to-cart" data-product-id="${product.id}">
+                                Add to Cart
+                            </button>
+                            <button class="btn-wishlist" data-product-id="${product.id}">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <div class="product-actions">
-                        <button class="btn-add-to-cart" data-product-id="${product.id}">
-                            Add to Cart
-                        </button>
-                        <button class="btn-wishlist" data-product-id="${product.id}">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </div>
+                
+                <!-- BACK OF CARD -->
+                <div class="product-card-back">
+                    <div class="card-back-header">
+                        <h3 class="card-back-title">${escapeHtml(product.name)}</h3>
+                        <button class="btn-flip-back" data-product-id="${product.id}" title="Flip back">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
                             </svg>
                         </button>
                     </div>
+                    
+                    <div class="card-back-content">
+                        <div class="card-back-dynamic-content">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <div class="card-back-actions">
+                        <button class="btn-back-action btn-add-cart-back" data-product-id="${product.id}">
+                            Add to Cart
+                        </button>
+                        <a href="/shop/details/${product.slug}" class="btn-back-action btn-view-details">
+                            Full Details
+                        </a>
+                    </div>
                 </div>
             </div>
-        `).join('');
+        </div>
+    `).join('');
 
         // Attach event listeners to new buttons
         attachProductEventListeners();
+        attachFlipEventListeners();
     }
 
     // Attach event listeners to product buttons
@@ -230,6 +272,35 @@
         // Wishlist buttons
         document.querySelectorAll('.btn-wishlist').forEach(btn => {
             btn.addEventListener('click', handleToggleWishlist);
+        });
+    }
+
+    // Attach flip card event listeners
+    function attachFlipEventListeners() {
+        // Flip to back buttons
+        document.querySelectorAll('.btn-flip').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = btn.dataset.productId;
+                const card = btn.closest('.product-card');
+                flipCard(productId, card);
+            });
+        });
+
+        // Flip to front buttons
+        document.querySelectorAll('.btn-flip-back').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const card = btn.closest('.product-card');
+                flipBackCard(card);
+            });
+        });
+
+        // Add to cart from back
+        document.querySelectorAll('.btn-add-cart-back').forEach(btn => {
+            btn.addEventListener('click', handleAddToCart);
         });
     }
 
@@ -507,6 +578,329 @@
                 btn.classList.add('expanded');
                 btn.textContent = 'Show Less';
             }
+        }
+    });
+
+    // Flip card functionality
+    let currentlyFlippedCard = null;
+
+    function flipCard(productId, cardElement) {
+        // If clicking the same card, just toggle it
+        if (currentlyFlippedCard === cardElement) {
+            cardElement.classList.remove('flipped');
+            currentlyFlippedCard = null;
+            document.body.classList.remove('card-flipped');
+            return;
+        }
+
+        // If another card is flipped, flip it back first
+        if (currentlyFlippedCard) {
+            currentlyFlippedCard.classList.remove('flipped');
+        }
+
+        // Flip the new card
+        cardElement.classList.add('flipped');
+        currentlyFlippedCard = cardElement;
+        document.body.classList.add('card-flipped');
+
+        // Load detailed data for the back of the card if not already loaded
+        if (!cardElement.dataset.backLoaded) {
+            loadCardBackData(productId, cardElement);
+            cardElement.dataset.backLoaded = 'true';
+        }
+    }
+
+    function flipBackCard(cardElement) {
+        cardElement.classList.remove('flipped');
+        if (currentlyFlippedCard === cardElement) {
+            currentlyFlippedCard = null;
+        }
+        document.body.classList.remove('card-flipped');
+    }
+
+// Load detailed product data for card back
+    async function loadCardBackData(productId, cardElement) {
+        const backContent = cardElement.querySelector('.card-back-dynamic-content');
+        if (!backContent) return;
+
+        try {
+            // Show loading state
+            backContent.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">Loading details...</div>';
+
+            const response = await fetch(`/api/${SITE}/product-list/${productId}/details`);
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                renderCardBackContent(data.product, backContent);
+            } else {
+                backContent.innerHTML = '<div style="text-align: center; padding: 2rem; color: #ef4444;">Failed to load details</div>';
+            }
+        } catch (error) {
+            console.error('Error loading card back data:', error);
+            backContent.innerHTML = '<div style="text-align: center; padding: 2rem; color: #ef4444;">An error occurred</div>';
+        }
+    }
+
+    function renderCardBackContent(product, container) {
+        const {
+            description,
+            stock_quantity,
+            variants,
+            price_history,
+            comparison,
+            specifications,
+            merchants,
+            lowest_merchant_price,
+            price,
+            sale_price
+        } = product;
+
+        let html = '';
+
+        // Description
+        if (description) {
+            const shortDesc = description.length > 150
+                ? description.substring(0, 150) + '...'
+                : description;
+            html += `
+            <div class="back-section">
+                <h4 class="back-section-title">Description</h4>
+                <p class="product-description">${escapeHtml(shortDesc)}</p>
+            </div>
+        `;
+        }
+
+        // Stock Status
+        const stockStatus = getStockStatus(stock_quantity);
+        html += `
+        <div class="back-section">
+            <h4 class="back-section-title">Availability</h4>
+            <div class="stock-indicator ${stockStatus.class}">
+                <span class="stock-dot"></span>
+                <span>${stockStatus.text}</span>
+            </div>
+        </div>
+    `;
+
+        // Variants (if available)
+        if (variants && variants.length > 0) {
+            html += `
+            <div class="back-section">
+                <h4 class="back-section-title">Available Options</h4>
+                <div class="variants-grid">
+                    ${variants.map(variant => `
+                        <div class="variant-option ${variant.in_stock ? '' : 'disabled'}" 
+                             data-variant-id="${variant.id}"
+                             data-variant-price="${variant.final_price}">
+                            <div style="font-weight: 500;">${escapeHtml(variant.name)}</div>
+                            ${variant.discount_percentage > 0 ? `
+                                <div style="font-size: 0.75rem; color: #059669;">-${variant.discount_percentage}%</div>
+                            ` : ''}
+                            <div style="font-size: 0.75rem; color: #64748b;">$${formatPrice(variant.final_price)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        }
+
+        // Price History (90 days)
+        if (price_history && price_history.length > 0) {
+            const prices = price_history.map(p => p.price);
+            const currentPrice = prices[prices.length - 1];
+            const lowestPrice = Math.min(...prices);
+            const highestPrice = Math.max(...prices);
+
+            // Calculate savings if currently at lowest
+            const savingsPercent = currentPrice === lowestPrice && highestPrice > lowestPrice
+                ? Math.round(((highestPrice - lowestPrice) / highestPrice) * 100)
+                : 0;
+
+            html += `
+            <div class="back-section">
+                <h4 class="back-section-title">Price History (90 Days)</h4>
+                <div class="price-chart-container">
+                    <div class="price-stats">
+                        <div class="price-stat">
+                            <div class="price-stat-label">Current</div>
+                            <div class="price-stat-value current">$${formatPrice(currentPrice)}</div>
+                        </div>
+                        <div class="price-stat">
+                            <div class="price-stat-label">Lowest</div>
+                            <div class="price-stat-value low">$${formatPrice(lowestPrice)}</div>
+                        </div>
+                        <div class="price-stat">
+                            <div class="price-stat-label">Highest</div>
+                            <div class="price-stat-value high">$${formatPrice(highestPrice)}</div>
+                        </div>
+                    </div>
+                    ${savingsPercent > 0 ? `
+                        <div style="text-align: center; margin-bottom: 0.5rem; color: #059669; font-size: 0.875rem; font-weight: 500;">
+                            💰 Save ${savingsPercent}% vs highest price!
+                        </div>
+                    ` : ''}
+                    <div class="price-chart">
+                        <svg class="price-chart-line" viewBox="0 0 100 40" preserveAspectRatio="none">
+                            ${generatePriceChartSVG(price_history)}
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        `;
+        }
+
+        // Specifications
+        if (specifications && specifications.length > 0) {
+            html += `
+            <div class="back-section">
+                <h4 class="back-section-title">Specifications</h4>
+                <div class="comparison-section">
+                    ${specifications.map(spec => `
+                        <div class="comparison-item">
+                            <span class="comparison-label">${escapeHtml(spec.key)}</span>
+                            <span class="comparison-value">${escapeHtml(spec.value)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        }
+
+        // Comparison with category
+        if (comparison) {
+            html += `
+            <div class="back-section">
+                <h4 class="back-section-title">Price Comparison</h4>
+                <div class="comparison-section">
+                    <div class="comparison-item">
+                        <span class="comparison-label">vs. Category Average</span>
+                        <span class="comparison-badge ${comparison.price_comparison}">
+                            ${comparison.price_difference}
+                        </span>
+                    </div>
+                    ${comparison.category_avg_price ? `
+                        <div class="comparison-item">
+                            <span class="comparison-label">Category Average</span>
+                            <span class="comparison-value">$${comparison.category_avg_price}</span>
+                        </div>
+                    ` : ''}
+                    ${comparison.discount_vs_regular ? `
+                        <div class="comparison-item">
+                            <span class="comparison-label">Your Savings</span>
+                            <span class="comparison-badge better">
+                                ${comparison.discount_vs_regular}
+                            </span>
+                        </div>
+                    ` : ''}
+                    ${comparison.products_in_category ? `
+                        <div class="comparison-item">
+                            <span class="comparison-label">Similar Products</span>
+                            <span class="comparison-value">${comparison.products_in_category} in category</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        }
+
+        // Merchant availability
+        if (merchants && merchants.length > 1) {
+            html += `
+            <div class="back-section">
+                <h4 class="back-section-title">Available From</h4>
+                <div class="comparison-section">
+                    ${merchants.slice(0, 3).map(merchant => `
+                        <div class="comparison-item">
+                            <span class="comparison-label">
+                                <a href="${merchant.url}" target="_blank" style="color: #2563eb; text-decoration: none;">
+                                    Merchant
+                                </a>
+                            </span>
+                            <span class="comparison-value">
+                                $${formatPrice(merchant.sale_price > 0 ? merchant.sale_price : merchant.price)}
+                                ${merchant.has_discount ? `
+                                    <span style="color: #059669; font-size: 0.75rem; margin-left: 0.25rem;">
+                                        -${merchant.discount_percentage}%
+                                    </span>
+                                ` : ''}
+                            </span>
+                        </div>
+                    `).join('')}
+                    ${merchants.length > 3 ? `
+                        <div style="text-align: center; margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;">
+                            +${merchants.length - 3} more retailers
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        }
+
+        container.innerHTML = html;
+
+        // Attach variant selection handlers
+        if (variants && variants.length > 0) {
+            attachVariantHandlers(container, product.id);
+        }
+    }
+
+// Get stock status
+    function getStockStatus(quantity) {
+        if (quantity === 0) {
+            return {class: 'out-of-stock', text: 'Out of Stock'};
+        } else if (quantity < 10) {
+            return {class: 'low-stock', text: `Only ${quantity} left in stock`};
+        } else {
+            return {class: 'in-stock', text: 'In Stock'};
+        }
+    }
+
+// Generate SVG path for price chart
+    function generatePriceChartSVG(priceHistory) {
+        if (!priceHistory || priceHistory.length < 2) return '';
+
+        const prices = priceHistory.map(p => p.price);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        const priceRange = maxPrice - minPrice || 1;
+
+        const points = priceHistory.map((item, index) => {
+            const x = (index / (priceHistory.length - 1)) * 100;
+            const y = 40 - ((item.price - minPrice) / priceRange) * 35;
+            return `${x},${y}`;
+        }).join(' ');
+
+        return `
+        <polyline 
+            points="${points}" 
+            fill="none" 
+            stroke="#2563eb" 
+            stroke-width="2" 
+            stroke-linecap="round" 
+            stroke-linejoin="round"
+        />
+    `;
+    }
+
+// Attach variant selection handlers
+    function attachVariantHandlers(container, productId) {
+        container.querySelectorAll('.variant-option:not(.disabled)').forEach(option => {
+            option.addEventListener('click', function () {
+                // Remove selected from all
+                container.querySelectorAll('.variant-option').forEach(o => o.classList.remove('selected'));
+                // Add selected to clicked
+                this.classList.add('selected');
+                // Store selected variant
+                const variantId = this.dataset.variantId;
+                console.log(`Selected variant ${variantId} for product ${productId}`);
+            });
+        });
+    }
+
+// Escape key to flip back
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && currentlyFlippedCard) {
+            flipBackCard(currentlyFlippedCard);
         }
     });
 

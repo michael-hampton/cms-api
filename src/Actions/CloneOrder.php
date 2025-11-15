@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Models\Order;
 use App\Repositories\OrderRepository;
 use App\Services\OrderService;
 use Exception;
@@ -21,7 +20,7 @@ class CloneOrder
         $this->database = $database ?? Database::getInstance();
     }
 
-    public function handle(int $orderId): Order
+    public function handle(int $orderId): array
     {
         return $this->database->transaction(function () use ($orderId) {
 
@@ -30,6 +29,8 @@ class CloneOrder
             if (!$originalOrder) {
                 throw new Exception("Order not found");
             }
+
+            $results = ['success' => [], 'failed' => [], 'items_cloned' => 0];
 
             $data = [
                 'user_id' => $originalOrder->user_id,
@@ -47,18 +48,21 @@ class CloneOrder
             ];
 
             // Handle address duplication
+            // Track address handling
             if ($originalOrder->shipping_address_id) {
-                // If original order has linked address, use the same address
                 $data['shipping_address_id'] = $originalOrder->shipping_address_id;
+                $results['success'][] = 'shipping_address_linked';
             } elseif ($originalOrder->shipping_address) {
-                // If original order has JSON address, copy it
                 $data['shipping_address'] = $originalOrder->shipping_address;
+                $results['success'][] = 'shipping_address_json';
             }
 
             if ($originalOrder->billing_address_id) {
                 $data['billing_address_id'] = $originalOrder->billing_address_id;
+                $results['success'][] = 'billing_address_linked';
             } elseif ($originalOrder->billing_address) {
                 $data['billing_address'] = $originalOrder->billing_address;
+                $results['success'][] = 'billing_address_json';
             }
 
             $items = [];
@@ -73,15 +77,22 @@ class CloneOrder
                     'total' => $item->total,
                     'metadata' => $item->metadata
                 ];
+                $results['items_cloned']++;
             }
 
             $newOrder = $this->orderService->createOrder($data, $items, $originalOrder->site_id);
+            $results['success'][] = 'order_created';
 
             // Add clone history
             $originalOrder->addCloneRecord('cloned_to', $newOrder->id, null);
             $newOrder->addCloneRecord('cloned_from', $originalOrder->id, null);
+            $results['success'][] = 'clone_history';
 
-            return $newOrder;
+            return [
+                'order' => $newOrder,
+                'results' => $results,
+                'original_order_id' => $orderId
+            ];
         });
     }
 }

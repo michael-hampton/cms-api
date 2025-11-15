@@ -16,7 +16,7 @@ class CloneCategory
         $this->database = $database ?? Database::getInstance();
     }
 
-    public function handle(int $categoryId, ?string $newName = null): bool
+    public function handle(int $categoryId, ?string $newName = null): array
     {
         return $this->database->transaction(function() use ($categoryId, $newName) {
             $originalCategory = $this->repository->find($categoryId);
@@ -24,6 +24,8 @@ class CloneCategory
             if (!$originalCategory) {
                 throw new \Exception("Category not found");
             }
+
+            $results = ['success' => [], 'failed' => [], 'children_cloned' => 0];
 
             $data = [
                 'name' => $newName ?? ($originalCategory->name . ' (Copy)'),
@@ -50,22 +52,31 @@ class CloneCategory
             $data['slug'] = $slug;
 
             $newCategory = $this->repository->create($data);
+            $results['success'][] = 'category_created';
 
-            if (!$newCategory) {
-                throw new \Exception("Failed to create duplicate category");
-            }
-
-            // Add clone history
             $originalCategory->addCloneRecord('cloned_to', $newCategory->id, null);
             $newCategory->addCloneRecord('cloned_from', $originalCategory->id, null);
+            $results['success'][] = 'clone_history';
 
             // Duplicate child categories recursively
             $children = $originalCategory->children();
             foreach ($children as $child) {
-                $this->duplicateCategoryRecursive($child, $newCategory->id);
+                try {
+                    $this->duplicateCategoryRecursive($child, $newCategory->id);
+                    $results['children_cloned']++;
+                } catch (\Exception $e) {
+                    $results['failed'][] = [
+                        'child_category_id' => $child->id,
+                        'error' => $e->getMessage()
+                    ];
+                }
             }
 
-            return $newCategory !== null;
+            return [
+                'category' => $newCategory,
+                'results' => $results,
+                'original_category_id' => $categoryId
+            ];
         });
     }
 

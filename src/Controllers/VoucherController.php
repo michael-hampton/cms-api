@@ -144,13 +144,13 @@ class VoucherController extends Controller
         try {
             $newCode = $request->get('code', null);
             $handler = Container::getInstance()->make(CloneVoucher::class);
-            $newVoucher = $handler->handle($id, $newCode);
+            $results = $handler->handle($id, $newCode);
 
-            if (!$newVoucher) {
+            if (!$results) {
                 return $this->errorResponse('Voucher not found', 404);
             }
 
-            return $this->jsonResponse(['voucher' => $newVoucher->toArray()], 201);
+            return $this->resourceResponse($results, 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

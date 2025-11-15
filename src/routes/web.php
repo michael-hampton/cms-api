@@ -27,8 +27,6 @@ use App\Controllers\RegionContentController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
 use App\Controllers\WishlistController;
-use App\Framework\Container;
-use App\Framework\Http\Router;
 use App\Framework\Middleware\CheckPageMemberAccess;
 use App\Framework\Middleware\RequireMemberAuth;
 
@@ -190,6 +188,8 @@ $router->get('/{site}/member/settings', [MemberAuthController::class, 'showChang
 $router->get('/{siteName}/deals', [DealsController::class, 'index']);
 
 $router->get('/{site}/member/wishlist', [MemberWishlistController::class, 'index']);
+
+$router->get('/api/{siteName}/product-list/{id}/details', [ProductListController::class, 'getProductDetails']);
 
 
 

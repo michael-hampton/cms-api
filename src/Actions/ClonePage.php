@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Models\Page;
 use App\Repositories\PageRepository;
 use App\Services\PageHistoryService;
 
@@ -20,14 +19,33 @@ class ClonePage
     /**
      * Duplicate a page with all its relations
      */
-    public function handle(int $pageId): ?Page
+    public function handle(int $pageId, array $options = []): ?array
     {
         $originalPage = $this->pageRepository->getCompletePageData($pageId);
         if (!$originalPage) {
             return null;
         }
 
-        return $this->database->transaction(function () use ($originalPage, $pageId) {
+        // Set default relations - all enabled by default
+        $defaultRelations = [
+            'categories' => true,
+            'tags' => true,
+            'accessRoles' => true,
+            'regionSets' => true,
+            'territories' => true,
+            'pageAuthors' => true,
+            'customFields' => true,
+            'products' => true,
+            'blocks' => true,
+            'metadata' => true,
+            'seo' => true,
+            'settings' => true,
+            'social' => true,
+        ];
+
+        $options['relations'] = array_merge($defaultRelations, $options['relations'] ?? []);
+
+        return $this->database->transaction(function () use ($originalPage, $pageId, $options) {
             $pageData = [
                 'title' => $originalPage->title . ' (Copy)',
                 'slug' => $originalPage->slug . '-copy-' . time(),
@@ -46,11 +64,10 @@ class ClonePage
                 'crop_overrides' => $originalPage->crop_overrides,
                 'resolved_images' => $originalPage->resolved_images,
                 'page_type' => $originalPage->page_type,
-                'gallery_slides' => $originalPage->gallery_slides, // ADD THIS
+                'gallery_slides' => $originalPage->gallery_slides,
                 'requires_approval' => $originalPage->requires_approval,
                 'approved_by' => null,
                 'approved_at' => null
-
             ];
 
             $newPage = $this->pageRepository->create($pageData);
@@ -59,12 +76,20 @@ class ClonePage
             $originalPage->addCloneRecord('cloned_to', $newPage->id, null);
             $newPage->addCloneRecord('cloned_from', $originalPage->id, null);
 
-            // Duplicate all relations using repository methods
-            $this->duplicatePageRelations($originalPage->id, $newPage->id);
+            // Duplicate relations using repository methods
+            $relationResults = $this->duplicatePageRelations(
+                $originalPage->id,
+                $newPage->id,
+                $options['relations']
+            );
 
             $this->historyService->logPageDuplicated($pageId, $newPage->id);
 
-            return $this->pageRepository->getCompletePageData($newPage->id);
+            return [
+                'page' => $this->pageRepository->getCompletePageData($newPage->id),
+                'results' => $relationResults,
+                'original_page_id' => $pageId,
+            ];
         });
     }
 
@@ -72,9 +97,9 @@ class ClonePage
      * Duplicate all relations from source to target page
      * This method orchestrates the duplication of all page relations
      */
-    private function duplicatePageRelations(int $sourcePageId, int $targetPageId): void
+    private function duplicatePageRelations(int $sourcePageId, int $targetPageId, array $relations): array
     {
-        $relations = [
+        $relationMethods = [
             'blocks' => 'duplicateBlocks',
             'metadata' => 'duplicateMetadata',
             'seo' => 'duplicateSeo',
@@ -90,14 +115,24 @@ class ClonePage
             'products' => 'duplicateProducts',
         ];
 
-        $errors = [];
+        $results = [
+            'success' => [],
+            'failed' => [],
+            'skipped' => []
+        ];
 
-        foreach ($relations as $relationType => $method) {
+        foreach ($relationMethods as $relationType => $method) {
+            // Check if this relation should be duplicated
+            if (!($relations[$relationType] ?? false)) {
+                $results['skipped'][] = $relationType;
+                continue;
+            }
+
             try {
                 $this->pageRepository->$method($sourcePageId, $targetPageId);
+                $results['success'][] = $relationType;
             } catch (\Exception $e) {
                 if ($_ENV['APP_ENV'] !== 'testing') {
-                    // Log the error but continue with other relations
                     error_log(sprintf(
                         'Failed to duplicate %s for page %d to %d: %s',
                         $relationType,
@@ -107,14 +142,18 @@ class ClonePage
                     ));
                 }
 
-                $errors[$relationType] = $e->getMessage();
+                $results['failed'][] = [
+                    'relation' => $relationType,
+                    'error' => $e->getMessage()
+                ];
             }
         }
 
         // If critical relations failed, you might want to throw
-        // For now, we'll allow partial duplication to succeed
-        if (!empty($errors) && count($errors) === count($relations)) {
-            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($errors));
+        if (!empty($results['failed']) && count($results['failed']) === count($relationMethods)) {
+            throw new \Exception('Failed to duplicate any page relations: ' . json_encode($results['failed']));
         }
+
+        return $results;
     }
 }
