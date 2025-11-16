@@ -49,4 +49,9 @@ class Config
     {
         return self::$config;
     }
+
+    public static function has(string $key): bool
+    {
+        return array_key_exists($key, self::$config);
+    }
 }

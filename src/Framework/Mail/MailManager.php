@@ -11,7 +11,7 @@ class MailManager
     private array $config;
     private MailerInterface $mailer;
 
-    private function __construct()
+    public function __construct()
     {
         $this->config = Config::get('mail');
         $this->mailer = $this->createMailer();

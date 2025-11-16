@@ -144,7 +144,8 @@ class OrderService
                 $this->createOrderItem($order->id, $item);
             }
 
-            $customerEmail = $order->user->email ?? $data['customer_email'] ?? null;
+            $customerEmail = $order->user?->email ?: ($data['customer_email'] ?? null);
+
             if ($customerEmail) {
                 try {
                     $this->mailManager->to($customerEmail)->send(new OrderConfirmation($order));

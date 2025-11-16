@@ -3,6 +3,9 @@
 namespace App\Tests\Unit\Services;
 
 use App\Framework\Database\Database;
+use App\Framework\Mail\MailManager;
+use App\Framework\Mail\PendingMail;
+use App\Mail\OrderConfirmation;
 use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
@@ -35,6 +38,8 @@ class OrderServiceTest extends FunctionalTestCase
 
     private $historyService;
 
+    private $mailManager;
+
     protected function setUp(): void
     {
         parent::setUp(); // Call parent setup if it exists
@@ -46,6 +51,7 @@ class OrderServiceTest extends FunctionalTestCase
         $this->orderItemRepository = m::mock(OrderItemRepository::class);
         $this->databaseMock = m::mock(Database::class);
         $this->historyService = m::mock(OrderHistoryService::class); // ADD THIS
+        $this->mailManager = m::mock(MailManager::class);
 
         $this->service = new OrderService(
             $this->orderRepository,
@@ -54,6 +60,7 @@ class OrderServiceTest extends FunctionalTestCase
             $this->addressRepository,
             $this->orderCalculationService,
             $this->historyService,
+            $this->mailManager,
             $this->databaseMock,
         );
     }
@@ -142,8 +149,12 @@ class OrderServiceTest extends FunctionalTestCase
         ];
         $siteId = 1;
 
+        $member = m::mock(Member::class)->makePartial();
+        $member->email = 'michaelhamptondesign@yahoo.com';
+
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -194,6 +205,8 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(m::mock(OrderItem::class));
 
+        $this->setMailExpectations();
+
         $this->orderRepository->shouldReceive('getOrderById')
             ->once()
             ->with(1)
@@ -220,8 +233,12 @@ class OrderServiceTest extends FunctionalTestCase
         ];
         $siteId = 1;
 
+        $member = m::mock(Member::class)->makePartial();
+        $member->email = 'michaelhamptondesign@yahoo.com';
+
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -249,6 +266,8 @@ class OrderServiceTest extends FunctionalTestCase
                 return $data['order_number'] === 'CUSTOM-001';
             }))
             ->andReturn($mockOrder);
+
+        $this->setMailExpectations();
 
         $this->orderItemRepository->shouldReceive('create')
             ->once()
@@ -298,8 +317,12 @@ class OrderServiceTest extends FunctionalTestCase
         ];
         $siteId = 1;
 
+        $member = m::mock(Member::class)->makePartial();
+        $member->email = 'michaelhamptondesign@yahoo.com';
+
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -333,6 +356,8 @@ class OrderServiceTest extends FunctionalTestCase
                     && $data['total'] == 148.00;
             }))
             ->andReturn($mockOrder);
+
+        $this->setMailExpectations();
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
@@ -384,8 +409,12 @@ class OrderServiceTest extends FunctionalTestCase
         ];
         $siteId = 1;
 
+        $member = m::mock(Member::class)->makePartial();
+        $member->email = 'michaelhamptondesign@yahoo.com';
+
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -423,6 +452,8 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->setMailExpectations();
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
@@ -1310,8 +1341,12 @@ class OrderServiceTest extends FunctionalTestCase
         ];
         $siteId = 1;
 
+        $member = m::mock(Member::class)->makePartial();
+        $member->email = 'michaelhamptondesign@yahoo.com';
+
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -1359,6 +1394,8 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(m::mock(OrderItem::class));
 
+        $this->setMailExpectations();
+
         $this->historyService->shouldReceive('logCreated')
             ->once()
             ->with(1, m::any(), 123)
@@ -1389,6 +1426,7 @@ class OrderServiceTest extends FunctionalTestCase
     {
         $existingMember = m::mock(Member::class)->makePartial();
         $existingMember->id = 456;
+        $existingMember->email = 'michaelhamptondesign@yahoo.com';
 
         $data = [
             'customer_name' => 'John Doe',
@@ -1406,6 +1444,7 @@ class OrderServiceTest extends FunctionalTestCase
 
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $existingMember;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -1447,6 +1486,8 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->setMailExpectations();
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
@@ -1497,6 +1538,7 @@ class OrderServiceTest extends FunctionalTestCase
     {
         $member = m::mock(Member::class)->makePartial();
         $member->id = 1;
+        $member->email = 'michaelhamptondesign@yahoo.com';
 
         $address = m::mock(Address::class)->makePartial();
         $address->id = 10;
@@ -1518,6 +1560,7 @@ class OrderServiceTest extends FunctionalTestCase
 
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -1560,6 +1603,8 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->setMailExpectations();
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
@@ -1626,6 +1671,7 @@ class OrderServiceTest extends FunctionalTestCase
     {
         $member = m::mock(Member::class)->makePartial();
         $member->id = 1;
+        $member->email = 'michaelhamptondesign@yahoo.com';
 
         $newAddress = m::mock(Address::class)->makePartial();
         $newAddress->id = 20;
@@ -1651,6 +1697,7 @@ class OrderServiceTest extends FunctionalTestCase
 
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
+        $mockOrder->user = $member;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -1697,6 +1744,8 @@ class OrderServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($mockOrder);
+
+        $this->setMailExpectations();
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
@@ -2106,6 +2155,20 @@ class OrderServiceTest extends FunctionalTestCase
         $result = $this->service->updateOrder($orderId, ['status' => 'pending']);
 
         $this->assertSame($updatedOrder, $result);
+    }
+
+    public function setMailExpectations()
+    {
+        $pendingMail = m::mock(PendingMail::class)->makePartial();
+
+        $this->mailManager->shouldReceive('to')
+            ->once()
+            ->with('michaelhamptondesign@yahoo.com')
+            ->andReturn($pendingMail);
+
+        $pendingMail->shouldReceive('send')
+            ->once()
+            ->with(m::type(OrderConfirmation::class));
     }
 
 
