@@ -26,6 +26,7 @@ $hasSidebar = !empty($sidebarBlocks);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title) ?></title>
     <meta name="description" content="<?= htmlspecialchars($description) ?>">
+    @css('base-blocks.css')
     <?php
 
     use App\Framework\Support\SiteContext;

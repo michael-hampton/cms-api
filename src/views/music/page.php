@@ -1,6 +1,8 @@
 @include('header', ['menu' => $menu])
+@css('base-blocks.css')
 
 <?php
+
 use App\Framework\Support\SiteContext;
 
 // Prepare page data

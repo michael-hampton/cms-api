@@ -3048,3 +3048,11 @@ nav.header-nav ul {
 .voucher-copy-btn:active {
     transform: scale(0.95);
 }
+
+.text-paragraph, .heading-text {
+    color: white !important;
+}
+
+.authors-section {
+    color: black !important;
+}

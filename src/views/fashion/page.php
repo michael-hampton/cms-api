@@ -1,5 +1,7 @@
 @include('header', ['menu' => $menu])
 
+@css('base-blocks.css')
+
 
 <?php
 // views/estate/page.php (enhanced page template)

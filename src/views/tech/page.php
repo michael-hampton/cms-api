@@ -1,4 +1,5 @@
 @include('header', ['menu' => $menu])
+@css('base-blocks.css')
 
 
 <?php
@@ -55,7 +56,7 @@ $hasSidebar = !empty($sidebarBlocks);
                     @include('comments')
 
                     <!-- Social Media Links -->
-                    @include('links)
+                    @include('links')
                 </div>
 
                 <!-- Sidebar -->

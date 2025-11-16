@@ -73,7 +73,7 @@ function loadConfigFiles(): void
     foreach ($files as $file) {
         $key = basename($file, '.php');
 
-        if (Config::has($key)) {
+        if (Config::has($key) || $key === 'DatabaseConfig') {
             continue;
         }
 

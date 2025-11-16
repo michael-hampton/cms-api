@@ -1,4 +1,5 @@
 @include('header', ['menu' => $menu])
+@css('base-blocks.css')
 
 
 <?php
