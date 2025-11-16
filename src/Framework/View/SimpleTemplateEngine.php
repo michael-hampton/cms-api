@@ -81,6 +81,12 @@ class SimpleTemplateEngine implements ViewEngineInterface
             }
         }
 
+        $path = __DIR__ . '/../../' . $this->viewsPath . '/' . $template . '.php';
+
+        if (file_exists($path)) {
+            return $path;
+        }
+
         return null;
     }
 

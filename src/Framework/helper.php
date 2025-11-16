@@ -393,6 +393,13 @@ if (!function_exists('class_uses_recursive')) {
 
         return array_unique($results);
     }
+
+    if (!function_exists('mail_manager')) {
+        function mail_manager(): \App\Framework\Mail\MailManager
+        {
+            return \App\Framework\Mail\MailManager::getInstance();
+        }
+    }
 }
 
 

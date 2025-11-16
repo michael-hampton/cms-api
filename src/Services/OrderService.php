@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Framework\Database\Database;
+use App\Framework\Mail\MailManager;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Mail\OrderConfirmation;
 use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -25,6 +28,7 @@ class OrderService
         private readonly AddressRepository       $addressRepository,
         private readonly OrderCalculationService $calculationService,
         private readonly OrderHistoryService     $historyService,
+        private readonly MailManager $mailManager,
         ?Database                                $database = null
     )
     {
@@ -138,6 +142,18 @@ class OrderService
             // Create order items
             foreach ($items as $item) {
                 $this->createOrderItem($order->id, $item);
+            }
+
+            $customerEmail = $order->user->email ?? $data['customer_email'] ?? null;
+            if ($customerEmail) {
+                try {
+                    $this->mailManager->to($customerEmail)->send(new OrderConfirmation($order));
+                } catch (\Exception $e) {
+                    Logger::error("Failed to send order confirmation email", [
+                        'order_id' => $order->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             // Reload with items
