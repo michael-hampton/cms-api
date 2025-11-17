@@ -28,6 +28,7 @@ class Product extends Model
         'clone_history',
         'created_by',
         'updated_by',
+        'stock_quantity'
     ];
 
     protected $casts = [

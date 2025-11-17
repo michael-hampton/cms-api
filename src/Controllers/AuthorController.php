@@ -9,11 +9,13 @@ use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
 use App\Repositories\AuthorRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateAuthorRequest;
 use App\Requests\UpdateAuthorRequest;
+use App\Resources\AuthorResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\AuthorService;
 use Exception;
@@ -37,7 +39,10 @@ class AuthorController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->authorRepository->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, AuthorResource::class);
+
+            return $this->resourceResponse($collection->toArray());
+
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

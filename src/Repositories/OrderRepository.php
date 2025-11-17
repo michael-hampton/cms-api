@@ -27,7 +27,7 @@ class OrderRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Order::with(['items', 'user', 'billingAddress', 'shippingAddress']);
+        $query = Order::with(['items', 'user', 'billingAddress', 'shippingAddress'])->withCount(['items']);
         return $this->searchEngine->search($query, $criteria);
     }
 

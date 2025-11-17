@@ -550,7 +550,7 @@ class PageModelTest extends FunctionalTestCase
         $this->assertContains('waiting_approval', $statuses);
         $this->assertContains('private', $statuses);
         $this->assertContains('on_hold', $statuses);
-        $this->assertCount(7, $statuses);
+        $this->assertCount(8, $statuses);
     }
 
     public function testScopeWaitingApproval()

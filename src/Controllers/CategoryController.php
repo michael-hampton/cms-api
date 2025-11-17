@@ -2,7 +2,6 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteBrand;
 use App\Actions\BulkDeleteCategory;
 use App\Actions\CloneCategory;
 use App\Exceptions\CannotDeleteException;
@@ -11,12 +10,14 @@ use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Validation\Validator;
 use App\Models\Category;
 use App\Repositories\CategoryRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateCategoryRequest;
 use App\Requests\UpdateCategoryRequest;
+use App\Resources\CategoryResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\CategoryService;
 use Exception;
@@ -40,7 +41,9 @@ class CategoryController extends Controller
 
             $result = $this->categoryRepository->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, CategoryResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

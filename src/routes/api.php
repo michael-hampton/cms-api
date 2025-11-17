@@ -24,6 +24,7 @@ use App\Controllers\PageLikeController;
 use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
+use App\Controllers\RefundController;
 use App\Controllers\RegionSetController;
 use App\Controllers\ReviewController;
 use App\Controllers\SearchController;
@@ -100,11 +101,19 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/orders/{id}', OrderController::class, 'update');
         $router->put('/orders/{id}/items', OrderController::class, 'updateItems');
         $router->delete('/orders/{id}', OrderController::class, 'destroy');
+        $router->get('/orders/{id}/refunds', OrderController::class, 'refunds');
+        $router->get('/orders/{orderId}/refunds/remaining', RefundController::class, 'remainingAmount');
         $router->post('/orders/{id}/cancel', OrderController::class, 'cancel');
         $router->post('/orders/{id}/complete', OrderController::class, 'complete');
         $router->post('/orders/{id}/refund', OrderController::class, 'refund');
         $router->post('/orders/{id}/duplicate', OrderController::class, 'duplicate');
         $router->post('/orders/bulk-status', [OrderController::class, 'bulkUpdateStatus']);
+
+        //Refunds
+        $router->post('refunds', RefundController::class, 'store');
+        $router->post('refunds/{refundId}/cancel', RefundController::class, 'cancel');
+        $router->get('/refunds', RefundController::class, 'index');
+
 
         // Tags API
         $router->get('/tags', TagController::class, 'index');

@@ -2,33 +2,20 @@
 
 namespace App\Tests\Unit\Models;
 
-use App\Models\Page;
-use App\Models\PageTerritory;
 use App\Models\RegionSet;
 use App\Models\Territory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class TerritoryModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testRegionSetRelationship()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Test Region Set',
-            'slug' => 'test-region-set',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'Test Territory',
-            'code' => 'TT',
-            'slug' => 'test-territory',
-            'region_set_id' => $regionSet->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
         $this->assertInstanceOf(RegionSet::class, $territory->regionSet());
         $this->assertEquals($regionSet->id, $territory->regionSet()->id);
@@ -36,25 +23,13 @@ class TerritoryModelTest extends FunctionalTestCase
 
     public function testPagesRelationship()
     {
-        $regionSet = RegionSet::create(['name' => 'test', 'slug' => 'test', 'is_active' => true, 'sort_order' => 1, 'site_id' => $this->siteId]);;
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'Test Territory',
-            'code' => 'TT',
-            'slug' => 'test-territory',
-            'region_set_id' => $regionSet->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
-        $page = Page::create([
-            'title' => 'Test Page',
-            'slug' => 'test-page',
-            'status' => 'published',
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
+
+        $this->attachTerritoryToPage($page, $territory);
 
         $pages = $territory->pages();
 
@@ -64,27 +39,10 @@ class TerritoryModelTest extends FunctionalTestCase
 
     public function testActiveScope()
     {
-        $regionSet = RegionSet::create(['name' => 'test', 'slug' => 'test', 'is_active' => true, 'sort_order' => 1, 'site_id' => $this->siteId]);;
+        $regionSet = $this->createRegionSet();
 
-        Territory::create([
-            'name' => 'Active Territory',
-            'code' => 'AT',
-            'slug' => 'test-territory',
-            'region_set_id' => $regionSet->id,
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
-
-        Territory::create([
-            'name' => 'Inactive Territory',
-            'code' => 'IT',
-            'slug' => 'test-territory',
-            'region_set_id' => 1,
-            'is_active' => false,
-            'sort_order' => 2,
-            'site_id' => $this->siteId
-        ]);
+        $this->createTerritory(['region_set_id' => $regionSet->id, 'is_active' => true, 'name' => 'Active Territory']);
+        $this->createTerritory(['region_set_id' => $regionSet->id, 'is_active' => false]);
 
         $activeTerritories = Territory::active()->get();
 
@@ -94,26 +52,19 @@ class TerritoryModelTest extends FunctionalTestCase
 
     public function testOrderedScope()
     {
-        $regionSet = RegionSet::create(['name' => 'test', 'slug' => 'test', 'is_active' => true, 'sort_order' => 1, 'site_id' => $this->siteId]);;
-
-        Territory::create([
+        $regionSet = $this->createRegionSet();
+        $this->createTerritory([
             'name' => 'Territory B',
-            'code' => 'TB',
-            'slug' => 'test-territory',
             'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 2,
-            'site_id' => $this->siteId
         ]);
 
-        Territory::create([
+        $this->createTerritory([
             'name' => 'Territory A',
-            'code' => 'TA',
-            'slug' => 'test-territory',
-            'region_set_id' => 1,
+            'region_set_id' => $regionSet->id,
             'is_active' => true,
             'sort_order' => 1,
-            'site_id' => $this->siteId
         ]);
 
         $orderedTerritories = Territory::ordered()->get();
@@ -124,41 +75,11 @@ class TerritoryModelTest extends FunctionalTestCase
 
     public function testByRegionSetScope()
     {
-        $regionSet1 = RegionSet::create([
-            'name' => 'Region Set 1',
-            'slug' => 'region-set-1',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
 
-        $regionSet2 = RegionSet::create([
-            'name' => 'Region Set 2',
-            'slug' => 'region-set-2',
-            'is_active' => true,
-            'sort_order' => 2,
-            'site_id' => $this->siteId
-        ]);
-
-        Territory::create([
-            'name' => 'Territory 1',
-            'code' => 'T1',
-            'region_set_id' => $regionSet1->id,
-            'slug' => 'test-territory',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
-
-        Territory::create([
-            'name' => 'Territory 2',
-            'code' => 'T2',
-            'region_set_id' => $regionSet2->id,
-            'slug' => 'test-territory',
-            'is_active' => true,
-            'sort_order' => 2,
-            'site_id' => $this->siteId
-        ]);
+        $this->createTerritory(['region_set_id' => $regionSet1->id, 'name' => 'Territory 1']);
+        $this->createTerritory(['region_set_id' => $regionSet2->id, 'name' => 'Territory 2']);;
 
         $territories = Territory::byRegionSet($regionSet1->id)->get();
 
@@ -168,66 +89,25 @@ class TerritoryModelTest extends FunctionalTestCase
 
     public function testGetPageCount()
     {
-        $regionSet = RegionSet::create(['name' => 'test', 'slug' => 'test', 'is_active' => true, 'sort_order' => 1, 'site_id' => $this->siteId]);;
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'Test Territory',
-            'code' => 'TT',
-            'region_set_id' => $regionSet->id,
-            'slug' => 'test-territory',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
-        $page = Page::create([
-            'title' => 'Page 1',
-            'slug' => 'page-1',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $page = $this->createPage();
 
-        PageTerritory::create([
-            'page_id' => $page->id,
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
+        $this->attachTerritoryToPage($page, $territory);
 
-        $page2 = Page::create([
-            'title' => 'Page 2',
-            'slug' => 'page-2',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
-
-        PageTerritory::create([
-            'page_id' => $page2->id,
-            'territory_id' => $territory->id,
-            'site_id' => $this->siteId
-        ]);
+        $page2 = $this->createPage();
+        $this->attachTerritoryToPage($page2, $territory);
 
         $this->assertEquals(2, $territory->getPageCount());
     }
 
     public function testToArrayWithRelations()
     {
-        $regionSet = RegionSet::create([
-            'name' => 'Test Region Set',
-            'slug' => 'test-region-set',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'Test Territory',
-            'code' => 'TT',
-            'region_set_id' => $regionSet->id,
-            'slug' => 'test-territory',
-            'is_active' => true,
-            'sort_order' => 1,
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
         $array = $territory->toArrayWithRelations();
 
@@ -238,17 +118,9 @@ class TerritoryModelTest extends FunctionalTestCase
 
     public function testCasts()
     {
-        $regionSet = RegionSet::create(['name' => 'test', 'slug' => 'test', 'is_active' => true, 'sort_order' => 1, 'site_id' => $this->siteId]);;
+        $regionSet = $this->createRegionSet();
 
-        $territory = Territory::create([
-            'name' => 'Test Territory',
-            'code' => 'TT',
-            'region_set_id' => $regionSet->id,
-            'slug' => 'test-territory',
-            'is_active' => 1,
-            'sort_order' => '5',
-            'site_id' => $this->siteId
-        ]);
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
         $this->assertIsBool($territory->is_active);
         $this->assertIsInt($territory->sort_order);

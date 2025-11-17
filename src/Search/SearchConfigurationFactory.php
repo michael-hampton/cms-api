@@ -10,20 +10,12 @@ use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
+use App\Search\Configurations\RefundSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
-use App\Search\Filters\BooleanFilter;
-use App\Search\Filters\CustomFilter;
-use App\Search\Filters\DateRangeFilter;
-use App\Search\Filters\EqualsFilter;
-use App\Search\Filters\InFilter;
-use App\Search\Filters\LikeFilter;
-use App\Search\Filters\RangeFilter;
-use App\Search\Filters\RelationshipExistsFilter;
-use App\Search\Filters\RelationshipFilter;
 
 class SearchConfigurationFactory
 {
@@ -41,6 +33,7 @@ class SearchConfigurationFactory
         'region_set' => RegionSetSearchConfiguration::class,
         'territory' => TerritorySearchConfiguration::class,
         'page_grid' => PageGridSearchConfiguration::class,
+        'refund' => RefundSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

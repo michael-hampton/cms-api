@@ -99,4 +99,18 @@ class OrderHistoryService
     {
         return $this->repository->getHistoryForOrder($orderId);
     }
+
+    public function logRefundCreated(int $orderId, int $refundId, ?int $userId = null, ?string $reason = null): Model
+    {
+        return $this->repository->create([
+            'order_id' => $orderId,
+            'action' => 'refund_created',
+            'user_id' => $userId,
+            'changes' => [
+                'refund_id' => $refundId,
+                'reason' => $reason
+            ],
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+    }
 }

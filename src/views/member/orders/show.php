@@ -120,6 +120,15 @@
             color: #1e40af;
         }
 
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
         .status-badge.completed {
             background: #d1fae5;
             color: #065f46;
@@ -322,6 +331,40 @@
                 justify-content: center;
             }
         }
+
+        /** Refund **/
+        .refund-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+        }
+
+        .refund-modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .refund-modal-container {
+            position: relative;
+            background: white;
+            max-width: 800px;
+            margin: 2rem auto;
+            border-radius: 1rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .refund-modal-header {
+            padding: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .refund-modal-header h2 {
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -476,12 +519,21 @@
     </div>
 
     <div class="actions">
-        <a href="/member/orders" class="btn btn-secondary">
+        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/orders" class="btn btn-secondary">
             ← Back to Orders
         </a>
         <?php if ($order->canBeCancelled()): ?>
             <button onclick="cancelOrder(<?= $order->id ?>)" class="btn btn-secondary">
                 Cancel Order
+            </button>
+        <?php endif; ?>
+        <?php if ($order->canBeRefunded()): ?>
+            <button onclick="openRefundModal()" class="btn btn-warning">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                Process Refund
             </button>
         <?php endif; ?>
     </div>
@@ -515,5 +567,129 @@
         }
     }
 </script>
+
+<!-- Refund Modal -->
+<div id="refundModal" class="refund-modal" style="display: none;">
+    <div class="refund-modal-overlay" onclick="closeRefundModal()"></div>
+    <div class="refund-modal-container">
+        <div class="refund-modal-header">
+            <h2>Process Refund</h2>
+            <p class="refund-modal-subtitle">Order #<?= htmlspecialchars($order->order_number) ?></p>
+            <button class="refund-close-btn" onclick="closeRefundModal()">×</button>
+        </div>
+        <div class="refund-modal-body">
+            <div class="refund-type-section">
+                <label>Refund Type</label>
+                <div class="refund-type-buttons">
+                    <label class="refund-type-option active">
+                        <input type="radio" name="refund_type" value="full" checked onchange="updateRefundType('full')">
+                        <div>
+                            <strong>Full Refund</strong>
+                            <p>Refund the entire order amount</p>
+                        </div>
+                    </label>
+                    <label class="refund-type-option">
+                        <input type="radio" name="refund_type" value="partial" onchange="updateRefundType('partial')">
+                        <div>
+                            <strong>Partial Refund</strong>
+                            <p>Refund specific items or amount</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="refund-summary">
+                <div class="refund-summary-row">
+                    <span>Order Total:</span>
+                    <span><?= htmlspecialchars($order->currency) ?> <?= number_format($order->total, 2) ?></span>
+                </div>
+                <div class="refund-summary-row refund-amount-row">
+                    <span>Refund Amount:</span>
+                    <span id="refundAmount"><?= htmlspecialchars($order->currency) ?> <?= number_format($order->total, 2) ?></span>
+                </div>
+                <div class="refund-progress">
+                    <div id="refundProgressBar" class="refund-progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="refund-percentage" id="refundPercentage">100% of order total</div>
+            </div>
+
+            <div id="partialRefundItems" style="display: none;">
+                <label>Items to Refund</label>
+                <div class="refund-items-list">
+                    <?php foreach ($order->items as $item): ?>
+                        <div class="refund-item">
+                            <div class="refund-item-info">
+                                <strong><?= htmlspecialchars($item->product_name) ?></strong>
+                                <span><?= htmlspecialchars($order->currency) ?> <?= number_format($item->price, 2) ?> × <?= $item->quantity ?></span>
+                            </div>
+                            <div class="refund-item-controls">
+                                <input type="number"
+                                       class="refund-qty-input"
+                                       min="0"
+                                       max="<?= $item->quantity ?>"
+                                       value="0"
+                                       data-item-id="<?= $item->id ?>"
+                                       data-price="<?= $item->price ?>"
+                                       onchange="updatePartialRefund()">
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Reason for Refund *</label>
+                <select id="refundReason" required>
+                    <option value="">Select a reason</option>
+                    <option value="customer_request">Customer Request</option>
+                    <option value="damaged_item">Damaged Item</option>
+                    <option value="wrong_item">Wrong Item Sent</option>
+                    <option value="not_received">Item Not Received</option>
+                    <option value="quality_issue">Quality Issue</option>
+                    <option value="changed_mind">Customer Changed Mind</option>
+                    <option value="duplicate_order">Duplicate Order</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Internal Notes</label>
+                <textarea id="refundNotes" rows="3" placeholder="Add any internal notes..."></textarea>
+            </div>
+
+            <div class="refund-options">
+                <label>
+                    <input type="checkbox" id="notifyCustomer" checked>
+                    <span>Notify customer via email</span>
+                </label>
+                <label>
+                    <input type="checkbox" id="restockItems" checked>
+                    <span>Restock items to inventory</span>
+                </label>
+            </div>
+        </div>
+        <div class="refund-modal-footer">
+            <button class="btn btn-secondary" onclick="closeRefundModal()">Cancel</button>
+            <button class="btn btn-warning" onclick="processRefund()">Process Refund</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
+
+<script>
+    const refundModal = document.getElementById('refundModal');
+
+    function openRefundModal() {
+        refundModal.style.display = 'block';
+
+    }
+
+    function closeRefundModal() {
+        refundModal.style.display = 'none';
+    }
+
+    function processRefund() {
+
+    }
+</script>

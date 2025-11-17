@@ -7,10 +7,12 @@ use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\ProductVariant;
 use App\Repositories\ProductRepository;
 use App\Requests\CreateProductRequest;
 use App\Requests\UpdateProductRequest;
+use App\Resources\ProductResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\ProductService;
 use Exception;
@@ -37,7 +39,9 @@ class ProductController extends Controller
 
             $result = $this->productRepository->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, ProductResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

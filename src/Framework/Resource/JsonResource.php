@@ -38,6 +38,11 @@ abstract class JsonResource
     protected function whenLoaded(string $relationship, $value = null, $default = null)
     {
         if (is_array($this->resource) && isset($this->resource[$relationship])) {
+
+            if (is_callable($value)) {
+                return $value(collect($this->resource[$relationship]));
+            }
+
             return $value ?: $this->resource[$relationship];
         }
 
@@ -119,7 +124,7 @@ abstract class JsonResource
         if (is_object($this->resource)) {
             return method_exists($this->resource, 'toArray')
                 ? $this->resource->toArray()
-                : (array) $this->resource;
+                : (array)$this->resource;
         }
 
         return [];

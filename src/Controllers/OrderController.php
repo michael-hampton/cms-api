@@ -177,15 +177,20 @@ class OrderController extends Controller
         }
     }
 
-    public function refund(int $id, Request $request, string $siteName): JsonResponse
+    public function refund(int $id, Request $request): JsonResponse
     {
         try {
-            $reason = $request->get('reason');
-            $order = $this->orderService->refundOrder($id, $reason);
+            $refundData = $request->all();
+            $refundData['order_id'] = $id;
 
-            return $this->jsonResponse(['order' => $order->toArray()]);
+            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\RefundService::class);
+            $refund = $refundService->createRefund($refundData, $request->user()->id ?? null);
 
-        } catch (Exception $e) {
+            return $this->jsonResponse([
+                'message' => 'Refund processed successfully',
+                'refund' => $refund->toArray()
+            ], 201);
+        } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 400);
         }
     }
@@ -275,6 +280,20 @@ class OrderController extends Controller
             return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
         } catch (\Exception $e) {
             return $this->resourceResponse(['error' => 'Bulk update failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function refunds(int $id): JsonResponse
+    {
+        try {
+            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\RefundService::class);
+            $refunds = $refundService->getRefundsByOrder($id);
+
+            return $this->jsonResponse([
+                'refunds' => $refunds->toArray()
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 }

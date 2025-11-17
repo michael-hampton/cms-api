@@ -21,6 +21,7 @@ class OrderResource extends JsonResource
             'customer_notes' => $this->getAttribute('customer_notes'),
             'payment_status' => $this->getAttribute('payment_status'),
             'items' => $this->getAttribute('items'),
+            'item_count' => $this->getAttribute('items_count'),
             'customer_name' => $this->getAttribute('customer_name'),
             'customer_email' => $this->getAttribute('customer_email'),
             'customer_phone' => $this->getAttribute('customer_phone'),

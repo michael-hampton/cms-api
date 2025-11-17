@@ -132,7 +132,6 @@ abstract class Mailable
         }
 
         if ($this->view) {
-            die('yes');
             return View::render($this->view, $this->viewData);
         }
 

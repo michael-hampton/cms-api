@@ -6,7 +6,6 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Category;
 use App\Models\Model;
-use App\Models\Page;
 use App\Models\PageCategory;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -31,7 +30,7 @@ class CategoryRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Category::query();
+        $query = Category::query()->withCount(['pages', 'products']);
         return $this->searchEngine->search($query, $criteria);
     }
 

@@ -2,21 +2,22 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteRegionSet;
 use App\Actions\BulkDeleteTag;
 use App\Actions\CloneTag;
 use App\Actions\MergeTag;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
-use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Validation\Validator;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateTagRequest;
 use App\Requests\UpdateTagRequest;
+use App\Resources\TagResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\TagService;
 use Exception;
@@ -41,7 +42,8 @@ class TagController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);;
             $result = $this->tagRepository->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, TagResource::class);
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

@@ -174,8 +174,6 @@ class MemberAuthControllerTest extends FunctionalTestCase
         $token = bin2hex(random_bytes(32));
         $hashedToken = hash('sha256', $token);
 
-        echo $hashedToken . ' ';
-
         $member = Member::create([
             'site_id' => $this->siteId,
             'email' => 'toverify@example.com',
@@ -231,8 +229,6 @@ class MemberAuthControllerTest extends FunctionalTestCase
     {
         $token = bin2hex(random_bytes(32));
         $hashedToken = hash('sha256', $token);
-
-        echo $hashedToken . ' ';
 
         $member = Member::create([
             'site_id' => $this->siteId,

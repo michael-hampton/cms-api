@@ -16,6 +16,7 @@ use App\Repositories\PageRepository;
 use App\Repositories\RegionSetRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Resources\PageResource;
+use App\Resources\RegionSetResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\RegionSetService;
 use Exception;
@@ -43,7 +44,8 @@ class RegionSetController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->repository->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, RegionSetResource::class);
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

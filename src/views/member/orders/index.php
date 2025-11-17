@@ -345,7 +345,8 @@
             </div>
 
             <div class="order-actions">
-                <a href="/member/orders/<?= $order->id ?>" class="btn btn-primary btn-sm">
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/orders/<?= $order->id ?>"
+                   class="btn btn-primary btn-sm">
                     View Details
                 </a>
                 <?php if ($order->canBeCancelled()): ?>

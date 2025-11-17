@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Actions\BulkActivateTerritories;
 use App\Actions\BulkDeactivateTerritories;
-use App\Actions\BulkDeleteTag;
 use App\Actions\BulkDeleteTerritories;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
@@ -44,7 +43,8 @@ class TerritoryController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->repository->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, TerritoryResource::class);
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

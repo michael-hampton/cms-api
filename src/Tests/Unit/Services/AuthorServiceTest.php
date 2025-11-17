@@ -47,7 +47,7 @@ class AuthorServiceTest extends FunctionalTestCase
 
     public function testGetAllAuthorsReturnsCollection()
     {
-        $author = $this->createMockAuthor(1, 'Author 1');
+        $author = Mockery::mock(Author::class)->makePartial();
 
         $author->shouldReceive('orderBy')
             //->with('name', 'asc')
@@ -202,30 +202,6 @@ class AuthorServiceTest extends FunctionalTestCase
         $result = $this->service->searchAuthors('John', 10);
 
         $this->assertInstanceOf(Collection::class, $result);
-    }
-
-    private function createMockAuthor($id, $name)
-    {
-        // Pass constructor arguments if Author::__construct requires them
-        $author = Mockery::mock(Author::class, [[], $this->databaseMock])->makePartial();
-
-        // Set properties directly
-        $author->id = $id;
-        $author->name = $name;
-
-        // Allow fill() to be called safely
-        $author->shouldReceive('fill')->andReturnSelf();
-
-        // Stub toArray() for convenience
-        $author->shouldReceive('toArray')->andReturn([
-            'id' => $id,
-            'name' => $name,
-        ]);
-
-        // Optionally, stub setAttribute if your model uses it
-        $author->shouldReceive('setAttribute')->andReturnNull();
-
-        return $author;
     }
 
     public function testItCanDeleteAuthorWithoutPages()

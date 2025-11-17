@@ -23,7 +23,7 @@ class BrandRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Brand::active();
+        $query = Brand::active()->withCount(['products']);
         return $this->searchEngine->search($query, $criteria);
     }
 

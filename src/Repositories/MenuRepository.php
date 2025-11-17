@@ -30,7 +30,7 @@ class MenuRepository extends Repository
     public function getAllMenus(string $siteName): Collection
     {
         $site = Site::resolveSite($siteName);
-        return Menu::with(['items', 'territories'])->where('site_id', $site)->where('is_active', true)->get();
+        return Menu::with(['items', 'territories', 'items.children'])->where('site_id', $site)->where('is_active', true)->get();
     }
 
     public function createMenuItem(array $data, ?int $siteId = null): Model
@@ -82,7 +82,7 @@ class MenuRepository extends Repository
 
     public function getMenuById(int $menuId): ?Menu
     {
-        return Menu::with(['items', 'items.activeChildren', 'territories'])->find($menuId);
+        return Menu::with(['items', 'items.children', 'territories'])->find($menuId);
 
     }
 

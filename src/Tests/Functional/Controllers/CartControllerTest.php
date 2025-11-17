@@ -155,7 +155,8 @@ class CartControllerTest extends FunctionalTestCase
             'slug' => 'test-product',
             'price' => 99.99,
             'is_active' => true,
-            'site_id' => $this->siteId
+            'site_id' => $this->siteId,
+            'stock_quantity' => 100
         ]);
 
         // Add item
@@ -216,7 +217,8 @@ class CartControllerTest extends FunctionalTestCase
             'slug' => 'product-1',
             'price' => 50.00,
             'is_active' => true,
-            'site_id' => $this->siteId
+            'site_id' => $this->siteId,
+            'stock_quantity' => 100
         ]);
 
         $product2 = Product::create([
@@ -224,7 +226,8 @@ class CartControllerTest extends FunctionalTestCase
             'slug' => 'product-2',
             'price' => 30.00,
             'is_active' => true,
-            'site_id' => $this->siteId
+            'site_id' => $this->siteId,
+            'stock_quantity' => 100
         ]);
 
         $this->postForSite('/api/cart/add', [

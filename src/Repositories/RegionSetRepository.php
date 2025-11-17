@@ -31,7 +31,7 @@ class RegionSetRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = RegionSet::with(['territories']);
+        $query = RegionSet::with(['territories'])->withCount(['pages', 'territories']);
         return $this->searchEngine->search($query, $criteria);
     }
 

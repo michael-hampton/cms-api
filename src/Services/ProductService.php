@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
-use App\Framework\Support\Str;
+use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
@@ -318,10 +318,7 @@ class ProductService
         try {
             $this->imageUploadService->delete($path);
         } catch (Exception $e) {
-            if($_ENV['APP_ENV'] !== 'testing') {
-                // Log but don't fail
-                error_log('Failed to delete image: ' . $e->getMessage());
-            }
+            Logger::error('Failed to delete image: ' . $e->getMessage());
         }
     }
 

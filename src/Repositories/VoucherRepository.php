@@ -154,11 +154,12 @@ class VoucherRepository extends Repository
 
     public function createRedemption(int $voucherId, ?int $userId, float $discountAmount, ?int $orderId = null): bool
     {
+
         try {
             VoucherRedemption::create([
                 'voucher_id' => $voucherId,
                 'member_id' => $userId,
-                'order_id' => $orderId,
+                'order_id' => $orderId ?? null,
                 'discount_amount' => $discountAmount,
                 'redeemed_at' => date('Y-m-d H:i:s')
             ]);

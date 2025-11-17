@@ -235,4 +235,9 @@ class Order extends Model
     {
         return $this->hasMany(OrderHistory::class, 'order_id', 'id', $relation);
     }
+
+    public function canBeRefunded()
+    {
+        return true;
+    }
 }

@@ -32,7 +32,7 @@ class TerritoryRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Territory::with(['regionSet']);
+        $query = Territory::with(['regionSet'])->withCount(['pages']);
         return $this->searchEngine->search($query, $criteria);
     }
 

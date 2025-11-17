@@ -36,9 +36,9 @@ class RegionSet extends Model
             ->orderBy('sort_order');
     }
 
-    public function pages(bool $relation = false)
+    public function pages($relation = false)
     {
-        return $this->hasMany(Page::class, 'region_set_id', 'id', $relation);
+        return $this->belongsToMany(Page::class, 'page_region_sets', 'region_set_id', 'id', $relation);
     }
 
     public function scopeActive(QueryBuilder $query): QueryBuilder

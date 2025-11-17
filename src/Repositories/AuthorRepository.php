@@ -28,7 +28,7 @@ class AuthorRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Author::query();
+        $query = Author::query()->withCount(['pages']);
         return $this->searchEngine->search($query, $criteria);
     }
 

@@ -4,7 +4,6 @@ namespace App\Factories;
 
 use App\Framework\Tests\Factories\Factory;
 use App\Framework\Tests\Factories\HasSiteId;
-use App\Models\Author;
 use App\Models\Order;
 
 class OrderFactory extends Factory
@@ -21,6 +20,7 @@ class OrderFactory extends Factory
         return $this->withSiteId([
             'order_number' => 'ORD-001',
             'status' => 'pending',
+            'payment_status' => 'pending',
             'total' => 100.00,
             'site_id' => $this->siteId
         ]);

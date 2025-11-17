@@ -19,6 +19,20 @@ class BrandResource extends JsonResource
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),
             'products' => $this->whenLoaded('products'),
+            'product_count' => $this->getProductCount(),
         ];
+    }
+
+    private function getProductCount(): int
+    {
+        if (is_array($this->resource) && isset($this->resource['products_count'])) {
+            return (int)$this->resource['products_count'];
+        }
+
+        if (is_object($this->resource) && method_exists($this->resource, 'products')) {
+            return $this->resource->products()->count();
+        }
+
+        return 0;
     }
 }

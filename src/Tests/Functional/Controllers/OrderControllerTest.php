@@ -262,7 +262,7 @@ class OrderControllerTest extends FunctionalTestCase
 
     public function testRefundChangesOrderStatusAndPaymentStatus()
     {
-        $order = $this->createOrder(['status' => 'completed']);
+        $order = $this->createOrder(['status' => 'completed', 'payment_status' => 'paid', 'admin_notes' => 'Product defect']);
 
         $refundData = [
             'reason' => 'Product defect'
@@ -270,11 +270,14 @@ class OrderControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite("/api/orders/{$order->id}/refund", $refundData);
 
-        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('refunded', $data['data']['order']['status']);
-        $this->assertEquals('refunded', $data['data']['order']['payment_status']);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertarrayHasKey('refund', $data['data']);
+        $this->assertEquals('processed', $data['data']['refund']['status']);
+        $this->assertEquals('Product defect', $data['data']['refund']['reason']);
+        $this->assertEquals('full', $data['data']['refund']['refund_type']);
 
         // Verify in database
         $refundedOrder = Order::find($order->id);

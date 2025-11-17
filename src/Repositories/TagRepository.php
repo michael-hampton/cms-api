@@ -5,7 +5,6 @@ namespace App\Repositories;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Model;
-use App\Models\PageCategory;
 use App\Models\PageTag;
 use App\Models\Tag;
 use App\Search\PaginatedResult;
@@ -31,7 +30,7 @@ class TagRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Tag::query();
+        $query = Tag::query()->withCount(['pages']);
         return $this->searchEngine->search($query, $criteria);
     }
 
