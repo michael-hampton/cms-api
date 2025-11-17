@@ -314,33 +314,297 @@ class RefundServiceTest extends FunctionalTestCase
         parent::tearDown();
     }
 
-//    public function testCreateRefundThrowsExceptionWhenAmountExceedsRemaining(): void
-//    {
-//        $mockOrder = m::mock(Order::class)->makePartial();
-//        $mockOrder->id = 1;
-//        $mockOrder->total = 200.00;
-//
-//        $mockOrder->shouldReceive('canBeRefunded')
-//            ->once()
-//            ->andReturn(true);
-//
-//        $data = [
-//            'order_id' => 1,
-//            'refund_type' => 'partial',
-//            'refund_amount' => 100.00,
-//            'reason' => 'customer_request'
-//        ];
-//
-//        $this->databaseMock->shouldReceive('transaction')
-//            ->once()
-//            ->andReturnUsing(function ($callback) {
-//                return $callback();
-//            });
-//
-//        $this->orderRepository->shouldReceive('find')
-//            ->once()
-//            ->with(1)
-//            ->andReturn($mockOrder);
-//
-//        $this->refundRepository->shouldReceive
+    public function testCreateRefundThrowsExceptionWhenAmountExceedsRemaining(): void
+    {
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->total = 200.00;
+        $mockOrder->status = 'completed';
+        $mockOrder->payment_status = 'paid';
+
+        $mockOrder->shouldReceive('canBeRefunded')
+            ->once()
+            ->andReturn(true);
+
+        $data = [
+            'order_id' => 1,
+            'refund_type' => 'partial',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request'
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($mockOrder);
+
+        $this->refundRepository->shouldReceive('getTotalRefundedAmount')
+            ->once()
+            ->with(1)
+            ->andReturn(150.00); // Already refunded 150, only 50 left
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Refund amount exceeds remaining order total');
+
+        $this->service->createRefund($data);
+    }
+
+    public function testGetRefundsByOrderReturnsRefunds(): void
+    {
+        $orderId = 1;
+        $mockCollection = m::mock(\App\Framework\Support\Collection::class);
+
+        $this->refundRepository->shouldReceive('findByOrderId')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockCollection);
+
+        $result = $this->service->getRefundsByOrder($orderId);
+
+        $this->assertSame($mockCollection, $result);
+    }
+
+    public function testCancelRefundCancelsRefund(): void
+    {
+        $refundId = 1;
+        $mockRefund = m::mock(Refund::class)->makePartial();
+        $mockRefund->id = $refundId;
+
+        $mockRefund->shouldReceive('isPending')
+            ->once()
+            ->andReturn(true);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->refundRepository->shouldReceive('find')
+            ->once()
+            ->with($refundId)
+            ->andReturn($mockRefund);
+
+        $this->refundRepository->shouldReceive('updateRefundStatus')
+            ->once()
+            ->with($refundId, 'cancelled', 123)
+            ->andReturn(true);
+
+        $result = $this->service->cancelRefund($refundId, 123);
+
+        $this->assertTrue($result);
+    }
+
+    public function testCancelRefundThrowsExceptionForNonPendingRefund(): void
+    {
+        $refundId = 1;
+        $mockRefund = m::mock(Refund::class)->makePartial();
+        $mockRefund->id = $refundId;
+
+        $mockRefund->shouldReceive('isPending')
+            ->once()
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->refundRepository->shouldReceive('find')
+            ->once()
+            ->with($refundId)
+            ->andReturn($mockRefund);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Only pending refunds can be cancelled');
+
+        $this->service->cancelRefund($refundId);
+    }
+
+    public function testGetRemainingRefundableAmountReturnsCorrectAmount(): void
+    {
+        $orderId = 1;
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->total = 200.00;
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        $this->refundRepository->shouldReceive('getTotalRefundedAmount')
+            ->once()
+            ->with($orderId)
+            ->andReturn(150.00);
+
+        $result = $this->service->getRemainingRefundableAmount($orderId);
+
+        $this->assertEquals(50.00, $result);
+    }
+
+    public function testGetRemainingRefundableAmountReturnsZeroForNonExistentOrder(): void
+    {
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with(999)
+            ->andReturn(null);
+
+        $result = $this->service->getRemainingRefundableAmount(999);
+
+        $this->assertEquals(0.0, $result);
+    }
+
+    public function testProcessRefundProcessesPendingRefund(): void
+    {
+        $refundId = 1;
+        $mockRefund = m::mock(Refund::class)->makePartial();
+        $mockRefund->id = $refundId;
+
+        $mockRefund->shouldReceive('isPending')
+            ->once()
+            ->andReturn(true);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->refundRepository->shouldReceive('find')
+            ->once()
+            ->with($refundId)
+            ->andReturn($mockRefund);
+
+        $this->refundRepository->shouldReceive('updateRefundStatus')
+            ->once()
+            ->with($refundId, 'processed', 456)
+            ->andReturn(true);
+
+        $result = $this->service->processRefund($refundId, 456);
+
+        $this->assertTrue($result);
+    }
+
+    public function testProcessRefundThrowsExceptionForAlreadyProcessedRefund(): void
+    {
+        $refundId = 1;
+        $mockRefund = m::mock(Refund::class)->makePartial();
+        $mockRefund->id = $refundId;
+
+        $mockRefund->shouldReceive('isPending')
+            ->once()
+            ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->refundRepository->shouldReceive('find')
+            ->once()
+            ->with($refundId)
+            ->andReturn($mockRefund);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Refund has already been processed');
+
+        $this->service->processRefund($refundId);
+    }
+
+    public function testCreateRefundCalculatesAmountFromItems(): void
+    {
+        $orderId = 1;
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = $orderId;
+        $mockOrder->total = 200.00;
+        $mockOrder->site_id = 1;
+        $mockOrder->user = null;
+        $mockOrder->payment_status = 'paid';
+
+        $mockRefund = m::mock(Refund::class)->makePartial();
+        $mockRefund->id = 1;
+        $mockRefund->status = 'pending';
+
+        $data = [
+            'order_id' => $orderId,
+            'refund_type' => 'partial',
+            'reason' => 'damaged_item',
+            'items' => [
+                [
+                    'id' => 1,
+                    'product_name' => 'Product 1',
+                    'quantity' => 2,
+                    'refund_quantity' => 1,
+                    'price' => 50.00,
+                    'refund_amount' => 50.00
+                ],
+                [
+                    'id' => 2,
+                    'product_name' => 'Product 2',
+                    'quantity' => 1,
+                    'refund_quantity' => 1,
+                    'price' => 30.00,
+                    'refund_amount' => 30.00
+                ]
+            ],
+            'notify_customer' => false,
+            'restock_items' => false
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with($orderId)
+            ->andReturn($mockOrder);
+
+        $mockOrder->shouldReceive('canBeRefunded')
+            ->once()
+            ->andReturn(true);
+
+        $this->refundRepository->shouldReceive('getTotalRefundedAmount')
+            ->twice()
+            ->with($orderId)
+            ->andReturn(0.0);
+
+        $this->refundRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($refundData) {
+                return $refundData['refund_amount'] === 80.00; // 50 + 30
+            }))
+            ->andReturn($mockRefund);
+
+        $this->refundRepository->shouldReceive('createRefundItem')
+            ->twice();
+
+        $this->refundRepository->shouldReceive('updateRefundStatus')
+            ->once();
+
+        $this->orderRepository->shouldReceive('update')
+            ->once();
+
+        $this->historyService->shouldReceive('logRefundCreated')
+            ->once();
+
+        $this->refundRepository->shouldReceive('find')
+            ->twice()
+            ->with(1)
+            ->andReturn($mockRefund);
+
+        $result = $this->service->createRefund($data);
+
+        $this->assertSame($mockRefund, $result);
+    }
 }

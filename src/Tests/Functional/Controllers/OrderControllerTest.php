@@ -1041,5 +1041,119 @@ class OrderControllerTest extends FunctionalTestCase
         $this->assertEquals('Customer requested cancellation', $history->notes);
     }
 
+    public function testRefundEndpointProcessesRefund(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 200.00
+        ]);
+
+        $this->createOrderItem($order->id);
+
+        $refundData = [
+            'refund_type' => 'full',
+            'refund_amount' => 200.00,
+            'reason' => 'customer_request',
+            'notify_customer' => false,
+            'restock_items' => false
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/refund", $refundData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('refund', $data['data']);
+        $this->assertEquals(200.00, $data['data']['refund']['refund_amount']);
+    }
+
+    public function testRefundsEndpointReturnsOrderRefunds(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 200.00
+        ]);
+
+        \App\Models\Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'partial',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite("/api/orders/{$order->id}/refunds");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('refunds', $data['data']);
+        $this->assertCount(1, $data['data']['refunds']);
+    }
+
+    public function testCannotRefundUnpaidOrder(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'total' => 100.00
+        ]);
+
+        $refundData = [
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request'
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/refund", $refundData);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testCannotRefundCancelledOrder(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'cancelled',
+            'payment_status' => 'paid',
+            'total' => 100.00
+        ]);
+
+        $refundData = [
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request'
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/refund", $refundData);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testCannotRefundAlreadyRefundedOrder(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'refunded',
+            'payment_status' => 'paid',
+            'total' => 100.00
+        ]);
+
+        $refundData = [
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request'
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/refund", $refundData);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
 
 }

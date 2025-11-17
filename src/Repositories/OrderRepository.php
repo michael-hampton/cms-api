@@ -34,7 +34,7 @@ class OrderRepository extends Repository
     public function findByOrderNumber(string $orderNumber): ?Order
     {
         return Order::where('order_number', $orderNumber)
-            ->with(['items', 'user', 'history']) // ADD 'history'
+            ->with(['items', 'user', 'history', 'refunds'])
             ->first();
     }
 
@@ -108,7 +108,7 @@ class OrderRepository extends Repository
 
     public function getOrderById(int $id): ?Order
     {
-        return Order::with(['items', 'user', 'item.product', 'history']) // ADD 'history'
+        return Order::with(['items', 'user', 'item.product', 'history', 'refunds']) // ADD 'history'
         ->find($id);
     }
 }

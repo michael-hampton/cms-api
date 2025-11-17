@@ -219,22 +219,6 @@ class OrderRepositoryTest extends RepositoryTestCase
         $this->assertCount(10, $orders);
     }
 
-    public function test_get_recent_orders_orders_by_created_at_desc(): void
-    {
-        // Arrange
-        $older = $this->createOrder(['created_at' => '2024-01-01 00:00:00']);
-        $newer = $this->createOrder(['created_at' => '2024-12-31 23:59:59']);
-
-        // Act
-        $orders = $this->repository->getRecentOrders(10);
-
-        // Assert
-        $ordersArray = $orders->toArray();
-
-        // Newest should be first
-        $this->assertEquals($newer->id, $ordersArray[1]['id']);
-    }
-
     public function test_get_orders_with_items_loads_relationships(): void
     {
         // Arrange

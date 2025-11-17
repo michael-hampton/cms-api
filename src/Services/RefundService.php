@@ -39,7 +39,7 @@ class RefundService
             }
 
             // Validate order can be refunded
-            if (!$this->canOrderBeRefunded($order)) {
+            if (!$order->canBeRefunded()) {
                 throw new Exception('Order cannot be refunded');
             }
 
@@ -101,25 +101,6 @@ class RefundService
 
             return $this->refundRepository->find($refund->id);
         });
-    }
-
-    private function canOrderBeRefunded(Order $order): bool
-    {
-        if (!$order->canBeRefunded()) {
-            return false;
-        }
-
-        // Can't refund cancelled or already refunded orders
-        if (in_array($order->status, ['cancelled', 'refunded'])) {
-            return false;
-        }
-
-        // Can't refund unpaid orders
-        if ($order->payment_status !== 'paid') {
-            return false;
-        }
-
-        return true;
     }
 
     private function calculateRefundAmount(array $items): float

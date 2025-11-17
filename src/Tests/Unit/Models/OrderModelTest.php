@@ -2,14 +2,29 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderHistory;
+use App\Models\Refund;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderModelTest extends FunctionalTestCase
 {
     use CreatesTestData;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->testUser = Member::create([
+            'email' => 'test@example.com',
+            'first_name' => 'Test',
+            'last_name' => 'User',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+            'site_id' => $this->siteId
+        ]);
+    }
 
     public function testOrderHasCorrectTable()
     {
@@ -194,4 +209,303 @@ class OrderModelTest extends FunctionalTestCase
 
         $order->changeStatus('pending');
     }
+
+    public function testIsPendingReturnsTrueForPendingStatus(): void
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+
+        $this->assertTrue($order->isPending());
+        $this->assertFalse($order->isCompleted());
+        $this->assertFalse($order->isCancelled());
+    }
+
+    public function testIsProcessingReturnsTrueForProcessingStatus(): void
+    {
+        $order = $this->createOrder(['status' => 'processing']);
+
+        $this->assertTrue($order->isProcessing());
+        $this->assertFalse($order->isPending());
+    }
+
+    public function testIsCompletedReturnsTrueForCompletedStatus(): void
+    {
+        $order = $this->createOrder(['status' => 'completed']);
+
+        $this->assertTrue($order->isCompleted());
+        $this->assertFalse($order->isPending());
+    }
+
+    public function testIsCancelledReturnsTrueForCancelledStatus(): void
+    {
+        $order = $this->createOrder(['status' => 'cancelled']);
+
+        $this->assertTrue($order->isCancelled());
+        $this->assertFalse($order->isPending());
+    }
+
+    public function testIsRefundedReturnsTrueForRefundedStatus(): void
+    {
+        $order = $this->createOrder(['status' => 'refunded']);
+
+        $this->assertTrue($order->isRefunded());
+    }
+
+    public function testIsPaidReturnsTrueForPaidStatus(): void
+    {
+        $order = $this->createOrder(['status' => 'completed', 'payment_status' => 'paid']);
+
+        $this->assertTrue($order->isPaid());
+    }
+
+    public function testCanBeCancelledReturnsTrueForPendingAndProcessing(): void
+    {
+        $pendingOrder = $this->createOrder(['status' => 'pending']);
+        $processingOrder = $this->createOrder(['status' => 'processing']);
+
+        $this->assertTrue($pendingOrder->canBeCancelled());
+        $this->assertTrue($processingOrder->canBeCancelled());
+    }
+
+    public function testCanBeCancelledReturnsFalseForCompletedOrders(): void
+    {
+        $order = $this->createOrder(['status' => 'completed']);
+
+        $this->assertFalse($order->canBeCancelled());
+    }
+
+    public function testCanTransitionToAllowsValidTransitions(): void
+    {
+        $order = $this->createOrder(['status' => 'pending']);
+
+        $this->assertTrue($order->canTransitionTo('processing'));
+        $this->assertTrue($order->canTransitionTo('cancelled'));
+    }
+
+    public function testCanTransitionToBlocksInvalidTransitions(): void
+    {
+        $order = $this->createOrder(['status' => 'completed']);
+
+        $this->assertFalse($order->canTransitionTo('pending'));
+        $this->assertFalse($order->canTransitionTo('processing'));
+    }
+
+    public function testCanBeRefundedReturnsFalseWhenFullyRefunded(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 100.00,
+        ]);
+
+        // Create a full refund
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        // Load refunds
+        $order = Order::with(['refunds'])->find($order->id);
+
+        $this->assertFalse($order->canBeRefunded());
+    }
+
+    public function testGetTotalRefundedAttributeReturnsZeroWithNoRefunds(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 100.00,
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertEquals(0.0, $order->getTotalRefundedAttribute());
+    }
+
+    public function testGetTotalRefundedAttributeCalculatesCorrectly(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 200.00,
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'partial',
+            'refund_amount' => 50.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'partial',
+            'refund_amount' => 30.00,
+            'reason' => 'damaged_item',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        // Pending refund should not be counted
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'partial',
+            'refund_amount' => 20.00,
+            'reason' => 'other',
+            'status' => 'pending',
+            'site_id' => $this->siteId
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertEquals(80.00, $order->getTotalRefundedAttribute());
+    }
+
+    public function testGetRemainingRefundableAttributeCalculatesCorrectly(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 200.00,
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'partial',
+            'refund_amount' => 50.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertEquals(150.00, $order->getRemainingRefundableAttribute());
+    }
+
+    public function testGetRemainingRefundableAttributeReturnsZeroWhenFullyRefunded(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 100.00,
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertEquals(0.0, $order->getRemainingRefundableAttribute());
+    }
+
+    public function testIsFullyRefundedReturnsTrueWhenFullyRefunded(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 100.00,
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertTrue($order->isFullyRefunded());
+    }
+
+    public function testIsFullyRefundedReturnsFalseWhenPartiallyRefunded(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 100.00,
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'partial',
+            'refund_amount' => 50.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertFalse($order->isFullyRefunded());
+    }
+
+    public function testRefundsRelationshipLoads(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'total' => 100.00,
+        ]);
+
+        Refund::create([
+            'order_id' => $order->id,
+            'refund_type' => 'full',
+            'refund_amount' => 100.00,
+            'reason' => 'customer_request',
+            'status' => 'processed',
+            'site_id' => $this->siteId
+        ]);
+
+        $order->load(['refunds']);
+
+        $this->assertTrue($order->relationLoaded('refunds'));
+        $this->assertCount(1, $order->refunds);
+    }
+
+    public function testHistoryRelationshipLoads(): void
+    {
+        $order = $this->createOrder([
+            'user_id' => $this->testUser->id,
+            'total' => 100.00,
+            'site_id' => $this->siteId
+        ]);
+
+        OrderHistory::create([
+            'order_id' => $order->id,
+            'action' => 'created',
+            'changes' => ['new_data' => []],
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $order->load(['history']);
+
+        $this->assertTrue($order->relationLoaded('history'));
+        $this->assertCount(1, $order->history);
+    }
+
+
 }

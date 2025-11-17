@@ -137,6 +137,10 @@ class Order extends Model
         $data['formatted_total'] = $this->getFormattedTotalAttribute();
         $data['is_paid'] = $this->isPaid();
         $data['can_be_cancelled'] = $this->canBeCancelled();
+        $data['can_be_refunded'] = $this->canBeRefunded();
+        $data['total_refunded'] = $this->getTotalRefundedAttribute();
+        $data['remaining_refundable'] = $this->getRemainingRefundableAttribute();
+        $data['is_fully_refunded'] = $this->isFullyRefunded();
 
         if ($this->relationLoaded('items')) {
             $data['items'] = $this->items->toArray();
@@ -148,6 +152,10 @@ class Order extends Model
 
         if ($this->relationLoaded('history')) {
             $data['history'] = $this->history->toArray();
+        }
+
+        if ($this->relationLoaded('refunds')) {
+            $data['refunds'] = $this->refunds->toArray();
         }
 
         return $data;
@@ -238,6 +246,46 @@ class Order extends Model
 
     public function canBeRefunded()
     {
+        // Can't refund cancelled or already refunded orders
+        if (in_array($this->status, ['cancelled', 'refunded'])) {
+            return false;
+        }
+
+        // Can't refund unpaid orders
+        if ($this->payment_status !== 'paid') {
+            return false;
+        }
+
+        if ($this->getTotalRefundedAttribute() >= $this->total) {
+            return false;
+        }
+
         return true;
     }
+
+    public function getTotalRefundedAttribute(): float
+    {
+        if ($this->relationLoaded('refunds')) {
+            return $this->refunds
+                ->where('status', 'processed')
+                ->sum('refund_amount');
+        }
+        return 0.0;
+    }
+
+    public function refunds($relation = false)
+    {
+        return $this->hasMany(Refund::class, 'order_id', 'id', $relation);
+    }
+
+    public function getRemainingRefundableAttribute(): float
+    {
+        return max(0, $this->total - $this->getTotalRefundedAttribute());
+    }
+
+    public function isFullyRefunded(): bool
+    {
+        return $this->getTotalRefundedAttribute() >= $this->total;
+    }
+
 }
