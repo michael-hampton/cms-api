@@ -17,7 +17,7 @@ class TerritoryResource extends JsonResource
             'sort_order' => $this->getAttribute('sort_order'),
             'page_count' => $this->getPageCount(),
             'region_set' => $this->whenLoaded('regionSet',
-                fn() => new RegionSetResource($this->resource->regionSet)
+                fn($regionSet) => new RegionSetResource($regionSet)
             ),
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),

@@ -271,6 +271,132 @@
                 justify-content: center;
             }
         }
+
+        .cancel-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .cancel-modal-container {
+            background: white;
+            border-radius: 1rem;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-top: 4px solid var(--danger-color);
+        }
+
+        .cancel-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            background: linear-gradient(to bottom, #fef2f2 0%, white 100%);
+        }
+
+        .cancel-warning-icon {
+            font-size: 2rem;
+        }
+
+        .cancel-modal-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+        }
+
+        .cancel-modal-header p {
+            margin: 0.25rem 0 0 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .cancel-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.25rem 0.5rem;
+        }
+
+        .cancel-modal-body {
+            padding: 1.5rem;
+        }
+
+        .cancel-form-group {
+            margin-bottom: 1rem;
+        }
+
+        .cancel-form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+
+        .cancel-form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .cancel-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: normal !important;
+            cursor: pointer;
+        }
+
+        .cancel-checkbox-label input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .cancel-warning-box {
+            padding: 1rem;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .cancel-warning-box strong {
+            color: #92400e;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .cancel-warning-box ul {
+            margin: 0.5rem 0 0 1.25rem;
+            padding: 0;
+            color: #78350f;
+        }
+
+        .cancel-modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
     </style>
 </head>
 <body>
@@ -349,11 +475,11 @@
                    class="btn btn-primary btn-sm">
                     View Details
                 </a>
-                <?php if ($order->canBeCancelled()): ?>
+
                     <button onclick="cancelOrder(<?= $order->id ?>)" class="btn btn-secondary btn-sm">
                         Cancel Order
                     </button>
-                <?php endif; ?>
+
             </div>
         </div>
         <?php endforeach; ?>
@@ -361,9 +487,67 @@
     <?php endif; ?>
 </main>
 
+<div class="cancel-modal-overlay" style="display: none;">
+    <div class="cancel-modal-container">
+        <div class="cancel-modal-header">
+            <div class="cancel-warning-icon">⚠️</div>
+            <div>
+                <h2>Cancel Order</h2>
+                <p>This action will cancel the order and cannot be undone</p>
+            </div>
+            <button class="cancel-modal-close" onclick="this.closest('.cancel-modal-overlay').remove()">×</button>
+        </div>
+        <div class="cancel-modal-body">
+            <div class="cancel-form-group">
+                <label>Cancellation Reason *</label>
+                <select id="cancelReason" class="cancel-form-control" required>
+                    <option value="">Select a reason...</option>
+                    <option value="customer_request">Customer Request</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                    <option value="payment_failed">Payment Failed</option>
+                    <option value="fraudulent">Fraudulent Order</option>
+                    <option value="duplicate">Duplicate Order</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="cancel-form-group">
+                <label class="cancel-checkbox-label">
+                    <input type="checkbox" id="notifyCustomer" checked>
+                    <span>Send cancellation notification to customer</span>
+                </label>
+            </div>
+            <div class="cancel-warning-box">
+                <strong>Important:</strong> Cancelling this order will:
+                <ul>
+                    <li>Mark the order as cancelled in the system</li>
+                    <li>Release any reserved inventory</li>
+                    <li>Stop any pending fulfillment processes</li>
+                </ul>
+            </div>
+        </div>
+        <div class="cancel-modal-footer">
+            <input type="hidden" id="cancelOrderId" value="">
+            <button class="btn btn-secondary" onclick="this.closest('.cancel-modal-overlay').style.display='none'">Keep
+                Order
+            </button>
+            <button class="btn btn-danger" onclick="confirmCancelOrder()">Cancel Order</button>
+        </div>
+    </div>
+</div>
+
 <script>
     async function cancelOrder(orderId) {
-        if (!confirm('Are you sure you want to cancel this order?')) {
+        document.getElementById('cancelOrderId').value = orderId;
+        document.querySelector('.cancel-modal-overlay').style.display = 'flex';
+    }
+
+    async function confirmCancelOrder() {
+        const reason = document.getElementById('cancelReason').value;
+        const notifyCustomer = document.getElementById('notifyCustomer').checked;
+        const orderId = document.getElementById('cancelOrderId').value
+
+        if (!reason) {
+            alert('Please select a cancellation reason');
             return;
         }
 

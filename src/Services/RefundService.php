@@ -92,7 +92,7 @@ class RefundService
             $this->updateOrderStatus($order);
 
             // Log history
-            $this->historyService->logRefundCreated($order->id, $refund->id, $userId, $data['reason']);
+            $this->historyService->logRefundCreated($order->id, $refund->id, $order->user_id, $data['reason']);
 
             // Send notification
             if ($data['notify_customer'] ?? true) {
@@ -119,7 +119,7 @@ class RefundService
             'product_name' => $itemData['product_name'],
             'quantity' => $itemData['quantity'] ?? 0,
             'refund_quantity' => $itemData['refund_quantity'] ?? $itemData['quantity'] ?? 0,
-            'unit_price' => $itemData['price'] ?? 0,
+            'unit_price' => $itemData['unit_price'] ?? 0,
             'refund_amount' => $itemData['refund_amount'] ?? 0,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s')

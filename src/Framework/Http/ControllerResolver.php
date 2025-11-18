@@ -13,6 +13,7 @@ class ControllerResolver implements ControllerResolverInterface
         $this->controllerMappings = array_merge([
             // Page type => Controller@method
             'content' => 'App\Controllers\ContentController@show',
+            'landing-page' => 'App\Controllers\ContentController@show',
             'gallery' => 'App\Controllers\ContentController@show',
             'blog' => 'App\Controllers\ContentController@show',
             'product' => 'App\Controllers\ProductController@show',

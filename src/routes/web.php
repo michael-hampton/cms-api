@@ -86,7 +86,7 @@ $router->get('/shop/details/{slug}', ProductDetailController::class, 'show');
 $router->get('/sites', ContentController::class, 'sites');
 
 $router->get('/member/register', [MemberAuthController::class, 'showRegisterForm']);
-$router->get('/member/login', [MemberAuthController::class, 'showLoginForm']);
+$router->get('/{siteName}/member/login', [MemberAuthController::class, 'showLoginForm']);
 $router->post('/member/logout', [MemberAuthController::class, 'logout']);
 
 // Email verification routes

@@ -129,9 +129,9 @@ class ProductBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<div class=\"product-block product-layout-{$parsedData['layout']}\">";
+        $html = "<div class=\"product-block-card product-layout-{$parsedData['layout']}\">";
 
-        if ($parsedData['sponsored']) {
+        /*if ($parsedData['sponsored']) {
             $html .= "<span class=\"sponsored-badge\">Sponsored</span>";
         }
 
@@ -229,6 +229,103 @@ class ProductBlockParser extends BaseBlockParser
 
         $html .= "</div>";
         $html .= "</div>";
+
+        return $html;*/
+
+        if ($parsedData['sponsored']) {
+            $badgeClass = 'sponsored';
+            $badgeText = 'Sponsored';
+        } else {
+            $badgeClass = '';
+            $badgeText = 'New';
+        }
+
+        $html .= "<div class=\"product-block-image\">";
+        if (!empty($parsedData['image']) && !empty($parsedData['image']['src'])) {
+            $html .= "<img src=\"{$parsedData['image']['src']}\" alt=\"{$parsedData['name']}\">";
+        }
+        $html .= "<div class=\"product-badge {$badgeClass}\">{$badgeText}</div>";
+
+        if ($parsedData['has_sale_price']) {
+            $html .= "<div class=\"product-price-badge\">{$parsedData['currency']}{$parsedData['salePrice']}</div>";
+        } else {
+            $html .= "<div class=\"product-price-badge\">{$parsedData['currency']}{$parsedData['price']}</div>";
+        }
+        $html .= "</div>";
+
+        $html .= "<div class=\"product-block-content\">";
+
+        if (!empty($parsedData['brand'])) {
+            $html .= "<div class=\"product-block-brand\">{$parsedData['brand']}</div>";
+        }
+
+        $html .= "<h3 class=\"product-block-title\">{$parsedData['name']}</h3>";
+
+        $html .= "<div class=\"product-block-pricing\">";
+        if ($parsedData['has_sale_price']) {
+            $savings = $parsedData['price'] - $parsedData['salePrice'];
+            $html .= "<span class=\"price-sale\">{$parsedData['currency']}{$parsedData['salePrice']}</span>";
+            $html .= "<span class=\"price-original\">{$parsedData['currency']}{$parsedData['price']}</span>";
+            $html .= "<span class=\"product-savings\">Save {$parsedData['currency']}{$savings}</span>";
+        } else {
+            $html .= "<span class=\"price-current\">{$parsedData['currency']}{$parsedData['price']}</span>";
+        }
+        $html .= "</div>";
+
+        if (!empty($parsedData['description'])) {
+            $html .= "<div class=\"product-block-description\">{$parsedData['formatted_description']}</div>";
+        }
+
+        if ($parsedData['showReviewPanel'] && !empty($parsedData['review'])) {
+            $review = $parsedData['review'];
+            $html .= "<div class=\"product-review-panel\">";
+
+            if (!empty($review['rating'])) {
+                $stars = str_repeat('⭐', (int)$review['rating']);
+                $html .= "<div class=\"review-rating\">{$stars} {$review['rating']}/5</div>";
+            }
+
+            if (!empty($review['pros'])) {
+                $html .= "<div class=\"review-pros\"><h4>Pros:</h4><ul>";
+                foreach ($review['pros'] as $pro) {
+                    $html .= "<li>{$pro}</li>";
+                }
+                $html .= "</ul></div>";
+            }
+
+            if (!empty($review['cons'])) {
+                $html .= "<div class=\"review-cons\"><h4>Cons:</h4><ul>";
+                foreach ($review['cons'] as $con) {
+                    $html .= "<li>{$con}</li>";
+                }
+                $html .= "</ul></div>";
+            }
+
+            $html .= "</div>";
+        }
+
+        $linkAttrs = '';
+        if ($parsedData['noFollow']) $linkAttrs .= ' rel="nofollow"';
+        if ($parsedData['sponsored']) $linkAttrs .= ' rel="sponsored"';
+        if ($parsedData['openInNewTab']) $linkAttrs .= ' target="_blank"';
+
+        $html .= "<div class=\"product-block-actions\">";
+        $html .= "<a href=\"{$parsedData['link']}\" class=\"product-action-btn btn-primary\"{$linkAttrs}>";
+        $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
+        $html .= "<circle cx=\"9\" cy=\"21\" r=\"1\"></circle><circle cx=\"20\" cy=\"21\" r=\"1\"></circle>";
+        $html .= "<path d=\"M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6\"></path>";
+        $html .= "</svg>";
+        $html .= "{$parsedData['linkText']}";
+        $html .= "</a>";
+
+        $html .= "<button class=\"product-action-btn btn-wishlist\" onclick=\"addToWishlist('{$parsedData['name']}')\">";
+        $html .= "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
+        $html .= "<path d=\"M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z\"></path>";
+        $html .= "</svg>";
+        $html .= "</button>";
+        $html .= "</div>";
+
+        $html .= "</div></div>";
 
         return $html;
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
 use App\Models\Concerns\TracksCreator;
@@ -228,11 +229,11 @@ class Order extends Model
         $this->status = $newStatus->value;
 
         // Set timestamps for specific statuses
-        if ($newStatus === OrderStatus::COMPLETED && !$this->completed_at) {
+        if ($newStatus === OrderStatus::COMPLETED->value && !$this->completed_at) {
             $this->completed_at = date('Y-m-d H:i:s');
         }
 
-        if ($newStatus === OrderStatus::CANCELLED && !$this->cancelled_at) {
+        if ($newStatus === OrderStatus::CANCELLED->value && !$this->cancelled_at) {
             $this->cancelled_at = date('Y-m-d H:i:s');
         }
 
@@ -247,12 +248,12 @@ class Order extends Model
     public function canBeRefunded()
     {
         // Can't refund cancelled or already refunded orders
-        if (in_array($this->status, ['cancelled', 'refunded'])) {
+        if (in_array($this->status, [OrderStatus::CANCELLED->value, OrderStatus::REFUNDED->value])) {
             return false;
         }
 
         // Can't refund unpaid orders
-        if ($this->payment_status !== 'paid') {
+        if ($this->payment_status !== PaymentStatus::PAID->value) {
             return false;
         }
 

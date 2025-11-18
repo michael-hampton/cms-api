@@ -11,7 +11,6 @@ use App\Framework\Validation\Validator;
 use App\Parsers\ProductBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Validation\Custom\SalePriceValidatorRule;
-use PHPUnit\Framework\TestCase;
 
 class ProductBlockParserTest extends FunctionalTestCase
 {
@@ -88,10 +87,10 @@ class ProductBlockParserTest extends FunctionalTestCase
         ];
         $html = $parser->generateHtml($parsedData);
 
-        $this->assertStringContainsString('<div class="product-block product-layout-compact">', $html);
-        $this->assertStringContainsString('<h3 class="product-name">The Gadget</h3>', $html);
-        $this->assertStringContainsString('<span class="product-price original">$100</span>', $html);
-        $this->assertStringContainsString('<span class="product-price sale">$80</span>', $html);
+        $this->assertStringContainsString('<div class="product-block-card product-layout-compact">', $html);
+        $this->assertStringContainsString('<h3 class="product-block-title">The Gadget</h3>', $html);
+        $this->assertStringContainsString('<div class="product-block-pricing">', $html);
+        $this->assertStringContainsString('<span class="price-sale">', $html);
         $this->assertStringContainsString('<div class="product-review-panel">', $html);
         $this->assertStringContainsString('rel="nofollow" target="_blank"', $html);
         $this->assertStringContainsString('Get Yours</a>', $html);

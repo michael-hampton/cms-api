@@ -365,6 +365,340 @@
         .refund-modal-header h2 {
             margin-bottom: 0.5rem;
         }
+
+        .refund-modal-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .refund-close-btn {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            line-height: 1;
+        }
+
+        .refund-modal-body {
+            padding: 2rem;
+        }
+
+        .refund-type-section {
+            margin-bottom: 2rem;
+        }
+
+        .refund-type-section label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .refund-type-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .refund-type-option {
+            border: 2px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .refund-type-option:hover {
+            border-color: var(--primary-color);
+        }
+
+        .refund-type-option.active {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+        }
+
+        .refund-type-option input {
+            display: none;
+        }
+
+        .refund-type-option strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .refund-type-option p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .refund-summary {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .refund-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+        }
+
+        .refund-amount-row {
+            border-top: 2px solid var(--border-color);
+            margin-top: 0.5rem;
+            padding-top: 1rem;
+            font-weight: 600;
+            font-size: 1.25rem;
+            color: var(--danger-color);
+        }
+
+        .refund-progress {
+            margin: 1rem 0 0.5rem;
+            height: 0.5rem;
+            background: var(--border-color);
+            border-radius: 0.25rem;
+            overflow: hidden;
+        }
+
+        .refund-progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #ef4444, #dc2626);
+            transition: width 0.3s;
+        }
+
+        .refund-percentage {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .refund-items-list {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+
+        .refund-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .refund-item:last-child {
+            border-bottom: none;
+        }
+
+        .refund-item-info strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .refund-item-info span {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .refund-qty-input {
+            width: 80px;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+        }
+
+        .refund-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-light);
+            border-radius: 0.5rem;
+        }
+
+        .refund-options label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+        }
+
+        .refund-modal-footer {
+            padding: 1.5rem 2rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .refund-type-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .refund-modal-container {
+                margin: 0;
+                border-radius: 0;
+                max-height: 100vh;
+            }
+        }
+
+
+        .cancel-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .cancel-modal-container {
+            background: white;
+            border-radius: 1rem;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-top: 4px solid var(--danger-color);
+        }
+
+        .cancel-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            background: linear-gradient(to bottom, #fef2f2 0%, white 100%);
+        }
+
+        .cancel-warning-icon {
+            font-size: 2rem;
+        }
+
+        .cancel-modal-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+        }
+
+        .cancel-modal-header p {
+            margin: 0.25rem 0 0 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .cancel-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.25rem 0.5rem;
+        }
+
+        .cancel-modal-body {
+            padding: 1.5rem;
+        }
+
+        .cancel-form-group {
+            margin-bottom: 1rem;
+        }
+
+        .cancel-form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+
+        .cancel-form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .cancel-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: normal !important;
+            cursor: pointer;
+        }
+
+        .cancel-checkbox-label input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .cancel-warning-box {
+            padding: 1rem;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .cancel-warning-box strong {
+            color: #92400e;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .cancel-warning-box ul {
+            margin: 0.5rem 0 0 1.25rem;
+            padding: 0;
+            color: #78350f;
+        }
+
+        .cancel-modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
     </style>
 </head>
 <body>
@@ -522,11 +856,6 @@
         <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/orders" class="btn btn-secondary">
             ← Back to Orders
         </a>
-        <?php if ($order->canBeCancelled()): ?>
-            <button onclick="cancelOrder(<?= $order->id ?>)" class="btn btn-secondary">
-                Cancel Order
-            </button>
-        <?php endif; ?>
         <?php if ($order->canBeRefunded()): ?>
             <button onclick="openRefundModal()" class="btn btn-warning">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -534,6 +863,17 @@
                     <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                 </svg>
                 Process Refund
+            </button>
+        <?php endif; ?>
+
+        <?php if ($order->canBeCancelled()): ?>
+            <button onclick="cancelOrder(<?= $order->id ?>)" class="btn btn-warning">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Cancel Order
             </button>
         <?php endif; ?>
     </div>
@@ -620,7 +960,7 @@
                         <div class="refund-item">
                             <div class="refund-item-info">
                                 <strong><?= htmlspecialchars($item->product_name) ?></strong>
-                                <span><?= htmlspecialchars($order->currency) ?> <?= number_format($item->price, 2) ?> × <?= $item->quantity ?></span>
+                                <span><?= htmlspecialchars($order->currency) ?> <?= number_format($item->unit_price, 2) ?> × <?= $item->quantity ?></span>
                             </div>
                             <div class="refund-item-controls">
                                 <input type="number"
@@ -629,7 +969,7 @@
                                        max="<?= $item->quantity ?>"
                                        value="0"
                                        data-item-id="<?= $item->id ?>"
-                                       data-price="<?= $item->price ?>"
+                                       data-price="<?= $item->unit_price ?>"
                                        onchange="updatePartialRefund()">
                             </div>
                         </div>
@@ -674,22 +1014,213 @@
         </div>
     </div>
 </div>
+
+<div class="cancel-modal-overlay" style="display: none;">
+    <div class="cancel-modal-container">
+        <div class="cancel-modal-header">
+            <div class="cancel-warning-icon">⚠️</div>
+            <div>
+                <h2>Cancel Order</h2>
+                <p>This action will cancel the order and cannot be undone</p>
+            </div>
+            <button class="cancel-modal-close" onclick="this.closest('.cancel-modal-overlay').remove()">×</button>
+        </div>
+        <div class="cancel-modal-body">
+            <div class="cancel-form-group">
+                <label>Cancellation Reason *</label>
+                <select id="cancelReason" class="cancel-form-control" required>
+                    <option value="">Select a reason...</option>
+                    <option value="customer_request">Customer Request</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                    <option value="payment_failed">Payment Failed</option>
+                    <option value="fraudulent">Fraudulent Order</option>
+                    <option value="duplicate">Duplicate Order</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="cancel-form-group">
+                <label class="cancel-checkbox-label">
+                    <input type="checkbox" id="notifyCustomer" checked>
+                    <span>Send cancellation notification to customer</span>
+                </label>
+            </div>
+            <div class="cancel-warning-box">
+                <strong>Important:</strong> Cancelling this order will:
+                <ul>
+                    <li>Mark the order as cancelled in the system</li>
+                    <li>Release any reserved inventory</li>
+                    <li>Stop any pending fulfillment processes</li>
+                </ul>
+            </div>
+        </div>
+        <div class="cancel-modal-footer">
+            <input type="hidden" id="cancelOrderId" value="">
+            <button class="btn btn-secondary" onclick="this.closest('.cancel-modal-overlay').style.display='none'">Keep
+                Order
+            </button>
+            <button class="btn btn-danger" onclick="confirmCancelOrder()">Cancel Order</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
 
 <script>
-    const refundModal = document.getElementById('refundModal');
+    let currentRefundType = 'full';
+    const orderTotal = <?= $order->total ?>;
+    const orderCurrency = '<?= htmlspecialchars($order->currency) ?>';
+
+    async function cancelOrder(orderId) {
+        document.getElementById('cancelOrderId').value = orderId;
+        document.querySelector('.cancel-modal-overlay').style.display = 'flex';
+    }
+
+    async function confirmCancelOrder() {
+        const reason = document.getElementById('cancelReason').value;
+        const notifyCustomer = document.getElementById('notifyCustomer').checked;
+        const orderId = document.getElementById('cancelOrderId').value
+
+        if (!reason) {
+            alert('Please select a cancellation reason');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/member/orders/${orderId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Order cancelled successfully');
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to cancel order');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to cancel order');
+        }
+    }
 
     function openRefundModal() {
-        refundModal.style.display = 'block';
-
+        document.getElementById('refundModal').style.display = 'block';
+        document.body.style.overflow = 'hidden';
     }
 
     function closeRefundModal() {
-        refundModal.style.display = 'none';
+        document.getElementById('refundModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
     }
 
-    function processRefund() {
+    function updateRefundType(type) {
+        currentRefundType = type;
+        const partialItems = document.getElementById('partialRefundItems');
 
+        // Update active state
+        document.querySelectorAll('.refund-type-option').forEach(option => {
+            option.classList.remove('active');
+        });
+        event.target.closest('.refund-type-option').classList.add('active');
+
+        if (type === 'full') {
+            partialItems.style.display = 'none';
+            updateRefundDisplay(orderTotal);
+        } else {
+            partialItems.style.display = 'block';
+            updatePartialRefund();
+        }
+    }
+
+    function updatePartialRefund() {
+        let total = 0;
+        document.querySelectorAll('.refund-qty-input').forEach(input => {
+            const quantity = parseInt(input.value) || 0;
+            alert(quantity)
+            const price = parseFloat(input.dataset.price) || 0;
+            alert(price)
+            total += quantity * price;
+        });
+        alert(total)
+        updateRefundDisplay(total);
+    }
+
+    function updateRefundDisplay(amount) {
+        const percentage = (amount / orderTotal) * 100;
+        document.getElementById('refundAmount').textContent =
+            `${orderCurrency} ${amount.toFixed(2)}`;
+        document.getElementById('refundProgressBar').style.width = `${percentage}%`;
+        document.getElementById('refundPercentage').textContent =
+            `${percentage.toFixed(1)}% of order total`;
+    }
+
+    async function processRefund() {
+        const reason = document.getElementById('refundReason').value;
+        if (!reason) {
+            alert('Please select a reason for the refund');
+            return;
+        }
+
+        const refundData = {
+            order_id: <?= $order->id ?>,
+            refund_type: currentRefundType,
+            refund_amount: currentRefundType === 'full' ? orderTotal : calculatePartialAmount(),
+            reason: reason,
+            internal_notes: document.getElementById('refundNotes').value,
+            notify_customer: document.getElementById('notifyCustomer').checked,
+            restock_items: document.getElementById('restockItems').checked,
+            items: currentRefundType === 'partial' ? getPartialItems() : []
+        };
+
+        try {
+            const response = await fetch(`/member/orders/<?= $order->id ?>/refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(refundData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Refund processed successfully');
+                window.location.reload();
+            } else {
+                alert(data.message || 'Failed to process refund');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to process refund');
+        }
+    }
+
+    function calculatePartialAmount() {
+        let total = 0;
+        document.querySelectorAll('.refund-qty-input').forEach(input => {
+            const quantity = parseInt(input.value) || 0;
+            const price = parseFloat(input.dataset.price) || 0;
+            total += quantity * price;
+        });
+        return total;
+    }
+
+    function getPartialItems() {
+        const items = [];
+        document.querySelectorAll('.refund-qty-input').forEach(input => {
+            const quantity = parseInt(input.value) || 0;
+            if (quantity > 0) {
+                items.push({
+                    item_id: input.dataset.itemId,
+                    quantity: quantity,
+                    amount: quantity * parseFloat(input.dataset.price)
+                });
+            }
+        });
+        return items;
     }
 </script>

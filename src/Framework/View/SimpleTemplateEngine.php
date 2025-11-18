@@ -190,19 +190,9 @@ class SimpleTemplateEngine implements ViewEngineInterface
     {
         return preg_replace_callback(
         // Match: @include('file', [optional variables])
-            '/@include\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*(\[[^\)]*\]))?\s*\)/',
+            '/@include\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*(\[.*?\]))?\s*\)/s',
             function ($matches) use ($data) {
                 $view = $matches[1];
-                $extra = [];
-
-                // Parse optional variables array
-                if (!empty($matches[2])) {
-                    $extra = (function ($data) use ($matches) {
-                        // extract current variables so they can be used in the eval
-                        extract($data, EXTR_SKIP);
-                        return eval('return ' . $matches[2] . ';');
-                    })($data);
-                }
 
                 $file = $this->findTemplate($view);
 
@@ -212,12 +202,36 @@ class SimpleTemplateEngine implements ViewEngineInterface
 
                 $contents = file_get_contents($file);
 
-                // Merge parent data with include-specific variables
-                $mergedData = array_merge($data, $extra);
+                if (!empty($matches[2])) {
+                    // With parameters: Pre-compile EVERYTHING including nested directives
+                    $arrayExpression = $matches[2];
 
-                // Compile included template — it can define @section/@yield
-                $compiled = $this->compileTemplate($contents, $mergedData);
+                    // Fully compile the template (all directives)
+                    $compiled = $this->compileJsonDirective($contents);
+                    $compiled = $this->compilePrintStatements($compiled);
+                    $compiled = $this->compileConditionals($compiled);
+                    $compiled = $this->compileLoops($compiled);
+                    $compiled = $this->compileIncludes($compiled, $data); // Recursively compile nested includes
+                    $compiled = $this->compileAssets($compiled);
+                    $compiled = str_replace('@csrf', '<?php echo csrf_field(); ?>', $compiled);
+                    $compiled = preg_replace('/@method\([\'"](.+?)[\'"]\)/', '<?php echo method_field(\'$1\'); ?>', $compiled);
+                    $compiled = $this->compileSections($compiled);
+                    $compiled = $this->compileExtends($compiled, $data);
 
+                    // Use base64 encoding to safely embed the compiled template
+                    $encodedCompiled = base64_encode($compiled);
+
+                    return "<?php 
+                    \$__extraVars = {$arrayExpression};
+                    \$__includeData = array_merge(get_defined_vars(), \$__extraVars);
+                    unset(\$__includeData['__extraVars'], \$__includeData['__includeData']);
+                    extract(\$__includeData, EXTR_OVERWRITE);
+                    eval('?>' . base64_decode('{$encodedCompiled}'));
+                ?>";
+                }
+
+                // No extra variables - compile inline as before
+                $compiled = $this->compileTemplate($contents, $data);
                 return $compiled;
 
             },
