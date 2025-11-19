@@ -53,18 +53,18 @@ class PageGridBlockParser extends BaseBlockParser
                 new BooleanRule()
             ],
             'pages' => [
-                new RequiredRule(),
+                //new RequiredRule(),
                 new ArrayRule(),
                 new MinRule(1) // At least one page required
             ],
             'pages.*.title' => [
-                new RequiredRule(),
+                //new RequiredRule(),
                 new MinLengthRule(2),
                 new MaxLengthRule(255)
             ],
             'pages.*.slug' => [
-                new RequiredRule(),
-                new MinLengthRule(2),
+                //new RequiredRule(),
+                //new MinLengthRule(2),
                 new MaxLengthRule(255)
             ],
             'pages.*.excerpt' => [

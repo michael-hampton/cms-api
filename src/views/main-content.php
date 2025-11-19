@@ -1,5 +1,7 @@
 <?php
 // views/estate/page.php (enhanced page template)
+use App\Parsers\PageGridRenderer;
+
 $title = $page->title ?? 'Premier Properties';
 $description = $page->meta_description ?? 'Premier Properties - Luxury Real Estate in London';
 
@@ -19,6 +21,7 @@ if ($page && $page->blocks) {
 }
 
 $hasSidebar = !empty($sidebarBlocks);
+$pageGridAdded = false;
 ?>
 
 
@@ -37,22 +40,24 @@ $hasSidebar = !empty($sidebarBlocks);
                             @if($page->page_type !== 'landing-page')
 
                             <!-- Categories -->
-                            @include('categories')
+                            @include('categories', ['page' => $page])
 
                             <!-- Tags -->
                             @include('tags')
 
                             @include('page-actions')
                             @endif
-
-                            <?php if (!empty($pageGridHtml)) {
-                                echo $pageGridHtml;
-                            } ?>
                         </div>
 
                         <!-- Main Content Blocks -->
-                        <?php foreach ($mainBlocks as $block): ?>
+                        <?php foreach ($mainBlocks as $index => $block): ?>
+
+                            <?php if (!empty($pageGrid) && $pageGrid->order === ($index + 1)): ?>
+                                <?= (new PageGridRenderer())->render($pageGrid) ?>
+                            <?php endif; ?>
+
                             <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
+
                         <?php endforeach; ?>
 
                         @include('product-section')

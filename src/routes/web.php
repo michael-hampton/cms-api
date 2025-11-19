@@ -2,6 +2,7 @@
 
 use App\Controllers\AuthorViewController;
 use App\Controllers\BlockController;
+use App\Controllers\BrandPageController;
 use App\Controllers\CartController;
 use App\Controllers\CategoryPageController;
 use App\Controllers\CommentController;
@@ -68,7 +69,8 @@ $router->get('/blocks/type/{type}', BlockController::class, 'getByType');
 $router->post('/contact', EstateWebsiteController::class, 'submitContact');
 //$router->get('/properties', EstateWebsiteController::class, 'properties');
 $router->get('/property/{id}', EstateWebsiteController::class, 'property');
-$router->get('/category/{slug}', CategoryPageController::class, 'show');
+$router->get('/{siteName}/category/{slug}', CategoryPageController::class, 'show')->name('category.show');
+$router->get('/{siteName}/brand/{slug}', BrandPageController::class, 'show')->name('brand.show');
 $router->post('/event-signup', EventController::class, 'signup');
 $router->post('/{site}/comments', CommentController::class, 'store');
 
@@ -76,7 +78,7 @@ $router->get('/{site}/member/account-details', [MemberController::class, 'accoun
 $router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
 
 $router->get('/authors/{slug}', AuthorViewController::class, 'show');
-$router->get('/tags/{slug}', TagViewController::class, 'show');
+$router->get('/{siteName}/tags/{slug}', TagViewController::class, 'show');
 
 $router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);
 $router->get('/{site}/member/liked-pages', [MemberLikedPagesController::class, 'index']);

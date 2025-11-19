@@ -4,13 +4,15 @@ namespace App\Services\Url;
 
 use App\Framework\Support\Cache;
 use App\Framework\Support\SiteContext;
+use App\Models\Brand;
+use App\Models\Category;
 use App\Models\Page;
 
 class DynamicUrlResolver implements UrlResolverInterface
 {
     public function __construct(
         private readonly Cache $cache,
-        private array         $config = []
+        private array $config = []
     )
     {
         $this->config = array_merge([
@@ -28,7 +30,7 @@ class DynamicUrlResolver implements UrlResolverInterface
         $page = $this->findPageBySlug($path);
 
         if (!$page) {
-            return null;
+            return $this->checkRelations($path);
         }
 
         return match ($page->status) {
@@ -43,11 +45,7 @@ class DynamicUrlResolver implements UrlResolverInterface
     {
         $cacheKey = 'page_slug_' . md5($slug . '_' . SiteContext::getId());
 
-        $siteSlug = SiteContext::get()->slug;
-
-        // remove site slug from url
-        $slug = str_replace($siteSlug, '', $slug);
-        $slug = trim($slug, '/');
+        $slug = $this->getSlugForPage($slug);
 
         return $this->cache->remember($cacheKey, $this->config['cache_duration'], function () use ($slug) {
             $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
@@ -61,6 +59,15 @@ class DynamicUrlResolver implements UrlResolverInterface
 
             return $query->first();
         });
+    }
+
+    private function getSlugForPage(string $path): string
+    {
+        $siteSlug = SiteContext::get()->slug;
+
+        // remove site slug from url
+        $slug = str_replace($siteSlug, '', $path);
+        return trim($slug, '/');
     }
 
     private function createPageResult(Page $page, string $requestedPath): UrlResolutionResult
@@ -198,5 +205,36 @@ class DynamicUrlResolver implements UrlResolverInterface
         }
 
         exit;
+    }
+
+    private function checkRelations(string $path): ?UrlResolutionResult
+    {
+        $slug = $this->getSlugForPage($path);
+
+        if (empty($slug)) {
+            return null;
+        }
+
+        $brand = Brand::where('slug', $slug)->first();
+
+        if ($brand) {
+            return new UrlResolutionResult(
+                type: 'brand',
+                redirectUrl: route('brand.show', ['slug' => $brand->slug]),
+                entity: $brand
+            );
+        }
+
+        $category = Category::where('slug', $slug)->first();
+
+        if ($category) {
+            return new UrlResolutionResult(
+                type: 'category',
+                redirectUrl: route('category.show', ['slug' => $category->slug]),
+                entity: $category
+            );
+        }
+
+        return null;
     }
 }

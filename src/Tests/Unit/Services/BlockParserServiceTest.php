@@ -381,7 +381,7 @@ class BlockParserServiceTest extends TestCase
 
         $result = $this->service->parseMultiplePages($pagesData);
 
-        $this->assertInstanceOf(\App\DTO\BatchParseResult::class, $result);
+        $this->assertInstanceOf(\App\Database\Seeders\DTO\BatchParseResult::class, $result);
         $this->assertEquals(1, $result->getSuccessCount());
         $this->assertEquals(1, $result->getFailedCount());
     }

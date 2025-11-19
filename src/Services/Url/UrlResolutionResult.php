@@ -2,6 +2,7 @@
 
 namespace App\Services\Url;
 
+use App\Models\Model;
 use App\Models\Page;
 
 class UrlResolutionResult
@@ -13,7 +14,8 @@ class UrlResolutionResult
         public readonly ?int $statusCode = null,
         public readonly ?string $reason = null,
         public readonly ?string $canonicalUrl = null,
-        public readonly array $meta = []
+        public readonly array  $meta = [],
+        public readonly ?Model $entity = null
     ) {}
 
     public function isRedirect(): bool
@@ -24,5 +26,10 @@ class UrlResolutionResult
     public function isPage(): bool
     {
         return $this->type === 'page';
+    }
+
+    public function isBrand(): bool
+    {
+        return $this->type === 'brand';
     }
 }

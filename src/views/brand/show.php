@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($category->name) ?> - Category</title>
-    <meta name="description" content="<?= htmlspecialchars($category->description ?? "Browse {$category->name} content") ?>">
+    <title><?= htmlspecialchars($tag->name) ?> - Brand</title>
+    <meta name="description" content="<?= htmlspecialchars($tag->description ?? "Browse {$tag->name} content") ?>">
     <style>
         * {
             margin: 0;
@@ -390,22 +390,29 @@
         <?php endforeach; ?>
     </nav>
 
-    <!-- Category Header -->
+    <!-- Brand Header -->
     <div class="category-header">
-        <h1 class="category-title"><?= htmlspecialchars($category->name) ?></h1>
-        <?php if (!empty($category->description)): ?>
-            <p class="category-description"><?= nl2br(htmlspecialchars($category->description)) ?></p>
+        <h1 class="category-title"><?= htmlspecialchars($tag->name) ?></h1>
+        <?php if (!empty($tag->description)): ?>
+            <p class="category-description"><?= nl2br(htmlspecialchars($tag->description)) ?></p>
         <?php endif; ?>
 
-        <?php if ($category->color): ?>
-            <div class="category-badge" style="background-color: <?= htmlspecialchars($category->color) ?>;">
-                <?php if ($category->icon): ?>
-                    <span class="category-icon"><?= $category->icon ?></span>
+        <?php if ($tag->color): ?>
+            <div class="category-badge" style="background-color: <?= htmlspecialchars($tag->color) ?>;">
+                <?php if ($tag->icon): ?>
+                    <span class="category-icon"><?= $tag->icon ?></span>
                 <?php endif; ?>
-                <?= htmlspecialchars($category->name) ?>
+                <?= htmlspecialchars($tag->name) ?>
             </div>
         <?php endif; ?>
     </div>
+
+    <!-- Categories -->
+    <?php foreach ($tag->categories as $category) { ?>
+        <?= $category->name; ?>
+    <?php }
+
+    ?>
 
     <!-- Child Categories -->
     <?php if (!empty($childCategories)): ?>
@@ -430,7 +437,7 @@
 
     <!-- Pages in Category -->
     <section class="category-pages">
-        <h2>Pages in <?= htmlspecialchars($category->name) ?></h2>
+        <h2>Pages in <?= htmlspecialchars($tag->name) ?></h2>
 
         <?php if (!empty($pages)): ?>
             <div class="pages-grid">
@@ -470,7 +477,8 @@
             <?php if (isset($pagination) && $pagination['last_page'] > 1): ?>
                 <nav class="pagination-wrapper">
                     <div class="pagination-info">
-                        Showing <?= $pagination['from'] ?> to <?= $pagination['to'] ?> of <?= $pagination['total'] ?> pages
+                        Showing <?= $pagination['from'] ?> to <?= $pagination['to'] ?> of <?= $pagination['total'] ?>
+                        pages
                     </div>
                     <ul class="pagination">
                         <?php if ($pagination['current_page'] > 1): ?>
@@ -505,7 +513,8 @@
                             <?php if ($end < $pagination['last_page'] - 1): ?>
                                 <li><span class="pagination-dots">...</span></li>
                             <?php endif; ?>
-                            <li><a href="?page=<?= $pagination['last_page'] ?>" class="pagination-link"><?= $pagination['last_page'] ?></a></li>
+                            <li><a href="?page=<?= $pagination['last_page'] ?>"
+                                   class="pagination-link"><?= $pagination['last_page'] ?></a></li>
                         <?php endif; ?>
 
                         <?php if ($pagination['current_page'] < $pagination['last_page']): ?>

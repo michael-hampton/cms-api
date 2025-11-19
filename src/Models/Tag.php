@@ -26,7 +26,8 @@ class Tag extends Model
         'seo_description',
         'no_index',
         'canonical_url',
-        'clone_history'
+        'clone_history',
+        'category_id'
     ];
 
     protected $casts = [
@@ -96,5 +97,16 @@ class Tag extends Model
     public function scopeBySlug(QueryBuilder $query, string $slug): QueryBuilder
     {
         return $query->where('slug', $slug);
+    }
+
+    public function categories(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            Category::class,
+            'tag_categories',
+            'tag_id',
+            'category_id',
+            $relation
+        );
     }
 }

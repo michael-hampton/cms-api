@@ -2,12 +2,10 @@
 
 namespace App\Controllers;
 
-use App\Framework\Http\Request;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Repositories\CategoryRepository;
 use App\Repositories\PageRepository;
-use App\Services\Url\UrlResolutionResult;
 
 class CategoryPageController extends Controller
 {
@@ -46,12 +44,12 @@ class CategoryPageController extends Controller
 
         $pages = $paginationData['data'];
         $pagination = [
-            'current_page' => $paginationData['current_page'],
-            'per_page' => $paginationData['per_page'],
-            'total' => $paginationData['total'],
-            'last_page' => $paginationData['last_page'],
-            'from' => $paginationData['from'],
-            'to' => $paginationData['to']
+            'current_page' => $paginationData['pagination']['current_page'],
+            'per_page' => $paginationData['pagination']['per_page'],
+            'total' => $paginationData['pagination']['total'],
+            'last_page' => $paginationData['pagination']['last_page'],
+            'from' => $paginationData['pagination']['from'],
+            'to' => $paginationData['pagination']['to']
         ];
 
         return $this->view('estate/category', [

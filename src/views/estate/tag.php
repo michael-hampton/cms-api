@@ -252,7 +252,7 @@
             <?php foreach ($pages as $page): ?>
                 <article class="page-card">
                     <h3>
-                        <a href="<?= htmlspecialchars($page->getUrlAttribute()) ?>">
+                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>">
                             <?= htmlspecialchars($page->title) ?>
                         </a>
                     </h3>

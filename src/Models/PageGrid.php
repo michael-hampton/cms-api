@@ -29,7 +29,8 @@ class PageGrid extends Model
         'start_date',
         'end_date',
         'use_hero',
-        'site_id'
+        'site_id',
+        'order'
     ];
 
     protected $casts = [

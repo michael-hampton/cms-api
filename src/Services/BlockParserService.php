@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\DTO\BatchParseResult;
+use App\Database\Seeders\DTO\BatchParseResult;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
@@ -218,6 +218,9 @@ class BlockParserService
         $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
 
         if (!$validationResult->isValid()) {
+
+            die('here');
+
             throw new ValidationException('Failed to validate block data', $validationResult->getErrors());
         }
     }
@@ -288,6 +291,16 @@ class BlockParserService
         $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
 
         if (!$validationResult->isValid()) {
+
+            echo '<pre>';
+            print_r($parser);
+
+            echo $blockData['type'];
+
+            echo '<pre>';
+            print_r($validationResult->getErrors());
+            die;
+
             throw new ValidationException('Failed to validate block data', $validationResult->getErrors());
         }
     }

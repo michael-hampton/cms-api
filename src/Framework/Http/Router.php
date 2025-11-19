@@ -184,22 +184,13 @@ class Router
         // Sort routes to prioritize specific paths over parameterized ones
         $sortedRoutes = $this->getSortedRoutes($method);
 
-        // Handle parameterized routes
-        foreach ($sortedRoutes as $routePath => $routeData) {
-            if ($this->matchRoute($routePath, $path, $params)) {
-                // Extract handler and middleware
-                $handler = $routeData['handler'] ?? $routeData;
-                $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
+        $result = $this->routeToControllerFromRoutePath($sortedRoutes, $path, [], $request);
 
-                Session::setPreviousUrl($routePath);
-
-                return $this->runMiddleware($middlewareStack, $request, function ($request) use ($handler, $params) {
-                    return $this->callAction($handler, $request, $params);
-                });
-            }
+        if ($result instanceof Response) {
+            return $result;
         }
 
-        return $this->runMiddleware($this->globalMiddleware, $request, function ($request) use ($path, $method) {
+        return $this->runMiddleware($this->globalMiddleware, $request, function ($request) use ($path, $method, $sortedRoutes) {
 
             // Check if it's a dynamic url
             $urlResolver = new DynamicUrlResolver(new Cache());
@@ -216,6 +207,17 @@ class Router
 
             $controllerResolver = new ControllerResolver();
 
+            if (in_array($urlResult->type, ['brand', 'category'])) {
+                $redirectPath = $urlResult->redirectUrl;
+
+                $result = $this->routeToControllerFromRoutePath($sortedRoutes, $redirectPath, [], $request);
+
+                if ($result instanceof Response) {
+                    return $result;
+                }
+
+            }
+
             if ($controllerResolver->shouldUseController($urlResult->page)) {
                 return $this->dispatchToController($urlResult, $request);
             }
@@ -224,6 +226,24 @@ class Router
         });
 
         return $this->show404($method, $path);
+    }
+
+    private function routeToControllerFromRoutePath(array $sortedRoutes, string $redirectPath, array $params, Request $request)
+    {
+        foreach ($sortedRoutes as $routePath => $routeData) {
+            if ($this->matchRoute($routePath, $redirectPath, $params)) {
+                // Extract handler and middleware
+                $handler = $routeData['handler'] ?? $routeData;
+
+                $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
+
+                Session::setPreviousUrl($routePath);
+
+                return $this->runMiddleware($middlewareStack, $request, function ($request) use ($handler, $params) {
+                    return $this->callAction($handler, $request, $params);
+                });
+            }
+        }
     }
 
     /**
@@ -285,10 +305,11 @@ class Router
 
     private function dispatchToController(UrlResolutionResult $result, ?Request $request = null)
     {
-        $request->setAttribute('page', $result->page);
         $controllerResolver = new ControllerResolver();
-
         $controllerAction = $controllerResolver->resolve($result->page);
+
+        $request->setAttribute('page', $result->page);
+
         $controllerDispatcher = new ControllerDispatcher();
 
         return $controllerDispatcher->dispatch(

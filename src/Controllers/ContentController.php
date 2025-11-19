@@ -6,7 +6,6 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
-use App\Models\PageGrid;
 use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
@@ -97,6 +96,7 @@ class ContentController extends Controller
         }
 
         $data['pageGridHtml'] = $pageGridHtml;
+        $data['pageGrid'] = $pageGrid;
 
         $dealsService = new \App\Services\DealsService();
         $data['todaysDeals'] = $dealsService->getTodaysDeals(10);

@@ -37,7 +37,8 @@
     <div class="page-tags">
         <?php foreach ($page->tags as $tag): ?>
             <span class="tag-badge <?= $tag->is_featured ? 'featured-tag' : '' ?>">
-                <a href="/tags/<?= urlencode($tag->slug) ?>" class="tag-link">
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/tags/<?= urlencode($tag->slug) ?>"
+                   class="tag-link">
                     <?php if ($tag->is_featured): ?>
                         <span class="featured-icon">★</span>
                     <?php endif; ?>

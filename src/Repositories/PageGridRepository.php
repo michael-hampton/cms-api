@@ -6,7 +6,6 @@ use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PageGrid;
 use App\Models\PageGridHistory;
-use App\Models\Product;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
@@ -124,13 +123,16 @@ class PageGridRepository extends Repository
     /**
      * Get active page grid for a specific page with optional date filtering
      */
-    public function getActiveGridForPage(int $pageId, ?string $startDate = null, ?string $endDate = null): ?PageGrid
+    public function getActiveGridForPage(int $pageId, ?string $startDate = null, ?string $endDate = null, ?int $siteId = null): ?PageGrid
     {
+        $siteId = $siteId ?? $this->siteId;
+
         $query = $this->model
             ->where('is_active', true)
-            ->whereHas('pages', function($q) use ($pageId) {
+            ->whereHas('pages', function ($q) use ($pageId) {
                 $q->where('pages.id', $pageId);
-            });
+            })
+            ->where('site_id', $siteId);
 
         // Apply date filters
         $query = $this->applyDateFilters($query, $startDate, $endDate);
@@ -145,7 +147,7 @@ class PageGridRepository extends Repository
     {
         $query = $this->model
             ->where('is_active', true)
-            ->whereHas('territories', function($q) use ($territoryId) {
+            ->whereHas('territories', function ($q) use ($territoryId) {
                 $q->where('territories.id', $territoryId);
             });
 
@@ -163,13 +165,13 @@ class PageGridRepository extends Repository
         $now = date('Y-m-d H:i:s');
 
         // If start_date is set, it must be <= now
-        $query->where(function($q) use ($now) {
+        $query->where(function ($q) use ($now) {
             $q->whereNull('start_date')
                 ->orWhere('start_date', '<=', $now);
         });
 
         // If end_date is set, it must be >= now
-        $query->where(function($q) use ($now) {
+        $query->where(function ($q) use ($now) {
             $q->whereNull('end_date')
                 ->orWhere('end_date', '>=', $now);
         });

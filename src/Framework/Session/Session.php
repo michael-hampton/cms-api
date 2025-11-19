@@ -15,9 +15,9 @@ class Session
             return;
         }
 
-        if (headers_sent()) {
-            throw new \RuntimeException('Cannot start session - headers already sent');
-        }
+//        if (headers_sent()) {
+//            throw new \RuntimeException('Cannot start session - headers already sent');
+//        }
 
         session_start();
         self::$started = true;
