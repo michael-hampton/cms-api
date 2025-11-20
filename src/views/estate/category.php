@@ -30,12 +30,9 @@
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 32px;
-            font-size: 0.9rem;
+            margin-bottom: 24px;
+            font-size: 0.875rem;
             color: #6b7280;
-            padding: 16px 20px;
-            background: white;
-            border-radius: 8px;
         }
 
         .breadcrumb a {
@@ -58,54 +55,65 @@
             color: #111827;
         }
 
-        /* Category Header */
-        .category-header {
-            text-align: center;
-            padding: 48px 32px;
+        /* Page Header */
+        .page-header {
             background: white;
             border-radius: 12px;
-            margin-bottom: 48px;
+            padding: 40px;
+            margin-bottom: 40px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #2563eb;
         }
 
-        .category-title {
-            font-size: 3rem;
+        .page-header h1 {
+            font-size: 2.5rem;
             font-weight: 800;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             color: #111827;
-        }
-
-        .category-description {
-            font-size: 1.125rem;
-            color: #6b7280;
-            max-width: 700px;
-            margin: 0 auto 24px;
-            line-height: 1.7;
-        }
-
-        .category-badge {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border-radius: 24px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            gap: 16px;
         }
 
         .category-icon {
-            font-size: 1.2rem;
+            font-size: 2rem;
+            color: #2563eb;
+        }
+
+        .page-description {
+            font-size: 1.125rem;
+            color: #6b7280;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .page-stats {
+            display: flex;
+            gap: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            color: #2563eb;
         }
 
         /* Child Categories */
         .child-categories {
-            margin-bottom: 48px;
+            margin-bottom: 40px;
         }
 
         .child-categories h2 {
-            font-size: 1.75rem;
+            font-size: 1.5rem;
             font-weight: 700;
             margin-bottom: 24px;
             color: #111827;
@@ -124,7 +132,7 @@
             padding: 24px;
             text-decoration: none;
             color: inherit;
-            transition: all 0.3s;
+            transition: all 0.25s ease;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -138,6 +146,7 @@
 
         .category-card-icon {
             font-size: 2rem;
+            color: #2563eb;
             margin-bottom: 4px;
         }
 
@@ -163,40 +172,42 @@
             letter-spacing: 0.5px;
         }
 
-        /* Category Pages */
-        .category-pages {
+        /* Content Section */
+        .content-section {
             background: white;
-            padding: 32px;
+            padding: 40px;
             border-radius: 12px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
-        .category-pages h2 {
+        .content-section h2 {
             font-size: 1.75rem;
             font-weight: 700;
-            margin-bottom: 24px;
+            margin-bottom: 32px;
             color: #111827;
         }
 
         .pages-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
             gap: 24px;
             margin-bottom: 32px;
         }
 
         .page-card {
             background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
             padding: 24px;
-            transition: all 0.2s;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         .page-card:hover {
             border-color: #2563eb;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
-            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+            transform: translateY(-4px);
         }
 
         .page-card h3 {
@@ -208,7 +219,7 @@
         .page-card h3 a {
             color: #111827;
             text-decoration: none;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .page-card h3 a:hover {
@@ -219,6 +230,7 @@
             color: #6b7280;
             margin-bottom: 16px;
             line-height: 1.6;
+            flex: 1;
         }
 
         .page-meta {
@@ -227,17 +239,17 @@
             align-items: center;
             font-size: 0.875rem;
             color: #9ca3af;
-            padding-top: 12px;
+            padding-top: 16px;
             border-top: 1px solid #e5e7eb;
         }
 
         .page-type {
-            background: #e5e7eb;
-            padding: 4px 10px;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 4px 12px;
             border-radius: 12px;
-            font-weight: 500;
-            text-transform: capitalize;
-            color: #374151;
+            font-weight: 600;
+            font-size: 0.8rem;
         }
 
         .page-tags-mini {
@@ -252,26 +264,33 @@
             color: #1e40af;
             padding: 4px 10px;
             border-radius: 12px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
 
         /* Empty State */
-        .no-pages {
+        .empty-state {
             text-align: center;
-            padding: 60px 20px;
+            padding: 80px 20px;
             color: #6b7280;
         }
 
-        .no-pages svg {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 16px;
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
             color: #d1d5db;
         }
 
-        .no-pages p {
-            font-size: 1.125rem;
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+            color: #374151;
+            font-weight: 700;
+        }
+
+        .empty-state p {
+            font-size: 1.05rem;
             margin-bottom: 24px;
         }
 
@@ -289,20 +308,22 @@
         .btn:hover {
             background: #1d4ed8;
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
 
         /* Pagination */
         .pagination-wrapper {
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid #e5e7eb;
+            margin-top: 40px;
+            padding-top: 32px;
+            border-top: 2px solid #e5e7eb;
         }
 
         .pagination-info {
             text-align: center;
             color: #6b7280;
-            margin-bottom: 16px;
-            font-size: 0.9rem;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
 
         .pagination {
@@ -311,6 +332,7 @@
             align-items: center;
             gap: 8px;
             list-style: none;
+            flex-wrap: wrap;
         }
 
         .pagination li {
@@ -323,19 +345,21 @@
             justify-content: center;
             min-width: 40px;
             height: 40px;
-            padding: 0 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
+            padding: 0 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
             text-decoration: none;
             color: #374151;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.2s;
+            background: white;
         }
 
         .pagination-link:hover {
-            background: #f3f4f6;
+            background: #f9fafb;
             border-color: #2563eb;
             color: #2563eb;
+            transform: translateY(-2px);
         }
 
         .pagination-link.active {
@@ -347,12 +371,20 @@
         .pagination-dots {
             color: #9ca3af;
             padding: 0 8px;
+            font-weight: 600;
         }
 
         /* Responsive */
         @media (max-width: 768px) {
-            .category-title {
+            .page-header h1 {
                 font-size: 2rem;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .page-stats {
+                flex-direction: column;
+                gap: 12px;
             }
 
             .categories-grid,
@@ -366,9 +398,106 @@
                 gap: 8px;
             }
 
-            .pagination {
-                flex-wrap: wrap;
+            .container {
+                padding: 20px 16px;
             }
+
+            .page-header,
+            .content-section {
+                padding: 24px;
+            }
+        }
+
+        .page-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-card-image {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            background: #f3f4f6;
+        }
+
+        .page-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .page-card:hover .page-card-image img {
+            transform: scale(1.05);
+        }
+
+        .page-card-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .page-subtitle {
+            font-size: 1rem;
+            color: #3b82f6;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .page-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .page-author-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .author-avatar-small {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
+        }
+
+        .author-avatar-placeholder {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .author-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .page-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            color: #9ca3af;
         }
     </style>
 </head>
@@ -390,22 +519,39 @@
         <?php endforeach; ?>
     </nav>
 
-    <!-- Category Header -->
-    <div class="category-header">
-        <h1 class="category-title"><?= htmlspecialchars($category->name) ?></h1>
+    <!-- Page Header -->
+    <header class="page-header">
+        <h1>
+            <?php if ($category->icon): ?>
+                <span class="category-icon"><?= $category->icon ?></span>
+            <?php endif; ?>
+            <?= htmlspecialchars($category->name) ?>
+        </h1>
+
         <?php if (!empty($category->description)): ?>
-            <p class="category-description"><?= nl2br(htmlspecialchars($category->description)) ?></p>
+            <p class="page-description"><?= nl2br(htmlspecialchars($category->description)) ?></p>
         <?php endif; ?>
 
-        <?php if ($category->color): ?>
-            <div class="category-badge" style="background-color: <?= htmlspecialchars($category->color) ?>;">
-                <?php if ($category->icon): ?>
-                    <span class="category-icon"><?= $category->icon ?></span>
-                <?php endif; ?>
-                <?= htmlspecialchars($category->name) ?>
+        <div class="page-stats">
+            <div class="stat-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span class="stat-value"><?= isset($pagination) ? $pagination['total'] : count($pages) ?></span>
+                <span>Pages</span>
             </div>
-        <?php endif; ?>
-    </div>
+            <?php if (!empty($childCategories)): ?>
+                <div class="stat-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="stat-value"><?= count($childCategories) ?></span>
+                    <span><?= count($childCategories) === 1 ? 'Subcategory' : 'Subcategories' ?></span>
+                </div>
+            <?php endif; ?>
+        </div>
+    </header>
 
     <!-- Child Categories -->
     <?php if (!empty($childCategories)): ?>
@@ -428,41 +574,78 @@
         </section>
     <?php endif; ?>
 
-    <!-- Pages in Category -->
-    <section class="category-pages">
-        <h2>Pages in <?= htmlspecialchars($category->name) ?></h2>
+    <!-- Pages Section -->
+    <section class="content-section">
+        <h2>All Pages</h2>
 
         <?php if (!empty($pages)): ?>
             <div class="pages-grid">
                 <?php foreach ($pages as $page): ?>
                     <article class="page-card">
-                        <h3>
-                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>"><?= htmlspecialchars($page->title) ?></a>
-                        </h3>
-
-                        <?php if (!empty($page->meta_description)): ?>
-                            <p class="page-excerpt"><?= htmlspecialchars(substr($page->meta_description, 0, 150)) ?><?= strlen($page->meta_description) > 150 ? '...' : '' ?></p>
-                        <?php endif; ?>
-
-                        <div class="page-meta">
-                            <?php if ($page->published_at): ?>
-                                <time datetime="<?= date('Y-m-d', strtotime($page->published_at)) ?>">
-                                    <?= date('M j, Y', strtotime($page->published_at)) ?>
-                                </time>
-                            <?php endif; ?>
-
-                            <?php if ($page->page_type): ?>
-                                <span class="page-type"><?= ucfirst(htmlspecialchars($page->page_type)) ?></span>
-                            <?php endif; ?>
-                        </div>
-
-                        <?php if (!empty($page->tags)): ?>
-                            <div class="page-tags-mini">
-                                <?php foreach (array_slice($page->tags, 0, 3) as $tag): ?>
-                                    <span class="tag-mini"><?= htmlspecialchars($tag->name) ?></span>
-                                <?php endforeach; ?>
+                        <?php if (!empty($page->featured_image)): ?>
+                            <div class="page-card-image">
+                                <img src="<?= htmlspecialchars($page->featured_image) ?>"
+                                     alt="<?= htmlspecialchars($page->title) ?>">
                             </div>
                         <?php endif; ?>
+
+                        <div class="page-card-content">
+                            <h3>
+                                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>">
+                                    <?= htmlspecialchars($page->title) ?>
+                                </a>
+                            </h3>
+
+                            <?php if ($page->subtitle): ?>
+                                <p class="page-subtitle">
+                                    <?= htmlspecialchars($page->subtitle) ?>
+                                </p>
+                            <?php endif; ?>
+
+                            <?php if ($page->meta_description): ?>
+                                <p class="page-excerpt">
+                                    <?= htmlspecialchars(substr($page->meta_description, 0, 120)) ?><?= strlen($page->meta_description) > 120 ? '...' : '' ?>
+                                </p>
+                            <?php endif; ?>
+
+                            <div class="page-footer">
+                                <div class="page-author-info">
+                                    <?php if ($page->authors && $page->authors->count() > 0): ?>
+                                        <?php $author = $page->authors->first(); ?>
+                                        <?php if ($author->avatar): ?>
+                                            <img src="<?= htmlspecialchars($author->avatar) ?>"
+                                                 alt="<?= htmlspecialchars($author->name) ?>"
+                                                 class="author-avatar-small">
+                                        <?php else: ?>
+                                            <div class="author-avatar-placeholder">
+                                                <?= strtoupper(substr($author->name, 0, 1)) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <span class="author-name"><?= htmlspecialchars($author->name) ?></span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="page-meta">
+                                    <?php if ($page->published_at): ?>
+                                        <time datetime="<?= $page->published_at->format('Y-m-d') ?>">
+                                            <?= $page->published_at->format('M j, Y') ?>
+                                        </time>
+                                    <?php endif; ?>
+
+                                    <?php if ($page->page_type): ?>
+                                        <span class="page-type"><?= ucfirst(htmlspecialchars($page->page_type)) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <?php if (!empty($page->tags) && count($page->tags) > 1): ?>
+                                <div class="page-tags-mini">
+                                    <?php foreach (array_slice($page->tags, 0, 3) as $pageTag): ?>
+                                        <span class="tag-mini"><?= htmlspecialchars($pageTag->name) ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </article>
                 <?php endforeach; ?>
             </div>
@@ -519,12 +702,13 @@
                 </nav>
             <?php endif; ?>
         <?php else: ?>
-            <div class="no-pages">
+            <div class="empty-state">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
-                <p>No pages found in this category yet.</p>
+                <h3>No Pages Yet</h3>
+                <p>No pages found in this category.</p>
                 <a href="/" class="btn">Explore Other Content</a>
             </div>
         <?php endif; ?>

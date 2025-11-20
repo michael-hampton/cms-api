@@ -30,6 +30,8 @@ class CommentController extends Controller
                 'comment' => [
                     'id' => $comment->id,
                     'name' => $comment->name,
+                    'email' => $comment->email,
+                    'member_id' => $comment->member_id ?? null,
                     'content' => $comment->content,
                     'created_at' => $comment->created_at,
                     'status' => $comment->status
@@ -38,10 +40,7 @@ class CommentController extends Controller
             ]);
 
         } catch (ValidationException|\InvalidArgumentException $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+            return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,

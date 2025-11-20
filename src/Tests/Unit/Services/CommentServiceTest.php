@@ -4,7 +4,9 @@
 namespace App\Tests\Unit\Services;
 
 use App\Models\Comment;
+use App\Models\Member;
 use App\Repositories\CommentRepository;
+use App\Repositories\MemberRepository;
 use App\Services\CommentService;
 use App\Services\NotificationService;
 use Mockery;
@@ -15,15 +17,18 @@ class CommentServiceTest extends TestCase
     private $commentRepository;
     private $notificationService;
     private $commentService;
+    private $memberRepository;
 
     protected function setUp(): void
     {
         $this->commentRepository = $this->createMock(CommentRepository::class);
         $this->notificationService = $this->createMock(NotificationService::class);
+        $this->memberRepository = Mockery::mock(MemberRepository::class);
 
         $this->commentService = new CommentService(
             $this->commentRepository,
-            $this->notificationService
+            $this->notificationService,
+            $this->memberRepository
         );
     }
 
@@ -60,6 +65,46 @@ class CommentServiceTest extends TestCase
         $this->assertEquals('approved', $result->status);
     }
 
+    public function testCreateCommentAsAuthenticatedMember()
+    {
+        $member = $this->createMockMember(1, 'Test Member', 'member@example.com');
+
+        $data = [
+            'page_id' => 1,
+            'member_id' => 1,
+            'content' => 'Great article!'
+        ];
+
+        $comment = $this->createMockComment(1, 'approved', 1);
+
+        // Mock the Member::find call
+        $this->memberRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($member);
+
+        $this->commentRepository
+            ->expects($this->once())
+            ->method('createComment')
+            ->with($this->callback(function ($arg) use ($member) {
+                return $arg['name'] === $member->first_name . ' ' . $member->last_name
+                    && $arg['email'] === $member->email
+                    && $arg['member_id'] === $member->id
+                    && $arg['status'] === 'approved';
+            }))
+            ->willReturn($comment);
+
+        $this->notificationService
+            ->expects($this->once())
+            ->method('notifyNewComment')
+            ->with($comment);
+
+        $result = $this->commentService->createComment($data);
+
+        $this->assertInstanceOf(Comment::class, $result);
+        $this->assertEquals('approved', $result->status);
+        $this->assertEquals(1, $result->member_id);
+    }
+
     public function testCreateCommentWithPendingStatus()
     {
         $data = [
@@ -90,6 +135,41 @@ class CommentServiceTest extends TestCase
 
         $this->assertEquals('pending', $result->status);
     }
+
+    public function testAuthenticatedMemberCommentsAutoApproved()
+    {
+        $member = $this->createMockMember(5, 'Auth Member', 'auth@example.com');
+
+        $data = [
+            'page_id' => 1,
+            'member_id' => 5,
+            'content' => 'Should be auto-approved'
+        ];
+
+        $comment = $this->createMockComment(10, 'approved', 5);
+
+        $this->memberRepository->shouldReceive('find')
+            ->with(5)
+            ->andReturn($member);
+
+        $this->commentRepository
+            ->expects($this->once())
+            ->method('createComment')
+            ->with($this->callback(function ($arg) {
+                return $arg['status'] === 'approved' && $arg['member_id'] === 5;
+            }))
+            ->willReturn($comment);
+
+        $this->notificationService
+            ->expects($this->once())
+            ->method('notifyNewComment');
+
+        $result = $this->commentService->createComment($data);
+
+        $this->assertEquals('approved', $result->status);
+        $this->assertEquals(5, $result->member_id);
+    }
+
 
     public function testCreateCommentDetectsSpam()
     {
@@ -234,15 +314,31 @@ class CommentServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    private function createMockComment(int $id, string $status): Comment
+    private function createMockComment(int $id, string $status, ?int $memberId = null): Comment
     {
         $comment = Mockery::mock(Comment::class)->makePartial();
         $comment->id = $id;
         $comment->status = $status;
+        $comment->member_id = $memberId;
 
         $comment->shouldReceive('isApproved')->andReturn($status === 'approved');
 
         return $comment;
+    }
+
+    private function createMockMember(int $id, string $name, string $email): Member
+    {
+        $nameParts = explode(' ', $name);
+        $firstName = $nameParts[0];
+        $lastName = $nameParts[1] ?? '';
+
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = $id;
+        $member->first_name = $firstName;
+        $member->last_name = $lastName;
+        $member->email = $email;
+
+        return $member;
     }
 
     protected function tearDown(): void

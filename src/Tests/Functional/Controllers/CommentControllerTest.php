@@ -3,24 +3,23 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Comment;
-use App\Models\Page;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CommentControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private $page;
+    private $member;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         // Create a test page
-        $this->page = Page::create([
-            'title' => 'Test Article',
-            'slug' => 'test-article',
-            'page_type' => 'blog',
-            'status' => 'published',
-            'site_id' => $this->siteId
-        ]);
+        $this->page = $this->createPage();
+
+        $this->member = $this->createMember();
     }
 
     public function testStoreCommentSuccessfully()
@@ -43,6 +42,74 @@ class CommentControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('comment', $json);
         $this->assertEquals('John Doe', $json['comment']['name']);
         $this->assertContains($json['status'], ['approved', 'pending']);
+    }
+
+    public function testStoreCommentAsAuthenticatedMember()
+    {
+        // Authenticate the member
+        $this->actingAsMember($this->member);
+
+        $data = [
+            'page_id' => $this->page->id,
+            'member_id' => $this->member->id,
+            'content' => 'This is a great article from an authenticated member!'
+        ];
+
+        $response = $this->post('/comments', $data);
+
+        $this->assertResponseStatus(200, $response);
+        $this->assertJsonResponse($response);
+
+        $json = json_decode($response->getContent(), true);
+
+        $this->assertTrue($json['success']);
+        $this->assertArrayHasKey('comment', $json);
+        $this->assertEquals($this->member->first_name . ' ' . $this->member->last_name, $json['comment']['name']);
+        $this->assertEquals($this->member->email, $json['comment']['email']);
+        $this->assertEquals($this->member->id, $json['comment']['member_id']);
+        $this->assertEquals('approved', $json['status']); // Should be auto-approved for authenticated members
+    }
+
+    public function testStoreCommentAsAuthenticatedMemberDoesNotRequireNameEmail()
+    {
+        // Authenticate the member
+        $this->actingAsMember($this->member);
+
+        $data = [
+            'page_id' => $this->page->id,
+            'member_id' => $this->member->id,
+            'content' => 'Comment without name/email fields'
+            // name and email not provided
+        ];
+
+        $response = $this->post('/comments', $data);
+
+        $this->assertResponseStatus(200, $response);
+
+        $json = json_decode($response->getContent(), true);
+        $this->assertTrue($json['success']);
+        $this->assertEquals($this->member->first_name . ' ' . $this->member->last_name, $json['comment']['name']);
+        $this->assertEquals($this->member->email, $json['comment']['email']);
+    }
+
+    public function testStoreCommentRequiresAuthenticationOrNameEmail()
+    {
+        $data = [
+            'page_id' => $this->page->id,
+            'content' => 'Comment without credentials'
+            // Missing name, email, and member_id
+        ];
+
+        $response = $this->post('/comments', $data);
+
+        $this->assertResponseStatus(422, $response);
+
+        $json = json_decode($response->getContent(), true);
+
+        $this->assertarrayHasKey('error', $json);
+        $this->assertArrayHasKey('errors', $json);
+        $this->assertArrayHasKey('name', $json['errors']);
+        $this->assertArrayHasKey('email', $json['errors']);
     }
 
     public function testStoreCommentRequiresAuthentication()
@@ -73,7 +140,12 @@ class CommentControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(422, $response);
 
         $json = json_decode($response->getContent(), true);
-        $this->assertFalse($json['success']);
+
+        $this->assertarrayHasKey('error', $json);
+        $this->assertArrayHasKey('errors', $json);
+        $this->assertArrayHasKey('name', $json['errors']);
+        $this->assertArrayHasKey('email', $json['errors']);
+        $this->assertArrayHasKey('content', $json['errors']);
     }
 
     public function testStoreCommentSanitizesContent()
@@ -273,5 +345,47 @@ class CommentControllerTest extends FunctionalTestCase
 
         $json = json_decode($response->getContent(), true);
         $this->assertEquals('approved', $json['status']);
+    }
+
+    public function testAuthenticatedMemberCommentsAutoApproved()
+    {
+        $this->actingAsMember($this->member);
+
+        $data = [
+            'page_id' => $this->page->id,
+            'member_id' => $this->member->id,
+            'content' => 'This should be auto-approved'
+        ];
+
+        $response = $this->post('/comments', $data);
+
+        $json = json_decode($response->getContent(), true);
+        $this->assertEquals('approved', $json['status']);
+
+        // Verify in database
+        $comment = Comment::where('page_id', $this->page->id)
+            ->where('member_id', $this->member->id)
+            ->first();
+
+        $this->assertNotNull($comment);
+        $this->assertEquals('approved', $comment->status);
+    }
+
+    public function testMemberCommentIncludesRelationship()
+    {
+        $this->actingAsMember($this->member);
+
+        $data = [
+            'page_id' => $this->page->id,
+            'member_id' => $this->member->id,
+            'content' => 'Comment with member relationship'
+        ];
+
+        $response = $this->post('/comments', $data);
+        $json = json_decode($response->getContent(), true);
+
+        $comment = Comment::find($json['comment']['id']);
+        $this->assertNotNull($comment->member);
+        $this->assertEquals($this->member->id, $comment->member->id);
     }
 }

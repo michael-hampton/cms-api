@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Models\Menu;
 use App\Models\Page;
-use App\Models\PageTag;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
 use Exception;
@@ -33,11 +32,10 @@ class TagViewController extends Controller
             $perPage = 12;
 
             // Get paginated pages for this tag
-            $paginationData = Page::whereHas('tags', function($query) use ($tag) {
+            $paginationData = Page::with(['authors'])->whereHas('tags', function ($query) use ($tag) {
                 $query->where('tags.id', $tag->id);
             })
                 ->where('status', 'published')
-                ->with(['author'])
                 ->orderBy('published_at', 'desc')
                 ->paginate($perPage, $currentPage);
 

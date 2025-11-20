@@ -4,12 +4,14 @@ namespace App\Services;
 use App\Framework\Support\Collection;
 use App\Models\Comment;
 use App\Repositories\CommentRepository;
+use App\Repositories\MemberRepository;
 
 class CommentService
 {
     public function __construct(
-        private CommentRepository $commentRepository,
-        private NotificationService $notificationService
+        private readonly CommentRepository   $commentRepository,
+        private readonly NotificationService $notificationService,
+        private readonly MemberRepository    $memberRepository
     ) {}
 
     /**
@@ -17,6 +19,21 @@ class CommentService
      */
     public function createComment(array $data): Comment
     {
+        // If member is authenticated, get their info
+        if (isset($data['member_id']) && !empty($data['member_id'])) {
+
+            $member = $this->memberRepository->find($data['member_id']);
+
+            if ($member) {
+                $data['name'] = $member->first_name . ' ' . $member->last_name;
+                $data['email'] = $member->email;
+                $data['member_id'] = $member->id;
+            }
+        } else {
+            // Ensure member_id is null if not authenticated
+            $data['member_id'] = null;
+        }
+
         // Validate and sanitize
         $data['content'] = $this->sanitizeContent($data['content']);
         $data['status'] = $this->determineInitialStatus($data);
@@ -90,6 +107,11 @@ class CommentService
         // Check for spam patterns
         if ($this->isLikelySpam($data)) {
             return 'spam';
+        }
+
+        // Auto-approve authenticated members
+        if (isset($data['member_id']) && !empty($data['member_id'])) {
+            return 'approved';
         }
 
         // Auto-approve trusted users or based on settings

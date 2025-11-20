@@ -10,8 +10,18 @@ class Comment extends Model
     protected $table = 'comments';
 
     protected $fillable = [
-        'page_id', 'name', 'email', 'content', 'status',
-        'ip_address', 'user_agent', 'parent_id', 'created_at', 'updated_at', 'site_id'
+        'page_id',
+        'name',
+        'email',
+        'content',
+        'status',
+        'ip_address',
+        'user_agent',
+        'parent_id',
+        'created_at',
+        'updated_at',
+        'site_id',
+        'member_id'
     ];
 
     protected $casts = [
@@ -22,6 +32,11 @@ class Comment extends Model
     public function page(): ?Model
     {
         return $this->belongsTo(Page::class, 'page_id', 'id');
+    }
+
+    public function member(): ?Model
+    {
+        return $this->belongsTo(Member::class, 'member_id', 'id');
     }
 
     public function parent(): ?Model

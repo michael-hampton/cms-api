@@ -2,7 +2,6 @@
 
 namespace App\Controllers;
 
-use App\Framework\Support\SiteContext;
 use App\Models\Author;
 use App\Models\Page;
 use App\Services\AuthorService;
@@ -39,7 +38,7 @@ class AuthorViewController extends Controller
                 $query->where('authors.id', $author->id);
             })
                 ->where('status', 'published')
-                ->with(['author'])
+                ->with(['authors', 'categories', 'tags'])
                 ->orderBy('published_at', 'desc')
                 ->paginate($perPage, $currentPage);
 

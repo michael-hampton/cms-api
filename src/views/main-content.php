@@ -60,6 +60,11 @@ $pageGridAdded = false;
 
                         <?php endforeach; ?>
 
+                        <!-- After the page header section -->
+                        <?php if ($page->page_type === 'landing-page' && !empty($categories)): ?>
+                            @include('categories-widget', ['page' => $page])
+                        <?php endif; ?>
+
                         @include('product-section')
 
                         <!-- Blog Comments Section -->

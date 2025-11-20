@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
+use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Models\PageLike;
@@ -70,6 +71,13 @@ class ContentController extends Controller
             'site' => SiteContext::get(),
             'member' => $member
         ];
+
+        $data['allCategories'] = Category::where('site_id', $siteId)
+            ->where('is_active', 1)
+            ->withCount('pages')
+            ->whereHas('pages')
+            ->orderBy('name')
+            ->get();
 
         $data['comments'] = $this->commentRepository->getCommentsForPage($page->id, true);
 

@@ -38,7 +38,7 @@ class CategoryPageController extends Controller
             $query->where('categories.id', $category->id);
         })
             ->where('status', 'Published')
-            ->with(['tags'])
+            ->with(['tags', 'authors'])
             ->orderBy('published_at', 'desc')
             ->paginate($perPage, $currentPage);
 
