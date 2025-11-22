@@ -7,6 +7,8 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderHistory;
 use App\Models\OrderItem;
+use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderControllerTest extends FunctionalTestCase
@@ -1154,6 +1156,251 @@ class OrderControllerTest extends FunctionalTestCase
         $response = $this->postForSite("/api/orders/{$order->id}/refund", $refundData);
 
         $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    // Add these tests to the existing OrderControllerTest class
+
+    public function testOrderPaymentsEndpointReturnsPayments(): void
+    {
+        $order = $this->createOrder();
+
+        // Create payments for the order
+        Payment::create([
+            'order_id' => $order->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'status' => 'completed',
+            'amount' => 50.00,
+            'currency' => 'GBP'
+        ]);
+
+        Payment::create([
+            'order_id' => $order->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'paypal',
+            'status' => 'failed',
+            'amount' => 50.00,
+            'currency' => 'GBP'
+        ]);
+
+        $response = $this->getForSite("/api/orders/{$order->id}/payments");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('payments', $data['data']);
+        $this->assertCount(2, $data['data']['payments']);
+    }
+
+    public function testOrderPaymentsReturns404ForNonExistentOrder(): void
+    {
+        $response = $this->getForSite('/api/orders/99999/payments');
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testCreatePaymentForOrderSuccessfully(): void
+    {
+        $order = $this->createOrder(['total' => 100.00]);
+
+        // Create payment method
+        PaymentMethod::create([
+            'site_id' => $this->siteId,
+            'name' => 'Stripe',
+            'code' => 'stripe',
+            'provider' => 'stripe',
+            'is_active' => true,
+            'requires_processing' => false,
+            'sort_order' => 0
+        ]);
+
+        $paymentData = [
+            'payment_method' => 'stripe',
+            'amount' => 100.00,
+            'currency' => 'GBP'
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/payments", $paymentData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('payment', $data['data']);
+        $this->assertEquals('completed', $data['data']['payment']['status']);
+        $this->assertEquals(100.00, $data['data']['payment']['amount']);
+        $this->assertEquals('stripe', $data['data']['payment']['payment_method']);
+    }
+
+    public function testCreatePaymentValidatesPaymentMethod(): void
+    {
+        $order = $this->createOrder();
+
+        $response = $this->postForSite("/api/orders/{$order->id}/payments", [
+            'payment_method' => 'invalid_method',
+            'amount' => 100.00
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testCreatePaymentRequiresPaymentMethod(): void
+    {
+        $order = $this->createOrder();
+
+        $response = $this->postForSite("/api/orders/{$order->id}/payments", [
+            'amount' => 100.00
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+    }
+
+    public function testCreatePaymentForNonExistentOrder(): void
+    {
+        PaymentMethod::create([
+            'site_id' => $this->siteId,
+            'name' => 'Stripe',
+            'code' => 'stripe',
+            'provider' => 'stripe',
+            'is_active' => true,
+            'requires_processing' => false,
+            'sort_order' => 0
+        ]);
+
+        $response = $this->postForSite('/api/orders/99999/payments', [
+            'payment_method' => 'stripe',
+            'amount' => 100.00
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testCreatePaymentWithMetadata(): void
+    {
+        $order = $this->createOrder();
+
+        PaymentMethod::create([
+            'site_id' => $this->siteId,
+            'name' => 'Stripe',
+            'code' => 'stripe',
+            'provider' => 'stripe',
+            'is_active' => true,
+            'requires_processing' => true,
+            'sort_order' => 0
+        ]);
+
+        $paymentData = [
+            'payment_method' => 'stripe',
+            'amount' => 100.00,
+            'currency' => 'GBP',
+            'metadata' => [
+                'customer_ip' => '192.168.1.1',
+                'user_agent' => 'Mozilla/5.0'
+            ]
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/payments", $paymentData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('metadata', $data['data']['payment']);
+    }
+
+    public function testCreatePaymentWithTransactionId(): void
+    {
+        $order = $this->createOrder();
+
+        PaymentMethod::create([
+            'site_id' => $this->siteId,
+            'name' => 'Stripe',
+            'code' => 'stripe',
+            'provider' => 'stripe',
+            'is_active' => true,
+            'requires_processing' => false,
+            'sort_order' => 0
+        ]);
+
+        $paymentData = [
+            'payment_method' => 'stripe',
+            'amount' => 100.00,
+            'transaction_id' => 'txn_test_123456'
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/payments", $paymentData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('txn_test_123456', $data['data']['payment']['transaction_id']);
+    }
+
+    public function testCreatePaymentAutoCompletesForNonProcessingMethods(): void
+    {
+        $order = $this->createOrder(['total' => 100.00]);
+
+        // Create payment method that doesn't require processing
+        PaymentMethod::create([
+            'site_id' => $this->siteId,
+            'name' => 'Cash on Delivery',
+            'code' => 'cash_on_delivery',
+            'provider' => null,
+            'is_active' => true,
+            'requires_processing' => false,
+            'sort_order' => 0
+        ]);
+
+        $paymentData = [
+            'payment_method' => 'cash_on_delivery',
+            'amount' => 100.00
+        ];
+
+        $response = $this->postForSite("/api/orders/{$order->id}/payments", $paymentData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Payment should be auto-completed for non-processing methods
+        $this->assertEquals('completed', $data['data']['payment']['status']);
+        $this->assertNotNull($data['data']['payment']['paid_at']);
+    }
+
+    public function testOrderPaymentsReturnedInDescendingOrder(): void
+    {
+        $order = $this->createOrder();
+
+        // Create payments at different times
+        Payment::create([
+            'order_id' => $order->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'status' => 'completed',
+            'amount' => 50.00,
+            'currency' => 'GBP',
+            'created_at' => '2024-01-01 10:00:00'
+        ]);
+
+        Payment::create([
+            'order_id' => $order->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'paypal',
+            'status' => 'completed',
+            'amount' => 50.00,
+            'currency' => 'GBP',
+            'created_at' => '2024-01-02 10:00:00'
+        ]);
+
+        $response = $this->getForSite("/api/orders/{$order->id}/payments");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Most recent payment should be first
+        $this->assertEquals('stripe', $data['data']['payments'][0]['payment_method']);
+        $this->assertEquals('paypal', $data['data']['payments'][1]['payment_method']);
     }
 
 }

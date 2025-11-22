@@ -21,6 +21,8 @@ use App\Controllers\PageController;
 use App\Controllers\PageGridController;
 use App\Controllers\PageHistoryController;
 use App\Controllers\PageLikeController;
+use App\Controllers\PaymentController;
+use App\Controllers\PaymentMethodController;
 use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
@@ -57,6 +59,29 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/bulk-update-status', PageController::class, 'bulkUpdateStatus');
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
+
+        // Payment routes
+        $router->get('/orders/{id}/payments', [OrderController::class, 'payments']);
+        $router->post('/orders/{id}/payments', [OrderController::class, 'createPayment']);
+
+// Payment method routes
+        $router->get('/payment-methods', [PaymentMethodController::class, 'index']);
+        $router->get('/payment-methods/active', [PaymentMethodController::class, 'active']);
+        $router->post('/payment-methods', [PaymentMethodController::class, 'store']);
+        $router->get('/payment-methods/{id}', [PaymentMethodController::class, 'show']);
+        $router->put('/payment-methods/{id}', [PaymentMethodController::class, 'update']);
+        $router->delete('/payment-methods/{id}', [PaymentMethodController::class, 'destroy']);
+
+        $router->get('/payments', [PaymentController::class, 'index']);
+        $router->get('/payments/by-transaction', [PaymentController::class, 'byTransaction']);
+        $router->get('/payments/total-collected', [PaymentController::class, 'totalCollected']);
+        $router->get('/payments/{id}', [PaymentController::class, 'show']);
+        $router->post('/payments/{id}/process', [PaymentController::class, 'process']);
+        $router->post('/payments/{id}/complete', [PaymentController::class, 'complete']);
+        $router->post('/payments/{id}/fail', [PaymentController::class, 'fail']);
+        $router->post('/payments/{id}/cancel', [PaymentController::class, 'cancel']);
+        $router->post('/payments/{id}/retry', [PaymentController::class, 'retry']);
+        $router->post('/payments/{id}/refund', [PaymentController::class, 'refund']);
 
         // Approval workflow routes
         $router->post('/pages/{id}/approve', PageController::class, 'approve');

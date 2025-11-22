@@ -195,7 +195,6 @@ h6 {
 
 /* Page Grid */
 .page-grid-block {
-    padding: 60px 20px;
     max-width: 1400px;
     margin: 0 auto;
 }
@@ -231,17 +230,6 @@ h6 {
 
 .page-grid-grid.columns-4 {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-.page-card {
-    background: var(--gc-white);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
 }
 
 .page-card:hover {
@@ -456,7 +444,6 @@ h6 {
 
 /* Info Blocks */
 .info-block {
-    padding: 20px 25px;
     border-radius: 8px;
     margin: 2rem 0;
     border-left: 4px solid;
@@ -487,16 +474,6 @@ h6 {
 
 .info-content {
     flex: 1;
-}
-
-/* Quote Block */
-.quote-block {
-    background: var(--gc-light);
-    border-left: 5px solid var(--gc-primary);
-    padding: 30px 40px;
-    margin: 3rem 0;
-    border-radius: 8px;
-    position: relative;
 }
 
 .quote-text {
@@ -577,7 +554,6 @@ h6 {
 .form-input,
 .form-select,
 .form-textarea {
-    width: 100%;
     padding: 12px 15px;
     border: 2px solid var(--gc-border);
     border-radius: 8px;
@@ -603,10 +579,6 @@ h6 {
 }
 
 /* List Block */
-.list-block {
-    margin: 2rem 0;
-}
-
 .list-items {
     padding-left: 2rem;
 }
@@ -1310,7 +1282,7 @@ textarea:focus {
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 10px;
 }
 
 .text-center {

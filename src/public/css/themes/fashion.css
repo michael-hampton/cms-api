@@ -20,7 +20,6 @@
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 2rem;
 }
 
 /* Header */
@@ -203,13 +202,6 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 40px;
-}
-
-.page-card {
-    background: white;
-    overflow: hidden;
-    transition: transform 0.3s ease;
-    border: 1px solid var(--fashion-medium-gray);
 }
 
 .page-card:hover {
@@ -474,16 +466,6 @@ body {
     margin-bottom: 12px;
 }
 
-/* Quote Block - Fashion Editorial */
-.quote-block {
-    max-width: 900px;
-    margin: 80px auto;
-    padding: 60px 40px;
-    text-align: center;
-    border-left: none;
-    background: var(--fashion-light-gray);
-}
-
 .quote-text {
     font-family: var(--fashion-font-serif);
     font-size: 2rem;
@@ -512,13 +494,6 @@ body {
 
 .quote-attribution::before {
     content: '— ';
-}
-
-/* List Block - Fashion Editorial */
-.list-block {
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 0 20px;
 }
 
 .list-items {
@@ -565,9 +540,6 @@ ol.list-items li::before {
 
 /* Info Block - Fashion Style */
 .info-block {
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 30px 40px;
     border-left: 4px solid var(--fashion-accent);
     background: var(--fashion-light-gray);
 }
@@ -798,7 +770,6 @@ ol.list-items li::before {
 .form-input,
 .form-select,
 .form-textarea {
-    width: 100%;
     padding: 14px;
     border: 2px solid var(--fashion-medium-gray);
     font-size: 1rem;
@@ -1132,11 +1103,6 @@ ol.list-items li::before {
     .page-title {
         font-size: 2rem;
     }
-}
-
-.page-layout {
-    display: grid;
-    gap: 2rem;
 }
 
 .page-layout.has-sidebar {

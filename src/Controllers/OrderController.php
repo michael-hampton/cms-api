@@ -8,22 +8,26 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Repositories\OrderRepository;
 use App\Requests\BulkUpdateOrderStatus;
 use App\Requests\CreateOrderRequest;
+use App\Requests\CreatePaymentRequest;
 use App\Requests\UpdateOrderItemsRequest;
 use App\Requests\UpdateOrderRequest;
 use App\Resources\OrderResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\OrderService;
+use App\Services\PaymentService;
 use Exception;
 
 class OrderController extends Controller
 {
     public function __construct(
         private readonly OrderService    $orderService,
-        private readonly OrderRepository $orderRepository
+        private readonly OrderRepository $orderRepository,
+        private readonly PaymentService  $paymentService
     )
     {
         parent::__construct();
@@ -294,6 +298,48 @@ class OrderController extends Controller
             ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function payments($id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $order = $this->orderService->getOrderById($id);
+
+            if (!$order) {
+                return $this->errorResponse('Order not found', 404);
+            }
+
+            $payments = $this->paymentService->getPaymentsByOrder($id);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'payments' => $payments->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function createPayment($id, CreatePaymentRequest $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $payment = $this->orderService->processOrderPayment(
+                $id,
+                $data,
+                SiteContext::getId()
+            );
+
+            return $this->jsonResponse([
+                'success' => true,
+                'payment' => $payment->toArray()
+            ], 201);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
         }
     }
 }

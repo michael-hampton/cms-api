@@ -18,6 +18,7 @@ use App\Repositories\OrderRepository;
 use App\Services\OrderCalculationService;
 use App\Services\OrderHistoryService;
 use App\Services\OrderService;
+use App\Services\PaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery as m;
@@ -35,7 +36,7 @@ class OrderServiceTest extends FunctionalTestCase
     private OrderService $service;
     private $addressRepository;
     private $orderCalculationService;
-
+    private $paymentService;
     private $historyService;
 
     private $mailManager;
@@ -52,6 +53,7 @@ class OrderServiceTest extends FunctionalTestCase
         $this->databaseMock = m::mock(Database::class);
         $this->historyService = m::mock(OrderHistoryService::class); // ADD THIS
         $this->mailManager = m::mock(MailManager::class);
+        $this->paymentService = m::mock(PaymentService::class);
 
         $this->service = new OrderService(
             $this->orderRepository,
@@ -61,6 +63,7 @@ class OrderServiceTest extends FunctionalTestCase
             $this->orderCalculationService,
             $this->historyService,
             $this->mailManager,
+            $this->paymentService,
             $this->databaseMock,
         );
     }
@@ -73,6 +76,7 @@ class OrderServiceTest extends FunctionalTestCase
         m::close();
         parent::tearDown(); // Call parent teardown if it exists
     }
+
     public function testGetOrderByIdReturnsOrder()
     {
         $orderId = 1;
@@ -361,7 +365,7 @@ class OrderServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with($items, m::on(function($orderData) {
+            ->with($items, m::on(function ($orderData) {
                 return $orderData['shipping'] == 10.00
                     && $orderData['discount'] == 5.00;
             }))
@@ -1364,7 +1368,7 @@ class OrderServiceTest extends FunctionalTestCase
         $mockMember = m::mock(Member::class)->makePartial();
         $mockMember->id = 123;
 
-       $this->memberRepository->shouldReceive('create')
+        $this->memberRepository->shouldReceive('create')
             ->once()
             ->with(m::on(function ($memberData) use ($siteId) {
                 return $memberData['email'] === 'jane.smith@example.com'
@@ -1531,7 +1535,6 @@ class OrderServiceTest extends FunctionalTestCase
 //            $this->invokePrivateMethod($this->service, 'parseCustomerName', [''])
 //        );
     }
-
 
 
     public function testCreateOrderWithShippingAddressId()

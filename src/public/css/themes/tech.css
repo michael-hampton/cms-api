@@ -24,7 +24,6 @@
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 2rem;
 }
 
 /* Header */
@@ -257,18 +256,6 @@ body {
     font-weight: 400;
 }
 
-/* Info Block - Alert Style */
-.info-block {
-    max-width: 1200px;
-    margin: 30px auto;
-    padding: 16px 24px;
-    border-radius: 8px;
-    display: flex;
-    align-items: start;
-    gap: 16px;
-    background: #eff6ff;
-    border-left: 4px solid var(--tech-primary);
-}
 
 .info-header {
     display: flex;
@@ -314,15 +301,6 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 32px;
-}
-
-.page-card {
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-    transition: all 0.3s ease;
-    border: 1px solid var(--tech-border);
 }
 
 .page-card:hover {
@@ -618,16 +596,6 @@ body {
     color: #6b7280;
 }
 
-/* Quote Block - Tech Citation Style */
-.quote-block {
-    max-width: 800px;
-    margin: 60px auto;
-    padding: 32px 40px;
-    border-left: 4px solid var(--tech-primary);
-    background: var(--tech-light-bg);
-    border-radius: 0 8px 8px 0;
-}
-
 .quote-text {
     font-size: 1.4rem;
     line-height: 1.6;
@@ -648,11 +616,6 @@ body {
 }
 
 /* List Block - Technical Documentation */
-.list-block {
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 0 20px;
-}
 
 .list-items {
     padding-left: 0;
@@ -965,7 +928,6 @@ ol.list-items li::before {
 .form-input,
 .form-select,
 .form-textarea {
-    width: 100%;
     padding: 12px 16px;
     border: 2px solid var(--tech-border);
     border-radius: 8px;

@@ -121,6 +121,7 @@ class BlockParserService
 
     public function buildBlock(int $pageId, array $blockData, int $order, bool $isPreviewMode = false): string
     {
+
         $this->validateBlockType($blockData);
 
         $type = $blockData['type'];

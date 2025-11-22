@@ -265,10 +265,6 @@ img {
 .page-card {
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    overflow: hidden;
-    position: relative;
-    transition: var(--transition);
-    cursor: pointer;
 }
 
 .page-card:hover {
@@ -385,18 +381,18 @@ img {
    Text Block
    ============================================ */
 
-.text-block {
-    max-width: 800px;
-    margin: var(--spacing-lg) auto;
-    padding: 0 var(--spacing-md);
-}
+/*.text-block {*/
+/*    max-width: 800px;*/
+/*    margin: var(--spacing-lg) auto;*/
+/*    padding: 0 var(--spacing-md);*/
+/*}*/
 
-.text-paragraph {
-    font-size: 1.1rem;
-    line-height: 1.9;
-    margin-bottom: var(--spacing-md);
-    color: var(--color-gray-light);
-}
+/*.text-paragraph {*/
+/*    font-size: 1.1rem;*/
+/*    line-height: 1.9;*/
+/*    margin-bottom: var(--spacing-md);*/
+/*    color: var(--color-gray-light);*/
+/*}*/
 
 .text-paragraph strong {
     color: var(--color-light);
@@ -435,10 +431,6 @@ img {
    ============================================ */
 
 .quote-block {
-    max-width: 900px;
-    margin: var(--spacing-xl) auto;
-    padding: var(--spacing-lg) var(--spacing-md);
-    position: relative;
     border-left: 5px solid var(--color-primary);
     background: linear-gradient(90deg, rgba(255, 0, 85, 0.1), transparent);
 }
@@ -481,12 +473,6 @@ img {
 /* ============================================
    List Block
    ============================================ */
-
-.list-block {
-    max-width: 800px;
-    margin: var(--spacing-lg) auto;
-    padding: 0 var(--spacing-md);
-}
 
 .list-items {
     list-style: none;
@@ -1389,9 +1375,6 @@ img {
    ============================================ */
 
 .info-block {
-    max-width: 800px;
-    margin: var(--spacing-lg) auto;
-    padding: var(--spacing-md);
     border-left: 4px solid;
     background: rgba(255, 255, 255, 0.03);
 }
@@ -1626,19 +1609,19 @@ img {
 }
 
 /* Page Layout */
-.page-layout {
-    display: grid;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-xl);
-}
+/*.page-layout {*/
+/*    display: grid;*/
+/*    gap: var(--spacing-lg);*/
+/*    margin-bottom: var(--spacing-xl);*/
+/*}*/
 
-.page-layout.has-sidebar {
-    grid-template-columns: 1fr 350px;
-}
+/*.page-layout.has-sidebar {*/
+/*    grid-template-columns: 1fr 350px;*/
+/*}*/
 
-.page-layout.full-width {
-    grid-template-columns: 1fr;
-}
+/*.page-layout.full-width {*/
+/*    grid-template-columns: 1fr;*/
+/*}*/
 
 /* Main Content */
 .main-content {

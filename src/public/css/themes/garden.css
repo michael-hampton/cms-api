@@ -665,8 +665,6 @@ img {
    Info Block
    =================================== */
 .info-block {
-    padding: 20px 30px;
-    margin: 2rem 0;
     border-radius: var(--border-radius);
     border-left: 4px solid;
     background: white;
@@ -777,16 +775,6 @@ img {
 
 .page-grid-grid.columns-4 {
     grid-template-columns: repeat(4, 1fr);
-}
-
-.page-card {
-    background: white;
-    border-radius: var(--border-radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    transition: var(--transition);
-    display: flex;
-    flex-direction: column;
 }
 
 .page-card:hover {
@@ -1131,19 +1119,6 @@ img {
     opacity: 0.9;
 }
 
-/* ===================================
-   Quote Block
-   =================================== */
-.quote-block {
-    margin: 3rem auto;
-    max-width: 800px;
-    padding: 2rem;
-    background: var(--bg-light);
-    border-left: 5px solid var(--primary-color);
-    border-radius: var(--border-radius);
-    font-style: italic;
-}
-
 .quote-text {
     font-size: 1.5rem;
     line-height: 1.8;
@@ -1204,7 +1179,6 @@ img {
 .form-input,
 .form-select,
 .form-textarea {
-    width: 100%;
     padding: 12px 16px;
     border: 2px solid var(--border-color);
     border-radius: var(--border-radius);
@@ -1268,12 +1242,6 @@ button[type="submit"]:hover {
 /* ===================================
    List Block
    =================================== */
-.list-block {
-    margin: 2rem 0;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
-}
 
 .list-items {
     padding-left: 2rem;

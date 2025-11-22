@@ -31,7 +31,6 @@ body {
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 2rem;
 }
 
 /* Header */
@@ -1325,15 +1324,6 @@ body {
     grid-template-columns: 1fr;
 }
 
-.page-card {
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    overflow: hidden;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: transform 0.2s;
-}
-
 .page-card:hover {
     transform: translateY(-2px);
 }
@@ -1415,11 +1405,6 @@ body {
     .page-title {
         font-size: 2rem;
     }
-}
-
-.page-layout {
-    display: grid;
-    gap: 2rem;
 }
 
 .page-layout.has-sidebar {

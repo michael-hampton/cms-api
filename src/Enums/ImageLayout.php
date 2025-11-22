@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum ImageLayout: string
 {
+    case INLINE = 'inline';
     case FULL = 'full';
     case RESPONSIVE = 'responsive';
     case FLUID = 'fluid';

@@ -11,6 +11,7 @@ use App\Mail\OrderConfirmation;
 use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Repositories\AddressRepository;
 use App\Repositories\MemberRepository;
 use App\Repositories\OrderItemRepository;
@@ -29,6 +30,7 @@ class OrderService
         private readonly OrderCalculationService $calculationService,
         private readonly OrderHistoryService     $historyService,
         private readonly MailManager $mailManager,
+        private readonly PaymentService $paymentService,
         ?Database                                $database = null
     )
     {
@@ -468,5 +470,53 @@ class OrderService
         if (!$order->canTransitionTo($newStatus)) {
             throw new \Exception("Cannot transition from {$order->status} to {$newStatus}");
         }
+    }
+
+    public function createOrderWithPayment(array $data, array $items, int $siteId, array $paymentData): array
+    {
+        return $this->database->transaction(function () use ($data, $items, $siteId, $paymentData) {
+            // Create the order
+            $order = $this->createOrder($data, $items, $siteId);
+
+            // Create payment if payment method provided
+            if (!empty($paymentData['payment_method'])) {
+                $payment = $this->paymentService->createPayment(
+                    $order->id,
+                    $paymentData,
+                    $siteId
+                );
+
+                return [
+                    'order' => $order,
+                    'payment' => $payment
+                ];
+            }
+
+            return [
+                'order' => $order,
+                'payment' => null
+            ];
+        });
+    }
+
+    public function processOrderPayment(int $orderId, array $paymentData, int $siteId): Payment
+    {
+        return $this->database->transaction(function () use ($orderId, $paymentData, $siteId) {
+            $order = $this->orderRepository->find($orderId);
+            if (!$order) {
+                throw new Exception('Order not found');
+            }
+
+            // Create payment for existing order
+            $payment = $this->paymentService->createPayment($orderId, $paymentData, $siteId);
+
+            // If payment method doesn't require processing, mark as completed immediately
+            $paymentMethod = $this->paymentService->paymentMethodRepository->findByCode($paymentData['payment_method']);
+            if ($paymentMethod && !$paymentMethod->requiresProcessing()) {
+                $payment = $this->paymentService->completePayment($payment->id);
+            }
+
+            return $payment;
+        });
     }
 }

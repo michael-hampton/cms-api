@@ -56,6 +56,7 @@ $isAuthenticated = $memberAuth !== null;
                         </div>
                         <div class="comment-body">
                             <div class="comment-meta">
+                                <?php if (!empty($comment->name)): ?>
                                 <h4 class="comment-author">
                                     <?= htmlspecialchars($comment->name) ?>
                                     <?php if ($comment->member_id): ?>
@@ -65,6 +66,7 @@ $isAuthenticated = $memberAuth !== null;
                                         </svg>
                                     <?php endif; ?>
                                 </h4>
+                                <?php endif; ?>
                                 <time class="comment-date" datetime="<?= $comment->created_at ?>">
                                     <?= formatCommentDate($comment->created_at) ?>
                                 </time>

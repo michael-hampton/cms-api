@@ -159,6 +159,10 @@ class Order extends Model
             $data['refunds'] = $this->refunds->toArray();
         }
 
+        if ($this->relationLoaded('payments')) {
+            $data['payments'] = $this->payments->toArray();
+        }
+
         return $data;
     }
 
@@ -287,6 +291,33 @@ class Order extends Model
     public function isFullyRefunded(): bool
     {
         return $this->getTotalRefundedAttribute() >= $this->total;
+    }
+
+    public function payments($relation = false)
+    {
+        return $this->hasMany(Payment::class, 'order_id', 'id', $relation);
+    }
+
+    public function getLatestPayment(): ?Payment
+    {
+        if ($this->relationLoaded('payments')) {
+            return $this->payments->sortByDesc('created_at')->first();
+        }
+
+        return Payment::where('order_id', $this->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
+    public function hasSuccessfulPayment(): bool
+    {
+        if ($this->relationLoaded('payments')) {
+            return $this->payments->where('status', 'completed')->count() > 0;
+        }
+
+        return Payment::where('order_id', $this->id)
+            ->where('status', 'completed')
+            ->exists();
     }
 
 }

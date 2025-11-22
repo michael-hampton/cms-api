@@ -26,7 +26,7 @@ $pageGridAdded = false;
 
 
     <main class="mt-20">
-        <div class="container" style="padding: 2rem;">
+        <div class="container">
             <?php if ($page): ?>
                 <div class="page-layout <?= $hasSidebar ? 'has-sidebar' : 'full-width' ?>">
 
@@ -116,3 +116,5 @@ $pageGridAdded = false;
     $footerRenderer = new \App\Services\FooterRenderer();
     echo $footerRenderer->renderFooter($footerMenu);
 } ?>
+
+@js('base.js')
