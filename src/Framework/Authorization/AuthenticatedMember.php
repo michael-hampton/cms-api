@@ -47,4 +47,9 @@ class AuthenticatedMember
     {
         return !empty(array_intersect($this->roles, $roleSlugs));
     }
+
+    public function getFullNameAttribute()
+    {
+        return "{$this->firstName} {$this->lastName}";
+    }
 }

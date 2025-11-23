@@ -508,6 +508,7 @@ class QueryBuilder
     public function get(): Collection
     {
         [$sql, $params] = $this->toSql();
+
         $stmt = $this->database->query($sql, $params);
         $results = $stmt->fetchAll();
 
@@ -966,6 +967,12 @@ class QueryBuilder
                 $quotedColumn = $this->quoteColumn($where['column']);
                 [$subSql, $subBindings] = $where['query']->toSql();
                 return ["{$quotedColumn} {$where['operator']} ({$subSql})", $subBindings];
+            case 'JsonContains':
+                $paramKey = 'param_' . $paramCounter++;
+                $quotedColumn = $this->quoteColumn($where['column']);
+                $bindings[$paramKey] = $where['value'];
+                return ["JSON_CONTAINS ({$quotedColumn}, :{$paramKey})", $bindings];
+                break;
 
             default:
                 throw new Exception("Unknown where type: {$where['type']}");
@@ -1279,8 +1286,6 @@ class QueryBuilder
                 $foreignKey = $relationData['foreign_key'];
                 $ownerKey = $relationData['owner_key'];
 
-                die('here2');
-
                 $subquery = "SELECT COUNT(*) FROM {$relatedTable} WHERE {$relatedTable}.{$ownerKey} = {$this->table}.{$foreignKey}";
 
                 if ($callback) {
@@ -1332,7 +1337,7 @@ class QueryBuilder
      */
     protected function addHasConstraintToMainQuery(array $relationData, string $operator, int $count, string $boolean, ?callable $callback): void
     {
-        $useExists = $count === 1 && in_array($operator, ['>=', '>','<','<=']);
+        $useExists = $count === 1 && in_array($operator, ['>=', '>', '<', '<=']);
 
         $subqueryData = $this->buildSubqueryWithBindings($relationData, $callback, $useExists);
 
@@ -1437,8 +1442,7 @@ class QueryBuilder
                         WHERE {$pivotTable}.{$foreignKey} = {$this->table}.id";
 
 
-
-               break;
+                break;
 
             default:
                 throw new BadMethodCallException("Unknown relation type: {$relationData['type']}");
@@ -1516,7 +1520,7 @@ class QueryBuilder
                     }
 
                     $column = $this->quoteColumn($column);
-                    $values = array_map(function($v) {
+                    $values = array_map(function ($v) {
                         if (is_string($v)) {
                             return "'" . str_replace("'", "''", $v) . "'";
                         }
@@ -1534,7 +1538,7 @@ class QueryBuilder
                     }
 
                     $column = $this->quoteColumn($column);
-                    $values = array_map(function($v) {
+                    $values = array_map(function ($v) {
                         if (is_string($v)) {
                             return "'" . str_replace("'", "''", $v) . "'";
                         }
@@ -1584,6 +1588,23 @@ class QueryBuilder
             'first' => $first,
             'operator' => $operatorOrSecond,
             'second' => $second,
+        ];
+
+        return $this;
+    }
+
+    public function whereJsonContains(string $column, $value): self
+    {
+        // Normalize value into JSON format
+        // Arrays become JSON arrays, scalars become JSON strings
+        $jsonValue = is_array($value)
+            ? json_encode($value)
+            : json_encode([$value]);
+
+        $this->wheres[] = [
+            'type' => 'JsonContains',
+            'column' => $column,
+            'value' => $jsonValue,
         ];
 
         return $this;

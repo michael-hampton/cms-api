@@ -302,6 +302,10 @@ class BadgeServiceTest extends FunctionalTestCase
         $earnedBadge = Mockery::mock(Badge::class)->makePartial();
         $earnedBadge->id = 1;
 
+        $member->shouldReceive('getTotalPointsAttribute')
+            ->once()
+            ->andReturn(500);
+
         $availableBadge = Mockery::mock(Badge::class)->makePartial();
         $availableBadge->id = 2;
         $availableBadge->criteria = [

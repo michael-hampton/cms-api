@@ -117,4 +117,6 @@ $pageGridAdded = false;
     echo $footerRenderer->renderFooter($footerMenu);
 } ?>
 
+@include('consent-banner', ['site' => $site])
+
 @js('base.js')

@@ -14,6 +14,7 @@ use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
 use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberCommentsController;
+use App\Controllers\Members\MemberConsentController;
 use App\Controllers\Members\MemberDashboardController;
 use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberNewslettersController;
@@ -128,6 +129,22 @@ $router->group(['middleware' => [RequireMemberAuth::class]], function($router) {
     $router->get('/member/change-password', [MemberAuthController::class, 'showChangePasswordForm'])
         ->name('member.change-password');
 });
+
+// Member Consent Management Routes (Protected - requires member auth)
+// Consent Preferences Page (HTML)
+$router->get('/{site}/member/consent', [MemberConsentController::class, 'index']);
+$router->get('/{site}/member/consent/audit-trail', 'App\Controllers\Members\MemberConsentController@auditTrail');
+$router->get('/{site}/member/consent/download-data', 'App\Controllers\Members\MemberConsentController@downloadData');
+
+// Consent API endpoints (JSON)
+$router->post('/{site}/member/consent/update', 'App\Controllers\Members\MemberConsentController@update');
+$router->post('/{site}/member/consent/grant/{consentCode}', 'App\Controllers\Members\MemberConsentController@grant');
+$router->post('/{site}/member/consent/revoke/{consentCode}', 'App\Controllers\Members\MemberConsentController@revoke');
+$router->post('/{site}/member/consent/withdrawal-request', 'App\Controllers\Members\MemberConsentController@createWithdrawalRequest');
+$router->post('/{site}/member/consent/accept-banner', 'App\Controllers\Members\MemberConsentController@acceptBanner');
+$router->get('/{site}/member/consent/check/{consentCode}', 'App\Controllers\Members\MemberConsentController@checkConsent');
+$router->get('/api/{siteName}/consent/types/optional', 'App\Controllers\Members\MemberConsentController@getOptionalConsentTypes');
+
 
 $router->get('/cart', [CartController::class, 'page']);
 $router->get('/wishlist', [WishlistController::class, 'page']);

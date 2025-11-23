@@ -11,10 +11,14 @@ use App\Models\Block;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Comment;
+use App\Models\ConsentAuditLog;
+use App\Models\ConsentType;
+use App\Models\ConsentWithdrawalRequest;
 use App\Models\CustomFieldDefinition;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
+use App\Models\MemberConsent;
 use App\Models\Merchant;
 use App\Models\Model;
 use App\Models\Order;
@@ -498,6 +502,67 @@ trait CreatesTestData
             'created_at' => now(),
             'site_id' => $this->siteId,
             'liked_at' => now(),
+        ], $attributes));
+    }
+
+    protected function createConsentType(array $attributes = []): ConsentType
+    {
+        return ConsentType::create(array_merge([
+            'code' => 'test_consent_' . uniqid(),
+            'name' => 'Test Consent',
+            'description' => 'Test description',
+            'category' => 'marketing',
+            'required' => false,
+            'retention_days' => 365,
+            'data_purposes' => ['Test purpose'],
+            'is_active' => true
+        ], $attributes));
+    }
+
+    protected function createMemberConsent(array $attributes = []): MemberConsent
+    {
+        $member = $attributes['member'] ?? $this->createMember();
+        $consentType = $attributes['consent_type'] ?? $this->createConsentType();
+
+        unset($attributes['member'], $attributes['consent_type']);
+
+        return MemberConsent::create(array_merge([
+            'member_id' => $member->id,
+            'consent_type_id' => $consentType->id,
+            'is_granted' => true,
+            'channel' => 'web',
+            'granted_at' => now_datetime()
+        ], $attributes));
+    }
+
+    protected function createConsentAuditLog(array $attributes = []): ConsentAuditLog
+    {
+        $member = $attributes['member'] ?? $this->createMember();
+        $consentType = $attributes['consent_type'] ?? $this->createConsentType();
+
+        unset($attributes['member'], $attributes['consent_type']);
+
+        return ConsentAuditLog::create(array_merge([
+            'member_id' => $member->id,
+            'consent_type_id' => $consentType->id,
+            'action' => 'granted',
+            'new_state' => true,
+            'source' => 'web',
+            'created_at' => now_datetime()
+        ], $attributes));
+    }
+
+    protected function createConsentWithdrawalRequest(array $attributes = []): ConsentWithdrawalRequest
+    {
+        $member = $attributes['member'] ?? $this->createMember();
+
+        unset($attributes['member']);
+
+        return ConsentWithdrawalRequest::create(array_merge([
+            'member_id' => $member->id,
+            'type' => 'all_marketing',
+            'status' => 'pending',
+            'requested_at' => now_datetime()
         ], $attributes));
     }
 

@@ -136,8 +136,7 @@ class BadgeService
     public function getMemberProgress(Member $member, ?int $siteId = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
-        $memberArr = $member->toArray();
-        $stats = $memberArr['activity_stats'] ?? [];
+        $stats = $member->activity_stats ?? [];
         $earnedBadges = $this->badgeRepository->getEarnedBadges($member);
         $availableBadges = $this->badgeRepository->getActiveBadgesForSite($siteId);
 
@@ -162,7 +161,7 @@ class BadgeService
 
         return [
             'stats' => $stats,
-            'total_points' => $memberArr['total_points'],
+            'total_points' => $member->totalPoints,
             'badges_earned' => $earnedBadges->count(),
             'badges_available' => $availableBadges->count(),
             'next_badges' => array_slice($nextBadges, 0, 5)

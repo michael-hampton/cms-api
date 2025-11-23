@@ -463,4 +463,46 @@ class Request implements RequestInterface
     {
         return $this->headers;
     }
+
+    /**
+     * Get the client IP address
+     *
+     * @return string|null
+     */
+    public function ip(): ?string
+    {
+        // Check for proxy headers first
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            $ip = $_SERVER['HTTP_CLIENT_IP'];
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            // X-Forwarded-For can contain multiple IPs, get the first one
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip = trim($ips[0]);
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED'])) {
+            $ip = $_SERVER['HTTP_X_FORWARDED'];
+        } elseif (!empty($_SERVER['HTTP_FORWARDED_FOR'])) {
+            $ip = $_SERVER['HTTP_FORWARDED_FOR'];
+        } elseif (!empty($_SERVER['HTTP_FORWARDED'])) {
+            $ip = $_SERVER['HTTP_FORWARDED'];
+        } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
+            $ip = $_SERVER['REMOTE_ADDR'];
+        } else {
+            return null;
+        }
+
+        // Validate IP address
+        $ip = filter_var($ip, FILTER_VALIDATE_IP);
+
+        return $ip ?: null;
+    }
+
+    /**
+     * Get the user agent string
+     *
+     * @return string|null
+     */
+    public function userAgent(): ?string
+    {
+        return $_SERVER['HTTP_USER_AGENT'] ?? $this->header('User-Agent') ?? null;
+    }
 }
