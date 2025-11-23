@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
@@ -11,8 +12,10 @@ use App\Repositories\PageLikeRepository;
 class PageLikeController extends Controller
 {
     public function __construct(
-        private PageLikeRepository $pageLikeRepository
-    ) {
+        private readonly PageLikeRepository $pageLikeRepository,
+        private readonly ActivityTracking   $activityTracking
+    )
+    {
         parent::__construct();
     }
 
@@ -37,6 +40,10 @@ class PageLikeController extends Controller
         $siteId = SiteContext::getId();
 
         $result = $this->pageLikeRepository->toggleLike($pageId, $member->id, $siteId);
+
+        if ($result['liked'] === true) {
+            $this->activityTracking->trackLike($result['like']);
+        }
 
         return $this->resourceResponse([
             'success' => true,

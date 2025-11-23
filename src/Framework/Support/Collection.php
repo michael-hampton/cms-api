@@ -115,12 +115,18 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         });
     }
 
-    public function groupBy(string $key): self
+    public function groupBy($key): self
     {
         $groups = [];
 
         foreach ($this->items as $item) {
-            $groupKey = is_array($item) ? $item[$key] : $item->{$key};
+
+            // Determine group key
+            if ($key instanceof \Closure) {
+                $groupKey = $key($item);
+            } else {
+                $groupKey = is_array($item) ? $item[$key] : $item->{$key};
+            }
 
             if (!isset($groups[$groupKey])) {
                 $groups[$groupKey] = new static();
@@ -434,11 +440,16 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
     public function get(mixed $index)
     {
-        if (!isset($this->items[$index])) {
-            throw new \OutOfBoundsException(sprintf('No item found at index %d', $index));
+        if (!array_key_exists($index, $this->items)) { // <-- array_key_exists supports string keys
+            return collect();
         }
 
         return $this->items[$index];
+    }
+
+    public function keys()
+    {
+        return array_keys($this->items);
     }
 
     public function has(mixed $key): bool

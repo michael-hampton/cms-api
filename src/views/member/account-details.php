@@ -629,6 +629,57 @@
             <?php endif; ?>
         </div>
     </div>
+
+    <!-- Add this section to the settings page -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="card-icon">🔒</span>
+                Privacy Settings
+            </h2>
+        </div>
+
+        <form method="POST" action="/member/settings/privacy">
+            @csrf
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input
+                            type="checkbox"
+                            id="show_activity"
+                            name="show_activity"
+                            value="1"
+                            <?= $member->show_activity ? 'checked' : '' ?>
+                    >
+                    <label for="show_activity">
+                        Show my activity publicly
+                    </label>
+                </div>
+                <span class="form-hint">Allow others to see your reading activity and engagement</span>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input
+                            type="checkbox"
+                            id="show_badges"
+                            name="show_badges"
+                            value="1"
+                            <?= $member->show_badges ? 'checked' : '' ?>
+                    >
+                    <label for="show_badges">
+                        Show my badges publicly
+                    </label>
+                </div>
+                <span class="form-hint">Display your earned badges on your profile</span>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    💾 Save Privacy Settings
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 </body>
 </html>

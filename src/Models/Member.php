@@ -17,7 +17,10 @@ class Member extends Model
         'email_verification_token',
         'email_verification_expires_at',
         'password_reset_token',
-        'password_reset_expires_at'
+        'password_reset_expires_at',
+        'created_at',
+        'total_points',
+        'activity_stats'
     ];
 
     protected $hidden = [
@@ -30,6 +33,7 @@ class Member extends Model
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
         'last_login_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     public $table = 'members';
@@ -153,7 +157,7 @@ class Member extends Model
 
     public function comments($relation = false)
     {
-        return $this->hasMany(Comment::class, 'email', 'email', $relation);
+        return $this->hasMany(Comment::class, 'member_id', 'id', $relation);
     }
 
     // Add these methods to App\Models\Member.php
@@ -188,5 +192,42 @@ class Member extends Model
             'page_id',
             $relation
         );
+    }
+
+    public function badges($relation = false)
+    {
+        return $this->belongsToMany(
+            Badge::class,
+            'member_badges',
+            'member_id',
+            'badge_id',
+            $relation
+        );
+    }
+
+    public function activities($relation = false)
+    {
+        return $this->hasMany(MemberActivity::class, 'member_id', 'id', $relation);
+    }
+
+    public function points($relation = false)
+    {
+        return $this->hasMany(MemberPoint::class, 'member_id', 'id', $relation);
+    }
+
+    public function getTotalPointsAttribute(): int
+    {
+        return $this->points()->sum('points');
+    }
+
+    public function getActivityStatsAttribute(): array
+    {
+        return [
+            'comments' => $this->comments()->count(),
+            'pages_read' => $this->pageViews()->unique('page_id')->count(),
+            'likes' => $this->pageLikes()->count(),
+            'orders' => Order::where('user_id', $this->id)->where('status', 'completed')->count(),
+            'member_days' => now_datetime()->diffInDays($this->created_at)
+        ];
     }
 }

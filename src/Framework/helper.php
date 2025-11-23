@@ -2,6 +2,7 @@
 
 use App\Framework\Authorization\Auth;
 use App\Framework\Container;
+use App\Framework\Date;
 use App\Framework\Http\Router;
 use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
@@ -331,10 +332,10 @@ if (!function_exists('now_datetime')) {
     function now_datetime(?string $timezone = null): \DateTime
     {
         if ($timezone) {
-            return new \DateTime('now', new \DateTimeZone($timezone));
+            return new Date('now', new \DateTimeZone($timezone));
         }
 
-        return new \DateTime('now');
+        return new Date('now');
     }
 }
 

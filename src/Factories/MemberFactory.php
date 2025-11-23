@@ -5,7 +5,6 @@ namespace App\Factories;
 use App\Framework\Tests\Factories\Factory;
 use App\Framework\Tests\Factories\HasSiteId;
 use App\Models\Member;
-use App\Models\User;
 
 class MemberFactory extends Factory
 {
@@ -23,7 +22,8 @@ class MemberFactory extends Factory
             'last_name' => 'User',
             'email' => 'user' . uniqid() . '@example.com',
             'password' => password_hash('password', PASSWORD_BCRYPT),
-            'is_active' => true
+            'is_active' => true,
+            'created_at' => date('Y-m-d H:i:s'),
         ];
     }
 

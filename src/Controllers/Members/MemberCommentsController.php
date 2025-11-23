@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Repositories\BadgeRepository;
 use App\Repositories\CommentRepository;
 
 class MemberCommentsController extends Controller
@@ -48,6 +49,12 @@ class MemberCommentsController extends Controller
         }
 
         if ($this->commentRepository->deleteComment($commentId)) {
+
+            $activityTracking = new \App\Events\ActivityTracking(
+                new \App\Services\BadgeService(new BadgeRepository())
+            );
+            $activityTracking->trackComment($comment);
+
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Comment deleted successfully'

@@ -14,6 +14,7 @@ use App\Framework\Console\Commands\QueueWorkCommand;
 use App\Framework\Console\Commands\ScheduleRunCommand;
 use App\Framework\Console\Commands\SeedCommand;
 use App\Framework\Database\Database;
+use App\Framework\Date;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Http\Router;
@@ -45,6 +46,7 @@ class ApiApplication
         $this->registerMiddleware();
 
         $this->container->instance(Router::class, $this->router);
+        $this->container->bind(\DateTimeInterface::class, Date::class);
 
         // Create route loader using container
         $this->routeLoader = $this->container->resolve(RouteLoader::class);

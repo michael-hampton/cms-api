@@ -189,4 +189,22 @@ class Product extends Model
             'merchant_id'
         )->withPivot(['url', 'price', 'is_available', 'variant_id', 'last_price_check']);
     }
+
+    public function badges($relation = false)
+    {
+        return $this->hasMany(ProductBadge::class, 'product_id', 'id', $relation)
+            ->where('is_active', true)
+            ->orderBy('sort_order');
+    }
+
+    public function activeBadges($relation = false)
+    {
+        return $this->badges($relation)->where(function ($query) {
+            $query->whereNull('valid_from')
+                ->orWhere('valid_from', '<=', now());
+        })->where(function ($query) {
+            $query->whereNull('valid_until')
+                ->orWhere('valid_until', '>=', now());
+        });
+    }
 }

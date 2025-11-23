@@ -72,6 +72,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/payment-methods/{id}', [PaymentMethodController::class, 'update']);
         $router->delete('/payment-methods/{id}', [PaymentMethodController::class, 'destroy']);
 
+        $router->get('/member/activity/stats', 'Api\MemberActivityApiController@stats');
+        $router->get('/member/activity/trends', 'Api\MemberActivityApiController@trends');
+        $router->get('/member/badges/progress', 'Api\MemberActivityApiController@badgeProgress');
+
         $router->get('/payments', [PaymentController::class, 'index']);
         $router->get('/payments/by-transaction', [PaymentController::class, 'byTransaction']);
         $router->get('/payments/total-collected', [PaymentController::class, 'totalCollected']);

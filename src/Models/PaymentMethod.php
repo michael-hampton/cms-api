@@ -39,7 +39,7 @@ class PaymentMethod extends Model
         return $this->hasMany(Payment::class, 'payment_method', 'code', $relation);
     }
 
-    public function getConfiguration(string $key = null)
+    public function getConfiguration(?string $key = null)
     {
         if ($key === null) {
             return $this->configuration;

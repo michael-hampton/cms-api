@@ -44,12 +44,13 @@ class PageLike extends Model
         if ($existing) {
             $existing->delete();
             return [
+                'like' => $existing,
                 'liked' => false,
                 'like_count' => self::getLikeCount($pageId)
             ];
         }
 
-        self::create([
+        $likeObject = self::create([
             'page_id' => $pageId,
             'member_id' => $memberId,
             'site_id' => $siteId,
@@ -57,6 +58,7 @@ class PageLike extends Model
         ]);
 
         return [
+            'like' => $likeObject,
             'liked' => true,
             'like_count' => self::getLikeCount($pageId)
         ];

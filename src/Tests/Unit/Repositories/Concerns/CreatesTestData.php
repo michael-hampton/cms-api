@@ -2,17 +2,19 @@
 
 namespace App\Tests\Unit\Repositories\Concerns;
 
-use App\Controllers\CustomFieldDefinitionController;
-use App\Factories\VoucherFactory;
 use App\Framework\Tests\Factories\HasFactories;
 use App\Framework\Tests\Factories\RelationshipFactory;
 use App\Models\Address;
 use App\Models\Author;
+use App\Models\Badge;
 use App\Models\Block;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Comment;
 use App\Models\CustomFieldDefinition;
 use App\Models\Member;
+use App\Models\MemberActivity;
+use App\Models\MemberBadge;
 use App\Models\Merchant;
 use App\Models\Model;
 use App\Models\Order;
@@ -23,6 +25,7 @@ use App\Models\PageCategory;
 use App\Models\PageCustomField;
 use App\Models\PageGrid;
 use App\Models\PageHistory;
+use App\Models\PageLike;
 use App\Models\PageMetadata;
 use App\Models\PageProduct;
 use App\Models\PageRegionSet;
@@ -31,6 +34,7 @@ use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Models\PageTag;
 use App\Models\PageTerritory;
+use App\Models\PageView;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
@@ -404,4 +408,97 @@ trait CreatesTestData
             'site_id' => $this->siteId
         ]);
     }
+
+    protected function createBadge(array $attributes = []): Badge
+    {
+        return Badge::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Badge ' . uniqid(),
+            'slug' => 'test-badge-' . uniqid(),
+            'description' => 'Test badge description',
+            'icon' => 'trophy',
+            'points' => 100,
+            'criteria' => [['type' => 'comments_count', 'operator' => '>=', 'value' => 5]],
+            'is_active' => true,
+            'sort_order' => 0,
+            'category' => 'test'
+        ], $attributes));
+    }
+
+    protected function createMemberBadge(array $attributes = []): MemberBadge
+    {
+        $member = $attributes['member_id'] ?? $this->createMember()->id;
+        $badge = $attributes['badge_id'] ?? $this->createBadge()->id;
+
+        return MemberBadge::create(array_merge([
+            'member_id' => $member,
+            'badge_id' => $badge,
+            'earned_at' => now(),
+            'criteria_met' => [],
+            'is_visible' => true
+        ], $attributes));
+    }
+
+    protected function createMemberActivity(array $attributes = []): MemberActivity
+    {
+        $member = $attributes['member_id'] ?? $this->createMember()->id;
+
+        return MemberActivity::create(array_merge([
+            'member_id' => $member,
+            'site_id' => $this->siteId,
+            'activity_type' => 'test_activity',
+            'entity_type' => null,
+            'entity_id' => null,
+            'metadata' => [],
+            'points' => 0,
+            'activity_date' => now()
+        ], $attributes));
+    }
+
+    protected function createMemberPoint(array $attributes = []): MemberPoint
+    {
+        $member = $attributes['member_id'] ?? $this->createMember()->id;
+
+        return MemberPoint::create(array_merge([
+            'member_id' => $member,
+            'points' => 10,
+            'reason' => 'Test points',
+            'reference_type' => null,
+            'reference_id' => null,
+            'awarded_at' => now()
+        ], $attributes));
+    }
+
+    protected function createComment(array $attributes = []): Comment
+    {
+        return Comment::create(array_merge([
+            'member_id' => $this->createMember()->id,
+            'page_id' => $this->createPage()->id,
+            'content' => 'Test comment',
+            'status' => 'approved',
+            'created_at' => now()
+        ], $attributes));
+    }
+
+    protected function createPageView(array $attributes = []): PageView
+    {
+        return PageView::create(array_merge([
+            'member_id' => $this->createMember()->id,
+            'page_id' => $this->createPage()->id,
+            'viewed_at' => now(),
+            'site_id' => $this->siteId,
+        ], $attributes));
+    }
+
+    protected function createPageLike(array $attributes = []): PageLike
+    {
+        return PageLike::create(array_merge([
+            'member_id' => $this->createMember()->id,
+            'page_id' => $this->createPage()->id,
+            'created_at' => now(),
+            'site_id' => $this->siteId,
+            'liked_at' => now(),
+        ], $attributes));
+    }
+
 }

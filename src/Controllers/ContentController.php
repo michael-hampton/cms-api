@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Category;
@@ -24,6 +25,7 @@ class ContentController extends Controller
         private readonly CommentRepository  $commentRepository,
         private readonly PageViewRepository $pageViewRepository,
         private readonly PageGridRepository $pageGridRepository,
+        private readonly ActivityTracking $activityTracking
     ) {
         parent::__construct();
     }
@@ -62,6 +64,8 @@ class ContentController extends Controller
             $_SERVER['HTTP_USER_AGENT'] ?? null,
             $_SERVER['HTTP_REFERER'] ?? null
         );
+
+        $this->activityTracking->trackPageView($page);
 
         $data = [
             'menu' => $menu,

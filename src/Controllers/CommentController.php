@@ -3,6 +3,7 @@
 
 namespace App\Controllers;
 
+use App\Events\ActivityTracking;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -12,7 +13,8 @@ use App\Services\CommentService;
 class CommentController extends Controller
 {
     public function __construct(
-        private CommentService $commentService
+        private readonly CommentService   $commentService,
+        private readonly ActivityTracking $activityTracking
     ) {
         parent::__construct();
     }
@@ -23,6 +25,8 @@ class CommentController extends Controller
             $data = $request->validated();
             $data['site_id'] = SiteContext::getId();
             $comment = $this->commentService->createComment($data);
+
+            $this->activityTracking->trackComment($comment);
 
             return $this->resourceResponse([
                 'success' => true,
