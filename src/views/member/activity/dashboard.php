@@ -394,7 +394,7 @@
                 <?php endforeach; ?>
             </div>
             <div style="text-align: center; margin-top: 1.5rem;">
-                <a href="/member/activity/badges"
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/activity/badges"
                    style="color: var(--primary-color); text-decoration: none; font-weight: 500;">
                     View All Badges →
                 </a>
@@ -473,7 +473,7 @@
                             ?>
                         </div>
                         <div class="activity-time">
-                            <?= $activity->activity_date->diffForHumans() ?>
+                            <?= diffForHumans($activity->activity_date) ?>
                             <?php if ($activity->points > 0): ?>
                                 <span class="activity-points">+<?= $activity->points ?> points</span>
                             <?php endif; ?>
@@ -487,43 +487,43 @@
 
 <script>
     // Activity Trends Chart
-    const activityData = <?= json_encode($activity_trends) ?>;
-
-    const ctx = document.getElementById('activityChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: activityData.map(d => {
-                const date = new Date(d.date);
-                return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-            }),
-            datasets: [{
-                label: 'Activities',
-                data: activityData.map(d => d.count),
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        precision: 0
-                    }
-                }
-            }
-        }
-    });
+    //const activityData = <?php //= json_encode($activity_trends) ?>//;
+    //
+    //const ctx = document.getElementById('activityChart').getContext('2d');
+    //new Chart(ctx, {
+    //    type: 'line',
+    //    data: {
+    //        labels: activityData.map(d => {
+    //            const date = new Date(d.date);
+    //            return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    //        }),
+    //        datasets: [{
+    //            label: 'Activities',
+    //            data: activityData.map(d => d.count),
+    //            borderColor: '#667eea',
+    //            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    //            tension: 0.4,
+    //            fill: true
+    //        }]
+    //    },
+    //    options: {
+    //        responsive: true,
+    //        maintainAspectRatio: false,
+    //        plugins: {
+    //            legend: {
+    //                display: false
+    //            }
+    //        },
+    //        scales: {
+    //            y: {
+    //                beginAtZero: true,
+    //                ticks: {
+    //                    precision: 0
+    //                }
+    //            }
+    //        }
+    //    }
+    //});
 </script>
 </body>
 </html>

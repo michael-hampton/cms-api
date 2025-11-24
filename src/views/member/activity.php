@@ -201,7 +201,7 @@
     }
 </style>
 
-<?php if (!$badges->isEmpty()): ?>
+<?php if ($badges && !$badges->isEmpty()): ?>
     <div class="badges-showcase">
         <h2 class="section-title">Recent Badges</h2>
         <div class="badges-grid">
@@ -260,7 +260,7 @@
 <!-- Recent Activity Feed -->
 <div class="activity-feed">
     <h2 class="section-title">Recent Activity</h2>
-    <?php if ($recent_activities->isEmpty()): ?>
+    <?php if ($recent_activities && $recent_activities->isEmpty()): ?>
         <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">
             No recent activity yet. Start engaging to see your activity here!
         </p>

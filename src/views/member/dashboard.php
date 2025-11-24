@@ -559,6 +559,28 @@
                 <p>View and track your order history and current shipments.</p>
             </div>
         </a>
+
+        <a href="/<?= $site->slug ?>/member/consent" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon orders">🛍️</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Privacy & Consent Preferences</h3>
+                <p>Control how your personal data is used across our platform.</p>
+            </div>
+        </a>
+
+        <a href="/<?= $site->slug ?>/member/activity" class="dashboard-card">
+            <div class="card-header">
+                <div class="card-icon orders">🛍️</div>
+                <div class="card-arrow">→</div>
+            </div>
+            <div class="card-content">
+                <h3>Activity & Achievements</h3>
+                <p>Track your engagement and earn badges</p>
+            </div>
+        </a>
     </div>
 
     <h2 class="section-title">Your Activity</h2>
@@ -633,7 +655,8 @@
         </div>
     <?php endif; ?>
 
-    @include('member/activity', ['progress' => $progress])
+    @include('member/activity', ['progress' => $progress, 'badges' => $badges, 'recent_activities' =>
+    $recent_activities])
 </div>
 
 

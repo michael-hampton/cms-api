@@ -404,4 +404,77 @@ if (!function_exists('class_uses_recursive')) {
 }
 
 
+/**
+ * Human readable difference between two dates.
+ *
+ * @param DateTimeInterface $time The time to compare (target time).
+ * @param DateTimeInterface|null $now Optional "now" reference (defaults to now).
+ * @param int $precision How many units to include (1 = "2 months", 2 = "2 months 3 days").
+ * @param bool $short If true, use compact units ("2mo 3d" / "in 2mo").
+ * @return string
+ */
+function diffForHumans(DateTimeInterface $time, ?DateTimeInterface $now = null, int $precision = 1, bool $short = false): string
+{
+    if ($now === null) {
+        $now = new DateTimeImmutable('now', $time->getTimezone());
+    }
+
+    // difference in seconds (positive means $time is in the future)
+    $diffSeconds = $time->getTimestamp() - $now->getTimestamp();
+    $isFuture = $diffSeconds > 0;
+    $diff = abs($diffSeconds);
+
+    // unit definitions (approximate months/years)
+    $units = [
+        'year' => 365 * 24 * 3600,
+        'month' => 30 * 24 * 3600,
+        'week' => 7 * 24 * 3600,
+        'day' => 24 * 3600,
+        'hour' => 3600,
+        'minute' => 60,
+        'second' => 1,
+    ];
+
+    $shortUnits = [
+        'year' => 'y',
+        'month' => 'mo',
+        'week' => 'w',
+        'day' => 'd',
+        'hour' => 'h',
+        'minute' => 'm',
+        'second' => 's',
+    ];
+
+    // If difference is < 1 second
+    if ($diff < 1) {
+        return $short ? ($isFuture ? 'in 0s' : '0s ago') : 'just now';
+    }
+
+    $parts = [];
+    foreach ($units as $name => $secondsPerUnit) {
+        if ($diff <= 0) break;
+        $count = intdiv($diff, $secondsPerUnit);
+        if ($count <= 0) continue;
+        $diff -= $count * $secondsPerUnit;
+
+        if ($short) {
+            $parts[] = $count . $shortUnits[$name];
+        } else {
+            $parts[] = $count . ' ' . $name . ($count === 1 ? '' : 's');
+        }
+
+        if (count($parts) >= max(1, $precision)) break;
+    }
+
+    $human = implode($short ? ' ' : ' ', $parts);
+
+    if ($short) {
+        return $isFuture ? "in {$human}" : "{$human} ago";
+    }
+
+    return $isFuture ? "in {$human}" : "{$human} ago";
+}
+
+
+
 

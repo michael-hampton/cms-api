@@ -12,6 +12,7 @@ use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
+use App\Controllers\Members\MemberActivityController;
 use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberConsentController;
@@ -75,6 +76,8 @@ $router->get('/{siteName}/brand/{slug}', BrandPageController::class, 'show')->na
 $router->post('/event-signup', EventController::class, 'signup');
 $router->post('/{site}/comments', CommentController::class, 'store');
 
+$router->get('/{site}/member/activity', [MemberActivityController::class, 'index']);
+$router->get('/{site}/member/activity/badges', [MemberActivityController::class, 'badges']);
 $router->get('/{site}/member/account-details', [MemberController::class, 'accountDetails']);
 $router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
 

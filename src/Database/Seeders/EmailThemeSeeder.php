@@ -1,7 +1,11 @@
 <?php
-// database/seeders/EmailThemeSeeder.php
+
+namespace App\Database\Seeders;
 
 use App\Framework\Database\Seeder\Seeder;
+use App\Models\EmailTheme;
+use App\Models\EmailThemeColor;
+use App\Models\EmailThemeFont;
 
 class EmailThemeSeeder extends Seeder
 {
@@ -36,7 +40,7 @@ class EmailThemeSeeder extends Seeder
             ];
 
             foreach ($colors as $key => $value) {
-                $this->db->insert('email_theme_colors', [
+                EmailThemeColor::create([
                     'theme_id' => $theme->id,
                     'color_key' => $key,
                     'color_value' => $value
@@ -63,7 +67,7 @@ class EmailThemeSeeder extends Seeder
             ];
 
             foreach ($fonts as $key => $font) {
-                $this->db->insert('email_theme_fonts', [
+                EmailthemeFont::create([
                     'theme_id' => $theme->id,
                     'font_key' => $key,
                     'font_family' => $font['family'],
@@ -83,7 +87,7 @@ class EmailThemeSeeder extends Seeder
             ];
 
             foreach ($settings as $key => $setting) {
-                $this->db->insert('email_theme_settings', [
+                \App\Models\EmailThemeSetting::create([
                     'theme_id' => $theme->id,
                     'setting_key' => $key,
                     'setting_value' => $setting['value'],

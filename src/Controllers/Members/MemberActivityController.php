@@ -18,13 +18,13 @@ class MemberActivityController extends Controller
         parent::__construct();
     }
 
-    public function dashboard()
+    public function index()
     {
         if (!MemberAuth::check()) {
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $member->load(['badges', 'points']);
 
         $progress = $this->badgeService->getMemberProgress($member);
@@ -46,12 +46,13 @@ class MemberActivityController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
-        $member->load('badges');
+        $member = MemberAuth::getMember();
+
+        $member->load(['badges']);
 
         return $this->view('member/activity/badges', [
             'member' => $member,
-            'site' => SiteContext::get()
+            'site' => $member->site
         ]);
     }
 }

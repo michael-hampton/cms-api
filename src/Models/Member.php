@@ -109,7 +109,7 @@ class Member extends Model
 
     public static function findByVerificationToken(string $token, int $siteId): ?self
     {
-       return self::where('email_verification_token', $token)
+        return self::where('email_verification_token', $token)
             ->where('site_id', $siteId)
             ->where('email_verification_expires_at', '>', date('Y-m-d H:i:s'))
             ->first();
@@ -229,5 +229,10 @@ class Member extends Model
             'orders' => Order::where('user_id', $this->id)->where('status', 'completed')->count(),
             'member_days' => now_datetime()->diffInDays($this->created_at)
         ];
+    }
+
+    public function site($relation = false)
+    {
+        return $this->belongsTo(Site::class, 'site_id', 'id', $relation);
     }
 }

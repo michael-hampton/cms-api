@@ -40,7 +40,7 @@ class MemberDashboardController extends Controller
     public function index()
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/member/login');
+            return $this->redirect('/' . SiteContext::slug() . '/member/login');
         }
 
         $member = MemberAuth::member();
@@ -76,7 +76,7 @@ class MemberDashboardController extends Controller
             'progress' => $progress,
             'activity_trends' => $activityTrends,
             'recent_activities' => $recentActivities,
-            'badges' => $memberObj->badges
+            'badges' => $memberObj->badges ?? collect()
         ]);
     }
 

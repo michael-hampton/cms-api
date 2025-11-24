@@ -117,6 +117,11 @@ class MemberAuth
     public static function getMember(): ?Member
     {
         $memberId = Session::get('member_id');
+
+        if (!$memberId) {
+            return null;
+        }
+
         return Member::find($memberId);
     }
 

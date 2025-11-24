@@ -474,10 +474,12 @@
             <button onclick="saveAllConsents()" class="btn btn-primary">
                 💾 Save All Changes
             </button>
-            <a href="/member/consent/download" class="btn btn-secondary">
+            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/consent/download-data"
+               class="btn btn-secondary">
                 📥 Download My Data
             </a>
-            <a href="/member/consent/audit-trail" class="btn btn-secondary">
+            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/consent/audit-trail"
+               class="btn btn-secondary">
                 📋 View History
             </a>
         </div>
@@ -536,14 +538,14 @@
                                 <?php if ($consent['granted_at']): ?>
                                     <div class="meta-item">
                                         <span>📅</span>
-                                        <span>Granted: <?= date('M j, Y', strtotime($consent['granted_at'])) ?></span>
+                                        <span>Granted: <?= $consent['granted_at']->format('M j, Y') ?></span>
                                     </div>
                                 <?php endif; ?>
 
                                 <?php if ($consent['expires_at']): ?>
                                     <div class="meta-item">
                                         <span>⏰</span>
-                                        <span>Expires: <?= date('M j, Y', strtotime($consent['expires_at'])) ?></span>
+                                        <span>Expires: <?= $consent['expires_at']->format('M j, Y') ?></span>
                                     </div>
                                 <?php endif; ?>
 
