@@ -3,11 +3,18 @@
 namespace App\Tests\Unit\Mail;
 
 use App\Framework\Mail\Mailable;
-use PHPUnit\Framework\TestCase;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class MailableTest extends TestCase
+class MailableTest extends FunctionalTestCase
 {
     private TestMailable $mailable;
+
+    public function setUp(): void
+    {
+        $this->mailable = new TestMailable();
+
+        parent::setUp();
+    }
 
     public function testSubjectCanBeSet(): void
     {
@@ -182,11 +189,6 @@ class MailableTest extends TestCase
 
         $this->assertFalse($this->mailable->isViewPath('**bold**'));
         $this->assertFalse($this->mailable->isViewPath('@button(text, url)'));
-    }
-
-    protected function setUp(): void
-    {
-        $this->mailable = new TestMailable();
     }
 }
 

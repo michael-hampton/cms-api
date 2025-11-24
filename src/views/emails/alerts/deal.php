@@ -15,9 +15,11 @@ We've found <?= $dealCount ?> amazing deal<?= $dealCount > 1 ? 's' : '' ?> based
         <?= htmlspecialchars(substr($deal['description'], 0, 150)) ?>...
     <?php endif; ?>
 
-    **Original Price:** ~~$<?= number_format($deal['original_price'], 2) ?>~~
-    **Deal Price:** @price(<?= number_format($deal['deal_price'], 2) ?>)
-    **You Save:** $<?= number_format($deal['original_price'] - $deal['deal_price'], 2) ?> (<?= $deal['discount_percentage'] ?>% OFF)
+    @table(Price Details|Amount)
+    @row(Original Price|~~$<?= number_format($deal['original_price'], 2) ?>~~)
+    @row(Deal Price|@price(<?= number_format($deal['deal_price'], 2) ?>))
+    @row(You Save|$<?= number_format($deal['original_price'] - $deal['deal_price'], 2) ?> (<?= $deal['discount_percentage'] ?>% OFF))
+    @endtable
 
     <?php if (!empty($deal['expires_at'])): ?>
         @panel(⏰ Hurry! This deal expires on <?= date('F j, Y \a\t g:i A', strtotime($deal['expires_at'])) ?>)

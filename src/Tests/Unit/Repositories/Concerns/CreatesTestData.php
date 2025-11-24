@@ -15,6 +15,7 @@ use App\Models\ConsentAuditLog;
 use App\Models\ConsentType;
 use App\Models\ConsentWithdrawalRequest;
 use App\Models\CustomFieldDefinition;
+use App\Models\EmailTheme;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
@@ -563,6 +564,18 @@ trait CreatesTestData
             'type' => 'all_marketing',
             'status' => 'pending',
             'requested_at' => now_datetime()
+        ], $attributes));
+    }
+
+    protected function createEmailTheme(array $attributes = []): EmailTheme
+    {
+        return EmailTheme::create(array_merge([
+            'name' => 'Test Theme ' . uniqid(),
+            'slug' => 'test-theme-' . uniqid(),
+            'description' => 'Test theme description',
+            'is_active' => true,
+            'is_default' => false,
+            'site_id' => $this->siteId ?? 1
         ], $attributes));
     }
 

@@ -24,26 +24,11 @@ Your subscription is confirmed! Welcome aboard – we're thrilled to have you as
 
 ## What's Coming Your Way
 
-Here's what you can look forward to:
+@panel(📰 **Weekly Digest** - Every Monday at 9 AM, get a curated roundup of latest blog posts, product spotlights, and industry news)
 
-### 📰 Weekly Digest
-Every **Monday at 9 AM**, get a curated roundup of:
-- Latest blog posts and articles
-- Product spotlights and recommendations
-- Industry news and trends
-- Community highlights
+@panel(🎁 **Exclusive Perks** - Early access to sales, subscriber-only discount codes, and VIP invitations)
 
-### 🎁 Exclusive Subscriber Perks
-- Early access to sales and new products
-- Subscriber-only discount codes
-- VIP invitations to special events
-- Free shipping offers
-
-### 💡 Educational Content
-- How-to guides and tutorials
-- Expert tips and best practices
-- Case studies and success stories
-- Video content and webinars
+@panel(💡 **Educational Content** - How-to guides, expert tips, case studies, and video content)
 
 @divider
 
@@ -51,10 +36,7 @@ Every **Monday at 9 AM**, get a curated roundup of:
 
 Stay connected on social media for even more content:
 
-📘 **Facebook:** facebook.com/yourstore
-📷 **Instagram:** @yourstore
-🐦 **Twitter:** @yourstore
-💼 **LinkedIn:** linkedin.com/company/yourstore
+📘 Facebook | 📷 Instagram | 🐦 Twitter | 💼 LinkedIn
 
 @buttonSecondary(Follow Us, <?= config('app.url') ?>/social)
 
@@ -62,25 +44,14 @@ Stay connected on social media for even more content:
 
 ## Customize Your Experience
 
-Want to adjust what you receive or how often? You're in control!
-
 @table(Preference|Action)
 @row(Email Frequency|Update how often we email you)
 @row(Content Types|Choose topics you're interested in)
 @row(Promotions|Opt in/out of special offers)
-@row(Unsubscribe|Leave anytime, no hard feelings)
+@row(Unsubscribe|Leave anytime\, no hard feelings)
 @endtable
 
 @buttonSecondary(Manage Preferences, <?= config('app.url') ?>/newsletter/preferences?email=<?= urlencode($email) ?>)
-
-@divider
-
-## Quick Links
-
-🛍️ [Shop Now](<?= config('app.url') ?>/shop)
-📖 [Read Our Blog](<?= config('app.url') ?>/blog)
-🎓 [Learning Center](<?= config('app.url') ?>/learn)
-💬 [Contact Us](<?= config('app.url') ?>/contact)
 
 @divider
 
@@ -93,4 +64,4 @@ Have questions? Want to share feedback? We'd love to hear from you!
 
 Thanks again for subscribing. We promise to make it worth your while!
 
-@subcopy(You're receiving this because you confirmed your subscription to our newsletter. To unsubscribe or manage your preferences, click here.)
+@subcopy(You're receiving this because you confirmed your subscription to our newsletter. To unsubscribe or manage your preferences\, click the link above.)

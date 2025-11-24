@@ -10,7 +10,7 @@ Thanks for subscribing to our newsletter! We're excited to keep you updated with
 
 To make sure we have the right email address and that you really want to hear from us, please confirm your subscription:
 
-@button(Yes, Subscribe Me!, <?= $confirmationUrl ?>)
+@button(Yes\, Subscribe Me!, <?= $confirmationUrl ?>)
 
 @panel(⏰ This confirmation link will expire in 48 hours)
 
@@ -20,13 +20,16 @@ To make sure we have the right email address and that you really want to hear fr
 
 Once confirmed, here's what you can expect from us:
 
-📰 **Weekly Newsletter** - Industry news, tips, and insights
-🎁 **Exclusive Offers** - Special discounts for subscribers only
-🚀 **Product Updates** - Be the first to know about new releases
-💡 **Tips & Guides** - Expert advice and how-to content
-🎉 **Special Announcements** - VIP access to events and sales
+@table(Content|Frequency)
+@row(📰 Weekly Newsletter|Industry news\, tips\, and insights)
+@row(🎁 Exclusive Offers|Special discounts for subscribers only)
+@row(🚀 Product Updates|Be the first to know about new releases)
+@row(💡 Tips & Guides|Expert advice and how-to content)
+@row(🎉 Special Announcements|VIP access to events and sales)
+@endtable
 
 <?php if (!empty($preferences)): ?>
+    @divider
 
     ## Your Preferences
 
@@ -43,10 +46,10 @@ Once confirmed, here's what you can expect from us:
 
 We respect your inbox! Here's our promise:
 
-- 📅 **Weekly digest** every Monday morning
-- 🎯 **Special offers** 2-3 times per month
-- 📢 **Important announcements** as needed
-- 🚫 **No spam** - ever!
+@panel(📅 Weekly digest every Monday morning
+🎯 Special offers 2-3 times per month
+📢 Important announcements as needed
+🚫 No spam - ever!)
 
 You can update your preferences or unsubscribe at any time.
 
@@ -58,6 +61,6 @@ If you didn't request this subscription, simply ignore this email. You won't be 
 
 @buttonSecondary(Manage Preferences, <?= config('app.url') ?>/newsletter/preferences?email=<?= urlencode($email) ?>)
 
-@subcopy(If you're having trouble clicking the confirmation button, copy and paste this URL into your browser: <?= $confirmationUrl ?>)
+@subcopy(If you're having trouble clicking the confirmation button\, copy and paste this URL into your browser: <?= $confirmationUrl ?>)
 
 @subcopy(Your email: <?= $email ?> | You can unsubscribe at any time using the link at the bottom of any newsletter.)

@@ -1,8 +1,12 @@
+// src/views/emails/orders/confirmation.php
+
 # Order Confirmation
 
 Hello **{{ $customerName }}**,
 
 Thank you for your order! We're pleased to confirm that we've received your order and it's being processed.
+
+@panel(📦 Your order is confirmed and will be processed shortly)
 
 ## Order Details
 
@@ -10,33 +14,39 @@ Thank you for your order! We're pleased to confirm that we've received your orde
 **Order Date:** {{ $order->created_at->format('F j, Y') }}
 **Status:** {{ ucfirst($order->status) }}
 
+@divider
+
 ## Items Ordered
 
 @foreach($order->items as $item)
----
 **{{ htmlspecialchars($item->product_name) }}**
-Quantity: {{ $item->quantity }}
-Price: ${{ number_format($item->unit_price, 2) }}
-Subtotal: ${{ number_format($item->subtotal, 2) }}
+- Quantity: {{ $item->quantity }}
+- Price: ${{ number_format($item->unit_price, 2) }}
+- Subtotal: ${{ number_format($item->subtotal, 2) }}
+
 @endforeach
 
----
+@divider
 
 ## Order Summary
 
-Subtotal: ${{ number_format($order->subtotal, 2) }}
+| Item | Amount |
+|------|--------|
+| Subtotal | ${{ number_format($order->subtotal, 2) }} |
 @if($order->shipping_cost > 0)
-Shipping: ${{ number_format($order->shipping_cost, 2) }}
+| Shipping | ${{ number_format($order->shipping_cost, 2) }} |
 @endif
 @if($order->tax > 0)
-Tax: ${{ number_format($order->tax, 2) }}
+| Tax | ${{ number_format($order->tax, 2) }} |
 @endif
 @if($order->discount > 0)
-Discount: -${{ number_format($order->discount, 2) }}
+| Discount | -${{ number_format($order->discount, 2) }} |
 @endif
-**Total:** @price({{ number_format($order->total, 2) }})
+| **Total** | **@price({{ number_format($order->total, 2) }})** |
 
 @if($shippingAddress)
+@divider
+
 ## Shipping Address
 
 {{ htmlspecialchars($shippingAddress['name'] ?? '') }}
@@ -48,8 +58,10 @@ Discount: -${{ number_format($order->discount, 2) }}
 {{ htmlspecialchars($shippingAddress['country']) }}
 @endif
 
-@button(View Order, {{ config('app.url') }}/orders/{{ $order->order_number }})
+@button(View Order Details, {{ config('app.url') }}/orders/{{ $order->order_number }})
 
-If you have any questions about your order, please don't hesitate to contact us.
+@buttonSecondary(Track Your Order, {{ config('app.url') }}/orders/{{ $order->order_number }}/track)
 
-Thank you for your business!
+@divider
+
+@subcopy(If you have any questions about your order, please don't hesitate to contact us. Thank you for your business!)

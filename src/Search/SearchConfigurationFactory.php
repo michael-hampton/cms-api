@@ -5,12 +5,12 @@ namespace App\Search;
 use App\Search\Configurations\AuthorSearchConfiguration;
 use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
+use App\Search\Configurations\EmailThemeSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
-use App\Search\Configurations\RefundSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
@@ -33,7 +33,8 @@ class SearchConfigurationFactory
         'region_set' => RegionSetSearchConfiguration::class,
         'territory' => TerritorySearchConfiguration::class,
         'page_grid' => PageGridSearchConfiguration::class,
-        'refund' => RefundSearchConfiguration::class,
+        'refund' => EmailThemeSearchConfiguration::class,
+        'email-theme' => EmailThemeSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

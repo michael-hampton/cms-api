@@ -27,14 +27,14 @@ No worries! It happens to the best of us.
 
 If you didn't request a password reset, you can safely ignore this email. Someone may have entered your email address by mistake.
 
-**Your account is secure** - no changes have been made.
+@panel(🔒 Your account is secure - no changes have been made)
 
 However, if you're concerned about your account security:
 
-- Make sure your password is strong and unique
-- Never share your password with anyone
-- Be cautious of phishing emails
-- Contact us if you notice any suspicious activity
+✓ Make sure your password is strong and unique
+✓ Never share your password with anyone
+✓ Be cautious of phishing emails
+✓ Contact us if you notice any suspicious activity
 
 @buttonSecondary(Contact Support, <?= config('app.url') ?>/support)
 
@@ -47,6 +47,6 @@ However, if you're concerned about your account security:
 🔐 **Don't reuse passwords** across different websites
 🔐 **Update your password regularly** every 3-6 months
 
-@subcopy(If the button doesn't work, copy and paste this URL into your browser: <?= $resetUrl ?>)
+@subcopy(If the button doesn't work\, copy and paste this URL into your browser: <?= $resetUrl ?>)
 
-@subcopy(This password reset link will expire on <?= date('F j, Y \a\t g:i A', strtotime('+' . $expiresInMinutes . ' minutes')) ?> for your security.)
+@subcopy(This password reset link will expire on <?= date('F j\, Y \a\t g:i A', strtotime('+' . $expiresInMinutes . ' minutes')) ?> for your security.)

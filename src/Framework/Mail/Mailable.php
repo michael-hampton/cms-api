@@ -3,7 +3,9 @@
 namespace App\Framework\Mail;
 
 use App\Framework\Support\Config;
+use App\Framework\Support\SiteContext;
 use App\Framework\Support\View;
+use App\Models\EmailTheme;
 
 abstract class Mailable
 {
@@ -19,15 +21,51 @@ abstract class Mailable
     public ?string $view = null;
     public ?string $markdown = null;
     public ?string $textView = null;
+    public ?EmailTheme $theme = null;
+    public ?string $themeSlug = null;
+    protected ?int $siteId = null;
 
     public function __construct()
     {
         $config = Config::get('mail');
         $this->from = $config['from']['address'] ?? '';
         $this->fromName = $config['from']['name'] ?? '';
+
+        // Get current site ID from context
+        $this->siteId = Sitecontext::getId();
     }
 
     abstract public function build(): self;
+
+    protected function loadTheme(): void
+    {
+        if ($this->theme !== null) {
+            return;
+        }
+
+        if ($this->themeSlug !== null) {
+            // Load specific theme by slug
+            $this->theme = EmailTheme::bySlug($this->themeSlug)
+                ->bySite($this->siteId)
+                ->active()
+                ->first();
+        }
+
+        // Fallback to default theme for site
+        if ($this->theme === null) {
+            $this->theme = EmailTheme::default()
+                ->where('site_id', $this->siteId)
+                ->where('is_active', true)
+                ->first();
+        }
+    }
+
+    public function theme(string $slug): self
+    {
+        $this->themeSlug = $slug;
+        $this->theme = null; // Force reload
+        return $this;
+    }
 
     public function subject(string $subject): self
     {
@@ -127,6 +165,9 @@ abstract class Mailable
 
     public function render(): string
     {
+        // Ensure theme is loaded
+        $this->loadTheme();
+
         if ($this->markdown) {
             return $this->renderMarkdown();
         }
@@ -155,9 +196,6 @@ abstract class Mailable
         return $html;
     }
 
-    /**
-     * Check if the markdown string is a view path or raw content
-     */
     protected function isViewPath(string $markdown): bool
     {
         // If it contains path separators or dots (view notation), it's likely a path
@@ -176,9 +214,6 @@ abstract class Mailable
         return false;
     }
 
-    /**
-     * Process raw markdown content with view data
-     */
     protected function processRawMarkdown(string $markdown): string
     {
         // Extract variables for use in evaluation
@@ -210,9 +245,6 @@ abstract class Mailable
         return $markdown;
     }
 
-    /**
-     * Safely evaluate a PHP expression with given data
-     */
     protected function evaluateExpression(string $expression, array $data): mixed
     {
         extract($data, EXTR_SKIP);
@@ -230,10 +262,18 @@ abstract class Mailable
     {
         $html = $markdown;
 
+        // Get theme colors
+        $primaryColor = $this->theme ? $this->theme->getColor('primary', '#4CAF50') : '#4CAF50';
+        $successColor = $this->theme ? $this->theme->getColor('success', '#4CAF50') : '#4CAF50';
+        $secondaryColor = $this->theme ? $this->theme->getColor('secondary', '#6c757d') : '#6c757d';
+        $warningColor = $this->theme ? $this->theme->getColor('warning', '#ffc107') : '#ffc107';
+        $textColor = $this->theme ? $this->theme->getColor('text', '#2c3e50') : '#2c3e50';
+        $textLightColor = $this->theme ? $this->theme->getColor('text_light', '#7f8c8d') : '#7f8c8d';
+
         // Headers
-        $html = preg_replace('/^# (.+)$/m', '<h1 style="color:#2c3e50;font-size:24px;margin:20px 0 10px;">$1</h1>', $html);
-        $html = preg_replace('/^## (.+)$/m', '<h2 style="color:#34495e;font-size:20px;margin:18px 0 8px;">$1</h2>', $html);
-        $html = preg_replace('/^### (.+)$/m', '<h3 style="color:#7f8c8d;font-size:16px;margin:16px 0 6px;">$1</h3>', $html);
+        $html = preg_replace('/^# (.+)$/m', '<h1 style="color:' . $textColor . ';font-size:24px;margin:20px 0 10px;">$1</h1>', $html);
+        $html = preg_replace('/^## (.+)$/m', '<h2 style="color:' . $textColor . ';font-size:20px;margin:18px 0 8px;">$1</h2>', $html);
+        $html = preg_replace('/^### (.+)$/m', '<h3 style="color:' . $textLightColor . ';font-size:16px;margin:16px 0 6px;">$1</h3>', $html);
 
         // Bold
         $html = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html);
@@ -245,37 +285,40 @@ abstract class Mailable
         $html = preg_replace('/~~(.+?)~~/', '<del style="text-decoration:line-through;">$1</del>', $html);
 
         // Links
-        $html = preg_replace('/\[(.+?)\]\((.+?)\)/', '<a href="$2" style="color:#3498db;text-decoration:none;">$1</a>', $html);
+        $linkColor = $this->theme ? $this->theme->getColor('link', '#3498db') : '#3498db';
+        $html = preg_replace('/\[(.+?)\]\((.+?)\)/', '<a href="$2" style="color:' . $linkColor . ';text-decoration:none;">$1</a>', $html);
 
         // PRIMARY BUTTON - @button(text, url)
         $html = preg_replace('/@button\(([^,]+),\s*([^)]+)\)/',
-            '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td align="center"><a href="$2" style="display:inline-block;padding:12px 30px;background:#4CAF50;color:white;text-decoration:none;border-radius:5px;font-weight:bold;font-size:16px;">$1</a></td></tr></table>',
+            '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td align="center"><a href="$2" style="display:inline-block;padding:12px 30px;background:' . $successColor . ';color:white;text-decoration:none;border-radius:5px;font-weight:bold;font-size:16px;">$1</a></td></tr></table>',
             $html);
 
         // SECONDARY BUTTON - @buttonSecondary(text, url)
         $html = preg_replace('/@buttonSecondary\(([^,]+),\s*([^)]+)\)/',
-            '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td align="center"><a href="$2" style="display:inline-block;padding:10px 24px;background:#6c757d;color:white;text-decoration:none;border-radius:5px;font-size:14px;">$1</a></td></tr></table>',
+            '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td align="center"><a href="$2" style="display:inline-block;padding:10px 24px;background:' . $secondaryColor . ';color:white;text-decoration:none;border-radius:5px;font-size:14px;">$1</a></td></tr></table>',
             $html);
 
         // PANEL/CALLOUT - @panel(content)
+        $panelBg = $this->theme ? $this->theme->getColor('card_background', '#f8f9fa') : '#f8f9fa';
         $html = preg_replace('/@panel\((.+?)\)/',
-            '<div style="background:#f8f9fa;border-left:4px solid #4CAF50;padding:15px;margin:15px 0;border-radius:4px;">$1</div>',
+            '<div style="background:' . $panelBg . ';border-left:4px solid ' . $primaryColor . ';padding:15px;margin:15px 0;border-radius:4px;">$1</div>',
             $html);
 
         // PROMOTION BOX - @promotion(content)
         $html = preg_replace('/@promotion\((.+?)\)/',
-            '<div style="background:#fff3cd;border:2px solid #ffc107;padding:15px;margin:15px 0;border-radius:6px;text-align:center;"><strong style="color:#856404;font-size:16px;">$1</strong></div>',
+            '<div style="background:#fff3cd;border:2px solid ' . $warningColor . ';padding:15px;margin:15px 0;border-radius:6px;text-align:center;"><strong style="color:#856404;font-size:16px;">$1</strong></div>',
             $html);
 
         // TABLE - @table(header1|header2|header3) ... @row(cell1|cell2|cell3) ... @endtable
-        $html = preg_replace_callback('/@table\(([^)]+)\)(.*?)@endtable/s', function ($matches) {
+        $borderColor = $this->theme ? $this->theme->getColor('border', '#ddd') : '#ddd';
+        $html = preg_replace_callback('/@table\(([^)]+)\)(.*?)@endtable/s', function ($matches) use ($borderColor, $panelBg) {
             $headers = explode('|', $matches[1]);
             $rows = $matches[2];
 
-            $tableHtml = '<table style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #ddd;">';
+            $tableHtml = '<table style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid ' . $borderColor . ';">';
             $tableHtml .= '<thead><tr>';
             foreach ($headers as $header) {
-                $tableHtml .= '<th style="border:1px solid #ddd;padding:12px;background:#f8f9fa;text-align:left;font-weight:bold;">' . trim($header) . '</th>';
+                $tableHtml .= '<th style="border:1px solid ' . $borderColor . ';padding:12px;background:' . $panelBg . ';text-align:left;font-weight:bold;">' . trim($header) . '</th>';
             }
             $tableHtml .= '</tr></thead><tbody>';
 
@@ -284,7 +327,7 @@ abstract class Mailable
                 $cells = explode('|', $row);
                 $tableHtml .= '<tr>';
                 foreach ($cells as $cell) {
-                    $tableHtml .= '<td style="border:1px solid #ddd;padding:12px;">' . trim($cell) . '</td>';
+                    $tableHtml .= '<td style="border:1px solid ' . $borderColor . ';padding:12px;">' . trim($cell) . '</td>';
                 }
                 $tableHtml .= '</tr>';
             }
@@ -295,21 +338,21 @@ abstract class Mailable
 
         // DIVIDER - @divider
         $html = preg_replace('/@divider/',
-            '<hr style="border:none;border-top:2px solid #e9ecef;margin:25px 0;">',
+            '<hr style="border:none;border-top:2px solid ' . $borderColor . ';margin:25px 0;">',
             $html);
 
         // PRICE - @price(amount)
         $html = preg_replace('/@price\(([0-9.]+)\)/',
-            '<span style="font-size:24px;font-weight:bold;color:#2c3e50;">$$$1</span>',
+            '<span style="font-size:24px;font-weight:bold;color:' . $textColor . ';">$$$1</span>',
             $html);
 
         // SUBCOPY - @subcopy(text)
         $html = preg_replace('/@subcopy\((.+?)\)/',
-            '<p style="font-size:12px;color:#6c757d;margin-top:30px;padding-top:20px;border-top:1px solid #dee2e6;line-height:1.6;">$1</p>',
+            '<p style="font-size:12px;color:' . $textLightColor . ';margin-top:30px;padding-top:20px;border-top:1px solid ' . $borderColor . ';line-height:1.6;">$1</p>',
             $html);
 
         // Horizontal rule ---
-        $html = preg_replace('/^---$/m', '<hr style="border:none;border-top:1px solid #dee2e6;margin:20px 0;">', $html);
+        $html = preg_replace('/^---$/m', '<hr style="border:none;border-top:1px solid ' . $borderColor . ';margin:20px 0;">', $html);
 
         // Line breaks (but not inside HTML tags we just created)
         $html = preg_replace('/\n(?![^<]*>)/', '<br>', $html);
@@ -323,6 +366,42 @@ abstract class Mailable
         $appName = Config::get('app.name', 'Application');
         $appUrl = Config::get('app.url', 'http://localhost');
 
+        // Get theme values
+        $primaryColor = $this->theme ? $this->theme->getColor('primary', '#667eea') : '#667eea';
+        $secondaryColor = $this->theme ? $this->theme->getColor('secondary', '#764ba2') : '#764ba2';
+        $backgroundColor = $this->theme ? $this->theme->getColor('background', '#f6f6f6') : '#f6f6f6';
+        $cardBackground = $this->theme ? $this->theme->getColor('card_background', '#ffffff') : '#ffffff';
+        $textColor = $this->theme ? $this->theme->getColor('text', '#333333') : '#333333';
+        $textLightColor = $this->theme ? $this->theme->getColor('text_light', '#6c757d') : '#6c757d';
+        $borderColor = $this->theme ? $this->theme->getColor('border', '#e9ecef') : '#e9ecef';
+
+        $bodyFont = $this->theme ? $this->theme->getFont('body') : null;
+        $fontFamily = $bodyFont ? $bodyFont['family'] : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+        $maxWidth = $this->theme ? $this->theme->getSetting('max_width', 600) : 600;
+        $borderRadius = $this->theme ? $this->theme->getSetting('border_radius', 8) : 8;
+        $headerGradient = $this->theme ? $this->theme->getSetting('header_gradient', 'linear-gradient(135deg, ' . $primaryColor . ' 0%, ' . $secondaryColor . ' 100%)') : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+
+        $showFooter = $this->theme ? $this->theme->getSetting('show_footer', true) : true;
+
+        // Get logo if available
+        $logo = $this->theme ? $this->theme->getAsset('logo') : null;
+        $logoHtml = '';
+        if ($logo) {
+            $logoHtml = '<img src="' . htmlspecialchars($logo['url']) . '" alt="' . htmlspecialchars($logo['alt'] ?? $appName) . '" style="max-height:50px;margin-bottom:10px;">';
+        }
+
+        $footerHtml = '';
+        if ($showFooter) {
+            $footerHtml = <<<HTML
+            <div class="email-footer">
+                <p><strong>{$this->fromName}</strong></p>
+                <p>© {date('Y')} {$appName}. All rights reserved.</p>
+                <p><a href="{$appUrl}">Visit our website</a></p>
+            </div>
+HTML;
+        }
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
@@ -335,80 +414,77 @@ abstract class Mailable
         body { 
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f6f6f6;
-        }
-        .email-wrapper {
-            width: 100%;
-            background-color: #f6f6f6;
-            padding: 20px 0;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .email-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px 20px;
-            text-align: center;
-        }
-        .email-header h1 {
-            margin: 0;
-            color: #ffffff;
-            font-size: 24px;
-            font-weight: 600;
-        }
-        .email-body {
-            padding: 40px 30px;
-        }
-        .email-footer {
-            background-color: #f8f9fa;
-            padding: 30px;
-            text-align: center;
-            border-top: 1px solid #e9ecef;
-        }
-        .email-footer p {
-            margin: 5px 0;
-            font-size: 12px;
-            color: #6c757d;
-        }
-        .email-footer a {
-            color: #667eea;
-            text-decoration: none;
-        }
-        p {
-            margin: 0 0 15px;
-        }
-        @media only screen and (max-width: 600px) {
-            .email-body {
-                padding: 20px 15px !important;
-            }
-            .email-footer {
-                padding: 20px 15px !important;
-            }
-        }
-    </style>
+            font-family: {$fontFamily};
+line-height: 1.6;
+color: {$textColor};
+background-color: {$backgroundColor};
+}
+.email-wrapper {
+width: 100%;
+background-color: {$backgroundColor};
+padding: 20px 0;
+}
+.email-container {
+max-width: {$maxWidth}px;
+margin: 0 auto;
+background-color: {$cardBackground};
+border-radius: {$borderRadius}px;
+overflow: hidden;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.email-header {
+background: {$headerGradient};
+padding: 30px 20px;
+text-align: center;
+}
+.email-header h1 {
+margin: 0;
+color: #ffffff;
+font-size: 24px;
+font-weight: 600;
+}
+.email-body {
+padding: 40px 30px;
+}
+.email-footer {
+background-color: {$cardBackground};
+padding: 30px;
+text-align: center;
+border-top: 1px solid {$borderColor};
+}
+.email-footer p {
+margin: 5px 0;
+font-size: 12px;
+color: {$textLightColor};
+}
+.email-footer a {
+color: {$primaryColor};
+text-decoration: none;
+}
+p {
+margin: 0 0 15px;
+}
+@media only screen and (max-width: 600px) {
+.email-body {
+padding: 20px 15px !important;
+}
+.email-footer {
+padding: 20px 15px !important;
+}
+}
+</style>
 </head>
 <body>
     <div class="email-wrapper">
         <div class="email-container">
             <div class="email-header">
+                {$logoHtml}
                 <h1>{$appName}</h1>
             </div>
             <div class="email-body">
                 {$content}
             </div>
-            <div class="email-footer">
-                <p><strong>{$this->fromName}</strong></p>
-                <p>© {date('Y')} {$appName}. All rights reserved.</p>
-                <p><a href="{$appUrl}">Visit our website</a></p>
-            </div>
+            {$footerHtml}
         </div>
     </div>
 </body>

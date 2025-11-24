@@ -10,6 +10,7 @@ use App\Controllers\CategoryController;
 use App\Controllers\CommentController;
 use App\Controllers\CustomFieldDefinitionController;
 use App\Controllers\DealsController;
+use App\Controllers\EmailThemeController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
 use App\Controllers\MemberController;
@@ -75,6 +76,17 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/member/activity/stats', 'Api\MemberActivityApiController@stats');
         $router->get('/member/activity/trends', 'Api\MemberActivityApiController@trends');
         $router->get('/member/badges/progress', 'Api\MemberActivityApiController@badgeProgress');
+
+        $router->get('/email-themes', [EmailThemeController::class, 'index']);
+        $router->get('/email-themes/active', [EmailThemeController::class, 'getActive']);
+        $router->post('/email-themes', [EmailThemeController::class, 'store']);
+        $router->get('/email-themes/{id}', [EmailThemeController::class, 'show']);
+        $router->put('/email-themes/{id}', [EmailThemeController::class, 'update']);;
+        $router->delete('/email-themes/{id}', [EmailThemeController::class, 'destroy']);;
+        $router->post('/email-themes/{id}/set-default', [EmailThemeController::class, 'setDefault']);
+        $router->get('/email-themes/{id}/alternatives', [EmailThemeController::class, 'alternatives']);
+        $router->post('/email-themes/{id}/duplicate', [EmailThemeController::class, 'duplicate']);
+        $router->post('/email-themes/bulk-delete', [EmailThemeController::class, 'bulkDelete']);;
 
         $router->get('/payments', [PaymentController::class, 'index']);
         $router->get('/payments/by-transaction', [PaymentController::class, 'byTransaction']);

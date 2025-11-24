@@ -36,4 +36,4 @@ Great news! The price on a product you've been watching has dropped!
 
 @buttonSecondary(View Product, <?= config('app.url') ?>/products/<?= $product->slug ?? $product->id ?>)
 
-@subcopy(You're receiving this because you set a price alert for this product. To manage your alerts, visit your account settings.)
+@subcopy(You're receiving this because you set a price alert for this product. To manage your alerts\, visit your account settings.)
