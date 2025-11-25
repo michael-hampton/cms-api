@@ -16,6 +16,7 @@ use App\Repositories\CommentRepository;
 use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
 use App\Services\BlockParserService;
+use App\Services\SubscriptionModalService;
 use App\Services\Url\UrlResolutionResult;
 
 class ContentController extends Controller
@@ -25,7 +26,8 @@ class ContentController extends Controller
         private readonly CommentRepository  $commentRepository,
         private readonly PageViewRepository $pageViewRepository,
         private readonly PageGridRepository $pageGridRepository,
-        private readonly ActivityTracking $activityTracking
+        private readonly ActivityTracking         $activityTracking,
+        private readonly SubscriptionModalService $modalService
     ) {
         parent::__construct();
     }
@@ -53,8 +55,10 @@ class ContentController extends Controller
             'seo', 'settings', 'social', 'customFields', 'authors', 'products'
         ]);
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $memberId = $member ? $member->id : null;
+
+        $modalData = $this->modalService->getModalData($member, $siteId);
 
         $this->pageViewRepository->recordView(
             $page->id,
@@ -73,7 +77,8 @@ class ContentController extends Controller
             'page' => $page,
             'blockParserService' => $this->blockParserService,
             'site' => SiteContext::get(),
-            'member' => $member
+            'member' => $member,
+            'subscriptionModalData' => $modalData
         ];
 
         $data['allCategories'] = Category::where('site_id', $siteId)

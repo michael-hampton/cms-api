@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Framework\Support\SiteContext;
+
 class Member extends Model
 {
     protected $fillable = [
@@ -149,10 +151,14 @@ class Member extends Model
         return $this->hasMany(Subscription::class, 'member_id', 'id', $relation);
     }
 
-    public function activeSubscription($relation = false)
+    public function activeSubscription($relation = false, ?int $siteId = null)
     {
+        $siteId = $siteId ?? SiteContext::getId();
+
         return $this->hasOne(Subscription::class, 'member_id', 'id', $relation)
-            ->where('status', 'active');
+            ->where('status', 'active')
+            ->where('site_id', $siteId)
+            ->first();
     }
 
     public function comments($relation = false)
@@ -234,5 +240,51 @@ class Member extends Model
     public function site($relation = false)
     {
         return $this->belongsTo(Site::class, 'site_id', 'id', $relation);
+    }
+
+    public function subscriptionPreference($relation = false)
+    {
+        return $this->hasOne(MemberSubscriptionPreference::class, 'member_id', 'id', $relation);
+    }
+
+    public function newsletters($relation = false)
+    {
+        return $this->hasMany(Subscriber::class, 'email', 'email', $relation)
+            ->where('site_id', $this->site_id);
+    }
+
+    public function hasActiveSubscription(): bool
+    {
+        if (!$this->relationLoaded('subscriptionPreference')) {
+            $this->load(['subscriptionPreference']);
+        }
+
+        $preference = $this->subscriptionPreference;
+        return $preference && $preference->is_active;
+    }
+
+    public function getSubscriptionPreference(): ?MemberSubscriptionPreference
+    {
+        if (!$this->relationLoaded('subscriptionPreference')) {
+            $this->load(['subscriptionPreference']);
+        }
+
+        return $this->subscriptionPreference;
+    }
+
+    public function createDefaultSubscriptionPreference(): MemberSubscriptionPreference
+    {
+        $token = bin2hex(random_bytes(32));
+
+        return MemberSubscriptionPreference::create([
+            'member_id' => $this->id,
+            'site_id' => $this->site_id,
+            'email_notifications' => true,
+            'newsletter_frequency' => 'weekly',
+            'content_types' => null,
+            'category_preferences' => null,
+            'unsubscribe_token' => $token,
+            'is_active' => true
+        ]);
     }
 }

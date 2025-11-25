@@ -32,6 +32,7 @@ use App\Controllers\RegionSetController;
 use App\Controllers\ReviewController;
 use App\Controllers\SearchController;
 use App\Controllers\SiteController;
+use App\Controllers\SubscriptionModalController;
 use App\Controllers\TagController;
 use App\Controllers\TerritoryController;
 use App\Controllers\UserController;
@@ -479,6 +480,9 @@ $router->get('/api/{siteName}/deals/filtered', [DealsController::class, 'filtere
 // Price alerts
 $router->post('/api/price-alerts', [DealsController::class, 'createPriceAlert']);
 $router->post('/api/deal-alerts/subscribe', [DealsController::class, 'subscribeDealAlert']);
+
+$router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalController::class, 'markShown']);
+
 
 
 

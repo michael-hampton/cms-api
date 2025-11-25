@@ -31,21 +31,18 @@ class Subscriber extends Model
 
     public static function findByConfirmationToken(string $token): ?self
     {
-        $result = static::where('confirmation_token', $token)->first();
-        return $result ? new self($result) : null;
+        return static::where('confirmation_token', $token)->first();
     }
 
     public static function findByUnsubscribeToken(string $token): ?self
     {
-        $result = static::where('unsubscribe_token', $token)->first();
-        return $result ? new self($result) : null;
+        return static::where('unsubscribe_token', $token)->first();
     }
 
     public static function getConfirmedEmails(int $siteId): array
     {
         return static::where('confirmed', true)
             ->where('site_id', $siteId)
-            ->pluck('email')
-            ->toArray();
+            ->pluck('email');
     }
 }

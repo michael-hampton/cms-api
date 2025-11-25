@@ -107,13 +107,13 @@ class CloneEmailTheme
             }
 
             // Add clone history
-            $cloneHistory = $original->clone_history ?? [];
-            $cloneHistory[] = [
-                'cloned_from_id' => $original->id,
-                'cloned_at' => date('Y-m-d H:i:s'),
-                'cloned_by' => auth()->id() ?? null
-            ];
-            $cloned->update(['clone_history' => $cloneHistory]);
+//            $cloneHistory = $original->clone_history ?? [];
+//            $cloneHistory[] = [
+//                'cloned_from_id' => $original->id,
+//                'cloned_at' => date('Y-m-d H:i:s'),
+//                'cloned_by' => auth()->id() ?? null
+//            ];
+//            $cloned->update(['clone_history' => $cloneHistory]);
 
             return [
                 'success' => true,

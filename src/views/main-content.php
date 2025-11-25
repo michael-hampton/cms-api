@@ -120,3 +120,7 @@ $pageGridAdded = false;
 @include('consent-banner', ['site' => $site])
 
 @js('base.js')
+
+<?php if (isset($subscriptionModalData)): ?>
+    @include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])
+<?php endif; ?>

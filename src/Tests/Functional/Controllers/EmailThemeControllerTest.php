@@ -190,59 +190,55 @@ class EmailThemeControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['data']['themes']['data']);
     }
 
-//    public function testDuplicateThemeSuccessfully()
-//    {
-//        $theme = $this->createEmailTheme([
-//            'name' => 'Original Theme',
-//            'slug' => 'original-theme',
-//            'description' => 'Original description'
-//        ]);
-//
-//        $response = $this->postForSite("/api/email-themes/{$theme->id}/duplicate");
-//
-//        echo '<pre>';
-//        print_r($response->getContent());
-//        die;
-//
-//        $this->assertResponseOk($response);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals('Original Theme (Copy)', $data['data']['theme']['name']);
-//        $this->assertEquals('Original description', $data['data']['theme']['description']);
-//        $this->assertNotEquals($theme->slug, $data['data']['theme']['slug']);
-//    }
-//
-//    public function testBulkDeleteSuccessfully()
-//    {
-//        $theme1 = $this->createEmailTheme(['is_default' => false]);
-//        $theme2 = $this->createEmailTheme(['is_default' => false]);
-//
-//        $response = $this->postForSite('/api/email-themes/bulk-delete', [
-//            'ids' => [$theme1->id, $theme2->id]
-//        ]);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertCount(2, $data['result']['deleted']);
-//        $this->assertCount(0, $data['result']['failed']);
-//
-//        $this->assertNull(EmailTheme::find($theme1->id));
-//        $this->assertNull(EmailTheme::find($theme2->id));
-//    }
-//
-//    public function testBulkDeleteFailsForDefaultTheme()
-//    {
-//        $theme = $this->createEmailTheme(['is_default' => true]);
-//
-//        $response = $this->postForSite('/api/email-themes/bulk-delete', [
-//            'ids' => [$theme->id]
-//        ]);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertCount(0, $data['result']['deleted']);
-//        $this->assertCount(1, $data['result']['failed']);
-//    }
+    public function testDuplicateThemeSuccessfully()
+    {
+        $theme = $this->createEmailTheme([
+            'name' => 'Original Theme',
+            'slug' => 'original-theme',
+            'description' => 'Original description'
+        ]);
+
+        $response = $this->postForSite("/api/email-themes/{$theme->id}/duplicate");
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Original Theme (Copy)', $data['data']['theme']['name']);
+        $this->assertEquals('Original description', $data['data']['theme']['description']);
+        $this->assertNotEquals($theme->slug, $data['data']['theme']['slug']);
+    }
+
+    public function testBulkDeleteSuccessfully()
+    {
+        $theme1 = $this->createEmailTheme(['is_default' => false]);
+        $theme2 = $this->createEmailTheme(['is_default' => false]);
+
+        $response = $this->postForSite('/api/email-themes/bulk-delete', [
+            'ids' => [$theme1->id, $theme2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['result']['deleted']);
+        $this->assertCount(0, $data['result']['failed']);
+
+        $this->assertNull(EmailTheme::find($theme1->id));
+        $this->assertNull(EmailTheme::find($theme2->id));
+    }
+
+    public function testBulkDeleteFailsForDefaultTheme()
+    {
+        $theme = $this->createEmailTheme(['is_default' => true]);
+
+        $response = $this->postForSite('/api/email-themes/bulk-delete', [
+            'ids' => [$theme->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(0, $data['result']['deleted']);
+        $this->assertCount(1, $data['result']['failed']);
+    }
 }

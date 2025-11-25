@@ -1,5 +1,6 @@
 <?php
 
+use App\Controllers\Admin\AdminSubscriptionPlansController;
 use App\Controllers\AuthorViewController;
 use App\Controllers\BlockController;
 use App\Controllers\BrandPageController;
@@ -21,12 +22,14 @@ use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
 use App\Controllers\Members\MemberReadingHistoryController;
+use App\Controllers\Members\MemberSubscriptionPlansController;
 use App\Controllers\Members\MemberSubscriptionsController;
 use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
+use App\Controllers\SubscriptionModalController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
 use App\Controllers\WishlistController;
@@ -195,7 +198,32 @@ $router->post('/{site}/member/orders/{id}/cancel', [MemberOrdersController::clas
 
 // Member Subscriptions Routes
 $router->get('/{site}/member/subscriptions', [MemberSubscriptionsController::class, 'index']);
-$router->post('/{site}/member/subscriptions/{id}/cancel', [MemberSubscriptionsController::class, 'cancel']);
+$router->get('/{site}/member/subscriptions/preferences', [MemberSubscriptionsController::class, 'preferences']);
+$router->post('/{site}/member/subscriptions/preferences', [MemberSubscriptionsController::class, 'updatePreferences']);
+$router->get('/{site}/member/subscriptions/unsubscribe/{token}', [MemberSubscriptionsController::class, 'unsubscribeForm']);
+$router->post('/{site}/member/subscriptions/unsubscribe/{token}', [MemberSubscriptionsController::class, 'unsubscribe']);
+$router->post('/{site}/member/subscriptions/resubscribe/{token}', [MemberSubscriptionsController::class, 'resubscribe']);
+$router->post('/{site}/member/subscriptions/{subscriptionId}/cancel', [MemberSubscriptionsController::class, 'cancel']);
+
+$router->get('/{site}/member/subscriptions/manage/{token}', [MemberSubscriptionsController::class, 'manageByToken']);
+$router->post('/{site}/member/subscriptions/manage/{token}', [MemberSubscriptionsController::class, 'updateByToken']);
+
+$router->get('/{site}/member/subscription-plans', [MemberSubscriptionPlansController::class, 'index']);
+$router->get('/{site}/member/subscription-plans/{slug}', [MemberSubscriptionPlansController::class, 'show']);;
+$router->post('/{site}/member/subscription-plans/{slug}/subscribe', [MemberSubscriptionPlansController::class, 'subscribe']);;
+
+$router->get('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'index']);
+$router->get('/{site}/admin/subscription-plans/create', [AdminSubscriptionPlansController::class, 'create']);
+$router->post('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'store']);;
+$router->get('/{site}/admin/subscription-plans/{id}/edit', [AdminSubscriptionPlansController::class, 'edit']);
+$router->put('/{site}/admin/subscription-plans/{id}', [AdminSubscriptionPlansController::class, 'update']);
+$router->delete('/{site}/admin/subscription-plans/{id}', [AdminSubscriptionPlansController::class, 'destroy']);
+$router->post('/{site}/admin/subscription-plans/{id}/toggle-active', [AdminSubscriptionPlansController::class, 'toggleActive']);
+$router->post('/{site}/admin/subscription-plans/{id}/toggle-featured', [AdminSubscriptionPlansController::class, 'toggleFeatured']);
+$router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalController::class, 'markShown']);
+
+
+
 
 // Member Newsletters Routes
 $router->get('/{site}/member/newsletters', [MemberNewslettersController::class, 'index']);

@@ -17,7 +17,8 @@ class Subscription extends Model
         'end_date',
         'auto_renew',
         'price',
-        'currency'
+        'currency',
+        'plan_id'
     ];
 
     protected $casts = [
@@ -34,8 +35,9 @@ class Subscription extends Model
 
     public function isActive(): bool
     {
+
         return $this->status === 'active' &&
-            ($this->end_date === null || strtotime($this->end_date) > time());
+            ($this->end_date === null || $this->end_date > new \DateTime());
     }
 
     public function isCancelled(): bool
@@ -46,7 +48,7 @@ class Subscription extends Model
     public function isExpired(): bool
     {
         return $this->status === 'expired' ||
-            ($this->end_date !== null && strtotime($this->end_date) <= time());
+            ($this->end_date !== null && $this->end_date <= new \DateTime());
     }
 
     public function scopeActive(QueryBuilder $query): QueryBuilder
@@ -57,5 +59,34 @@ class Subscription extends Model
     public function scopeByMember(QueryBuilder $query, int $memberId): QueryBuilder
     {
         return $query->where('member_id', $memberId);
+    }
+
+    public function plan($relation = false)
+    {
+        return $this->belongsTo(SubscriptionPlan::class, 'plan_id', 'id', $relation);
+    }
+
+    public function scopeByPlan(QueryBuilder $query, int $planId): QueryBuilder
+    {
+        return $query->where('plan_id', $planId);
+    }
+
+    public function isTrialing(): bool
+    {
+        if (!$this->plan) {
+            return false;
+        }
+
+        $trialEnds = (clone $this->start_date)->modify('+' . $this->plan->trial_days . ' days');
+        return $this->plan->trial_days > 0 && new \DateTime() <= $trialEnds;
+    }
+
+    public function trialEndsAt(): ?\DateTime
+    {
+        if (!$this->plan || $this->plan->trial_days <= 0) {
+            return null;
+        }
+
+        return (clone $this->start_date)->modify('+' . $this->plan->trial_days . ' days');
     }
 }
