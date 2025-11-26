@@ -25,6 +25,8 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function setUp(): void
     {
+        $this->cleanupServerGlobals();
+
         $_ENV['APP_ENV'] = 'testing';
         putenv('APP_ENV=testing'); // optional, for functions using getenv()
 
@@ -170,7 +172,54 @@ abstract class FunctionalTestCase extends TestCase
     protected function tearDown(): void
     {
         $this->cleanupDatabase();
+        $this->cleanupServerGlobals();
         parent::tearDown();
+    }
+
+    /**
+     * Clean up $_SERVER superglobal to prevent test pollution
+     */
+    protected function cleanupServerGlobals(): void
+    {
+        // Store the keys we want to preserve (PHPUnit and system-level vars)
+        $preserveKeys = [
+            'SERVER_NAME', 'SERVER_PORT', 'SCRIPT_NAME', 'SCRIPT_FILENAME',
+            'PHP_SELF', 'argv', 'argc', 'PWD', 'SHLVL', '_'
+        ];
+
+        // Remove all HTTP_* headers that were set during tests
+        foreach ($_SERVER as $key => $value) {
+            if (strpos($key, 'HTTP_') === 0 && !in_array($key, $preserveKeys)) {
+                unset($_SERVER[$key]);
+            }
+        }
+
+        // Reset request-related server variables but preserve system ones
+        $requestVars = [
+            'REQUEST_METHOD',
+            'REQUEST_URI',
+            'CONTENT_TYPE',
+            'QUERY_STRING',
+            'REQUEST_TIME',
+            'REQUEST_TIME_FLOAT'
+        ];
+
+        foreach ($requestVars as $var) {
+            if (isset($_SERVER[$var])) {
+                unset($_SERVER[$var]);
+            }
+        }
+
+        // Clean up superglobals
+        $_GET = [];
+        $_POST = [];
+        $_FILES = [];
+        $_REQUEST = [];
+
+        // Clean up session if exists
+        if (isset($_SESSION)) {
+            $_SESSION = [];
+        }
     }
 
     protected function runMigrations(): void

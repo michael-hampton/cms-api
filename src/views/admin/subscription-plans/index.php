@@ -160,7 +160,8 @@
 <div class="container">
     <div class="header">
         <h1>Subscription Plans</h1>
-        <a href="/admin/subscription-plans/create" class="btn btn-primary">
+        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/admin/subscription-plans/create"
+           class="btn btn-primary">
             + Create Plan
         </a>
     </div>
@@ -213,12 +214,12 @@
                         </td>
                         <td>
                             <div class="actions">
-                                <a href="/admin/subscription-plans/<?= $plan->id ?>/edit"
+                                <a href="<?= \App\Framework\Support\SiteContext::slug() ?>/admin/subscription-plans/<?= $plan->id ?>/edit"
                                    class="btn btn-sm btn-primary">
                                     Edit
                                 </a>
                                 <form method="POST"
-                                      action="/admin/subscription-plans/<?= $plan->id ?>/toggle-active"
+                                      action="<?= \App\Framework\Support\SiteContext::slug() ?>/admin/subscription-plans/<?= $plan->id ?>/toggle-active"
                                       style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-success">
                                         <?= $plan->is_active ? 'Deactivate' : 'Activate' ?>
@@ -233,7 +234,8 @@
         <?php else: ?>
             <div class="empty-state">
                 <p>No subscription plans yet.</p>
-                <a href="/admin/subscription-plans/create" class="btn btn-primary" style="margin-top: 20px;">
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/admin/subscription-plans/create"
+                   class="btn btn-primary" style="margin-top: 20px;">
                     Create Your First Plan
                 </a>
             </div>

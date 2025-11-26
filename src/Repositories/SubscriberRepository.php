@@ -41,22 +41,19 @@ class SubscriberRepository extends Repository
             ->get();
     }
 
-//    public function create(array $data): Subscriber
-//    {
-//        $result = Subscriber::create($data);
-//        return new Subscriber($result);
-//    }
-//
-//    public function update(Subscriber $subscriber, array $data): Subscriber
-//    {
-//        $subscriber->update($data);
-//        return $subscriber;
-//    }
-//
-//    public function delete(Subscriber $subscriber): bool
-//    {
-//        return $subscriber->delete();
-//    }
+
+    public function findByEmailAndNewsletter(string $email, int $newsletterId, int $siteId): ?Subscriber
+    {
+        return Subscriber::where('email', $email)
+            ->where('newsletter_id', $newsletterId)
+            ->where('site_id', $siteId)
+            ->first();
+    }
+
+    public function create(array $data): Subscriber
+    {
+        return Subscriber::create($data);
+    }
 
     protected function getModelClass(): string
     {

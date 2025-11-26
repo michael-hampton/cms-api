@@ -1,7 +1,3 @@
-<?php
-// views/components/categories-widget.php
-?>
-
 <div class="categories-widget">
     <div class="categories-widget-header">
         <h2 class="categories-widget-title">
@@ -16,7 +12,8 @@
     <div class="categories-grid">
         <?php if (!empty($categories) && count($categories) > 0): ?>
             <?php foreach ($categories as $category): ?>
-                <a href="/category/<?= urlencode($category->slug) ?>" class="category-card">
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>"
+                   class="category-card">
                     <?php if ($category->icon): ?>
                         <span class="category-icon"><?= $category->icon ?></span>
                     <?php endif; ?>

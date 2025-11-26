@@ -215,7 +215,6 @@ class Router
                 if ($result instanceof Response) {
                     return $result;
                 }
-
             }
 
             if ($controllerResolver->shouldUseController($urlResult->page)) {

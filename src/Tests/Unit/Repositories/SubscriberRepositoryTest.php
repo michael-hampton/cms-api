@@ -219,4 +219,138 @@ class SubscriberRepositoryTest extends RepositoryTestCase
         $this->assertCount(1, $result);
         $this->assertEquals($this->siteId, $result->first()->site_id);
     }
+
+    public function test_find_by_email_and_newsletter_returns_subscriber(): void
+    {
+        // Arrange
+        $newsletter = $this->createNewsletter();
+
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'newsletter_id' => $newsletter->id,
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId
+        ]);
+
+        // Act
+        $result = $this->repository->findByEmailAndNewsletter('test@example.com', $newsletter->id, $this->siteId);
+
+        // Assert
+        $this->assertNotNull($result);
+        $this->assertEquals($subscriber->id, $result->id);
+        $this->assertEquals('test@example.com', $result->email);
+        $this->assertEquals($newsletter->id, $result->newsletter_id);
+    }
+
+    public function test_find_by_email_and_newsletter_returns_null_when_not_found(): void
+    {
+        // Arrange
+        $newsletter = $this->createNewsletter();
+
+        // Act
+        $result = $this->repository->findByEmailAndNewsletter('nonexistent@example.com', $newsletter->id, $this->siteId);
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_find_by_email_and_newsletter_returns_null_for_different_newsletter(): void
+    {
+        // Arrange
+        $newsletter1 = $this->createNewsletter();
+        $newsletter2 = $this->createNewsletter();
+
+        Subscriber::create([
+            'email' => 'test@example.com',
+            'newsletter_id' => $newsletter1->id,
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId
+        ]);
+
+        // Act
+        $result = $this->repository->findByEmailAndNewsletter('test@example.com', $newsletter2->id, $this->siteId);
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_find_by_email_and_newsletter_filters_by_site(): void
+    {
+        // Arrange
+        $newsletter = $this->createNewsletter();
+        $otherSite = $this->createSite();
+
+        Subscriber::create([
+            'email' => 'test@example.com',
+            'newsletter_id' => $newsletter->id,
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $otherSite->id
+        ]);
+
+        // Act
+        $result = $this->repository->findByEmailAndNewsletter('test@example.com', $newsletter->id, $this->siteId);
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_create_returns_new_subscriber(): void
+    {
+        // Arrange
+        $newsletter = $this->createNewsletter();
+
+        $data = [
+            'email' => 'newsubscriber@example.com',
+            'newsletter_id' => $newsletter->id,
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId
+        ];
+
+        // Act
+        $result = $this->repository->create($data);
+
+        // Assert
+        $this->assertInstanceOf(Subscriber::class, $result);
+        $this->assertEquals('newsubscriber@example.com', $result->email);
+        $this->assertEquals($newsletter->id, $result->newsletter_id);
+        $this->assertTrue($result->confirmed);
+        $this->assertEquals($this->siteId, $result->site_id);
+    }
+
+    public function test_create_persists_to_database(): void
+    {
+        // Arrange
+        $newsletter = $this->createNewsletter();
+
+        $data = [
+            'email' => 'persist@example.com',
+            'newsletter_id' => $newsletter->id,
+            'confirmed' => false,
+            'confirmation_token' => 'token456',
+            'unsubscribe_token' => 'unsub456',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId
+        ];
+
+        // Act
+        $subscriber = $this->repository->create($data);
+
+        // Assert - verify it's in the database
+        $found = Subscriber::find($subscriber->id);
+        $this->assertNotNull($found);
+        $this->assertEquals('persist@example.com', $found->email);
+        $this->assertEquals($newsletter->id, $found->newsletter_id);
+    }
 }

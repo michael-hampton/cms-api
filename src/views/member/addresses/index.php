@@ -36,37 +36,6 @@
             padding: 0 20px;
         }
 
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            padding: 1rem 0;
-            margin-bottom: 2rem;
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .nav a {
-            color: var(--text-primary);
-            text-decoration: none;
-            margin-left: 1.5rem;
-            font-weight: 500;
-        }
-
-        .nav a:hover {
-            color: var(--primary-color);
-        }
-
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -398,19 +367,8 @@
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="container">
-        <div class="header-content">
-            <a href="/" class="logo"><?= htmlspecialchars($site->name) ?></a>
-            <nav class="nav">
-                <a href="/<?= $site->slug ?>/member/dashboard">Dashboard</a>
-                <a href="/<?= $site->slug ?>/member/addresses">Addresses</a>
-                <a href="/<?= $site->slug ?>/member/change-password">Change Password</a>
-                <a href="/<?= $site->slug ?>/member/logout">Logout</a>
-            </nav>
-        </div>
-    </div>
-</header>
+
+@include('member._header')
 
 <main class="container">
     <div class="page-header">

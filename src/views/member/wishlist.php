@@ -1,14 +1,3 @@
-<?php
-use App\Framework\Authorization\MemberAuth;
-
-if (!MemberAuth::check()) {
-    header('Location: /member/login');
-    exit;
-}
-
-$member = MemberAuth::member();
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -457,61 +446,10 @@ $member = MemberAuth::member();
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="dashboard-layout">
-        <!-- Sidebar Navigation -->
-        <aside class="dashboard-sidebar">
-            <nav>
-                <ul class="sidebar-nav">
-                    <li>
-                        <a href="/member/dashboard">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            </svg>
-                            Dashboard
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/member/orders">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <circle cx="9" cy="21" r="1"></circle>
-                                <circle cx="20" cy="21" r="1"></circle>
-                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                            </svg>
-                            Orders
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/member/wishlist" class="active">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                            </svg>
-                            Wishlist
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/member/profile">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="12" cy="7" r="4"></circle>
-                            </svg>
-                            Profile
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/member/logout">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                <polyline points="16 17 21 12 16 7"></polyline>
-                                <line x1="21" y1="12" x2="9" y2="12"></line>
-                            </svg>
-                            Logout
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
 
+@include('member._header')
+
+<div class="container">
         <!-- Main Content -->
         <main>
             <div class="page-header">
@@ -560,7 +498,6 @@ $member = MemberAuth::member();
             </div>
         </main>
     </div>
-</div>
 
 <!-- Toast -->
 <div id="toast" class="toast"></div>

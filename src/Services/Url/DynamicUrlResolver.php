@@ -27,6 +27,21 @@ class DynamicUrlResolver implements UrlResolverInterface
     {
         $path = $this->normalizePath(ltrim($path, '/'));
 
+        $parts = explode('/', $path);
+
+        if (count($parts) === 1) {
+            // check if path is a site and if so redirect to homepage
+            $site = SiteContext::get();
+
+            if ($site->url_handle) {
+                $page = Page::where('slug', $site->url_handle)
+                    ->where('site_id', SiteContext::getId())
+                    ->first();
+                $path = SiteContext::slug() . '/' . $page->slug;
+                return $this->createPageResult($page, $path);
+            }
+        }
+
         $page = $this->findPageBySlug($path);
 
         if (!$page) {

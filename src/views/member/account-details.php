@@ -34,76 +34,6 @@
             color: var(--text-primary);
         }
 
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-decoration: none;
-        }
-
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .avatar {
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 1rem;
-        }
-
-        .btn-logout {
-            padding: 0.5rem 1.25rem;
-            background: var(--bg-light);
-            color: var(--text-secondary);
-            border: none;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .btn-logout:hover {
-            background: #e5e7eb;
-            color: var(--text-primary);
-        }
-
         .container {
             max-width: 1000px;
             margin: 0 auto;
@@ -415,21 +345,8 @@
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="header-content">
-        <a href="/<?= $site->slug ?>/member/dashboard" class="logo"><?= htmlspecialchars($site->name ?? 'Site') ?></a>
-        <div class="user-menu">
-            <div class="user-info">
-                <div class="avatar">
-                    <?= strtoupper(substr($member->first_name ?? 'M', 0, 1)) ?>
-                </div>
-            </div>
-            <form method="POST" action="/member/logout" style="display: inline;">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        </div>
-    </div>
-</header>
+
+@include('member._header')
 
 <div class="container">
     <div class="breadcrumb">

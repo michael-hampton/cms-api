@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Framework\Support\Collection;
+use App\Framework\Support\Str;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\SubscriptionPlanRepository;
@@ -50,12 +51,12 @@ class SubscriptionPlanService
             $prepared['name'] = $data['name'];
 
             // Auto-generate slug if not provided
-            if (!isset($data['slug'])) {
+            if (empty($data['slug'])) {
                 $prepared['slug'] = $this->generateSlug($data['name']);
             }
         }
 
-        if (isset($data['slug'])) {
+        if (!empty($data['slug'])) {
             $prepared['slug'] = $this->sanitizeSlug($data['slug']);
         }
 
@@ -102,7 +103,7 @@ class SubscriptionPlanService
 
     private function generateSlug(string $name): string
     {
-        return strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name), '-'));
+        return Str::slug($name);
     }
 
     private function sanitizeSlug(string $slug): string

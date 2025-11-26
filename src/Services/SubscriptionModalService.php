@@ -17,11 +17,7 @@ class SubscriptionModalService
 
     public function getModalData(?Member $member, int $siteId): array
     {
-        $plans = $this->planRepository->getFeaturedPlans($siteId);
-
-        if ($plans->count() === 0) {
-            $plans = $this->planRepository->getActivePlans($siteId);
-        }
+        $plans = $this->planRepository->getActivePlans($siteId);
 
         // Limit to 3 plans for the modal
         $plans = $plans->take(3);

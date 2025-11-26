@@ -22,17 +22,17 @@ use App\Services\BadgeService;
 class MemberDashboardController extends Controller
 {
     public function __construct(
-        private OrderRepository $orderRepository,
-        private SubscriptionRepository $subscriptionRepository,
-        private SubscriberRepository $subscriberRepository,
-        private CommentRepository $commentRepository,
-        private MemberRepository $memberRepository,
-        private PageRepository $pageRepository,
-        private NewsletterRepository $newsletterRepository,
-        private PageViewRepository $pageViewRepository,
-        private PageLikeRepository       $pageLikeRepository,
-        private BadgeService             $badgeService,
-        private MemberActivityRepository $activityRepository
+        private readonly OrderRepository          $orderRepository,
+        private readonly SubscriptionRepository   $subscriptionRepository,
+        private readonly SubscriberRepository     $subscriberRepository,
+        private readonly CommentRepository        $commentRepository,
+        private MemberRepository                  $memberRepository,
+        private readonly PageRepository           $pageRepository,
+        private NewsletterRepository              $newsletterRepository,
+        private readonly PageViewRepository       $pageViewRepository,
+        private readonly PageLikeRepository       $pageLikeRepository,
+        private readonly BadgeService             $badgeService,
+        private readonly MemberActivityRepository $activityRepository
     ) {
         parent::__construct();
     }

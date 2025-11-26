@@ -228,6 +228,7 @@ $router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalCon
 // Member Newsletters Routes
 $router->get('/{site}/member/newsletters', [MemberNewslettersController::class, 'index']);
 $router->post('/{site}/member/newsletters/unsubscribe', [MemberNewslettersController::class, 'unsubscribe']);
+$router->post('/{site}/member/newsletter/signup', [MemberNewslettersController::class, 'subscribe']);
 
 // Member Comments Routes
 $router->get('/{site}/member/comments', [MemberCommentsController::class, 'index']);
@@ -244,8 +245,8 @@ $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController
 
 
 // Apply page member access check to content routes
-$router->get('/{slug}', [ContentController::class, 'show'])
-    ->middleware([CheckPageMemberAccess::class]);
+//$router->get('{slug}', [ContentController::class, 'show'])
+//    ->middleware([CheckPageMemberAccess::class]);
 
 $router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
     ->middleware([CheckPageMemberAccess::class])

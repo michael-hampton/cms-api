@@ -11,7 +11,8 @@ class Subscriber extends Model
         'confirmation_token',
         'unsubscribe_token',
         'subscribed_at',
-        'site_id'
+        'site_id',
+        'newsletter_id'
     ];
 
     protected $casts = [

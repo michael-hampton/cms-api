@@ -98,32 +98,32 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
         $this->assertEquals(302, $response->getStatusCode());
     }
 
-//    public function testUpdatePreferencesSuccessfully(): void
-//    {
-//        $token = bin2hex(random_bytes(32));
-//        MemberSubscriptionPreference::create([
-//            'member_id' => $this->member->id,
-//            'site_id' => $this->siteId,
-//            'email_notifications' => true,
-//            'newsletter_frequency' => 'weekly',
-//            'unsubscribe_token' => $token,
-//            'is_active' => true
-//        ]);
-//
-//        $response = $this->postForSite('/member/subscriptions/preferences', [
-//            'email_notifications' => true,
-//            'newsletter_frequency' => 'daily',
-//            'content_types' => ['news', 'blog'],
-//            'category_preferences' => [1, 2]
-//        ], [], ['X-Requested-With' => 'XMLHttpRequest']);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertTrue($data['success']);
-//        $this->assertArrayHasKey('preference', $data['data']);
-//        $this->assertEquals('daily', $data['data']['preference']['newsletter_frequency']);
-//    }
+    public function testUpdatePreferencesSuccessfully(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => true,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => true
+        ]);
+
+        $response = $this->postForSite('/member/subscriptions/preferences', [
+            'email_notifications' => true,
+            'newsletter_frequency' => 'daily',
+            'content_types' => ['news', 'blog'],
+            'category_preferences' => [1, 2]
+        ], [], ['X-Requested-With' => 'XMLHttpRequest']);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('preference', $data['data']);
+        $this->assertEquals('daily', $data['data']['preference']['newsletter_frequency']);
+    }
 
     public function testUnsubscribeFormDisplaysForValidToken(): void
     {
@@ -145,19 +145,19 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
         $this->assertStringContainsString($token, $content);
     }
 
-//    public function testUpdatePreferencesRequiresAuthentication(): void
-//    {
-//        MemberAuth::setMember(null);
-//        Session::forget('member_id');
-//
-//        $response = $this->postForSite('/member/subscriptions/preferences', [
-//            'email_notifications' => true
-//        ], [], ['X-Requested-With' => 'XMLHttpRequest']);
-//
-//        $this->assertEquals(401, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertFalse($data['success']);
-//    }
+    public function testUpdatePreferencesRequiresAuthentication(): void
+    {
+        MemberAuth::setMember(null);
+        Session::forget('member_id');
+
+        $response = $this->postForSite('/member/subscriptions/preferences', [
+            'email_notifications' => true
+        ], [], ['X-Requested-With' => 'XMLHttpRequest']);
+
+        $this->assertEquals(401, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
 
     public function testUnsubscribeFormDisplaysErrorForInvalidToken(): void
     {
@@ -223,31 +223,31 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
         $this->assertTrue($preference->email_notifications);
     }
 
-//    public function testUnsubscribeReturnsJsonForAjax(): void
-//    {
-//        $token = bin2hex(random_bytes(32));
-//        MemberSubscriptionPreference::create([
-//            'member_id' => $this->member->id,
-//            'site_id' => $this->siteId,
-//            'email_notifications' => true,
-//            'newsletter_frequency' => 'weekly',
-//            'unsubscribe_token' => $token,
-//            'is_active' => true
-//        ]);
-//
-//        $response = $this->postForSite(
-//            "/member/subscriptions/unsubscribe/{$token}",
-//            [],
-//            [],
-//            ['X-Requested-With' => 'XMLHttpRequest']
-//        );
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertTrue($data['success']);
-//        $this->assertStringContainsString('unsubscribed', $data['message']);
-//    }
+    public function testUnsubscribeReturnsJsonForAjax(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => true,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => true
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/unsubscribe/{$token}",
+            [],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertStringContainsString('unsubscribed', $data['message']);
+    }
 
     public function testCancelSubscriptionSuccessfully(): void
     {
@@ -276,30 +276,30 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
         $this->assertFalse($updated->auto_renew);
     }
 
-//    public function testResubscribeReturnsJsonForAjax(): void
-//    {
-//        $token = bin2hex(random_bytes(32));
-//        MemberSubscriptionPreference::create([
-//            'member_id' => $this->member->id,
-//            'site_id' => $this->siteId,
-//            'email_notifications' => false,
-//            'newsletter_frequency' => 'weekly',
-//            'unsubscribe_token' => $token,
-//            'is_active' => false
-//        ]);
-//
-//        $response = $this->postForSite(
-//            "/member/subscriptions/resubscribe/{$token}",
-//            [],
-//            [],
-//            ['X-Requested-With' => 'XMLHttpRequest']
-//        );
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertTrue($data['success']);
-//        $this->assertStringContainsString('resubscribed', $data['message']);
-//    }
+    public function testResubscribeReturnsJsonForAjax(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => false,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => false
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/resubscribe/{$token}",
+            [],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertStringContainsString('resubscribed', $data['message']);
+    }
 
     public function testCancelSubscriptionRequiresAuthentication(): void
     {

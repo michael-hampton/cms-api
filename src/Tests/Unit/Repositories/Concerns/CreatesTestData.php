@@ -22,6 +22,7 @@ use App\Models\MemberBadge;
 use App\Models\MemberConsent;
 use App\Models\Merchant;
 use App\Models\Model;
+use App\Models\Newsletter;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Page;
@@ -576,6 +577,18 @@ trait CreatesTestData
             'is_active' => true,
             'is_default' => false,
             'site_id' => $this->siteId ?? 1
+        ], $attributes));
+    }
+
+    protected function createNewsletter(array $attributes = []): Newsletter
+    {
+        return Newsletter::create(array_merge([
+            'title' => 'Test Newsletter',
+            'content' => 'Test content',
+            'interval' => 'weekly',
+            'active' => true,
+            'site_id' => $this->siteId,
+            'last_sent_at' => null
         ], $attributes));
     }
 

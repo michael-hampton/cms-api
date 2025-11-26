@@ -29,46 +29,6 @@
             color: var(--text-primary);
         }
 
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .nav {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        .nav a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav a:hover {
-            color: var(--primary-color);
-        }
-
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -330,18 +290,8 @@
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="header-content">
-        <a href="/" class="logo"><?= htmlspecialchars($site->name) ?></a>
-        <nav class="nav">
-            <a href="/member/dashboard">Dashboard</a>
-            <a href="/member/orders">Orders</a>
-            <a href="/member/newsletters">Newsletters</a>
-            <a href="/member/settings">Settings</a>
-            <a href="/member/logout">Logout</a>
-        </nav>
-    </div>
-</header>
+
+@include('member._header')
 
 <main class="container">
     <div class="page-header">
@@ -415,7 +365,8 @@
                     }
                     ?>
                     <?php if (!$isSubscribed): ?>
-                        <button onclick="subscribe('<?= htmlspecialchars($member->email) ?>')" class="btn btn-secondary btn-sm">
+                        <button onclick="subscribe('<?= htmlspecialchars($newsletter->id) ?>')"
+                                class="btn btn-secondary btn-sm">
                             Subscribe
                         </button>
                     <?php else: ?>
@@ -434,7 +385,7 @@
         }
 
         try {
-            const response = await fetch('/member/newsletters/unsubscribe', {
+            const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/newsletters/unsubscribe', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -456,14 +407,14 @@
         }
     }
 
-    async function subscribe(email) {
+    async function subscribe(newsletterId) {
         try {
-            const response = await fetch('/newsletter/signup', {
+            const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/newsletter/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ email: email })
+                body: JSON.stringify({newsletter_id: newsletterId})
             });
 
             const data = await response.json();

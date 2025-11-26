@@ -3,7 +3,8 @@
 namespace App\Controllers\Members;
 
 use App\Controllers\Controller;
-use App\Repositories\OrderRepository;
+use App\Framework\Authorization\MemberAuth;
+use App\Framework\Support\SiteContext;
 use App\Services\WishlistService;
 
 class MemberWishlistController extends Controller
@@ -13,8 +14,14 @@ class MemberWishlistController extends Controller
         parent::__construct();
     }
 
-    public function index() {
+    public function index()
+    {
+        $member = MemberAuth::getMember();
 
-        return $this->view('member.wishlist', ['items' => $this->wishlistService->getItems()]);
+        return $this->view('member.wishlist', [
+            'items' => $this->wishlistService->getItems(),
+            'member' => $member,
+            'site' => SiteContext::get()
+        ]);
     }
 }

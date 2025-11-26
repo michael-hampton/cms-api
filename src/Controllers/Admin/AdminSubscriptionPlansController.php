@@ -11,8 +11,8 @@ use App\Services\SubscriptionPlanService;
 class AdminSubscriptionPlansController extends Controller
 {
     public function __construct(
-        private SubscriptionPlanService    $planService,
-        private SubscriptionPlanRepository $planRepository
+        private readonly SubscriptionPlanService $planService,
+        private SubscriptionPlanRepository       $planRepository
     )
     {
         parent::__construct();
@@ -52,9 +52,11 @@ class AdminSubscriptionPlansController extends Controller
             }
 
             $_SESSION['flash_success'] = 'Plan created successfully';
-            return $this->redirect('/admin/subscription-plans');
+            return $this->redirect('/' . SiteContext::slug() . '/admin/subscription-plans');
 
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
                 return $this->jsonResponse([
                     'success' => false,

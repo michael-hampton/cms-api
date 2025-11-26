@@ -149,7 +149,7 @@
     </div>
 
     <div class="form-card">
-        <form method="POST" action="/admin/subscription-plans">
+        <form method="POST" action="/<?= \App\Framework\Support\SiteContext::slug() ?>/admin/subscription-plans">
             <div class="form-group">
                 <label class="form-label">Plan Name *</label>
                 <input type="text" name="name" class="form-control" required>
@@ -224,7 +224,8 @@
 
             <div class="btn-group">
                 <button type="submit" class="btn btn-primary">Create Plan</button>
-                <a href="/admin/subscription-plans" class="btn btn-secondary">Cancel</a>
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/admin/subscription-plans"
+                   class="btn btn-secondary">Cancel</a>
             </div>
         </form>
     </div>

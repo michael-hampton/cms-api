@@ -31,50 +31,6 @@
             color: var(--text-primary);
         }
 
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 1.5rem;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav-link:hover {
-            color: var(--primary-color);
-        }
-
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -294,18 +250,8 @@
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="header-content">
-        <a href="/" class="logo"><?= htmlspecialchars($site->name ?? 'Site') ?></a>
-        <div class="nav-links">
-            <a href="/member/dashboard" class="nav-link">Dashboard</a>
-            <a href="/member/liked-pages" class="nav-link">Liked Pages</a>
-            <form method="POST" action="/member/logout" style="display: inline;">
-                <button type="submit" class="nav-link" style="background: none; border: none; cursor: pointer;">Logout</button>
-            </form>
-        </div>
-    </div>
-</header>
+
+@include('member._header')
 
 <div class="container">
     <div class="page-header">
@@ -352,7 +298,7 @@
                                 } elseif ($diff < 604800) {
                                     echo floor($diff / 86400) . ' days ago';
                                 } else {
-                                    echo $viewedDate->format('M j, Y \a\t g:i A');
+                                    echo $view->viewed_at->format('M j, Y \a\t g:i A');
                                 }
                                 ?>
                             </div>
