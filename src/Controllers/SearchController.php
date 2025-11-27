@@ -4,8 +4,10 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PageRepository;
+use App\Resources\PageResource;
 
 class SearchController extends Controller
 {
@@ -26,11 +28,14 @@ class SearchController extends Controller
                 'limit' => $limit,
                 'status' => 'published',
                 'site_id' => $siteId,
+                'with' => ['authors']
             ]);
 
             $allPages = $pages->items;
 
-            return $this->jsonResponse($allPages);
+            $collection = new ResourceCollection($allPages, PageResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,

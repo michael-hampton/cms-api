@@ -48,6 +48,9 @@ class BoxoutBlockParser extends BaseBlockParser
             ],
             'openInNewTab' => [
                 new BooleanRule()
+            ],
+            'context' => [
+                new MaxLengthRule(20)
             ]
         ];
     }
@@ -62,6 +65,7 @@ class BoxoutBlockParser extends BaseBlockParser
             'paragraphs' => $paragraphs,
             'image' => $data['image'] ?? null,
             'formatted_title' => htmlspecialchars($title),
+            'context' => $data['context'] ?? 'default',
             'formatted_paragraphs' => array_map(function($p) {
                 return nl2br(htmlspecialchars($p));
             }, $paragraphs),
@@ -109,7 +113,9 @@ class BoxoutBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $alignmentClass = 'note-align-' . $parsedData['alignment'];
-        $html = "<div class=\"note-block {$alignmentClass}\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' note-sidebar' : '';
+
+        $html = "<div class=\"note-block {$alignmentClass}{$contextClass}\">";
 
         if ($parsedData['has_image']) {
             $html .= "<div class=\"note-image\">";

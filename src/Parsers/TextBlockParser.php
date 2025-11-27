@@ -2,10 +2,10 @@
 
 namespace App\Parsers;
 
-use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinRule;
+use App\Framework\Validation\Rules\RequiredRule;
 
 class TextBlockParser extends BaseBlockParser
 {
@@ -50,6 +50,7 @@ class TextBlockParser extends BaseBlockParser
         $totalCharCount = $this->calculateTotalCharCount($cleanParagraphs);
 
         return [
+            'context' => $data['context'] ?? 'default',
             'paragraphs' => $cleanParagraphs,
             'paragraph_count' => count($cleanParagraphs),
             'total_word_count' => $totalWordCount,
@@ -88,6 +89,29 @@ class TextBlockParser extends BaseBlockParser
     }
 
     public function generateHtml(array $parsedData): string
+    {
+        $context = $parsedData['context'] ?? 'default';
+
+        if ($context === 'sidebar') {
+            return $this->generateSidebarHtml($parsedData);
+        }
+
+        return $this->generateDefaultHtml($parsedData);
+    }
+
+    private function generateSidebarHtml(array $parsedData): string
+    {
+        $html = "<div class=\"text-block text-block-sidebar\">";
+
+        foreach ($parsedData['paragraphs'] as $paragraph) {
+            $html .= "<p class=\"sidebar-text\">{$paragraph}</p>";
+        }
+
+        $html .= "</div>";
+        return $html;
+    }
+
+    public function generateDefaultHtml(array $parsedData): string
     {
         $html = "<div class=\"text-block\">";
 

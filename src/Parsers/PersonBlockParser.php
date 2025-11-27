@@ -9,7 +9,6 @@ use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
-use App\Models\Person;
 use App\Validation\Custom\SocialMediaUrlRule;
 
 class PersonBlockParser extends BaseBlockParser
@@ -65,6 +64,9 @@ class PersonBlockParser extends BaseBlockParser
             'displayType' => [
                 new EnumRule(DisplayType::class)
             ],
+            'context' => [
+                new MaxLengthRule(20)
+            ]
         ];
     }
 
@@ -98,6 +100,7 @@ class PersonBlockParser extends BaseBlockParser
             'formatted_strapline' => htmlspecialchars($strapline),
             'social_links' => $this->getSocialLinks($data),
             'displayType' => $data['displayType'] ?? 'profile',
+            'context' => $data['context'] ?? 'default',
         ];
     }
 
@@ -142,10 +145,11 @@ class PersonBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $displayType = $parsedData['displayType'] ?? 'contact';
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' person-sidebar' : '';
 
         if ($displayType === 'contact') {
             // Contact info layout
-            $html = "<div class=\"person-block person-display-contact\">";
+            $html = "<div class=\"person-block person-display-contact{$contextClass}\">";
             $html .= "<div class=\"contact-info\">";
             $html .= "<h3>Contact Information</h3>";
 
@@ -186,7 +190,7 @@ class PersonBlockParser extends BaseBlockParser
         }
 
         // Default to profile layout for any other displayType or if not specified
-        $html = "<div class=\"person-block person-display-profile\">";
+        $html = "<div class=\"person-block person-display-profile{$contextClass}\">";
 
         if ($parsedData['image']) {
             $html .= "<div class=\"person-image\">";

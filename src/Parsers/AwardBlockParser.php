@@ -47,6 +47,9 @@ class AwardBlockParser extends BaseBlockParser
             'rating' => [
                 new MinRule(0),
                 new MaxRule(5)
+            ],
+            'context' => [
+                new MaxLengthRule(20)
             ]
         ];
     }
@@ -59,6 +62,7 @@ class AwardBlockParser extends BaseBlockParser
 
         return [
             'subcategory' => trim($data['subcategory'] ?? ''),
+            'context' => $data['context'] ?? 'default',
             'productName' => trim($data['productName'] ?? ''),
             'image' => $data['image'] ?? null,
             'caption' => $caption,
@@ -76,7 +80,8 @@ class AwardBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<div class=\"award-block" . ($parsedData['winner'] ? ' award-winner' : '') . "\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' award-sidebar' : '';
+        $html = "<div class=\"award-block{$contextClass}" . ($parsedData['winner'] ? ' award-winner' : '') . "\">";
 
         if (!empty($parsedData['image'])) {
             $html .= "<div class=\"award-image\">";

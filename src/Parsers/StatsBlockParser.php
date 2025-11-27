@@ -55,7 +55,8 @@ class StatsBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<section class=\"stats-block stats-layout-{$parsedData['layout']}\">";
+        $contextClass = isset($parsedData['context']) && $parsedData['context'] === 'sidebar' ? ' stats-sidebar' : '';
+        $html = "<section class=\"stats-block stats-layout-{$parsedData['layout']}{$contextClass}\">";
 
         if (!empty($parsedData['title'])) {
             $html .= "<h2 class=\"stats-title\">{$parsedData['formatted_title']}</h2>";

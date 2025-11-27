@@ -7,13 +7,11 @@ use App\Enums\ImageLayout;
 use App\Enums\ImageRights;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EnumRule;
+use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
-use App\Framework\Validation\Rules\MaxLengthRule;
-use App\Framework\Validation\Rules\MinLengthRule;
 use App\Models\Image;
 use App\Validation\Custom\AltTextLengthRule;
-use App\Validation\Custom\ImageLayoutRule;
 use App\Validation\Custom\ImageSourceRule;
 
 class ImageBlockParser extends BaseBlockParser
@@ -54,6 +52,9 @@ class ImageBlockParser extends BaseBlockParser
             ],
             'alignment' => [
                 new EnumRule(Alignment::class)
+            ],
+            'context' => [
+                new MaxLengthRule(20)
             ]
         ];
     }
@@ -110,7 +111,8 @@ class ImageBlockParser extends BaseBlockParser
             'alignment_css_class' => $this->getAlignmentCssClass($data['alignment'] ?? 'fullscreen'),
             'endorsements' => $endorsements,
             'has_endorsements' => !empty($endorsements),
-            'endorsement_positions' => array_keys($endorsements)
+            'endorsement_positions' => array_keys($endorsements),
+            'context' => $data['context'] ?? 'default',
         ];
     }
 
@@ -304,7 +306,8 @@ class ImageBlockParser extends BaseBlockParser
         $layoutClass = $parsedData['layout_css_class'];
         $alignmentClass = $parsedData['alignment_css_class'];
 
-        $html = "<div class=\"image-block {$layoutClass} {$alignmentClass}\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' image-sidebar' : '';
+        $html = "<div class=\"image-block {$layoutClass} {$alignmentClass}{$contextClass}\">";
 
         if (!empty($parsedData['linkUrl'])) {
             $linkUrl = htmlspecialchars($parsedData['linkUrl'], ENT_QUOTES, 'UTF-8');

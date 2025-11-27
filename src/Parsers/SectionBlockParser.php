@@ -54,7 +54,8 @@ class SectionBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $level = $parsedData['heading_level'];
-        $html = "<div class=\"section-block section-level-{$level}\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' section-sidebar' : '';
+        $html = "<div class=\"section-block section-level-{$level}{$contextClass}\">";
 
         $html .= "<{$parsedData['headingType']} class=\"section-title\">{$parsedData['title']}</{$parsedData['headingType']}>";
 

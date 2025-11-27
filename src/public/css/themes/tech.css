@@ -297,12 +297,6 @@ body {
     margin: 0 auto;
 }
 
-.page-grid-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 32px;
-}
-
 .page-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px rgba(0,0,0,0.15);

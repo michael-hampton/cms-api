@@ -5,12 +5,12 @@ namespace App\Parsers;
 // MapLocationBlockParser.php
 namespace App\Parsers;
 
-use App\Framework\Validation\Rules\MaxLengthRule;
-use App\Framework\Validation\Rules\RequiredRule;
-use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\BooleanRule;
-use App\Framework\Validation\Rules\MinRule;
+use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MaxRule;
+use App\Framework\Validation\Rules\MinRule;
+use App\Framework\Validation\Rules\NumericRule;
+use App\Framework\Validation\Rules\RequiredRule;
 
 class MapLocationBlockParser extends BaseBlockParser
 {
@@ -54,7 +54,8 @@ class MapLocationBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<div class=\"map-location-block\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' map-location-sidebar' : '';
+        $html = "<div class=\"map-location-block{$contextClass}\">";
 
         if (!empty($parsedData['title'])) {
             $html .= "<h3 class=\"map-title\">{$parsedData['formatted_title']}</h3>";

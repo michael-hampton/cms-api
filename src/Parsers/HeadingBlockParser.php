@@ -37,6 +37,9 @@ class HeadingBlockParser extends BaseBlockParser
             'level' => [
                 new RequiredRule(),
                 new EnumRule(HeadingLevel::class)
+            ],
+            'context' => [
+                new MaxLengthRule(20)
             ]
         ];
     }
@@ -54,7 +57,8 @@ class HeadingBlockParser extends BaseBlockParser
             'word_count' => str_word_count($text . ' ' . $subtitle),
             'formatted_text' => htmlspecialchars($text),
             'formatted_subtitle' => htmlspecialchars($subtitle),
-            'has_subtitle' => !empty($subtitle)
+            'has_subtitle' => !empty($subtitle),
+            'context' => $data['context'] ?? 'default',
         ];
     }
 
@@ -76,7 +80,8 @@ class HeadingBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $level = $parsedData['level'];
-        $html = "<div class=\"heading-block heading-level-{$level}\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' heading-sidebar' : '';
+        $html = "<div class=\"heading-block heading-level-{$level}{$contextClass}\">";
 
         $html .= "<h{$level} class=\"heading-text\">{$parsedData['formatted_text']}</h{$level}>";
 

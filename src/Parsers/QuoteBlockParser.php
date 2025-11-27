@@ -21,6 +21,9 @@ class QuoteBlockParser extends BaseBlockParser
             ],
             'attribution' => [
                 new MaxLengthRule(255)
+            ],
+            'context' => [
+                new MaxLengthRule(20)
             ]
         ];
     }
@@ -36,13 +39,15 @@ class QuoteBlockParser extends BaseBlockParser
             'word_count' => str_word_count($text),
             'formatted_text' => nl2br(htmlspecialchars($text)),
             'formatted_attribution' => htmlspecialchars($attribution),
-            'has_attribution' => !empty($attribution)
+            'has_attribution' => !empty($attribution),
+            'context' => $data['context'] ?? 'default',
         ];
     }
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<blockquote class=\"quote-block\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' quote-sidebar' : '';
+        $html = "<blockquote class=\"quote-block{$contextClass}\">";
 
         $html .= "<div class=\"quote-text\">{$parsedData['formatted_text']}</div>";
 

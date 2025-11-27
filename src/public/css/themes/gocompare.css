@@ -64,7 +64,6 @@ h6 {
     position: relative;
     background-size: cover;
     background-position: center;
-    padding: 100px 20px;
     text-align: center;
     color: var(--gc-white);
     overflow: hidden;
@@ -84,8 +83,6 @@ h6 {
 .hero-content {
     position: relative;
     z-index: 2;
-    max-width: 900px;
-    margin: 0 auto;
 }
 
 .hero-title {
@@ -1933,7 +1930,6 @@ textarea:focus {
     position: relative;
     background-size: cover;
     background-position: center;
-    padding: 6rem 2rem;
     color: white;
     text-align: center;
     border-radius: 16px;

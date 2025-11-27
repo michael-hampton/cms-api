@@ -28,26 +28,27 @@ $pageGridAdded = false;
     <main class="mt-20">
         <div class="container">
             <?php if ($page): ?>
+
+                <!-- Page Header -->
+                <div class="page-header">
+                    @include('page-title')
+
+                    @if($page->page_type !== 'landing-page')
+
+                    <!-- Categories -->
+                    @include('categories', ['page' => $page])
+
+                    <!-- Tags -->
+                    @include('tags')
+
+                    @include('page-actions')
+                    @endif
+                </div>
+
                 <div class="page-layout <?= $hasSidebar ? 'has-sidebar' : 'full-width' ?>">
 
                     <!-- Main Content Area -->
                     <div class="main-content <?= $hasSidebar ? 'with-sidebar' : 'full-width' ?>">
-
-                        <!-- Page Header -->
-                        <div class="page-header">
-                            @include('page-title')
-
-                            @if($page->page_type !== 'landing-page')
-
-                            <!-- Categories -->
-                            @include('categories', ['page' => $page])
-
-                            <!-- Tags -->
-                            @include('tags')
-
-                            @include('page-actions')
-                            @endif
-                        </div>
 
                         <!-- Main Content Blocks -->
                         <?php foreach ($mainBlocks as $index => $block): ?>
@@ -85,6 +86,8 @@ $pageGridAdded = false;
                         </aside>
                     <?php endif; ?>
                 </div>
+
+
             <?php else: ?>
                 <div style="text-align: center; padding: 4rem 0;">
                     <h1>Page Not Found</h1>

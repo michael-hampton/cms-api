@@ -78,6 +78,9 @@ class DealBlockParser extends BaseBlockParser
             'voucherId' => [
                 new MaxLengthRule(255)
             ],
+            'context' => [
+                new MaxLengthRule(20)
+            ]
         ];
     }
 
@@ -114,7 +117,8 @@ class DealBlockParser extends BaseBlockParser
                 $data['noFollow'] ?? false,
                 $data['sponsored'] ?? false,
                 $data['openInNewTab'] ?? false
-            )
+            ),
+            'context' => $data['context'] ?? 'default',
         ];
     }
 
@@ -159,7 +163,8 @@ class DealBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<div class=\"deal-block\">";
+        $contextClass = $parsedData['context'] === 'sidebar' ? ' deal-sidebar' : '';
+        $html = "<div class=\"deal-block{$contextClass}\">";
 
         if ($parsedData['sponsored']) {
             $html .= "<span class=\"sponsored-badge\">Sponsored</span>";
