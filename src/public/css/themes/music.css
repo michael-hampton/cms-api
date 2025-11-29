@@ -984,8 +984,8 @@ img {
     max-width: 600px;
     margin: var(--spacing-lg) auto;
     padding: var(--spacing-lg);
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 .contact-info h3 {
@@ -1033,8 +1033,8 @@ img {
     max-width: 800px;
     margin: var(--spacing-lg) auto;
     padding: var(--spacing-md);
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 .person-image {
@@ -2627,178 +2627,6 @@ img {
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
-.header-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.logo {
-    text-decoration: none;
-    color: #fff;
-    display: flex;
-    align-items: baseline;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 700;
-}
-
-.logo-main {
-    font-size: 1.8rem;
-    letter-spacing: 2px;
-}
-
-.logo-sub {
-    font-size: 0.9rem;
-    color: #ff007a;
-    margin-left: 6px;
-}
-
-nav.header-nav ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    gap: 1.5rem;
-}
-
-.nav-link {
-    color: #ccc;
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.3s ease;
-}
-
-.nav-link:hover {
-    color: #ff007a;
-}
-
-.header-actions {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.social-icon {
-    color: #ccc;
-    font-size: 0.9rem;
-    text-decoration: none;
-    transition: color 0.3s;
-}
-
-.social-icon:hover {
-    color: #ff007a;
-}
-
-.header-search-toggle {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    padding: 0.4rem 0.8rem;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.header-search-toggle:hover {
-    background: rgba(255,255,255,0.1);
-}
-
-/* Search Overlay */
-.search-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.95);
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-}
-
-.search-overlay.active {
-    display: flex;
-}
-
-.search-container {
-    text-align: center;
-}
-
-.search-input {
-    width: 300px;
-    max-width: 80%;
-    padding: 0.7rem;
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    font-size: 1rem;
-    outline: none;
-}
-
-.search-submit {
-    background: #ff007a;
-    border: none;
-    color: #fff;
-    padding: 0.7rem 1.2rem;
-    cursor: pointer;
-    margin-left: 0.5rem;
-    border-radius: 3px;
-    transition: background 0.3s;
-}
-
-.search-submit:hover {
-    background: #ff3399;
-}
-
-.search-close {
-    position: absolute;
-    top: 20px;
-    right: 30px;
-    font-size: 2rem;
-    background: none;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-}
-
-/* Mobile */
-.mobile-menu-toggle {
-    display: none;
-    flex-direction: column;
-    gap: 4px;
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-
-.mobile-menu-toggle span {
-    width: 24px;
-    height: 2px;
-    background: #fff;
-}
-
-@media (max-width: 768px) {
-    nav.header-nav ul {
-        display: none;
-        flex-direction: column;
-        background: #1a1a1a;
-        position: absolute;
-        top: 60px;
-        left: 0;
-        right: 0;
-        padding: 1rem;
-    }
-
-    nav.header-nav ul.active {
-        display: flex;
-    }
-
-    .mobile-menu-toggle {
-        display: flex;
-    }
-}
-
 /* ==========================================
    DYNAMIC FOOTER STYLES
    ========================================== */
@@ -3486,8 +3314,8 @@ nav.header-nav ul {
 }
 
 /* Person Block */
-.person-block {
-    background: rgba(255, 255, 255, 0.05) !important;
+.team-block .person-block {
+    background: var(--color-dark) !important;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 12px;

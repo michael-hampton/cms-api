@@ -14,13 +14,6 @@
     --header-height: 80px;
 }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    line-height: 1.6;
-    color: var(--text-color);
-    background: #fff;
-}
-
 /* Header */
 .site-header {
     position: fixed;
@@ -99,49 +92,6 @@ main {
     min-height: calc(100vh - var(--header-height) - 300px);
 }
 
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 10px;
-}
-
-.page-layout.has-sidebar {
-    grid-template-columns: 1fr 350px;
-}
-
-.page-header {
-    margin-bottom: 3rem;
-    padding-bottom: 2rem;
-    border-bottom: 2px solid var(--border-color);
-}
-
-.page-title {
-    font-size: 2.5rem;
-    font-weight: 800;
-    margin-bottom: 1rem;
-    line-height: 1.2;
-}
-
-.page-categories, .page-tags {
-    margin: 0.5rem 0;
-}
-
-.category-link, .tag-link {
-    color: var(--primary-color);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.tag-badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    background: var(--bg-light);
-    border-radius: 999px;
-    font-size: 0.875rem;
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
 /* Blocks */
 .block {
     margin-bottom: 2rem;
@@ -211,53 +161,6 @@ main {
     height: fit-content;
     position: sticky;
     top: calc(var(--header-height) + 2rem);
-}
-
-/* Footer */
-.site-footer {
-    background: var(--text-color);
-    color: #fff;
-    padding: 3rem 2rem;
-    margin-top: 4rem;
-}
-
-.footer-container {
-    max-width: 1400px;
-    margin: 0 auto;
-}
-
-.footer-content {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-    margin-bottom: 2rem;
-}
-
-.footer-section h3 {
-    margin-bottom: 1rem;
-    font-size: 1.125rem;
-}
-
-.footer-section ul {
-    list-style: none;
-}
-
-.footer-section a {
-    color: rgba(255,255,255,0.8);
-    text-decoration: none;
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-.footer-section a:hover {
-    color: #fff;
-}
-
-.footer-bottom {
-    text-align: center;
-    padding-top: 2rem;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.6);
 }
 
 @media (max-width: 768px) {
