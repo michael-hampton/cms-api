@@ -17,7 +17,8 @@ class MemberConsent extends Model
         'revoked_at',
         'expires_at',
         'metadata',
-        'created_at'
+        'created_at',
+        'site_id'
     ];
 
     protected $casts = [

@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($tag->name) ?> - Tag</title>
-    <meta name="description" content="<?= htmlspecialchars($tag->description ?? "Pages tagged with {$tag->name}") ?>">
+    <title>Reviews - Expert Recommendations & Analysis</title>
     <style>
         * {
             margin: 0;
@@ -19,7 +18,6 @@
             line-height: 1.6;
         }
 
-        /* Header */
         header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -27,73 +25,33 @@
             text-align: center;
         }
 
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
         .header-content h1 {
             font-size: 3rem;
             font-weight: 700;
             margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        .tag-hash {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 3rem;
         }
 
         .header-content p {
             font-size: 1.25rem;
             opacity: 0.95;
             max-width: 600px;
-            margin: 0 auto 24px;
+            margin: 0 auto;
         }
 
-        .tag-stats-header {
-            display: flex;
-            justify-content: center;
-            gap: 32px;
-            margin-top: 24px;
-            flex-wrap: wrap;
-        }
-
-        .stat-item-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .stat-value-header {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-
-        .stat-label-header {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-
-        /* Container */
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 40px 20px;
         }
 
-        /* Pages Grid */
-        .pages-grid {
+        .reviews-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
             gap: 24px;
             margin-bottom: 40px;
         }
 
-        .page-card {
+        .review-card {
             background: white;
             border: 2px solid #e5e7eb;
             border-radius: 12px;
@@ -103,13 +61,13 @@
             flex-direction: column;
         }
 
-        .page-card:hover {
+        .review-card:hover {
             border-color: #667eea;
             box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
             transform: translateY(-4px);
         }
 
-        .page-card-image {
+        .review-card-image {
             width: 100%;
             height: 200px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -121,20 +79,20 @@
             overflow: hidden;
         }
 
-        .page-card-image img {
+        .review-card-image img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
-        .page-card-content {
+        .review-card-content {
             padding: 24px;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
         }
 
-        .page-meta {
+        .review-meta {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -142,7 +100,7 @@
             flex-wrap: wrap;
         }
 
-        .page-badge {
+        .review-badge {
             display: inline-block;
             background: #dbeafe;
             color: #1e40af;
@@ -154,7 +112,7 @@
             font-size: 0.75rem;
         }
 
-        .page-card-title {
+        .review-card-title {
             font-size: 1.35rem;
             font-weight: 700;
             margin-bottom: 12px;
@@ -162,17 +120,17 @@
             line-height: 1.4;
         }
 
-        .page-card-title a {
+        .review-card-title a {
             text-decoration: none;
             color: inherit;
             transition: color 0.3s ease;
         }
 
-        .page-card-title a:hover {
+        .review-card-title a:hover {
             color: #667eea;
         }
 
-        .page-excerpt {
+        .review-excerpt {
             color: #6b7280;
             font-size: 0.95rem;
             margin-bottom: 16px;
@@ -180,7 +138,7 @@
             line-height: 1.6;
         }
 
-        .page-footer {
+        .review-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -188,24 +146,24 @@
             border-top: 2px solid #f3f4f6;
         }
 
-        .page-author-date {
+        .review-author-date {
             display: flex;
             flex-direction: column;
             gap: 4px;
         }
 
-        .page-author {
+        .review-author {
             font-size: 0.85rem;
             color: #4b5563;
             font-weight: 500;
         }
 
-        .page-date {
+        .review-date {
             font-size: 0.85rem;
             color: #9ca3af;
         }
 
-        .page-link {
+        .review-link {
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -219,22 +177,21 @@
             transition: all 0.2s ease;
         }
 
-        .page-link:hover {
+        .review-link:hover {
             background: #5568d3;
             transform: translateX(2px);
         }
 
-        .page-link svg {
+        .review-link svg {
             width: 16px;
             height: 16px;
             transition: transform 0.2s ease;
         }
 
-        .page-link:hover svg {
+        .review-link:hover svg {
             transform: translateX(4px);
         }
 
-        /* Empty State */
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -257,13 +214,8 @@
             color: #9ca3af;
         }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .header-content h1 {
-                font-size: 2rem;
-            }
-
-            .tag-hash {
                 font-size: 2rem;
             }
 
@@ -271,12 +223,12 @@
                 font-size: 1rem;
             }
 
-            .tag-stats-header {
-                gap: 16px;
+            .reviews-grid {
+                grid-template-columns: 1fr;
             }
 
-            .pages-grid {
-                grid-template-columns: 1fr;
+            .review-card-title {
+                font-size: 1.1rem;
             }
 
             .container {
@@ -310,94 +262,75 @@
     </style>
 </head>
 <body>
+@include('header', ['menu' => $menu, 'hasTitle' => false])
+
 <header>
     <div class="header-content">
-        <h1>
-            <span class="tag-hash">#</span><?= htmlspecialchars($tag->name) ?>
-        </h1> <?php if ($tag->description): ?>
-            <p><?= nl2br(htmlspecialchars($tag->description)) ?></p>
-        <?php endif; ?>
-        <div class="tag-stats-header">
-            <div class="stat-item-header">
-                <span class="stat-value-header"><?= isset($pagination) ? $pagination['total'] : count($pages) ?></span>
-                <span class="stat-label-header"><?= (isset($pagination) ? $pagination['total'] : count($pages)) === 1 ? 'Article' : 'Articles' ?></span>
-            </div>
-        </div>
+        <h1>Expert Reviews</h1>
+        <p>In-depth analysis and honest recommendations from our team of experts</p>
     </div>
 </header>
-<!-- Main Content -->
+
 <div class="container">
     <?php if ($pages && count($pages) > 0): ?>
-        <!-- Filters -->
         @include('partials.filters', ['pages' => $pages])
-        <!-- Pages Grid -->
-        <div class="pages-grid">
+
+        <div class="reviews-grid">
             <?php foreach ($pages as $page): ?>
-                <article class="page-card">
+                <article class="review-card">
                     <?php if ($page->featured_image): ?>
-                        <div class="page-card-image">
+                        <div class="review-card-image">
                             <img src="<?= htmlspecialchars($page->featured_image) ?>"
                                  alt="<?= htmlspecialchars($page->title) ?>">
                         </div>
                     <?php else: ?>
-                        <div class="page-card-image">📄</div>
+                        <div class="review-card-image">📋</div>
                     <?php endif; ?>
 
-                    <div class="page-card-content">
-                        <div class="page-meta">
+                    <div class="review-card-content">
+                        <div class="review-meta">
                             <?php if ($page->categories && count($page->categories) > 0): ?>
                                 <?php foreach ($page->categories->take(2) as $category): ?>
-                                    <span class="page-badge"><?= htmlspecialchars($category->name) ?></span>
+                                    <span class="review-badge"><?= htmlspecialchars($category->name) ?></span>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
 
-                        <h3 class="page-card-title">
-                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>">
+                        <h2 class="review-card-title">
+                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($page->slug) ?>">
                                 <?= htmlspecialchars($page->title) ?>
                             </a>
-                        </h3>
+                        </h2>
 
-                        <?php if ($page->meta_description): ?>
-                            <p class="page-excerpt">
-                                <?= htmlspecialchars(substr($page->meta_description, 0, 150)) ?>
-                                <?= strlen($page->meta_description) > 150 ? '...' : '' ?>
+                        <?php if ($page->excerpt): ?>
+                            <p class="review-excerpt">
+                                <?= htmlspecialchars(substr($page->excerpt, 0, 150)) ?>
+                                <?= strlen($page->excerpt) > 150 ? '...' : '' ?>
                             </p>
                         <?php endif; ?>
 
-                        <div class="page-footer">
-                            <div class="page-author-date">
+                        <div class="review-footer">
+                            <div class="review-author-date">
                                 <?php if ($page->authors && count($page->authors) > 0): ?>
-                                    <span class="page-author">
-                                    By <?= htmlspecialchars($page->authors->first()->name) ?>
-                                </span>
+                                    <span class="review-author">
+                                        By <?= htmlspecialchars($page->authors->first()->name) ?>
+                                    </span>
                                 <?php endif; ?>
                                 <?php if ($page->published_at): ?>
-                                    <span class="page-date">
-                                    <?= $page->published_at->format('M j, Y') ?>
-                                </span>
+                                    <span class="review-date">
+                                        <?= date('M j, Y', strtotime($page->published_at)) ?>
+                                    </span>
                                 <?php endif; ?>
                             </div>
-                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>"
-                               class="page-link">
-                                Read More
+                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($page->slug) ?>"
+                               class="review-link">
+                                Read Review
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M9 5l7 7-7 7"/>
                                 </svg>
                             </a>
                         </div>
-
-                        <?php if ($page->tags && count($page->tags) > 0): ?>
-                            <div class="page-tags">
-                                <?php foreach ($page->tags->take(3) as $tag): ?>
-                                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/tags/<?= htmlspecialchars($tag->slug) ?>"
-                                       class="tag-mini">
-                                        #<?= htmlspecialchars($tag->name) ?>
-                                    </a>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
                     </div>
                 </article>
             <?php endforeach; ?>
@@ -405,12 +338,15 @@
 
         @include('partials.pagination', ['pages' => $pages])
     <?php else: ?>
-    <div class="empty-state">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <h2>No Articles Found</h2>
-        <p>No articles with this tag yet.</p>
-    </div>
-<?php endif; ?>
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h2>No Reviews Yet</h2>
+            <p>Check back soon for expert reviews and recommendations.</p>
+        </div>
+    <?php endif; ?>
+</div>
+</body>
+</html>

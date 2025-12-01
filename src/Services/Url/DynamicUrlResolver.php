@@ -27,7 +27,7 @@ class DynamicUrlResolver implements UrlResolverInterface
     {
         $path = $this->normalizePath(ltrim($path, '/'));
 
-        $parts = explode('/', $path);
+        $parts = explode('/', rtrim(trim($path), '/'));
 
         if (count($parts) === 1) {
             // check if path is a site and if so redirect to homepage

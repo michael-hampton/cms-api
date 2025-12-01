@@ -16,6 +16,7 @@ use App\Repositories\CommentRepository;
 use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
 use App\Services\BlockParserService;
+use App\Services\MenuRenderer;
 use App\Services\SubscriptionModalService;
 use App\Services\Url\UrlResolutionResult;
 
@@ -78,7 +79,8 @@ class ContentController extends Controller
             'blockParserService' => $this->blockParserService,
             'site' => SiteContext::get(),
             'member' => $member,
-            'subscriptionModalData' => $modalData
+            'subscriptionModalData' => $modalData,
+            'menuRenderer' => new Menurenderer()
         ];
 
         $data['allCategories'] = Category::where('site_id', $siteId)

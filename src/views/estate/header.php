@@ -8,9 +8,9 @@
 
     <?php
 
-use App\Framework\Support\SiteContext;
+    use App\Framework\Support\SiteContext;
 
-$cssFile = asset(SiteContext::css(), 'css');
+    $cssFile = asset(SiteContext::css(), 'css');
 
 ?>
 
@@ -18,5 +18,10 @@ $cssFile = asset(SiteContext::css(), 'css');
 </head>
 <body>
 <header class="header">
-    <?php echo (new \App\Services\MenuRenderer())->render($menu, ['layout' => 'vertical', 'logo' => true, 'title' => $title ?? $page->title]) ?>
+    <?php echo $menuRenderer->render($menu, [
+            'layout' => 'mega', // Use 'mega' for mega menu, 'horizontal' for standard dropdowns
+            'css_classes' => 'main-navigation',
+            'logo' => true,
+            'title' => $title ?? $page->title
+    ]); ?>
 </header>

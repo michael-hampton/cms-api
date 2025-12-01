@@ -53,7 +53,8 @@
                             </p>
                         <?php endif; ?>
 
-                        <a href="/authors/<?= htmlspecialchars($author->slug) ?>" class="author-profile-link">
+                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/authors/<?= htmlspecialchars($author->slug) ?>"
+                           class="author-profile-link">
                             <span>View Profile</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2">

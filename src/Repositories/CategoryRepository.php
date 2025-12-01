@@ -34,10 +34,10 @@ class CategoryRepository extends Repository
         return $this->searchEngine->search($query, $criteria);
     }
 
-    public function findBySlug(string $slug): ?Category
+    public function findBySlug(string $slug, ?int $siteId = null): ?Category
     {
         $query = Category::bySlug($slug);
-        return $this->applySiteFilter($query)->first();
+        return $siteId ? $query->where('site_id', $siteId)->first() : $this->applySiteFilter($query)->first();
     }
 
     public function getActive(): Collection
@@ -90,7 +90,7 @@ class CategoryRepository extends Repository
     {
         $slug = Str::slug($name, [$this, 'findBySlug'], '-', 'en', true);
 
-        $existing = $this->findBySlug($slug);
+        $existing = $this->findBySlug($slug, $siteId);
 
         if ($existing) {
             return $existing;

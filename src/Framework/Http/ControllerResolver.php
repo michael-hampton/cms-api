@@ -14,7 +14,9 @@ class ControllerResolver implements ControllerResolverInterface
             // Page type => Controller@method
             'content' => 'App\Controllers\ContentController@show',
             'landing-page' => 'App\Controllers\ContentController@show',
+            'buying-guide' => 'App\Controllers\ContentController@show',
             'gallery' => 'App\Controllers\ContentController@show',
+            'review' => 'App\Controllers\ContentController@show',
             'blog' => 'App\Controllers\ContentController@show',
             'product' => 'App\Controllers\ProductController@show',
             'category' => 'App\Controllers\CategoryController@show',

@@ -4,6 +4,7 @@ use App\Controllers\Admin\AdminSubscriptionPlansController;
 use App\Controllers\AuthorViewController;
 use App\Controllers\BlockController;
 use App\Controllers\BrandPageController;
+use App\Controllers\BuyingGuideController;
 use App\Controllers\CartController;
 use App\Controllers\CategoryPageController;
 use App\Controllers\CommentController;
@@ -29,6 +30,7 @@ use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
+use App\Controllers\ReviewPageController;
 use App\Controllers\SubscriptionModalController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
@@ -84,7 +86,10 @@ $router->get('/{site}/member/activity/badges', [MemberActivityController::class,
 $router->get('/{site}/member/account-details', [MemberController::class, 'accountDetails']);
 $router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
 
-$router->get('/authors/{slug}', AuthorViewController::class, 'show');
+$router->get('/{site}/reviews', [ReviewPageController::class, 'index']);
+$router->get('/{site}/buying-guides', [BuyingGuideController::class, 'index']);
+
+$router->get('/{site}/authors/{slug}', AuthorViewController::class, 'show');
 $router->get('/{siteName}/tags/{slug}', TagViewController::class, 'show');
 
 $router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);

@@ -2,10 +2,12 @@
 
 namespace App\Controllers;
 
+use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Repositories\CategoryRepository;
 use App\Repositories\PageRepository;
+use App\Services\MenuRenderer;
 
 class CategoryPageController extends Controller
 {
@@ -24,8 +26,12 @@ class CategoryPageController extends Controller
             return $this->notFound();
         }
 
-        $pages = $this->pageRepository->getPagesByCategory($category->id, 20);
-        $menu = Menu::where('is_active', true)->with(['items'])->first();
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', SiteContext::getId())
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
         $breadcrumb = $category->getBreadcrumb();
         $childCategories = $this->categoryRepository->getChildCategories($category->id);
 
@@ -33,14 +39,39 @@ class CategoryPageController extends Controller
         $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $perPage = 12;
 
-        // Get paginated pages for this category
-        $paginationData = Page::whereHas('categories', function($query) use ($category) {
+        // Get filter parameters
+        $sort = $_GET['sort'] ?? 'latest';
+        $authorFilter = $_GET['author'] ?? '';
+
+        // Build query
+        $query = Page::whereHas('categories', function ($query) use ($category) {
             $query->where('categories.id', $category->id);
         })
             ->where('status', 'Published')
-            ->with(['tags', 'authors'])
-            ->orderBy('published_at', 'desc')
-            ->paginate($perPage, $currentPage);
+            ->with(['tags', 'authors', 'categories']);
+
+        // Apply author filter
+        if ($authorFilter) {
+            $query->whereHas('authors', function ($q) use ($authorFilter) {
+                $q->where('authors.id', $authorFilter);
+            });
+        }
+
+        // Apply sorting
+        switch ($sort) {
+            case 'oldest':
+                $query->orderBy('published_at', 'asc');
+                break;
+            case 'title':
+                $query->orderBy('title', 'asc');
+                break;
+            case 'latest':
+            default:
+                $query->orderBy('published_at', 'desc');
+                break;
+        }
+
+        $paginationData = $query->paginate($perPage, $currentPage);
 
         $pages = $paginationData['data'];
         $pagination = [
@@ -59,6 +90,8 @@ class CategoryPageController extends Controller
             'breadcrumb' => $breadcrumb,
             'childCategories' => $childCategories,
             'pagination' => $pagination,
+            'currentSort' => $sort,
+            'menuRenderer' => new MenuRenderer()
         ]);
     }
 

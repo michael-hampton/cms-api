@@ -13,7 +13,8 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
 
     // Or check in database if they have any consent records
     if (!$hasResponded) {
-        $consentCount = \App\Models\MemberConsent::where('member_id', $memberId)->count();
+
+        $consentCount = \App\Models\MemberConsent::where('member_id', $memberId)->where('site_id', \App\Framework\Support\SiteContext::getId())->count();
         $shouldShowBanner = $consentCount === 0;
     }
 }

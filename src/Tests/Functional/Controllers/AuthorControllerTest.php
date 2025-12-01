@@ -365,4 +365,84 @@ class AuthorControllerTest extends FunctionalTestCase
         $this->assertNull(Author::find($author1->id));
         $this->assertNull(Author::find($author2->id));
     }
+
+    public function testStoreWithExpertiseFields()
+    {
+        $authorData = [
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'expertise' => 'Web development and design',
+            'location' => json_encode(['New York', 'Remote']),
+            'education' => json_encode(['BS Computer Science']),
+            'awards' => json_encode(['Best Writer 2023']),
+            'seniority_date' => '2020-01-15',
+            'is_active' => true
+        ];
+
+        $response = $this->postForSite('/api/authors', $authorData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Web development and design', $data['data']['author']['expertise']);
+        $this->assertEquals(['New York', 'Remote'], $data['data']['author']['location']);
+        $this->assertEquals(['BS Computer Science'], $data['data']['author']['education']);
+        $this->assertEquals(['Best Writer 2023'], $data['data']['author']['awards']);
+        $this->assertNotEmpty($data['data']['author']['seniority_date']);
+        $this->assertTrue($data['data']['author']['is_active']);
+    }
+
+    public function testUpdateWithExpertiseFields()
+    {
+        $author = $this->createAuthor();
+
+        $response = $this->putForSite("/api/authors/{$author->id}", [
+            'name' => 'John Updated',
+            'expertise' => 'Updated expertise',
+            'location' => json_encode(['Boston']),
+            'seniority_date' => '2019-06-01',
+            'is_active' => false
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Updated expertise', $data['data']['author']['expertise']);
+        $this->assertEquals(['Boston'], $data['data']['author']['location']);
+        $this->assertFalse($data['data']['author']['is_active']);
+    }
+
+    public function testShowReturnsPublishedCounts()
+    {
+        $author = $this->createAuthor();
+
+        $page1 = $this->createPage(['status' => 'published']);
+        $page2 = $this->createPage(['status' => 'published', 'page_type' => 'review']);
+
+        $this->attachAuthorToPage($page1, $author);
+        $this->attachAuthorToPage($page2, $author);
+
+        $response = $this->getForSite("/api/authors/{$author->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(2, $data['data']['author']['total_published_articles']);
+        $this->assertEquals(1, $data['data']['author']['total_published_reviews']);
+    }
+
+    public function testValidatesExpertiseMaxLength()
+    {
+        $longExpertise = str_repeat('a', 801);
+
+        $response = $this->postForSite('/api/authors', [
+            'name' => 'John Doe',
+            'expertise' => $longExpertise
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+    }
 }

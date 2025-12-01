@@ -333,4 +333,40 @@ class AuthorServiceTest extends FunctionalTestCase
 
         $this->assertCount(2, $result);
     }
+
+    public function testCreateAuthorWithExpertiseFields()
+    {
+        $data = [
+            'name' => 'John Doe',
+            'expertise' => 'Web development',
+            'location' => ['New York'],
+            'education' => ['BS CS'],
+            'awards' => ['Award 1'],
+            'seniority_date' => '2020-01-01',
+            'is_active' => true
+        ];
+
+        $mockedAuthor = Mockery::mock(Author::class);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->authorRepository->shouldReceive('findBySlug')
+            ->once()
+            ->andReturn(null);
+
+        $this->authorRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($arg) {
+                return $arg['expertise'] === 'Web development' &&
+                    $arg['location'] === ['New York'] &&
+                    is_bool($arg['is_active']);
+            }))
+            ->andReturn($mockedAuthor);
+
+        $result = $this->service->createAuthor($data, 1);
+
+        $this->assertInstanceOf(Author::class, $result);
+    }
 }

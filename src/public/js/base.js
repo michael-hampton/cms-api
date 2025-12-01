@@ -49,3 +49,41 @@ setInterval(() => {
         updateTestimonialCarousel(carousel);
     }
 }, 5000);
+
+// Mobile menu toggle
+document.addEventListener('DOMContentLoaded', function () {
+    // Mobile menu toggle button
+    const mobileToggle = document.querySelector('.mobile-menu-toggle');
+    const megaMenuNav = document.querySelector('.mega-menu-nav');
+
+    if (mobileToggle && megaMenuNav) {
+        mobileToggle.addEventListener('click', function () {
+            megaMenuNav.classList.toggle('active');
+            this.setAttribute('aria-expanded',
+                megaMenuNav.classList.contains('active')
+            );
+        });
+    }
+
+    // Mobile dropdown toggles
+    const mobileDropdowns = document.querySelectorAll('.mega-menu-item.has-dropdown');
+
+    if (window.innerWidth <= 1024) {
+        mobileDropdowns.forEach(item => {
+            const link = item.querySelector('.mega-menu-link');
+
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                item.classList.toggle('active');
+            });
+        });
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.mega-menu-nav') &&
+            !e.target.closest('.mobile-menu-toggle')) {
+            megaMenuNav?.classList.remove('active');
+        }
+    });
+});

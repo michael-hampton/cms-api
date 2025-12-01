@@ -25,6 +25,12 @@ class AuthorResource extends JsonResource
             'updated_at' => $this->getAttribute('updated_at'),
             'page_count' => $this->getPageCount(),
             'url' => '/authors/' . $this->getAttribute('slug'),
+            'expertise' => $this->getAttribute('expertise'),
+            'awards' => $this->getAttribute('awards'),
+            'location' => $this->getAttribute('location'),
+            'education' => $this->getAttribute('education'),
+            'seniority_date' => $this->getAttribute('seniority_date')?->format('Y-m-d'),
+
         ];
     }
 

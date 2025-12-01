@@ -164,7 +164,8 @@ class PageGridBlockParser extends BaseBlockParser
             'has_badges' => $this->hasBadges($cleanPages),
             'has_prices' => $this->hasPrices($cleanPages),
             'total_features' => $this->countTotalFeatures($cleanPages),
-            'grid_class' => $this->buildGridClass($data['layout'] ?? 'grid', (int)($data['columns'] ?? 3))
+            'grid_class' => $this->buildGridClass($data['layout'] ?? 'grid', (int)($data['columns'] ?? 3)),
+            'button' => $data['button'] ?? null,
         ];
     }
 
@@ -176,28 +177,13 @@ class PageGridBlockParser extends BaseBlockParser
 
         $cleanMeta = [];
 
-        if (!empty($meta['date'])) {
-            $cleanMeta['date'] = trim($meta['date']);
-        }
-
-        if (!empty($meta['author'])) {
-            if (is_array($meta['author'])) {
-                $cleanMeta['authors'] = array_map('trim', $meta['author']);
-            } else {
-                $cleanMeta['author'] = trim($meta['author']);
+        foreach ($meta as $key => $value) {
+            if (is_array($value)) {
+                $cleanMeta[$key] = array_map('trim', $value);
+                continue;
             }
-        }
 
-        if (!empty($meta['authors']) && is_array($meta['authors'])) {
-            $cleanMeta['authors'] = array_map('trim', $meta['authors']);
-        }
-
-        if (!empty($meta['category'])) {
-            $cleanMeta['category'] = trim($meta['category']);
-        }
-
-        if (!empty($meta['readTime'])) {
-            $cleanMeta['readTime'] = trim($meta['readTime']);
+            $cleanMeta[$key] = trim($value);
         }
 
         return !empty($cleanMeta) ? $cleanMeta : null;
@@ -355,6 +341,10 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "<h2 class=\"page-grid-title\">" . htmlspecialchars($parsedData['title']) . "</h2>";
             }
 
+            if (!empty($parsedData['button'])) {
+                $html .= "<a href=\"{$parsedData['button']['url']}\" class=\"page-grid-button button button-primary\">{$parsedData['button']['text']}</a>";
+            }
+
             if (!empty($parsedData['subtitle'])) {
                 $html .= "<p class=\"page-grid-subtitle\">" . htmlspecialchars($parsedData['subtitle']) . "</p>";
             }
@@ -474,7 +464,7 @@ class PageGridBlockParser extends BaseBlockParser
 
             $html .= "</div>"; // page-card-content
 
-            if(!empty($url)) {
+            if (!empty($url)) {
                 $html .= "</a>";
             }
 
@@ -500,11 +490,12 @@ class PageGridBlockParser extends BaseBlockParser
         return $html;
     }
 
-    private function addLink(string $html, string $slug) {
+    private function addLink(string $html, string $slug)
+    {
         $original = $html;
         $url = $this->buildPageUrl($slug);
 
-        if(!empty($url)) {
+        if (!empty($url)) {
             $html = "<a href=\"{$url}\">{$original}</a>";
         }
 

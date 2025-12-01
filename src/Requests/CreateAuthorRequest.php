@@ -30,7 +30,8 @@ class CreateAuthorRequest extends FormRequest
             'twitter' => ['string', 'max:255'],
             'linkedin' => ['string', 'max:255'],
             'facebook' => ['string', 'max:255'],
-            'status' => ['in:active,inactive']
+            'status' => ['in:active,inactive'],
+            'expertise' => ['nullable', 'string', 'max:500'],
         ];
     }
 

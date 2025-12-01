@@ -2,28 +2,35 @@
 
 namespace App\Controllers;
 
+use App\Framework\Support\SiteContext;
 use App\Models\Author;
+use App\Models\Menu;
 use App\Models\Page;
-use App\Services\AuthorService;
+use App\Repositories\CategoryRepository;
+use App\Repositories\TagRepository;
+use App\Services\MenuRenderer;
 use Exception;
 
 class AuthorViewController extends Controller
 {
-    private AuthorService $authorService;
-
-    public function __construct(AuthorService $authorService)
+    public function __construct(private CategoryRepository $categoryRepository, private TagRepository $tagRepository)
     {
-        $this->authorService = $authorService;
         parent::__construct();
     }
 
     public function show(string $slug)
     {
         try {
+
+            $menu = Menu::where('is_active', true)
+                ->where('site_id', SiteContext::getId())
+                ->where('menu_type', 'header')
+                ->with(['items'])
+                ->first();
+
             $author = Author::where('slug', $slug)->first();
 
             if (!$author) {
-                // Return 404 view or redirect
                 http_response_code(404);
                 include __DIR__ . '/../../views/404.php';
                 return;
@@ -33,20 +40,54 @@ class AuthorViewController extends Controller
             $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
             $perPage = 12;
 
-            // Get paginated pages for this author
-            $paginationData = Page::whereHas('authors', function($query) use ($author) {
+            // Get filter parameters
+            $sort = $_GET['sort'] ?? 'latest';
+            $categoryFilter = $_GET['category'] ?? '';
+
+            // Build query
+            $query = Page::whereHas('authors', function ($query) use ($author) {
                 $query->where('authors.id', $author->id);
             })
                 ->where('status', 'published')
-                ->with(['authors', 'categories', 'tags'])
-                ->orderBy('published_at', 'desc')
-                ->paginate($perPage, $currentPage);
+                ->with(['authors', 'categories', 'tags']);
+
+            // Apply category filter
+            if ($categoryFilter) {
+                $query->whereHas('categories', function ($q) use ($categoryFilter) {
+                    $q->where('categories.id', $categoryFilter);
+                });
+            }
+
+            // Apply sorting
+            switch ($sort) {
+                case 'oldest':
+                    $query->orderBy('published_at', 'asc');
+                    break;
+                case 'title':
+                    $query->orderBy('title', 'asc');
+                    break;
+                case 'latest':
+                default:
+                    $query->orderBy('published_at', 'desc');
+                    break;
+            }
+
+            $paginationData = $query->paginate($perPage, $currentPage);
 
             $pages = $paginationData['data'];
             $pagination = $paginationData['pagination'];
 
             // Render the author view
-            return $this->view('estate/author', ['author' => $author, 'pages' => $pages, 'pagination' => $pagination]);;
+            return $this->view('estate/author', [
+                'author' => $author,
+                'menu' => $menu,
+                'pages' => $pages,
+                'pagination' => $pagination,
+                'currentSort' => $sort,
+                'categories' => $this->categoryRepository->getActive(),
+                'tags' => $this->tagRepository->all(),
+                'menuRenderer' => new MenuRenderer()
+            ]);
 
         } catch (Exception $e) {
             http_response_code(500);

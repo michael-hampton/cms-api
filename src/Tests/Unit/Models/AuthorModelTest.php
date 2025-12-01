@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Author;
-use App\Models\Page;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -57,6 +56,7 @@ class AuthorModelTest extends FunctionalTestCase
             'slug' => 'active-author',
             'email' => 'active@example.com',
             'status' => 'active',
+            'is_active' => true
         ]);
 
         $inactive = Author::create([
@@ -64,6 +64,7 @@ class AuthorModelTest extends FunctionalTestCase
             'slug' => 'inactive-author',
             'email' => 'inactive@example.com',
             'status' => 'inactive',
+            'is_active' => false
         ]);
 
         $this->assertTrue($active->isActive());
@@ -96,8 +97,8 @@ class AuthorModelTest extends FunctionalTestCase
 
     public function testScopeActive()
     {
-        Author::create(['name' => 'Active', 'slug' => 'active', 'email' => 'active@test.com', 'status' => 'active']);
-        Author::create(['name' => 'Inactive', 'slug' => 'inactive', 'email' => 'inactive@test.com', 'status' => 'inactive']);
+        Author::create(['name' => 'Active', 'slug' => 'active', 'email' => 'active@test.com', 'status' => 'active', 'is_active' => true]);
+        Author::create(['name' => 'Inactive', 'slug' => 'inactive', 'email' => 'inactive@test.com', 'status' => 'inactive', 'is_active' => false]);
 
         $active = Author::active()->get();
         $this->assertCount(1, $active);
@@ -218,5 +219,94 @@ class AuthorModelTest extends FunctionalTestCase
 
         $this->assertNotNull($author->created_at);
         $this->assertNotNull($author->updated_at);
+    }
+
+    public function testAuthorWithExpertiseFields()
+    {
+        $author = Author::create([
+            'name' => 'John Doe',
+            'slug' => 'john-doe',
+            'email' => 'john@example.com',
+            'expertise' => 'Web development, Content strategy',
+            'location' => ['New York', 'Remote'],
+            'education' => ['BS Computer Science', 'MS Web Development'],
+            'awards' => ['Best Writer 2023', 'Excellence Award 2024'],
+            'seniority_date' => '2020-01-15',
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+
+        $this->assertEquals('Web development, Content strategy', $author->expertise);
+        $this->assertEquals(['New York', 'Remote'], $author->location);
+        $this->assertEquals(['BS Computer Science', 'MS Web Development'], $author->education);
+        $this->assertEquals(['Best Writer 2023', 'Excellence Award 2024'], $author->awards);
+        $this->assertEquals('2020-01-15', $author->seniority_date->format('Y-m-d'));
+        $this->assertTrue($author->is_active);
+    }
+
+    public function testGetYearsOfExperienceAttribute()
+    {
+        $author = Author::create([
+            'name' => 'John Doe',
+            'slug' => 'john-doe',
+            'email' => 'john@example.com',
+            'seniority_date' => '2020-01-01',
+            'status' => 'active',
+        ]);
+
+        $years = $author->getYearsOfExperienceAttribute();
+        $this->assertGreaterThanOrEqual(4, $years);
+        $this->assertLessThanOrEqual(6, $years);
+    }
+
+    public function testGetTotalPublishedArticlesAttribute()
+    {
+        $author = $this->createAuthor();
+
+        $page1 = $this->createPage(['status' => 'published']);
+        $page2 = $this->createPage(['status' => 'published']);
+        $page3 = $this->createPage(['status' => 'draft']);
+
+        $this->attachAuthorToPage($page1, $author);
+        $this->attachAuthorToPage($page2, $author);
+        $this->attachAuthorToPage($page3, $author);
+
+        $this->assertEquals(2, $author->getTotalPublishedArticlesAttribute());
+    }
+
+    public function testGetTotalPublishedReviewsAttribute()
+    {
+        $author = $this->createAuthor();
+
+        $review1 = $this->createPage(['status' => 'published', 'page_type' => 'review']);
+        $review2 = $this->createPage(['status' => 'published', 'page_type' => 'review']);
+        $article = $this->createPage(['status' => 'published', 'page_type' => 'article']);
+
+        $this->attachAuthorToPage($review1, $author);
+        $this->attachAuthorToPage($review2, $author);
+        $this->attachAuthorToPage($article, $author);
+
+        $this->assertEquals(2, $author->getTotalPublishedReviewsAttribute());
+    }
+
+    public function testToArrayIncludesNewFields()
+    {
+        $author = Author::create([
+            'name' => 'John Doe',
+            'slug' => 'john-doe',
+            'email' => 'john@example.com',
+            'expertise' => 'Writing',
+            'location' => ['NYC'],
+            'seniority_date' => '2020-01-01',
+            'status' => 'active',
+        ]);
+
+        $array = $author->toArray();
+
+        $this->assertArrayHasKey('expertise', $array);
+        $this->assertArrayHasKey('location', $array);
+        $this->assertArrayHasKey('total_published_articles', $array);
+        $this->assertArrayHasKey('total_published_reviews', $array);
+        $this->assertArrayHasKey('years_of_experience', $array);
     }
 }

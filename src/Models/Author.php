@@ -24,13 +24,24 @@ class Author extends Model
         'facebook',
         'status',
         'site_id',
-        'clone_history'
+        'clone_history',
+        'expertise',
+        'location',
+        'education',
+        'awards',
+        'seniority_date',
+        'is_active'
     ];
 
     protected $casts = [
         'created_at' => 'date',
         'updated_at' => 'date',
         'clone_history' => 'array',
+        'location' => 'array',
+        'education' => 'array',
+        'awards' => 'array',
+        'seniority_date' => 'date',
+        'is_active' => 'boolean'
     ];
 
     public function pages($relation = false)
@@ -40,7 +51,7 @@ class Author extends Model
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->is_active === true;
     }
 
     public function getFullNameAttribute(): string
@@ -53,9 +64,36 @@ class Author extends Model
         return '/authors/' . $this->slug;
     }
 
+    public function getTotalPublishedArticlesAttribute(): int
+    {
+        return $this->pages(true)
+            ->where('status', 'published')
+            ->count();
+    }
+
+    public function getTotalPublishedReviewsAttribute(): int
+    {
+        return $this->pages(true)
+            ->where('status', 'published')
+            ->where('page_type', 'review')
+            ->count();
+    }
+
+    public function getYearsOfExperienceAttribute(): ?int
+    {
+        if (!$this->seniority_date) {
+            return null;
+        }
+
+        $now = new \DateTime();
+        $interval = $this->seniority_date->diff($now);
+
+        return $interval->y;
+    }
+
     public function scopeActive(QueryBuilder $query): QueryBuilder
     {
-        return $query->where('status', 'active');
+        return $query->where('is_active', true);
     }
 
     public function scopeBySlug(QueryBuilder $query, string $slug): QueryBuilder
@@ -67,6 +105,9 @@ class Author extends Model
     {
         $data = parent::toArray();
         $data['url'] = $this->getUrlAttribute();
+        $data['total_published_articles'] = $this->getTotalPublishedArticlesAttribute();
+        $data['total_published_reviews'] = $this->getTotalPublishedReviewsAttribute();
+        $data['years_of_experience'] = $this->getYearsOfExperienceAttribute();
         return $data;
     }
 }

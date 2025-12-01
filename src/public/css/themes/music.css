@@ -3709,3 +3709,7 @@ img {
 .user-badge {
     background-color: var(--color-dark) !important;
 }
+
+.page-grid-title, .page-grid-subtitle {
+    color: white !important;
+}

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Models\ConsentAuditLog;
 use App\Models\ConsentType;
 use App\Models\ConsentWithdrawalRequest;
@@ -77,6 +78,7 @@ class ConsentService
         $consent->channel = $channel;
         $consent->granted_at = now();
         $consent->revoked_at = null;
+        $consent->site_id = SiteContext::getId();
         $consent->created_at = now();
 
         // Calculate expiry if retention period is set

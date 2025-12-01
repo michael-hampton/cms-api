@@ -133,7 +133,7 @@
 }
 
 /* Page Grid - Fashion Magazine Layout */
-.page-grid-block {
+/*.page-grid-block {
     padding: 60px 20px;
     max-width: 1400px;
     margin: 0 auto;
@@ -230,7 +230,7 @@
 .page-card-meta-author {
     font-weight: 600;
     color: var(--fashion-primary);
-}
+}*/
 
 /* Text Block - Fashion Editorial Style */
 .text-block {
@@ -977,15 +977,15 @@ ol.list-items li::before {
     object-fit: cover;
 }
 
-.page-badge {
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: bold;
-}
+/*.page-badge {*/
+/*    position: absolute;*/
+/*    top: 1rem;*/
+/*    left: 1rem;*/
+/*    padding: 0.25rem 0.75rem;*/
+/*    border-radius: 4px;*/
+/*    font-size: 0.875rem;*/
+/*    font-weight: bold;*/
+/*}*/
 
 .page-price {
     position: absolute;

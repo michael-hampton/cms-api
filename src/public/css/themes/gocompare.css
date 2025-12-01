@@ -2324,3 +2324,7 @@ textarea:focus {
         grid-template-columns: 1fr;
     }
 }
+
+.hero-title {
+    color: white;
+}
