@@ -62,7 +62,7 @@ class Review extends Model
     public function getAuthorNameAttribute(): string
     {
         if ($this->user) {
-            return $this->user->name;
+            return $this->user->first_name . ' ' . $this->user->last_name;
         }
         return 'Anonymous';
     }

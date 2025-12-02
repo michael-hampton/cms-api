@@ -2,9 +2,11 @@
 
 namespace App\Controllers;
 
+use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Models\Tag;
+use App\Services\MenuRenderer;
 
 class BrandPageController extends Controller
 {
@@ -40,10 +42,18 @@ class BrandPageController extends Controller
             'to' => $paginationData['pagination']['to']
         ];
 
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', SiteContext::getId())
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
         return $this->view('brand.show', [
             'pages' => $pages,
             'tag' => $tag,
-            'pagination' => $pagination
+            'pagination' => $pagination,
+            'menu' => $menu,
+            'menuRenderer' => new MenuRenderer()
         ]);
     }
 

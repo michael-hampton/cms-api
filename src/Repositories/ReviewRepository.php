@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Framework\Support\Collection;
-use App\Models\Model;
 use App\Models\Review;
 
 class ReviewRepository extends Repository
@@ -18,6 +17,7 @@ class ReviewRepository extends Repository
         $query = $this->model->query()
             ->where('product_id', $productId)
             ->where('is_approved', true)
+            ->with(['user']) // Add this to eager load user data
             ->orderBy('created_at', 'desc');
 
         return $query->paginate($perPage, $page);

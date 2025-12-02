@@ -16,8 +16,9 @@ class MenuReorganizationSeeder extends Seeder
 //        $this->reorganizeMusicWeekMenu();
 //        $this->reorganizeGamesRadarMenu();
 //        $this->reorganizeSoundwaveMenu();
-        $this->reorganizeVogueNoirMenu(); // Add this
-        $this->reorganizeGoCompareMenu(); // Add this
+//        $this->reorganizeVogueNoirMenu();
+//        $this->reorganizeGoCompareMenu();
+        $this->reorganizeWineChronicleMenu();
     }
 
     private function reorganizeVogueNoirMenu(): void
@@ -1039,5 +1040,145 @@ class MenuReorganizationSeeder extends Seeder
             'sort_order' => 6,
             'is_active' => true
         ]);
+    }
+
+    private function reorganizeWineChronicleMenu(): void
+    {
+        $site = Site::where('slug', 'wine-chronicle')->first();
+        if (!$site) return;
+
+        $menu = Menu::where('site_id', $site->id)->where('slug', 'main-menu')->first();
+        if (!$menu) return;
+
+        MenuItem::where('menu_id', $menu->id)->delete();
+
+        // Home
+        MenuItem::create([
+            'menu_id' => $menu->id,
+            'label' => 'Home',
+            'target_type' => 'custom',
+            'custom_url' => '/',
+            'sort_order' => 1,
+            'is_active' => true
+        ]);
+
+        // Wine Regions dropdown
+        $regionsParent = MenuItem::create([
+            'menu_id' => $menu->id,
+            'label' => 'Wine Regions',
+            'target_type' => 'custom',
+            'custom_url' => '#',
+            'sort_order' => 2,
+            'is_active' => true
+        ]);
+
+        $regions = [
+            ['label' => 'Bordeaux', 'url' => '/bordeaux-wine-guide-left-bank-right-bank'], // or '/region/bordeaux'
+            ['label' => 'Burgundy', 'url' => '/burgundy-beginners-guide-appellations'],
+            ['label' => 'Champagne', 'url' => '/champagne-region-houses-growers-guide'],
+            ['label' => 'Tuscany', 'url' => '/tuscany-wine-guide-chianti-brunello'],
+            ['label' => 'Rhône Valley', 'url' => '/rhone-valley-wine-guide-north-south'],
+            ['label' => 'Napa Valley', 'url' => '/napa-valley-wine-guide-cabernet-sauvignon']
+        ];
+
+        foreach ($regions as $index => $region) {
+            MenuItem::create([
+                'menu_id' => $menu->id,
+                'parent_id' => $regionsParent->id,
+                'label' => $region['label'],
+                'target_type' => 'custom',
+                'custom_url' => $region['url'],
+                'sort_order' => $index + 1,
+                'is_active' => true
+            ]);
+        }
+
+        // Wine Travel dropdown
+        $travelParent = MenuItem::create([
+            'menu_id' => $menu->id,
+            'label' => 'Wine Travel',
+            'target_type' => 'custom',
+            'custom_url' => '#',
+            'sort_order' => 3,
+            'is_active' => true
+        ]);
+
+        $travelTopics = [
+            ['label' => 'Vineyard Tours', 'url' => '/category/vineyard-tours'],
+            ['label' => 'Wine Routes', 'url' => '/category/wine-routes'],
+            ['label' => 'Destinations', 'url' => '/category/destinations']
+        ];
+
+        foreach ($travelTopics as $index => $topic) {
+            MenuItem::create([
+                'menu_id' => $menu->id,
+                'parent_id' => $travelParent->id,
+                'label' => $topic['label'],
+                'target_type' => 'custom',
+                'custom_url' => $topic['url'],
+                'sort_order' => $index + 1,
+                'is_active' => true
+            ]);
+        }
+
+        // Wine Knowledge dropdown
+        $knowledgeParent = MenuItem::create([
+            'menu_id' => $menu->id,
+            'label' => 'Wine Knowledge',
+            'target_type' => 'custom',
+            'custom_url' => '#',
+            'sort_order' => 4,
+            'is_active' => true
+        ]);
+
+        $knowledgeTopics = [
+            ['label' => 'Tasting Guides', 'url' => '/category/tasting-guides'],
+            ['label' => 'Grape Varieties', 'url' => '/category/grape-varieties'],
+            ['label' => 'Food Pairing', 'url' => '/category/food-pairing']
+        ];
+
+        foreach ($knowledgeTopics as $index => $topic) {
+            MenuItem::create([
+                'menu_id' => $menu->id,
+                'parent_id' => $knowledgeParent->id,
+                'label' => $topic['label'],
+                'target_type' => 'custom',
+                'custom_url' => $topic['url'],
+                'sort_order' => $index + 1,
+                'is_active' => true
+            ]);
+        }
+
+        // About - find the page ID
+        $aboutPage = \App\Models\Page::where('slug', 'about')
+            ->where('site_id', $site->id)
+            ->first();
+
+        if ($aboutPage) {
+            MenuItem::create([
+                'menu_id' => $menu->id,
+                'label' => 'About',
+                'target_type' => 'page',
+                'target_id' => $aboutPage->id,
+                'sort_order' => 5,
+                'is_active' => true
+            ]);
+        }
+
+        // Contact - find the page ID
+        $contactPage = \App\Models\Page::where('slug', 'contact')
+            ->where('site_id', $site->id)
+            ->first();
+
+        if ($contactPage) {
+            MenuItem::create([
+                'menu_id' => $menu->id,
+                'label' => 'Contact',
+                'target_type' => 'page',
+                'target_id' => $contactPage->id,
+                'sort_order' => 6,
+                'is_active' => true
+            ]);
+        }
     }
 }

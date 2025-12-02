@@ -565,9 +565,6 @@
             <p>Check back soon for personalized content recommendations.</p>
         </div>
     <?php endif; ?>
-
-    @include('member/activity', ['progress' => $progress, 'badges' => $badges, 'recent_activities' =>
-    $recent_activities])
 </div>
 
 

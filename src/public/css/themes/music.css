@@ -3713,3 +3713,103 @@ img {
 .page-grid-title, .page-grid-subtitle {
     color: white !important;
 }
+
+/* Soundwave Theme Overrides for Generic Elements */
+.categories-widget,
+.stat-item,
+.testimonial-item,
+.subcategories-grid .subcategory-card,
+.filters-section,
+.page-card,
+.empty-state,
+.author-info-section,
+.info-card {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.subcategory-card:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--color-primary) !important;
+}
+
+.filters-section {
+    background: rgba(255, 255, 255, 0.03) !important;
+    backdrop-filter: blur(10px);
+}
+
+.filter-group select {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: var(--color-light) !important;
+}
+
+.filter-group select:hover,
+.filter-group select:focus {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--color-accent) !important;
+}
+
+.filter-group label {
+    color: var(--color-gray-light) !important;
+}
+
+.filters-header {
+    color: var(--color-light) !important;
+}
+
+.header {
+    background: linear-gradient(135deg, rgba(255, 0, 85, 0.85) 0%, rgba(123, 44, 191, 0.85) 100%) !important;
+}
+
+.stat-item-header {
+    background: rgba(0, 245, 255, 0.15) !important;
+    border: 1px solid rgba(0, 245, 255, 0.3) !important;
+}
+
+.stat-item-header:hover {
+    background: rgba(0, 245, 255, 0.25) !important;
+    border-color: rgba(0, 245, 255, 0.5) !important;
+}
+
+/* Add to music.css */
+
+/* Soundwave Navigation Override */
+.site-header,
+.header-nav {
+    background: rgba(10, 10, 10, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 0, 85, 0.3);
+}
+
+.header-logo,
+.nav-link {
+    color: var(--color-light) !important;
+}
+
+.nav-link:hover {
+    color: var(--color-accent) !important;
+}
+
+.header-search-toggle {
+    color: var(--color-light) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.header-search-toggle:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: var(--color-accent) !important;
+}
+
+.mobile-menu-toggle span {
+    background: var(--color-light) !important;
+}
+
+.mega-menu-link {
+    color: white !important;
+}
+
+.filters-section {
+    margin-top: 20px !important;
+}
+

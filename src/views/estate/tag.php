@@ -5,311 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($tag->name) ?> - Tag</title>
     <meta name="description" content="<?= htmlspecialchars($tag->description ?? "Pages tagged with {$tag->name}") ?>">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #ffffff;
-            color: #111827;
-            line-height: 1.6;
-        }
-
-        /* Header */
-        header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 60px 20px;
-            text-align: center;
-        }
-
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .header-content h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        .tag-hash {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 3rem;
-        }
-
-        .header-content p {
-            font-size: 1.25rem;
-            opacity: 0.95;
-            max-width: 600px;
-            margin: 0 auto 24px;
-        }
-
-        .tag-stats-header {
-            display: flex;
-            justify-content: center;
-            gap: 32px;
-            margin-top: 24px;
-            flex-wrap: wrap;
-        }
-
-        .stat-item-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .stat-value-header {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-
-        .stat-label-header {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-
-        /* Container */
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-
-        /* Pages Grid */
-        .pages-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 24px;
-            margin-bottom: 40px;
-        }
-
-        .page-card {
-            background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .page-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
-            transform: translateY(-4px);
-        }
-
-        .page-card-image {
-            width: 100%;
-            height: 200px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 3rem;
-            overflow: hidden;
-        }
-
-        .page-card-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .page-card-content {
-            padding: 24px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .page-meta {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-        }
-
-        .page-badge {
-            display: inline-block;
-            background: #dbeafe;
-            color: #1e40af;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-size: 0.75rem;
-        }
-
-        .page-card-title {
-            font-size: 1.35rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #111827;
-            line-height: 1.4;
-        }
-
-        .page-card-title a {
-            text-decoration: none;
-            color: inherit;
-            transition: color 0.3s ease;
-        }
-
-        .page-card-title a:hover {
-            color: #667eea;
-        }
-
-        .page-excerpt {
-            color: #6b7280;
-            font-size: 0.95rem;
-            margin-bottom: 16px;
-            flex-grow: 1;
-            line-height: 1.6;
-        }
-
-        .page-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 16px;
-            border-top: 2px solid #f3f4f6;
-        }
-
-        .page-author-date {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .page-author {
-            font-size: 0.85rem;
-            color: #4b5563;
-            font-weight: 500;
-        }
-
-        .page-date {
-            font-size: 0.85rem;
-            color: #9ca3af;
-        }
-
-        .page-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
-        }
-
-        .page-link:hover {
-            background: #5568d3;
-            transform: translateX(2px);
-        }
-
-        .page-link svg {
-            width: 16px;
-            height: 16px;
-            transition: transform 0.2s ease;
-        }
-
-        .page-link:hover svg {
-            transform: translateX(4px);
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-        }
-
-        .empty-state svg {
-            width: 80px;
-            height: 80px;
-            color: #d1d5db;
-            margin-bottom: 20px;
-        }
-
-        .empty-state h2 {
-            font-size: 1.5rem;
-            margin-bottom: 12px;
-            color: #6b7280;
-        }
-
-        .empty-state p {
-            color: #9ca3af;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header-content h1 {
-                font-size: 2rem;
-            }
-
-            .tag-hash {
-                font-size: 2rem;
-            }
-
-            .header-content p {
-                font-size: 1rem;
-            }
-
-            .tag-stats-header {
-                gap: 16px;
-            }
-
-            .pages-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .container {
-                padding: 20px;
-            }
-        }
-
-        .page-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-top: 12px;
-        }
-
-        .tag-mini {
-            display: inline-block;
-            background: #f3f4f6;
-            color: #6b7280;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .tag-mini:hover {
-            background: #667eea;
-            color: white;
-        }
-    </style>
+    @css('landing-page.css')
 </head>
 <body>
+
+@include('header', ['menu' => $menu, 'title' => $tag->name])
+
 <header>
     <div class="header-content">
         <h1>
@@ -325,18 +26,40 @@
         </div>
     </div>
 </header>
-<!-- Main Content -->
 <div class="container">
     <?php if ($pages && count($pages) > 0): ?>
-        <!-- Filters -->
         @include('partials.filters', ['pages' => $pages])
-        <!-- Pages Grid -->
         <div class="pages-grid">
             <?php foreach ($pages as $page): ?>
                 <article class="page-card">
-                    <?php if ($page->featured_image): ?>
+                    <?php
+                    $imageUrl = '';
+                    $cropOverrides = $page->crop_overrides ?? null;
+                    $resolvedImages = $page->resolved_images ?? null;
+                    $useAsHero = ($page->listing_use_as_hero === true || $page->listing_use_as_hero === 1);
+
+                    if ($useAsHero) {
+                        if (isset($cropOverrides['hero-banner']['imageUrl'])) {
+                            $imageUrl = $cropOverrides['hero-banner']['imageUrl'];
+                        } elseif (isset($resolvedImages['hero-banner']['image_url'])) {
+                            $imageUrl = $resolvedImages['hero-banner']['image_url'];
+                        }
+                    } else {
+                        if (isset($cropOverrides['listing-card']['imageUrl'])) {
+                            $imageUrl = $cropOverrides['listing-card']['imageUrl'];
+                        } elseif (isset($resolvedImages['listing-card']['image_url'])) {
+                            $imageUrl = $resolvedImages['listing-card']['image_url'];
+                        }
+                    }
+
+                    if (!$imageUrl && isset($page->image->url)) {
+                        $imageUrl = $page->image->url;
+                    }
+                    ?>
+
+                    <?php if ($imageUrl): ?>
                         <div class="page-card-image">
-                            <img src="<?= htmlspecialchars($page->featured_image) ?>"
+                            <img src="<?= htmlspecialchars($imageUrl) ?>"
                                  alt="<?= htmlspecialchars($page->title) ?>">
                         </div>
                     <?php else: ?>
@@ -344,13 +67,16 @@
                     <?php endif; ?>
 
                     <div class="page-card-content">
-                        <div class="page-meta">
-                            <?php if ($page->categories && count($page->categories) > 0): ?>
+                        <?php if ($page->categories && count($page->categories) > 0): ?>
+                            <div class="page-meta">
                                 <?php foreach ($page->categories->take(2) as $category): ?>
-                                    <span class="page-badge"><?= htmlspecialchars($category->name) ?></span>
+                                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= htmlspecialchars($category->slug) ?>"
+                                       class="tags-badge">
+                                        <?= htmlspecialchars($category->name) ?>
+                                    </a>
                                 <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
+                            </div>
+                        <?php endif; ?>
 
                         <h3 class="page-card-title">
                             <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>">
@@ -368,14 +94,27 @@
                         <div class="page-footer">
                             <div class="page-author-date">
                                 <?php if ($page->authors && count($page->authors) > 0): ?>
-                                    <span class="page-author">
-                                    By <?= htmlspecialchars($page->authors->first()->name) ?>
-                                </span>
+                                    <div class="page-authors">
+            <span class="page-author">
+                By
+                <?php
+                $authorNames = array_map(function ($author) {
+                    return '<a href="/' . \App\Framework\Support\SiteContext::slug() . '/authors/' . $author['slug'] . '">' . htmlspecialchars($author['name']) . '</a>';
+                }, $page->authors->take(3)->toArray());
+
+                if (count($page->authors) > 3) {
+                    echo implode(', ', $authorNames) . ' +' . (count($page->authors) - 3);
+                } else {
+                    echo implode(', ', $authorNames);
+                }
+                ?>
+            </span>
+                                    </div>
                                 <?php endif; ?>
                                 <?php if ($page->published_at): ?>
                                     <span class="page-date">
-                                    <?= $page->published_at->format('M j, Y') ?>
-                                </span>
+            <?= $page->published_at->format('M j, Y') ?>
+        </span>
                                 <?php endif; ?>
                             </div>
                             <a href="/<?= \App\Framework\Support\SiteContext::slug() ?><?= htmlspecialchars($page->getUrlAttribute()) ?>"
@@ -405,12 +144,15 @@
 
         @include('partials.pagination', ['pages' => $pages])
     <?php else: ?>
-    <div class="empty-state">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <h2>No Articles Found</h2>
-        <p>No articles with this tag yet.</p>
-    </div>
-<?php endif; ?>
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h2>No Articles Found</h2>
+            <p>No articles with this tag yet.</p>
+        </div>
+    <?php endif; ?>
+</div>
+</body>
+</html>
