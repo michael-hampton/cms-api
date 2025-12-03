@@ -94,7 +94,7 @@ class MenuItem extends Model
     {
         if ($this->target_id && class_exists('App\Models\Category')) {
             $category = Category::find($this->target_id);
-            return $category ? "/categories/{$category->slug}" : '#';
+            return $category ? "/category/{$category->slug}" : '#';
         }
         return '#';
     }
