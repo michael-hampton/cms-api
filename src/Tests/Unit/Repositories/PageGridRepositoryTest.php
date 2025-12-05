@@ -34,7 +34,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         ], $overrides));
     }
 
-    /** @test */
     public function test_find_by_slug_returns_active_grid(): void
     {
         // Arrange
@@ -49,7 +48,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertEquals('test-grid-slug', $found->slug);
     }
 
-    /** @test */
     public function test_find_by_slug_returns_null_for_deleted_grid(): void
     {
         // Arrange
@@ -63,7 +61,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNull($found);
     }
 
-    /** @test */
     public function test_find_by_slug_returns_null_when_not_found(): void
     {
         // Act
@@ -73,7 +70,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNull($found);
     }
 
-    /** @test */
     public function test_restore_brings_back_deleted_grid(): void
     {
         // Arrange
@@ -94,7 +90,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNull($restored->deleted_at);
     }
 
-    /** @test */
     public function test_restore_returns_false_when_grid_not_found(): void
     {
         // Act
@@ -104,7 +99,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
     public function test_force_delete_permanently_removes_grid(): void
     {
         // Arrange
@@ -120,7 +114,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNull(PageGrid::withTrashed()->find($gridId));
     }
 
-    /** @test */
     public function test_force_delete_returns_false_when_not_found(): void
     {
         // Act
@@ -130,7 +123,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
     public function test_get_active_returns_only_active_non_deleted_grids(): void
     {
         // Arrange
@@ -157,7 +149,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNotContains('Deleted', $titles);
     }
 
-    /** @test */
     public function test_duplicate_creates_copy_with_modified_title_and_slug(): void
     {
         // Arrange
@@ -178,7 +169,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertEquals($original->is_active, $duplicate->is_active);
     }
 
-    /** @test */
     public function test_duplicate_returns_null_when_original_not_found(): void
     {
         // Act
@@ -188,7 +178,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertNull($duplicate);
     }
 
-    /** @test */
     public function test_slug_exists_returns_true_when_slug_exists(): void
     {
         // Arrange
@@ -201,7 +190,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertTrue($exists);
     }
 
-    /** @test */
     public function test_slug_exists_returns_false_when_slug_not_found(): void
     {
         // Act
@@ -211,7 +199,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertFalse($exists);
     }
 
-    /** @test */
     public function test_slug_exists_excludes_specific_id(): void
     {
         // Arrange
@@ -224,7 +211,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertFalse($exists);
     }
 
-    /** @test */
     public function test_slug_exists_with_exclude_id_still_finds_other_matches(): void
     {
         // Arrange
@@ -238,7 +224,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertTrue($exists);
     }
 
-    /** @test */
     public function test_search_returns_paginated_results(): void
     {
         // Arrange
@@ -257,7 +242,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertLessThanOrEqual(2, count($result->getData()));
     }
 
-    /** @test */
     public function test_log_history_creates_history_record(): void
     {
         // Arrange
@@ -274,7 +258,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_log_history_stores_changes_as_json(): void
     {
         // Arrange
@@ -298,7 +281,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertEquals($changes, $storedChanges);
     }
 
-    /** @test */
     public function test_get_history_returns_all_history_for_grid(): void
     {
         // Arrange
@@ -321,7 +303,6 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $this->assertEquals('deleted', $actions[2]);
     }
 
-    /** @test */
     public function test_get_history_returns_empty_collection_when_no_history(): void
     {
         // Arrange
@@ -365,12 +346,12 @@ class PageGridRepositoryTest extends RepositoryTestCase
     public function test_get_active_grid_for_page_returns_grid_when_no_dates_set(): void
     {
         // Arrange
-        $grid = $this->createPageGrid(['start_date' => null, 'end_date' => null]);
+        $grid = $this->createPageGrid(['start_date' => null, 'end_date' => null, 'site_id' => $this->siteId]);
         $page = $this->createPage(['title' => 'Test Page']);
         $grid->pages(true)->attach($page->id);
 
         // Act
-        $found = $this->repository->getActiveGridForPage($page->id);
+        $found = $this->repository->getActiveGridForPage($page->id, null, null, $this->siteId);
 
         // Assert
         $this->assertNotNull($found);
@@ -385,13 +366,14 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         $grid = $this->createPageGrid([
             'start_date' => $yesterday,
-            'end_date' => $tomorrow
+            'end_date' => $tomorrow,
+            'site_id' => $this->siteId
         ]);
         $page = $this->createPage(['title' => 'Test Page']);
         $grid->pages(true)->attach($page->id);
 
         // Act
-        $found = $this->repository->getActiveGridForPage($page->id);
+        $found = $this->repository->getActiveGridForPage($page->id, null, null, $this->siteId);;
 
         // Assert
         $this->assertNotNull($found);
@@ -445,13 +427,14 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         $grid = $this->createPageGrid([
             'start_date' => $yesterday,
-            'end_date' => null
+            'end_date' => null,
+            'site_id' => $this->siteId
         ]);
         $page = $this->createPage(['title' => 'Test Page']);
         $grid->pages(true)->attach($page->id);
 
         // Act
-        $found = $this->repository->getActiveGridForPage($page->id);
+        $found = $this->repository->getActiveGridForPage($page->id, null, null, $this->siteId);;
 
         // Assert
         $this->assertNotNull($found);
@@ -465,13 +448,14 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         $grid = $this->createPageGrid([
             'start_date' => null,
-            'end_date' => $tomorrow
+            'end_date' => $tomorrow,
+            'site_id' => $this->siteId
         ]);
         $page = $this->createPage(['title' => 'Test Page']);
         $grid->pages(true)->attach($page->id);
 
         // Act
-        $found = $this->repository->getActiveGridForPage($page->id);
+        $found = $this->repository->getActiveGridForPage($page->id, null, null, $this->siteId);
 
         // Assert
         $this->assertNotNull($found);

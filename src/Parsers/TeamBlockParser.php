@@ -63,6 +63,9 @@ class TeamBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
+        $memberCount = count($parsedData['members']);
+        $showCarousel = $memberCount > 3; // Show carousel if more than 3 members
+
         $html = "<section class=\"team-block team-layout-{$parsedData['layout']}\">";
         $html .= "<div class=\"container\">";
 
@@ -73,10 +76,24 @@ class TeamBlockParser extends BaseBlockParser
         }
         $html .= "</div>";
 
-        $html .= "<div class=\"team-grid\">";
+        if ($showCarousel) {
+            $html .= "<div class=\"team-carousel-wrapper\">";
+
+            // Navigation buttons
+            $html .= "<button class=\"team-nav team-nav-prev\" onclick=\"scrollTeamCarousel(this, 'prev')\" aria-label=\"Previous\">";
+            $html .= "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"15 18 9 12 15 6\"></polyline></svg>";
+            $html .= "</button>";
+
+            $html .= "<button class=\"team-nav team-nav-next\" onclick=\"scrollTeamCarousel(this, 'next')\" aria-label=\"Next\">";
+            $html .= "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"9 18 15 12 9 6\"></polyline></svg>";
+            $html .= "</button>";
+
+            $html .= "<div class=\"team-carousel\" data-team-carousel>";
+        } else {
+            $html .= "<div class=\"team-grid\">";
+        }
 
         foreach ($parsedData['members'] as $member) {
-            // Use PersonBlockParser to generate each member
             $personParser = new PersonBlockParser();
             $memberData = [
                 'name' => $member['name'],
@@ -91,8 +108,23 @@ class TeamBlockParser extends BaseBlockParser
             $html .= $personParser->generateHtml($parsedMember);
         }
 
-        $html .= "</div>";
-        $html .= "</div>";
+        $html .= "</div>"; // Close team-grid or team-carousel
+
+        // Add indicators for carousel
+        if ($showCarousel && $memberCount > 1) {
+            $html .= "<div class=\"team-indicators\">";
+            for ($i = 0; $i < $memberCount; $i++) {
+                $activeClass = $i === 0 ? ' active' : '';
+                $html .= "<button class=\"team-indicator{$activeClass}\" onclick=\"scrollTeamToIndex(this, {$i})\" aria-label=\"Go to member " . ($i + 1) . "\"></button>";
+            }
+            $html .= "</div>";
+        }
+
+        if ($showCarousel) {
+            $html .= "</div>"; // Close team-carousel-wrapper
+        }
+
+        $html .= "</div>"; // Close container
         $html .= "</section>";
 
         return $html;

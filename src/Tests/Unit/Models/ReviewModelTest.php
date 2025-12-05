@@ -2,8 +2,8 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Member;
 use App\Models\Review;
-use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class ReviewModelTest extends FunctionalTestCase
@@ -87,7 +87,7 @@ class ReviewModelTest extends FunctionalTestCase
 
     public function testGetAuthorNameAttributeReturnsUserName()
     {
-        $user = new User(['name' => 'John Doe']);
+        $user = new Member(['first_name' => 'John', 'last_name' => 'Doe']);
         $this->review->setRelation('user', $user);
 
         $authorName = $this->review->getAuthorNameAttribute();

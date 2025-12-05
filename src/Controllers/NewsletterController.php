@@ -24,6 +24,8 @@ class NewsletterController extends Controller
             $siteId = $request->getSiteId();
             $this->service = new NewsletterSignupService($this->repository, $siteId);
 
+            die('mike');
+
             $email = $request->input('email');
             $result = $this->service->signup($email);
 

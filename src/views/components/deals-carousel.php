@@ -14,6 +14,20 @@
         margin-bottom: 1.5rem;
     }
 
+    .view-all-deals {
+        color: #007185;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-left: auto; /* Push it to the left of the refresh button */
+        padding-right: 1rem;
+    }
+
+    .view-all-deals:hover {
+        color: #c45500;
+        text-decoration: underline;
+    }
+
     .deals-carousel-header h2 {
         font-size: 1.75rem;
         color: #0f1111;
@@ -87,17 +101,32 @@
     }
 
     .deal-card {
-        flex: 0 0 300px;
+        flex: 0 0 280px; /* Make card slightly narrower */
         background: #fff;
         border: 1px solid #e7e7e7;
         border-radius: 4px;
         position: relative;
         transition: transform 0.2s, box-shadow 0.2s;
+        display: flex; /* Flexbox for better content control */
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .deal-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .deal-header-actions {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 200px; /* Same height as image */
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        z-index: 10; /* Ensure they are above the image */
     }
 
     .deal-badge {
@@ -113,28 +142,57 @@
         z-index: 5;
     }
 
+    .deal-wishlist-btn {
+        position: static; /* No longer absolute within the card */
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #ddd;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+        color: #565959;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        align-self: flex-start; /* Aligns the button at the top right */
+    }
+
+    .deal-wishlist-btn:hover {
+        color: #cc0c39;
+        border-color: #cc0c39;
+    }
+
     .deal-image-link {
         display: block;
-        margin-bottom: 1rem;
+        margin-bottom: 0; /* Remove space above content */
+        position: relative;
     }
 
     .deal-image {
         width: 100%;
         height: 200px;
         object-fit: cover;
+        margin: 0 !important;
+        min-width: 100%;
     }
 
     .deal-content {
         text-align: left;
         padding: 1rem;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .deal-title {
         font-size: 1rem;
-        margin: 0 0 0.5rem;
-        height: 2.5em;
+        margin: 0 0 0.5rem !important; /* Reduced space after title */
+        height: 2.5em !important;
         overflow: hidden;
-        display: -webkit-box;
+        display: -webkit-box !important;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
     }
@@ -175,25 +233,32 @@
     }
 
     .deal-prices {
-        margin: 0.75rem 0;
+        margin: 0.5rem 0 1rem; /* Reduced space above prices, more space below */
     }
 
     .was-price {
-        display: block;
+        display: inline; /* Display inline with now-price (will wrap if necessary) */
         color: #565959;
         text-decoration: line-through;
         font-size: 0.875rem;
+        margin-right: 0.5rem;
     }
 
     .now-price {
-        display: block;
+        display: inline; /* Display inline with was-price */
         color: #cc0c39;
-        font-size: 1.5rem;
+        font-size: 1.25rem; /* Slightly smaller now-price */
         font-weight: 700;
     }
 
+    .deal-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: auto; /* Push actions to the bottom */
+    }
+
     .deal-cta {
-        width: 100%;
+        flex: 1; /* Take half the space */
         padding: 0.5rem;
         background: #ffa41c;
         color: #0f1111;
@@ -202,6 +267,32 @@
         font-weight: 600;
         cursor: pointer;
         transition: background 0.2s;
+    }
+
+    .deal-cta:hover {
+        background: #ff8f00;
+    }
+
+    .deal-add-cart {
+        flex: 1; /* Take half the space */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        padding: 0.5rem;
+        background: #f0f2f2;
+        color: #0f1111;
+        border: 1px solid #d5d9d9;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .deal-add-cart:hover {
+        background: #e9ecec;
+        border-color: #adb1b8 #a2a6ac #8d9096;
+        box-shadow: 0 1px 2px rgba(15, 17, 17, .15);
     }
 
     .deal-cta:hover {
@@ -232,6 +323,7 @@
 <div class="deals-carousel-wrapper">
     <div class="deals-carousel-header">
         <h2>Today's Best Deals & Offers</h2>
+        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/deals" class="view-all-deals">View All Deals</a>
         <button class="refresh-deals-btn" onclick="refreshDeals()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <polyline points="23 4 23 10 17 10"></polyline>

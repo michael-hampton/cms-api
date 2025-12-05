@@ -2,6 +2,7 @@
 
 namespace App\Parsers;
 
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
@@ -11,7 +12,8 @@ use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
-use App\Framework\Validation\Rules\UrlRule;
+use App\Models\Product;
+use App\Services\BuildProductCardService;
 
 class PageGridBlockParser extends BaseBlockParser
 {
@@ -74,7 +76,7 @@ class PageGridBlockParser extends BaseBlockParser
                 new ArrayRule()
             ],
             'pages.*.image.src' => [
-                new UrlRule(),
+                //new UrlRule(),
                 new MaxLengthRule(500)
             ],
             'pages.*.image.alt' => [
@@ -143,6 +145,15 @@ class PageGridBlockParser extends BaseBlockParser
                 'url' => $this->buildPageUrl($page['slug'] ?? ''),
                 'word_count' => str_word_count($page['excerpt'] ?? ''),
             ];
+
+            // Check if this is a product and fetch full product data
+            if (!empty($cleanPage['price'])) {
+                $productData = $this->fetchProductData($cleanPage['slug']);
+                if ($productData) {
+                    $cleanPage['product_data'] = $productData;
+                    $cleanPage['is_product'] = true;
+                }
+            }
 
             if (!empty($cleanPage['title']) && !empty($cleanPage['slug'])) {
                 $cleanPages[] = $cleanPage;
@@ -213,6 +224,24 @@ class PageGridBlockParser extends BaseBlockParser
             'color' => trim($badge['color'] ?? 'primary'),
             'background' => trim($badge['background'] ?? '')
         ];
+    }
+
+    private function fetchProductData(string $slug): ?array
+    {
+        try {
+            $slug = str_replace('shop/details/', '', $slug);
+
+            $product = Product::where('slug', $slug)->first();
+
+            if (!$product) {
+                return null;
+            }
+
+            return (new BuildProductCardService())->build($product->id);
+        } catch (\Exception $e) {
+            Logger::error('Error fetching product data: ' . $e->getMessage());
+            return null;
+        }
     }
 
     private function parseFeatures(array $features): array
@@ -504,6 +533,12 @@ class PageGridBlockParser extends BaseBlockParser
 
     private function generatePageCard(array $page, array $parsedData): string
     {
+        $isProduct = !empty($page['price']); // Detect if this is a product
+
+        if ($isProduct) {
+            return $this->generateProductCard($page, $parsedData);
+        }
+
         $html = "<div class=\"page-card\">";
 
         // Image section
@@ -591,7 +626,10 @@ class PageGridBlockParser extends BaseBlockParser
                 $relAttr = !empty($action['rel']) ? " rel=\"{$action['rel']}\"" : '';
                 $targetAttr = $action['target'] !== '_self' ? " target=\"{$action['target']}\"" : '';
 
-                $html .= "<a href=\"" . htmlspecialchars($action['url']) . "\" class=\"btn btn-{$action['style']}\"{$targetAttr}{$relAttr}>";
+                $site = SiteContext::get();
+                $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
+
+                $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn btn-{$action['style']}\"{$targetAttr}{$relAttr}>";
                 $html .= htmlspecialchars($action['text']);
                 $html .= "</a>";
             }
@@ -602,5 +640,368 @@ class PageGridBlockParser extends BaseBlockParser
         $html .= "</div>";
 
         return $html;
+    }
+
+    private function generateProductCard(array $page, array $parsedData): string
+    {
+        $productData = $page['product_data'] ?? null;
+
+        $productId = $productData ? 'product-' . $productData['id'] : 'page-' . ($page['slug'] ?? uniqid());
+
+        // Use real product data if available
+        $price = $productData ? $productData['price'] : ($page['price'] ?? '');
+        $salePrice = $productData ? $productData['sale_price'] : null;
+        $discountPercentage = $productData ? $productData['discount_percentage'] : 0;
+        $category = $productData && $productData['category'] ? $productData['category'] : null;
+        $brand = $productData && $productData['brand'] ? $productData['brand'] : null;
+        $stockQuantity = $productData ? $productData['stock_quantity'] : null;
+
+        $html = "<div class=\"page-card product-card\" data-product-id=\"{$productId}\">";
+        $html .= "<div class=\"product-card-inner\">";
+
+        // FRONT OF CARD
+        $html .= "<div class=\"product-card-front\">";
+
+        // Flip button
+        $html .= "<button class=\"btn-flip\" data-product-id=\"{$productId}\" title=\"View details\">";
+        $html .= "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
+        $html .= "<path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"/>";
+        $html .= "</svg>";
+        $html .= "</button>";
+
+        // Product image
+        if ($parsedData['showImage'] && !empty($page['image'])) {
+            $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\" class=\"product-image\">";
+            $html .= "<img src=\"" . htmlspecialchars($page['image']['src']) . "\" alt=\"" . htmlspecialchars($page['image']['alt'] ?: $page['title']) . "\">";
+
+            if ($discountPercentage > 0) {
+                $html .= "<span class=\"badge-sale\">-{$discountPercentage}%</span>";
+            }
+            $html .= "</a>";
+        }
+
+        // Product content
+        $html .= "<div class=\"product-content\">";
+
+        // Category and Brand
+        if ($category || $brand) {
+            $html .= "<div class=\"product-meta-tags\">";
+            if ($category) {
+                $html .= "<span class=\"product-category-tag\">" . htmlspecialchars($category['name']) . "</span>";
+            }
+            if ($brand) {
+                $html .= "<span class=\"product-brand-tag\">" . htmlspecialchars($brand['name']) . "</span>";
+            }
+            $html .= "</div>";
+        }
+
+        $html .= "<h3 class=\"product-name\">";
+        $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
+        $html .= "</h3>";
+
+        // Price
+        $html .= "<div class=\"product-price\">";
+        if ($salePrice && $salePrice > 0 && $salePrice < $price) {
+            $html .= "<span class=\"price-sale\">$" . number_format($salePrice, 2) . "</span>";
+            $html .= "<span class=\"price-original\">$" . number_format($price, 2) . "</span>";
+        } else {
+            $html .= "<span class=\"price-current\">$" . number_format($price, 2) . "</span>";
+        }
+        $html .= "</div>";
+
+        // Stock indicator
+        if ($stockQuantity !== null) {
+            $stockStatus = $this->getStockStatus($stockQuantity);
+            $html .= "<div class=\"stock-indicator-small {$stockStatus['class']}\">";
+            $html .= "<span class=\"stock-dot\"></span>";
+            $html .= "<span>" . $stockStatus['text'] . "</span>";
+            $html .= "</div>";
+        }
+
+        // Actions
+        if ($parsedData['showActions'] && !empty($page['actions'])) {
+            $html .= "<div class=\"product-actions\">";
+            foreach ($page['actions'] as $action) {
+                $site = SiteContext::get();
+                $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
+                $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn-add-to-cart\">";
+                $html .= htmlspecialchars($action['text']);
+                $html .= "</a>";
+            }
+            $html .= "</div>";
+        }
+
+        $html .= "</div>"; // product-content
+        $html .= "</div>"; // product-card-front
+
+        // BACK OF CARD - Now with real product data
+        $html .= $this->generateProductCardBack($page, $parsedData, $productData, $productId);
+
+        $html .= "</div>"; // product-card-inner
+        $html .= "</div>"; // product-card
+
+        return $html;
+    }
+
+    private function getStockStatus($quantity): array
+    {
+        if ($quantity === 0 || $quantity === null) {
+            return ['class' => 'out-of-stock', 'text' => 'Out of Stock'];
+        } elseif ($quantity < 10) {
+            return ['class' => 'low-stock', 'text' => "Only {$quantity} left"];
+        } else {
+            return ['class' => 'in-stock', 'text' => 'In Stock'];
+        }
+    }
+
+    private function generateProductCardBack(array $page, array $parsedData, ?array $productData, string $productId): string
+    {
+        $html = "<div class=\"product-card-back\">";
+        $html .= "<div class=\"card-back-header\">";
+        $html .= "<h3 class=\"card-back-title\">" . htmlspecialchars($page['title']) . "</h3>";
+        $html .= "<button class=\"btn-flip-back\" data-product-id=\"{$productId}\" title=\"Flip back\">";
+        $html .= "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
+        $html .= "<line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line>";
+        $html .= "<line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line>";
+        $html .= "</svg>";
+        $html .= "</button>";
+        $html .= "</div>";
+
+        $html .= "<div class=\"card-back-content\">";
+
+        if ($productData) {
+            // Description
+            if (!empty($productData['description'])) {
+                $shortDesc = strlen($productData['description']) > 150
+                    ? substr($productData['description'], 0, 150) . '...'
+                    : $productData['description'];
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Description</h4>";
+                $html .= "<p class=\"product-description\">" . htmlspecialchars($shortDesc) . "</p>";
+                $html .= "</div>";
+            }
+
+            // Stock Status
+            $html .= "<div class=\"back-section\">";
+            $html .= "<h4 class=\"back-section-title\">Availability</h4>";
+            $stockStatus = $this->getStockStatus($productData['stock_quantity']);
+            $html .= "<div class=\"stock-indicator {$stockStatus['class']}\">";
+            $html .= "<span class=\"stock-dot\"></span>";
+            $html .= "<span>{$stockStatus['text']}</span>";
+            $html .= "</div>";
+            $html .= "</div>";
+
+            // Variants
+            if (!empty($productData['variants']) && count($productData['variants']) > 0) {
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Available Options</h4>";
+                $html .= "<div class=\"variants-grid\">";
+                foreach ($productData['variants'] as $variant) {
+                    $disabledClass = !$variant['in_stock'] ? ' disabled' : '';
+                    $html .= "<div class=\"variant-option{$disabledClass}\">";
+                    $html .= "<div style=\"font-weight: 500;\">" . htmlspecialchars($variant['name']) . "</div>";
+                    if ($variant['discount_percentage'] > 0) {
+                        $html .= "<div style=\"font-size: 0.75rem; color: #059669;\">-{$variant['discount_percentage']}%</div>";
+                    }
+                    $html .= "<div style=\"font-size: 0.75rem; color: #64748b;\">$" . number_format($variant['final_price'], 2) . "</div>";
+                    $html .= "</div>";
+                }
+                $html .= "</div>";
+                $html .= "</div>";
+            }
+
+            // Price History
+            if (!empty($productData['price_history']) && count($productData['price_history']) > 0) {
+                $prices = array_column($productData['price_history'], 'price');
+                $currentPrice = end($prices);
+                $lowestPrice = min($prices);
+                $highestPrice = max($prices);
+                $savingsPercent = 0;
+
+                if ($currentPrice == $lowestPrice && $highestPrice > $lowestPrice) {
+                    $savingsPercent = round((($highestPrice - $lowestPrice) / $highestPrice) * 100);
+                }
+
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Price History (90 Days)</h4>";
+                $html .= "<div class=\"price-chart-container\">";
+                $html .= "<div class=\"price-stats\">";
+                $html .= "<div class=\"price-stat\">";
+                $html .= "<div class=\"price-stat-label\">Current</div>";
+                $html .= "<div class=\"price-stat-value current\">$" . number_format($currentPrice, 2) . "</div>";
+                $html .= "</div>";
+                $html .= "<div class=\"price-stat\">";
+                $html .= "<div class=\"price-stat-label\">Lowest</div>";
+                $html .= "<div class=\"price-stat-value low\">$" . number_format($lowestPrice, 2) . "</div>";
+                $html .= "</div>";
+                $html .= "<div class=\"price-stat\">";
+                $html .= "<div class=\"price-stat-label\">Highest</div>";
+                $html .= "<div class=\"price-stat-value high\">$" . number_format($highestPrice, 2) . "</div>";
+                $html .= "</div>";
+                $html .= "</div>";
+
+                if ($savingsPercent > 0) {
+                    $html .= "<div style=\"text-align: center; margin-bottom: 0.5rem; color: #059669; font-size: 0.875rem; font-weight: 500;\">";
+                    $html .= "💰 Save {$savingsPercent}% vs highest price!";
+                    $html .= "</div>";
+                }
+
+                $html .= "<div class=\"price-chart\">";
+                $html .= "<svg class=\"price-chart-line\" viewBox=\"0 0 100 40\" preserveAspectRatio=\"none\">";
+                $html .= $this->generatePriceChartSVG($productData['price_history']);
+                $html .= "</svg>";
+                $html .= "</div>";
+                $html .= "</div>";
+                $html .= "</div>";
+            }
+
+            // Specifications
+            if (!empty($productData['specifications']) && count($productData['specifications']) > 0) {
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Specifications</h4>";
+                $html .= "<div class=\"comparison-section\">";
+                foreach ($productData['specifications'] as $spec) {
+                    $html .= "<div class=\"comparison-item\">";
+                    $html .= "<span class=\"comparison-label\">" . htmlspecialchars($spec['key']) . "</span>";
+                    $html .= "<span class=\"comparison-value\">" . htmlspecialchars($spec['value']) . "</span>";
+                    $html .= "</div>";
+                }
+                $html .= "</div>";
+                $html .= "</div>";
+            }
+
+            // Comparison
+            if (!empty($productData['comparison'])) {
+                $comp = $productData['comparison'];
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Price Comparison</h4>";
+                $html .= "<div class=\"comparison-section\">";
+                $html .= "<div class=\"comparison-item\">";
+                $html .= "<span class=\"comparison-label\">vs. Category Average</span>";
+                $html .= "<span class=\"comparison-badge {$comp['price_comparison']}\">{$comp['price_difference']}</span>";
+                $html .= "</div>";
+
+                if (!empty($comp['category_avg_price'])) {
+                    $html .= "<div class=\"comparison-item\">";
+                    $html .= "<span class=\"comparison-label\">Category Average</span>";
+                    $html .= "<span class=\"comparison-value\">\$" . $comp['category_avg_price'] . "</span>";
+                    $html .= "</div>";
+                }
+
+                if (!empty($comp['discount_vs_regular'])) {
+                    $html .= "<div class=\"comparison-item\">";
+                    $html .= "<span class=\"comparison-label\">Your Savings</span>";
+                    $html .= "<span class=\"comparison-badge better\">{$comp['discount_vs_regular']}</span>";
+                    $html .= "</div>";
+                }
+
+                if (!empty($comp['products_in_category'])) {
+                    $html .= "<div class=\"comparison-item\">";
+                    $html .= "<span class=\"comparison-label\">Similar Products</span>";
+                    $html .= "<span class=\"comparison-value\">{$comp['products_in_category']} in category</span>";
+                    $html .= "</div>";
+                }
+
+                $html .= "</div>";
+                $html .= "</div>";
+            }
+
+            // Merchant availability
+            if (!empty($productData['merchants']) && count($productData['merchants']) > 1) {
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Available From</h4>";
+                $html .= "<div class=\"comparison-section\">";
+                foreach (array_slice($productData['merchants'], 0, 3) as $merchant) {
+                    $merchantPrice = $merchant['sale_price'] > 0 ? $merchant['sale_price'] : $merchant['price'];
+                    $html .= "<div class=\"comparison-item\">";
+                    $html .= "<span class=\"comparison-label\">";
+                    $html .= "<a href=\"" . htmlspecialchars($merchant['url']) . "\" target=\"_blank\" style=\"color: #2563eb; text-decoration: none;\">";
+                    $html .= htmlspecialchars($merchant['name']);
+                    $html .= "</a>";
+                    $html .= "</span>";
+                    $html .= "<span class=\"comparison-value\">";
+                    $html .= "$" . number_format($merchantPrice, 2);
+                    if ($merchant['has_discount']) {
+                        $html .= "<span style=\"color: #059669; font-size: 0.75rem; margin-left: 0.25rem;\">";
+                        $html .= "-{$merchant['discount_percentage']}%";
+                        $html .= "</span>";
+                    }
+                    $html .= "</span>";
+                    $html .= "</div>";
+                }
+                if (count($productData['merchants']) > 3) {
+                    $remaining = count($productData['merchants']) - 3;
+                    $html .= "<div style=\"text-align: center; margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;\">";
+                    $html .= "+{$remaining} more retailers";
+                    $html .= "</div>";
+                }
+                $html .= "</div>";
+                $html .= "</div>";
+            }
+
+        } else {
+            // Fallback to basic page data if no product data
+            if (!empty($page['excerpt'])) {
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Description</h4>";
+                $html .= "<p class=\"product-description\">" . htmlspecialchars($page['excerpt']) . "</p>";
+                $html .= "</div>";
+            }
+
+            if ($parsedData['showFeatures'] && !empty($page['features'])) {
+                $html .= "<div class=\"back-section\">";
+                $html .= "<h4 class=\"back-section-title\">Features</h4>";
+                $html .= "<div class=\"comparison-section\">";
+                foreach ($page['features'] as $feature) {
+                    $html .= "<div class=\"comparison-item\">";
+                    $html .= "<span class=\"comparison-value\">✓ " . htmlspecialchars($feature) . "</span>";
+                    $html .= "</div>";
+                }
+                $html .= "</div>";
+                $html .= "</div>";
+            }
+        }
+
+        $html .= "</div>"; // card-back-content
+
+        // Back actions
+        if ($parsedData['showActions'] && !empty($page['actions'])) {
+            $html .= "<div class=\"card-back-actions\">";
+            foreach ($page['actions'] as $action) {
+                $site = SiteContext::get();
+                $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
+                $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn-back-action btn-view-details\">";
+                $html .= htmlspecialchars($action['text']);
+                $html .= "</a>";
+            }
+            $html .= "</div>";
+        }
+
+        $html .= "</div>"; // product-card-back
+
+        return $html;
+    }
+
+    private function generatePriceChartSVG(array $priceHistory): string
+    {
+        if (empty($priceHistory) || count($priceHistory) < 2) {
+            return '';
+        }
+
+        $prices = array_column($priceHistory, 'price');
+        $minPrice = min($prices);
+        $maxPrice = max($prices);
+        $priceRange = $maxPrice - $minPrice ?: 1;
+
+        $points = [];
+        foreach ($priceHistory as $index => $item) {
+            $x = ($index / (count($priceHistory) - 1)) * 100;
+            $y = 40 - (($item['price'] - $minPrice) / $priceRange) * 35;
+            $points[] = "{$x},{$y}";
+        }
+
+        $pointsStr = implode(' ', $points);
+
+        return "<polyline points=\"{$pointsStr}\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />";
     }
 }

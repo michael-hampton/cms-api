@@ -1323,6 +1323,26 @@ abstract class Model
         return $instance;
     }
 
+    public static function firstOrCreate(array $attributes, array $values = [])
+    {
+        // Step 1: Try to find an existing record matching the attributes
+        $query = static::query();
+        foreach ($attributes as $key => $value) {
+            $query->where($key, $value);
+        }
+
+        $existing = $query->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        // Step 2: Not found — create new record
+        $data = array_merge($attributes, $values);
+
+        return static::create($data);
+    }
+
     /**
      * Boot all of the bootable traits on the model
      */

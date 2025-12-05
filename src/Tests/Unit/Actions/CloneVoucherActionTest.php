@@ -75,7 +75,7 @@ class CloneVoucherActionTest extends FunctionalTestCase
         $result = $this->service->handle($voucherId);
 
         $this->assertInstanceOf(Voucher::class, $result['voucher']);
-        $this->assertEquals('inactive', $result->status);
+        $this->assertEquals('inactive', $result['voucher']->status);;
     }
 
     public function testDuplicateVoucherWithCustomCode()

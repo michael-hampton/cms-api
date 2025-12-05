@@ -50,6 +50,8 @@ setInterval(() => {
     }
 }, 5000);
 
+let currentlyFlippedPageCard = null;
+
 // Mobile menu toggle
 document.addEventListener('DOMContentLoaded', function () {
     // Mobile menu toggle button
@@ -86,4 +88,115 @@ document.addEventListener('DOMContentLoaded', function () {
             megaMenuNav?.classList.remove('active');
         }
     });
+
+    const carousels = document.querySelectorAll('[data-team-carousel]');
+
+    carousels.forEach(carousel => {
+        carousel.addEventListener('scroll', () => {
+            updateTeamIndicators(carousel);
+        });
+    });
+
+    // Attach flip event listeners to page grid product cards
+    document.querySelectorAll('.page-grid-container .btn-flip').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const card = btn.closest('.product-card');
+            flipPageCard(card);
+        });
+    });
+
+    document.querySelectorAll('.page-grid-container .btn-flip-back').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const card = btn.closest('.product-card');
+            flipBackPageCard(card);
+        });
+    });
+
+
+    // Escape key to flip back
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && currentlyFlippedPageCard) {
+            flipBackPageCard(currentlyFlippedPageCard);
+        }
+    });
 });
+
+function flipPageCard(cardElement) {
+    // If clicking the same card, just toggle it
+    if (currentlyFlippedPageCard === cardElement) {
+        cardElement.classList.remove('flipped');
+        currentlyFlippedPageCard = null;
+        document.body.classList.remove('card-flipped');
+        return;
+    }
+
+    // If another card is flipped, flip it back first
+    if (currentlyFlippedPageCard) {
+        currentlyFlippedPageCard.classList.remove('flipped');
+    }
+
+    // Flip the new card
+    cardElement.classList.add('flipped');
+    currentlyFlippedPageCard = cardElement;
+    document.body.classList.add('card-flipped');
+}
+
+function flipBackPageCard(cardElement) {
+    cardElement.classList.remove('flipped');
+    if (currentlyFlippedPageCard === cardElement) {
+        currentlyFlippedPageCard = null;
+    }
+    document.body.classList.remove('card-flipped');
+}
+
+function scrollTeamCarousel(button, direction) {
+    const wrapper = button.closest('.team-carousel-wrapper');
+    const carousel = wrapper.querySelector('.team-carousel');
+    const cards = carousel.querySelectorAll('.person-block, .team-member');
+    const cardWidth = cards[0].offsetWidth;
+    const gap = 32; // 2rem gap
+    const scrollAmount = cardWidth + gap;
+
+    if (direction === 'prev') {
+        carousel.scrollBy({left: -scrollAmount, behavior: 'smooth'});
+    } else {
+        carousel.scrollBy({left: scrollAmount, behavior: 'smooth'});
+    }
+
+    setTimeout(() => updateTeamIndicators(carousel), 300);
+}
+
+function scrollTeamToIndex(button, index) {
+    const wrapper = button.closest('.team-carousel-wrapper');
+    const carousel = wrapper.querySelector('.team-carousel');
+    const cards = carousel.querySelectorAll('.person-block, .team-member');
+    const cardWidth = cards[0].offsetWidth;
+    const gap = 32;
+    const scrollPosition = index * (cardWidth + gap);
+
+    carousel.scrollTo({left: scrollPosition, behavior: 'smooth'});
+
+    setTimeout(() => updateTeamIndicators(carousel), 300);
+}
+
+function updateTeamIndicators(carousel) {
+    const wrapper = carousel.closest('.team-carousel-wrapper');
+    const indicators = wrapper.querySelectorAll('.team-indicator');
+    const cards = carousel.querySelectorAll('.person-block, .team-member');
+    const scrollLeft = carousel.scrollLeft;
+    const cardWidth = cards[0].offsetWidth;
+    const gap = 32;
+    const currentIndex = Math.round(scrollLeft / (cardWidth + gap));
+
+    indicators.forEach((indicator, index) => {
+        if (index === currentIndex) {
+            indicator.classList.add('active');
+        } else {
+            indicator.classList.remove('active');
+        }
+    });
+}

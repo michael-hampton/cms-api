@@ -62,6 +62,7 @@ class CloneVoucher
 
             try {
                 $newVoucher = $this->repository->create($data);
+
                 $results['success'][] = 'voucher_created';
             } catch (\Exception $e) {
                 $results['failed'][] = [

@@ -95,8 +95,8 @@ $router->get('/{siteName}/tags/{slug}', TagViewController::class, 'show');
 $router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);
 $router->get('/{site}/member/liked-pages', [MemberLikedPagesController::class, 'index']);
 
-$router->get('/shop', ProductListController::class, 'index');
-$router->get('/shop/details/{slug}', ProductDetailController::class, 'show');
+$router->get('{siteName}/shop', ProductListController::class, 'index');
+$router->get('{siteName}/shop/details/{slug}', ProductDetailController::class, 'show');
 $router->get('/sites', ContentController::class, 'sites');
 
 $router->get('/member/register', [MemberAuthController::class, 'showRegisterForm']);

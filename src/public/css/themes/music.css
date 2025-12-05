@@ -1635,13 +1635,6 @@ img {
     border-bottom: 2px solid rgba(255, 255, 255, 0.1);
 }
 
-.page-title {
-    font-size: clamp(2rem, 5vw, 3.5rem);
-    color: var(--color-light);
-    margin-bottom: var(--spacing-md);
-    line-height: 1.2;
-}
-
 .page-meta {
     display: flex;
     flex-wrap: wrap;
@@ -3812,4 +3805,40 @@ img {
 .filters-section {
     margin-top: 20px !important;
 }
+
+.categories-widget-title, .categories-widget-subtitle {
+    color: white !important;
+}
+
+.testimonial-content {
+    background-color: rgba(255, 255, 255, 0.05) !important; /* very subtle white overlay */
+    color: #fff !important; /* make text white for contrast */
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.category-card {
+    background-color: #2a273d !important; /* dark card to match gradient */
+    color: #fff !important; /* light text for contrast */
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+}
+
+.category-name,
+.category-count {
+    color: #fff !important;
+}
+
 

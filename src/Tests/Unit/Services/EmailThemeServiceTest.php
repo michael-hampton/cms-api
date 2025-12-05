@@ -43,6 +43,11 @@ class EmailThemeServiceTest extends FunctionalTestCase
             ->with('id')
             ->andReturn(1);
 
+        $this->repository->shouldReceive('find')
+            ->with(1, ['assets', 'colors', 'fonts', 'settings'])
+            ->once()
+            ->andReturn($mockedTheme);
+
         $this->repository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(fn($arg) => $arg['slug'] === 'modern-theme'))

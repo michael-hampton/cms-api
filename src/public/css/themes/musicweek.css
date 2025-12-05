@@ -207,19 +207,19 @@ body {
     margin-bottom: var(--spacing-sm);
 }
 
-.stat-number {
-    font-size: 3rem;
-    font-weight: 700;
-    color: var(--secondary-color);
-    line-height: 1;
-    margin-bottom: var(--spacing-xs);
-}
+/*.stat-number {*/
+/*    font-size: 3rem;*/
+/*    font-weight: 700;*/
+/*    color: var(--secondary-color);*/
+/*    line-height: 1;*/
+/*    margin-bottom: var(--spacing-xs);*/
+/*}*/
 
-.stat-label {
-    font-size: 1rem;
-    color: var(--text-light);
-    font-weight: 500;
-}
+/*.stat-label {*/
+/*    font-size: 1rem;*/
+/*    color: var(--text-light);*/
+/*    font-weight: 500;*/
+/*}*/
 
 /* ===================================
    HEADING BLOCK
