@@ -100,14 +100,16 @@ class SubscriptionRepository extends Repository
         ], $additionalData));
     }
 
-    public function hasActiveSubscriptionToPlan(int $memberId, int $planId, ?int $siteId = null): bool
+    public function hasActiveSubscriptionToPlan(int $memberId, int $planId, ?int $siteId = null, bool $allowCancelled = true): bool
     {
         $siteId = $siteId ?? SiteContext::getId();
+
+        $statuses = $allowCancelled ? ['active', 'cancelled'] : ['active'];
 
         return Subscription::where('member_id', $memberId)
             ->where('plan_id', $planId)
             ->where('site_id', $siteId)
-            ->where('status', 'active')
+            ->whereIn('status', $statuses)
             ->exists();
     }
 
@@ -196,5 +198,24 @@ class SubscriptionRepository extends Repository
         return Subscription::where('site_id', $siteId)
             ->where('status', 'past_due')
             ->get();
+    }
+
+    public function getCancelledSubscriptionForPlan(int $memberId, int $planId, int $siteId): ?Subscription
+    {
+        return Subscription::where('member_id', $memberId)
+            ->where('plan_id', $planId)
+            ->where('site_id', $siteId)
+            ->where('status', 'cancelled')
+            ->orderBy('updated_at', 'DESC')
+            ->first();
+    }
+
+    public function getCancelledSubscriptionForMember(int $memberId, int $siteId): ?Subscription
+    {
+        return Subscription::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->where('status', 'cancelled')
+            ->orderBy('updated_at', 'DESC')
+            ->first();
     }
 }

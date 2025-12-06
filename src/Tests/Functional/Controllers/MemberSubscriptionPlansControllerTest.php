@@ -14,6 +14,27 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
     private Member $member;
     private SubscriptionPlan $plan;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->member = $this->createMember();
+
+        $this->plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'description' => 'Premium features',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'trial_days' => 7,
+            'features' => ['Feature 1', 'Feature 2'],
+            'is_active' => true,
+            'is_featured' => true
+        ]);
+    }
+
     public function testIndexDisplaysAvailablePlans(): void
     {
         $response = $this->getForSite('/member/subscription-plans');
@@ -117,24 +138,41 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('already', strtolower($data['message']));
     }
 
-    protected function setUp(): void
+    public function testSubscribeReactivatesCancelledStripeSubscription(): void
     {
-        parent::setUp();
+        $this->actingAsMember($this->member);
 
-        $this->member = $this->createMember();
-
-        $this->plan = SubscriptionPlan::create([
+        // Create cancelled subscription with Stripe ID
+        $cancelledSubscription = Subscription::create([
+            'member_id' => $this->member->id,
             'site_id' => $this->siteId,
-            'name' => 'Premium Plan',
-            'slug' => 'premium',
-            'description' => 'Premium features',
+            'plan_id' => $this->plan->id,
+            'plan_name' => $this->plan->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
             'price' => 29.99,
             'currency' => 'USD',
-            'billing_period' => 'monthly',
-            'trial_days' => 7,
-            'features' => ['Feature 1', 'Feature 2'],
-            'is_active' => true,
-            'is_featured' => true
+            'payment_subscription_id' => 'sub_test123'
         ]);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/subscribe',
+            ['payment_method' => 'credit_card'],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertStringContainsString('reactivated', strtolower($data['message']));
+
+        // Verify subscription is now active
+        $updated = Subscription::find($cancelledSubscription->id);
+        $this->assertEquals('active', $updated->status);
+        $this->assertTrue($updated->auto_renew);
     }
+
 }

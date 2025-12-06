@@ -137,7 +137,7 @@ class SubscriptionPlanService
     ): Subscription
     {
         // Check if member already has active subscription
-        if ($this->subscriptionRepository->hasActiveSubscriptionToPlan($memberId, $planId, $siteId)) {
+        if ($this->subscriptionRepository->hasActiveSubscriptionToPlan($memberId, $planId, $siteId, false)) {
             throw new \Exception("Member already has an active subscription to this plan");
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Payment;
 
+use App\Framework\Support\Logger;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -328,14 +329,144 @@ class StripePaymentProcessor
         }
     }
 
-    public function cancelSubscription(string $stripeSubscriptionId): array
+    public function cancelSubscription(string $stripeSubscriptionId, bool $cancelAtPeriodEnd = true): array
     {
         try {
-            $subscription = $this->stripe->subscriptions->cancel($stripeSubscriptionId);
+            $updateData = [];
+
+            if ($cancelAtPeriodEnd) {
+                // Cancel at period end - subscription remains active until then
+                $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                    'cancel_at_period_end' => true
+                ]);
+            } else {
+                // Cancel immediately
+                $subscription = $this->stripe->subscriptions->cancel($stripeSubscriptionId);
+            }
 
             return [
                 'success' => true,
-                'status' => $subscription->status
+                'status' => $subscription->status,
+                'cancel_at_period_end' => $subscription->cancel_at_period_end ?? false,
+                'canceled_at' => $subscription->canceled_at ?? null,
+                'current_period_end' => $subscription->current_period_end ?? null
+            ];
+        } catch (ApiErrorException $e) {
+            error_log('Stripe cancel subscription error: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => $e->getStripeCode()
+            ];
+        }
+    }
+
+    /**
+     * Reactivate a cancelled subscription (only works if cancel_at_period_end is true)
+     */
+    public function reactivateSubscription(string $stripeSubscriptionId): array
+    {
+        try {
+            // First check the subscription status
+            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId);
+
+            // Can only reactivate if it's set to cancel at period end but hasn't been canceled yet
+            if ($subscription->status === 'canceled') {
+                return [
+                    'success' => false,
+                    'message' => 'Subscription has already been canceled and cannot be reactivated. Please create a new subscription.',
+                    'error_code' => 'subscription_already_canceled'
+                ];
+            }
+
+            // Check if it's set to cancel at period end
+            if (!$subscription->cancel_at_period_end) {
+                return [
+                    'success' => false,
+                    'message' => 'Subscription is not scheduled for cancellation',
+                    'error_code' => 'subscription_not_scheduled_for_cancellation'
+                ];
+            }
+
+            // Remove the cancel_at_period_end flag to reactivate
+            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'cancel_at_period_end' => false
+            ]);
+
+            return [
+                'success' => true,
+                'status' => $subscription->status,
+                'cancel_at_period_end' => false
+            ];
+        } catch (ApiErrorException $e) {
+            error_log('Stripe reactivate subscription error: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => $e->getStripeCode()
+            ];
+        }
+    }
+
+    public function createRefund(string $paymentIntentId, array $options = []): array
+    {
+        try {
+            $refundData = [
+                'payment_intent' => $paymentIntentId
+            ];
+
+            if (isset($options['amount'])) {
+                $refundData['amount'] = (int)($options['amount'] * 100); // Convert to cents
+            }
+
+            if (isset($options['reason'])) {
+                $refundData['reason'] = $options['reason']; // 'duplicate', 'fraudulent', 'requested_by_customer'
+            }
+
+            if (isset($options['metadata'])) {
+                $refundData['metadata'] = $options['metadata'];
+            }
+
+            $refund = $this->stripe->refunds->create($refundData);
+
+            return [
+                'success' => true,
+                'refund_id' => $refund->id,
+                'amount' => $refund->amount / 100, // Convert back to dollars
+                'status' => $refund->status,
+                'created' => $refund->created
+            ];
+        } catch (ApiErrorException $e) {
+            error_log('Stripe create refund error: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => $e->getStripeCode()
+            ];
+        }
+    }
+
+    public function getSubscription(string $stripeSubscriptionId): array
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId, [
+                'expand' => ['latest_invoice.payment_intent']
+            ]);
+
+            return [
+                'success' => true,
+                'subscription' => [
+                    'id' => $subscription->id,
+                    'status' => $subscription->status,
+                    'current_period_start' => $subscription->current_period_start,
+                    'current_period_end' => $subscription->current_period_end,
+                    'cancel_at_period_end' => $subscription->cancel_at_period_end,
+                    'canceled_at' => $subscription->canceled_at,
+                    'ended_at' => $subscription->ended_at
+                ]
             ];
         } catch (ApiErrorException $e) {
             return [
@@ -344,6 +475,7 @@ class StripePaymentProcessor
             ];
         }
     }
+
 
     public function handleWebhook(array $payload, string $signature): array
     {
@@ -361,6 +493,7 @@ class StripePaymentProcessor
                 'invoice.payment_failed' => $this->handleInvoicePaymentFailed($event->data->object),
                 'customer.subscription.updated' => $this->handleSubscriptionUpdated($event->data->object),
                 'customer.subscription.deleted' => $this->handleSubscriptionDeleted($event->data->object),
+                'charge.refunded' => $this->handleChargeRefunded($event->data->object),
                 default => ['success' => true, 'message' => 'Event not handled']
             };
         } catch (\Exception $e) {
@@ -369,6 +502,136 @@ class StripePaymentProcessor
                 'message' => $e->getMessage()
             ];
         }
+    }
+
+    private function handleChargeRefunded($charge): array
+    {
+        try {
+            // Find payment by payment_intent_id
+            $payment = Payment::where('payment_intent_id', $charge->payment_intent)->first();
+
+            if ($payment) {
+                $refundAmount = $charge->amount_refunded / 100; // Convert from cents
+
+                $this->paymentRepository->update($payment->id, [
+                    'status' => 'refunded',
+                    'metadata' => array_merge($payment->metadata ?? [], [
+                        'refund_amount' => $refundAmount,
+                        'refunded_at' => date('Y-m-d H:i:s'),
+                        'stripe_refund_id' => $charge->id
+                    ])
+                ]);
+
+                // Create a negative payment record for the refund
+                $this->paymentRepository->create([
+                    'subscription_id' => $payment->subscription_id,
+                    'order_id' => $payment->order_id,
+                    'site_id' => $payment->site_id,
+                    'payment_method' => 'stripe',
+                    'payment_provider' => 'stripe',
+                    'amount' => -$refundAmount,
+                    'currency' => strtoupper($charge->currency),
+                    'status' => 'completed',
+                    'paid_at' => date('Y-m-d H:i:s'),
+                    'transaction_id' => $charge->id,
+                    'metadata' => [
+                        'refund' => true,
+                        'original_payment_id' => $payment->id,
+                        'stripe_refund_id' => $charge->id
+                    ]
+                ]);
+            }
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            Logger::error('Failed to handle charge refunded webhook', [
+                'charge_id' => $charge->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Create a refund record in the refunds table
+     */
+    private function createRefundRecord(Payment $payment, float $refundAmount, string $stripeRefundId): void
+    {
+        $refundRepo = new \App\Repositories\RefundRepository();
+
+        // Check if refund already exists for this charge
+        $existingRefund = \App\Models\Refund::where('site_id', $payment->site_id)
+            ->where('order_id', $payment->order_id)
+            ->whereRaw("JSON_EXTRACT(internal_notes, '$.stripe_refund_id') = ?", [$stripeRefundId])
+            ->first();
+
+        if ($existingRefund) {
+            return; // Already processed
+        }
+
+        $order = \App\Models\Order::find($payment->order_id);
+        if (!$order) {
+            return;
+        }
+
+        // Create refund record
+        $refundData = [
+            'order_id' => $payment->order_id,
+            'site_id' => $payment->site_id,
+            'refund_type' => 'full', // Can be 'partial' if amount is less than order total
+            'refund_amount' => $refundAmount,
+            'reason' => 'Stripe refund processed',
+            'internal_notes' => json_encode([
+                'stripe_refund_id' => $stripeRefundId,
+                'payment_id' => $payment->id,
+                'processed_via_webhook' => true,
+                'processed_at' => date('Y-m-d H:i:s')
+            ]),
+            'notify_customer' => false, // Already notified by Stripe
+            'restock_items' => false, // Manual decision needed
+            'status' => 'processed',
+            'processed_at' => date('Y-m-d H:i:s'),
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        // Determine if full or partial refund
+        if ($refundAmount < $order->total) {
+            $refundData['refund_type'] = 'partial';
+        }
+
+        $refund = $refundRepo->create($refundData);
+
+        // Create refund items based on order items
+        $orderItems = \App\Models\OrderItem::where('order_id', $order->id)->get();
+
+        foreach ($orderItems as $orderItem) {
+            // Calculate proportional refund for each item
+            $itemRefundAmount = ($orderItem->price * $orderItem->quantity / $order->total) * $refundAmount;
+
+            $refundRepo->createRefundItem([
+                'refund_id' => $refund->id,
+                'order_item_id' => $orderItem->id,
+                'product_id' => $orderItem->product_id,
+                'product_name' => $orderItem->product_name,
+                'quantity' => $orderItem->quantity,
+                'refund_quantity' => $orderItem->quantity, // Full refund of item
+                'unit_price' => $orderItem->price,
+                'refund_amount' => $itemRefundAmount,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+
+        // Update order status
+        $totalRefunded = $refundRepo->getTotalRefundedAmount($order->id);
+        $orderStatus = $totalRefunded >= $order->total ? 'refunded' : 'partially_refunded';
+
+        \App\Models\Order::where('id', $order->id)->update([
+            'status' => $orderStatus,
+            'payment_status' => 'refunded'
+        ]);
     }
 
     private function handleInvoicePaymentSucceeded($invoice): array

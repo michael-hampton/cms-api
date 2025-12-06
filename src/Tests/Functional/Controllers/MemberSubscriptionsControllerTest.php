@@ -355,6 +355,165 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
         $this->assertFalse($data['success']);
     }
 
+    public function testUnsubscribeWarnsAboutActiveStripeSubscription(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => true,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => true
+        ]);
+
+        // Create active Stripe subscription
+        Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'payment_subscription_id' => 'sub_test123',
+            'auto_renew' => true
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/unsubscribe/{$token}",
+            [],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['has_active_subscription']);
+        $this->assertStringContainsString('does not cancel your paid subscription', $data['message']);
+    }
+
+    public function testResubscribeReactivatesCancelledStripeSubscription(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => false,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => false
+        ]);
+
+        // Create cancelled subscription that can still be reactivated
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'payment_subscription_id' => 'sub_test123',
+            'auto_renew' => false
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/resubscribe/{$token}",
+            [],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['subscription_reactivated']);
+        $this->assertStringContainsString('subscription has been reactivated', $data['message']);
+
+        // Verify preference is active
+        $preference = MemberSubscriptionPreference::where('unsubscribe_token', $token)->first();
+        $this->assertTrue($preference->is_active);
+        $this->assertTrue($preference->email_notifications);
+
+        // Verify subscription is reactivated
+        $updated = Subscription::find($subscription->id);
+        $this->assertEquals('active', $updated->status);
+        $this->assertTrue($updated->auto_renew);
+    }
+
+    public function testResubscribeOnlyUpdatesEmailPreferencesIfNoSubscription(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => false,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => false
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/resubscribe/{$token}",
+            [],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertFalse($data['subscription_reactivated']);
+        $this->assertStringContainsString('email notifications', $data['message']);
+        $this->assertStringNotContainsString('subscription has been reactivated', $data['message']);
+    }
+
+    public function testResubscribeDoesNotReactivateExpiredSubscription(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => false,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => false
+        ]);
+
+        // Create cancelled subscription that expired
+        Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'payment_subscription_id' => 'sub_test123',
+            'auto_renew' => false
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/resubscribe/{$token}",
+            [],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertFalse($data['subscription_reactivated']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

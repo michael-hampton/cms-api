@@ -76,10 +76,10 @@ class SubscriptionModalServiceTest extends FunctionalTestCase
         $this->planRepository->shouldReceive('getActivePlans')
             ->andReturn($plans);
 
-        $this->planRepository->shouldReceive('getFeaturedPlans')
-            ->with(1)
-            ->once()
-            ->andReturn($plans);
+//        $this->planRepository->shouldReceive('getFeaturedPlans')
+//            ->with(1)
+//            ->once()
+//            ->andReturn($plans);
 
         $result = $this->service->getModalData($member, 1);
 

@@ -63,7 +63,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
     public function testSubscribeMemberToPlanThrowsIfAlreadySubscribed(): void
     {
         $this->subscriptionRepository->shouldReceive('hasActiveSubscriptionToPlan')
-            ->with(1, 1, 1)
+            ->with(1, 1, 1, false)
             ->once()
             ->andReturn(true);
 
@@ -78,7 +78,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $subscription = Mockery::mock(Subscription::class);
 
         $this->subscriptionRepository->shouldReceive('hasActiveSubscriptionToPlan')
-            ->with(1, 1, 1)
+            ->with(1, 1, 1, false)
             ->once()
             ->andReturn(false);
 

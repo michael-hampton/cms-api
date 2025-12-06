@@ -554,23 +554,73 @@
             return;
         }
 
+        // button.disabled = true;
+        // button.classList.add('loading');
+        // const originalText = button.textContent;
+
+        window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/checkout?plan_slug=' + slug;
+
+        //fetch('/<?php //= \App\Framework\Support\SiteContext::slug() ?>///member/subscription-plans/' + slug + '/subscribe', {
+        //    method: 'POST',
+        //    headers: {
+        //        'Content-Type': 'application/json',
+        //        'X-Requested-With': 'XMLHttpRequest'
+        //    }
+        //})
+        //    .then(response => response.json())
+        //    .then(data => {
+        //        if (data.success) {
+        //            window.location.reload();
+        //        } else {
+        //            alert(data.message || 'Failed to subscribe');
+        //            button.disabled = false;
+        //            button.classList.remove('loading');
+        //            button.textContent = originalText;
+        //        }
+        //    })
+        //    .catch(error => {
+        //        alert('An error occurred. Please try again.');
+        //        console.error('Error:', error);
+        //        button.disabled = false;
+        //        button.classList.remove('loading');
+        //        button.textContent = originalText;
+        //    });
+    }
+
+    function cancelSubscription(subscriptionId) {
+        // Show options dialog
+        const cancelAtPeriodEnd = confirm(
+            'Choose cancellation option:\n\n' +
+            'OK = Cancel at end of billing period (recommended)\n' +
+            'Cancel = Cancel immediately'
+        );
+
+        if (cancelAtPeriodEnd === null) {
+            return; // User clicked X
+        }
+
+        const button = event.target;
         button.disabled = true;
         button.classList.add('loading');
         const originalText = button.textContent;
 
-        fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscription-plans/' + slug + '/subscribe', {
+        fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/cancel`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
-            }
+            },
+            body: JSON.stringify({
+                cancel_at_period_end: cancelAtPeriodEnd
+            })
         })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    alert(data.message);
                     window.location.reload();
                 } else {
-                    alert(data.message || 'Failed to subscribe');
+                    alert(data.message || 'Failed to cancel subscription');
                     button.disabled = false;
                     button.classList.remove('loading');
                     button.textContent = originalText;
@@ -585,8 +635,8 @@
             });
     }
 
-    function cancelSubscription(subscriptionId) {
-        if (!confirm('Are you sure you want to cancel your subscription? This action cannot be undone.')) {
+    function reactivateSubscription(subscriptionId) {
+        if (!confirm('Reactivate your subscription?')) {
             return;
         }
 
@@ -595,7 +645,7 @@
         button.classList.add('loading');
         const originalText = button.textContent;
 
-        fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/cancel`, {
+        fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/reactivate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -608,7 +658,7 @@
                     alert(data.message);
                     window.location.reload();
                 } else {
-                    alert(data.message || 'Failed to cancel subscription');
+                    alert(data.message || 'Failed to reactivate subscription');
                     button.disabled = false;
                     button.classList.remove('loading');
                     button.textContent = originalText;

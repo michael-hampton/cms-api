@@ -133,4 +133,14 @@ class Subscription extends Model
 
         return $interval->invert ? 0 : $interval->days;
     }
+
+    public function hasStripeSubscription(): bool
+    {
+        return $this->payment_subscription_id && strlen($this->payment_subscription_id) > 0;
+    }
+
+    public function getStripeSubscriptionId(): ?string
+    {
+        return $this->payment_subscription_id;
+    }
 }

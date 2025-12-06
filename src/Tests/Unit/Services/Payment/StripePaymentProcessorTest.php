@@ -32,6 +32,42 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     private $invoiceServiceMock;
     private $paymentIntentServiceMock;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->paymentRepository = m::mock(PaymentRepository::class);
+
+        // Mock Stripe client and services
+        $this->stripeMock = m::mock(StripeClient::class);
+        $this->customerServiceMock = m::mock(CustomerService::class);
+        $this->subscriptionServiceMock = m::mock(SubscriptionService::class);
+        $this->paymentMethodServiceMock = m::mock(PaymentMethodService::class);
+        $this->productServiceMock = m::mock(ProductService::class);
+        $this->priceServiceMock = m::mock(PriceService::class);
+        $this->invoiceServiceMock = m::mock(InvoiceService::class);
+        $this->paymentIntentServiceMock = m::mock(PaymentIntentService::class);
+
+        $this->stripeMock->customers = $this->customerServiceMock;
+        $this->stripeMock->subscriptions = $this->subscriptionServiceMock;
+        $this->stripeMock->paymentMethods = $this->paymentMethodServiceMock;
+        $this->stripeMock->products = $this->productServiceMock;
+        $this->stripeMock->prices = $this->priceServiceMock;
+        $this->stripeMock->invoices = $this->invoiceServiceMock;
+        $this->stripeMock->paymentIntents = $this->paymentIntentServiceMock;
+
+        // Inject mocked Stripe client via constructor
+        $this->processor = new StripePaymentProcessor(
+            $this->paymentRepository,
+            $this->stripeMock
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        m::close();
+        parent::tearDown();
+    }
     public function testProcessSubscriptionPaymentWithNewCustomer(): void
     {
         $member = $this->createMockMember(null);
@@ -599,46 +635,170 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with('sub_test123')
             ->andReturn($stripeSubscription);
 
-        $result = $this->processor->cancelSubscription('sub_test123');
+        $result = $this->processor->cancelSubscription('sub_test123', false);
 
         $this->assertTrue($result['success']);
         $this->assertEquals('canceled', $result['status']);
     }
 
-    protected function setUp(): void
+    public function testCancelSubscriptionImmediately(): void
     {
-        parent::setUp();
+        $canceledSubscription = new \stdClass();
+        $canceledSubscription->id = 'sub_test123';
+        $canceledSubscription->status = 'canceled';
+        $canceledSubscription->cancel_at_period_end = false;
+        $canceledSubscription->canceled_at = time();
+        $canceledSubscription->current_period_end = null;
 
-        $this->paymentRepository = m::mock(PaymentRepository::class);
+        $this->subscriptionServiceMock->shouldReceive('cancel')
+            ->once()
+            ->with('sub_test123')
+            ->andReturn($canceledSubscription);
 
-        // Mock Stripe client and services
-        $this->stripeMock = m::mock(StripeClient::class);
-        $this->customerServiceMock = m::mock(CustomerService::class);
-        $this->subscriptionServiceMock = m::mock(SubscriptionService::class);
-        $this->paymentMethodServiceMock = m::mock(PaymentMethodService::class);
-        $this->productServiceMock = m::mock(ProductService::class);
-        $this->priceServiceMock = m::mock(PriceService::class);
-        $this->invoiceServiceMock = m::mock(InvoiceService::class);
-        $this->paymentIntentServiceMock = m::mock(PaymentIntentService::class);
+        $result = $this->processor->cancelSubscription('sub_test123', false);
 
-        $this->stripeMock->customers = $this->customerServiceMock;
-        $this->stripeMock->subscriptions = $this->subscriptionServiceMock;
-        $this->stripeMock->paymentMethods = $this->paymentMethodServiceMock;
-        $this->stripeMock->products = $this->productServiceMock;
-        $this->stripeMock->prices = $this->priceServiceMock;
-        $this->stripeMock->invoices = $this->invoiceServiceMock;
-        $this->stripeMock->paymentIntents = $this->paymentIntentServiceMock;
-
-        // Inject mocked Stripe client via constructor
-        $this->processor = new StripePaymentProcessor(
-            $this->paymentRepository,
-            $this->stripeMock
-        );
+        $this->assertTrue($result['success']);
+        $this->assertEquals('canceled', $result['status']);
+        $this->assertFalse($result['cancel_at_period_end']);
     }
 
-    protected function tearDown(): void
+    public function testCancelSubscriptionAtPeriodEnd(): void
     {
-        m::close();
-        parent::tearDown();
+        $subscription = new \stdClass();
+        $subscription->id = 'sub_test123';
+        $subscription->status = 'active';
+        $subscription->cancel_at_period_end = true;
+        $subscription->canceled_at = time();
+        $subscription->current_period_end = time() + (30 * 24 * 60 * 60);
+
+        $this->subscriptionServiceMock->shouldReceive('update')
+            ->once()
+            ->with('sub_test123', ['cancel_at_period_end' => true])
+            ->andReturn($subscription);
+
+        $result = $this->processor->cancelSubscription('sub_test123', true);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('active', $result['status']);
+        $this->assertTrue($result['cancel_at_period_end']);
     }
+
+    public function testReactivateSubscription(): void
+    {
+        $subscription = new \stdClass();
+        $subscription->id = 'sub_test123';
+        $subscription->status = 'active';
+        $subscription->cancel_at_period_end = true;
+
+        $this->subscriptionServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('sub_test123')
+            ->andReturn($subscription);
+
+        $this->subscriptionServiceMock->shouldReceive('update')
+            ->once()
+            ->with('sub_test123', ['cancel_at_period_end' => false])
+            ->andReturn($subscription);
+
+        $result = $this->processor->reactivateSubscription('sub_test123');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('active', $result['status']);
+        $this->assertFalse($result['cancel_at_period_end']);
+    }
+
+    public function testCreateRefund(): void
+    {
+        $refund = new \stdClass();
+        $refund->id = 'ref_test123';
+        $refund->amount = 5000; // cents
+        $refund->status = 'succeeded';
+        $refund->created = time();
+
+        $refundServiceMock = m::mock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds = $refundServiceMock;
+
+        $refundServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['payment_intent'] === 'pi_test123'
+                    && $data['amount'] === 5000;
+            }))
+            ->andReturn($refund);
+
+        $result = $this->processor->createRefund('pi_test123', ['amount' => 50.00]);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('ref_test123', $result['refund_id']);
+        $this->assertEquals(50.00, $result['amount']);
+        $this->assertEquals('succeeded', $result['status']);
+    }
+
+    public function testReactivateSubscriptionSucceeds(): void
+    {
+        $subscription = new \stdClass();
+        $subscription->id = 'sub_test123';
+        $subscription->status = 'active';
+        $subscription->cancel_at_period_end = true; // Set to cancel at period end
+
+        // First retrieve to check status
+        $this->subscriptionServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('sub_test123')
+            ->andReturn($subscription);
+
+        // Then update to remove cancellation
+        $updatedSubscription = new \stdClass();
+        $updatedSubscription->id = 'sub_test123';
+        $updatedSubscription->status = 'active';
+        $updatedSubscription->cancel_at_period_end = false;
+
+        $this->subscriptionServiceMock->shouldReceive('update')
+            ->once()
+            ->with('sub_test123', ['cancel_at_period_end' => false])
+            ->andReturn($updatedSubscription);
+
+        $result = $this->processor->reactivateSubscription('sub_test123');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('active', $result['status']);
+        $this->assertFalse($result['cancel_at_period_end']);
+    }
+
+    public function testReactivateSubscriptionFailsIfAlreadyCanceled(): void
+    {
+        $subscription = new \stdClass();
+        $subscription->id = 'sub_test123';
+        $subscription->status = 'canceled'; // Already fully canceled
+
+        $this->subscriptionServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('sub_test123')
+            ->andReturn($subscription);
+
+        $result = $this->processor->reactivateSubscription('sub_test123');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('subscription_already_canceled', $result['error_code']);
+        $this->assertStringContainsString('already been canceled', $result['message']);
+    }
+
+    public function testReactivateSubscriptionFailsIfNotScheduledForCancellation(): void
+    {
+        $subscription = new \stdClass();
+        $subscription->id = 'sub_test123';
+        $subscription->status = 'active';
+        $subscription->cancel_at_period_end = false; // Not scheduled for cancellation
+
+        $this->subscriptionServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('sub_test123')
+            ->andReturn($subscription);
+
+        $result = $this->processor->reactivateSubscription('sub_test123');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('subscription_not_scheduled_for_cancellation', $result['error_code']);
+    }
+
 }

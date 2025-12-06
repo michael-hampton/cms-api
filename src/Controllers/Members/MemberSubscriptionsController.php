@@ -5,10 +5,12 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\CategoryRepository;
 use App\Repositories\SubscriptionRepository;
 use App\Services\MemberSubscriptionService;
+use App\Services\SubscriptionCancellationService;
 use App\Services\SubscriptionPlanService;
 
 class MemberSubscriptionsController extends Controller
@@ -17,7 +19,9 @@ class MemberSubscriptionsController extends Controller
         private readonly SubscriptionRepository    $subscriptionRepository,
         private readonly MemberSubscriptionService $subscriptionService,
         private readonly CategoryRepository        $categoryRepository,
-        private readonly SubscriptionPlanService   $subscriptionPlanService
+        private readonly SubscriptionPlanService         $subscriptionPlanService,
+        private readonly SubscriptionCancellationService $cancellationService
+
     )
     {
         parent::__construct();
@@ -142,9 +146,10 @@ class MemberSubscriptionsController extends Controller
 
     public function unsubscribe(Request $request, string $token)
     {
-        $success = $this->subscriptionService->unsubscribeByToken($token);
+        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $preference = $repo->findByToken($token);
 
-        if (!$success) {
+        if (!$preference) {
             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
                 return $this->resourceResponse([
                     'success' => false,
@@ -157,24 +162,56 @@ class MemberSubscriptionsController extends Controller
             ]);
         }
 
+        // Check if member has an active Stripe subscription
+        $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember(
+            $preference->member_id,
+            $preference->site_id
+        );
+
+        // If they have a Stripe subscription, warn them this only affects email preferences
+        $hasStripeSubscription = $activeSubscription && $activeSubscription->hasStripeSubscription();
+
+        $success = $this->subscriptionService->unsubscribeByToken($token);
+
+        if (!$success) {
+            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Failed to unsubscribe'
+                ], 500);
+            }
+
+            return $this->view('member/subscriptions/unsubscribe-invalid', [
+                'site' => SiteContext::get()
+            ]);
+        }
+
+        $message = 'Successfully unsubscribed from all emails';
+        if ($hasStripeSubscription) {
+            $message .= '. Note: This does not cancel your paid subscription. To cancel your subscription, please visit your account settings.';
+        }
+
         if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
             return $this->resourceResponse([
                 'success' => true,
-                'message' => 'Successfully unsubscribed from all emails'
+                'message' => $message,
+                'has_active_subscription' => $hasStripeSubscription
             ]);
         }
 
         return $this->view('member/subscriptions/unsubscribe-success', [
             'site' => SiteContext::get(),
-            'token' => $token
+            'token' => $token,
+            'has_active_subscription' => $hasStripeSubscription
         ]);
     }
 
     public function resubscribe(Request $request, string $token)
     {
-        $success = $this->subscriptionService->resubscribeByToken($token);
+        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $preference = $repo->findByToken($token);
 
-        if (!$success) {
+        if (!$preference) {
             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
                 return $this->resourceResponse([
                     'success' => false,
@@ -182,18 +219,73 @@ class MemberSubscriptionsController extends Controller
                 ], 404);
             }
 
-            $_SESSION['flash_success'] = 'Your subscription preferences have been updated.';
+            $_SESSION['flash_error'] = 'Invalid resubscribe token';
             return $this->redirect('/member/subscriptions');
+        }
+
+        // Resubscribe to email preferences
+        $success = $this->subscriptionService->resubscribeByToken($token);
+
+        if (!$success) {
+            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Failed to resubscribe'
+                ], 500);
+            }
+
+            $_SESSION['flash_error'] = 'Failed to resubscribe. Please try again.';
+            return $this->redirect('/member/subscriptions');
+        }
+
+        // Check if they have a cancelled Stripe subscription that can be reactivated
+        $cancelledSubscription = $this->subscriptionRepository->getCancelledSubscriptionForMember(
+            $preference->member_id,
+            $preference->site_id
+        );
+
+        $reactivatedSubscription = false;
+        $reactivationMessage = null;
+
+        if ($cancelledSubscription && $cancelledSubscription->hasStripeSubscription()) {
+            // Check if subscription is still within the billing period (can be reactivated)
+            $canReactivate = $cancelledSubscription->end_date &&
+                $cancelledSubscription->end_date > new \DateTime();
+
+            if ($canReactivate) {
+                try {
+                    $result = $this->cancellationService->reactivateSubscription($cancelledSubscription->id);
+                    $reactivatedSubscription = $result['success'];
+                } catch (\Exception $e) {
+                    Logger::error('Failed to reactivate subscription during resubscribe', [
+                        'subscription_id' => $cancelledSubscription->id,
+                        'error' => $e->getMessage()
+                    ]);
+
+                    // Set a message if the subscription can't be reactivated
+                    if (str_contains($e->getMessage(), 'cannot be reactivated')) {
+                        $reactivationMessage = 'Your email preferences have been updated. Your previous subscription cannot be reactivated - please subscribe to a new plan if you wish to continue.';
+                    }
+                }
+            }
+        }
+
+        $message = 'Successfully resubscribed to email notifications';
+        if ($reactivatedSubscription) {
+            $message .= ' and your subscription has been reactivated';
+        } elseif ($reactivationMessage) {
+            $message = $reactivationMessage;
         }
 
         if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
             return $this->resourceResponse([
                 'success' => true,
-                'message' => 'Successfully resubscribed'
+                'message' => $message,
+                'subscription_reactivated' => $reactivatedSubscription
             ]);
         }
 
-        $_SESSION['flash_success'] = 'Your subscription preferences have been updated.';
+        $_SESSION['flash_success'] = $message;
         return $this->redirect('/member/subscriptions');
     }
 
@@ -210,14 +302,81 @@ class MemberSubscriptionsController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
         }
 
-        if ($this->subscriptionRepository->cancelSubscription($subscriptionId)) {
+        try {
+            $cancelAtPeriodEnd = $request->input('cancel_at_period_end', true);
+
+            $result = $this->cancellationService->cancelSubscription($subscriptionId, [
+                'cancel_at_period_end' => $cancelAtPeriodEnd
+            ]);
+
+            if (!$result['success']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Failed to cancel subscription'
+                ], 500);
+            }
+
+            $message = $cancelAtPeriodEnd
+                ? 'Subscription will be cancelled at the end of the billing period'
+                : 'Subscription cancelled successfully';
+
             return $this->jsonResponse([
                 'success' => true,
-                'message' => 'Subscription cancelled successfully'
+                'message' => $message,
+                'data' => ['subscription' => $result['subscription']]
             ]);
+        } catch (\Exception $e) {
+            Logger::error('Failed to cancel subscription', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function reactivate(Request $request, int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        return $this->jsonResponse(['success' => false, 'message' => 'Failed to cancel subscription'], 500);
+        $member = MemberAuth::member();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $member->id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
+        }
+
+        try {
+            $result = $this->cancellationService->reactivateSubscription($subscriptionId);
+
+            if (!$result['success']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Failed to reactivate subscription'
+                ], 500);
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Subscription reactivated successfully',
+                'data' => ['subscription' => $result['subscription']]
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Failed to reactivate subscription', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function manageByToken(string $token)
