@@ -113,17 +113,6 @@ class SubscriptionRepository extends Repository
             ->exists();
     }
 
-    public function getActiveSubscriptionForPlan(int $memberId, int $planId, ?int $siteId = null): ?Subscription
-    {
-        $siteId = $siteId ?? SiteContext::getId();
-
-        return Subscription::where('member_id', $memberId)
-            ->where('plan_id', $planId)
-            ->where('site_id', $siteId)
-            ->where('status', 'active')
-            ->first();
-    }
-
     public function getMemberLastSubscriptionCheck(int $memberId, int $siteId): ?string
     {
         // Check session/cookie for last time we showed the modal

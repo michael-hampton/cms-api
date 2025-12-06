@@ -91,6 +91,14 @@ class PaymentRepository extends Repository
         )->get();
     }
 
+    public function getAllPayments(): Collection
+    {
+        return $this->applySiteFilter(
+            Payment::whereNotNull('subscription_id')
+                ->orderBy('created_at', 'desc')
+        )->get();
+    }
+
     public function countSubscriptionPayments(int $subscriptionId, ?string $status = null): int
     {
         $query = Payment::where('subscription_id', $subscriptionId);

@@ -106,7 +106,10 @@ class ProductBlockParser extends BaseBlockParser
             'review' => $this->parseReviewData($data['review'] ?? []),
             'has_sale_price' => $salePrice > 0 && $salePrice < $price,
             'description_word_count' => str_word_count(strip_tags($description)),
-            'formatted_description' => nl2br(htmlspecialchars($description))
+            'formatted_description' => nl2br(htmlspecialchars($description)),
+            'product_id' => $data['product_id'] ?? null,
+            'variant_id' => $data['variant_id'] ?? null,
+            'opted_out_product_match' => (bool)($data['opted_out_product_match'] ?? false),
         ];
     }
 

@@ -27,11 +27,13 @@ use App\Controllers\PaymentMethodController;
 use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
+use App\Controllers\ProductMatchingController;
 use App\Controllers\RefundController;
 use App\Controllers\RegionSetController;
 use App\Controllers\ReviewController;
 use App\Controllers\SearchController;
 use App\Controllers\SiteController;
+use App\Controllers\SubscriptionController;
 use App\Controllers\SubscriptionModalController;
 use App\Controllers\TagController;
 use App\Controllers\TerritoryController;
@@ -103,8 +105,17 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         //payment subscriptions
         $router->get('/payments/subscription-failures', [PaymentController::class, 'subscriptionFailures']);
 
+        $router->get('/subscriptions', [SubscriptionController::class, 'index']);
+        $router->get('/subscriptions/payments', [SubscriptionController::class, 'payments']);
+        $router->get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
+        $router->post('/subscriptions/plans', [SubscriptionController::class, 'createPlan']);
+        $router->put('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
+        $router->delete('/subscriptions/plans/{id}', [SubscriptionController::class, 'deletePlan']);
+
         $router->get('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'subscriptionPayments']);
         $router->post('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'createSubscriptionPayment']);
+
+        $router->post('/products/find-matches', [ProductMatchingController::class, 'findMatches']);
 
         // Approval workflow routes
         $router->post('/pages/{id}/approve', PageController::class, 'approve');

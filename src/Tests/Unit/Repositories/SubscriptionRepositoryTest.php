@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\SubscriptionRepository;
@@ -416,5 +417,348 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
 
         $this->assertNull($subscription->next_billing_date);
         $this->assertFalse($subscription->auto_renew);
+    }
+
+    public function test_get_cancelled_subscription_for_plan_returns_most_recent_cancelled(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        // Create older cancelled subscription
+        $olderCancelled = Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'updated_at' => date('Y-m-d H:i:s', strtotime('-1 month'))
+        ]);
+
+        // Create newer cancelled subscription
+        $newerCancelled = Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForPlan(
+            $member->id,
+            $plan->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNotNull($result);
+        $this->assertEquals($olderCancelled->id, $result->id);
+        $this->assertEquals('cancelled', $result->status);
+    }
+
+    public function test_get_cancelled_subscription_for_plan_returns_null_when_none_exist(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForPlan(
+            $member->id,
+            $plan->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_plan_ignores_active_subscriptions(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        // Create active subscription
+        Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => true,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForPlan(
+            $member->id,
+            $plan->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_plan_filters_by_site(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+        $otherSite = $this->createSite();
+
+        // Create cancelled subscription in other site
+        Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'site_id' => $otherSite->id,
+            'plan_name' => $plan->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForPlan(
+            $member->id,
+            $plan->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_plan_filters_by_plan(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan1 = $this->createSubscriptionPlan();
+        $plan2 = $this->createSubscriptionPlan();
+
+        // Create cancelled subscription for different plan
+        Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan2->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan2->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan2->price,
+            'currency' => $plan2->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForPlan(
+            $member->id,
+            $plan1->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_member_returns_most_recent_cancelled(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan1 = $this->createSubscriptionPlan();
+        $plan2 = $this->createSubscriptionPlan();
+
+        // Create older cancelled subscription
+        $olderCancelled = Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan1->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan1->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'price' => $plan1->price,
+            'currency' => $plan1->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'updated_at' => date('Y-m-d H:i:s', strtotime('-1 month'))
+        ]);
+
+        // Create newer cancelled subscription (different plan)
+        $newerCancelled = Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan2->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan2->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'price' => $plan2->price,
+            'currency' => $plan2->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForMember(
+            $member->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNotNull($result);
+        $this->assertEquals($olderCancelled->id, $result->id);
+        $this->assertEquals('cancelled', $result->status);
+    }
+
+    public function test_get_cancelled_subscription_for_member_returns_null_when_none_exist(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForMember(
+            $member->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_member_ignores_active_subscriptions(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        // Create active subscription
+        Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => true,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForMember(
+            $member->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_member_filters_by_site(): void
+    {
+        // Arrange
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+        $otherSite = $this->createSite();
+
+        // Create cancelled subscription in other site
+        Subscription::create([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'site_id' => $otherSite->id,
+            'plan_name' => $plan->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForMember(
+            $member->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function test_get_cancelled_subscription_for_member_filters_by_member(): void
+    {
+        // Arrange
+        $member1 = $this->createMember();
+        $member2 = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        // Create cancelled subscription for different member
+        Subscription::create([
+            'member_id' => $member2->id,
+            'plan_id' => $plan->id,
+            'site_id' => $this->siteId,
+            'plan_name' => $plan->name,
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan->price,
+            'currency' => $plan->currency,
+            'auto_renew' => false,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        // Act
+        $result = $this->repository->getCancelledSubscriptionForMember(
+            $member1->id,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+
+    protected function createSubscriptionPlan(array $attributes = []): Model
+    {
+        return SubscriptionPlan::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Plan ' . uniqid(),
+            'slug' => 'test-plan-' . uniqid(),
+            'description' => 'A test subscription plan',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'features' => ['Feature 1', 'Feature 2'],
+            'is_active' => true,
+            'is_featured' => false,
+            'sort_order' => 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ], $attributes));
     }
 }

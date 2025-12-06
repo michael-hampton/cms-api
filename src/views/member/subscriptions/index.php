@@ -296,6 +296,221 @@
                 font-size: 32px;
             }
         }
+
+
+        /* Keep all existing styles and add these for the dialog */
+        .dialog-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 9998;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .dialog-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            animation: slideUp 0.3s ease;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .dialog-content {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .dialog-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+            animation: scaleIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .icon-danger {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #dc2626;
+        }
+
+        .icon-warning {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #f59e0b;
+        }
+
+        .icon-info {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #3b82f6;
+        }
+
+        .icon-success {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            color: #10b981;
+        }
+
+        .dialog-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+            line-height: 1.3;
+            text-align: center;
+        }
+
+        .dialog-message {
+            font-size: 16px;
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .dialog-options {
+            margin: 28px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            padding: 18px 20px;
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .option-item:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateY(-2px);
+        }
+
+        .option-item.selected {
+            background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+            border-color: #7c3aed;
+        }
+
+        .option-item input[type="radio"] {
+            margin-right: 16px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #7c3aed;
+        }
+
+        .option-content {
+            flex: 1;
+            text-align: left;
+        }
+
+        .option-label {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .option-description {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .option-check {
+            color: #7c3aed;
+            font-size: 24px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .option-item.selected .option-check {
+            opacity: 1;
+        }
+
+        .dialog-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+
+        .btn-cancel {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .btn-cancel:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-confirm {
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -40%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -549,6 +764,27 @@
     </div>
 </div>
 <script>
+    // Notification Helper
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+        notification.style.cssText = 'position: fixed;         top: 20px;         right: 20px;         padding: 16px 24px;         border-radius: 12px;         font-weight: 600;         z-index: 10000;         animation: slideIn 0.3s ease;         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);';
+        if (type === 'success') {
+            notification.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            notification.style.color = 'white';
+        } else if (type === 'error') {
+            notification.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            notification.style.color = 'white';
+        }
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
     function quickSubscribe(slug, button) {
         if (!confirm('Subscribe to this plan?')) {
             return;
@@ -588,90 +824,199 @@
     }
 
     function cancelSubscription(subscriptionId) {
-        // Show options dialog
-        const cancelAtPeriodEnd = confirm(
-            'Choose cancellation option:\n\n' +
-            'OK = Cancel at end of billing period (recommended)\n' +
-            'Cancel = Cancel immediately'
-        );
+        const dialog = createConfirmDialog({
+            title: 'Cancel Subscription',
+            message: 'How would you like to cancel your subscription?',
+            confirmText: 'Cancel Subscription',
+            type: 'danger',
+            showOptions: true,
+            options: [
+                {
+                    label: 'Cancel at end of billing period',
+                    value: true,
+                    description: 'You\'ll keep access until the current period ends (Recommended)'
+                },
+                {
+                    label: 'Cancel immediately',
+                    value: false,
+                    description: 'Your access ends right away'
+                }
+            ]
+        });
 
-        if (cancelAtPeriodEnd === null) {
-            return; // User clicked X
-        }
+        dialog.then(cancelAtPeriodEnd => {
+            const button = event.target;
+            button.disabled = true;
+            button.classList.add('loading');
+            const originalText = button.textContent;
 
-        const button = event.target;
-        button.disabled = true;
-        button.classList.add('loading');
-        const originalText = button.textContent;
-
-        fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/cancel`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                cancel_at_period_end: cancelAtPeriodEnd
+            fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    cancel_at_period_end: cancelAtPeriodEnd
+                })
             })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.message || 'Failed to cancel subscription');
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Subscription cancelled successfully', 'success');
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        showNotification(data.message || 'Failed to cancel subscription', 'error');
+                        button.disabled = false;
+                        button.classList.remove('loading');
+                        button.textContent = originalText;
+                    }
+                })
+                .catch(error => {
+                    showNotification('An error occurred. Please try again.', 'error');
+                    console.error('Error:', error);
                     button.disabled = false;
                     button.classList.remove('loading');
                     button.textContent = originalText;
-                }
-            })
-            .catch(error => {
-                alert('An error occurred. Please try again.');
-                console.error('Error:', error);
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.textContent = originalText;
-            });
+                });
+        }).catch(() => {
+            // User cancelled
+        });
     }
 
     function reactivateSubscription(subscriptionId) {
-        if (!confirm('Reactivate your subscription?')) {
-            return;
-        }
+        const dialog = createConfirmDialog({
+            title: 'Reactivate Subscription',
+            message: 'Reactivate your subscription? Billing will resume on the next scheduled date.',
+            confirmText: 'Reactivate',
+            type: 'success'
+        });
 
-        const button = event.target;
-        button.disabled = true;
-        button.classList.add('loading');
-        const originalText = button.textContent;
+        dialog.then(confirmed => {
+            if (confirmed) {
+                const button = event.target;
+                button.disabled = true;
+                button.classList.add('loading');
+                const originalText = button.textContent;
 
-        fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/reactivate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/reactivate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotification('Subscription reactivated successfully', 'success');
+                            setTimeout(() => window.location.reload(), 1500);
+                        } else {
+                            showNotification(data.message || 'Failed to reactivate subscription', 'error');
+                            button.disabled = false;
+                            button.classList.remove('loading');
+                            button.textContent = originalText;
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('An error occurred. Please try again.', 'error');
+                        console.error('Error:', error);
+                        button.disabled = false;
+                        button.classList.remove('loading');
+                        button.textContent = originalText;
+                    });
             }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.message || 'Failed to reactivate subscription');
-                    button.disabled = false;
-                    button.classList.remove('loading');
-                    button.textContent = originalText;
-                }
-            })
-            .catch(error => {
-                alert('An error occurred. Please try again.');
-                console.error('Error:', error);
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.textContent = originalText;
-            });
+        }).catch(() => {
+            // User cancelled
+        });
     }
+
+    // Confirmation Dialog Helper
+    function createConfirmDialog(config) {
+        return new Promise((resolve, reject) => {
+            const backdrop = document.createElement('div');
+            backdrop.className = 'dialog-backdrop';
+
+            const container = document.createElement('div');
+            container.className = 'dialog-container';
+
+            const iconMap = {
+                danger: '⚠️',
+                warning: '⚡',
+                info: 'ℹ️',
+                success: '✓'
+            };
+
+            let selectedOption = config.showOptions && config.options ? config.options[0].value : null;
+
+            let optionsHTML = '';
+            if (config.showOptions && config.options) {
+                optionsHTML = '<div class="dialog-options">';
+                config.options.forEach((option, index) => {
+                    optionsHTML += `
+                    <label class="option-item ${index === 0 ? 'selected' : ''}" data-value="${option.value}">
+                        <input type="radio" name="dialog-option" value="${option.value}" ${index === 0 ? 'checked' : ''}>
+                        <div class="option-content">
+                            <div class="option-label">${option.label}</div>
+                            ${option.description ? `<div class="option-description">${option.description}</div>` : ''}
+                        </div>
+                        <div class="option-check">✓</div>
+                    </label>
+                `;
+                });
+                optionsHTML += '</div>';
+            }
+
+            container.innerHTML = `
+            <div class="dialog-content">
+                <div class="dialog-icon icon-${config.type}">
+                    <span>${iconMap[config.type] || iconMap.info}</span>
+                </div>
+                <h2 class="dialog-title">${config.title}</h2>
+                <p class="dialog-message">${config.message}</p>
+${optionsHTML}
+<div class="dialog-actions">
+<button class="btn btn-cancel">${config.cancelText || 'Cancel'}</button>
+<button class="btn btn-confirm btn-${config.type}">${config.confirmText || 'Confirm'}</button>
+</div>
+</div>
+`;
+            document.body.appendChild(backdrop);
+            document.body.appendChild(container);
+
+            // Handle option selection
+            if (config.showOptions) {
+                container.querySelectorAll('.option-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        selectedOption = item.dataset.value === 'true' ? true : item.dataset.value === 'false' ? false : item.dataset.value;
+                    });
+                });
+            }
+
+            const closeDialog = () => {
+                backdrop.remove();
+                container.remove();
+            };
+
+            backdrop.addEventListener('click', () => {
+                closeDialog();
+                reject();
+            });
+
+            container.querySelector('.btn-cancel').addEventListener('click', () => {
+                closeDialog();
+                reject();
+            });
+
+            container.querySelector('.btn-confirm').addEventListener('click', () => {
+                closeDialog();
+                resolve(config.showOptions ? selectedOption : true);
+            });
+        });
+    }
+
 </script>
 </body>
 </html>

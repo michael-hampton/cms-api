@@ -110,6 +110,11 @@ class BlockParserService
 
         $parsedData = $parser->parse($blockData);
 
+        // Handle product block creation/matching
+        if ($type === 'product') {
+            $parsedData = $this->handleProductBlock($parsedData);
+        }
+
         $result = $this->blockRepository->createBlock($pageId, $type, $parsedData, $order);
 
         if ($type === 'person' && !empty($parsedData['data']['email'])) {
@@ -117,6 +122,67 @@ class BlockParserService
         }
 
         return $result;
+    }
+
+    /**
+     * Handle product block creation - match or create product
+     */
+    private function handleProductBlock(array $parsedData): array
+    {
+        // If user opted out of matching, don't do anything
+        if (!empty($parsedData['opted_out_product_match'])) {
+            return $parsedData;
+        }
+
+        // If product_id already provided (from search modal), keep it
+        if (!empty($parsedData['product_id'])) {
+            return $parsedData;
+        }
+
+        // Try to find matching product
+        $productName = $parsedData['productName'] ?? $parsedData['name'] ?? null;
+        $brand = $parsedData['brand'] ?? null;
+
+        if (empty($productName)) {
+            return $parsedData;
+        }
+
+        $matchingService = new ProductMatchingService(new \App\Repositories\ProductRepository());
+        $matches = $matchingService->findMatches($productName, $brand, \App\Framework\Support\SiteContext::getId());
+
+        // If we have a high confidence match (>85%), use it
+        if (!empty($matches) && $matches[0]['similarity'] > 0.85) {
+            $parsedData['product_id'] = $matches[0]['product']->id;
+        } else {
+            // Create new product if no good match
+            $parsedData['product_id'] = $this->createProductFromBlock($parsedData);
+        }
+
+        return $parsedData;
+    }
+
+    /**
+     * Create a new product from block data
+     */
+    private function createProductFromBlock(array $blockData): int
+    {
+        $productRepository = new \App\Repositories\ProductRepository();
+
+        $productData = [
+            'name' => $blockData['productName'] ?? $blockData['name'],
+            'brand' => $blockData['brand'] ?? null,
+            'price' => $blockData['price'] ?? 0,
+            'sale_price' => $blockData['salePrice'] ?? 0,
+            'description' => $blockData['description'] ?? null,
+            'image' => $blockData['image']['src'] ?? null,
+            'site_id' => \App\Framework\Support\SiteContext::getId(),
+            'is_active' => true,
+            'slug' => \App\Framework\Support\Str::slug($blockData['productName'] ?? $blockData['name']),
+        ];
+
+        $product = $productRepository->create($productData);
+
+        return $product->id;
     }
 
     public function buildBlock(int $pageId, array $blockData, int $order, bool $isPreviewMode = false): string

@@ -457,4 +457,16 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 ];
             });
     }
+
+    public function searchByName(string $name, int $siteId, int $limit = 10): Collection
+    {
+        return Product::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($name) {
+                $query->where('name', 'LIKE', "%{$name}%")
+                    ->orWhere('name', 'LIKE', "%" . str_replace(' ', '%', $name) . "%");
+            })
+            ->limit($limit)
+            ->get();
+    }
 }

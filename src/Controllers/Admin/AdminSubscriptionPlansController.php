@@ -55,8 +55,6 @@ class AdminSubscriptionPlansController extends Controller
             return $this->redirect('/' . SiteContext::slug() . '/admin/subscription-plans');
 
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
                 return $this->jsonResponse([
                     'success' => false,
