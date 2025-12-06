@@ -100,6 +100,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/payments/{id}/retry', [PaymentController::class, 'retry']);
         $router->post('/payments/{id}/refund', [PaymentController::class, 'refund']);
 
+        //payment subscriptions
+        $router->get('/payments/subscription-failures', [PaymentController::class, 'subscriptionFailures']);
+
+        $router->get('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'subscriptionPayments']);
+        $router->post('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'createSubscriptionPayment']);
+
         // Approval workflow routes
         $router->post('/pages/{id}/approve', PageController::class, 'approve');
         $router->post('/pages/{id}/reject', PageController::class, 'reject');

@@ -1,5 +1,6 @@
 <?php
-        use App\Framework\Database\Schema;
+
+use App\Framework\Database\Schema;
 use App\Framework\Migration\Blueprint;
 use App\Framework\Migration\Migration;
 
@@ -12,7 +13,7 @@ class CreateSubscriptionsTable extends Migration
             $table->unsignedBigInteger('member_id');
             $table->unsignedBigInteger('site_id');
             $table->string('plan_name', 255);
-            $table->enum('status', ['active', 'cancelled', 'expired', 'paused'])->default('active');
+            $table->enum('status', ['active', 'cancelled', 'expired', 'paused', 'past_due', 'pending'])->default('active');
             $table->dateTime('start_date');
             $table->dateTime('end_date')->nullable();
             $table->boolean('auto_renew')->default(true);

@@ -21,7 +21,8 @@ class SubscriptionPlan extends Model
         'features',
         'is_active',
         'is_featured',
-        'sort_order'
+        'sort_order',
+        'stripe_price_id'
     ];
 
     protected $casts = [

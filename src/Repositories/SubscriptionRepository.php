@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 
@@ -58,19 +59,29 @@ class SubscriptionRepository extends Repository
             ]) !== null;
     }
 
-    public function createSubscription(int $memberId, int $planId, int $siteId, array $additionalData = []): Subscription
+    public function createSubscription(int $memberId, int $planId, int $siteId, array $additionalData = []): Model
     {
         $plan = SubscriptionPlan::find($planId);
 
         $startDate = new \DateTime();
         $endDate = null;
+        $nextBillingDate = null;
 
         if ($plan->billing_period !== 'lifetime') {
             $endDate = clone $startDate;
+            $nextBillingDate = clone $startDate;
+
             match ($plan->billing_period) {
                 'monthly' => $endDate->modify('+1 month'),
                 'quarterly' => $endDate->modify('+3 months'),
                 'yearly' => $endDate->modify('+1 year'),
+            };
+
+            // Set next billing date same as end date initially
+            match ($plan->billing_period) {
+                'monthly' => $nextBillingDate->modify('+1 month'),
+                'quarterly' => $nextBillingDate->modify('+3 months'),
+                'yearly' => $nextBillingDate->modify('+1 year'),
             };
         }
 
@@ -82,6 +93,7 @@ class SubscriptionRepository extends Repository
             'status' => 'active',
             'start_date' => $startDate->format('Y-m-d H:i:s'),
             'end_date' => $endDate?->format('Y-m-d H:i:s'),
+            'next_billing_date' => $nextBillingDate?->format('Y-m-d H:i:s'),
             'price' => $plan->price,
             'currency' => $plan->currency,
             'auto_renew' => $plan->billing_period !== 'lifetime'
@@ -142,5 +154,47 @@ class SubscriptionRepository extends Repository
 //        }
 
         return true;
+    }
+
+    public function getSubscriptionsDueForRenewal(?int $siteId = null): Collection
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        return Subscription::where('site_id', $siteId)
+            ->where('status', 'active')
+            ->where('auto_renew', true)
+            ->whereNotNull('next_billing_date')
+            ->where('next_billing_date', '<=', date('Y-m-d H:i:s'))
+            ->get();
+    }
+
+    public function updateNextBillingDate(int $subscriptionId, \DateTime $nextBillingDate): bool
+    {
+        return $this->update($subscriptionId, [
+                'next_billing_date' => $nextBillingDate->format('Y-m-d H:i:s')
+            ]) !== null;
+    }
+
+    public function updateLastPaymentDate(int $subscriptionId, \DateTime $lastPaymentDate): bool
+    {
+        return $this->update($subscriptionId, [
+                'last_payment_date' => $lastPaymentDate->format('Y-m-d H:i:s')
+            ]) !== null;
+    }
+
+    public function markAsPastDue(int $subscriptionId): bool
+    {
+        return $this->update($subscriptionId, [
+                'status' => 'past_due'
+            ]) !== null;
+    }
+
+    public function getSubscriptionsWithFailedPayments(?int $siteId = null): Collection
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        return Subscription::where('site_id', $siteId)
+            ->where('status', 'past_due')
+            ->get();
     }
 }

@@ -67,6 +67,41 @@ class PaymentRepository extends Repository
         )->get();
     }
 
+    public function findBySubscriptionId(int $subscriptionId): Collection
+    {
+        return Payment::where('subscription_id', $subscriptionId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    public function getLastSubscriptionPayment(int $subscriptionId): ?Payment
+    {
+        return Payment::where('subscription_id', $subscriptionId)
+            ->where('status', 'completed')
+            ->orderBy('paid_at', 'desc')
+            ->first();
+    }
+
+    public function getFailedSubscriptionPayments(): Collection
+    {
+        return $this->applySiteFilter(
+            Payment::where('status', 'failed')
+                ->whereNotNull('subscription_id')
+                ->orderBy('created_at', 'desc')
+        )->get();
+    }
+
+    public function countSubscriptionPayments(int $subscriptionId, ?string $status = null): int
+    {
+        $query = Payment::where('subscription_id', $subscriptionId);
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        return $query->count();
+    }
+
     protected function getModelClass(): string
     {
         return Payment::class;

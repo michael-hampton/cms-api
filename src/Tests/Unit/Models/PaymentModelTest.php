@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Payment;
+use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -155,6 +156,80 @@ class PaymentModelTest extends FunctionalTestCase
 
         $this->assertTrue($payment->relationLoaded('order'));
         $this->assertEquals($order->id, $payment->order->id);
+    }
+
+    public function testPaymentCanHaveSubscription()
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $payment = Payment::create([
+            'subscription_id' => $subscription->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'status' => 'completed',
+            'amount' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertNotNull($payment->subscription_id);
+        $this->assertEquals($subscription->id, $payment->subscription_id);
+    }
+
+    public function testIsSubscriptionPaymentReturnsTrueWhenSubscriptionIdPresent()
+    {
+        $payment = new Payment([
+            'subscription_id' => 1,
+            'status' => 'completed'
+        ]);
+
+        $this->assertTrue($payment->isSubscriptionPayment());
+    }
+
+    public function testIsSubscriptionPaymentReturnsFalseWhenSubscriptionIdNull()
+    {
+        $payment = new Payment([
+            'subscription_id' => null,
+            'status' => 'completed'
+        ]);
+
+        $this->assertFalse($payment->isSubscriptionPayment());
+    }
+
+    public function testSubscriptionRelationshipLoads()
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $payment = Payment::create([
+            'subscription_id' => $subscription->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'status' => 'completed',
+            'amount' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $payment->load(['subscription']);
+
+        $this->assertTrue($payment->relationLoaded('subscription'));
+        $this->assertEquals($subscription->id, $payment->subscription->id);
     }
 
     protected function setUp(): void

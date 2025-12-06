@@ -4,7 +4,9 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Models\Subscription;
 use App\Repositories\PaymentRepository;
+use App\Requests\CreateSubscriptionPaymentRequest;
 use App\Requests\FailPaymentRequest;
 use App\Requests\RefundPaymentRequest;
 use App\Services\PaymentService;
@@ -199,6 +201,37 @@ class PaymentController extends Controller
                 'start_date' => $startDate,
                 'end_date' => $endDate
             ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function subscriptionFailures()
+    {
+        try {
+            $result = $this->paymentRepository->getFailedSubscriptionPayments();
+            return $this->jsonResponse(['payments' => $result->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function subscriptionPayments(int $subscriptionId)
+    {
+        try {
+            $subscription = Subscription::findOrFail($subscriptionId);
+
+            return $this->jsonResponse(['payments' => $subscription->payments->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function createSubscriptionPayment(int $subscriptionId, CreateSubscriptionPaymentRequest $request)
+    {
+        try {
+            $result = $this->paymentService->createSubscriptionPayment($subscriptionId, $request->validated());
+            return $this->jsonResponse(['payment' => $result], 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
+use App\Models\Subscription;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PaymentControllerTest extends FunctionalTestCase
@@ -369,5 +370,85 @@ class PaymentControllerTest extends FunctionalTestCase
         ]);
 
         $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testCreateSubscriptionPayment(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $paymentMethod = $this->createPaymentMethod(['code' => 'stripe']);
+
+        $paymentData = [
+            'payment_method' => 'stripe',
+            'amount' => 29.99,
+            'currency' => 'USD'
+        ];
+
+        $response = $this->postForSite("/api/subscriptions/{$subscription->id}/payments", $paymentData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($subscription->id, $data['data']['payment']['subscription_id']);
+        $this->assertEquals(29.99, $data['data']['payment']['amount']);
+    }
+
+    public function testGetSubscriptionPayments(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->createPayment(['subscription_id' => $subscription->id, 'status' => 'completed']);
+        $this->createPayment(['subscription_id' => $subscription->id, 'status' => 'completed']);
+
+        $response = $this->getForSite("/api/subscriptions/{$subscription->id}/payments");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['data']['payments']);
+    }
+
+    public function testGetFailedSubscriptionPayments(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'past_due',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->createPayment(['subscription_id' => $subscription->id, 'status' => 'failed']);
+
+        $response = $this->getForSite('/api/payments/subscription-failures');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertGreaterThanOrEqual(1, count($data['data']['payments']));
     }
 }

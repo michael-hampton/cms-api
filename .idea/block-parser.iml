@@ -74,6 +74,9 @@
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/symfony/string" />
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/vimeo/psalm" />
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/webmozart/assert" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/paypal/paypal-checkout-sdk" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/paypal/paypalhttp" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/stripe/stripe-php" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

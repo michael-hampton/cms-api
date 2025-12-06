@@ -8,14 +8,15 @@ use App\Framework\Support\SiteContext;
 use App\Services\CartService;
 use App\Services\CheckoutService;
 use App\Services\OrderService;
-use App\Services\VoucherService;
+use App\Services\SubscriptionCheckoutService;
 
 class CartController extends Controller
 {
     public function __construct(
         private readonly CartService     $cartService,
         private readonly OrderService    $orderService,
-        private readonly CheckoutService $checkoutService
+        private readonly CheckoutService             $checkoutService,
+        private readonly SubscriptionCheckoutService $subscriptionCheckoutService
     )
     {
         parent::__construct();
@@ -41,8 +42,22 @@ class CartController extends Controller
         ]);
     }
 
-    public function checkoutPage()
+    public function checkoutPage(Request $request)
     {
+        $planId = $request->query('plan_id');
+        $planSlug = $request->query('plan_slug');
+
+        if ($planId || $planSlug) {
+            if ($planSlug) {
+                $plan = $this->subscriptionCheckoutService->getSubscriptionPlanBySlug($planSlug);
+                $planId = $plan?->id;
+            }
+
+            if ($planId) {
+                return $this->subscriptionCheckout($planId);
+            }
+        }
+
         $cartData = [
             'items' => $this->cartService->getItems(),
             'total' => $this->cartService->getTotal(),
@@ -56,6 +71,11 @@ class CartController extends Controller
     {
         $data = $request->all();
         $siteId = SiteContext::getId();
+
+        // Check if this is a subscription checkout
+        if (!empty($data['subscription_plan_id'])) {
+            return $this->processSubscription($request);
+        }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
 
@@ -147,5 +167,54 @@ class CartController extends Controller
             'status' => $order->status,
             'createdAt' => $order->created_at
         ]);
+    }
+
+    private function subscriptionCheckout(int $planId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login?redirect=/checkout?plan_id=' . $planId);
+        }
+
+        $member = MemberAuth::member();
+        $plan = $this->subscriptionCheckoutService->getSubscriptionPlan($planId);
+
+        if (!$plan || !$plan->is_active) {
+            $_SESSION['flash_error'] = 'Subscription plan not found or unavailable.';
+            return $this->redirect('/');
+        }
+
+        // Check if already subscribed
+        if ($this->subscriptionCheckoutService->hasActiveSubscription($member->id, $planId)) {
+            $_SESSION['flash_error'] = 'You already have an active subscription to this plan.';
+            return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
+        }
+
+        return $this->view('checkout/subscription', [
+            'plan' => $plan,
+            'member' => $member,
+            'isSubscription' => true
+        ]);
+    }
+
+    private function processSubscription(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+
+        $data = $request->all();
+        $member = MemberAuth::member();
+        $siteId = SiteContext::getId();
+
+        $result = $this->subscriptionCheckoutService->processSubscriptionCheckout(
+            $member->id,
+            $data,
+            $siteId
+        );
+
+        return $this->jsonResponse($result, $result['success'] ? 200 : 400);
     }
 }

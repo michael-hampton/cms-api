@@ -22,7 +22,8 @@ class Member extends Model
         'password_reset_expires_at',
         'created_at',
         'total_points',
-        'activity_stats'
+        'activity_stats',
+        'stripe_customer_id'
     ];
 
     protected $hidden = [

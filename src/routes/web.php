@@ -168,6 +168,7 @@ $router->delete('/api/{site}/cart/{id}', [CartController::class, 'remove']);
 $router->delete('/api/{site}/cart/clear', [CartController::class, 'clear']);
 
 $router->get('/checkout', [CartController::class, 'checkoutPage']);
+$router->get('/{siteName}/checkout', [CartController::class, 'checkoutPage']);
 $router->post('/api/{site}/checkout/process', [CartController::class, 'processCheckout']);
 
 // API routes for Wishlist (JSON responses)

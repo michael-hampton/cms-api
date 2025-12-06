@@ -62,7 +62,9 @@ class ComposerStaticInit8d070178755c320c69f93ee4800660ef
             'Symfony\\Component\\String\\' => 25,
             'Symfony\\Component\\Filesystem\\' => 29,
             'Symfony\\Component\\Console\\' => 26,
+            'Stripe\\' => 7,
             'Spatie\\ArrayToXml\\' => 18,
+            'Sample\\' => 7,
         ),
         'R' => 
         array (
@@ -75,6 +77,8 @@ class ComposerStaticInit8d070178755c320c69f93ee4800660ef
             'Psr\\Container\\' => 14,
             'Psalm\\' => 6,
             'PhpParser\\' => 10,
+            'PayPalHttp\\' => 11,
+            'PayPalCheckoutSdk\\' => 18,
             'PHPStan\\PhpDocParser\\' => 21,
         ),
         'M' => 
@@ -176,9 +180,17 @@ class ComposerStaticInit8d070178755c320c69f93ee4800660ef
         array (
             0 => __DIR__ . '/..' . '/symfony/console',
         ),
+        'Stripe\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/stripe/stripe-php/lib',
+        ),
         'Spatie\\ArrayToXml\\' => 
         array (
             0 => __DIR__ . '/..' . '/spatie/array-to-xml/src',
+        ),
+        'Sample\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/paypal/paypal-checkout-sdk/samples',
         ),
         'Revolt\\' => 
         array (
@@ -204,6 +216,14 @@ class ComposerStaticInit8d070178755c320c69f93ee4800660ef
         'PhpParser\\' => 
         array (
             0 => __DIR__ . '/..' . '/nikic/php-parser/lib/PhpParser',
+        ),
+        'PayPalHttp\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/paypal/paypalhttp/lib/PayPalHttp',
+        ),
+        'PayPalCheckoutSdk\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/paypal/paypal-checkout-sdk/lib/PayPalCheckoutSdk',
         ),
         'PHPStan\\PhpDocParser\\' => 
         array (

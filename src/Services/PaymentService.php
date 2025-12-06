@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Repositories\OrderRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PaymentRepository;
+use App\Repositories\SubscriptionRepository;
 use Exception;
 
 class PaymentService
@@ -18,6 +19,7 @@ class PaymentService
         private readonly PaymentRepository      $paymentRepository,
         public readonly PaymentMethodRepository $paymentMethodRepository,
         private readonly OrderRepository        $orderRepository,
+        private readonly SubscriptionRepository $subscriptionRepository,
         ?Database                               $database = null
     )
     {
@@ -292,5 +294,40 @@ class PaymentService
 
         // Check if payment amount matches order total
         return abs($amount - $order->total) < 0.01; // Allow for floating point precision
+    }
+
+    public function createSubscriptionPayment(int $subscriptionId, array $data): Payment
+    {
+        return $this->database->transaction(function () use ($subscriptionId, $data) {
+            $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+            if (!$subscription) {
+                throw new Exception('Subscription not found');
+            }
+
+            $paymentData = [
+                'subscription_id' => $subscriptionId,
+                'order_id' => null,
+                'site_id' => $subscription->site_id,
+                'payment_method' => $data['payment_method'],
+                'payment_provider' => $data['payment_provider'] ?? 'stripe',
+                'amount' => $data['amount'] ?? $subscription->price,
+                'currency' => $data['currency'] ?? $subscription->currency,
+                'status' => 'pending',
+                'transaction_id' => $data['transaction_id'] ?? null,
+                'payment_intent_id' => $data['payment_intent_id'] ?? null,
+                'metadata' => $data['metadata'] ?? null,
+            ];
+
+            $payment = $this->paymentRepository->create($paymentData);
+
+            Logger::info("Subscription payment created", [
+                'payment_id' => $payment->id,
+                'subscription_id' => $subscriptionId,
+                'amount' => $payment->amount
+            ]);
+
+            return $payment;
+        });
     }
 }

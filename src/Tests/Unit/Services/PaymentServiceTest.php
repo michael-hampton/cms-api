@@ -9,6 +9,7 @@ use App\Models\PaymentMethod;
 use App\Repositories\OrderRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PaymentRepository;
+use App\Repositories\SubscriptionRepository;
 use App\Services\PaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
@@ -18,9 +19,28 @@ class PaymentServiceTest extends FunctionalTestCase
     private $paymentRepository;
     private $paymentMethodRepository;
     private $orderRepository;
+    private $subscriptionRepository;
     private $databaseMock;
     private PaymentService $service;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->paymentRepository = m::mock(PaymentRepository::class);
+        $this->paymentMethodRepository = m::mock(PaymentMethodRepository::class);
+        $this->orderRepository = m::mock(OrderRepository::class);
+        $this->databaseMock = m::mock(Database::class);
+        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
+
+        $this->service = new PaymentService(
+            $this->paymentRepository,
+            $this->paymentMethodRepository,
+            $this->orderRepository,
+            $this->subscriptionRepository,
+            $this->databaseMock
+        );
+    }
     public function testCreatePaymentSuccessfully()
     {
         $orderId = 1;
@@ -445,21 +465,49 @@ class PaymentServiceTest extends FunctionalTestCase
         $this->assertFalse($result);
     }
 
-    protected function setUp(): void
+
+    public function testCreateSubscriptionPaymentSuccessfully()
     {
-        parent::setUp();
+        $subscriptionId = 1;
+        $data = [
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe'
+        ];
 
-        $this->paymentRepository = m::mock(PaymentRepository::class);
-        $this->paymentMethodRepository = m::mock(PaymentMethodRepository::class);
-        $this->orderRepository = m::mock(OrderRepository::class);
-        $this->databaseMock = m::mock(Database::class);
+        $mockSubscription = m::mock(\App\Models\Subscription::class)->makePartial();
+        $mockSubscription->id = $subscriptionId;
+        $mockSubscription->site_id = 1;
+        $mockSubscription->price = 29.99;
+        $mockSubscription->currency = 'USD';
 
-        $this->service = new PaymentService(
-            $this->paymentRepository,
-            $this->paymentMethodRepository,
-            $this->orderRepository,
-            $this->databaseMock
-        );
+        $mockPayment = m::mock(Payment::class)->makePartial();
+        $mockPayment->id = 1;
+        $mockPayment->subscription_id = $subscriptionId;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        // Mock Subscription::find
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->with($subscriptionId)
+            ->andReturn($mockSubscription);
+
+        $this->paymentRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($paymentData) use ($subscriptionId) {
+                return $paymentData['subscription_id'] === $subscriptionId
+                    && $paymentData['order_id'] === null
+                    && $paymentData['status'] === 'pending';
+            }))
+            ->andReturn($mockPayment);
+
+        $result = $this->service->createSubscriptionPayment($subscriptionId, $data);
+
+        $this->assertSame($mockPayment, $result);
     }
 
     protected function tearDown(): void

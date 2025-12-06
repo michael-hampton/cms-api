@@ -508,44 +508,45 @@ $member = $subscriptionModalData['member'];
     }
 
     function subscribeToModalPlan(slug, button) {
-        // Disable button and show loading state
-        button.disabled = true;
-        button.classList.add('loading');
-        const originalText = button.textContent;
-
-        fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscription-plans/' + slug + '/subscribe', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    button.textContent = '✓ Subscribed!';
-                    button.classList.remove('loading');
-                    button.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-
-                    setTimeout(() => {
-                        closeSubscriptionModal();
-                        // Optionally reload or redirect
-                        //window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions';
-                    }, 1500);
-                } else {
-                    alert(data.message || 'Failed to subscribe. Please try again.');
-                    button.disabled = false;
-                    button.classList.remove('loading');
-                    button.textContent = originalText;
-                }
-            })
-            .catch(error => {
-                console.error('Subscription error:', error);
-                alert('An error occurred. Please try again.');
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.textContent = originalText;
-            });
+        window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/checkout?plan_slug=' + slug;
+        //// Disable button and show loading state
+        //button.disabled = true;
+        //button.classList.add('loading');
+        //const originalText = button.textContent;
+        //
+        //fetch('/<?php //= \App\Framework\Support\SiteContext::slug() ?>///member/subscription-plans/' + slug + '/subscribe', {
+        //    method: 'POST',
+        //    headers: {
+        //        'Content-Type': 'application/json',
+        //        'X-Requested-With': 'XMLHttpRequest'
+        //    }
+        //})
+        //    .then(response => response.json())
+        //    .then(data => {
+        //        if (data.success) {
+        //            button.textContent = '✓ Subscribed!';
+        //            button.classList.remove('loading');
+        //            button.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        //
+        //            setTimeout(() => {
+        //                closeSubscriptionModal();
+        //                // Optionally reload or redirect
+        //                //window.location.href = '/<?php //= \App\Framework\Support\SiteContext::slug() ?>///member/subscriptions';
+        //            }, 1500);
+        //        } else {
+        //            alert(data.message || 'Failed to subscribe. Please try again.');
+        //            button.disabled = false;
+        //            button.classList.remove('loading');
+        //            button.textContent = originalText;
+        //        }
+        //    })
+        //    .catch(error => {
+        //        console.error('Subscription error:', error);
+        //        alert('An error occurred. Please try again.');
+        //        button.disabled = false;
+        //        button.classList.remove('loading');
+        //        button.textContent = originalText;
+        //    });
     }
 
     // Close modal when clicking overlay

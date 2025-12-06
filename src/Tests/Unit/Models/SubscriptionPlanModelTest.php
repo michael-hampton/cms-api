@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Models;
 use App\Models\SubscriptionPlan;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class SubscriptionPlanTest extends FunctionalTestCase
+class SubscriptionPlanModelTest extends FunctionalTestCase
 {
     public function testCreateSubscriptionPlan(): void
     {

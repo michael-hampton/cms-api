@@ -23,7 +23,8 @@ class Payment extends Model
         'paid_at',
         'failed_at',
         'created_at',
-        'updated_at'
+        'updated_at',
+        'subscription_id'
     ];
 
     protected $casts = [
@@ -118,5 +119,16 @@ class Payment extends Model
     public function canBeRefunded(): bool
     {
         return $this->status === PaymentStatus::COMPLETED->value;
+    }
+
+    public function subscription($relation = false)
+    {
+        return $this->belongsTo(Subscription::class, 'subscription_id', 'id', $relation);
+    }
+
+// Add this method to check if payment is for subscription
+    public function isSubscriptionPayment(): bool
+    {
+        return $this->subscription_id !== null;
     }
 }

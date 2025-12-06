@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Payment;
+use App\Models\Subscription;
 use App\Repositories\PaymentRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -210,6 +211,139 @@ class PaymentRepositoryTest extends RepositoryTestCase
             $this->assertEquals('stripe', $payment->payment_method);
         }
     }
+
+    public function test_find_by_subscription_id_returns_payments(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $payment1 = $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed'
+        ]);
+
+        $payment2 = $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed'
+        ]);
+
+        $payments = $this->repository->findBySubscriptionId($subscription->id);
+
+        $this->assertCount(2, $payments);
+        $this->assertTrue($payments->contains('id', $payment1->id));
+        $this->assertTrue($payments->contains('id', $payment2->id));
+    }
+
+    public function test_get_last_subscription_payment_returns_most_recent(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $oldPayment = $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed',
+            'paid_at' => '2024-01-01 12:00:00'
+        ]);
+
+        $recentPayment = $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed',
+            'paid_at' => '2024-06-01 12:00:00'
+        ]);
+
+        $result = $this->repository->getLastSubscriptionPayment($subscription->id);
+
+        $this->assertNotNull($result);
+        $this->assertEquals($recentPayment->id, $result->id);
+    }
+
+    public function test_get_failed_subscription_payments(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'failed'
+        ]);
+
+        $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed'
+        ]);
+
+        // Regular payment without subscription
+        $this->createPayment(['status' => 'failed']);
+
+        $payments = $this->repository->getFailedSubscriptionPayments();
+
+        $this->assertGreaterThanOrEqual(1, $payments->count());
+
+        foreach ($payments as $payment) {
+            $this->assertEquals('failed', $payment->status);
+            $this->assertNotNull($payment->subscription_id);
+        }
+    }
+
+    public function test_count_subscription_payments(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed'
+        ]);
+
+        $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'failed'
+        ]);
+
+        $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed'
+        ]);
+
+        $totalCount = $this->repository->countSubscriptionPayments($subscription->id);
+        $failedCount = $this->repository->countSubscriptionPayments($subscription->id, 'failed');
+
+        $this->assertEquals(3, $totalCount);
+        $this->assertEquals(1, $failedCount);
+    }
+
 
     protected function setUp(): void
     {

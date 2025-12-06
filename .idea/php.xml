@@ -88,6 +88,9 @@
       <path value="$PROJECT_DIR$/src/vendor/phpdocumentor/reflection-common" />
       <path value="$PROJECT_DIR$/src/vendor/dnoegel/php-xdg-base-dir" />
       <path value="$PROJECT_DIR$/src/vendor/fidry/cpu-core-counter" />
+      <path value="$PROJECT_DIR$/src/vendor/stripe/stripe-php" />
+      <path value="$PROJECT_DIR$/src/vendor/paypal/paypalhttp" />
+      <path value="$PROJECT_DIR$/src/vendor/paypal/paypal-checkout-sdk" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.4">

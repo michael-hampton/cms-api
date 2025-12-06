@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\Member;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Repositories\SubscriptionRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -231,5 +232,189 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertNotNull($result);
         $this->assertEquals('Site 1 Plan', $result->plan_name);
+    }
+
+    public function test_get_subscriptions_due_for_renewal(): void
+    {
+        // Create subscription due for renewal
+        $dueSubscription = Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'next_billing_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'auto_renew' => true,
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        // Create subscription not due yet
+        Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Basic',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'next_billing_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'auto_renew' => true,
+            'price' => 9.99,
+            'currency' => 'USD'
+        ]);
+
+        $result = $this->repository->getSubscriptionsDueForRenewal($this->siteId);
+
+        $this->assertGreaterThanOrEqual(1, $result->count());
+        $this->assertTrue($result->contains('id', $dueSubscription->id));
+    }
+
+    public function test_update_next_billing_date(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'next_billing_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $newBillingDate = new \DateTime('+2 months');
+        $result = $this->repository->updateNextBillingDate($subscription->id, $newBillingDate);
+
+        $this->assertTrue($result);
+
+        $updated = Subscription::find($subscription->id);
+        $this->assertEquals(
+            $newBillingDate->format('Y-m-d'),
+            $updated->next_billing_date->format('Y-m-d')
+        );
+    }
+
+    public function test_update_last_payment_date(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $paymentDate = new \DateTime();
+        $result = $this->repository->updateLastPaymentDate($subscription->id, $paymentDate);
+
+        $this->assertTrue($result);
+
+        $updated = Subscription::find($subscription->id);
+        $this->assertNotNull($updated->last_payment_date);
+        $this->assertEquals(
+            $paymentDate->format('Y-m-d'),
+            $updated->last_payment_date->format('Y-m-d')
+        );
+    }
+
+    public function test_mark_as_past_due(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $result = $this->repository->markAsPastDue($subscription->id);
+
+        $this->assertTrue($result);
+
+        $updated = Subscription::find($subscription->id);
+        $this->assertEquals('past_due', $updated->status);
+    }
+
+    public function test_get_subscriptions_with_failed_payments(): void
+    {
+        Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'past_due',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Basic',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 9.99,
+            'currency' => 'USD'
+        ]);
+
+        $result = $this->repository->getSubscriptionsWithFailedPayments($this->siteId);
+
+        $this->assertGreaterThanOrEqual(1, $result->count());
+
+        foreach ($result as $subscription) {
+            $this->assertEquals('past_due', $subscription->status);
+        }
+    }
+
+    public function test_create_subscription_sets_next_billing_date(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Monthly Plan',
+            'slug' => 'monthly',
+            'price' => 19.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true
+        ]);
+
+        $subscription = $this->repository->createSubscription(
+            $this->testMember->id,
+            $plan->id,
+            $this->siteId
+        );
+
+        $this->assertNotNull($subscription->next_billing_date);
+        $this->assertInstanceOf(\DateTime::class, $subscription->next_billing_date);
+
+        // Should be approximately 1 month from now
+        $expectedDate = new \DateTime('+1 month');
+        $diff = $subscription->next_billing_date->diff($expectedDate);
+        $this->assertLessThanOrEqual(1, $diff->days);
+    }
+
+    public function test_create_subscription_does_not_set_next_billing_date_for_lifetime(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Lifetime Plan',
+            'slug' => 'lifetime',
+            'price' => 299.99,
+            'currency' => 'USD',
+            'billing_period' => 'lifetime',
+            'is_active' => true
+        ]);
+
+        $subscription = $this->repository->createSubscription(
+            $this->testMember->id,
+            $plan->id,
+            $this->siteId
+        );
+
+        $this->assertNull($subscription->next_billing_date);
+        $this->assertFalse($subscription->auto_renew);
     }
 }

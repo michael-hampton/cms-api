@@ -18,14 +18,20 @@ class Subscription extends Model
         'auto_renew',
         'price',
         'currency',
-        'plan_id'
+        'plan_id',
+        'next_billing_date',
+        'last_payment_date',
+        'payment_intent_id',
+        'payment_subscription_id'
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'auto_renew' => 'boolean',
-        'price' => 'float'
+        'price' => 'float',
+        'next_billing_date' => 'datetime',
+        'last_payment_date' => 'datetime',
     ];
 
     public function member($relation = false)
@@ -88,5 +94,43 @@ class Subscription extends Model
         }
 
         return (clone $this->start_date)->modify('+' . $this->plan->trial_days . ' days');
+    }
+
+    public function payments($relation = false)
+    {
+        return $this->hasMany(Payment::class, 'subscription_id', 'id', $relation);
+    }
+
+    public function lastPayment($relation = false)
+    {
+        return $this->hasOne(Payment::class, 'subscription_id', 'id', $relation)
+            ->where('status', 'completed')
+            ->orderBy('paid_at', 'desc')
+            ->first();
+    }
+
+    public function isDueForRenewal(): bool
+    {
+        if (!$this->auto_renew || $this->status !== 'active') {
+            return false;
+        }
+
+        if (!$this->next_billing_date) {
+            return false;
+        }
+
+        return $this->next_billing_date <= new \DateTime();
+    }
+
+    public function getDaysUntilRenewal(): ?int
+    {
+        if (!$this->next_billing_date) {
+            return null;
+        }
+
+        $now = new \DateTime();
+        $interval = $now->diff($this->next_billing_date);
+
+        return $interval->invert ? 0 : $interval->days;
     }
 }
