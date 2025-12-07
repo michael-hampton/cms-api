@@ -40,6 +40,61 @@
             padding: 2rem;
         }
 
+        .verification-banner {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid var(--warning-color);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .verification-banner h2 {
+            color: #92400e;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .verification-banner p {
+            color: #78350f;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .verification-actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-resend {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            color: white;
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-resend:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-resend:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .welcome-section {
             background: white;
             border-radius: 1rem;
@@ -75,6 +130,12 @@
             border-left: 4px solid var(--success-color);
         }
 
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid var(--danger-color);
+        }
+
         .section-title {
             font-size: 1.25rem;
             font-weight: 600;
@@ -93,7 +154,6 @@
             border-radius: 2px;
         }
 
-        /* Dashboard Cards Grid */
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -112,12 +172,40 @@
             color: inherit;
             display: block;
             border: 2px solid transparent;
+            position: relative;
         }
 
         .dashboard-card:hover {
             transform: translateY(-4px);
             box-shadow: var(--shadow-lg);
             border-color: var(--primary-color);
+        }
+
+        .dashboard-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .dashboard-card.disabled::after {
+            content: '🔒 Verify Email to Unlock';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .dashboard-card.disabled:hover::after {
+            opacity: 1;
         }
 
         .card-header {
@@ -188,7 +276,6 @@
             transform: translateX(4px);
         }
 
-        /* Stats Cards Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -222,100 +309,51 @@
             letter-spacing: 0.05em;
         }
 
-        /* Recommended Pages Grid */
-        .pages-grid {
+        .limited-access-section {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .limited-access-section h2 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .limited-access-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
         }
 
-        .page-card {
-            background: white;
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            transition: all 0.3s ease;
-            text-decoration: none;
-            color: inherit;
-            display: block;
-        }
-
-        .page-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .page-image {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-            background: linear-gradient(135deg, var(--primary-color)20 0%, var(--secondary-color)20 100%);
-        }
-
-        .page-content {
+        .info-card {
+            background: var(--bg-light);
+            border-radius: 0.75rem;
             padding: 1.5rem;
+            border: 2px solid var(--border-color);
         }
 
-        .page-title {
-            font-size: 1.125rem;
+        .info-card h3 {
+            font-size: 1rem;
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 0.5rem;
-            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .page-excerpt {
+        .info-card p {
             font-size: 0.875rem;
             color: var(--text-secondary);
             line-height: 1.6;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .page-meta {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--border-color);
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 3rem 2rem;
-            background: white;
-            border-radius: 1rem;
-            box-shadow: var(--shadow);
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .empty-state h3 {
-            font-size: 1.25rem;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .empty-state p {
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
         }
 
         @media (max-width: 768px) {
             .container {
-                padding: 1rem;
-            }
-
-            .header-content {
                 padding: 1rem;
             }
 
@@ -327,21 +365,21 @@
                 font-size: 1.5rem;
             }
 
-            .dashboard-grid,
-            .stats-grid,
-            .pages-grid {
-                grid-template-columns: 1fr;
+            .verification-banner {
+                padding: 1.5rem;
             }
 
-            .user-name {
-                display: none;
+            .verification-actions {
+                flex-direction: column;
+            }
+
+            .btn-resend {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
 </head>
-
-<?php
-?>
 <body>
 @include('member._header')
 
@@ -353,220 +391,350 @@
         </div>
     <?php endif; ?>
 
-    <div class="welcome-section">
-        <h1>Welcome back, <?= htmlspecialchars($member->first_name ?? 'Member') ?>!</h1>
-        <p>Manage your account, track your orders, and explore exclusive content.</p>
-    </div>
-
-    <h2 class="section-title">Quick Access</h2>
-
-    <div class="dashboard-grid">
-        <a href="/<?= $site->slug ?>/member/orders" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon orders">🛍️</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>My Orders</h3>
-                <p>View and track your order history and current shipments.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/newsletters" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon newsletters">📧</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Newsletters</h3>
-                <p>Manage your newsletter subscriptions and preferences.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/subscriptions" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon subscriptions">⭐</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Subscriptions</h3>
-                <p>View and manage your active subscriptions and membership plans.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/addresses" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon addresses">📍</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Addresses</h3>
-                <p>Manage your shipping and billing addresses.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/comments" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon comments">💬</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Comments</h3>
-                <p>View and manage your comments across the site.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/account-details" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon" style="background: linear-gradient(135deg, #6b728020 0%, #4b556320 100%);">👤</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Account Details</h3>
-                <p>View and update your personal information and account status.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/settings" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon settings">⚙️</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Security Settings</h3>
-                <p>Update your password and security preferences.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/reading-history" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon" style="background: linear-gradient(135deg, #ec489920 0%, #f5717620 100%);">📚</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Reading History</h3>
-                <p>View pages you've read and track your reading progress.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/liked-pages" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon" style="background: linear-gradient(135deg, #ef444420 0%, #dc262620 100%);">❤️</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Liked Pages</h3>
-                <p>Access your collection of liked pages and content.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/wishlist" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon orders">🛍️</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>My Favorites</h3>
-                <p>View and track your order history and current shipments.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/consent" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon orders">🛍️</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Privacy & Consent Preferences</h3>
-                <p>Control how your personal data is used across our platform.</p>
-            </div>
-        </a>
-
-        <a href="/<?= $site->slug ?>/member/activity" class="dashboard-card">
-            <div class="card-header">
-                <div class="card-icon orders">🛍️</div>
-                <div class="card-arrow">→</div>
-            </div>
-            <div class="card-content">
-                <h3>Activity & Achievements</h3>
-                <p>Track your engagement and earn badges</p>
-            </div>
-        </a>
-    </div>
-
-    <h2 class="section-title">Your Activity</h2>
-
-    <?php if(!empty($stats)): ?>
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['orders'] ?></div>
-            <div class="stat-label">Total Orders</div>
+    <?php if ($error = error()): ?>
+        <div class="message error">
+            <span>⚠</span>
+            <?= htmlspecialchars($error) ?>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['newsletters'] ?></div>
-            <div class="stat-label">Newsletters</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['subscriptions'] ?></div>
-            <div class="stat-label">Active Subscriptions</div>
-        </div>
-
-<!--        <div class="stat-card">-->
-<!--            <div class="stat-number">--><?php //= $stats['addresses'] ?><!--</div>-->
-<!--            <div class="stat-label">Saved Addresses</div>-->
-<!--        </div>-->
-
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['comments'] ?></div>
-            <div class="stat-label">Comments Posted</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['pages_read'] ?></div>
-            <div class="stat-label">Pages Read</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-number"><?= $stats['likes'] ?></div>
-            <div class="stat-label">Pages Liked</div>
-        </div>
-    </div>
     <?php endif; ?>
 
-    <h2 class="section-title">Recommended For You</h2>
+    <?php if (!$member->isEmailVerified()): ?>
+        <!-- Email Verification Required Banner -->
+        <div class="verification-banner">
+            <h2>
+                <span>⚠️</span>
+                Email Verification Required
+            </h2>
+            <p>
+                Welcome! Please verify your email address to unlock your full account and access all features.
+                We've sent a verification link to <strong><?= htmlspecialchars($member->email) ?></strong>.
+            </p>
+            <div class="verification-actions">
+                <button class="btn-resend" id="resendBtn" onclick="resendVerification()">
+                    <span>📧</span>
+                    Resend Verification Email
+                </button>
+            </div>
+        </div>
 
-    <?php if (isset($recommendedPages) && !$recommendedPages?->isEmpty()): ?>
-        <div class="pages-grid">
-            <?php foreach ($recommendedPages as $page): ?>
-                <a href="/<?= $site->slug ?>/<?= htmlspecialchars($page->slug) ?>" class="page-card">
-                    <?php if ($page->listing_image_id): ?>
-                        <img src="/images/<?= $page->listing_image_id ?>" alt="<?= htmlspecialchars($page->title) ?>" class="page-image">
-                    <?php else: ?>
-                        <div class="page-image"></div>
-                    <?php endif; ?>
-                    <div class="page-content">
-                        <h3 class="page-title"><?= htmlspecialchars($page->title) ?></h3>
-                        <?php if ($page->listing_synopsis): ?>
-                            <p class="page-excerpt"><?= htmlspecialchars($page->listing_synopsis) ?></p>
-                        <?php endif; ?>
-                        <div class="page-meta">
-                            <span>📅 <?= $page->created_at->format('M j, Y') ?></span>
-                        </div>
+        <!-- Limited Access Section -->
+        <div class="limited-access-section">
+            <h2>Your Account Overview</h2>
+            <div class="limited-access-grid">
+                <div class="info-card">
+                    <h3>
+                        <span>👤</span>
+                        Profile Information
+                    </h3>
+                    <p>
+                        <strong>Name:</strong> <?= htmlspecialchars($member->first_name . ' ' . $member->last_name) ?>
+                        <br>
+                        <strong>Email:</strong> <?= htmlspecialchars($member->email) ?><br>
+                        <strong>Member Since:</strong> <?= $member->created_at->format('M j, Y') ?>
+                    </p>
+                </div>
+
+                <?php if (!empty($stats['orders'])): ?>
+                    <div class="info-card">
+                        <h3>
+                            <span>🛍️</span>
+                            Your Orders
+                        </h3>
+                        <p>
+                            You have <strong><?= $stats['orders'] ?></strong>
+                            order<?= $stats['orders'] !== 1 ? 's' : '' ?>.
+                            Verify your email to view order details and tracking information.
+                        </p>
                     </div>
-                </a>
-            <?php endforeach; ?>
+                <?php endif; ?>
+
+                <?php if (!empty($stats['subscriptions'])): ?>
+                    <div class="info-card">
+                        <h3>
+                            <span>⭐</span>
+                            Your Subscriptions
+                        </h3>
+                        <p>
+                            You have <strong><?= $stats['subscriptions'] ?></strong> active
+                            subscription<?= $stats['subscriptions'] !== 1 ? 's' : '' ?>.
+                            Verify your email to manage your subscriptions.
+                        </p>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
+
+        <!-- Disabled Feature Cards -->
+        <h2 class="section-title">Available After Verification</h2>
+        <div class="dashboard-grid">
+            <div class="dashboard-card disabled">
+                <div class="card-header">
+                    <div class="card-icon orders">🛍️</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>My Orders</h3>
+                    <p>View and track your order history and current shipments.</p>
+                </div>
+            </div>
+
+            <div class="dashboard-card disabled">
+                <div class="card-header">
+                    <div class="card-icon newsletters">📧</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Newsletters</h3>
+                    <p>Manage your newsletter subscriptions and preferences.</p>
+                </div>
+            </div>
+
+            <div class="dashboard-card disabled">
+                <div class="card-header">
+                    <div class="card-icon subscriptions">⭐</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Subscriptions</h3>
+                    <p>View and manage your active subscriptions and membership plans.</p>
+                </div>
+            </div>
+
+            <div class="dashboard-card disabled">
+                <div class="card-header">
+                    <div class="card-icon comments">💬</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Comments</h3>
+                    <p>View and manage your comments across the site.</p>
+                </div>
+            </div>
+        </div>
+
     <?php else: ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">📄</div>
-            <h3>No Recommendations Yet</h3>
-            <p>Check back soon for personalized content recommendations.</p>
+        <!-- Full Dashboard for Verified Users -->
+        <div class="welcome-section">
+            <h1>Welcome back, <?= htmlspecialchars($member->first_name ?? 'Member') ?>!</h1>
+            <p>Manage your account, track your orders, and explore exclusive content.</p>
         </div>
+
+        <h2 class="section-title">Quick Access</h2>
+
+        <div class="dashboard-grid">
+            <a href="/<?= $site->slug ?>/member/orders" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon orders">🛍️</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>My Orders</h3>
+                    <p>View and track your order history and current shipments.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/newsletters" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon newsletters">📧</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Newsletters</h3>
+                    <p>Manage your newsletter subscriptions and preferences.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/subscriptions" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon subscriptions">⭐</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Subscriptions</h3>
+                    <p>View and manage your active subscriptions and membership plans.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/addresses" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon addresses">📍</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Addresses</h3>
+                    <p>Manage your shipping and billing addresses.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/comments" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon comments">💬</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Comments</h3>
+                    <p>View and manage your comments across the site.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/account-details" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #6b728020 0%, #4b556320 100%);">
+                        👤
+                    </div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Account Details</h3>
+                    <p>View and update your personal information and account status.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/settings" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon settings">⚙️</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Security Settings</h3>
+                    <p>Update your password and security preferences.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/reading-history" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #ec489920 0%, #f5717620 100%);">
+                        📚
+                    </div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Reading History</h3>
+                    <p>View pages you've read and track your reading progress.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/liked-pages" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #ef444420 0%, #dc262620 100%);">
+                        ❤️
+                    </div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Liked Pages</h3>
+                    <p>Access your collection of liked pages and content.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/wishlist" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon orders">🛍️</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>My Favorites</h3>
+                    <p>View your saved favorite items.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/consent" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon orders">🔒</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Privacy & Consent</h3>
+                    <p>Control how your personal data is used.</p>
+                </div>
+            </a>
+
+            <a href="/<?= $site->slug ?>/member/activity" class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-icon orders">🏆</div>
+                    <div class="card-arrow">→</div>
+                </div>
+                <div class="card-content">
+                    <h3>Activity & Achievements</h3>
+                    <p>Track your engagement and earn badges.</p>
+                </div>
+            </a>
+        </div>
+
+        <h2 class="section-title">Your Activity</h2>
+
+        <?php if (!empty($stats)): ?>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number"><?= $stats['orders'] ?></div>
+                    <div class="stat-label">Total Orders</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-number"><?= $stats['newsletters'] ?></div>
+                    <div class="stat-label">Newsletters</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-number"><?= $stats['subscriptions'] ?></div>
+                    <div class="stat-label">Active Subscriptions</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-number"><?= $stats['comments'] ?></div>
+                    <div class="stat-label">Comments Posted</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-number"><?= $stats['pages_read'] ?></div>
+                    <div class="stat-label">Pages Read</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-number"><?= $stats['likes'] ?></div>
+                    <div class="stat-label">Pages Liked</div>
+                </div>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 
+<script>
+    async function resendVerification() {
+        const btn = document.getElementById('resendBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> Sending...';
 
+        try {
+            const response = await fetch('/<?= $site->slug ?>/member/resend-verification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                btn.innerHTML = '<span>✓</span> Email Sent!';
+                btn.style.background = 'linear-gradient(135deg, var(--success-color), #059669)';
+
+                setTimeout(() => {
+                    btn.innerHTML = '<span>📧</span> Resend Verification Email';
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 3000);
+            } else {
+                alert(result.message || 'Failed to send email. Please try again.');
+                btn.innerHTML = '<span>📧</span> Resend Verification Email';
+                btn.disabled = false;
+            }
+        } catch (error) {
+            alert('An error occurred. Please try again.');
+            btn.innerHTML = '<span>📧</span> Resend Verification Email';
+            btn.disabled = false;
+        }
+    }
+</script>
 </body>
 </html>

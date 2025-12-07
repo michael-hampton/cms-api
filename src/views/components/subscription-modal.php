@@ -1172,12 +1172,48 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
 
             if (result.success) {
                 currentMember = result.member;
-                hideLoading();
-                goToStep(3);
-                updatePaymentSummary();
+
+                // Check if email verification is required
+                if (result.requires_verification) {
+                    hideLoading();
+                    showVerificationNotice(data.email);
+                } else {
+                    hideLoading();
+                    goToStep(3);
+                    updatePaymentSummary();
+                }
             } else {
                 hideLoading();
-                document.getElementById('register-error').textContent = result.message || 'Registration failed';
+
+                // Check if email already exists
+                if (result.error === 'email_exists' || result.message?.toLowerCase().includes('already registered')) {
+                    const errorDiv = document.getElementById('register-error');
+
+                    let message = 'This email is already registered. ';
+
+                    if (result.is_verified === false) {
+                        message += '<strong>Your account exists but email is not verified.</strong> Please check your email for the verification link, or ';
+                        message += '<a href="/' + SITE + '/member/resend-verification" style="color: var(--sub-primary); text-decoration: underline;">click here to resend</a>.';
+                    } else {
+                        message += '<strong>Please log in instead.</strong>';
+                    }
+
+                    errorDiv.innerHTML = `<div>${message}</div>`;
+
+                    // Switch to login tab after a moment
+                    if (result.is_verified !== false) {
+                        setTimeout(() => {
+                            document.querySelector('[data-tab="login"]').click();
+                            const emailInput = document.querySelector('#login-form input[name="email"]');
+                            if (emailInput) {
+                                emailInput.value = data.email;
+                                emailInput.focus();
+                            }
+                        }, 2000);
+                    }
+                } else {
+                    document.getElementById('register-error').textContent = result.message || 'Registration failed';
+                }
             }
         } catch (error) {
             hideLoading();
@@ -1290,6 +1326,50 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
 
     function hideLoading() {
         document.getElementById('sub-loading').classList.remove('show');
+    }
+
+    // Show verification notice
+    function showVerificationNotice(email) {
+        const errorDiv = document.getElementById('register-error');
+        errorDiv.style.background = '#dbeafe';
+        errorDiv.style.color = '#1e40af';
+        errorDiv.style.borderLeft = '4px solid #3b82f6';
+        errorDiv.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 0.75rem;">
+            <span style="font-size: 1.25rem;">📧</span>
+            <div>
+                <strong>Verification Email Sent!</strong>
+                <p style="margin-top: 0.25rem; font-size: 0.875rem;">
+                    We've sent a verification link to <strong>${email}</strong>.
+                    Please check your inbox and click the link to verify your account before proceeding with payment.
+                </p>
+                <button onclick="resendVerificationEmail('${email}')"
+                        style="margin-top: 0.75rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; font-weight: 600;">
+                    Resend Verification Email
+                </button>
+            </div>
+        </div>
+    `;
+    }
+
+    async function resendVerificationEmail(email) {
+        try {
+            const response = await fetch('/' + SITE + '/member/resend-verification', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert('Verification email resent! Please check your inbox.');
+            } else {
+                alert(result.message || 'Failed to resend email. Please try again.');
+            }
+        } catch (error) {
+            alert('An error occurred. Please try again.');
+        }
     }
 
     // Close on overlay click

@@ -1,33 +1,25 @@
 <?php
+// src/Services/NewsletterSendService.php
 
 namespace App\Services;
 
 use App\Framework\Support\SiteContext;
+use App\Repositories\MemberSubscriptionPreferenceRepository;
 use App\Repositories\NewsletterRepository;
 use App\Repositories\NewsletterSendRepository;
 use App\Repositories\SubscriberRepository;
 
 class NewsletterSendService
 {
-    private BlockParserService $parser;
-    private EmailService $emailService;
-    private SubscriberRepository $subscriberRepository;
-    private NewsletterRepository $newsletterRepository;
-    private NewsletterSendRepository $sendRepository;
-    private ?int $siteId;
-
     public function __construct(
-        BlockParserService $parser,
-        EmailService $emailService,
-        SubscriberRepository $subscriberRepository,
-        NewsletterRepository $newsletterRepository,
-        NewsletterSendRepository $sendRepository,
+        private readonly BlockParserService                     $parser,
+        private readonly EmailService                           $emailService,
+        private readonly SubscriberRepository                   $subscriberRepository,
+        private readonly NewsletterRepository                   $newsletterRepository,
+        private readonly NewsletterSendRepository               $sendRepository,
+        private readonly MemberSubscriptionPreferenceRepository $preferenceRepository,
+        private readonly NewsletterPageBuilderService           $pageBuilderService
     ) {
-        $this->parser = $parser;
-        $this->emailService = $emailService;
-        $this->subscriberRepository = $subscriberRepository;
-        $this->newsletterRepository = $newsletterRepository;
-        $this->sendRepository = $sendRepository;
     }
 
     public function sendDueNewsletters(?int $siteId = null): array
@@ -46,9 +38,27 @@ class NewsletterSendService
     public function sendNewsletter($newsletter, ?int $siteId = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
-        $subscribers = $this->subscriberRepository->getConfirmedEmails($siteId);
 
-        if (empty($subscribers)) {
+        // Get all confirmed subscribers (legacy system)
+        $legacySubscribers = $this->subscriberRepository->getConfirmedEmails($siteId);
+
+        // Get member subscribers with preferences
+        $memberPreferences = $this->preferenceRepository->getActiveSubscribersForSite($siteId);
+
+        // Filter member preferences by newsletter frequency
+        $filteredMembers = $memberPreferences->filter(function ($pref) use ($newsletter) {
+            return $pref->newsletter_frequency === $newsletter->interval;
+        });
+
+        // Get member emails
+        $memberEmails = $filteredMembers->map(function ($pref) {
+            return $pref->member->email;
+        })->toArray();
+
+        // Combine and deduplicate
+        $allSubscribers = array_unique(array_merge($legacySubscribers, $memberEmails));
+
+        if (empty($allSubscribers)) {
             return [
                 'success' => false,
                 'newsletter_id' => $newsletter->id,
@@ -56,20 +66,48 @@ class NewsletterSendService
             ];
         }
 
-        // Parse blocks using BlockParserService
-        $blocks = json_decode($newsletter->content, true);
-        if (!is_array($blocks)) {
-            $blocks = [];
+        // Build newsletter content
+        if ($newsletter->isAutomated()) {
+            $pages = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
+
+            if ($pages->isEmpty()) {
+                return [
+                    'success' => false,
+                    'newsletter_id' => $newsletter->id,
+                    'error' => 'No pages match newsletter criteria'
+                ];
+            }
+
+            $baseHtml = $this->pageBuilderService->buildNewsletterHtml($newsletter, $pages);
+        } else {
+            // Manual newsletter - use blocks
+            $blocks = json_decode($newsletter->content, true);
+            if (!is_array($blocks)) {
+                $blocks = [];
+            }
+            $baseHtml = $this->renderBlocksToHtml($blocks);
         }
 
-        $html = $this->renderBlocksToHtml($blocks);
-
         $sent = 0;
-        foreach ($subscribers as $email) {
+        $failed = [];
+
+        foreach ($allSubscribers as $email) {
             try {
+                // Get unsubscribe token for this email
+                $unsubscribeToken = $this->getUnsubscribeToken($email, $siteId);
+
+                // Add unsubscribe link to HTML
+                $html = $newsletter->isAutomated()
+                    ? $baseHtml // Already has footer with token placeholder
+                    : $this->addUnsubscribeLink($baseHtml, $unsubscribeToken);
+
                 $this->emailService->send($email, $newsletter->title, $html);
                 $sent++;
             } catch (\Exception $e) {
+                $failed[] = [
+                    'email' => $email,
+                    'error' => $e->getMessage()
+                ];
                 error_log("Failed to send to {$email}: " . $e->getMessage());
             }
         }
@@ -87,8 +125,35 @@ class NewsletterSendService
         return [
             'success' => true,
             'newsletter_id' => $newsletter->id,
-            'recipients' => $sent
+            'recipients' => $sent,
+            'failed' => $failed,
+            'pages_included' => $newsletter->isAutomated() ? $pages->count() : 0
         ];
+    }
+
+    private function getUnsubscribeToken(string $email, int $siteId): ?string
+    {
+        // First check if it's a member
+        $preference = $this->preferenceRepository->findByMemberEmail($email, $siteId);
+        if ($preference) {
+            return $preference->unsubscribe_token;
+        }
+
+        // Fall back to legacy subscriber
+        $subscriber = $this->subscriberRepository->findByEmail($email, $siteId);
+        return $subscriber?->unsubscribe_token;
+    }
+
+    private function addUnsubscribeLink(string $html, ?string $token): string
+    {
+        if (!$token) {
+            return $html;
+        }
+
+        $unsubscribeUrl = url("/member/subscriptions/unsubscribe/{$token}");
+        $unsubscribeFooter = "<hr><p style='font-size: 12px; color: #666;'>Don't want to receive these emails? <a href='{$unsubscribeUrl}'>Unsubscribe</a></p>";
+
+        return $html . $unsubscribeFooter;
     }
 
     private function renderBlocksToHtml(array $blocks): string
@@ -112,7 +177,7 @@ class NewsletterSendService
                 case 'image':
                     $url = htmlspecialchars($block['url'] ?? '');
                     $alt = htmlspecialchars($block['alt'] ?? '');
-                    $html[] = "<img src=\"{$url}\" alt=\"{$alt}\">";
+                    $html[] = "<img src=\"{$url}\" alt=\"{$alt}\" style=\"max-width: 100%;\">";
                     break;
 
                 case 'list':
@@ -128,7 +193,7 @@ class NewsletterSendService
                 case 'button':
                     $url = htmlspecialchars($block['url'] ?? '#');
                     $text = htmlspecialchars($content);
-                    $html[] = "<a href=\"{$url}\" class=\"button\">{$text}</a>";
+                    $html[] = "<a href=\"{$url}\" style=\"display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;\">{$text}</a>";
                     break;
 
                 default:

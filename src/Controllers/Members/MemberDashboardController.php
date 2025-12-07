@@ -69,7 +69,7 @@ class MemberDashboardController extends Controller
         $recommendedPages = $this->pageRepository->getFeaturedPages(6, $siteId);
 
         return $this->view('member/dashboard', [
-            'member' => $member,
+            'member' => $memberObj,
             'site' => SiteContext::get(),
             'stats' => $stats,
             'recommendedPages' => $recommendedPages,

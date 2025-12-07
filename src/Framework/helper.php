@@ -52,9 +52,14 @@ if (!function_exists('old')) {
 }
 
 if (!function_exists('error')) {
-    function error(string $key): ?string
+    function error(string $key = ''): ?string
     {
         $errors = errors();
+
+        if (empty($key)) {
+            return implode(', ', $errors);
+        }
+
         return isset($errors[$key]) ? (is_array($errors[$key]) ? $errors[$key][0] : $errors[$key]) : null;
     }
 }

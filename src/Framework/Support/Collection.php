@@ -476,4 +476,22 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($result);
     }
 
+    /**
+     * Return a slice of the collection.
+     *
+     * @param int $offset The starting index.
+     * @param int|null $length The number of items to return (null = until end).
+     * @return static           A new collection instance.
+     */
+    public function slice(int $offset, ?int $length = null): static
+    {
+        if ($length === null) {
+            $sliced = array_slice($this->items, $offset);
+        } else {
+            $sliced = array_slice($this->items, $offset, $length);
+        }
+
+        return new static($sliced);
+    }
+
 }

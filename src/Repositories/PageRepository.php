@@ -73,10 +73,10 @@ class PageRepository extends Repository
         return $this->searchEngine->search($query, $criteria);
     }
 
-    public function findBySlug(string $slug): ?Model
+    public function findBySlug(string $slug, ?int $siteId = null): ?Model
     {
         $query = Page::where('slug', $slug);
-        return $this->applySiteFilter($query)->first();
+        return !empty($siteId) ? $query->where('site_id', $siteId)->first() : $this->applySiteFilter($query)->first();
     }
 
     public function getPublishedPages(): Collection
@@ -662,5 +662,10 @@ class PageRepository extends Repository
                 'site_id' => $targetSiteId
             ]);
         }
+    }
+
+    public function getMetaDataForPage(int $pageId): ?PageMetadata
+    {
+        return PageMetadata::where('page_id', $pageId)->first();
     }
 }

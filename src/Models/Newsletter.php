@@ -7,15 +7,34 @@ use DateTime;
 class Newsletter extends Model
 {
     protected $table = 'newsletters';
-    protected $fillable = ['title', 'content', 'interval', 'last_sent', 'active', 'site_id'];
+    protected $fillable = [
+        'title',
+        'content',
+        'interval',
+        'last_sent',
+        'active',
+        'site_id',
+        'content_type',
+        'page_filters',
+        'max_pages',
+        'sort_by',
+        'sort_order',
+        'template'
+    ];
+
     protected $casts = [
         'active' => 'boolean',
-        'last_sent' => 'datetime'
+        'last_sent' => 'datetime',
+        'page_filters' => 'array',
+        'max_pages' => 'integer'
     ];
 
     const INTERVAL_DAILY = 'daily';
     const INTERVAL_WEEKLY = 'weekly';
     const INTERVAL_MONTHLY = 'monthly';
+
+    const CONTENT_TYPE_MANUAL = 'manual';
+    const CONTENT_TYPE_AUTO_PAGES = 'auto_pages';
 
     public function sends()
     {
@@ -60,5 +79,10 @@ class Newsletter extends Model
         }
 
         return $due;
+    }
+
+    public function isAutomated()
+    {
+        return true;
     }
 }

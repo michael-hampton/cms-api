@@ -40,13 +40,17 @@ class MemberAuthController extends Controller
         $siteId = SiteContext::getId();
         $validated = $request->validated();
 
-        // Check if email already exists
-        if (Member::findByEmail($validated['email'], $siteId)) {
+        $existingMember = Member::findByEmail($validated['email'], $siteId);
 
-            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' || $request->getHeader('Content-Type') === 'application/json') {
+        // Check if email already exists
+        if ($existingMember) {
+            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
+                $request->getHeader('Content-Type') === 'application/json') {
                 return $this->resourceResponse([
                     'success' => false,
-                    'message' => 'Email already registered'
+                    'error' => 'email_exists',
+                    'message' => 'Email already registered',
+                    'is_verified' => $existingMember->isEmailVerified()
                 ]);
             }
 
@@ -60,7 +64,7 @@ class MemberAuthController extends Controller
             'password' => password_hash($validated['password'], PASSWORD_DEFAULT),
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
-            'is_active' => $request->getHeader('X-Requested-With') === 'XMLHttpRequest' || $request->getHeader('Content-Type') === 'application/json' // Requires email verification
+            'is_active' => true
         ]);
 
         // Assign default role
@@ -79,15 +83,71 @@ class MemberAuthController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
 
-        if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' || $request->getHeader('Content-Type') === 'application/json') {
+        $requiresVerification = true;
+
+        if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
+            $request->getHeader('Content-Type') === 'application/json') {
             return $this->resourceResponse([
                 'success' => true,
-                'message' => 'Verification email sent successfully'
+                'message' => $requiresVerification ? 'Verification email sent successfully' : 'Registration successful',
+                'requires_verification' => $requiresVerification,
+                'member' => [
+                    'id' => $member->id,
+                    'email' => $member->email,
+                    'first_name' => $member->first_name,
+                    'last_name' => $member->last_name,
+                    'is_verified' => $member->isEmailVerified()
+                ]
             ]);
         }
 
         return $this->redirect('/member/verify-email-sent')
             ->with('email', $member->email);
+    }
+
+    public function resendVerification(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
+
+        $member = MemberAuth::getMember();
+
+        // Check if already verified
+        if ($member->isEmailVerified()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Email is already verified'
+            ]);
+        }
+
+        // Check rate limiting (e.g., once per 60 seconds)
+        $lastSent = $request->session()->get('verification_email_sent_at');
+        if ($lastSent && (time() - $lastSent) < 60) {
+            $waitTime = 60 - (time() - $lastSent);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => "Please wait {$waitTime} seconds before requesting another verification email"
+            ]);
+        }
+
+        try {
+            // Generate new verification token
+            $token = $this->emailVerificationService->generateVerificationToken($member);
+
+            // Send verification email
+            $this->emailVerificationService->sendVerificationEmail($member, $token);
+
+            // Update session timestamp
+            $request->session()->put('verification_email_sent_at', time());
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Verification email sent successfully'
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to send verification email: ' . $e->getMessage(), 500);
+        }
     }
 
     public function showLoginForm()

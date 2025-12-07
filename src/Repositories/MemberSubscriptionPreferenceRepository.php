@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
 
 class MemberSubscriptionPreferenceRepository extends Repository
@@ -133,5 +134,24 @@ class MemberSubscriptionPreferenceRepository extends Repository
     protected function getModelClass(): string
     {
         return MemberSubscriptionPreference::class;
+    }
+
+
+// Add this method to src/Repositories/MemberSubscriptionPreferenceRepository.php
+
+    public function findByMemberEmail(string $email, ?int $siteId = null): ?MemberSubscriptionPreference
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        // Find member by email first
+        $member = Member::where('email', $email)
+            ->where('site_id', $siteId)
+            ->first();
+
+        if (!$member) {
+            return null;
+        }
+
+        return $this->findByMember($member->id, $siteId);
     }
 }

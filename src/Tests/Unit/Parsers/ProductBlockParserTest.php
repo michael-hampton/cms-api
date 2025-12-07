@@ -14,6 +14,13 @@ use App\Validation\Custom\SalePriceValidatorRule;
 
 class ProductBlockParserTest extends FunctionalTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->parser = new ProductBlockParser();
+        $this->validator = new Validator();
+    }
+
     public function testProductParserGetType(): void
     {
         $parser = new ProductBlockParser();
@@ -445,5 +452,454 @@ class ProductBlockParserTest extends FunctionalTestCase
         $result = $validator->validate($data, $rules);
 
         $this->assertFalse($result->isValid());
+    }
+
+    public function testRequiredFieldsValidation()
+    {
+        $data = [
+            'brand' => 'Brand'
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
+        $this->assertArrayHasKey('link', $errors);
+        $this->assertArrayHasKey('name', $errors);
+        $this->assertArrayHasKey('productName', $errors);
+        $this->assertArrayHasKey('price', $errors);
+    }
+
+    public function testInvalidLinkValidation()
+    {
+        $data = [
+            'link' => 'not_a_valid_url',
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'price' => 100
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('link', $result->getErrors());
+    }
+
+    public function testValidLinkValidation()
+    {
+        $validUrls = [
+            'https://example.com',
+            'http://example.com/product',
+            'https://shop.example.com/item?id=123',
+            'http://localhost:8000/product'
+        ];
+
+        foreach ($validUrls as $url) {
+            $data = [
+                'link' => $url,
+                'name' => 'Product',
+                'productName' => 'Product Name',
+                'price' => 100
+            ];
+
+            $rules = $this->parser->getValidationRules();
+            $result = $this->validator->validate($data, $rules);
+
+            $this->assertTrue($result->isValid(), "URL {$url} should be valid");
+        }
+    }
+
+    public function testNameMinLengthValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'a',
+            'productName' => 'Product Name',
+            'price' => 100
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('name', $result->getErrors());
+    }
+
+    public function testProductNameMinLengthValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'Product',
+            'productName' => 'a',
+            'price' => 100
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('productName', $result->getErrors());
+    }
+
+    public function testBrandMaxLengthValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'brand' => str_repeat('a', 256),
+            'price' => 100
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('brand', $result->getErrors());
+    }
+
+    public function testBooleanFieldsValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'price' => 100,
+            'noFollow' => 'not_boolean',
+            'sponsored' => 'not_boolean',
+            'openInNewTab' => 'not_boolean'
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('noFollow', $result->getErrors());
+        $this->assertArrayHasKey('sponsored', $result->getErrors());
+        $this->assertArrayHasKey('openInNewTab', $result->getErrors());
+    }
+
+    public function testInvalidCurrencyValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'currency' => 'INVALID',
+            'price' => 100
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('currency', $result->getErrors());
+    }
+
+    public function testValidCurrencies()
+    {
+        foreach (Currency::cases() as $currency) {
+            $data = [
+                'link' => 'https://example.com',
+                'name' => 'Product',
+                'productName' => 'Product Name',
+                'currency' => $currency->value,
+                'price' => 100
+            ];
+
+            $result = $this->parser->parse($data);
+            $this->assertEquals($currency->value, $result['currency']);
+        }
+    }
+
+    public function testInvalidLayoutValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'price' => 100,
+            'layout' => 'invalid_layout'
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('layout', $result->getErrors());
+    }
+
+    public function testValidLayouts()
+    {
+        $validLayouts = ['standard', 'compact', 'wide'];
+        foreach ($validLayouts as $layout) {
+            $data = [
+                'link' => 'https://example.com',
+                'name' => 'Product',
+                'productName' => 'Product Name',
+                'price' => 100,
+                'layout' => $layout
+            ];
+
+            $result = $this->parser->parse($data);
+            $this->assertEquals($layout, $result['layout']);
+        }
+    }
+
+    public function testInvalidDisplayAsValidation()
+    {
+        $data = [
+            'link' => 'https://example.com',
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'price' => 100,
+            'displayAs' => 'invalid_display'
+        ];
+
+        $rules = $this->parser->getValidationRules();
+        $result = $this->validator->validate($data, $rules);
+
+        $this->assertFalse($result->isValid());
+        $this->assertArrayHasKey('displayAs', $result->getErrors());
+    }
+
+    public function testValidDisplayAs()
+    {
+        foreach (DisplayAs::cases() as $displayAs) {
+            $data = [
+                'link' => 'https://example.com',
+                'name' => 'Product',
+                'productName' => 'Product Name',
+                'price' => 100,
+                'displayAs' => $displayAs->value
+            ];
+
+            $result = $this->parser->parse($data);
+            $this->assertEquals($displayAs->value, $result['displayAs']);
+        }
+    }
+
+    public function testProductParserCalculatesSalePrice()
+    {
+        $data = [
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'link' => 'https://example.com',
+            'price' => 200,
+            'salePrice' => 150
+        ];
+
+        $result = $this->parser->parse($data);
+
+        $this->assertTrue($result['has_sale_price']);
+        $this->assertEquals(150, $result['salePrice']);
+    }
+
+    public function testProductParserNoSalePrice()
+    {
+        $data = [
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'link' => 'https://example.com',
+            'price' => 200,
+            'salePrice' => 0
+        ];
+
+        $result = $this->parser->parse($data);
+
+        $this->assertFalse($result['has_sale_price']);
+    }
+
+    public function testProductParserDefaultValues()
+    {
+        $data = [
+            'name' => 'Product',
+            'productName' => 'Product Name',
+            'link' => 'https://example.com',
+            'price' => 100
+        ];
+
+        $result = $this->parser->parse($data);
+
+        $this->assertEquals('Buy Now', $result['linkText']);
+        $this->assertEquals('button', $result['displayAs']);
+        $this->assertEquals('$', $result['currency']);
+        $this->assertEquals('standard', $result['layout']);
+        $this->assertFalse($result['noFollow']);
+        $this->assertFalse($result['sponsored']);
+        $this->assertFalse($result['openInNewTab']);
+    }
+
+
+    public function testHtmlContainsBrand()
+    {
+        $parsedData = [
+            'link' => 'http://example.com',
+            'name' => 'Product',
+            'brand' => 'Test Brand',
+            'productName' => 'Product',
+            'currency' => '$',
+            'price' => 100,
+            'salePrice' => 0,
+            'layout' => 'standard',
+            'description' => '',
+            'showReviewPanel' => false,
+            'review' => null,
+            'has_sale_price' => false,
+            'description_word_count' => 0,
+            'formatted_description' => '',
+            'linkText' => 'Buy Now',
+            'displayAs' => 'button',
+            'noFollow' => false,
+            'sponsored' => false,
+            'openInNewTab' => false
+        ];
+
+        $html = $this->parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('Test Brand', $html);
+        $this->assertStringContainsString('product-block-brand', $html);
+    }
+
+    public function testHtmlContainsSponsoredBadge()
+    {
+        $parsedData = [
+            'link' => 'http://example.com',
+            'name' => 'Product',
+            'brand' => '',
+            'productName' => 'Product',
+            'currency' => '$',
+            'price' => 100,
+            'salePrice' => 0,
+            'layout' => 'standard',
+            'description' => '',
+            'showReviewPanel' => false,
+            'review' => null,
+            'has_sale_price' => false,
+            'description_word_count' => 0,
+            'formatted_description' => '',
+            'linkText' => 'Buy Now',
+            'displayAs' => 'button',
+            'noFollow' => false,
+            'sponsored' => true,
+            'openInNewTab' => false
+        ];
+
+        $html = $this->parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('Sponsored', $html);
+        $this->assertStringContainsString('product-badge', $html);
+        $this->assertStringContainsString('sponsored', $html);
+    }
+
+    public function testHtmlContainsReviewPanel()
+    {
+        $parsedData = [
+            'link' => 'http://example.com',
+            'name' => 'Product',
+            'brand' => '',
+            'productName' => 'Product',
+            'currency' => '$',
+            'price' => 100,
+            'salePrice' => 0,
+            'layout' => 'standard',
+            'description' => '',
+            'showReviewPanel' => true,
+            'review' => [
+                'pros' => ['Fast shipping', 'Good quality'],
+                'cons' => ['Expensive'],
+                'rating' => 4.5
+            ],
+            'has_sale_price' => false,
+            'description_word_count' => 0,
+            'formatted_description' => '',
+            'linkText' => 'Buy Now',
+            'displayAs' => 'button',
+            'noFollow' => false,
+            'sponsored' => false,
+            'openInNewTab' => false
+        ];
+
+        $html = $this->parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('product-review-panel', $html);
+        $this->assertStringContainsString('review-pros', $html);
+        $this->assertStringContainsString('review-cons', $html);
+        $this->assertStringContainsString('Fast shipping', $html);
+        $this->assertStringContainsString('Expensive', $html);
+        $this->assertStringContainsString('4.5/5', $html);
+    }
+
+    public function testHtmlContainsWishlistButton()
+    {
+        $parsedData = [
+            'link' => 'http://example.com',
+            'name' => 'Product',
+            'brand' => '',
+            'productName' => 'Product',
+            'currency' => '$',
+            'price' => 100,
+            'salePrice' => 0,
+            'layout' => 'standard',
+            'description' => '',
+            'showReviewPanel' => false,
+            'review' => null,
+            'has_sale_price' => false,
+            'description_word_count' => 0,
+            'formatted_description' => '',
+            'linkText' => 'Buy Now',
+            'displayAs' => 'button',
+            'noFollow' => false,
+            'sponsored' => false,
+            'openInNewTab' => false
+        ];
+
+        $html = $this->parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('btn-wishlist', $html);
+        $this->assertStringContainsString('addToWishlist', $html);
+    }
+
+    public function testCompleteProductWithAllFeatures()
+    {
+        $data = [
+            'name' => 'Premium Widget',
+            'productName' => 'Premium Widget',
+            'brand' => 'Top Brand',
+            'link' => 'https://shop.example.com/widget',
+            'price' => 299.99,
+            'salePrice' => 199.99,
+            'currency' => '€',
+            'layout' => 'wide',
+            'displayAs' => 'link',
+            'linkText' => 'Shop Now',
+            'description' => 'The best widget on the market with premium features.',
+            'image' => ['src' => '/images/widget.jpg', 'alt' => 'Premium Widget'],
+            'noFollow' => true,
+            'sponsored' => true,
+            'openInNewTab' => true,
+            'showReviewPanel' => true,
+            'review' => [
+                'pros' => ['Excellent quality', 'Fast delivery', 'Great support'],
+                'cons' => ['High price'],
+                'rating' => 4.8
+            ]
+        ];
+
+        $parsed = $this->parser->parse($data);
+        $html = $this->parser->generateHtml($parsed);
+
+        // Check all elements are present
+        $this->assertStringContainsString('Premium Widget', $html);
+        $this->assertStringContainsString('Top Brand', $html);
+        $this->assertStringContainsString('€199.99', $html);
+        $this->assertStringContainsString('€299.99', $html);
+        $this->assertStringContainsString('Sponsored', $html);
+        $this->assertStringContainsString('Excellent quality', $html);
+        $this->assertStringContainsString('High price', $html);
+        $this->assertStringContainsString('4.8/5', $html);
+        $this->assertStringContainsString('Shop Now', $html);
     }
 }

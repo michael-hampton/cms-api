@@ -2,6 +2,7 @@
 
 namespace App\Parsers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Rules\ArrayRule;
@@ -13,10 +14,16 @@ use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Models\Product;
+use App\Repositories\PageRepository;
 use App\Services\BuildProductCardService;
 
 class PageGridBlockParser extends BaseBlockParser
 {
+    public function __construct(private readonly PageRepository $pageRepository)
+    {
+
+    }
+
     public function getType(): string
     {
         return 'page_grid';
@@ -351,6 +358,7 @@ class PageGridBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
+
         if ($parsedData['layout'] === 'carousel') {
             return $this->generateCarouselHtml($parsedData);
         }
@@ -533,13 +541,106 @@ class PageGridBlockParser extends BaseBlockParser
 
     private function generatePageCard(array $page, array $parsedData): string
     {
-        $isProduct = !empty($page['price']); // Detect if this is a product
+        $isProduct = !empty($page['price']);
 
         if ($isProduct) {
             return $this->generateProductCard($page, $parsedData);
         }
 
-        $html = "<div class=\"page-card\">";
+        // Check if page is private
+        $isPrivate = $this->isPagePrivate($page['slug']);
+        $isLoggedIn = MemberAuth::check();
+
+        $html = '';
+
+        if ($isPrivate && !$isLoggedIn) {
+            $html .= "
+        <style>
+            .page-card-private {
+                position: relative;
+            }
+
+            .page-image {
+                position: relative;
+            }
+
+            .private-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(255, 255, 255, 0.6);
+                backdrop-filter: blur(4px);
+                z-index: 1;
+            }
+
+            .private-badge {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: 2rem;
+                font-weight: 700;
+                font-size: 0.875rem;
+                z-index: 2;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                white-space: nowrap;
+            }
+
+            .page-content-faded {
+                position: relative;
+            }
+
+            .page-excerpt-faded {
+                max-height: 3em;
+                overflow: hidden;
+                position: relative;
+            }
+
+            .page-excerpt-faded::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 2em;
+                background: linear-gradient(to bottom, transparent, white);
+            }
+
+            .btn-subscribe-required {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                width: 100%;
+                padding: 0.875rem 1.5rem;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                border: none;
+                border-radius: 0.5rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+
+            .btn-subscribe-required:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+            }
+
+            .btn-subscribe-required svg {
+                width: 16px;
+                height: 16px;
+            }
+        </style>
+        ";
+        }
+
+        $html .= "<div class=\"page-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\">";
 
         // Image section
         if ($parsedData['showImage'] && !empty($page['image'])) {
@@ -547,6 +648,12 @@ class PageGridBlockParser extends BaseBlockParser
 
             $altText = htmlspecialchars($page['image']['alt'] ?: $page['title']);
             $titleText = htmlspecialchars($page['image']['title'] ?: $page['title']);
+
+            // Add overlay for private content
+            if ($isPrivate && !$isLoggedIn) {
+                $html .= "<div class=\"private-overlay\"></div>";
+                $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
+            }
 
             $html .= "<img src=\"" . htmlspecialchars($page['image']['src']) . "\" ";
             $html .= "alt=\"{$altText}\" ";
@@ -567,11 +674,15 @@ class PageGridBlockParser extends BaseBlockParser
         }
 
         // Content section
-        $html .= "<div class=\"page-content\">";
+        $html .= "<div class=\"page-content" . ($isPrivate && !$isLoggedIn ? " page-content-faded" : "") . "\">";
 
         // Title
         $html .= "<h3 class=\"page-title\">";
-        $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
+        if ($isPrivate && !$isLoggedIn) {
+            $html .= htmlspecialchars($page['title']);
+        } else {
+            $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
+        }
         $html .= "</h3>";
 
         // Meta information
@@ -607,7 +718,8 @@ class PageGridBlockParser extends BaseBlockParser
 
         // Excerpt
         if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
-            $html .= "<div class=\"page-excerpt\">" . htmlspecialchars($page['excerpt']) . "</div>";
+            $excerptClass = ($isPrivate && !$isLoggedIn) ? "page-excerpt page-excerpt-faded" : "page-excerpt";
+            $html .= "<div class=\"{$excerptClass}\">" . htmlspecialchars($page['excerpt']) . "</div>";
         }
 
         // Features
@@ -622,16 +734,28 @@ class PageGridBlockParser extends BaseBlockParser
         // Actions
         if ($parsedData['showActions'] && !empty($page['actions'])) {
             $html .= "<div class=\"page-actions\">";
-            foreach ($page['actions'] as $action) {
-                $relAttr = !empty($action['rel']) ? " rel=\"{$action['rel']}\"" : '';
-                $targetAttr = $action['target'] !== '_self' ? " target=\"{$action['target']}\"" : '';
 
-                $site = SiteContext::get();
-                $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
+            if ($isPrivate && !$isLoggedIn) {
+                // Show subscription required button
+                $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
+                $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
+                $html .= "<rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"/>";
+                $html .= "<path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/>";
+                $html .= "</svg>";
+                $html .= "Subscribe to Access";
+                $html .= "</button>";
+            } else {
+                foreach ($page['actions'] as $action) {
+                    $relAttr = !empty($action['rel']) ? " rel=\"{$action['rel']}\"" : '';
+                    $targetAttr = $action['target'] !== '_self' ? " target=\"{$action['target']}\"" : '';
 
-                $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn btn-{$action['style']}\"{$targetAttr}{$relAttr}>";
-                $html .= htmlspecialchars($action['text']);
-                $html .= "</a>";
+                    $site = SiteContext::get();
+                    $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
+
+                    $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn btn-{$action['style']}\"{$targetAttr}{$relAttr}>";
+                    $html .= htmlspecialchars($action['text']);
+                    $html .= "</a>";
+                }
             }
             $html .= "</div>";
         }
@@ -641,6 +765,34 @@ class PageGridBlockParser extends BaseBlockParser
 
         return $html;
     }
+
+    /**
+     * Check if a page is private by fetching its metadata
+     */
+    private function isPagePrivate(string $slug): bool
+    {
+        try {
+            $siteId = SiteContext::getId();
+
+            $page = $this->pageRepository->findBySlug($slug, $siteId);
+
+            if (!$page) {
+                return false;
+            }
+
+            $metadata = $this->pageRepository->getMetaDataForPage($page->id);
+
+            if (!$metadata) {
+                return false;
+            }
+
+            return $metadata->visibility === 'private';
+        } catch (\Exception $e) {
+            Logger::error('Error checking page privacy: ' . $e->getMessage());
+            return false;
+        }
+    }
+
 
     private function generateProductCard(array $page, array $parsedData): string
     {
