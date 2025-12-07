@@ -596,7 +596,8 @@
 
                         <div style="display: grid; gap: 16px;">
                             <?php foreach ($plans as $plan): ?>
-                                <div style="padding: 20px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 12px; border: 2px solid #e2e8f0; transition: all 0.3s ease;">
+                                <div data-plan-id="<?= $plan->id ?>"
+                                     style="padding: 20px; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 12px; border: 2px solid #e2e8f0; transition: all 0.3s ease;">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                                         <div>
                                             <div style="font-weight: 700; font-size: 18px; color: #1e293b; margin-bottom: 4px;">
@@ -786,42 +787,25 @@
     }
 
     function quickSubscribe(slug, button) {
-        if (!confirm('Subscribe to this plan?')) {
-            return;
+        // Get plan ID from the button or nearby element
+        // You'll need to add data-plan-id to the button in the PHP
+        const planCard = button.closest('div[data-plan-id]');
+        const planId = planCard ? planCard.dataset.planId : null;
+
+        if (planId) {
+            // Show modal with pre-selected plan
+            if (typeof showSubscriptionModalWithPlan === 'function') {
+                showSubscriptionModalWithPlan(slug, planId);
+            } else {
+                // Fallback to direct checkout page
+                window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/checkout?plan_slug=' + slug;
+            }
+        } else {
+            // Fallback if plan ID not found
+            window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/checkout?plan_slug=' + slug;
         }
-
-        // button.disabled = true;
-        // button.classList.add('loading');
-        // const originalText = button.textContent;
-
-        window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/checkout?plan_slug=' + slug;
-
-        //fetch('/<?php //= \App\Framework\Support\SiteContext::slug() ?>///member/subscription-plans/' + slug + '/subscribe', {
-        //    method: 'POST',
-        //    headers: {
-        //        'Content-Type': 'application/json',
-        //        'X-Requested-With': 'XMLHttpRequest'
-        //    }
-        //})
-        //    .then(response => response.json())
-        //    .then(data => {
-        //        if (data.success) {
-        //            window.location.reload();
-        //        } else {
-        //            alert(data.message || 'Failed to subscribe');
-        //            button.disabled = false;
-        //            button.classList.remove('loading');
-        //            button.textContent = originalText;
-        //        }
-        //    })
-        //    .catch(error => {
-        //        alert('An error occurred. Please try again.');
-        //        console.error('Error:', error);
-        //        button.disabled = false;
-        //        button.classList.remove('loading');
-        //        button.textContent = originalText;
-        //    });
     }
+
 
     function cancelSubscription(subscriptionId) {
         const dialog = createConfirmDialog({
@@ -1018,5 +1002,7 @@ ${optionsHTML}
     }
 
 </script>
+
+@include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])
 </body>
 </html>

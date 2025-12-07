@@ -100,6 +100,7 @@ $router->get('{siteName}/shop/details/{slug}', ProductDetailController::class, '
 $router->get('/sites', ContentController::class, 'sites');
 
 $router->get('/member/register', [MemberAuthController::class, 'showRegisterForm']);
+$router->get('/{siteName}/member/register', [MemberAuthController::class, 'showRegisterForm']);
 $router->get('/{siteName}/member/login', [MemberAuthController::class, 'showLoginForm']);
 $router->post('/member/logout', [MemberAuthController::class, 'logout']);
 
@@ -127,6 +128,8 @@ $router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::clas
         ->name('member.login.submit');
 
     $router->post('/member/register', [MemberAuthController::class, 'register'])
+        ->name('member.register');
+    $router->post('/{siteName}/member/register', [MemberAuthController::class, 'register'])
         ->name('member.register');
 
     $router->post('/member/change-password', [MemberAuthController::class, 'changePassword'])

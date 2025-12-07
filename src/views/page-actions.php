@@ -110,7 +110,7 @@
     <?php else: ?>
         <div class="login-prompt">
             <span>❤️</span>
-            <a href="/member/login?redirect=<?= urlencode($_SERVER['REQUEST_URI']) ?>">
+            <a href="<?= \App\Framework\Support\SiteContext::slug() ?>/member/login?redirect=<?= urlencode($_SERVER['REQUEST_URI']) ?>">
                 Login to like this page
             </a>
             <span class="like-count">

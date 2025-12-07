@@ -3,15 +3,17 @@ namespace App\Controllers;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\MemberRole;
+use App\Models\Menu;
 use App\Requests\ChangePasswordRequest;
 use App\Requests\LoginRequest;
-use App\Requests\ResetPasswordRequest;
 use App\Requests\MemberRegistrationRequest;
+use App\Requests\ResetPasswordRequest;
 use App\Services\EmailVerificationService;
+use App\Services\MenuRenderer;
 use App\Services\PasswordResetService;
-use App\Framework\Support\SiteContext;
 
 class MemberAuthController extends Controller
 {
@@ -40,6 +42,14 @@ class MemberAuthController extends Controller
 
         // Check if email already exists
         if (Member::findByEmail($validated['email'], $siteId)) {
+
+            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' || $request->getHeader('Content-Type') === 'application/json') {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Email already registered'
+                ]);
+            }
+
             return $this->back()->withErrors(['email' => 'Email already registered']);
         }
 
@@ -50,7 +60,7 @@ class MemberAuthController extends Controller
             'password' => password_hash($validated['password'], PASSWORD_DEFAULT),
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
-            'is_active' => false // Requires email verification
+            'is_active' => $request->getHeader('X-Requested-With') === 'XMLHttpRequest' || $request->getHeader('Content-Type') === 'application/json' // Requires email verification
         ]);
 
         // Assign default role
@@ -63,6 +73,19 @@ class MemberAuthController extends Controller
         $token = $this->emailVerificationService->generateVerificationToken($member);
         $this->emailVerificationService->sendVerificationEmail($member, $token);
 
+        try {
+            MemberAuth::login($member);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+
+        if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' || $request->getHeader('Content-Type') === 'application/json') {
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Verification email sent successfully'
+            ]);
+        }
+
         return $this->redirect('/member/verify-email-sent')
             ->with('email', $member->email);
     }
@@ -73,8 +96,18 @@ class MemberAuthController extends Controller
             return $this->redirect('/member/dashboard');
         }
 
+        $siteId = SiteContext::getId();
+
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', $siteId)
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
         return $this->view('member/login', [
-            'site' => SiteContext::get()
+            'site' => SiteContext::get(),
+            'menu' => $menu,
+            'menuRenderer' => new Menurenderer()
         ]);
     }
 

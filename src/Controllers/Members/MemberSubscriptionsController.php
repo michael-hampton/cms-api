@@ -50,7 +50,13 @@ class MemberSubscriptionsController extends Controller
             'activeSubscription' => $activeSubscription,
             'subscriptionHistory' => $subscriptionHistory,
             'subscriptionSummary' => $subscriptionSummary,
-            'plans' => $plans
+            'plans' => $plans,
+            'subscriptionModalData' => [
+                'plans' => $plans,
+                'show_modal' => false,
+                'is_direct' => true,
+                'member' => $member,
+            ]
         ]);
     }
 

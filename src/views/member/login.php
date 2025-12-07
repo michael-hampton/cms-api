@@ -314,7 +314,7 @@
 
                 <div class="signup-prompt">
                     Don't have an account?
-                    <a href="/member/register">Create one now →</a>
+                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/register">Create one now →</a>
                 </div>
             </div>
         </form>

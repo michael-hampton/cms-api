@@ -192,7 +192,7 @@
         <div class="message error"><?= htmlspecialchars($generalError) ?></div>
     <?php endif; ?>
 
-    <form method="POST" action="/member/register">
+    <form method="POST" action="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/register">
         @csrf
         <div class="form-group">
             <label for="first_name">
