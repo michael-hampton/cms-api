@@ -17,9 +17,11 @@ $siteSlug = $site ? $site->slug : 'default';
     <title><?= SiteContext::name() ?></title>
     <meta data-site-name="<?= SiteContext::get()->slug?>">
     @css('base-blocks.css')
+    @js('product-interactions.js')
 
     <script>
         site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+        SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
         // Newsletter signup functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -158,6 +160,23 @@ $siteSlug = $site ? $site->slug : 'default';
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                 </svg>
+            </button>
+            <?php if (\App\Framework\Authorization\MemberAuth::check()): ?>
+                <button class="icon-btn" id="wishlist-btn" onclick="location.href=`/${SITE}/member/wishlist`"
+                        aria-label="Wishlist">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <span class="badge" id="wishlist-count" style="display: block;">4</span>
+                </button>
+            <?php endif; ?>
+            <button class="icon-btn" id="cart-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span class="badge" id="cart-count" style="display: none;">0</span>
             </button>
             <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
                 <span></span>

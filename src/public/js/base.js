@@ -81,6 +81,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('.btn-flip') || e.target.closest('.btn-flip-back')) {
+            const button = e.target.closest('.btn-flip') || e.target.closest('.btn-flip-back');
+            const productId = button.dataset.productId;
+            const card = document.querySelector(`[data-product-id=\"${productId}\"]`);
+            if (card) {
+                card.classList.toggle('flipped');
+            }
+        }
+    });
+
     // Close menu when clicking outside
     document.addEventListener('click', function (e) {
         if (!e.target.closest('.mega-menu-nav') &&

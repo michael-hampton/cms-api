@@ -129,9 +129,9 @@ body {
 }
 
 /* Shop Layout */
-.main-content {
-    padding: 3rem 0;
-}
+/*.main-content {*/
+/*    padding: 3rem 0;*/
+/*}*/
 
 .shop-layout {
     display: grid;

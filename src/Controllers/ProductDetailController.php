@@ -2,9 +2,13 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
+use App\Models\Menu;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
+use App\Services\MenuRenderer;
 use App\Services\ProductService;
 use App\Services\ReviewService;
 use App\Services\WishlistService;
@@ -31,12 +35,18 @@ class ProductDetailController extends Controller
             ]);
         }
 
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', SiteContext::getId())
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
         $this->productService->trackView($product);
 
         $relatedProducts = $this->productService->getRelatedProducts($product, 8);
         $recentlyViewed = $this->productService->getRecentlyViewedProducts(6);
 
-        $user = auth()->user();
+        $user = MemberAuth::getMember();
         $isInWishlist = $this->wishlistService->isInWishlist($user, $product);
 
         // Get review data
@@ -103,8 +113,10 @@ class ProductDetailController extends Controller
             'canReview' => ['can_review' => true],
             'reviewData' => $reviewData,
             'merchantsArray' => $merchantsArray,
-            'menu' => $this->getMenu(),
+            'menu' => $menu,
+            'menuRenderer' => new MenuRenderer(),
             'priceHistoryTimeline' => $priceHistoryTimeline,
+            'member' => $user
         ]);
     }
 

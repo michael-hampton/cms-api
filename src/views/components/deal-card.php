@@ -12,13 +12,14 @@
             </svg>
         </button>
     </div>
-    <a href="/shop/details/<?= $deal['slug'] ?>" class="deal-image-link">
+    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/shop/details/<?= $deal['slug'] ?>"
+       class="deal-image-link">
         <img src="<?= $deal['image'] ?>" alt="<?= htmlspecialchars($deal['title']) ?>" class="deal-image">
     </a>
 
     <div class="deal-content">
         <h3 class="deal-title">
-            <a href="/shop/details/<?= $deal['slug'] ?>"><?= htmlspecialchars($deal['title']) ?></a>
+            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/shop/details/<?= $deal['slug'] ?>"><?= htmlspecialchars($deal['title']) ?></a>
         </h3>
 
         <?php if ($deal['rating'] > 0): ?>
@@ -42,7 +43,10 @@
                 </svg>
                 Add to Cart
             </button>
-            <button class="deal-cta" onclick="window.location.href='/shop/details/<?= $deal['slug'] ?>'">View Deal</button>
+            <button class="deal-cta"
+                    onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/shop/details/<?= $deal['slug'] ?>'">
+                View Deal
+            </button>
         </div>
     </div>
 </div>

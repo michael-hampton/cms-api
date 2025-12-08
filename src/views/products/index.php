@@ -9,50 +9,22 @@
 <body>
 <div class="page-wrapper">
     <!-- Header -->
-    <header class="site-header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
-                    <a href="/">YourStore</a>
-                </div>
-                <nav class="main-nav">
-                    <a href="/">Home</a>
-                    <a href="/shop" class="active">Shop</a>
-                    <a href="/deals">Today's Deals</a>
-                    <a href="/about">About</a>
-                    <a href="/contact">Contact</a>
-                </nav>
-                <div class="header-actions">
-                    <button class="icon-btn" id="wishlist-btn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                        </svg>
-                        <span class="badge" id="wishlist-count">0</span>
-                    </button>
-                    <button class="icon-btn" id="cart-btn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <circle cx="9" cy="21" r="1"></circle>
-                            <circle cx="20" cy="21" r="1"></circle>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                        </svg>
-                        <span class="badge" id="cart-count">0</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
+    @include('header', ['menu' => $menu, 'menuRenderer' => $menuRenderer, 'title' => 'Shop'])]
 
-    <!-- Hero Section -->
-    <section class="hero-section">
-        <div class="container">
-            <h1 class="hero-title">Discover Amazing Products</h1>
-            <p class="hero-subtitle">Quality items curated just for you</p>
-        </div>
-    </section>
+    @include('member-badge')
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="container">
+        <div class="full-container" style="margin: 20px">
+            <!-- Hero Section -->
+            <section class="hero-section" style="margin-bottom: 20px">
+                <div class="container">
+                    <h1 class="hero-title">Discover Amazing Products</h1>
+                    <p class="hero-subtitle">Quality items curated just for you</p>
+                </div>
+            </section>
+
+
             <div class="shop-layout">
                 <!-- Sidebar -->
                 <aside class="shop-sidebar">
@@ -253,7 +225,7 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    SITE = 'test-mike'
+    SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
 </script>
 
 @js('products.js')

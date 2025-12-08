@@ -55,8 +55,11 @@
 
     async function handleToggleWishlist(e) {
         const btn = e.currentTarget;
+        console.log('btn', btn)
         const productId = btn.dataset.productId;
         const isInWishlist = btn.classList.contains('active');
+
+        alert(productId + ' ' + isInWishlist)
 
         btn.disabled = true;
 

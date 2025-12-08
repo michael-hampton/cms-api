@@ -193,7 +193,7 @@
                         </svg>
                     </button>
                     
-                    <a href="/shop/details/${product.slug}" class="product-image">
+                    <a href="/${SITE}/shop/details/${product.slug}" class="product-image">
                         <img src="${product.image || '/images/placeholder.jpg'}" 
                              alt="${escapeHtml(product.name)}">
                         ${product.discount_percentage > 0 ? `
@@ -203,7 +203,7 @@
                     
                     <div class="product-content">
                         <h3 class="product-name">
-                            <a href="/shop/details/${product.slug}">${escapeHtml(product.name)}</a>
+                            <a href="/${SITE}/shop/details/${product.slug}">${escapeHtml(product.name)}</a>
                         </h3>
                         <div class="product-price">
                             ${product.sale_price && product.sale_price < product.price ? `
@@ -248,7 +248,7 @@
                         <button class="btn-back-action btn-add-cart-back" data-product-id="${product.id}">
                             Add to Cart
                         </button>
-                        <a href="/shop/details/${product.slug}" class="btn-back-action btn-view-details">
+                        <a href="/${SITE}/shop/details/${product.slug}" class="btn-back-action btn-view-details">
                             Full Details
                         </a>
                     </div>

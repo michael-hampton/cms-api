@@ -4,17 +4,16 @@
  * @var array $subscriptionModalData
  */
 
-if (!isset($subscriptionModalData) || (!$subscriptionModalData['show_modal'] && $subscriptionModalData['is_direct'] !== true)) {
+if (!isset($subscriptionModalData) || (!$subscriptionModalData['show_modal'] && ($subscriptionModalData['is_direct'] ?? false) || false !== true)) {
     return;
 }
 
 $plans = $subscriptionModalData['plans'];
 $member = $subscriptionModalData['member'];
 $isLoggedIn = !empty($member);
-$class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
 ?>
 
-<div id="subscriptionModal" class="sub-modal <?= $class ?>">
+<div id="subscriptionModal" class="sub-modal hide">
     <div class="sub-modal-overlay"></div>
     <div class="sub-modal-container">
         <button class="sub-modal-close" onclick="closeSubscriptionModal()" aria-label="Close">
@@ -997,6 +996,8 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
     const API_BASE = '/api/' + SITE;
     const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? '' ?>';
     const IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
+    const MODAL_STORAGE_KEY = 'subscription_modal_last_shown';
+    const MODAL_COOLDOWN_HOURS = 24;
 
     let stripe = null;
     let cardElement = null;
@@ -1027,7 +1028,7 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
     }
 
     // Show modal
-    function showSubscriptionModal(planSlug = null, planId = null) {
+    function showSubscriptionModal(planSlug = null, planId = null, isManual = false) {
         const modal = document.getElementById('subscriptionModal');
         if (modal) {
             modal.classList.add('show');
@@ -1047,11 +1048,16 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
                 goToStep(1);
             }
 
-            // Mark as shown
-            fetch('/' + SITE + '/api/subscription-modal/mark-shown', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'}
-            });
+            // Only track if not a manual open
+            if (!isManual) {
+                trackModalShown();
+
+                // Mark as shown on server (for logged-in users)
+                fetch('/' + SITE + '/api/subscription-modal/mark-shown', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+            }
         }
     }
 
@@ -1372,6 +1378,26 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
         }
     }
 
+    // Check if we should show modal for non-logged-in visitors
+    function shouldShowModalForVisitor() {
+        const lastShown = localStorage.getItem(MODAL_STORAGE_KEY);
+
+        if (!lastShown) {
+            return true;
+        }
+
+        const lastShownTime = parseInt(lastShown, 10);
+        const hoursSince = (Date.now() - lastShownTime) / (1000 * 60 * 60);
+
+        return hoursSince >= MODAL_COOLDOWN_HOURS;
+    }
+
+    function trackModalShown() {
+        if (!IS_LOGGED_IN) {
+            localStorage.setItem(MODAL_STORAGE_KEY, Date.now().toString());
+        }
+    }
+
     // Close on overlay click
     document.querySelector('.sub-modal-overlay')?.addEventListener('click', closeSubscriptionModal);
 
@@ -1382,10 +1408,25 @@ $class = $subscriptionModalData['is_direct'] ? 'hide' : 'show';
 
     // Show modal after delay
     <?php if ($subscriptionModalData['show_modal'] ?? false): ?>
-    setTimeout(() => showSubscriptionModal(), 3000);
+    setTimeout(() => {
+        // For logged-in users, server already checked - just show
+        if (IS_LOGGED_IN) {
+            showSubscriptionModal(null, null, false);
+        }
+        // For visitors, check localStorage first
+        else if (shouldShowModalForVisitor()) {
+            showSubscriptionModal(null, null, false);
+        }
+    }, 3000);
     <?php endif; ?>
 
+    // Manual trigger (from button clicks) - always show, don't track
     window.showSubscriptionModalWithPlan = function (planSlug, planId) {
-        showSubscriptionModal(planSlug, planId);
+        showSubscriptionModal(planSlug, planId, true);
+    };
+
+    // Also add a manual trigger without plan
+    window.openSubscriptionModal = function () {
+        showSubscriptionModal(null, null, true);
     };
 </script>

@@ -136,13 +136,13 @@ class SubscriptionRepository extends Repository
         // Don't show if we showed it in the last 24 hours
         $lastShown = $this->getMemberLastSubscriptionCheck($memberId, $siteId);
 
-//        if ($lastShown) {
-//            $lastShownTime = strtotime($lastShown);
-//            $hoursSince = (time() - $lastShownTime) / 3600;
-//            if ($hoursSince < 24) {
-//                return false;
-//            }
-//        }
+        if ($lastShown) {
+            $lastShownTime = strtotime($lastShown);
+            $hoursSince = (time() - $lastShownTime) / 3600;
+            if ($hoursSince < 24) {
+                return false;
+            }
+        }
 
         return true;
     }

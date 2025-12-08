@@ -4,12 +4,15 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Menu;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Search\SearchCriteria;
 use App\Services\BuildProductCardService;
+use App\Services\MenuRenderer;
 use App\Services\ProductService;
 
 class ProductListController extends Controller
@@ -87,10 +90,17 @@ class ProductListController extends Controller
             ];
         });
 
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', SiteContext::getId())
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
         return $this->view('products.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
-            'menu' => $this->getMenu(),
+            'menu' => $menu,
+            'menuRenderer' => new MenuRenderer(),
         ]);
     }
 
@@ -163,11 +173,5 @@ class ProductListController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-    }
-
-    protected function getMenu(): array
-    {
-        // Return your menu structure
-        return [];
     }
 }

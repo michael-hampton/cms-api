@@ -213,11 +213,7 @@ async function refreshDeals() {
                     </svg>
                     Add to Cart
                 </button>
-                <button class="deal-cta" onclick="window.location.href='/shop/details/${deal.slug}'">View Deal</button>
-            </div>
-        </div>
-    </div>
-`).join('');
+                <button class="deal-cta" onclick="window.location.href='/${SITE}/shop/details/${deal.slug}`).join('');
 
             // Reinitialize carousel
             window.dealsCarousel = new DealsCarousel('#deals-carousel');

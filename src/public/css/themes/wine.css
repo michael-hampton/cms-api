@@ -47,7 +47,7 @@ a {
 a:hover { color: var(--dark-burgundy); }
 
 /* Header */
-.header {
+/*.header {
     background: linear-gradient(135deg, var(--dark-burgundy) 0%, var(--burgundy) 100%);
     color: var(--off-white);
     padding: 0.8rem 0;
@@ -120,7 +120,7 @@ a:hover { color: var(--dark-burgundy); }
     color: var(--gold);
     cursor: pointer;
     font-size: 1.2rem;
-}
+}*/
 
 .btn-subscribe {
     background: var(--gold);
@@ -2556,7 +2556,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* 5. PRODUCT BLOCK FIX */
-.product-block {
+/*.product-block {
     background: white;
     border-radius: 12px;
     padding: 0;
@@ -2744,6 +2744,10 @@ h1, h2, h3, h4, h5, h6 {
 .product-wishlist-btn:hover {
     background: var(--burgundy);
     color: white;
+}*/
+
+.page-grid-container .product-card {
+    min-height: 715px !important;
 }
 
 /* 6. IMAGE BLOCK SIZING */
