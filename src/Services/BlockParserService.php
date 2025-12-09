@@ -7,11 +7,14 @@ use App\Framework\Database\Database;
 use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\Logger;
+use App\Framework\Support\SiteContext;
+use App\Framework\Support\Str;
 use App\Framework\Validation\Validator;
 use App\Models\Block;
 use App\Parsers\BlockRegistry;
 use App\Repositories\BlockRepository;
 use App\Repositories\PageRepository;
+use App\Repositories\ProductRepository;
 use Exception;
 
 class BlockParserService
@@ -110,9 +113,9 @@ class BlockParserService
 
         $parsedData = $parser->parse($blockData);
 
-        // Handle product block creation/matching
-        if ($type === 'product') {
-            $parsedData = $this->handleProductBlock($parsedData);
+        // Handle product/deal block creation/matching
+        if ($type === 'product' || $type === 'deal') {
+            $parsedData = $this->handleProductBlock($parsedData, $type);
         }
 
         $result = $this->blockRepository->createBlock($pageId, $type, $parsedData, $order);
@@ -127,7 +130,7 @@ class BlockParserService
     /**
      * Handle product block creation - match or create product
      */
-    private function handleProductBlock(array $parsedData): array
+    private function handleProductBlock(array $parsedData, string $type = 'product'): array
     {
         // If user opted out of matching, don't do anything
         if (!empty($parsedData['opted_out_product_match'])) {
@@ -139,23 +142,28 @@ class BlockParserService
             return $parsedData;
         }
 
-        // Try to find matching product
-        $productName = $parsedData['productName'] ?? $parsedData['name'] ?? null;
-        $brand = $parsedData['brand'] ?? null;
+        // Extract product name and brand based on block type
+        if ($type === 'deal') {
+            $productName = $parsedData['productName'] ?? null;
+            $brand = $parsedData['brand'] ?? null;
+        } else {
+            $productName = $parsedData['productName'] ?? $parsedData['name'] ?? null;
+            $brand = $parsedData['brand'] ?? null;
+        }
 
         if (empty($productName)) {
             return $parsedData;
         }
 
-        $matchingService = new ProductMatchingService(new \App\Repositories\ProductRepository());
-        $matches = $matchingService->findMatches($productName, $brand, \App\Framework\Support\SiteContext::getId());
+        $matchingService = new ProductMatchingService(new ProductRepository());
+        $matches = $matchingService->findMatches($productName, $brand, SiteContext::getId());
 
         // If we have a high confidence match (>85%), use it
         if (!empty($matches) && $matches[0]['similarity'] > 0.85) {
             $parsedData['product_id'] = $matches[0]['product']->id;
         } else {
             // Create new product if no good match
-            $parsedData['product_id'] = $this->createProductFromBlock($parsedData);
+            $parsedData['product_id'] = $this->createProductFromBlock($parsedData, $type);
         }
 
         return $parsedData;
@@ -164,20 +172,32 @@ class BlockParserService
     /**
      * Create a new product from block data
      */
-    private function createProductFromBlock(array $blockData): int
+    private function createProductFromBlock(array $blockData, string $type = 'product'): int
     {
         $productRepository = new \App\Repositories\ProductRepository();
 
+        $brand = $blockData['brand'] ?? null;
+        $price = $blockData['price'] ?? 0;
+        $salePrice = $blockData['salePrice'] ?? 0;
+        $description = $blockData['description'] ?? null;
+        $image = $blockData['image']['src'] ?? null;
+
+        if ($type === 'deal') {
+            $name = $blockData['productName'] ?? $blockData['title'];
+        } else {
+            $name = $blockData['productName'] ?? $blockData['name'];
+        }
+
         $productData = [
-            'name' => $blockData['productName'] ?? $blockData['name'],
-            'brand' => $blockData['brand'] ?? null,
-            'price' => $blockData['price'] ?? 0,
-            'sale_price' => $blockData['salePrice'] ?? 0,
-            'description' => $blockData['description'] ?? null,
-            'image' => $blockData['image']['src'] ?? null,
-            'site_id' => \App\Framework\Support\SiteContext::getId(),
+            'name' => $name,
+            'brand' => $brand,
+            'price' => $price,
+            'sale_price' => $salePrice,
+            'description' => $description,
+            'image' => $image,
+            'site_id' => SiteContext::getId(),
             'is_active' => true,
-            'slug' => \App\Framework\Support\Str::slug($blockData['productName'] ?? $blockData['name']),
+            'slug' => Str::slug($name),
         ];
 
         $product = $productRepository->create($productData);
@@ -355,17 +375,6 @@ class BlockParserService
         $validationResult = $this->validator->validate($blockData, $parser->getValidationRules());
 
         if (!$validationResult->isValid()) {
-
-            echo '<pre>';
-            print_r($parser);
-            print_r($blockData);
-
-            echo $blockData['type'];
-
-            echo '<pre>';
-            print_r($validationResult->getErrors());
-            die;
-
             throw new ValidationException('Failed to validate block data', $validationResult->getErrors());
         }
     }

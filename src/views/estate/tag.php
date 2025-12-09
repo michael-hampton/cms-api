@@ -11,7 +11,7 @@
 
 @include('header', ['menu' => $menu, 'title' => $tag->name])
 
-<header>
+<header class="header">
     <div class="header-content">
         <h1>
             <span class="tag-hash">#</span><?= htmlspecialchars($tag->name) ?>

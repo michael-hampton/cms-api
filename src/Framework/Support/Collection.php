@@ -494,4 +494,48 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($sliced);
     }
 
+    public function concat(iterable $items): self
+    {
+        $merged = [];
+
+        foreach ($this->items as $item) {
+            $merged[] = $item;
+        }
+
+        foreach ($items as $item) {
+            $merged[] = $item;
+        }
+
+        return new self($merged);
+    }
+
+    public function whereIn(string $key, array $values): self
+    {
+        $filtered = array_filter($this->items, function ($item) use ($key, $values) {
+
+            // If item is an object with attribute array (like Eloquent model)
+            if (is_object($item)) {
+                // Try property directly
+                if (isset($item->$key)) {
+                    return in_array($item->$key, $values, true);
+                }
+
+                // Try attribute bag (Eloquent-style)
+                if (method_exists($item, 'getAttribute')) {
+                    $attr = $item->getAttribute($key);
+                    return in_array($attr, $values, true);
+                }
+            }
+
+            // Array support (if needed)
+            if (is_array($item) && array_key_exists($key, $item)) {
+                return in_array($item[$key], $values, true);
+            }
+
+            return false;
+        });
+
+        return new self(array_values($filtered));
+    }
+
 }

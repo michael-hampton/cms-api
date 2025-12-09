@@ -6834,9 +6834,7 @@ nav.header-nav ul {
     color: #475569;
 }
 
-* Wishlist Button *
-
-/
+/* Wishlist Button */
 .btn-wishlist-card {
     background: rgba(255, 255, 255, 0.95);
     border: none;
@@ -7015,7 +7013,7 @@ nav.header-nav ul {
 /* Wishlist Button */
 .btn-wishlist {
     width: 48px;
-    height: 48px;
+    height: 32px;
     background: white;
     border: 2px solid #e2e8f0;
     border-radius: 8px;

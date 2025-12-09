@@ -119,6 +119,9 @@ class DealBlockParser extends BaseBlockParser
                 $data['openInNewTab'] ?? false
             ),
             'context' => $data['context'] ?? 'default',
+            'product_id' => $data['product_id'] ?? null,
+            'variant_id' => $data['variant_id'] ?? null,
+            'opted_out_product_match' => (bool)($data['opted_out_product_match'] ?? false),
         ];
     }
 

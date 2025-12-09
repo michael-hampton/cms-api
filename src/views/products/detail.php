@@ -845,6 +845,14 @@
             display: grid;
             gap: 0.5rem;
         }
+
+        .btn-wishlist {
+            width: 228px !important;
+        }
+
+        .badge-sale {
+            width: 65px;
+        }
     </style>
 </head>
 <body>
@@ -852,12 +860,14 @@
     <!-- Header -->
     @include('header', ['menu' => $menu, 'menuRenderer' => $menuRenderer, 'title' => 'Shop'])]
 
-
-    @include('member-badge')
-
     <!-- Product Detail -->
     <main class="main-content">
         <div class="container">
+            <div style="display: flex; justify-content: space-between;">
+                @include('components/price-alert')
+                @include('member-badge')
+            </div>
+
             <!-- Breadcrumb -->
             <div class="breadcrumb" style="margin-bottom: 1rem;">
                 <div class="container">
@@ -1818,8 +1828,6 @@ $merchants = json_encode(array_map(function($m) {
 
 @js('product-reviews.js')
 @js('product-detail.js')
-
-@include('components/price-alert')
 
 @css('price-alert.css')
 @js('price-alert.js')

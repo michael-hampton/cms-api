@@ -1309,4 +1309,58 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(99.99, $history->price);
         $this->assertEquals(79.99, $history->sale_price);
     }
+
+    public function test_get_product_pages_returns_pages_with_product_blocks(): void
+    {
+        $product = $this->createProduct();
+        $page1 = $this->createPage(['title' => 'Review Page']);
+        $page2 = $this->createPage(['title' => 'Deal Page']);
+
+        $this->createBlock($page1->id, ['type' => 'product', 'data' => [
+            'product_id' => $product->id,
+            'name' => 'Test Product'
+        ]]);
+
+        $this->createBlock($page2->id, ['type' => 'deal', 'data' => [
+            'product_id' => $product->id,
+            'productName' => 'Test Product'
+        ]]);
+
+        $pages = $this->repository->getProductPages($product->id);
+
+        $this->assertCount(2, $pages);
+        $pageTitles = $pages->pluck('title')->toArray();
+        $this->assertContains('Review Page', $pageTitles);
+        $this->assertContains('Deal Page', $pageTitles);
+    }
+
+    public function test_get_product_pages_includes_comparison_blocks(): void
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+        $page = $this->createPage(['title' => 'Comparison']);
+
+        $this->createBlock($page->id, ['type' => 'product-comparison', 'data' => [
+            'product_a_id' => $product1->id,
+            'product_b_id' => $product2->id,
+            'productA' => 'Product A',
+            'productB' => 'Product B'
+        ]]);
+
+        $pagesForProduct1 = $this->repository->getProductPages($product1->id);
+        $pagesForProduct2 = $this->repository->getProductPages($product2->id);
+
+        $this->assertCount(1, $pagesForProduct1);
+        $this->assertCount(1, $pagesForProduct2);
+        $this->assertEquals($page->id, $pagesForProduct1->first()->id);
+    }
+
+    public function test_get_product_pages_returns_empty_when_no_references(): void
+    {
+        $product = $this->createProduct();
+
+        $pages = $this->repository->getProductPages($product->id);
+
+        $this->assertCount(0, $pages);
+    }
 }

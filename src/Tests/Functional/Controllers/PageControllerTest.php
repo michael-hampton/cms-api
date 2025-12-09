@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Page;
 use App\Models\PageAuthor;
 use App\Models\PageHistory;
+use App\Models\Product;
 use App\Models\Site;
 use App\Models\Tag;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -2009,5 +2010,213 @@ class PageControllerTest extends FunctionalTestCase
         // Cloned page should have the current user as creator
         $this->assertEquals(1, $data['data']['page']['created_by']);
         $this->assertEquals(1, $data['data']['page']['updated_by']);
+    }
+
+    public function testStoreWithProductBlockCreatesProduct()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Product Page'],
+                'meta' => ['slug' => 'product-page', 'status' => 'draft']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'product',
+                    'name' => 'New Product',
+                    'productName' => 'New Product',
+                    'brand' => 'Test Brand',
+                    'price' => 99.99,
+                    'salePrice' => 79.99,
+                    'description' => 'Test description',
+                    'link' => 'https://example.com',
+                    'image' => ['src' => 'https://example.com/image.jpg'],
+                    'currency' => '$',
+                    'linkText' => 'Buy Now',
+                    'displayAs' => 'button',
+                    'layout' => 'standard'
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify product was created
+        $blockData = $data['data']['page']['blocks'][0]['data'];
+        $this->assertNotNull($blockData['product_id']);
+
+        // Verify product exists in database
+        $product = Product::find($blockData['product_id']);
+        $this->assertNotNull($product);
+        $this->assertEquals('New Product', $product->name);
+    }
+
+    public function testStoreWithProductBlockMatchesExistingProduct()
+    {
+        $existingProduct = $this->createProduct([
+            'name' => 'Existing Product',
+            'brand' => 'Test Brand',
+            'site_id' => $this->siteId
+        ]);
+
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Product Page'],
+                'meta' => ['slug' => 'product-page', 'status' => 'draft']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'product',
+                    'name' => 'Existing Product',
+                    'productName' => 'Existing Product',
+                    'brand' => 'Test Brand',
+                    'price' => 99.99,
+                    'salePrice' => 79.99,
+                    'link' => 'https://example.com',
+                    'image' => ['src' => 'https://example.com/image.jpg'],
+                    'currency' => '$',
+                    'linkText' => 'Buy Now',
+                    'displayAs' => 'button',
+                    'layout' => 'standard'
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify existing product was matched
+        $blockData = $data['data']['page']['blocks'][0]['data'];
+        $this->assertEquals($existingProduct->id, $blockData['product_id']);
+    }
+
+    public function testStoreWithProductBlockOptedOutDoesNotCreateProduct()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Product Page'],
+                'meta' => ['slug' => 'product-page', 'status' => 'draft']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'product',
+                    'name' => 'Manual Product',
+                    'productName' => 'Manual Product',
+                    'price' => 99.99,
+                    'link' => 'https://example.com',
+                    'image' => ['src' => 'https://example.com/image.jpg'],
+                    'currency' => '$',
+                    'linkText' => 'Buy Now',
+                    'displayAs' => 'button',
+                    'layout' => 'standard',
+                    'opted_out_product_match' => true
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify no product was created
+        $blockData = $data['data']['page']['blocks'][0]['data'];
+
+        $this->assertEmpty($blockData['product_id']);
+    }
+
+    public function testStoreWithDealBlockCreatesProduct()
+    {
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Deal Page'],
+                'meta' => ['slug' => 'deal-page', 'status' => 'draft']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'deal',
+                    'title' => 'Great Deal',
+                    'productName' => 'Deal Product',
+                    'brand' => 'Test Brand',
+                    'price' => 199.99,
+                    'salePrice' => 149.99,
+                    'description' => 'Amazing deal',
+                    'link' => 'https://example.com',
+                    'image' => ['src' => 'https://example.com/image.jpg'],
+                    'currency' => '$',
+                    'noFollow' => false,
+                    'sponsored' => false,
+                    'openInNewTab' => true,
+                    'showDealButton' => true,
+                    'starBlock' => false
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify product was created
+        $blockData = $data['data']['page']['blocks'][0]['data'];
+        $this->assertNotNull($blockData['product_id']);
+
+        // Verify product exists
+        $product = Product::find($blockData['product_id']);
+        $this->assertNotNull($product);
+        $this->assertEquals('Deal Product', $product->name);
+    }
+
+    public function testStoreWithDealBlockMatchesExistingProduct()
+    {
+        $existingProduct = $this->createProduct([
+            'name' => 'Deal Product',
+            'brand' => 'Test Brand',
+            'site_id' => $this->siteId
+        ]);
+
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => ['title' => 'Deal Page'],
+                'meta' => ['slug' => 'deal-page', 'status' => 'draft']
+            ],
+            'blocks' => [
+                [
+                    'type' => 'deal',
+                    'title' => 'Great Deal',
+                    'productName' => 'Deal Product',
+                    'brand' => 'Test Brand',
+                    'price' => 199.99,
+                    'salePrice' => 149.99,
+                    'link' => 'https://example.com',
+                    'image' => ['src' => 'https://example.com/image.jpg'],
+                    'currency' => '$',
+                    'noFollow' => false,
+                    'sponsored' => false,
+                    'openInNewTab' => true,
+                    'showDealButton' => true,
+                    'starBlock' => false
+                ]
+            ]
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Verify existing product was matched
+        $blockData = $data['data']['page']['blocks'][0]['data'];
+        $this->assertEquals($existingProduct->id, $blockData['product_id']);
     }
 }

@@ -33,7 +33,7 @@ class ProductMatchingService
 
         foreach ($products as $product) {
 
-            if ($product->name == $productName || $products->count() == 1) {
+            if ($product->name == $productName) {
                 $matches[] = [
                     'product' => $product,
                     'similarity' => 8,

@@ -45,7 +45,9 @@ class ProductComparisonBlockParser extends BaseBlockParser
             'productB' => trim($data['productB'] ?? ''),
             'comparisons' => $comparisons,
             'comparison_count' => count($comparisons),
-            'total_word_count' => $this->calculateTotalWordCount($comparisons)
+            'total_word_count' => $this->calculateTotalWordCount($comparisons),
+            'product_a_id' => $data['product_a_id'] ?? null,
+            'product_b_id' => $data['product_b_id'] ?? null,
         ];
     }
 

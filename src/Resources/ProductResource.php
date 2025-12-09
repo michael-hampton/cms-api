@@ -47,16 +47,16 @@ class ProductResource extends JsonResource
             // Relationships
             'brand' => $this->whenLoaded('brand', function () {
                 return [
-                    'id' => $this->brand->id,
-                    'name' => $this->brand->name,
-                    'slug' => $this->brand->slug
+                    'id' => $this->brand['id'],
+                    'name' => $this->brand['name'],
+                    'slug' => $this->brand['slug'],
                 ];
             }),
             'category' => $this->whenLoaded('category', function () {
                 return [
-                    'id' => $this->category->id,
-                    'name' => $this->category->name,
-                    'slug' => $this->category->slug
+                    'id' => $this->category['id'],
+                    'name' => $this->category['name'],
+                    'slug' => $this->category['slug'],
                 ];
             }),
             'images' => $this->whenLoaded('images', function ($images) {

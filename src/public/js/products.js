@@ -270,9 +270,9 @@
         });
 
         // Wishlist buttons
-        document.querySelectorAll('.btn-wishlist').forEach(btn => {
+        /*document.querySelectorAll('.btn-wishlist').forEach(btn => {
             btn.addEventListener('click', handleToggleWishlist);
-        });
+        });*/
     }
 
     // Attach flip card event listeners

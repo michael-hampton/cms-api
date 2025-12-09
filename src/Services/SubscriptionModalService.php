@@ -32,7 +32,7 @@ class SubscriptionModalService
     public function shouldShowModal(?Member $member, int $siteId): bool
     {
         if (!$member) {
-            return true; //todo check on ip
+            return true;
         }
 
         // Check if member should see the modal

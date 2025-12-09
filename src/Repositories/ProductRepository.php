@@ -4,8 +4,10 @@ namespace App\Repositories;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
+use App\Models\Block;
 use App\Models\Merchant;
 use App\Models\Model;
+use App\Models\Page;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
@@ -30,7 +32,17 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = Product::with(['activeVariants', 'availableMerchants', 'images', 'specifications', 'priceHistory', 'activeVariants.images', 'availableMerchants.merchant']);
+        $query = Product::with([
+            'activeVariants',
+            'availableMerchants',
+            'images',
+            'specifications',
+            'priceHistory',
+            'activeVariants.images',
+            'availableMerchants.merchant',
+            'brand',
+            'category'
+        ]);
         return $this->searchEngine->search($query, $criteria);
     }
 
@@ -458,10 +470,12 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             });
     }
 
-    public function searchByName(string $name, int $siteId, int $limit = 10): Collection
+    public function searchByName(string $name, ?int $siteId, int $limit = 10): Collection
     {
-        return Product::where('site_id', $siteId)
-            ->where('is_active', true)
+        return Product::where('is_active', true)
+            ->when($siteId, function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            })
             ->where(function ($query) use ($name) {
                 $query->where('name', 'LIKE', "%{$name}%")
                     ->orWhere('name', 'LIKE', "%" . str_replace(' ', '%', $name) . "%");
@@ -469,4 +483,38 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->limit($limit)
             ->get();
     }
+
+    public function getProductPages(int $productId): Collection
+    {
+        // Fetch only blocks we care about by type (much cheaper than scanning everything)
+        $blocks = Block::whereIn('type', [
+            'product',
+            'deal',
+            'product-comparison',
+        ])->get();
+
+        // Filter manually in PHP
+        $filtered = $blocks->filter(function (Block $block) use ($productId) {
+            $data = $block->data ?? [];
+
+            return match ($block->type) {
+                'product' => ($data['product_id'] ?? null) == $productId,
+                'deal' => ($data['product_id'] ?? null) == $productId,
+
+                'product-comparison' =>
+                    ($data['product_a_id'] ?? null) == $productId ||
+                    ($data['product_b_id'] ?? null) == $productId,
+
+                default => false,
+            };
+        });
+
+        // Extract unique page IDs
+        $pageIds = $filtered->pluck('page_id')->unique()->toArray();
+
+        return Page::whereIn('id', $pageIds)
+            ->orderBy('updated_at', 'desc')
+            ->get();
+    }
+
 }

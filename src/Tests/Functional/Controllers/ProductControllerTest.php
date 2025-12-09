@@ -1570,4 +1570,89 @@ class ProductControllerTest extends FunctionalTestCase
         // Should still succeed because price defaults to 0, but in real scenario you might want validation
         $this->assertEquals(422, $response->getStatusCode());
     }
+
+    public function testGetProductPages(): void
+    {
+        $product = $this->createProduct(['name' => 'iPhone 15']);
+
+        // Create page with product block
+        $page1 = $this->createPage(['title' => 'iPhone Review']);
+        $this->createBlock($page1->id, ['type' => 'product', 'data' => [
+            'product_id' => $product->id,
+            'name' => 'iPhone 15',
+            'price' => 999
+        ]]);
+
+        // Create page with deal block
+        $page2 = $this->createPage(['title' => 'Best Phone Deals']);
+        $this->createBlock($page2->id, ['type' => 'deal', 'data' => [
+            'product_id' => $product->id,
+            'productName' => 'iPhone 15',
+            'price' => 999
+        ]]);
+
+        // Create page with comparison block
+        $product2 = $this->createProduct(['name' => 'Samsung S24']);
+        $page3 = $this->createPage(['title' => 'Phone Comparison']);
+        $this->createBlock($page3->id, ['type' => 'product-comparison', 'data' => [
+            'product_a_id' => $product->id,
+            'product_b_id' => $product2->id,
+            'productA' => 'iPhone 15',
+            'productB' => 'Samsung S24'
+        ]]);
+
+        $response = $this->getForSite("/api/products/{$product->id}/pages");
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(3, $data['pages']);
+
+        // Verify page details
+        $pageTitles = array_column($data['pages'], 'title');
+        $this->assertContains('iPhone Review', $pageTitles);
+        $this->assertContains('Best Phone Deals', $pageTitles);
+        $this->assertContains('Phone Comparison', $pageTitles);
+    }
+
+    public function testGetProductPagesReturnsEmptyWhenNoPages(): void
+    {
+        $product = $this->createProduct();
+
+        $response = $this->getForSite("/api/products/{$product->id}/pages");
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(0, $data['pages']);
+    }
+
+    public function testGetProductPagesIncludesBlockTypes(): void
+    {
+        $product = $this->createProduct();
+        $page = $this->createPage(['title' => 'Mixed Content']);
+
+        $this->createBlock($page->id, ['type' => 'product', 'data' => [
+            'product_id' => $product->id,
+            'name' => 'Test Product',
+            'price' => 99
+        ]]);
+
+        $this->createBlock($page->id, ['type' => 'deal', 'data' => [
+            'product_id' => $product->id,
+            'productName' => 'Test Product',
+            'price' => 89
+        ]]);
+
+        $response = $this->getForSite("/api/products/{$product->id}/pages");
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $pageData = $data['pages'][0];
+
+        $this->assertArrayHasKey('type', $pageData);
+        $this->assertIsArray($pageData['type']);
+        $this->assertContains('product', $pageData['type']);
+        $this->assertContains('deal', $pageData['type']);
+    }
 }

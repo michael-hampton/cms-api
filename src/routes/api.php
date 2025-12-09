@@ -116,6 +116,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'createSubscriptionPayment']);
 
         $router->post('/products/find-matches', [ProductMatchingController::class, 'findMatches']);
+        $router->get('/products/{id}/pages', [ProductController::class, 'pages']);
 
         // Approval workflow routes
         $router->post('/pages/{id}/approve', PageController::class, 'approve');

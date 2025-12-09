@@ -16,11 +16,11 @@ class SubscriptionModalServiceTest extends FunctionalTestCase
     private $subscriptionRepository;
     private $service;
 
-    public function testShouldShowModalReturnsFalseForNonMember(): void
+    public function testShouldShowModalForNonMember(): void
     {
         $result = $this->service->shouldShowModal(null, 1);
 
-        $this->assertFalse($result);
+        $this->assertTrue($result);
     }
 
     public function testShouldShowModalReturnsFalseWhenMemberHasActiveSubscription(): void

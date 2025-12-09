@@ -296,4 +296,37 @@ class ProductController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    public function pages(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+
+            $pages = $this->productRepository->getProductPages($id);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'pages' => $pages->map(fn($page) => [
+                    'id' => $page->id,
+                    'title' => $page->title,
+                    'slug' => $page->slug,
+                    'type' => $this->extractBlockType($page->blocks),
+                    'block_count' => $page->blocks->count(),
+                    'status' => $page->status,
+                    'created_at' => $page->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $page->updated_at->format('Y-m-d H:i:s')
+                ])->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    private function extractBlockType($blocks): array
+    {
+        return $blocks
+            ->whereIn('type', ['product', 'deal'])
+            ->pluck('type')
+            ->unique()
+            ->toArray();
+    }
 }
