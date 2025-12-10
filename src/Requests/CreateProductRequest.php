@@ -49,7 +49,7 @@ class CreateProductRequest extends FormRequest
 
             // Specifications
             'specifications' => ['nullable', 'array'],
-            'specifications.*.category' => ['required', 'string'],
+            'specifications.*.category' => ['nullable', 'string'],
             'specifications.*.key' => ['required', 'string'],
             'specifications.*.value' => ['required', 'string'],
             'specifications.*.sort_order' => ['integer'],

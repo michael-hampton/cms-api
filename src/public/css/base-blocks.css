@@ -467,6 +467,9 @@ body {
     margin: var(--spacing-xl) 0;
     overflow: hidden;
     border: 2px solid var(--primary-color);
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .deal-block::before {
@@ -1340,6 +1343,16 @@ body {
 /*!* ============================================*/
 /*   PRODUCT BLOCK STYLES*/
 /*   ============================================ *!*/
+
+.product-card-container {
+    /* Use max-width and margin: auto to control size and center it */
+    max-width: 1300px; /* Optional: If you want to limit the width of the container */
+    margin-left: auto;
+    margin-right: auto;
+
+    /* Add padding to prevent the card from touching screen edges on mobile */
+    padding: 0 15px;
+}
 
 /*.product-block {*/
 /*    display: flex;*/
@@ -6751,6 +6764,8 @@ nav.header-nav ul {
     height: 100%;
     transition: transform 0.6s;
     transform-style: preserve-3d;
+    border-radius: 12px; /* Rounded corners for the entire card */
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15); /* New, cleaner shadow */
 }
 
 .product-card.flipped .product-card-inner {
@@ -6762,18 +6777,16 @@ nav.header-nav ul {
     position: absolute;
     width: 100%;
     height: 100%;
-    min-height: 520px;
-    backface-visibility: hidden;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    backface-visibility: hidden; /* Hides the back during flip */
+    background: #fff;
+    border-radius: 12px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column; /* Allows content, price, and button to stack */
 }
 
 .product-card-back {
     transform: rotateY(180deg);
-    display: flex;
-    flex-direction: column;
 }
 
 .product-card-front {
@@ -6784,11 +6797,52 @@ nav.header-nav ul {
 /* Card Actions Container (Flip + Wishlist) */
 .product-card-actions-top {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 5;
+    top: 15px;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+}
+
+.product-badge-best-value {
+    background: #FFD700; /* Gold/Yellow for 'Best Value' */
+    color: #333;
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 0.85em;
+    text-transform: uppercase;
+}
+
+.action-buttons-group {
     display: flex;
     gap: 8px;
+}
+
+.product-card-actions-top button {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.product-card-actions-top button:hover {
+    background: #fff;
+}
+
+.product-card-actions-top svg {
+    width: 20px;
+    height: 20px;
+    color: #333;
 }
 
 .product-card-actions-top .btn-flip {
@@ -6884,6 +6938,15 @@ nav.header-nav ul {
     /*align-items: center;*/
     /*justify-content: center;*/
     overflow: visible;
+}
+
+.product-card-container .product-image {
+    width: 100%;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+    max-height: 50%; /* Ensures image area is prominent */
+    min-height: 250px;
 }
 
 .product-card-front .product-image img {
@@ -7317,12 +7380,18 @@ body.card-flipped {
 }
 
 .product-card {
+    /* Retains original fixed size and 3D properties */
+    width: 400px;
+    height: 600px;
     perspective: 1000px;
-    height: 580px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
+    position: relative;
+    box-shadow: none !important;
+
+    /* New: If the container isn't a flex container, ensure the card is centered
+       horizontally by using margin: auto on the card itself,
+       as it now has a defined width. */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .product-card:hover {
@@ -7358,6 +7427,527 @@ body.card-flipped {
     border-radius: 10px;
     min-width: 18px;
     text-align: center;
+}
+
+/* ============================================
+   ACCORDION THEMES
+   ============================================ */
+
+/* Base Accordion Styles (shared across all themes) */
+.accordion-block {
+    margin: 2rem 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.accordion-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 1rem 0;
+    color: inherit;
+}
+
+.accordion-intro {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    color: inherit;
+    opacity: 0.9;
+}
+
+.accordion-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.accordion-item {
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.accordion-item-hidden {
+    display: none;
+}
+
+.accordion-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: left;
+    transition: all 0.3s ease;
+}
+
+.accordion-question {
+    flex: 1;
+    padding-right: 1rem;
+}
+
+.accordion-icon {
+    font-size: 0.875rem;
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+}
+
+.accordion-header[aria-expanded="true"] .accordion-icon {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.accordion-answer {
+    padding: 0 1.5rem 1.5rem 1.5rem;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+}
+
+.accordion-load-more-container {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.accordion-load-more-btn {
+    background: none;
+    border: 2px solid currentColor;
+    border-radius: 8px;
+    padding: 0.875rem 2rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* ============================================
+   THEME: LIGHT (Default)
+   ============================================ */
+.accordion-theme-light {
+    color: #1e293b;
+}
+
+.accordion-theme-light .accordion-item {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+
+.accordion-theme-light .accordion-item:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.accordion-theme-light .accordion-header {
+    color: #1e293b;
+}
+
+.accordion-theme-light .accordion-header:hover {
+    background: #f8fafc;
+}
+
+.accordion-theme-light .accordion-header[aria-expanded="true"] {
+    background: #f1f5f9;
+    color: #3b82f6;
+}
+
+.accordion-theme-light .accordion-answer {
+    color: #475569;
+    background: #f8fafc;
+}
+
+.accordion-theme-light .accordion-load-more-btn {
+    color: #3b82f6;
+    background: white;
+}
+
+.accordion-theme-light .accordion-load-more-btn:hover {
+    background: #3b82f6;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* ============================================
+   THEME: DARK
+   ============================================ */
+.accordion-theme-dark {
+    color: #f1f5f9;
+}
+
+.accordion-theme-dark .accordion-title {
+    color: #ffffff;
+}
+
+.accordion-theme-dark .accordion-intro {
+    color: #cbd5e1;
+}
+
+.accordion-theme-dark .accordion-item {
+    background: #1e293b;
+    border: 1px solid #334155;
+}
+
+.accordion-theme-dark .accordion-item:hover {
+    border-color: #475569;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.accordion-theme-dark .accordion-header {
+    color: #f1f5f9;
+}
+
+.accordion-theme-dark .accordion-header:hover {
+    background: #334155;
+}
+
+.accordion-theme-dark .accordion-header[aria-expanded="true"] {
+    background: #475569;
+    color: #60a5fa;
+}
+
+.accordion-theme-dark .accordion-answer {
+    color: #cbd5e1;
+    background: #0f172a;
+}
+
+.accordion-theme-dark .accordion-load-more-btn {
+    color: #60a5fa;
+    background: #1e293b;
+}
+
+.accordion-theme-dark .accordion-load-more-btn:hover {
+    background: #60a5fa;
+    color: #0f172a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3);
+}
+
+/* ============================================
+   THEME: COLORED
+   ============================================ */
+.accordion-theme-colored {
+    color: #1e293b;
+}
+
+.accordion-theme-colored .accordion-item {
+    background: linear-gradient(135deg, #ffffff 0%, #fef3c7 100%);
+    border: 2px solid #fbbf24;
+    position: relative;
+    overflow: hidden;
+}
+
+.accordion-theme-colored .accordion-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+.accordion-theme-colored .accordion-item:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
+    transform: translateX(4px);
+}
+
+.accordion-theme-colored .accordion-header {
+    color: #92400e;
+    padding-left: 2rem;
+}
+
+.accordion-theme-colored .accordion-header:hover {
+    background: rgba(251, 191, 36, 0.1);
+}
+
+.accordion-theme-colored .accordion-header[aria-expanded="true"] {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+    color: #b45309;
+}
+
+.accordion-theme-colored .accordion-icon {
+    color: #f59e0b;
+}
+
+.accordion-theme-colored .accordion-answer {
+    color: #78350f;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    padding-left: 2rem;
+}
+
+.accordion-theme-colored .accordion-load-more-btn {
+    color: #d97706;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-color: #fbbf24;
+}
+
+.accordion-theme-colored .accordion-load-more-btn:hover {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+/* ============================================
+   THEME: MINIMAL
+   ============================================ */
+.accordion-theme-minimal {
+    color: #374151;
+}
+
+.accordion-theme-minimal .accordion-item {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 0;
+}
+
+.accordion-theme-minimal .accordion-item:last-child {
+    border-bottom: none;
+}
+
+.accordion-theme-minimal .accordion-item:hover {
+    background: #f9fafb;
+}
+
+.accordion-theme-minimal .accordion-header {
+    color: #111827;
+    padding: 1rem 0.5rem;
+}
+
+.accordion-theme-minimal .accordion-header:hover {
+    background: transparent;
+    color: #3b82f6;
+}
+
+.accordion-theme-minimal .accordion-header[aria-expanded="true"] {
+    background: transparent;
+    color: #1e40af;
+}
+
+.accordion-theme-minimal .accordion-icon {
+    color: #9ca3af;
+    font-size: 0.75rem;
+}
+
+.accordion-theme-minimal .accordion-answer {
+    color: #6b7280;
+    background: transparent;
+    padding: 0 0.5rem 1rem 0.5rem;
+    border-left: 3px solid #e5e7eb;
+    margin-left: 0.5rem;
+}
+
+.accordion-theme-minimal .accordion-load-more-btn {
+    color: #6b7280;
+    background: transparent;
+    border: 1px solid #d1d5db;
+    padding: 0.75rem 1.5rem;
+}
+
+.accordion-theme-minimal .accordion-load-more-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+    color: #374151;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ============================================
+   SIDEBAR VARIANTS (All Themes)
+   ============================================ */
+.accordion-sidebar {
+    margin: 1rem 0;
+}
+
+.accordion-title-sidebar {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem 0;
+}
+
+.accordion-intro-sidebar {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+
+.accordion-container-sidebar {
+    gap: 0.5rem;
+}
+
+.accordion-item-sidebar {
+    border-radius: 6px;
+}
+
+.accordion-header-sidebar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: left;
+    transition: all 0.3s ease;
+}
+
+.accordion-question-sidebar {
+    flex: 1;
+    padding-right: 0.75rem;
+}
+
+.accordion-icon-sidebar {
+    font-size: 0.75rem;
+    transition: transform 0.3s ease;
+}
+
+.accordion-header-sidebar[aria-expanded="true"] .accordion-icon-sidebar {
+    transform: rotate(180deg);
+}
+
+.accordion-answer-sidebar {
+    padding: 0 1rem 1rem 1rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+}
+
+.accordion-load-more-container-sidebar {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.accordion-load-more-btn-sidebar {
+    background: none;
+    border: 2px solid currentColor;
+    border-radius: 6px;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* Sidebar Theme Adjustments */
+.accordion-theme-light.accordion-sidebar .accordion-item-sidebar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+
+.accordion-theme-dark.accordion-sidebar .accordion-item-sidebar {
+    background: #1e293b;
+    border: 1px solid #334155;
+}
+
+.accordion-theme-colored.accordion-sidebar .accordion-item-sidebar {
+    background: linear-gradient(135deg, #ffffff 0%, #fef3c7 100%);
+    border: 1px solid #fbbf24;
+}
+
+.accordion-theme-minimal.accordion-sidebar .accordion-item-sidebar {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 0;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+@media (max-width: 768px) {
+    .accordion-header {
+        padding: 1rem;
+        font-size: 0.9375rem;
+    }
+
+    .accordion-answer {
+        padding: 0 1rem 1rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .accordion-title {
+        font-size: 1.5rem;
+    }
+
+    .accordion-load-more-btn {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .accordion-header {
+        padding: 0.875rem;
+    }
+
+    .accordion-answer {
+        padding: 0 0.875rem 0.875rem 0.875rem;
+    }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+    .accordion-item {
+        border: 1px solid #000;
+        page-break-inside: avoid;
+    }
+
+    .accordion-header {
+        background: #f5f5f5 !important;
+    }
+
+    .accordion-content {
+        display: block !important;
+    }
+
+    .accordion-icon {
+        display: none;
+    }
+
+    .accordion-load-more-container,
+    .accordion-load-more-container-sidebar {
+        display: none;
+    }
+}
+
+/* ============================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================ */
+.accordion-header:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.accordion-header:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.accordion-header:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .accordion-item,
+    .accordion-header,
+    .accordion-icon,
+    .accordion-content,
+    .accordion-load-more-btn {
+        transition: none;
+    }
 }
 
 

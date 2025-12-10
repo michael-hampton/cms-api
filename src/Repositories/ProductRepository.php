@@ -196,8 +196,8 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 'is_available' => $merchantData['is_available'] ?? true,
                 'variant_id' => $merchantData['variant_id'] ?? null,
                 'variant_sku' => $merchantData['variant_sku'] ?? null,
-                'override_price' => $merchantData['override_price'] ?? 0,
-                'override_sale_price' => $merchantData['override_sale_price'] ?? 0,
+                'override_price' => !empty($merchantData['override_price']) ? $merchantData['override_price'] : 0,
+                'override_sale_price' => !empty($merchantData['override_sale_price']) ? $merchantData['override_sale_price'] : 0,
                 'price' => $merchantData['price'] ?? 0,
                 'sale_price' => $merchantData['sale_price'] ?? null,
             ];
@@ -238,7 +238,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return $this->getProductMerchantsWithDetails($productId);
     }
 
-    public function recordMerchantPriceHistory(int $productId, int $merchantId, float $price, ?float $salePrice = null): ?Model
+    public function recordMerchantPriceHistory(int $productId, int $productMerchantId, float $price, int $merchantId, ?float $salePrice = null): ?Model
     {
         if ($price < 0) {
             return null;
@@ -246,6 +246,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
         return ProductPriceHistory::create([
             'product_id' => $productId,
+            'product_merchant_id' => $productMerchantId,
             'merchant_id' => $merchantId,
             'price' => $price,
             'sale_price' => $salePrice,
@@ -255,10 +256,10 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function getPriceHistory(int $productId, ?int $merchantId = null): Collection
     {
-        $query = ProductPriceHistory::where('product_id', $productId);
+        $query = ProductPriceHistory::with(['merchant'])->where('product_id', $productId);
 
         if ($merchantId !== null) {
-            $query->where('merchant_id', $merchantId);
+            $query->where('product_merchant_id', $merchantId);
         }
 
         return $query->orderBy('recorded_at', 'desc')->get();
@@ -375,7 +376,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
         return ProductPriceHistory::create([
             'product_id' => $product->id,
-            'merchant_id' => null,
+            'product_merchant_id' => null,
             'price' => $product->price,
             'sale_price' => $product->sale_price,
             'recorded_at' => date('Y-m-d H:i:s')

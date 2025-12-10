@@ -8,6 +8,7 @@ class ProductPriceHistory extends Model
 
     protected $fillable = [
         'product_id',
+        'product_merchant_id',
         'merchant_id',
         'price',
         'sale_price',
@@ -25,8 +26,13 @@ class ProductPriceHistory extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function productMerchant()
+    {
+        return $this->belongsTo(ProductMerchant::class, 'product_merchant_id', 'id');
+    }
+
     public function merchant()
     {
-        return $this->belongsTo(ProductMerchant::class);
+        return $this->belongsTo(Merchant::class, 'merchant_id', 'id');
     }
 }

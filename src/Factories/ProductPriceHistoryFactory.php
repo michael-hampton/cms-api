@@ -16,7 +16,7 @@ class ProductPriceHistoryFactory extends Factory
     {
         return [
             'product_id' => 1,
-            'merchant_id' => null,
+            'product_merchant_id' => null,
             'price' => 99.99,
             'recorded_at' => date('Y-m-d H:i:s'),
         ];
@@ -29,7 +29,7 @@ class ProductPriceHistoryFactory extends Factory
 
     public function forMerchant(int $merchantId): static
     {
-        return $this->state(['merchant_id' => $merchantId]);
+        return $this->state(['product_merchant_id' => $merchantId]);
     }
 
     public function priced(float $price): static

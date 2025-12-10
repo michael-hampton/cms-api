@@ -111,18 +111,19 @@ class ProductService
                 return $merchantData;
             }, $merchants);
 
-            $merchantIds = $this->repository->syncMerchants($product->id, $mappedMerchants);
+            $productMerchantIds = $this->repository->syncMerchants($product->id, $mappedMerchants);
 
             // Record price history for each merchant
-            foreach ($merchantIds as $index => $merchantId) {
+            foreach ($productMerchantIds as $index => $productMerchantId) {
                 $merchantData = $mappedMerchants[$index]; // Use mapped data
                 $prices = $this->getEffectiveMerchantPrices($merchantData, $product->id);
 
                 if ($prices['price'] !== null) {
                     $this->repository->recordMerchantPriceHistory(
                         $product->id,
-                        $merchantId,
+                        $productMerchantId,
                         $prices['price'],
+                        $merchantData['id'],
                         $prices['sale_price']
                     );
                 }
@@ -215,12 +216,14 @@ class ProductService
                             $product->id,
                             $merchantId,
                             $newPrices['price'],
+                            $merchantData['id'],
                             $newPrices['sale_price']
                         );
                     }
                 }
             }
         }
+
         if ($variants !== null) {
             $this->repository->syncVariants($product->id, $variants);
         }

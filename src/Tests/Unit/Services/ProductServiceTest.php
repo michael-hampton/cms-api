@@ -7,9 +7,7 @@ use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
 use App\Models\Product;
 use App\Models\ProductImage;
-use App\Models\ProductMerchant;
 use App\Models\ProductPriceHistory;
-use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductViewRepository;
@@ -367,7 +365,7 @@ class ProductServiceTest extends FunctionalTestCase
             'name' => 'Test Product',
             'price' => 99.99,
             'merchants' => [
-                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
+                ['id' => 27, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
             ]
         ];
 
@@ -384,7 +382,7 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 79.99, null);
+            ->with(1, 1, 79.99, 27, null);
 
         $this->repository->shouldReceive('recordPriceHistory')
             ->with($product)
@@ -556,7 +554,7 @@ class ProductServiceTest extends FunctionalTestCase
             ->andReturn(collect([]));
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
-            ->with(1, 1, 89.99, null)
+            ->with(1, 1, 89.99, 1, null)
             ->andReturn(new ProductPriceHistory());
 
         $data = [
@@ -976,8 +974,8 @@ class ProductServiceTest extends FunctionalTestCase
             'name' => 'Test Product',
             'price' => 99.99,
             'merchants' => [
-                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
-                ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true],
+                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true, 'id' => 1],
+                ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true, 'id' => 2],
             ]
         ];
 
@@ -1001,12 +999,12 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 79.99, null)
+            ->with(1, 1, 79.99, 1, null)
             ->andReturn(new ProductPriceHistory(['price' => 79.99]));
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 2, 89.99, null)
+            ->with(1, 2, 89.99, 2, null)
             ->andReturn(new ProductPriceHistory(['price' => 89.99]));
 
         $result = $this->service->createProduct($data);
@@ -1048,7 +1046,7 @@ class ProductServiceTest extends FunctionalTestCase
         // Should only record history for Amazon (price changed)
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 74.99, null)
+            ->with(1, 1, 74.99, 1, null)
             ->andReturn(new ProductPriceHistory(['price' => 74.99]));
 
         $result = $this->service->updateProduct(1, $data);
@@ -1071,7 +1069,7 @@ class ProductServiceTest extends FunctionalTestCase
         $data = [
             'merchants' => [
                 ['id' => 1, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 89.99, 'is_available' => true],
-                ['name' => 'BestBuy', 'url' => 'https://bestbuy.com', 'price' => 85.99, 'is_available' => true], // New merchant
+                ['id' => 2, 'name' => 'BestBuy', 'url' => 'https://bestbuy.com', 'price' => 85.99, 'is_available' => true], // New merchant
             ]
         ];
 
@@ -1081,12 +1079,12 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 89.99, null);
+            ->with(1, 1, 89.99, 1, null);
 
         // Should record history for new merchant
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 3, 85.99, null);
+            ->with(1, 3, 85.99, 2, null);
 
         $result = $this->service->updateProduct(1, $data);
 
@@ -1346,7 +1344,8 @@ class ProductServiceTest extends FunctionalTestCase
                     'override_sale_price' => false,
                     'variant_id' => 1, // Will be resolved after variant creation
                     'variant_sku' => 'AMZN-VAR-001',
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => 1
                 ],
             ]
         ];
@@ -1381,7 +1380,7 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 115, 100);
+            ->with(1, 1, 115, 1, 100);
 
         $result = $this->service->createProduct($data);
 
@@ -1446,7 +1445,7 @@ class ProductServiceTest extends FunctionalTestCase
         // Should record history because effective price changed from 110 to 120
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 120, null);
+            ->with(1, 1, 120, 1, null);
 
         $result = $this->service->updateProduct(1, $data);
 
@@ -1495,7 +1494,8 @@ class ProductServiceTest extends FunctionalTestCase
                     'price' => 979, // Override price
                     'override_price' => true,
                     'variant_id' => 1,
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => 1
                 ],
                 [
                     'name' => 'BestBuy',
@@ -1503,7 +1503,8 @@ class ProductServiceTest extends FunctionalTestCase
                     'price' => 999, // Use variant price
                     'override_price' => false,
                     'variant_id' => 1,
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => 2
                 ],
             ]
         ];
@@ -1535,12 +1536,12 @@ class ProductServiceTest extends FunctionalTestCase
         // Amazon should record override price
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 979, 949);
+            ->with(1, 1, 979, 1, 949);
 
         // BestBuy should record variant price (999)
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 2, 999, 949);
+            ->with(1, 2, 999, 2, 949);
 
         $result = $this->service->createProduct($data);
 
@@ -1609,7 +1610,8 @@ class ProductServiceTest extends FunctionalTestCase
                     'price' => 105,
                     'override_price' => true,
                     'variant_id' => 1, // Form index (1-indexed)
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => 1
                 ],
                 [
                     'name' => 'Amazon',
@@ -1617,7 +1619,8 @@ class ProductServiceTest extends FunctionalTestCase
                     'price' => 115,
                     'override_price' => true,
                     'variant_id' => 2, // Form index (1-indexed)
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => 2
                 ],
             ]
         ];

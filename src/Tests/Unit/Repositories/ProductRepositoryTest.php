@@ -24,7 +24,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->repository = new ProductRepository();
     }
 
-    /** @test */
     public function test_it_can_search_products_with_relationships(): void
     {
         // Arrange
@@ -46,7 +45,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertNotEmpty($foundProduct['availableMerchants']);
     }
 
-    /** @test */
     public function test_find_by_slug_returns_correct_product(): void
     {
         // Arrange
@@ -61,7 +59,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals('unique-product-slug', $found->slug);
     }
 
-    /** @test */
     public function test_find_by_slug_returns_null_when_not_found(): void
     {
         // Act
@@ -71,7 +68,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertNull($found);
     }
 
-    /** @test */
     public function test_find_by_slug_and_site_filters_by_site(): void
     {
         $site = $this->createSite();
@@ -87,7 +83,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals($this->siteId, $found->site_id);
     }
 
-    /** @test */
     public function test_sync_images_removes_old_and_adds_new(): void
     {
         // Arrange
@@ -134,7 +129,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_sync_images_handles_variant_images(): void
     {
         // Arrange
@@ -162,7 +156,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_get_images_returns_sorted_images(): void
     {
         // Arrange
@@ -182,7 +175,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals('image-2.jpg', $images[2]['url']);
     }
 
-    /** @test */
     public function test_sync_merchants_updates_existing_and_creates_new(): void
     {
         // Arrange
@@ -233,7 +225,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($ebay);
     }
 
-    /** @test */
     public function test_sync_merchants_handles_variant_specific_merchants(): void
     {
         // Arrange
@@ -264,47 +255,46 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_record_merchant_price_history_creates_record(): void
     {
         // Arrange
         $product = $this->createProduct();
-        $merchant = $this->createProductMerchant($product->id);
+        $merchant = $this->createMerchant();
+        $productMerchant = $this->createProductMerchant($product->id);
 
         // Act
-        $history = $this->repository->recordMerchantPriceHistory($product->id, $merchant->id, 99.99);
+        $history = $this->repository->recordMerchantPriceHistory($product->id, $productMerchant->id, 99.99, $merchant->id);
 
         // Assert
         $this->assertNotNull($history);
         $this->assertEquals($product->id, $history->product_id);
-        $this->assertEquals($merchant->id, $history->merchant_id);
+        $this->assertEquals($merchant->id, $history->product_merchant_id);
         $this->assertEquals(99.99, $history->price);
         $this->assertDatabaseHas('product_price_history', [
             'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
+            'product_merchant_id' => $merchant->id,
             'price' => 99.99
         ]);
     }
 
-    /** @test */
     public function test_record_merchant_price_history_rejects_negative_price(): void
     {
         // Arrange
         $product = $this->createProduct();
-        $merchant = $this->createProductMerchant($product->id);
+        $merchant = $this->createMerchant();
+        $productMerchant = $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
 
         // Act
-        $history = $this->repository->recordMerchantPriceHistory($product->id, $merchant->id, -10.00);
+        $history = $this->repository->recordMerchantPriceHistory($product->id, $productMerchant->id, -10.00, $merchant->id);
 
         // Assert
         $this->assertNull($history);
         $this->assertDatabaseMissing('product_price_history', [
             'product_id' => $product->id,
-            'merchant_id' => $merchant->id
+            'product_merchant_id' => $merchant->id
         ]);
     }
 
-    /** @test */
     public function test_get_price_history_returns_all_for_product(): void
     {
         $merchant1 = $this->createMerchant(['name' => 'Amazon']);
@@ -312,11 +302,11 @@ class ProductRepositoryTest extends RepositoryTestCase
 
         // Arrange
         $product = $this->createProduct();
-        $merchant1 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
-        $merchant2 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant2->id]);
+        $productMerchant1 = $this->createProductMerchant($product->id, ['product_merchant_id' => $merchant1->id]);
+        $productMerchant2 = $this->createProductMerchant($product->id, ['product_merchant_id' => $merchant2->id]);
 
-        $this->repository->recordMerchantPriceHistory($product->id, $merchant1->id, 99.99);
-        $this->repository->recordMerchantPriceHistory($product->id, $merchant2->id, 89.99);
+        $this->repository->recordMerchantPriceHistory($product->id, $productMerchant1->id, 99.99, $merchant1->id);
+        $this->repository->recordMerchantPriceHistory($product->id, $productMerchant2->id, 89.99, $merchant2->id);;
 
         // Act
         $history = $this->repository->getPriceHistory($product->id);
@@ -325,7 +315,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertCount(2, $history);
     }
 
-    /** @test */
     public function test_get_price_history_filters_by_merchant(): void
     {
         $merchant1 = $this->createMerchant(['name' => 'Amazon']);
@@ -333,21 +322,20 @@ class ProductRepositoryTest extends RepositoryTestCase
 
         // Arrange
         $product = $this->createProduct();
-        $merchant1 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
-        $merchant2 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant2->id]);
+        $productMerchant1 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
+        $productMerchant2 = $this->createProductMerchant($product->id, ['merchant_id' => $merchant2->id]);
 
-        $this->repository->recordMerchantPriceHistory($product->id, $merchant1->id, 99.99);
-        $this->repository->recordMerchantPriceHistory($product->id, $merchant2->id, 89.99);
+        $this->repository->recordMerchantPriceHistory($product->id, $productMerchant1->id, 99.99, $merchant1->id);
+        $this->repository->recordMerchantPriceHistory($product->id, $productMerchant2->id, 89.99, $merchant2->id);
 
         // Act
         $history = $this->repository->getPriceHistory($product->id, $merchant1->id);
 
         // Assert
         $this->assertCount(1, $history);
-        $this->assertEquals($merchant1->id, $history->first()->merchant_id);
+        $this->assertEquals($merchant1->id, $history->first()->product_merchant_id);
     }
 
-    /** @test */
     public function test_get_merchants_returns_all_product_merchants(): void
     {
         $merchant1 = $this->createMerchant(['name' => 'Amazon']);
@@ -365,7 +353,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertCount(2, $merchants);
     }
 
-    /** @test */
     public function test_delete_merchants_removes_all_merchants(): void
     {
         // Arrange
@@ -381,7 +368,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $count);
     }
 
-    /** @test */
     public function test_sync_variants_removes_old_and_adds_new(): void
     {
         // Arrange
@@ -428,7 +414,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_sync_variants_with_images_creates_variant_images(): void
     {
         // Arrange
@@ -465,7 +450,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_sync_variant_images_replaces_existing_images(): void
     {
         // Arrange
@@ -502,7 +486,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_get_variant_images_returns_sorted_images(): void
     {
         // Arrange
@@ -531,7 +514,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals('image-2.jpg', $images[1]['url']);
     }
 
-    /** @test */
     public function test_delete_variant_images_removes_all_images(): void
     {
         // Arrange
@@ -549,7 +531,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $count);
     }
 
-    /** @test */
     public function test_get_variants_returns_all_product_variants(): void
     {
         // Arrange
@@ -564,7 +545,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertCount(2, $variants);
     }
 
-    /** @test */
     public function test_delete_variants_removes_all_variants(): void
     {
         // Arrange
@@ -580,7 +560,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $count);
     }
 
-    /** @test */
     public function test_sync_specifications_replaces_all_specs(): void
     {
         // Arrange
@@ -629,7 +608,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_get_specifications_returns_sorted_specs(): void
     {
         // Arrange
@@ -663,7 +641,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals('spec_2', $specs[2]['key']);
     }
 
-    /** @test */
     public function test_delete_specifications_removes_all_specs(): void
     {
         // Arrange
@@ -679,7 +656,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $count);
     }
 
-    /** @test */
     public function test_record_price_history_creates_record_for_product(): void
     {
         // Arrange
@@ -696,7 +672,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(79.99, $history->sale_price);
     }
 
-    /** @test */
     public function test_record_price_history_rejects_negative_prices(): void
     {
         // Arrange
@@ -709,15 +684,15 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertNull($history);
     }
 
-    /** @test */
     public function test_delete_price_history_removes_all_history(): void
     {
         // Arrange
         $product = $this->createProduct();
-        $merchant = $this->createProductMerchant($product->id);
+        $merchant = $this->createMerchant();
+        $productMerchant = $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
 
-        $this->repository->recordMerchantPriceHistory($product->id, $merchant->id, 99.99);
-        $this->repository->recordMerchantPriceHistory($product->id, $merchant->id, 89.99);
+        $this->repository->recordMerchantPriceHistory($product->id, $productMerchant->id, 99.99, $merchant->id);
+        $this->repository->recordMerchantPriceHistory($product->id, $productMerchant->id, 89.99, $merchant->id);
 
         // Act
         $this->repository->deletePriceHistory($product->id);
@@ -727,7 +702,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $count);
     }
 
-    /** @test */
     public function test_find_related_excludes_current_product(): void
     {
         // Arrange
@@ -745,7 +719,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         }
     }
 
-    /** @test */
     public function test_find_related_only_returns_active_products(): void
     {
         // Arrange
@@ -763,7 +736,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         }
     }
 
-    /** @test */
     public function test_find_related_respects_limit(): void
     {
         // Arrange
@@ -782,7 +754,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertLessThanOrEqual(5, $related->count());
     }
 
-    /** @test */
     public function test_get_recently_viewed_returns_active_products_in_order(): void
     {
         // Arrange
@@ -802,7 +773,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         }
     }
 
-    /** @test */
     public function test_get_recently_viewed_returns_empty_collection_for_empty_array(): void
     {
         // Act
@@ -813,7 +783,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertCount(0, $viewed);
     }
 
-    /** @test */
     public function test_get_recently_viewed_respects_limit(): void
     {
         // Arrange
@@ -964,7 +933,6 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(99.99, $merchants->first()['price']);
     }
 
-    /** @test */
     public function test_sync_images_updates_primary_flag(): void
     {
         // Arrange
@@ -1292,20 +1260,22 @@ class ProductRepositoryTest extends RepositoryTestCase
     {
         // Arrange
         $product = $this->createProduct();
-        $merchant = $this->createProductMerchant($product->id);
+        $merchant = $this->createMerchant();
+        $productMerchant = $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
 
         // Act
         $history = $this->repository->recordMerchantPriceHistory(
             $product->id,
-            $merchant->id,
+            $productMerchant->id,
             99.99,
+            $merchant->id,
             79.99
         );
 
         // Assert
         $this->assertNotNull($history);
         $this->assertEquals($product->id, $history->product_id);
-        $this->assertEquals($merchant->id, $history->merchant_id);
+        $this->assertEquals($merchant->id, $history->product_merchant_id);
         $this->assertEquals(99.99, $history->price);
         $this->assertEquals(79.99, $history->sale_price);
     }

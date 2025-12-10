@@ -379,6 +379,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $category = $this->createCategory(['name' => 'Electronics']);
         $brand = $this->createBrand();
+        $merchant = $this->createMerchant();
 
         $data = [
             'name' => 'Complete Product',
@@ -392,7 +393,7 @@ class ProductControllerTest extends FunctionalTestCase
                 ['url' => 'image2.jpg', 'alt' => 'Image 2', 'is_primary' => false, 'sort_order' => 1],
             ],
             'merchants' => [
-                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
+                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true, 'id' => $merchant->id],
             ],
             'variants' => [
                 ['sku' => 'VAR-001', 'attributes' => ['color' => 'Red'], 'price_modifier' => 0, 'is_active' => true],
@@ -466,6 +467,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $brand = $this->createBrand();
         $category = $this->createCategory(['name' => 'Electronics']);
+        $merchant = $this->createMerchant();
 
         $data = [
             'name' => 'iPhone 15',
@@ -474,8 +476,8 @@ class ProductControllerTest extends FunctionalTestCase
             'brand_id' => $brand->id,
             'category_id' => $category->id,
             'merchants' => [
-                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 949.99, 'is_available' => true],
-                ['name' => 'BestBuy', 'url' => 'https://bestbuy.com', 'price' => 979.99, 'is_available' => true],
+                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 949.99, 'is_available' => true, 'id' => $merchant->id],
+                ['name' => 'BestBuy', 'url' => 'https://bestbuy.com', 'price' => 979.99, 'is_available' => true, 'id' => $merchant->id],
             ]
         ];
 
@@ -498,11 +500,11 @@ class ProductControllerTest extends FunctionalTestCase
         $bestbuyMerchant = $product->merchants->where('merchant_id', $createdMerchants->get('BestBuy')->id)->first();
 
         $amazonHistory = ProductPriceHistory::where('product_id', $productId)
-            ->where('merchant_id', $amazonMerchant->id)
+            ->where('product_merchant_id', $amazonMerchant->id)
             ->first();
 
         $bestbuyHistory = ProductPriceHistory::where('product_id', $productId)
-            ->where('merchant_id', $bestbuyMerchant->id)
+            ->where('product_merchant_id', $bestbuyMerchant->id)
             ->first();
 
         $this->assertNotNull($amazonHistory);
@@ -522,7 +524,7 @@ class ProductControllerTest extends FunctionalTestCase
             'merchant_id' => $merchant->id
         ]);
 
-        $this->createProductPriceHistory(['merchant_id' => $merchant->id]);
+        $this->createProductPriceHistory(['product_merchant_id' => $merchant->id, 'price' => 79.99, 'product_id' => $product->id]);;
 
         $updateData = [
             'name' => 'Test Product',
@@ -547,13 +549,13 @@ class ProductControllerTest extends FunctionalTestCase
 
         // Verify new price history entry was created
         $historyCount = ProductPriceHistory::where('product_id', $product->id)
-            ->where('merchant_id', $merchant->id)
+            ->where('product_merchant_id', $merchant->id)
             ->count();
 
         $this->assertEquals(2, $historyCount); // Initial + update
 
         $latestHistory = ProductPriceHistory::where('product_id', $product->id)
-            ->where('merchant_id', $merchant->id)
+            ->where('product_merchant_id', $merchant->id)
             ->orderBy('recorded_at', 'desc')
             ->first();
 
@@ -569,7 +571,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->createProductPriceHistory(
             [
                 'product_id' => $product->id,
-                'merchant_id' => $merchant->id,
+                'product_merchant_id' => $merchant->id,
                 'price' => 79.99,
             ]
         );
@@ -577,7 +579,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->createProductPriceHistory(
             [
                 'product_id' => $product->id,
-                'merchant_id' => $merchant->id,
+                'product_merchant_id' => $merchant->id,
                 'price' => 74.99,
             ]
         );
@@ -585,12 +587,13 @@ class ProductControllerTest extends FunctionalTestCase
         $this->createProductPriceHistory(
             [
                 'product_id' => $product->id,
-                'merchant_id' => $merchant->id,
+                'product_merchant_id' => $merchant->id,
                 'price' => 69.99,
             ]
         );
 
         $response = $this->getForSite("/api/products/{$product->id}/price-history");
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -611,13 +614,13 @@ class ProductControllerTest extends FunctionalTestCase
 
         $this->createProductPriceHistory([
             'product_id' => $product->id,
-            'merchant_id' => $merchant1->id,
+            'product_merchant_id' => $merchant1->id,
             'price' => 79.99,
         ]);
 
         $this->createProductPriceHistory([
             'product_id' => $product->id,
-            'merchant_id' => $merchant2->id,
+            'product_merchant_id' => $merchant2->id,
             'price' => 89.99,
         ]);
 
@@ -627,7 +630,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertCount(1, $data['data']);
         $this->assertEquals(79.99, $data['data'][0]['price']);
-        $this->assertEquals($merchant1->id, $data['data'][0]['merchant_id']);
+        $this->assertEquals($merchant1->id, $data['data'][0]['product_merchant_id']);
     }
 
     public function testDuplicateProductToAnotherSite(): void
@@ -1184,6 +1187,7 @@ class ProductControllerTest extends FunctionalTestCase
     {
         $brand = $this->createBrand();
         $category = $this->createCategory();
+        $merchant = $this->createMerchant();
 
         $data = [
             'name' => 'iPhone 15',
@@ -1220,7 +1224,8 @@ class ProductControllerTest extends FunctionalTestCase
                     'override_sale_price' => false,
                     'variant_id' => 1,
                     'variant_sku' => 'AMZN-IPH15-128',
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => $merchant->id
                 ],
                 [
                     'name' => 'Amazon',
@@ -1230,7 +1235,8 @@ class ProductControllerTest extends FunctionalTestCase
                     'override_sale_price' => false,
                     'variant_id' => 2,
                     'variant_sku' => 'AMZN-IPH15-256',
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => $merchant->id
                 ],
                 [
                     'name' => 'BestBuy',
@@ -1239,7 +1245,8 @@ class ProductControllerTest extends FunctionalTestCase
                     'override_price' => false,
                     'override_sale_price' => false,
                     'variant_id' => 1,
-                    'is_available' => true
+                    'is_available' => true,
+                    'id' => $merchant->id
                 ]
             ]
         ];
@@ -1492,7 +1499,7 @@ class ProductControllerTest extends FunctionalTestCase
         // Create initial price history
         $this->createProductPriceHistory([
             'product_id' => $product->id,
-            'merchant_id' => $pm->id,
+            'product_merchant_id' => $pm->id,
             'price' => 95
         ]);
 
@@ -1520,13 +1527,13 @@ class ProductControllerTest extends FunctionalTestCase
 
         // Verify new price history entry
         $historyCount = ProductPriceHistory::where('product_id', $product->id)
-            ->where('merchant_id', $pm->id)
+            ->where('product_merchant_id', $pm->id)
             ->count();
 
         $this->assertEquals(2, $historyCount);
 
         $latestHistory = ProductPriceHistory::where('product_id', $product->id)
-            ->where('merchant_id', $pm->id)
+            ->where('product_merchant_id', $pm->id)
             ->orderBy('recorded_at', 'desc')
             ->first();
 

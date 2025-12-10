@@ -95,10 +95,10 @@ class ProductBlockParserTest extends FunctionalTestCase
         ];
         $html = $parser->generateHtml($parsedData);
 
-        $this->assertStringContainsString('<div class="page-card product-card" data-product-id="product-1">', $html);
+        $this->assertStringContainsString('<div class="product-card-container"><div class="product-card" data-product-id="product-1">', $html);
         $this->assertStringContainsString('<h3 class="product-name"><a href="http://buy.com">The Gadget</a></h3>', $html);
         $this->assertStringContainsString('<div class="product-price"><span class="price-sale">$80.00</span><span class="price-original">$100.00</span></div>', $html);
-        $this->assertStringContainsString('<a href="http://buy.com" class="btn-back-action btn-view-details" rel="nofollow" target="_blank">Get Yours</a>', $html);
+        $this->assertStringContainsString('<a href="http://buy.com" class="btn-add-to-cart btn-primary" rel="nofollow" target="_blank">Get Yours</a>', $html);
     }
 
     public function testProductBlockParserCalculatesSalePrice()
@@ -839,7 +839,7 @@ class ProductBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('Cons:', $html);
         $this->assertStringContainsString('Fast shipping', $html);
         $this->assertStringContainsString('Expensive', $html);
-        $this->assertStringContainsString('4.5/5', $html);
+        $this->assertStringContainsString('4.5 / 5', $html);
     }
 
 //    public function testHtmlContainsWishlistButton()
@@ -909,7 +909,7 @@ class ProductBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('Sponsored', $html);
         $this->assertStringContainsString('Excellent quality', $html);
         $this->assertStringContainsString('High price', $html);
-        $this->assertStringContainsString('4.8/5', $html);
+        $this->assertStringContainsString('4.8 / 5', $html);
         $this->assertStringContainsString('Shop Now', $html);
     }
 

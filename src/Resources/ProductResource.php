@@ -106,7 +106,7 @@ class ProductResource extends JsonResource
                 return $priceHistory->map(fn($history) => [
                     'id' => $history['id'],
                     'product_id' => $history['product_id'],
-                    'merchant_id' => $history['merchant_id'],
+                    'product_merchant_id' => $history['product_merchant_id'],
                     'price' => $history['price'],
                     'sale_price' => $history['sale_price'],
                     'recorded_at' => $history['recorded_at']->format('Y-m-d H:i:s')

@@ -70,7 +70,7 @@ class ProductMatchingService
         $name = strtolower($name);
 
         // Remove common words
-        $commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at'];
+        $commonWords = ['the', 'an', 'and', 'or', 'but', 'in', 'on', 'at'];
         $words = explode(' ', $name);
         $words = array_filter($words, fn($word) => !in_array($word, $commonWords));
 
