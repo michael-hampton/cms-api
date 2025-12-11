@@ -9,8 +9,6 @@ use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
-use App\Framework\Validation\ValidationResult;
-use App\Framework\Validation\Validator;
 use App\Models\Image;
 use App\Models\ImageCategory;
 use App\Models\Model;
@@ -402,9 +400,11 @@ class ImageService
         // Calculate dimensions maintaining aspect ratio
         $aspectRatio = $sourceWidth / $sourceHeight;
         if ($width / $height > $aspectRatio) {
-            $width = $height * $aspectRatio;
+            // Explicitly cast or round the resulting float to an integer
+            $width = (int)($height * $aspectRatio);
         } else {
-            $height = $width / $aspectRatio;
+            // Explicitly cast or round the resulting float to an integer
+            $height = (int)($width / $aspectRatio); // Fix for line 411
         }
 
         // Create thumbnail
