@@ -228,8 +228,8 @@ $router->post('/{site}/member/subscription-plans/{slug}/subscribe', [MemberSubsc
 
 $router->get('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'index']);
 $router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'store']);;
-$router->post('/{site}/member/payment-methods/{id}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);;
-$router->delete('/{site}/member/payment-methods/{id}', [MemberPaymentMethodsController::class, 'destroy']);
+$router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);;
+$router->delete('/{site}/member/payment-methods/{paymentMethodId}', [MemberPaymentMethodsController::class, 'destroy']);
 
 $router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
 
