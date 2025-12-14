@@ -22,10 +22,13 @@ use App\Controllers\Members\MemberDashboardController;
 use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
+use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\MemberReadingHistoryController;
+use App\Controllers\Members\MemberSubscriptionPaymentsController;
 use App\Controllers\Members\MemberSubscriptionPlansController;
 use App\Controllers\Members\MemberSubscriptionsController;
 use App\Controllers\Members\MemberWishlistController;
+use App\Controllers\NewsletterController;
 use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
@@ -223,6 +226,15 @@ $router->get('/{site}/member/subscription-plans', [MemberSubscriptionPlansContro
 $router->get('/{site}/member/subscription-plans/{slug}', [MemberSubscriptionPlansController::class, 'show']);;
 $router->post('/{site}/member/subscription-plans/{slug}/subscribe', [MemberSubscriptionPlansController::class, 'subscribe']);;
 
+$router->get('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'index']);
+$router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'store']);;
+$router->post('/{site}/member/payment-methods/{id}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);;
+$router->delete('/{site}/member/payment-methods/{id}', [MemberPaymentMethodsController::class, 'destroy']);
+
+$router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
+
+$router->post('/{site}/member/newsletters/bulk-subscribe', [MemberNewslettersController::class, 'bulkSubscribe']);;
+
 $router->get('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'index']);
 $router->get('/{site}/admin/subscription-plans/create', [AdminSubscriptionPlansController::class, 'create']);
 $router->post('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'store']);;
@@ -252,6 +264,9 @@ $router->get('/{siteName}/deals', [DealsController::class, 'index']);
 $router->get('/{site}/member/wishlist', [MemberWishlistController::class, 'index']);
 
 $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController::class, 'getProductDetails']);
+
+$router->post('/default/{site}/newsletter/signup', NewsletterController::class, 'signup');
+
 
 
 

@@ -136,12 +136,22 @@ class FooterRenderer
             $html .= "<p class='newsletter-description'>" . htmlspecialchars($config['newsletter_description']) . "</p>";
         }
 
-        $html .= "<form class='newsletter-form' id='newsletter-form'>";
-        $html .= "<input type='email' name='email' class='newsletter-input' id='newsletter-email' placeholder='" .
+        $html .= "<form class='newsletter-form' id='footer-newsletter-form'>";
+        $html .= "<div class='newsletter-input-group'>";
+        $html .= "<input type='email' name='email' class='newsletter-input' id='footer-newsletter-email' placeholder='" .
             htmlspecialchars($config['newsletter_placeholder'] ?? 'Your email address') . "' required>";
-        $html .= "<button type='submit' class='newsletter-button' id='newsletter-submit'>" .
+        $html .= "<button type='submit' class='newsletter-button' id='footer-newsletter-submit'>" .
             htmlspecialchars($config['newsletter_button_text'] ?? 'Subscribe') . "</button>";
-        $html .= "<div class='newsletter-message' id='newsletter-message'></div>";
+        $html .= "</div>";
+
+        // Account creation option
+        $html .= "<div class='newsletter-account-option'>";
+        $html .= "<button type='button' class='newsletter-create-account-link' id='footer-create-account-btn'>";
+        $html .= "✨ Create account to unlock exclusive features";
+        $html .= "</button>";
+        $html .= "</div>";
+
+        $html .= "<div class='newsletter-message' id='footer-newsletter-message'></div>";
         $html .= "</form>";
 
         $html .= "</div>";

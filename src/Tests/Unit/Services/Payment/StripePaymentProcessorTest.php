@@ -801,4 +801,167 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertEquals('subscription_not_scheduled_for_cancellation', $result['error_code']);
     }
 
+    public function testGetCustomerPaymentMethods(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $customer = new \stdClass();
+        $customer->invoice_settings = new \stdClass();
+        $customer->invoice_settings->default_payment_method = 'pm_default123';
+
+        $this->customerServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('cus_test123')
+            ->andReturn($customer);
+
+        $paymentMethod1 = new \stdClass();
+        $paymentMethod1->id = 'pm_test123';
+        $paymentMethod2 = new \stdClass();
+        $paymentMethod2->id = 'pm_test456';
+
+        $paymentMethodsData = new \stdClass();
+        $paymentMethodsData->data = [$paymentMethod1, $paymentMethod2];
+
+        $this->paymentMethodServiceMock->shouldReceive('all')
+            ->once()
+            ->with([
+                'customer' => 'cus_test123',
+                'type' => 'card',
+            ])
+            ->andReturn($paymentMethodsData);
+
+        $result = $this->processor->getCustomerPaymentMethods($member);
+
+        $this->assertTrue($result['success']);
+        $this->assertCount(2, $result['payment_methods']);
+        $this->assertEquals('pm_default123', $result['default_payment_method_id']);
+    }
+
+    public function testGetCustomerPaymentMethodsWithNoCustomer(): void
+    {
+        $member = $this->createMockMember(null);
+
+        $result = $this->processor->getCustomerPaymentMethods($member);
+
+        $this->assertEmpty($result['payment_methods']);
+        $this->assertNull($result['default_payment_method_id']);
+    }
+
+    public function testAddPaymentMethodWithNewCustomer(): void
+    {
+        $member = $this->createMockMember(null);
+
+        $customer = $this->expectCustomerCreation($member);
+
+        // Mock member update to return true
+        $member->shouldReceive('update')
+            ->once()
+            ->with(['stripe_customer_id' => $customer->id])
+            ->andReturn(true);
+
+        $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
+
+        $result = $this->processor->addPaymentMethod($member, 'pm_test123', false);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testAddPaymentMethodWithExistingCustomer(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $this->expectPaymentMethodAttachment('pm_test123', 'cus_test123');
+
+        $result = $this->processor->addPaymentMethod($member, 'pm_test123', false);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testAddPaymentMethodSetAsDefault(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $this->expectPaymentMethodAttachment('pm_test123', 'cus_test123');
+
+        $customer = new \stdClass();
+        $customer->id = 'cus_test123';
+
+        $this->customerServiceMock->shouldReceive('update')
+            ->once()
+            ->with('cus_test123', [
+                'invoice_settings' => [
+                    'default_payment_method' => 'pm_test123'
+                ]
+            ])
+            ->andReturn($customer);
+
+        $result = $this->processor->addPaymentMethod($member, 'pm_test123', true);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testSetDefaultPaymentMethod(): void
+    {
+        $customer = new \stdClass();
+        $customer->id = 'cus_test123';
+
+        $this->customerServiceMock->shouldReceive('update')
+            ->once()
+            ->with('cus_test123', [
+                'invoice_settings' => [
+                    'default_payment_method' => 'pm_test123'
+                ]
+            ])
+            ->andReturn($customer);
+
+        $result = $this->processor->setDefaultPaymentMethod('cus_test123', 'pm_test123');
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testRemovePaymentMethod(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $paymentMethod = new \stdClass();
+        $paymentMethod->id = 'pm_test123';
+        $paymentMethod->customer = 'cus_test123';
+
+        $this->paymentMethodServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_test123')
+            ->andReturn($paymentMethod);
+
+        $detachedPaymentMethod = new \stdClass();
+        $detachedPaymentMethod->id = 'pm_test123';
+
+        $this->paymentMethodServiceMock->shouldReceive('detach')
+            ->once()
+            ->with('pm_test123')
+            ->andReturn($detachedPaymentMethod);
+
+        $result = $this->processor->removePaymentMethod($member, 'pm_test123');
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testRemovePaymentMethodUnauthorized(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $paymentMethod = new \stdClass();
+        $paymentMethod->id = 'pm_test123';
+        $paymentMethod->customer = 'cus_different456'; // Different customer
+
+        $this->paymentMethodServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_test123')
+            ->andReturn($paymentMethod);
+
+        $result = $this->processor->removePaymentMethod($member, 'pm_test123');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('unauthorized', $result['error_code']);
+    }
+
 }

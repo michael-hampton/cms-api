@@ -127,3 +127,5 @@ $pageGridAdded = false;
 <?php if (isset($subscriptionModalData)): ?>
     @include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])
 <?php endif; ?>
+
+@include('components/newsletter-account-creation-modal')

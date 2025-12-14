@@ -109,4 +109,68 @@ class MemberNewslettersController extends Controller
 
         return $this->jsonResponse(['success' => false, 'message' => 'Failed to subscribe'], 500);
     }
+
+    public function bulkSubscribe(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $siteId = SiteContext::getId();
+        $newsletterIds = $request->input('newsletter_ids', []);
+
+        if (empty($newsletterIds)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'No newsletters selected'], 400);
+        }
+
+        $successCount = 0;
+        $errors = [];
+
+        foreach ($newsletterIds as $newsletterId) {
+            // Check if newsletter exists and is active
+            $newsletter = $this->newsletterRepository->find($newsletterId);
+
+            if (!$newsletter || !$newsletter->active || $newsletter->site_id !== $siteId) {
+                $errors[] = "Newsletter ID $newsletterId not found or inactive";
+                continue;
+            }
+
+            // Check if already subscribed
+            $existing = $this->subscriberRepository->findByEmailAndNewsletter($member->email, $newsletterId, $siteId);
+
+            if ($existing) {
+                continue; // Skip if already subscribed
+            }
+
+            // Create subscription
+            $subscriber = $this->subscriberRepository->create([
+                'email' => $member->email,
+                'newsletter_id' => $newsletterId,
+                'site_id' => $siteId,
+                'confirmed' => true, // Auto-confirm for logged-in members
+                'confirmation_token' => bin2hex(random_bytes(16)),
+                'unsubscribe_token' => bin2hex(random_bytes(16)),
+                'subscribed_at' => date('Y-m-d H:i:s')
+            ]);
+
+            if ($subscriber) {
+                $successCount++;
+            }
+        }
+
+        if ($successCount > 0) {
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => "Successfully subscribed to $successCount newsletter(s)",
+                'count' => $successCount
+            ]);
+        }
+
+        return $this->jsonResponse([
+            'success' => false,
+            'message' => 'Failed to subscribe to newsletters',
+            'errors' => $errors
+        ], 400);
+    }
 }

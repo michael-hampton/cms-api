@@ -369,36 +369,37 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($zipped);
     }
 
-    public function orderBy(string $key, string $direction = 'asc'): Collection
+    public function orderBy(string|callable $key, string $direction = 'asc'): Collection
     {
         $direction = strtolower($direction);
-
         $sorted = $this->items;
 
-        usort($sorted, function($a, $b) use ($key, $direction) {
-            // Handle both array and object access
-            $aValue = is_array($a) ? $a[$key] ?? null : (isset($a->$key) ? $a->$key : null);
-            $bValue = is_array($b) ? $b[$key] ?? null : (isset($b->$key) ? $b->$key : null);
+        usort($sorted, function ($a, $b) use ($key, $direction) {
+            $aValue = is_callable($key)
+                ? $key($a)
+                : (is_array($a) ? ($a[$key] ?? null) : ($a->$key ?? null));
 
-            // Handle null values - put them at the end
+            $bValue = is_callable($key)
+                ? $key($b)
+                : (is_array($b) ? ($b[$key] ?? null) : ($b->$key ?? null));
+
+            // Handle nulls (always last)
             if ($aValue === null && $bValue === null) return 0;
             if ($aValue === null) return 1;
             if ($bValue === null) return -1;
 
-            // Compare values
             if ($aValue == $bValue) return 0;
 
-            if ($direction === 'desc') {
-                return $aValue < $bValue ? 1 : -1;
-            } else {
-                return $aValue < $bValue ? -1 : 1;
-            }
+            return $direction === 'desc'
+                ? ($aValue < $bValue ? 1 : -1)
+                : ($aValue < $bValue ? -1 : 1);
         });
 
         return new static($sorted);
     }
 
-    public function sortByDesc(string $key): Collection
+
+    public function sortByDesc(string|callable $key): Collection
     {
         return $this->orderBy($key, 'desc');
     }

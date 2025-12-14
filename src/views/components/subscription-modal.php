@@ -3,14 +3,15 @@
 /**
  * @var array $subscriptionModalData
  */
-
 if (!isset($subscriptionModalData) || (!$subscriptionModalData['show_modal'] && ($subscriptionModalData['is_direct'] ?? false) || false !== true)) {
-    return;
+    //return;
 }
 
 $plans = $subscriptionModalData['plans'];
 $member = $subscriptionModalData['member'];
 $isLoggedIn = !empty($member);
+
+
 ?>
 
 <div id="subscriptionModal" class="sub-modal hide">

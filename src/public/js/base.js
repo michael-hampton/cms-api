@@ -134,6 +134,134 @@ document.addEventListener('DOMContentLoaded', function () {
             flipBackPageCard(currentlyFlippedPageCard);
         }
     });
+
+    const newsletterSignupModal = document.getElementById('newsletter-account-modal');
+    const createAccountBtn = document.getElementById('footer-create-account-btn');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalCancelBtn = document.getElementById('modal-cancel-btn');
+    const modalOverlay = document.getElementById('modal-overlay');
+
+    function openNewsletterModal() {
+        if (newsletterSignupModal) {
+            alert('yes')
+            newsletterSignupModal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+
+            const emailInput = document.getElementById('footer-newsletter-email');
+            const modalEmailInput = document.getElementById('modal-email');
+            if (emailInput && modalEmailInput) {
+                modalEmailInput.value = pendingEmail || emailInput.value;
+            }
+        }
+    }
+
+    function closeNewsletterModal() {
+        if (newsletterSignupModal) {
+            newsletterSignupModal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
+    if (createAccountBtn) {
+        createAccountBtn.addEventListener('click', openNewsletterModal);
+    }
+
+    if (modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', closeNewsletterModal);
+    }
+
+    if (modalCancelBtn) {
+        modalCancelBtn.addEventListener('click', closeNewsletterModal);
+    }
+
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', closeNewsletterModal);
+    }
+
+// Escape key to close modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && modal.style.display === 'block') {
+            closeNewsletterModal();
+        }
+    });
+
+// Account creation form submission
+    const accountForm = document.getElementById('footer-account-creation-form');
+    if (accountForm) {
+        accountForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const password = formData.get('password');
+            const passwordConfirm = formData.get('password_confirm');
+            const messageEl = document.getElementById('modal-message');
+            const submitBtn = document.getElementById('modal-submit-btn');
+
+            // Validate passwords match
+            if (password !== passwordConfirm) {
+                messageEl.className = 'modal-message error';
+                messageEl.textContent = 'Passwords do not match';
+                return;
+            }
+
+            const data = {
+                email: formData.get('email'),
+                create_account: true,
+                first_name: formData.get('first_name'),
+                last_name: formData.get('last_name'),
+                password: password
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+
+            try {
+                const response = await fetch(`/default/${SITE}/newsletter/signup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                console.log('resut', result)
+
+                if (result.success && result.data) {
+                    if (result.data.account_created && result.data.logged_in) {
+                        messageEl.className = 'modal-message success';
+                        messageEl.textContent = '✓ Account created and you\'re logged in!';
+
+                        setTimeout(() => {
+                            closeNewsletterModal();
+                            window.location.reload(); // Reload to update UI with logged-in state
+                        }, 1500);
+                    } else if (result.data.account_created) {
+                        messageEl.className = 'modal-message success';
+                        messageEl.textContent = '✓ Account created! Redirecting to login...';
+
+                        setTimeout(() => {
+                            window.location.href = '/member/login';
+                        }, 1500);
+                    } else if (result.data.account_exists) {
+                        messageEl.className = 'modal-message error';
+                        messageEl.textContent = 'You already have an account. Please log in.';
+                    }
+                } else {
+                    messageEl.className = 'modal-message error';
+                    messageEl.textContent = '✕ ' + (result.message || 'Failed to create account');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                messageEl.className = 'modal-message error';
+                messageEl.textContent = '✕ An error occurred. Please try again.';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Account';
+            }
+        });
+    }
 });
 
 function flipPageCard(cardElement) {

@@ -569,6 +569,33 @@
                     </li>
 
                     <li class="nav-item">
+                        <a href="/<?= $site->slug ?>/member/subscription-payments"
+                           class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/subscription-payments') !== false ? 'active' : '' ?>">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2">
+                                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                                <line x1="8" y1="6" x2="16" y2="6"></line>
+                                <line x1="8" y1="10" x2="16" y2="10"></line>
+                                <line x1="8" y1="14" x2="12" y2="14"></line>
+                            </svg>
+                            Payments
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="/<?= $site->slug ?>/member/payment-methods"
+                           class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/payment-methods') !== false ? 'active' : '' ?>">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2">
+                                <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="2" y1="10" x2="22" y2="10"></line>
+                                <line x1="6" y1="15" x2="10" y2="15"></line>
+                            </svg>
+                            Payment Methods
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
                         <a href="/<?= $site->slug ?>/member/settings"
                            class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/settings') !== false ? 'active' : '' ?>">
                             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"

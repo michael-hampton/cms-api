@@ -56,7 +56,8 @@ class NewsletterSignupService
         return [
             'success' => true,
             'email' => $email,
-            'confirmation_token' => $confirmationToken
+            'confirmation_token' => $confirmationToken,
+            'subscriber_id' => $subscriber->id
         ];
     }
 
@@ -79,6 +80,20 @@ class NewsletterSignupService
 
         if (!$subscriber || $subscriber->site_id !== $this->siteId) {
             return ['success' => false, 'error' => 'Invalid unsubscribe token'];
+        }
+
+        $email = $subscriber->email;
+        $this->repository->delete($subscriber->id);
+
+        return ['success' => true, 'email' => $email];
+    }
+
+    public function unsubscribeById(int $subscriberId, int $siteId): array
+    {
+        $subscriber = $this->repository->find($subscriberId);
+
+        if (!$subscriber || $subscriber->site_id !== $siteId) {
+            return ['success' => false, 'error' => 'Subscriber not found'];
         }
 
         $email = $subscriber->email;

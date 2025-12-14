@@ -736,4 +736,148 @@ class StripePaymentProcessor
             return null;
         }
     }
+
+    /**
+     * Get customer's payment methods
+     */
+    public function getCustomerPaymentMethods($member): array
+    {
+        $paymentMethods = [];
+        $defaultPaymentMethodId = null;
+
+        if (!$member->stripe_customer_id) {
+            return [
+                'payment_methods' => [],
+                'default_payment_method_id' => null
+            ];
+        }
+
+        try {
+            $customer = $this->stripe->customers->retrieve($member->stripe_customer_id);
+            $defaultPaymentMethodId = $customer->invoice_settings->default_payment_method;
+
+            $methods = $this->stripe->paymentMethods->all([
+                'customer' => $member->stripe_customer_id,
+                'type' => 'card',
+            ]);
+
+            $paymentMethods = $methods->data;
+
+            return [
+                'success' => true,
+                'payment_methods' => $paymentMethods,
+                'default_payment_method_id' => $defaultPaymentMethodId
+            ];
+        } catch (\Exception $e) {
+            error_log('Error fetching payment methods: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'payment_methods' => [],
+                'default_payment_method_id' => null,
+                'message' => 'Failed to fetch payment methods'
+            ];
+        }
+    }
+
+    /**
+     * Add payment method to customer
+     */
+    public function addPaymentMethod($member, string $paymentMethodId, bool $setDefault = false): array
+    {
+        try {
+            $customerId = $member->stripe_customer_id;
+            // Create customer if doesn't exist
+            if (!$customerId) {
+                $customer = $this->stripe->customers->create([
+                    'email' => $member->email,
+                    'name' => $member->full_name,
+                    'metadata' => [
+                        'member_id' => $member->id,
+                        'site_id' => $member->site_id
+                    ]
+                ]);
+
+                $member->update(['stripe_customer_id' => $customer->id]);
+                $customerId = $customer->id;
+            }
+
+            // Attach payment method to customer
+            $this->stripe->paymentMethods->attach($paymentMethodId, [
+                'customer' => $customerId
+            ]);
+
+            // Set as default if requested
+            if ($setDefault) {
+                $this->stripe->customers->update($member->stripe_customer_id, [
+                    'invoice_settings' => [
+                        'default_payment_method' => $paymentMethodId
+                    ]
+                ]);
+            }
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            error_log('Error adding payment method: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Failed to add payment method: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Set default payment method for customer
+     */
+    public function setDefaultPaymentMethod(string $customerId, string $paymentMethodId): array
+    {
+        try {
+            $this->stripe->customers->update($customerId, [
+                'invoice_settings' => [
+                    'default_payment_method' => $paymentMethodId
+                ]
+            ]);
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            error_log('Error setting default payment method: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Failed to update default payment method'
+            ];
+        }
+    }
+
+    /**
+     * Remove payment method
+     */
+    public function removePaymentMethod($member, string $paymentMethodId): array
+    {
+        try {
+            // Verify payment method belongs to customer
+            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
+
+            if ($paymentMethod->customer !== $member->stripe_customer_id) {
+                return [
+                    'success' => false,
+                    'message' => 'Unauthorized',
+                    'error_code' => 'unauthorized'
+                ];
+            }
+
+            // Detach payment method
+            $this->stripe->paymentMethods->detach($paymentMethodId);
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            error_log('Error removing payment method: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Failed to remove payment method'
+            ];
+        }
+    }
 }
