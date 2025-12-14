@@ -398,6 +398,14 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
          $router->post('/newsletter/unsubscribe', NewsletterController::class, 'unsubscribe');
          $router->get('/newsletter/subscribers', NewsletterController::class, 'getSubscribers');
 
+        $router->get('/newsletters', [NewsletterController::class, 'index']);
+        $router->post('/newsletters', [NewsletterController::class, 'create']);
+        $router->get('/newsletters/{id}/subscribers', [NewsletterController::class, 'getNewsletterSubscribers']);
+        $router->post('/newsletters/{id}/send', [NewsletterController::class, 'send']);
+        $router->delete('/newsletters/{id}', [NewsletterController::class, 'delete']);;
+        $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
+        $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
+
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
 
         $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);

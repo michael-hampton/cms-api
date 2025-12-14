@@ -29,6 +29,7 @@ use App\Controllers\Members\MemberSubscriptionPlansController;
 use App\Controllers\Members\MemberSubscriptionsController;
 use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\NewsletterController;
+use App\Controllers\NewsletterWebController;
 use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
@@ -246,6 +247,8 @@ $router->post('/{site}/admin/subscription-plans/{id}/toggle-featured', [AdminSub
 $router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalController::class, 'markShown']);
 
 
+$router->get('/{site}/newsletters', [NewsletterWebController::class, 'index']);
+$router->get('/{site}/newsletters/{id}', [NewsletterWebController::class, 'show']);
 
 
 // Member Newsletters Routes

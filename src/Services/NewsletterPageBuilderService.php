@@ -80,7 +80,7 @@ class NewsletterPageBuilderService
     /**
      * Build newsletter HTML from pages
      */
-    public function buildNewsletterHtml(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken = null): string
+    public function buildNewsletterHtml(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken = null, bool $includeBlocks = false): string
     {
         $template = $newsletter->template ?? 'default';
 
@@ -92,7 +92,7 @@ class NewsletterPageBuilderService
             case 'simple':
                 return $this->buildSimpleTemplate($newsletter, $pages, $unsubscribeToken);
             default:
-                return $this->buildDefaultTemplate($newsletter, $pages, $unsubscribeToken);
+                return $this->buildDefaultTemplate($newsletter, $pages, $unsubscribeToken, $includeBlocks);
         }
     }
 
@@ -1033,7 +1033,7 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function buildDefaultTemplate(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken): string
+    private function buildDefaultTemplate(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken, bool $includeBlocks = false): string
     {
         $html = [];
 
@@ -1044,7 +1044,7 @@ class NewsletterPageBuilderService
 
         // Pages
         foreach ($pages as $page) {
-            $html[] = $this->renderPageCard($page);
+            $html[] = $this->renderPageCard($page, $includeBlocks);
         }
 
         // Footer
@@ -1054,7 +1054,7 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderPageCard(Page $page, bool $includeBlocks = false): string
+    private function renderPageCard(Page $page, bool $includeBlocks = true): string
     {
         $url = url($page->slug);
         $html = [];
@@ -1086,7 +1086,8 @@ class NewsletterPageBuilderService
 
         // Description or blocks
         if ($includeBlocks) {
-            $blocks = json_decode($page->content, true);
+            $blocks = $page->blocks->toArray();
+
             if (is_array($blocks)) {
                 // Render first few blocks
                 $blockCount = 0;

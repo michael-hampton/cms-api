@@ -422,7 +422,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$page]);
 
         // Act
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, 'test-token');
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, 'test-token', false);
 
         // Assert
         $this->assertStringContainsString('Test Article', $html);

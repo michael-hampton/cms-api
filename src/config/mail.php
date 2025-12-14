@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'driver' => env('MAIL_DRIVER', 'log'), // smtp, log, array
+    'driver' => getenv('APP_ENV') === 'testing' ? 'array' : (getenv('MAIL_DRIVER') ?: 'log'),
 
     'from' => [
         'address' => env('MAIL_FROM_ADDRESS', 'noreply@example.com'),

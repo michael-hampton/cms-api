@@ -88,6 +88,7 @@ abstract class Controller
         $data = [
             'error' => $message,
             'errors' => $errors,
+            'success' => false,
             'status' => $statusCode,
             'timestamp' => date('c')
         ];

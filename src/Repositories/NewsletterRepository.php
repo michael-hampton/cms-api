@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Framework\Support\Collection;
 use App\Models\Newsletter;
 
 class NewsletterRepository extends Repository
@@ -25,17 +26,29 @@ class NewsletterRepository extends Repository
         return $due;
     }
 
-//    public function update(Newsletter $newsletter, array $data): Newsletter
-//    {
-//        $newsletter->update($data);
-//        return $newsletter;
-//    }
-//
-//    public function create(array $data): Newsletter
-//    {
-//        $result = Newsletter::create($data);
-//        return new Newsletter($result);
-//    }
+    public function getPublished(int $siteId): Collection
+    {
+        return Newsletter::where('site_id', $siteId)
+            ->where('active', true)
+            ->whereNotNull('last_sent')
+            ->orderBy('last_sent', 'desc')
+            ->limit(10)
+            ->get();
+    }
+
+    public function getArchive(int $siteId, int $page = 1, int $perPage = 20): Collection
+    {
+        $offset = ($page - 1) * $perPage;
+
+        return Newsletter::where('site_id', $siteId)
+            ->where('active', true)
+            ->whereNotNull('last_sent')
+            ->orderBy('last_sent', 'desc')
+            ->limit($perPage)
+            ->offset($offset)
+            ->get();
+    }
+
     protected function getModelClass(): string
     {
         return Newsletter::class;
