@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Models;
 use App\Models\Member;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\Voucher;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -392,6 +393,127 @@ class SubscriptionModelTest extends FunctionalTestCase
         ]);
 
         $this->assertInstanceOf(\DateTime::class, $subscription->last_payment_date);
+    }
+
+    public function test_subscription_has_voucher_relationship()
+    {
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'voucher_id' => $voucher->id,
+            'discount_amount' => 2.99
+        ]);
+
+        $loadedVoucher = $subscription->voucher;
+
+        $this->assertNotNull($loadedVoucher);
+        $this->assertEquals($voucher->id, $loadedVoucher->id);
+        $this->assertEquals('SUB10', $loadedVoucher->code);
+    }
+
+    public function test_get_discounted_price()
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'discount_amount' => 5.00
+        ]);
+
+        $this->assertEquals(24.99, $subscription->getDiscountedPrice());
+    }
+
+    public function test_get_discounted_price_with_no_discount()
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'discount_amount' => 0
+        ]);
+
+        $this->assertEquals(29.99, $subscription->getDiscountedPrice());
+    }
+
+    public function test_has_voucher_returns_true()
+    {
+        $voucher = $this->createVoucher();
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'voucher_id' => $voucher->id,
+            'discount_amount' => 5.00
+        ]);
+
+        $this->assertTrue($subscription->hasVoucher());
+    }
+
+    public function test_has_voucher_returns_false()
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'voucher_id' => null,
+            'discount_amount' => 0
+        ]);
+
+        $this->assertFalse($subscription->hasVoucher());
+    }
+
+    public function test_original_price_is_stored()
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 24.99,
+            'currency' => 'USD',
+            'original_price' => 29.99,
+            'discount_amount' => 5.00
+        ]);
+
+        $this->assertEquals(29.99, $subscription->original_price);
+        $this->assertEquals(24.99, $subscription->price);
     }
 
     protected function setUp(): void

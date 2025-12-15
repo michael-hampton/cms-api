@@ -6,6 +6,7 @@ use App\Framework\Support\Logger;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\Voucher;
 use App\Repositories\PaymentRepository;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
@@ -879,5 +880,203 @@ class StripePaymentProcessor
                 'message' => 'Failed to remove payment method'
             ];
         }
+    }
+
+    public function processSubscriptionPaymentWithVoucher(
+        Subscription     $subscription,
+        SubscriptionPlan $plan,
+        ?Voucher         $voucher,
+        array            $data
+    ): array
+    {
+        try {
+            $customerId = $this->getOrCreateCustomer($subscription->member, $data);
+
+            if (!empty($data['payment_method_id'])) {
+                $paymentMethodId = $data['payment_method_id'];
+
+                $this->stripe->paymentMethods->attach($paymentMethodId, [
+                    'customer' => $customerId
+                ]);
+
+                $this->stripe->customers->update($customerId, [
+                    'invoice_settings' => [
+                        'default_payment_method' => $paymentMethodId
+                    ]
+                ]);
+            }
+
+            // Create or get Stripe coupon for voucher
+            $couponId = null;
+            if ($voucher && $voucher->appliesToSubscriptions()) {
+                $couponId = $this->getOrCreateStripeCoupon($voucher);
+            }
+
+            $priceId = $this->getOrCreatePrice($plan);
+
+            $subscriptionData = [
+                'customer' => $customerId,
+                'items' => [
+                    ['price' => $priceId]
+                ],
+                'metadata' => [
+                    'subscription_id' => $subscription->id,
+                    'plan_id' => $plan->id,
+                    'member_id' => $subscription->member_id
+                ],
+                'expand' => ['latest_invoice.payment_intent']
+            ];
+
+            // Apply coupon if voucher provided
+            if ($couponId) {
+                $subscriptionData['coupon'] = $couponId;
+                $subscriptionData['metadata']['voucher_id'] = $voucher->id;
+                $subscriptionData['metadata']['voucher_code'] = $voucher->code;
+            }
+
+            if ($plan->trial_days > 0) {
+                $subscriptionData['trial_period_days'] = $plan->trial_days;
+            }
+
+            $stripeSubscription = $this->stripe->subscriptions->create($subscriptionData);
+
+            $latestInvoice = $stripeSubscription->latest_invoice;
+            $paymentIntentId = null;
+            $requiresAction = false;
+            $clientSecret = null;
+
+            if (is_string($latestInvoice)) {
+                $invoice = $this->stripe->invoices->retrieve($latestInvoice, [
+                    'expand' => ['payment_intent']
+                ]);
+
+                if ($invoice->payment_intent) {
+                    $paymentIntent = $invoice->payment_intent;
+                    $paymentIntentId = is_string($paymentIntent) ? $paymentIntent : $paymentIntent->id;
+
+                    if (!is_string($paymentIntent)) {
+                        $requiresAction = $paymentIntent->status === 'requires_action';
+                        $clientSecret = $paymentIntent->client_secret;
+                    }
+                }
+            } elseif (is_object($latestInvoice) && isset($latestInvoice->payment_intent)) {
+                $paymentIntent = $latestInvoice->payment_intent;
+                $paymentIntentId = is_string($paymentIntent) ? $paymentIntent : $paymentIntent->id;
+
+                if (!is_string($paymentIntent)) {
+                    $requiresAction = $paymentIntent->status === 'requires_action';
+                    $clientSecret = $paymentIntent->client_secret;
+                }
+            }
+
+            // Calculate actual amount after discount
+            $actualAmount = $subscription->getDiscountedPrice();
+
+            $payment = $this->paymentRepository->create([
+                'subscription_id' => $subscription->id,
+                'site_id' => $subscription->site_id,
+                'payment_method' => 'stripe',
+                'payment_provider' => 'stripe',
+                'transaction_id' => is_string($latestInvoice) ? $latestInvoice : $latestInvoice->id,
+                'payment_intent_id' => $paymentIntentId,
+                'status' => $this->mapStripeStatus($stripeSubscription->status),
+                'amount' => $actualAmount,
+                'currency' => strtoupper($plan->currency),
+                'metadata' => [
+                    'subscription_id' => $subscription->id,
+                    'plan_id' => $plan->id,
+                    'billing_period' => $plan->billing_period,
+                    'stripe_subscription_id' => $stripeSubscription->id,
+                    'stripe_customer_id' => $customerId,
+                    'voucher_id' => $voucher ? $voucher->id : null,
+                    'voucher_code' => $voucher ? $voucher->code : null,
+                    'discount_amount' => $subscription->discount_amount,
+                    'original_amount' => $subscription->original_price
+                ]
+            ]);
+
+            if ($stripeSubscription->status === 'active' && !$requiresAction) {
+                $this->paymentRepository->update($payment->id, [
+                    'status' => 'completed',
+                    'paid_at' => date('Y-m-d H:i:s')
+                ]);
+
+                $subscription->update(['status' => 'active']);
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $paymentIntentId,
+                'subscription_id' => $stripeSubscription->id,
+                'status' => $stripeSubscription->status,
+                'customer_id' => $customerId,
+                'requires_action' => $requiresAction,
+                'payment_intent_client_secret' => $clientSecret,
+                'discount_applied' => $subscription->discount_amount > 0
+            ];
+
+        } catch (ApiErrorException $e) {
+            error_log('Stripe API Error: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $this->getUserFriendlyMessage($e),
+                'error_code' => $e->getStripeCode()
+            ];
+        } catch (\Exception $e) {
+            error_log('Stripe Payment Error: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'An unexpected error occurred. Please try again.'
+            ];
+        }
+    }
+
+    private function getOrCreateStripeCoupon(Voucher $voucher): string
+    {
+        // Check if coupon already exists
+        if ($voucher->stripe_coupon_id) {
+            try {
+                $this->stripe->coupons->retrieve($voucher->stripe_coupon_id);
+                return $voucher->stripe_coupon_id;
+            } catch (\Exception $e) {
+                // Coupon doesn't exist, create new one
+            }
+        }
+
+        $couponData = [
+            'name' => $voucher->name,
+            'metadata' => [
+                'voucher_id' => $voucher->id,
+                'voucher_code' => $voucher->code
+            ]
+        ];
+
+        if ($voucher->type === 'percentage') {
+            $couponData['percent_off'] = $voucher->value;
+        } else {
+            $couponData['amount_off'] = (int)($voucher->value * 100); // Convert to cents
+            $couponData['currency'] = 'usd'; // Should match subscription currency
+        }
+
+        // Set duration
+        if ($voucher->duration_in_months) {
+            $couponData['duration'] = 'repeating';
+            $couponData['duration_in_months'] = $voucher->duration_in_months;
+        } else {
+            $couponData['duration'] = 'once'; // Apply only to first payment
+        }
+
+        if ($voucher->maximum_discount && $voucher->type === 'percentage') {
+            $couponData['max_redemptions'] = 1; // Stripe doesn't support max discount per transaction
+        }
+
+        $stripeCoupon = $this->stripe->coupons->create($couponData);
+
+        // Store coupon ID
+        $voucher->update(['stripe_coupon_id' => $stripeCoupon->id]);
+
+        return $stripeCoupon->id;
     }
 }

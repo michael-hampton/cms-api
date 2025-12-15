@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Models\Voucher;
+use App\Repositories\SubscriptionPlanRepository;
 use App\Repositories\VoucherRepository;
 use App\Services\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -19,13 +20,16 @@ class VoucherServiceTest extends FunctionalTestCase
     private $repository;
     private $service;
 
+    private $subscriptionPlanRepository;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(VoucherRepository::class);
-        $this->service = new VoucherService($this->databaseMock, $this->repository);
+        $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->service = new VoucherService($this->databaseMock, $this->repository, $this->subscriptionPlanRepository);
     }
 
     protected function tearDown(): void
@@ -726,5 +730,147 @@ class VoucherServiceTest extends FunctionalTestCase
         $result = $this->service->validateVoucher($code, 100, $userId);
 
         $this->assertTrue($result['valid']);
+    }
+
+    public function testValidateVoucherForSubscriptionSuccess()
+    {
+        $code = 'SUB10';
+        $planId = 1;
+        $userId = 123;
+        $subscriptionPrice = 29.99;
+
+        $plan = Mockery::mock(\App\Models\SubscriptionPlan::class)->makePartial();
+        $plan->id = $planId;
+        $plan->price = $subscriptionPrice;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->status = 'active';
+        $voucher->per_user_limit = null;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToSubscriptionPlan')->with($planId)->andReturn(true);
+        $voucher->shouldReceive('calculateSubscriptionDiscount')->with($subscriptionPrice)->andReturn(2.99);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->with($code)
+            ->andReturn($voucher);
+
+        // Mock the SubscriptionPlanRepository
+        $this->subscriptionPlanRepository->shouldReceive('find')->with($planId)->andReturn($plan);
+
+        $result = $this->service->validateVoucherForSubscription($code, $planId, $userId);
+
+        $this->assertTrue($result['valid']);
+        $this->assertEquals('Voucher applied successfully', $result['message']);
+        $this->assertEquals(2.99, $result['discount']);
+        $this->assertEquals(1, $result['voucher_id']);
+    }
+
+    public function testValidateVoucherForSubscriptionNotFound()
+    {
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->with('NOTFOUND')
+            ->andReturn(null);
+
+        $result = $this->service->validateVoucherForSubscription('NOTFOUND', 1);
+
+        $this->assertFalse($result['valid']);
+        $this->assertEquals('Voucher not found', $result['message']);
+        $this->assertEquals(0, $result['discount']);
+    }
+
+    public function testValidateVoucherForSubscriptionNotApplicableToSubscriptions()
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('appliesToSubscriptions')->andReturn(false);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucherForSubscription('TEST', 1);
+
+        $this->assertFalse($result['valid']);
+        $this->assertEquals('This voucher cannot be used for subscriptions', $result['message']);
+    }
+
+    public function testValidateVoucherForSubscriptionNotApplicableToPlan()
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToSubscriptionPlan')->with(1)->andReturn(false);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucherForSubscription('TEST', 1);
+
+        $this->assertFalse($result['valid']);
+        $this->assertEquals('Voucher not applicable to this subscription plan', $result['message']);
+    }
+
+    public function testValidateVoucherForSubscriptionExceedsPerUserLimit()
+    {
+        $userId = 123;
+        $planId = 1;
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->per_user_limit = 2;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToSubscriptionPlan')->andReturn(true);
+        $voucher->shouldReceive('getUserUsageCount')->with($userId)->andReturn(2);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucherForSubscription('TEST', $planId, $userId);
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('already used', $result['message']);
+    }
+
+    public function testValidateVoucherForSubscriptionPlanNotFound()
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToSubscriptionPlan')->andReturn(true);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->andReturn(null);
+
+        $result = $this->service->validateVoucherForSubscription('TEST', 999);
+
+        $this->assertFalse($result['valid']);
+        $this->assertEquals('Plan not found', $result['message']);
+    }
+
+    public function testValidateVoucherForSubscriptionInvalidVoucher()
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->status = 'expired';
+        $voucher->shouldReceive('isValid')->andReturn(false);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucherForSubscription('EXPIRED', 1);
+
+        $this->assertFalse($result['valid']);
+        $this->assertEquals('Voucher has expired', $result['message']);
     }
 }

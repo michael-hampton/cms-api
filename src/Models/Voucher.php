@@ -27,7 +27,11 @@ Voucher extends Model
         'starts_at',
         'expires_at',
         'status',
-        'clone_history'
+        'clone_history',
+        'applies_to_subscriptions',
+        'subscription_plan_ids',
+        'stripe_coupon_id',
+        'duration_in_months'
     ];
 
     protected $casts = [
@@ -41,6 +45,8 @@ Voucher extends Model
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'clone_history' => 'array',
+        'applies_to_subscriptions' => 'boolean',
+        'subscription_plan_ids' => 'array',
     ];
 
     public function isValid(): bool
@@ -167,8 +173,8 @@ Voucher extends Model
         }
 
         return $this->redemptions()
-            ->where('member_id', $userId)
-            ->count() > 0;
+                ->where('member_id', $userId)
+                ->count() > 0;
     }
 
     public function getUserUsageCount(?int $userId): int
@@ -180,5 +186,45 @@ Voucher extends Model
         return $this->redemptions()
             ->where('member_id', $userId)
             ->count();
+    }
+
+    public function subscriptions($returnRelation = false)
+    {
+        return $this->hasMany(Subscription::class, 'voucher_id', 'id', $returnRelation);
+    }
+
+    public function appliesToSubscriptions(): bool
+    {
+        return $this->applies_to_subscriptions ?? false;
+    }
+
+    public function isApplicableToSubscriptionPlan(int $planId): bool
+    {
+        if (!$this->applies_to_subscriptions) {
+            return false;
+        }
+
+        if (!$this->subscription_plan_ids || count($this->subscription_plan_ids) === 0) {
+            return true; // Applies to all plans
+        }
+
+        return in_array($planId, $this->subscription_plan_ids);
+    }
+
+    public function calculateSubscriptionDiscount(float $subscriptionPrice): float
+    {
+        $discount = 0;
+
+        if ($this->type === 'percentage') {
+            $discount = ($subscriptionPrice * $this->value) / 100;
+        } else {
+            $discount = $this->value;
+        }
+
+        if ($this->maximum_discount && $discount > $this->maximum_discount) {
+            $discount = $this->maximum_discount;
+        }
+
+        return round($discount, 2);
     }
 }

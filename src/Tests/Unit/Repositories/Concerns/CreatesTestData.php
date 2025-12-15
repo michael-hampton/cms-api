@@ -49,6 +49,7 @@ use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Models\ProductVoucher;
 use App\Models\RegionSet;
+use App\Models\SubscriptionPlan;
 use App\Models\Tag;
 use App\Models\Territory;
 use App\Models\User;
@@ -589,6 +590,25 @@ trait CreatesTestData
             'active' => true,
             'site_id' => $this->siteId,
             'last_sent_at' => null
+        ], $attributes));
+    }
+
+    protected function createSubscriptionPlan(array $attributes = []): Model
+    {
+        return SubscriptionPlan::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Plan ' . uniqid(),
+            'slug' => 'test-plan-' . uniqid(),
+            'description' => 'A test subscription plan',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'features' => ['Feature 1', 'Feature 2'],
+            'is_active' => true,
+            'is_featured' => false,
+            'sort_order' => 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
         ], $attributes));
     }
 

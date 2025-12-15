@@ -16,6 +16,28 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
     private $planRepository;
     private $subscriptionRepository;
     private $service;
+    private $voucherServiceMock;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+        $this->voucherServiceMock = Mockery::mock(\App\Services\VoucherService::class);
+
+        $this->service = new SubscriptionPlanService(
+            $this->planRepository,
+            $this->subscriptionRepository,
+            $this->voucherServiceMock
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function testGetAvailablePlans(): void
     {
@@ -168,22 +190,108 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $this->service->deletePlan(1);
     }
 
-    protected function setUp(): void
+    public function testSubscribeMemberToPlanWithVoucherSuccess(): void
     {
-        parent::setUp();
+        $memberId = 1;
+        $planId = 1;
+        $siteId = 1;
+        $voucherCode = 'SUB10';
 
-        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
-        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = $planId;
+        $plan->price = 29.99;
 
-        $this->service = new SubscriptionPlanService(
-            $this->planRepository,
-            $this->subscriptionRepository
+        $subscription = Mockery::mock(Subscription::class);
+
+        $this->planRepository->shouldReceive('find')
+            ->with($planId)
+            ->once()
+            ->andReturn($plan);
+
+        // Mock VoucherService validation
+        $this->voucherServiceMock->shouldReceive('validateVoucherForSubscription')
+            ->with($voucherCode, $planId, $memberId)
+            ->andReturn([
+                'valid' => true,
+                'voucher_id' => 1,
+                'discount' => 2.99
+            ]);
+
+        $this->subscriptionRepository->shouldReceive('createSubscription')
+            ->with($memberId, $planId, $siteId, Mockery::on(function ($data) {
+                return $data['voucher_id'] === 1
+                    && $data['discount_amount'] === 2.99
+                    && $data['original_price'] === 29.99;
+            }))
+            ->once()
+            ->andReturn($subscription);
+
+        $result = $this->service->subscribeMemberToPlanWithVoucher(
+            $memberId,
+            $planId,
+            $siteId,
+            $voucherCode
         );
+
+        $this->assertSame($subscription, $result);
     }
 
-    protected function tearDown(): void
+    public function testSubscribeMemberToPlanWithInvalidVoucher(): void
     {
-        Mockery::close();
-        parent::tearDown();
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 29.99;
+
+        $this->planRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->voucherServiceMock->shouldReceive('validateVoucherForSubscription')
+            ->andReturn([
+                'valid' => false,
+                'message' => 'Voucher not found'
+            ]);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Voucher not found');
+
+        $this->service->subscribeMemberToPlanWithVoucher(1, 1, 1, 'INVALID');
+    }
+
+    public function testSubscribeMemberToPlanWithoutVoucher(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->price = 29.99;
+
+        $subscription = Mockery::mock(Subscription::class);
+
+        $this->planRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->subscriptionRepository->shouldReceive('createSubscription')
+            ->with(1, 1, 1, Mockery::on(function ($data) {
+                return $data['voucher_id'] === null
+                    && $data['discount_amount'] === 0
+                    && $data['original_price'] === 29.99;
+            }))
+            ->once()
+            ->andReturn($subscription);
+
+        $result = $this->service->subscribeMemberToPlanWithVoucher(1, 1, 1, null);
+
+        $this->assertSame($subscription, $result);
+    }
+
+    public function testSubscribeMemberToPlanWithVoucherThrowsWhenPlanNotFound(): void
+    {
+        $this->planRepository->shouldReceive('find')
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Plan not found');
+
+        $this->service->subscribeMemberToPlanWithVoucher(1, 999, 1, 'SUB10');
     }
 }

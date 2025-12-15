@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Subscription;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -403,5 +404,270 @@ class VoucherModelTest extends FunctionalTestCase
 
         $this->assertEquals(2, $voucher->getUserUsageCount($user1->id));
         $this->assertEquals(1, $voucher->getUserUsageCount($user2->id));
+    }
+
+    public function test_voucher_applies_to_subscriptions()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $this->assertTrue($voucher->appliesToSubscriptions());
+    }
+
+    public function test_voucher_does_not_apply_to_subscriptions_by_default()
+    {
+        $voucher = Voucher::create([
+            'code' => 'PRODUCT10',
+            'name' => 'Product Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId
+        ]);
+
+        $this->assertFalse($voucher->appliesToSubscriptions());
+    }
+
+    public function test_is_applicable_to_subscription_plan()
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'subscription_plan_ids' => [$plan->id]
+        ]);
+
+        $this->assertTrue($voucher->isApplicableToSubscriptionPlan($plan->id));
+    }
+
+    public function test_is_not_applicable_to_subscription_plan_when_plan_not_in_list()
+    {
+        $plan1 = $this->createSubscriptionPlan();
+        $plan2 = $this->createSubscriptionPlan();
+
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'subscription_plan_ids' => [$plan1->id]
+        ]);
+
+        $this->assertFalse($voucher->isApplicableToSubscriptionPlan($plan2->id));
+    }
+
+    public function test_is_applicable_to_all_subscription_plans_when_empty_list()
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'subscription_plan_ids' => []
+        ]);
+
+        $this->assertTrue($voucher->isApplicableToSubscriptionPlan($plan->id));
+    }
+
+    public function test_is_not_applicable_when_does_not_apply_to_subscriptions()
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $voucher = Voucher::create([
+            'code' => 'PRODUCT10',
+            'name' => 'Product Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => false
+        ]);
+
+        $this->assertFalse($voucher->isApplicableToSubscriptionPlan($plan->id));
+    }
+
+    public function test_calculate_subscription_discount_percentage()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB20',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 20,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $discount = $voucher->calculateSubscriptionDiscount(100.00);
+
+        $this->assertEquals(20.00, $discount);
+    }
+
+    public function test_calculate_subscription_discount_fixed()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB15',
+            'name' => 'Subscription Discount',
+            'type' => 'fixed',
+            'value' => 15,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $discount = $voucher->calculateSubscriptionDiscount(100.00);
+
+        $this->assertEquals(15.00, $discount);
+    }
+
+    public function test_calculate_subscription_discount_respects_maximum()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB50',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 50,
+            'maximum_discount' => 20,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $discount = $voucher->calculateSubscriptionDiscount(100.00);
+
+        $this->assertEquals(20.00, $discount);
+    }
+
+    public function test_subscriptions_relationship()
+    {
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $subscription1 = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'voucher_id' => $voucher->id,
+            'discount_amount' => 2.99
+        ]);
+
+        $subscription2 = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'voucher_id' => $voucher->id,
+            'discount_amount' => 2.99
+        ]);
+
+        $subscriptions = $voucher->subscriptions();
+
+        $this->assertCount(2, $subscriptions);
+        $this->assertTrue($subscriptions->contains('id', $subscription1->id));
+        $this->assertTrue($subscriptions->contains('id', $subscription2->id));
+    }
+
+    public function test_stripe_coupon_id_is_nullable()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'stripe_coupon_id' => null
+        ]);
+
+        $this->assertNull($voucher->stripe_coupon_id);
+    }
+
+    public function test_stripe_coupon_id_can_be_set()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'stripe_coupon_id' => 'coupon_test123'
+        ]);
+
+        $this->assertEquals('coupon_test123', $voucher->stripe_coupon_id);
+    }
+
+    public function test_duration_in_months_is_nullable()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'duration_in_months' => null
+        ]);
+
+        $this->assertNull($voucher->duration_in_months);
+    }
+
+    public function test_duration_in_months_can_be_set()
+    {
+        $voucher = Voucher::create([
+            'code' => 'SUB10',
+            'name' => 'Subscription Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true,
+            'duration_in_months' => 3
+        ]);
+
+        $this->assertEquals(3, $voucher->duration_in_months);
     }
 }

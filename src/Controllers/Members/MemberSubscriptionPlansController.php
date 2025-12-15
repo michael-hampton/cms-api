@@ -10,13 +10,15 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\SubscriptionRepository;
 use App\Services\SubscriptionCancellationService;
 use App\Services\SubscriptionPlanService;
+use App\Services\VoucherService;
 
 class MemberSubscriptionPlansController extends Controller
 {
     public function __construct(
         private readonly SubscriptionPlanService         $planService,
         private readonly SubscriptionRepository          $subscriptionRepository,
-        private readonly SubscriptionCancellationService $cancellationService
+        private readonly SubscriptionCancellationService $cancellationService,
+        private readonly VoucherService                  $voucherService
     )
     {
         parent::__construct();
@@ -96,10 +98,8 @@ class MemberSubscriptionPlansController extends Controller
             return $this->notFound('Plan not found');
         }
 
-        // Check if member can subscribe
         $canSubscribe = $this->planService->canMemberSubscribe($member->id, $plan->id, $siteId);
 
-        // If they can't subscribe, check if it's because they have a cancelled subscription
         if (!$canSubscribe['can_subscribe']) {
             $cancelledSubscription = $this->subscriptionRepository->getCancelledSubscriptionForPlan(
                 $member->id,
@@ -107,9 +107,7 @@ class MemberSubscriptionPlansController extends Controller
                 $siteId
             );
 
-            // If they have a cancelled subscription, try to reactivate it
             if ($cancelledSubscription && $cancelledSubscription->hasStripeSubscription()) {
-                // Check if subscription is still within the billing period (can potentially be reactivated)
                 $canReactivate = $cancelledSubscription->end_date &&
                     $cancelledSubscription->end_date > new \DateTime();
 
@@ -135,9 +133,6 @@ class MemberSubscriptionPlansController extends Controller
                             'error' => $e->getMessage()
                         ]);
 
-                        // If reactivation failed because subscription is fully canceled,
-                        // we'll allow them to create a new subscription below
-                        // Otherwise, show the error
                         if (!str_contains($e->getMessage(), 'cannot be reactivated')) {
                             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
                                 return $this->jsonResponse([
@@ -149,22 +144,9 @@ class MemberSubscriptionPlansController extends Controller
                             $_SESSION['flash_error'] = $e->getMessage();
                             return $this->redirect("/member/subscription-plans/{$slug}");
                         }
-                        // If we get here, reactivation failed because subscription is fully canceled
-                        // Continue to allow creating a new subscription
                     }
                 }
 
-                // If we reach here, either:
-                // 1. The subscription has ended (canReactivate = false), OR
-                // 2. Reactivation failed because subscription is fully canceled
-                // In both cases, we should allow creating a new subscription
-                // So we need to "archive" or ignore the old cancelled subscription
-                // and proceed with creating a new one
-
-                // The issue is that canSubscribe returned false because of the cancelled subscription
-                // We need to override this and allow the new subscription
-
-                // Update the cancelled subscription to mark it as replaced/archived
                 try {
                     $this->subscriptionRepository->update($cancelledSubscription->id, [
                         'metadata' => array_merge(
@@ -178,10 +160,7 @@ class MemberSubscriptionPlansController extends Controller
                         'error' => $e->getMessage()
                     ]);
                 }
-
-                // Now proceed to create new subscription (fall through to creation logic below)
             } else {
-                // They can't subscribe for a different reason (e.g., already has active subscription)
                 if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
                     return $this->resourceResponse([
                         'success' => false,
@@ -194,16 +173,19 @@ class MemberSubscriptionPlansController extends Controller
             }
         }
 
-        // Create new subscription
+        // Get voucher code from request
+        $voucherCode = $request->input('voucher_code');
+
         try {
-            $subscription = $this->planService->subscribeMemberToPlan(
+            $subscription = $this->planService->subscribeMemberToPlanWithVoucher(
                 $member->id,
                 $plan->id,
                 $siteId,
+                $voucherCode,
                 [
-                    'payment_method' => $request->input('payment_method', 'manual'),
+                    'payment_method' => $request->input('payment_method', 'stripe'),
                     'transaction_id' => $request->input('transaction_id'),
-                    'payment_method_id' => $request->input('payment_method_id') // For Stripe
+                    'payment_method_id' => $request->input('payment_method_id')
                 ]
             );
 
@@ -211,7 +193,12 @@ class MemberSubscriptionPlansController extends Controller
                 return $this->resourceResponse([
                     'success' => true,
                     'message' => 'Successfully subscribed to ' . $plan->name,
-                    'data' => ['subscription' => $subscription]
+                    'data' => [
+                        'subscription' => $subscription,
+                        'discount_applied' => $subscription->hasVoucher(),
+                        'discount_amount' => $subscription->discount_amount,
+                        'final_price' => $subscription->getDiscountedPrice()
+                    ]
                 ]);
             }
 
@@ -219,8 +206,6 @@ class MemberSubscriptionPlansController extends Controller
             return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
 
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
             Logger::error('Failed to create subscription', [
                 'member_id' => $member->id,
                 'plan_id' => $plan->id,
@@ -237,5 +222,67 @@ class MemberSubscriptionPlansController extends Controller
             $_SESSION['flash_error'] = $e->getMessage();
             return $this->redirect("/member/subscription-plans/{$slug}");
         }
+    }
+
+    public function validateVoucher(Request $request, string $slug)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Please login to validate voucher'
+            ], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
+
+        $plan = $this->planService->getPlanBySlug($slug, $siteId);
+
+        if (!$plan) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Plan not found'
+            ], 404);
+        }
+
+        $voucherCode = $request->input('voucher_code');
+
+        if (empty($voucherCode)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Voucher code is required'
+            ], 400);
+        }
+
+        $validation = $this->voucherService->validateVoucherForSubscription(
+            $voucherCode,
+            $plan->id,
+            $member->id
+        );
+
+        if ($validation['valid']) {
+            $finalPrice = $plan->price - $validation['discount'];
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => $validation['message'],
+                'data' => [
+                    'discount' => $validation['discount'],
+                    'original_price' => $plan->price,
+                    'final_price' => $finalPrice,
+                    'voucher' => [
+                        'id' => $validation['voucher_id'],
+                        'code' => $voucherCode,
+                        'type' => $validation['voucher']->type,
+                        'value' => $validation['voucher']->value
+                    ]
+                ]
+            ]);
+        }
+
+        return $this->jsonResponse([
+            'success' => false,
+            'message' => $validation['message']
+        ], 400);
     }
 }

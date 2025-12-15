@@ -13,7 +13,8 @@ class SubscriptionPlanService
 {
     public function __construct(
         private readonly SubscriptionPlanRepository $planRepository,
-        private readonly SubscriptionRepository     $subscriptionRepository
+        private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly VoucherService         $voucherService
     )
     {
     }
@@ -232,5 +233,53 @@ class SubscriptionPlanService
     public function togglePlanFeatured(int $planId): bool
     {
         return $this->planRepository->toggleFeatured($planId);
+    }
+
+    public function subscribeMemberToPlanWithVoucher(
+        int     $memberId,
+        int     $planId,
+        int     $siteId,
+        ?string $voucherCode = null,
+        array   $paymentData = []
+    ): Subscription
+    {
+        $plan = $this->planRepository->find($planId);
+
+        if (!$plan) {
+            throw new \Exception("Plan not found");
+        }
+
+        $voucherId = null;
+        $discountAmount = 0;
+        $originalPrice = $plan->price;
+
+        // Validate and apply voucher
+        if ($voucherCode) {
+            $validation = $this->voucherService->validateVoucherForSubscription(
+                $voucherCode,
+                $planId,
+                $memberId
+            );
+
+            if (!$validation['valid']) {
+                throw new \Exception($validation['message']);
+            }
+
+            $voucherId = $validation['voucher_id'];
+            $discountAmount = $validation['discount'];
+        }
+
+        $subscriptionData = array_merge($paymentData, [
+            'voucher_id' => $voucherId,
+            'discount_amount' => $discountAmount,
+            'original_price' => $originalPrice,
+        ]);
+
+        return $this->subscriptionRepository->createSubscription(
+            $memberId,
+            $planId,
+            $siteId,
+            $subscriptionData
+        );
     }
 }

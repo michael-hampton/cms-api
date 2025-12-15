@@ -224,6 +224,49 @@ $isLoggedIn = !empty($member);
                 </div>
             </div>
 
+            <div class="sub-voucher-section">
+                <div class="sub-form-group">
+                    <label class="sub-label">
+                        Have a voucher code?
+                        <span class="sub-hint">Optional - Enter your discount code</span>
+                    </label>
+                    <div class="sub-voucher-input-group">
+                        <input
+                                type="text"
+                                id="voucher-code"
+                                class="sub-input"
+                                placeholder="Enter voucher code"
+                                style="margin-bottom: 0;"
+                        >
+                        <button
+                                type="button"
+                                id="apply-voucher-btn"
+                                class="sub-btn-voucher"
+                                onclick="applyVoucher()"
+                        >
+                            Apply
+                        </button>
+                    </div>
+                    <div id="voucher-message" class="sub-voucher-message"></div>
+                </div>
+
+                <div id="voucher-applied" class="sub-voucher-applied" style="display: none;">
+                    <div class="sub-voucher-success">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <div class="sub-voucher-details">
+                            <strong id="voucher-discount-text">-</strong>
+                            <span id="voucher-code-text">-</span>
+                        </div>
+                    </div>
+                    <button type="button" class="sub-voucher-remove" onclick="removeVoucher()">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
             <form id="payment-form" class="sub-form">
                 <div class="sub-form-group">
                     <label class="sub-label">Card Information</label>
@@ -989,6 +1032,114 @@ $isLoggedIn = !empty($member);
             margin-bottom: 0;
         }
     }
+
+    .sub-voucher-section {
+        margin-bottom: 24px;
+    }
+
+    .sub-voucher-input-group {
+        display: flex;
+        gap: 12px;
+    }
+
+    .sub-voucher-input-group .sub-input {
+        flex: 1;
+    }
+
+    .sub-btn-voucher {
+        padding: 12px 24px;
+        background: white;
+        border: 2px solid var(--sub-primary);
+        color: var(--sub-primary);
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        white-space: nowrap;
+    }
+
+    .sub-btn-voucher:hover {
+        background: var(--sub-primary);
+        color: white;
+    }
+
+    .sub-btn-voucher:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .sub-voucher-message {
+        margin-top: 8px;
+        font-size: 14px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        display: none;
+    }
+
+    .sub-voucher-message.success {
+        display: block;
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .sub-voucher-message.error {
+        display: block;
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .sub-voucher-applied {
+        margin-top: 16px;
+        padding: 16px;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border-radius: 10px;
+        border: 2px solid #28a745;
+    }
+
+    .sub-voucher-success {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .sub-voucher-success svg {
+        color: #28a745;
+        flex-shrink: 0;
+    }
+
+    .sub-voucher-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .sub-voucher-details strong {
+        font-size: 16px;
+        color: #155724;
+    }
+
+    .sub-voucher-details span {
+        font-size: 13px;
+        color: #28a745;
+        font-weight: 600;
+    }
+
+    .sub-voucher-remove {
+        background: transparent;
+        border: none;
+        color: #28a745;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .sub-voucher-remove:hover {
+        background: rgba(40, 167, 69, 0.1);
+    }
 </style>
 
 <script src="https://js.stripe.com/v3/"></script>
@@ -1286,14 +1437,21 @@ $isLoggedIn = !empty($member);
             }
 
             // Process subscription
+            const requestBody = {
+                subscription_plan_id: selectedPlanId,
+                payment_method: 'stripe',
+                payment_method_id: paymentMethod.id
+            };
+
+            // Include voucher code if applied
+            if (appliedVoucher) {
+                requestBody.voucher_code = appliedVoucher.voucher.code;
+            }
+
             const response = await fetch(API_BASE + '/checkout/process', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    subscription_plan_id: selectedPlanId,
-                    payment_method: 'stripe',
-                    payment_method_id: paymentMethod.id
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const result = await response.json();
@@ -1325,6 +1483,112 @@ $isLoggedIn = !empty($member);
             document.getElementById('card-errors').textContent = 'An error occurred. Please try again.';
         }
     });
+
+    let appliedVoucher = null;
+
+    async function applyVoucher() {
+        const input = document.getElementById('voucher-code');
+        const button = document.getElementById('apply-voucher-btn');
+        const message = document.getElementById('voucher-message');
+        const code = input.value.trim();
+
+        if (!code) {
+            showVoucherMessage('Please enter a voucher code', 'error');
+            return;
+        }
+
+        if (!selectedPlanSlug) {
+            showVoucherMessage('Please select a plan first', 'error');
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = 'Validating...';
+        message.className = 'sub-voucher-message';
+        message.textContent = '';
+
+        try {
+            const response = await fetch(`/api/${SITE}/subscription-plans/${selectedPlanSlug}/validate-voucher`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({voucher_code: code})
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                appliedVoucher = result.data;
+                showVoucherApplied();
+                updatePaymentSummaryWithDiscount();
+                showVoucherMessage('Voucher applied successfully!', 'success');
+
+                // Hide input and button
+                document.querySelector('.sub-voucher-input-group').style.display = 'none';
+            } else {
+                showVoucherMessage(result.message, 'error');
+            }
+        } catch (error) {
+            showVoucherMessage('Failed to validate voucher', 'error');
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Apply';
+        }
+    }
+
+    function removeVoucher() {
+        appliedVoucher = null;
+        document.getElementById('voucher-applied').style.display = 'none';
+        document.querySelector('.sub-voucher-input-group').style.display = 'flex';
+        document.getElementById('voucher-code').value = '';
+        document.getElementById('voucher-message').className = 'sub-voucher-message';
+        updatePaymentSummary();
+    }
+
+    function showVoucherApplied() {
+        if (!appliedVoucher) return;
+
+        const container = document.getElementById('voucher-applied');
+        const discountText = document.getElementById('voucher-discount-text');
+        const codeText = document.getElementById('voucher-code-text');
+
+        discountText.textContent = `-${appliedVoucher.voucher.currency || '$'}${appliedVoucher.discount.toFixed(2)} discount`;
+        codeText.textContent = `Code: ${appliedVoucher.voucher.code}`;
+
+        container.style.display = 'flex';
+    }
+
+    function showVoucherMessage(message, type) {
+        const messageEl = document.getElementById('voucher-message');
+        messageEl.textContent = message;
+        messageEl.className = `sub-voucher-message ${type}`;
+    }
+
+    function updatePaymentSummaryWithDiscount() {
+        if (selectedPlanData && appliedVoucher) {
+            const originalPrice = parseFloat(selectedPlanData.price.replace(/,/g, ''));
+            const finalPrice = appliedVoucher.final_price;
+
+            document.getElementById('summary-plan-name').textContent = selectedPlanData.name;
+            document.getElementById('summary-billing').innerHTML = `
+            <div>
+                <div>Billed ${selectedPlanData.period.replace('/', '')}</div>
+                <div style="font-size: 13px; color: #28a745; margin-top: 4px;">
+                    Voucher: -${selectedPlanData.currency}${appliedVoucher.discount.toFixed(2)}
+                </div>
+            </div>
+        `;
+            document.getElementById('summary-total').innerHTML = `
+            <div>
+                <div style="text-decoration: line-through; font-size: 14px; color: #999; font-weight: 400;">
+                    ${selectedPlanData.currency}${selectedPlanData.price}${selectedPlanData.period}
+                </div>
+                <div style="color: #28a745;">
+                    ${selectedPlanData.currency}${finalPrice.toFixed(2)}${selectedPlanData.period}
+                </div>
+            </div>
+        `;
+        }
+    }
 
     // Loading helpers
     function showLoading() {

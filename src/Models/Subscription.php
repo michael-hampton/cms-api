@@ -22,7 +22,10 @@ class Subscription extends Model
         'next_billing_date',
         'last_payment_date',
         'payment_intent_id',
-        'payment_subscription_id'
+        'payment_subscription_id',
+        'voucher_id',
+        'discount_amount',
+        'original_price'
     ];
 
     protected $casts = [
@@ -142,5 +145,20 @@ class Subscription extends Model
     public function getStripeSubscriptionId(): ?string
     {
         return $this->payment_subscription_id;
+    }
+
+    public function voucher($relation = false)
+    {
+        return $this->belongsTo(Voucher::class, 'voucher_id', 'id', $relation);
+    }
+
+    public function getDiscountedPrice(): float
+    {
+        return $this->price - $this->discount_amount;
+    }
+
+    public function hasVoucher(): bool
+    {
+        return $this->voucher_id !== null;
     }
 }

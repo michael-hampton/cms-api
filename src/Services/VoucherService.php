@@ -5,17 +5,20 @@ namespace App\Services;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
-use App\Framework\Support\SiteContext;
-use App\Framework\Support\Str;
 use App\Models\Concerns\HasCloneHistory;
 use App\Models\Voucher;
+use App\Repositories\SubscriptionPlanRepository;
 use App\Repositories\VoucherRepository;
 
 class VoucherService
 {
     use HasCloneHistory;
 
-    public function __construct(private readonly Database $database, private readonly VoucherRepository $repository)
+    public function __construct(
+        private readonly Database                   $database,
+        private readonly VoucherRepository          $repository,
+        private readonly SubscriptionPlanRepository $subscriptionPlanRepository
+    )
     {
     }
 
@@ -179,5 +182,93 @@ class VoucherService
     public function updateExpiredVouchers(): int
     {
         return $this->repository->updateExpiredVouchers();
+    }
+
+    public function validateVoucherForSubscription(
+        string $code,
+        int    $planId,
+        ?int   $userId = null
+    ): array
+    {
+        $voucher = $this->repository->findByCode($code);
+
+        if (!$voucher) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher not found',
+                'discount' => 0
+            ];
+        }
+
+        if (!$voucher->isValid()) {
+            $message = $this->getInvalidMessage($voucher);
+            return [
+                'valid' => false,
+                'message' => $message,
+                'discount' => 0
+            ];
+        }
+
+        if (!$voucher->appliesToSubscriptions()) {
+            return [
+                'valid' => false,
+                'message' => 'This voucher cannot be used for subscriptions',
+                'discount' => 0
+            ];
+        }
+
+        if (!$voucher->isApplicableToSubscriptionPlan($planId)) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher not applicable to this subscription plan',
+                'discount' => 0
+            ];
+        }
+
+        // Check per-user limit
+        if ($userId && $voucher->per_user_limit) {
+            $userUsageCount = $voucher->getUserUsageCount($userId);
+
+            if ($userUsageCount >= $voucher->per_user_limit) {
+                return [
+                    'valid' => false,
+                    'message' => 'You have already used this voucher the maximum number of times',
+                    'discount' => 0
+                ];
+            }
+        }
+
+        $plan = $this->subscriptionPlanRepository->find($planId);
+
+        if (!$plan) {
+            return [
+                'valid' => false,
+                'message' => 'Plan not found',
+                'discount' => 0
+            ];
+        }
+
+        $discount = $voucher->calculateSubscriptionDiscount($plan->price);
+
+        return [
+            'valid' => true,
+            'message' => 'Voucher applied successfully',
+            'discount' => $discount,
+            'voucher_id' => $voucher->id,
+            'voucher' => $voucher
+        ];
+    }
+
+    private function getInvalidMessage($voucher): string
+    {
+        if ($voucher->status === 'expired') {
+            return 'Voucher has expired';
+        } elseif ($voucher->status === 'inactive') {
+            return 'Voucher is inactive';
+        } elseif ($voucher->usage_limit && $voucher->usage_count >= $voucher->usage_limit) {
+            return 'Voucher usage limit reached';
+        }
+
+        return 'Voucher is not valid';
     }
 }
