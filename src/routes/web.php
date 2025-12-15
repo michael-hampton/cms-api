@@ -244,11 +244,15 @@ $router->put('/{site}/admin/subscription-plans/{id}', [AdminSubscriptionPlansCon
 $router->delete('/{site}/admin/subscription-plans/{id}', [AdminSubscriptionPlansController::class, 'destroy']);
 $router->post('/{site}/admin/subscription-plans/{id}/toggle-active', [AdminSubscriptionPlansController::class, 'toggleActive']);
 $router->post('/{site}/admin/subscription-plans/{id}/toggle-featured', [AdminSubscriptionPlansController::class, 'toggleFeatured']);
+$router->post('/{site}/member/subscription-plans/{slug}/validate-voucher', [MemberSubscriptionPlansController::class, 'validateVoucher']);
 $router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalController::class, 'markShown']);
+
+$router->post('/api/{site}/subscription-plans/{slug}/validate-voucher', [MemberSubscriptionPlansController::class, 'validateVoucher']);
 
 
 $router->get('/{site}/newsletters', [NewsletterWebController::class, 'index']);
 $router->get('/{site}/newsletters/{id}', [NewsletterWebController::class, 'show']);
+$router->get('/{site}/newsletters/archive', [NewsletterWebController::class, 'archive']);
 
 
 // Member Newsletters Routes

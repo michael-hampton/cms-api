@@ -19,14 +19,16 @@ class Newsletter extends Model
         'max_pages',
         'sort_by',
         'sort_order',
-        'template'
+        'template',
+        'created_at',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'last_sent' => 'datetime',
         'page_filters' => 'array',
-        'max_pages' => 'integer'
+        'max_pages' => 'integer',
+        'created_at' => 'datetime'
     ];
 
     const INTERVAL_DAILY = 'daily';

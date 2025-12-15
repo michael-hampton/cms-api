@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Controllers;
 
 use App\Framework\Authorization\MemberAuth;
@@ -20,7 +21,8 @@ class MemberAuthController extends Controller
     public function __construct(
         private EmailVerificationService $emailVerificationService,
         private PasswordResetService $passwordResetService
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -178,6 +180,11 @@ class MemberAuthController extends Controller
         if (MemberAuth::attempt($credentials)) {
             $intendedUrl = $request->session()->get('intended_url', '/member/dashboard');
             $request->session()->forget('intended_url');
+
+            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
+                $request->getHeader('Content-Type') === 'application/json') {
+                return $this->resourceResponse(['success' => true]);
+            }
 
             return $this->redirect($intendedUrl);
         }

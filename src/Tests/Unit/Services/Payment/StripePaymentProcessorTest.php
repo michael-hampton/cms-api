@@ -10,6 +10,7 @@ use App\Repositories\PaymentRepository;
 use App\Services\Payment\StripePaymentProcessor;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
+use Stripe\Service\CouponService;
 use Stripe\Service\CustomerService;
 use Stripe\Service\InvoiceService;
 use Stripe\Service\PaymentIntentService;
@@ -31,6 +32,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     private $priceServiceMock;
     private $invoiceServiceMock;
     private $paymentIntentServiceMock;
+    private $couponServiceMock;
 
     protected function setUp(): void
     {
@@ -47,6 +49,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->priceServiceMock = m::mock(PriceService::class);
         $this->invoiceServiceMock = m::mock(InvoiceService::class);
         $this->paymentIntentServiceMock = m::mock(PaymentIntentService::class);
+        $this->couponServiceMock = m::mock(CouponService::class);
 
         $this->stripeMock->customers = $this->customerServiceMock;
         $this->stripeMock->subscriptions = $this->subscriptionServiceMock;
@@ -55,6 +58,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->stripeMock->prices = $this->priceServiceMock;
         $this->stripeMock->invoices = $this->invoiceServiceMock;
         $this->stripeMock->paymentIntents = $this->paymentIntentServiceMock;
+        $this->stripeMock->coupons = $this->couponServiceMock;
 
         // Inject mocked Stripe client via constructor
         $this->processor = new StripePaymentProcessor(
@@ -962,6 +966,260 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $this->assertFalse($result['success']);
         $this->assertEquals('unauthorized', $result['error_code']);
+    }
+
+    // Add these tests to the existing class
+
+    public function testProcessSubscriptionPaymentWithVoucher(): void
+    {
+        $member = $this->createMockMember(null);
+        $subscription = $this->createMockSubscription($member);
+        $plan = $this->createMockPlan();
+
+        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->code = 'SUB10';
+        $voucher->type = 'percentage';
+        $voucher->value = 10;
+        $voucher->stripe_coupon_id = null;
+        $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
+        $voucher->shouldReceive('update')->once();
+
+        $subscription->discount_amount = 2.99;
+        $subscription->original_price = 29.99;
+        $subscription->shouldReceive('getDiscountedPrice')->andReturn(27.00);
+
+        $customer = $this->expectCustomerCreation($member);
+        $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
+        $this->expectCustomerUpdate($customer->id, $customer);
+
+        // Expect coupon creation
+        $this->expectCouponCreation($voucher);
+
+        $this->expectPriceCreation($plan);
+
+        $stripeSubscription = $this->expectSubscriptionCreationWithCoupon(
+            'sub_test123',
+            'active',
+            'in_test123',
+            'coupon_test123'
+        );
+
+        $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
+
+        $payment = $this->expectPaymentCreationWithVoucher($subscription->id, $voucher);
+        $this->expectPaymentUpdate($payment->id, 'completed');
+
+        $subscription->shouldReceive('update')
+            ->once()
+            ->with(['status' => 'active']);
+
+        $member->shouldReceive('update')
+            ->once()
+            ->with(['stripe_customer_id' => $customer->id]);
+
+        $data = ['payment_method_id' => 'pm_test123'];
+
+        $result = $this->processor->processSubscriptionPaymentWithVoucher(
+            $subscription,
+            $plan,
+            $voucher,
+            $data
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['discount_applied']);
+        $this->assertEquals('sub_test123', $result['subscription_id']);
+    }
+
+    public function testGetOrCreateStripeCouponCreatesNewCoupon(): void
+    {
+        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->code = 'SUB10';
+        $voucher->name = '10% Off';
+        $voucher->type = 'percentage';
+        $voucher->value = 10;
+        $voucher->stripe_coupon_id = null;
+        $voucher->duration_in_months = null;
+        $voucher->maximum_discount = null;
+
+        $stripeCoupon = new \stdClass();
+        $stripeCoupon->id = 'coupon_test123';
+
+        $plan = $this->createMockPlan();
+        $plan->currency = 'gbp';
+
+        $this->couponServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['name'] === '10% Off'
+                    && $data['percent_off'] === 10
+                    && $data['duration'] === 'once'
+                    && isset($data['metadata']['voucher_id']);
+            }))
+            ->andReturn($stripeCoupon);
+
+        $voucher->shouldReceive('update')
+            ->once()
+            ->with(['stripe_coupon_id' => 'coupon_test123']);
+
+        // Use reflection to test private method
+        $reflection = new \ReflectionClass($this->processor);
+        $method = $reflection->getMethod('getOrCreateStripeCoupon');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->processor, $voucher, $plan);
+
+        $this->assertEquals('coupon_test123', $result);
+    }
+
+    public function testGetOrCreateStripeCouponUsesExisting(): void
+    {
+        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->stripe_coupon_id = 'coupon_existing123';
+        $stripeCoupon = new \stdClass();
+        $stripeCoupon->id = 'coupon_existing123';
+
+        $this->couponServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('coupon_existing123')
+            ->andReturn($stripeCoupon);
+
+        $reflection = new \ReflectionClass($this->processor);
+        $method = $reflection->getMethod('getOrCreateStripeCoupon');
+        $method->setAccessible(true);
+
+        $plan = $this->createMockPlan();
+        $plan->currency = 'gbp';
+
+        $result = $method->invoke($this->processor, $voucher, $plan);
+
+        $this->assertEquals('coupon_existing123', $result);
+    }
+
+    public function testGetOrCreateStripeCouponWithFixedAmount(): void
+    {
+        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->code = 'SUB15';
+        $voucher->name = '$15 Off';
+        $voucher->type = 'fixed';
+        $voucher->value = 15;
+        $voucher->stripe_coupon_id = null;
+        $voucher->duration_in_months = null;
+        $stripeCoupon = new \stdClass();
+        $stripeCoupon->id = 'coupon_test123';
+
+        $this->couponServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['amount_off'] === 1500 // $15 in cents
+                    && $data['currency'] === 'usd';
+            }))
+            ->andReturn($stripeCoupon);
+
+        $voucher->shouldReceive('update')->once();
+
+        $reflection = new \ReflectionClass($this->processor);
+        $method = $reflection->getMethod('getOrCreateStripeCoupon');
+        $method->setAccessible(true);
+
+        $plan = $this->createMockPlan();
+        $plan->currency = 'usd';
+
+        $result = $method->invoke($this->processor, $voucher, $plan);
+
+        $this->assertEquals('coupon_test123', $result);
+    }
+
+    public function testGetOrCreateStripeCouponWithDuration(): void
+    {
+        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->code = 'SUB10';
+        $voucher->name = '10% Off';
+        $voucher->type = 'percentage';
+        $voucher->value = 10;
+        $voucher->stripe_coupon_id = null;
+        $voucher->duration_in_months = 3;
+        $stripeCoupon = new \stdClass();
+        $stripeCoupon->id = 'coupon_test123';
+
+        $this->couponServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['duration'] === 'repeating'
+                    && $data['duration_in_months'] === 3;
+            }))
+            ->andReturn($stripeCoupon);
+
+        $voucher->shouldReceive('update')->once();
+
+        $reflection = new \ReflectionClass($this->processor);
+        $method = $reflection->getMethod('getOrCreateStripeCoupon');
+        $method->setAccessible(true);
+
+        $plan = $this->createMockPlan();
+        $plan->currency = 'gbp';
+
+        $result = $method->invoke($this->processor, $voucher, $plan);
+
+        $this->assertEquals('coupon_test123', $result);
+    }
+
+// Helper methods
+    private function expectCouponCreation($voucher): void
+    {
+        $stripeCoupon = new \stdClass();
+        $stripeCoupon->id = 'coupon_test123';
+        $couponServiceMock = m::mock(\Stripe\Service\CouponService::class);
+        $this->stripeMock->coupons = $couponServiceMock;
+
+        $couponServiceMock->shouldReceive('create')
+            ->once()
+            ->andReturn($stripeCoupon);
+    }
+
+    private function expectSubscriptionCreationWithCoupon(
+        string $subscriptionId,
+        string $status,
+        string $invoiceId,
+        string $couponId
+    ): \Stripe\Subscription
+    {
+        $stripeSubscription = \Stripe\Subscription::constructFrom([
+            'id' => $subscriptionId,
+            'status' => $status,
+            'latest_invoice' => $invoiceId,
+        ]);
+        $this->subscriptionServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) use ($couponId) {
+                return isset($data['discounts'][0]['coupon'])
+                    && $data['discounts'][0]['coupon'] === $couponId
+                    && isset($data['metadata']['voucher_id']);
+            }))
+            ->andReturn($stripeSubscription);
+
+        return $stripeSubscription;
+    }
+
+    private function expectPaymentCreationWithVoucher($subscriptionId, $voucher)
+    {
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 1;
+        $payment->subscription_id = $subscriptionId;
+        $this->paymentRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) use ($voucher) {
+                return isset($data['metadata']['voucher_id'])
+                    && $data['metadata']['voucher_id'] === $voucher->id
+                    && isset($data['metadata']['discount_amount']);
+            }))
+            ->andReturn($payment);
+
+        return $payment;
     }
 
 }

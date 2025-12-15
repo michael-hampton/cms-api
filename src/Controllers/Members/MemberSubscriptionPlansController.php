@@ -213,7 +213,7 @@ class MemberSubscriptionPlansController extends Controller
             ]);
 
             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
-                return $this->jsonResponse([
+                return $this->resourceResponse([
                     'success' => false,
                     'message' => $e->getMessage()
                 ], 500);
@@ -227,7 +227,7 @@ class MemberSubscriptionPlansController extends Controller
     public function validateVoucher(Request $request, string $slug)
     {
         if (!MemberAuth::check()) {
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Please login to validate voucher'
             ], 401);
@@ -239,7 +239,7 @@ class MemberSubscriptionPlansController extends Controller
         $plan = $this->planService->getPlanBySlug($slug, $siteId);
 
         if (!$plan) {
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Plan not found'
             ], 404);
@@ -248,7 +248,7 @@ class MemberSubscriptionPlansController extends Controller
         $voucherCode = $request->input('voucher_code');
 
         if (empty($voucherCode)) {
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Voucher code is required'
             ], 400);
@@ -263,7 +263,7 @@ class MemberSubscriptionPlansController extends Controller
         if ($validation['valid']) {
             $finalPrice = $plan->price - $validation['discount'];
 
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => true,
                 'message' => $validation['message'],
                 'data' => [
@@ -280,7 +280,7 @@ class MemberSubscriptionPlansController extends Controller
             ]);
         }
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'success' => false,
             'message' => $validation['message']
         ], 400);

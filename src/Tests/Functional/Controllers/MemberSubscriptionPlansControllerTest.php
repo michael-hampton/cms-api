@@ -175,4 +175,172 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
         $this->assertTrue($updated->auto_renew);
     }
 
+    public function testSubscribeWithValidVoucher(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $voucher = \App\Models\Voucher::create([
+            'code' => 'SUB10',
+            'name' => '10% Off',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/subscribe',
+            [
+                'payment_method' => 'stripe',
+                'voucher_code' => 'SUB10'
+            ],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['data']['discount_applied']);
+        $this->assertGreaterThan(0, $data['data']['discount_amount']);
+        $this->assertLessThan($this->plan->price, $data['data']['final_price']);
+    }
+
+    public function testSubscribeWithInvalidVoucher(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/subscribe',
+            [
+                'payment_method' => 'stripe',
+                'voucher_code' => 'INVALID'
+            ],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('Voucher', $data['message']);
+    }
+
+    public function testSubscribeWithoutVoucher(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/subscribe',
+            ['payment_method' => 'stripe'],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+    }
+
+    public function testValidateVoucherSuccess(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $voucher = \App\Models\Voucher::create([
+            'code' => 'SUB20',
+            'name' => '20% Off',
+            'type' => 'percentage',
+            'value' => 20,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => true
+        ]);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/validate-voucher',
+            ['voucher_code' => 'SUB20']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('discount', $data['data']);
+        $this->assertArrayHasKey('original_price', $data['data']);
+        $this->assertArrayHasKey('final_price', $data['data']);
+        $this->assertEquals(round(20 * $this->plan->price / 100, 2), $data['data']['discount']);
+    }
+
+    public function testValidateVoucherNotFound(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/validate-voucher',
+            ['voucher_code' => 'NOTFOUND']
+        );
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+        $this->assertEquals('Voucher not found', $data['message']);
+    }
+
+    public function testValidateVoucherRequiresAuthentication(): void
+    {
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/validate-voucher',
+            ['voucher_code' => 'TEST']
+        );
+
+        $this->assertEquals(401, $response->getStatusCode());
+    }
+
+    public function testValidateVoucherRequiresCode(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/validate-voucher',
+            []
+        );
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+        $this->assertEquals('Voucher code is required', $data['message']);
+    }
+
+    public function testValidateVoucherNotApplicableToSubscriptions(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $voucher = \App\Models\Voucher::create([
+            'code' => 'PRODUCT10',
+            'name' => 'Product Discount',
+            'type' => 'percentage',
+            'value' => 10,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+            'applies_to_subscriptions' => false
+        ]);
+
+        $response = $this->postForSite(
+            '/member/subscription-plans/premium/validate-voucher',
+            ['voucher_code' => 'PRODUCT10']
+        );
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('cannot be used for subscriptions', $data['message']);
+    }
+
 }

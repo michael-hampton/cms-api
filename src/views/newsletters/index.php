@@ -191,27 +191,30 @@
     <?php if ($newsletters->count() > 0): ?>
         <div class="newsletters-grid">
             <?php foreach ($newsletters as $newsletter): ?>
-                <div class="newsletter-card" onclick="window.location.href='/newsletters/<?= $newsletter->id ?>'">
+                <div class="newsletter-card"
+                     onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>'">
                     <div class="newsletter-image">
                         📧
                     </div>
                     <div class="newsletter-content">
                         <div class="newsletter-date">
-                            <?= $newsletter->created_at->format('F d, Y') ?>
+                            <?= $newsletter->created_at?->format('F d, Y') ?>
                         </div>
                         <h2 class="newsletter-title">
-                            <?= htmlspecialchars($newsletter->subject ?? 'Untitled Newsletter') ?>
+                            <?= htmlspecialchars($newsletter->title ?? 'Untitled Newsletter') ?>
                         </h2>
-                        <?php if (!empty($newsletter->preview_text)): ?>
+                        <?php if (!empty($newsletter->content)): ?>
                             <p class="newsletter-excerpt">
-                                <?= htmlspecialchars(substr($newsletter->preview_text, 0, 120)) ?>...
+                                <?= htmlspecialchars(substr($newsletter->content, 0, 120)) ?>...
                             </p>
                         <?php endif; ?>
                         <div class="newsletter-footer">
-                                <span class="newsletter-status <?= $newsletter->status === 'published' ? 'status-published' : 'status-draft' ?>">
-                                    <?= ucfirst($newsletter->status) ?>
-                                </span>
-                            <a href="/newsletters/<?= $newsletter->id ?>" class="read-more"
+                            <!--                                <span class="newsletter-status -->
+                            <?php //= $newsletter->status === 'published' ? 'status-published' : 'status-draft' ?><!--">-->
+                            <!--                                    --><?php //= ucfirst($newsletter->status) ?>
+                            <!--                                </span>-->
+                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>"
+                               class="read-more"
                                onclick="event.stopPropagation()">
                                 Read More →
                             </a>

@@ -192,7 +192,7 @@
             <?= $newsletter->created_at->format('F d, Y') ?>
         </div>
         <h1 class="newsletter-title">
-            <?= htmlspecialchars($newsletter->subject ?? 'Newsletter') ?>
+            <?= htmlspecialchars($newsletter->title ?? 'Newsletter') ?>
         </h1>
         <div class="newsletter-meta">
             <span>📧 Newsletter</span>

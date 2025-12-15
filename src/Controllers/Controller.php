@@ -110,9 +110,9 @@ abstract class Controller
     }
 
     // Non-API methods return Response objects
-    protected function redirectResponse(string $url): Response
+    protected function redirectResponse(string $url, int $status = 302): Response
     {
-        return Response::redirect($url);
+        return Response::redirect($url, $status);
     }
 
     /**

@@ -909,7 +909,7 @@ class StripePaymentProcessor
             // Create or get Stripe coupon for voucher
             $couponId = null;
             if ($voucher && $voucher->appliesToSubscriptions()) {
-                $couponId = $this->getOrCreateStripeCoupon($voucher);
+                $couponId = $this->getOrCreateStripeCoupon($voucher, $plan);
             }
 
             $priceId = $this->getOrCreatePrice($plan);
@@ -929,7 +929,9 @@ class StripePaymentProcessor
 
             // Apply coupon if voucher provided
             if ($couponId) {
-                $subscriptionData['coupon'] = $couponId;
+                $subscriptionData['discounts'] = [
+                    ['coupon' => $couponId]
+                ];
                 $subscriptionData['metadata']['voucher_id'] = $voucher->id;
                 $subscriptionData['metadata']['voucher_code'] = $voucher->code;
             }
@@ -1033,7 +1035,7 @@ class StripePaymentProcessor
         }
     }
 
-    private function getOrCreateStripeCoupon(Voucher $voucher): string
+    private function getOrCreateStripeCoupon(Voucher $voucher, SubscriptionPlan $plan): string
     {
         // Check if coupon already exists
         if ($voucher->stripe_coupon_id) {
@@ -1054,10 +1056,10 @@ class StripePaymentProcessor
         ];
 
         if ($voucher->type === 'percentage') {
-            $couponData['percent_off'] = $voucher->value;
+            $couponData['percent_off'] = (int)$voucher->value;
         } else {
             $couponData['amount_off'] = (int)($voucher->value * 100); // Convert to cents
-            $couponData['currency'] = 'usd'; // Should match subscription currency
+            $couponData['currency'] = $plan->currency; // Should match subscription currency
         }
 
         // Set duration

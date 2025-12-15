@@ -184,11 +184,11 @@
                             <?= $newsletter->created_at->format('F d, Y') ?>
                         </div>
                         <h3 class="newsletter-item-title">
-                            <?= htmlspecialchars($newsletter->subject ?? 'Untitled Newsletter') ?>
+                            <?= htmlspecialchars($newsletter->title ?? 'Untitled Newsletter') ?>
                         </h3>
-                        <?php if (!empty($newsletter->preview_text)): ?>
+                        <?php if (!empty($newsletter->content)): ?>
                             <p class="newsletter-item-excerpt">
-                                <?= htmlspecialchars(substr($newsletter->preview_text, 0, 150)) ?>...
+                                <?= htmlspecialchars(substr($newsletter->content, 0, 150)) ?>...
                             </p>
                         <?php endif; ?>
                         <a href="/newsletters/<?= $newsletter->id ?>" class="newsletter-item-link"

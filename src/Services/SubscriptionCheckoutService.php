@@ -21,6 +21,7 @@ class SubscriptionCheckoutService
         private readonly PaymentMethodRepository    $paymentMethodRepository,
         private readonly StripePaymentProcessor     $stripeProcessor,
         private readonly PayPalPaymentProcessor     $paypalProcessor,
+        private readonly VoucherService $voucherService,
         private readonly Database                   $database
     )
     {
@@ -53,15 +54,45 @@ class SubscriptionCheckoutService
                     throw new Exception('Invalid payment method');
                 }
 
-                // Create subscription
-                $subscription = $this->createSubscription($memberId, $plan, $siteId);
+                // Handle voucher if provided
+                $voucherId = null;
+                $discountAmount = 0;
+                $finalPrice = $plan->price;
 
-                // Process payment
+                if (!empty($data['voucher_code'])) {
+                    $voucherValidation = $this->voucherService->validateVoucherForSubscription(
+                        $data['voucher_code'],
+                        $plan->id,
+                        $memberId
+                    );
+
+                    if (!$voucherValidation['valid']) {
+                        throw new Exception($voucherValidation['message']);
+                    }
+
+                    $voucher = $voucherValidation['voucher'];
+                    $voucherId = $voucherValidation['voucher_id'];
+                    $discountAmount = $voucherValidation['discount'];
+                    $finalPrice = $voucherValidation['final_price'] ?? null;
+                }
+
+                // Create subscription with voucher data
+                $subscription = $this->createSubscription(
+                    $memberId,
+                    $plan,
+                    $siteId,
+                    $voucherId,
+                    $discountAmount,
+                    $finalPrice
+                );
+
+                // Process payment with voucher
                 $paymentResult = $this->processPayment(
                     $subscription,
                     $plan,
                     $data,
-                    $paymentMethod
+                    $paymentMethod,
+                    $voucher
                 );
 
                 if (!$paymentResult['success']) {
@@ -89,25 +120,33 @@ class SubscriptionCheckoutService
         }
     }
 
-    private function createSubscription(int $memberId, SubscriptionPlan $plan, int $siteId): Model
+    private function createSubscription(
+        int              $memberId,
+        SubscriptionPlan $plan,
+        int              $siteId,
+        ?int             $voucherId = null,
+        float            $discountAmount = 0,
+        ?float           $finalPrice = null
+    ): Model
     {
         $startDate = new \DateTime();
         $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
 
-        return $this->subscriptionRepository->create(
-            [
-                'member_id' => $memberId,
-                'site_id' => $siteId,
-                'plan_id' => $plan->id,
-                'plan_name' => $plan->name,
-                'status' => 'pending',
-                'start_date' => $startDate->format('Y-m-d H:i:s'),
-                'end_date' => $endDate?->format('Y-m-d H:i:s'),
-                'price' => $plan->price,
-                'currency' => $plan->currency,
-                'auto_renew' => $plan->billing_period !== 'lifetime'
-            ]
-        );
+        return $this->subscriptionRepository->create([
+            'member_id' => $memberId,
+            'site_id' => $siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'status' => 'pending',
+            'start_date' => $startDate->format('Y-m-d H:i:s'),
+            'end_date' => $endDate?->format('Y-m-d H:i:s'),
+            'price' => $finalPrice ?? $plan->price,
+            'original_price' => $plan->price,
+            'discount_amount' => $discountAmount,
+            'voucher_id' => $voucherId,
+            'currency' => $plan->currency,
+            'auto_renew' => $plan->billing_period !== 'lifetime'
+        ]);
     }
 
     private function calculateEndDate(\DateTime $startDate, string $billingPeriod): ?\DateTime
@@ -130,7 +169,8 @@ class SubscriptionCheckoutService
         Subscription     $subscription,
         SubscriptionPlan $plan,
         array            $data,
-                         $paymentMethod
+        $paymentMethod,
+        $voucher = null
     ): array
     {
         $processor = match ($data['payment_method']) {
@@ -138,6 +178,16 @@ class SubscriptionCheckoutService
             'paypal' => $this->paypalProcessor,
             default => throw new Exception('Unsupported payment method')
         };
+
+        // Use the new method that handles vouchers
+        if ($voucher) {
+            return $processor->processSubscriptionPaymentWithVoucher(
+                $subscription,
+                $plan,
+                $voucher,
+                $data
+            );
+        }
 
         return $processor->processSubscriptionPayment(
             $subscription,

@@ -172,6 +172,7 @@ $isLoggedIn = !empty($member);
 
             <!-- Login Form -->
             <form id="login-form" class="sub-form" style="display: none;">
+                @csrf
                 <div class="sub-form-group">
                     <label class="sub-label">Email</label>
                     <input type="email" name="email" class="sub-input" required>

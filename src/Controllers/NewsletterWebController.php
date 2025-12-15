@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\NewsletterRepository;
 use App\Services\NewsletterPageBuilderService;
@@ -27,16 +28,17 @@ class NewsletterWebController extends Controller
         ]);
     }
 
-    public function show(int $id, ?string $token = null)
+    public function show(int $id, Request $request)
     {
+        $token = $request->query('token');
         $newsletter = $this->newsletterRepository->find($id);
 
         if (!$newsletter) {
-            return $this->notFound('Newsletter not found');
+            return $this->redirectResponse('', 404);
         }
 
         if ($newsletter->site_id !== SiteContext::getId()) {
-            return $this->forbidden('Newsletter not available');
+            return $this->redirectResponse('', 403);
         }
 
         // Get pages for automated newsletter
@@ -55,9 +57,6 @@ class NewsletterWebController extends Controller
             $token,
             true
         );
-
-        echo $html;
-        die;
 
         return $this->view('newsletters/show', [
             'site' => SiteContext::get(),
