@@ -262,6 +262,104 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    const commentForm = document.getElementById('commentForm');
+    const commentText = document.getElementById('commentText');
+    const charCount = document.getElementById('commentCharCount');
+
+    if (commentText) {
+        commentText.addEventListener('input', function () {
+            charCount.textContent = this.value.length;
+        });
+    }
+
+    if (commentForm) {
+        commentForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = this.querySelector('.comment-submit');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Posting...';
+
+            const formData = {
+                pageUrl: document.getElementById('commentPageUrl').value,
+                pageId: document.getElementById('commentPageId').value,
+                name: document.getElementById('commentName').value,
+                email: document.getElementById('commentEmail').value,
+                comment: document.getElementById('commentText').value
+            };
+
+            try {
+                const response = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('commentMessage', 'Comment posted successfully!', 'success');
+                    setTimeout(() => {
+                        closeCommentModal();
+                        showToast('Comment Posted!', 'Your comment has been submitted');
+                    }, 1500);
+                } else {
+                    showMessage('commentMessage', data.message || 'Failed to post comment', 'error');
+                }
+            } catch (error) {
+                console.error('Error posting comment:', error);
+                showMessage('commentMessage', 'An error occurred. Please try again.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Post Comment';
+            }
+        });
+    }
+
+    const newsletterForm = document.getElementById('newsletterForm');
+
+    if (newsletterForm) {
+        newsletterForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = this.querySelector('.comment-submit');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Subscribing...';
+
+            const email = document.getElementById('newsletterEmail').value;
+
+            try {
+                const response = await fetch('/api/newsletter/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({email})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('newsletterMessage', 'Successfully subscribed to newsletter!', 'success');
+                    setTimeout(() => {
+                        closeNewsletterModal();
+                        showToast('Subscribed!', 'Welcome to our newsletter');
+                    }, 1500);
+                } else {
+                    showMessage('newsletterMessage', data.message || 'Failed to subscribe', 'error');
+                }
+            } catch (error) {
+                console.error('Error subscribing to newsletter:', error);
+                showMessage('newsletterMessage', 'An error occurred. Please try again.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Subscribe Now';
+            }
+        });
+    }
 });
 
 function flipPageCard(cardElement) {
@@ -339,3 +437,157 @@ function updateTeamIndicators(carousel) {
         }
     });
 }
+
+function toggleShareDropdown(button) {
+    event.stopPropagation();
+    const dropdown = button.querySelector('.share-dropdown');
+    const isActive = dropdown.classList.contains('active');
+
+    // Close all other dropdowns
+    document.querySelectorAll('.share-dropdown.active').forEach(d => {
+        if (d !== dropdown) d.classList.remove('active');
+    });
+
+    dropdown.classList.toggle('active');
+
+    // Close dropdown when clicking outside
+    if (!isActive) {
+        setTimeout(() => {
+            document.addEventListener('click', closeAllDropdowns);
+        }, 0);
+    }
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.share-dropdown.active').forEach(d => {
+        d.classList.remove('active');
+    });
+    document.removeEventListener('click', closeAllDropdowns);
+}
+
+// Social Share Functions
+function shareToFacebook(url) {
+    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    window.open(shareUrl, 'facebook-share', 'width=600,height=400');
+    showToast('Shared to Facebook', 'Link opened in new window');
+    closeAllDropdowns();
+}
+
+function shareToTwitter(url, text) {
+    const shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    window.open(shareUrl, 'twitter-share', 'width=600,height=400');
+    showToast('Shared to Twitter', 'Link opened in new window');
+    closeAllDropdowns();
+}
+
+function shareToLinkedIn(url) {
+    const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+    window.open(shareUrl, 'linkedin-share', 'width=600,height=400');
+    showToast('Shared to LinkedIn', 'Link opened in new window');
+    closeAllDropdowns();
+}
+
+function shareToWhatsApp(url, text) {
+    const shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+    window.open(shareUrl, 'whatsapp-share', 'width=600,height=400');
+    showToast('Shared to WhatsApp', 'Link opened in new window');
+    closeAllDropdowns();
+}
+
+function shareToReddit(url, title) {
+    const shareUrl = `https://reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`;
+    window.open(shareUrl, 'reddit-share', 'width=600,height=400');
+    showToast('Shared to Reddit', 'Link opened in new window');
+    closeAllDropdowns();
+}
+
+function copyLink(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Link Copied!', 'URL copied to clipboard');
+        closeAllDropdowns();
+    }).catch(err => {
+        console.error('Failed to copy link:', err);
+        showToast('Copy Failed', 'Could not copy link to clipboard', 'error');
+    });
+}
+
+function openCommentModal(pageUrl, pageId) {
+    const modal = document.getElementById('commentModal');
+    document.getElementById('commentPageUrl').value = pageUrl;
+    document.getElementById('commentPageId').value = pageId;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeCommentModal() {
+    const modal = document.getElementById('commentModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('commentForm').reset();
+    document.getElementById('commentCharCount').textContent = '0';
+    hideMessage('commentMessage');
+}
+
+function openNewsletterModal() {
+    const modal = document.getElementById('newsletterModal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeNewsletterModal() {
+    const modal = document.getElementById('newsletterModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('newsletterForm').reset();
+    hideMessage('newsletterMessage');
+}
+
+// Utility Functions
+function showMessage(elementId, message, type) {
+    const messageEl = document.getElementById(elementId);
+    messageEl.textContent = message;
+    messageEl.className = `form-message ${type} active`;
+}
+
+function hideMessage(elementId) {
+    const messageEl = document.getElementById(elementId);
+    messageEl.classList.remove('active');
+}
+
+function showToast(title, message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastMessage = document.getElementById('toastMessage');
+
+    toastTitle.textContent = title;
+    toastMessage.textContent = message;
+
+    const icon = toast.querySelector('.toast-icon');
+    icon.className = `toast-icon ${type}`;
+
+    toast.classList.add('active');
+
+    setTimeout(() => {
+        toast.classList.remove('active');
+    }, 3000);
+}
+
+// Close modals on overlay click
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('modal-overlay')) {
+        if (e.target.id === 'commentModal') {
+            closeCommentModal();
+        } else if (e.target.id === 'newsletterModal') {
+            closeNewsletterModal();
+        }
+    }
+});
+
+// Close modals on escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeCommentModal();
+        closeNewsletterModal();
+        closeAllDropdowns();
+    }
+});

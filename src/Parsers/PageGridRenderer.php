@@ -12,114 +12,17 @@ use App\Models\Territory;
 
 class PageGridRenderer
 {
+    use PageGridToolbar;
+
     public function render(PageGrid $pageGrid, ?Territory $territory = null): string
     {
         $parsedData = $this->parsePageGrid($pageGrid, $territory);
 
-        $html = '';
-
         if ($pageGrid->layout === 'carousel') {
-            $html = $this->generateCarouselHtml($parsedData);
-        } else {
-            $html = $this->generateGridHtml($parsedData);
+            return $this->generateCarouselHtml($parsedData);
         }
 
-        // Add private page styles
-        $html .= $this->getPrivatePageStyles();
-
-        return $html;
-    }
-
-    private function getPrivatePageStyles(): string
-    {
-        return "
-        <style>
-            .page-card-private {
-                position: relative;
-            }
-
-            .page-card-image {
-                position: relative;
-            }
-
-            .private-overlay {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(255, 255, 255, 0.6);
-                backdrop-filter: blur(4px);
-                z-index: 1;
-            }
-
-            .private-badge {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                color: white;
-                padding: 0.75rem 1.5rem;
-                border-radius: 2rem;
-                font-weight: 700;
-                font-size: 0.875rem;
-                z-index: 2;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                white-space: nowrap;
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            }
-
-            .page-content-faded {
-                position: relative;
-            }
-
-            .page-excerpt-faded {
-                max-height: 3em;
-                overflow: hidden;
-                position: relative;
-            }
-
-            .page-excerpt-faded::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 2em;
-                background: linear-gradient(to bottom, transparent, white);
-            }
-
-            .btn-subscribe-required {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-                width: 100%;
-                padding: 0.875rem 1.5rem;
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                color: white;
-                border: none;
-                border-radius: 0.5rem;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            }
-
-            .btn-subscribe-required:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
-            }
-
-            .btn-subscribe-required svg {
-                width: 16px;
-                height: 16px;
-                flex-shrink: 0;
-            }
-        </style>
-        ";
+        return $this->generateGridHtml($parsedData);
     }
 
     private function parsePageGrid(PageGrid $pageGrid, ?Territory $territory = null): array
@@ -391,6 +294,10 @@ class PageGridRenderer
             }
 
             $html .= "</div>";
+        }
+
+        if (!$isPrivate || $isLoggedIn) {
+            $html .= $this->generateToolbar();
         }
 
         // Content section

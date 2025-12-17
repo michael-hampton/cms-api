@@ -1,26 +1,9 @@
 <?php
 // views/estate/page.php (enhanced page template)
-use App\Parsers\PageGridRenderer;
 
 $title = $page->title ?? 'Premier Properties';
 $description = $page->meta_description ?? 'Premier Properties - Luxury Real Estate in London';
 
-// Separate sidebar and main content blocks
-$sidebarBlocks = [];
-$mainBlocks = [];
-
-if ($page && $page->blocks) {
-    foreach ($page->blocks as $block) {
-        $blockData = $block->data ?? [];
-        if (isset($blockData['context']) && $blockData['context'] === 'sidebar') {
-            $sidebarBlocks[] = $block;
-        } else {
-            $mainBlocks[] = $block;
-        }
-    }
-}
-
-$hasSidebar = !empty($sidebarBlocks);
 $pageGridAdded = false;
 ?>
 
@@ -45,25 +28,12 @@ $pageGridAdded = false;
                     @endif
                 </div>
 
-                <div class="page-layout <?= $hasSidebar ? 'has-sidebar' : 'full-width' ?>">
+                <div class="page-layout <?= $html['hasSidebar'] ? 'has-sidebar' : 'full-width' ?>">
 
                     <!-- Main Content Area -->
-                    <div class="main-content <?= $hasSidebar ? 'with-sidebar' : 'full-width' ?>">
+                    <div class="main-content <?= $html['hasSidebar'] ? 'with-sidebar' : 'full-width' ?>">
 
-                        <!-- Main Content Blocks -->
-                        <?php foreach ($mainBlocks as $index => $block): ?>
-
-                            <?php if (!empty($pageGrid) && $pageGrid->order === ($index + 1)): ?>
-                                <?= (new PageGridRenderer())->render($pageGrid) ?>
-                            <?php endif; ?>
-
-                            <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
-
-                        <?php endforeach; ?>
-
-                        <?php if ($html): ?>
-                            <?= $html ?>
-                        <?php endif; ?>
+                        <?= $html['main'] ?>
 
                         <!-- After the page header section -->
                         <?php if ($page->page_type === 'landing-page' && !empty($categories)): ?>
@@ -82,11 +52,9 @@ $pageGridAdded = false;
                     </div>
 
                     <!-- Sidebar -->
-                    <?php if ($hasSidebar): ?>
+                    <?php if ($html['hasSidebar']): ?>
                         <aside class="sidebar">
-                            <?php foreach ($sidebarBlocks as $block): ?>
-                                <?= $blockParserService->buildBlock($page->id, $block->data + ['type' => $block->type], $block->order) ?>
-                            <?php endforeach; ?>
+                            <?= $html['sidebar'] ?>
                         </aside>
                     <?php endif; ?>
                 </div>
@@ -133,3 +101,5 @@ $pageGridAdded = false;
 <?php endif; ?>
 
 @include('components/newsletter-account-creation-modal')
+@include('components/modals')
+

@@ -131,11 +131,11 @@ class GalleryBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        if ($parsedData['layout'] === 'carousel') {
+        if ($parsedData['layout'] === GalleryLayout::CAROUSEL->value) {
             return $this->generateCarouselLayout($parsedData);
         }
 
-        if ($parsedData['layout'] === 'list') {
+        if ($parsedData['layout'] === GalleryLayout::LIST->value) {
             return $this->generateListLayout($parsedData);
         }
 

@@ -11,9 +11,7 @@ use App\Models\Page;
 use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
-use App\Parsers\BlockRegistry;
 use App\Parsers\PageGridRenderer;
-use App\Repositories\BlockRepository;
 use App\Repositories\CommentRepository;
 use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
@@ -32,7 +30,7 @@ class ContentController extends Controller
         private readonly PageGridRepository $pageGridRepository,
         private readonly ActivityTracking         $activityTracking,
         private readonly SubscriptionModalService $modalService,
-        private readonly BlockRepository          $blockRepository,
+        private readonly PageRenderService $pageRenderService,
     ) {
         parent::__construct();
     }
@@ -129,13 +127,7 @@ class ContentController extends Controller
             $viewPath = "estate/page";
         }
 
-        $pageRenderService = new PageRenderService(
-            $this->blockRepository,
-            new BlockRegistry(),
-            $this->blockParserService
-        );
-
-        $html = $pageRenderService->renderPage($page);
+        $html = $this->pageRenderService->renderPage($page);
         $data['html'] = $html;
 
         return $this->view($viewPath, $data);

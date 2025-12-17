@@ -126,7 +126,7 @@ class ZoneBlockParser extends BaseBlockParser
 
         return [
             'html' => implode("\n", $zonesHtml),
-            'usedBlockIds' => array_unique($usedBlockIds)
+            'usedBlockIds' => array_unique(array_keys($usedBlockIds))
         ];
     }
 

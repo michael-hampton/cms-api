@@ -1,5 +1,4 @@
 <?php
-// src/Tests/Unit/Parsers/ZoneBlockParserTest.php
 
 namespace App\Tests\Unit\Parsers;
 
@@ -104,7 +103,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
         $this->blockRepository->shouldReceive('getPageBlocks')
             ->with(1)
             ->once()
-            ->andReturn([$block]);
+            ->andReturn(collect([$block]));
 
         $this->blockParserService->shouldReceive('buildBlock')
             ->once()
@@ -115,8 +114,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('zone-a', $result['html']);
         $this->assertStringContainsString('zone-columns-1', $result['html']);
         $this->assertStringContainsString('zone-background-default', $result['html']);
-        $this->assertArrayHasKey(1, $result['usedBlockIds']);
-        $this->assertTrue($result['usedBlockIds'][1]);
+        $this->assertEquals([1], $result['usedBlockIds']);
     }
 
     public function testBuildZonesHtmlWithMultipleColumns()
@@ -153,7 +151,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
         $this->blockRepository->shouldReceive('getPageBlocks')
             ->with(1)
             ->once()
-            ->andReturn([$block1, $block2]);
+            ->andReturn(collect([$block1, $block2]));
 
         $this->blockParserService->shouldReceive('buildBlock')
             ->twice()
@@ -165,10 +163,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('zone-columns-2', $result['html']);
         $this->assertStringContainsString('zone-background-muted', $result['html']);
         $this->assertStringContainsString('zone-padding-large', $result['html']);
-        $this->assertArrayHasKey(1, $result['usedBlockIds']);
-        //$this->assertArrayHasKey(2, $result['usedBlockIds']);
-        $this->assertTrue($result['usedBlockIds'][1]);
-        //$this->assertTrue($result['usedBlockIds'][2]);
+        $this->assertEquals([1, 2], $result['usedBlockIds']);
     }
 
     public function testBuildZonesHtmlSkipsDuplicateBlocks()
@@ -213,8 +208,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
 
         $this->assertStringContainsString('zone-a', $result['html']);
         $this->assertStringContainsString('zone-b', $result['html']);
-        $this->assertArrayHasKey(1, $result['usedBlockIds']); // Should only have block 1 once
-        $this->assertTrue($result['usedBlockIds'][1]);
+        $this->assertEquals([1], $result['usedBlockIds']); // Should only have block 1 once
     }
 
     public function testBuildZonesHtmlSortsZonesBySortOrder()
@@ -335,8 +329,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
 
         $result = $this->parser->buildZonesHtml($page);
 
-        $this->assertArrayHasKey(1, $result['usedBlockIds']);
-        $this->assertTrue($result['usedBlockIds'][1]);
+        $this->assertEquals([1, 2], $result['usedBlockIds']);
     }
 
     public function testBuildZonesHtmlHandlesBlockRenderErrors()

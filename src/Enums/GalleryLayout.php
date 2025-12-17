@@ -8,6 +8,7 @@ enum GalleryLayout: string
     case GRID = 'grid';
     case MASONRY = 'masonry';
     case SLIDER = 'slider';
+    case LIST = 'list';
 
     public static function values(): array
     {

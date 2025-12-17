@@ -20,6 +20,8 @@ use App\Services\BuildProductCardService;
 
 class PageGridBlockParser extends BaseBlockParser
 {
+    use PageGridToolbar;
+
     public function __construct(private readonly PageRepository $pageRepository)
     {
 
@@ -462,6 +464,10 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
             }
 
+            if (!$isPrivate || $isLoggedIn) {
+                $html .= $this->generateToolbar();
+            }
+
             $html .= "<div class=\"page-card-content" . ($isPrivate && !$isLoggedIn ? " page-content-faded" : "") . "\">";
 
             // Title
@@ -554,96 +560,7 @@ class PageGridBlockParser extends BaseBlockParser
         $isPrivate = $this->isPagePrivate($page['slug']);
         $isLoggedIn = MemberAuth::check();
 
-        $html = '';
-
-        if ($isPrivate && !$isLoggedIn) {
-            $html .= "
-        <style>
-            .page-card-private {
-                position: relative;
-            }
-
-            .page-image {
-                position: relative;
-            }
-
-            .private-overlay {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(255, 255, 255, 0.6);
-                backdrop-filter: blur(4px);
-                z-index: 1;
-            }
-
-            .private-badge {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                color: white;
-                padding: 0.75rem 1.5rem;
-                border-radius: 2rem;
-                font-weight: 700;
-                font-size: 0.875rem;
-                z-index: 2;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                white-space: nowrap;
-            }
-
-            .page-content-faded {
-                position: relative;
-            }
-
-            .page-excerpt-faded {
-                max-height: 3em;
-                overflow: hidden;
-                position: relative;
-            }
-
-            .page-excerpt-faded::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 2em;
-                background: linear-gradient(to bottom, transparent, white);
-            }
-
-            .btn-subscribe-required {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-                width: 100%;
-                padding: 0.875rem 1.5rem;
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                color: white;
-                border: none;
-                border-radius: 0.5rem;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            }
-
-            .btn-subscribe-required:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
-            }
-
-            .btn-subscribe-required svg {
-                width: 16px;
-                height: 16px;
-            }
-        </style>
-        ";
-        }
-
-        $html .= "<div class=\"page-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\">";
+        $html = "<div class=\"page-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\">";
 
         // Image section
         if ($parsedData['showImage'] && !empty($page['image'])) {
@@ -674,6 +591,10 @@ class PageGridBlockParser extends BaseBlockParser
             }
 
             $html .= "</div>";
+        }
+
+        if (!$isPrivate || $isLoggedIn) {
+            $html .= $this->generateToolbar();
         }
 
         // Content section
@@ -856,6 +777,10 @@ class PageGridBlockParser extends BaseBlockParser
             }
 
             $html .= "</div>";
+        }
+
+        if (!$isPrivate || $isLoggedIn) {
+            $html .= $this->generateToolbar();
         }
 
         // Product content

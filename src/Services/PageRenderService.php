@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Framework\Container;
 use App\Models\Page;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\BlockRepository;
@@ -11,65 +10,62 @@ class PageRenderService
 {
     public function __construct(
         private readonly BlockRepository    $blockRepository,
-        private readonly BlockParserService $blockParserService
+        private readonly BlockParserService $blockParserService,
+        private readonly ZoneBlockParser    $zoneBlockParser,
     )
     {
     }
 
-    public function renderPage(Page $page): string
+    /**
+     * Renders a page with proper separation of main content and sidebar blocks
+     * Returns an array with 'main' and 'sidebar' HTML
+     */
+    public function renderPage(Page $page): array
     {
-        $html = '';
+        $mainHtml = '';
+        $sidebarHtml = '';
 
-        // Get zone parser
-        $zoneParser = Container::getInstance()->make(ZoneBlockParser::class);
+        // Build zones HTML and get list of used block IDs
+        $zonesResult = $this->zoneBlockParser->buildZonesHtml($page);
 
-        if ($zoneParser instanceof ZoneBlockParser) {
-            // Build zones HTML and get list of used block IDs
-            $zonesResult = $zoneParser->buildZonesHtml($page);
-            $html .= $zonesResult['html'];
-            $usedBlockIds = $zonesResult['usedBlockIds'];
+        $usedBlockIds = $zonesResult['usedBlockIds'];
 
-            // Render remaining blocks that weren't used in zones
-            $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
+        // Render remaining blocks that weren't used in zones
+        $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
 
-            foreach ($pageBlocks as $block) {
-                // Skip blocks that were already rendered in zones
-                if (in_array($block->id, $usedBlockIds)) {
-                    continue;
-                }
-
-                try {
-                    $blockHtml = $this->blockParserService->buildBlock(
-                        $block->page_id,
-                        array_merge($block->data, ['type' => $block->type]),
-                        $block->order
-                    );
-
-                    $html .= $blockHtml;
-                } catch (\Exception $e) {
-                    // Log error but continue rendering
-                    error_log("Failed to render block {$block->id}: {$e->getMessage()}");
-                }
+        foreach ($pageBlocks as $block) {
+            // Skip blocks that were already rendered in zones
+            if (in_array($block->id, $usedBlockIds)) {
+                continue;
             }
-        } else {
-            // Fallback: render all blocks normally if zone parser not available
-            $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
 
-            foreach ($pageBlocks as $block) {
-                try {
-                    $blockHtml = $this->blockParserService->buildBlock(
-                        $block->page_id,
-                        array_merge($block->data, ['type' => $block->type]),
-                        $block->order
-                    );
+            try {
+                $blockHtml = $this->blockParserService->buildBlock(
+                    $block->page_id,
+                    array_merge($block->data, ['type' => $block->type]),
+                    $block->order
+                );
 
-                    $html .= $blockHtml;
-                } catch (\Exception $e) {
-                    error_log("Failed to render block {$block->id}: {$e->getMessage()}");
+                // Determine if this block should go in sidebar or main content
+                $context = $block->data['context'] ?? 'default';
+
+                if ($context === 'sidebar') {
+                    $sidebarHtml .= $blockHtml;
+                } else {
+                    $mainHtml .= $blockHtml;
                 }
+            } catch (\Exception $e) {
+                // Log error but continue rendering
+                error_log("Failed to render block {$block->id}: {$e->getMessage()}");
             }
         }
 
-        return $html;
+        $mainHtml .= $zonesResult['html'];
+
+        return [
+            'main' => $mainHtml,
+            'sidebar' => $sidebarHtml,
+            'hasSidebar' => !empty($sidebarHtml)
+        ];
     }
 }

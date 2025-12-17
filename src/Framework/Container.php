@@ -2,7 +2,6 @@
 namespace App\Framework;
 
 use Closure;
-use Exception;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionParameter;
@@ -69,7 +68,6 @@ class Container
 
         // Check if we're already building this (circular dependency protection)
         if (isset($this->building[$abstract])) {
-            echo $abstract;
             throw new \Exception("Circular dependency detected: {$abstract}");
         }
 
