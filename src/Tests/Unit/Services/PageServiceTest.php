@@ -4,16 +4,9 @@ namespace App\Tests\Unit\Services;
 
 use App\Enums\PageStatus;
 use App\Framework\Database\Database;
-use App\Framework\Support\Collection;
-use App\Models\Block;
 use App\Models\CustomFieldDefinition;
 use App\Models\Page;
-use App\Models\PageCustomField;
 use App\Models\PageHistory;
-use App\Models\PageMetadata;
-use App\Models\PageSeo;
-use App\Models\PageSettings;
-use App\Models\PageSocial;
 use App\Repositories\AccessRoleRepository;
 use App\Repositories\BlockRepository;
 use App\Repositories\PageAuthorRepository;
@@ -36,7 +29,6 @@ use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Exception;
 use Mockery;
-use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 
 class PageServiceTest extends FunctionalTestCase
 {
@@ -1024,5 +1016,50 @@ class PageServiceTest extends FunctionalTestCase
         $result = $this->service->makePageInternal(1, 1);
 
         $this->assertNotNull($result);
+    }
+
+    public function testCreatePageWithZones()
+    {
+        $requestData = [
+            'forms' => [
+                'main' => ['title' => 'Page with Zones'],
+                'meta' => ['slug' => 'page-with-zones', 'status' => 'draft']
+            ],
+            'zones' => [
+                [
+                    'id' => 'zone-a',
+                    'name' => 'Main Zone',
+                    'columns' => 2,
+                    'blocks' => [[1], [2]],
+                    'options' => [
+                        'background' => 'muted',
+                        'padding' => 'large',
+                        'width' => 'contained'
+                    ],
+                    'sortOrder' => 0
+                ]
+            ],
+            'blocks' => []
+        ];
+
+        $newPage = $this->createMockPage(1, 'Page with Zones');
+
+        $this->setupTransaction();
+        $this->pageHistory->shouldReceive('logPageCreated')->once()->with($newPage);
+
+        $this->pageRepository->shouldReceive('create')
+            ->with(Mockery::on(function ($data) {
+                return $data['title'] === 'Page with Zones'
+                    && isset($data['zones'])
+                    && is_string($data['zones']);
+            }))
+            ->once()
+            ->andReturn($newPage);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($newPage);
+
+        $result = $this->service->createPageWithAllData($requestData, $this->siteId);
+
+        $this->assertSame($newPage, $result);
     }
 }

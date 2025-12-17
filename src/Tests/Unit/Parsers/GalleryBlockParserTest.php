@@ -10,7 +10,6 @@ use App\Framework\Validation\Rules\UrlRule;
 use App\Framework\Validation\Validator;
 use App\Parsers\GalleryBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class GalleryBlockParserTest extends FunctionalTestCase
 {
@@ -136,6 +135,59 @@ class GalleryBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('<img src="/img1.jpg"', $html);
         $this->assertStringContainsString('<h3 class="gallery-slide-title">S1 Title</h3>', $html);
         $this->assertStringContainsString('<div class="gallery-slide-caption">S1 Caption</div>', $html);
+    }
+
+    public function testGalleryParserGenerateHtmlList(): void
+    {
+        $parser = new GalleryBlockParser();
+        $parsedData = [
+            'layout' => 'list',
+            'slides' => [
+                [
+                    'image' => ['src' => '/img1.jpg'],
+                    'formatted_title' => 'List Item 1',
+                    'formatted_description' => 'Description for item 1',
+                    'formatted_caption' => 'Photo credit',
+                    'has_link' => true,
+                    'link' => 'https://example.com',
+                    'noFollow' => false,
+                    'sponsored' => false,
+                    'openInNewTab' => true,
+                    'title' => 'List Item 1',
+                    'description' => 'Description for item 1',
+                    'caption' => 'Photo credit'
+                ],
+                [
+                    'image' => ['src' => '/img2.jpg'],
+                    'formatted_title' => 'List Item 2',
+                    'formatted_description' => 'Description for item 2',
+                    'formatted_caption' => '',
+                    'has_link' => false,
+                    'link' => '',
+                    'noFollow' => false,
+                    'sponsored' => false,
+                    'openInNewTab' => false,
+                    'title' => 'List Item 2',
+                    'description' => 'Description for item 2',
+                    'caption' => ''
+                ]
+            ]
+        ];
+        $html = $parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('<div class="gallery-block gallery-list">', $html);
+        $this->assertStringContainsString('<div class="gallery-list-item"', $html);
+        $this->assertStringContainsString('<div class="list-item-image">', $html);
+        $this->assertStringContainsString('<div class="list-item-content">', $html);
+        $this->assertStringContainsString('<h3 class="list-item-title">', $html);
+        $this->assertStringContainsString('<a href="https://example.com" target="_blank">List Item 1</a>', $html);
+        $this->assertStringContainsString('<img src="/img1.jpg"', $html);
+        $this->assertStringContainsString('Description for item 1', $html);
+        $this->assertStringContainsString('<div class="list-item-caption">Photo credit</div>', $html);
+
+        // Second item without link
+        $this->assertStringContainsString('List Item 2', $html);
+        $this->assertStringNotContainsString('<a href="">List Item 2</a>', $html);
     }
 
     public function testGalleryBlockParserParsesSlides()
@@ -300,5 +352,35 @@ class GalleryBlockParserTest extends FunctionalTestCase
 
         $result = $validator->validate($slideData, $slideRules);
         $this->assertFalse($result->isValid());
+    }
+
+    public function testGalleryBlockParserListLayoutWithLinks()
+    {
+        $parser = new GalleryBlockParser();
+        $parsedData = [
+            'layout' => 'list',
+            'slides' => [
+                [
+                    'image' => ['src' => '/img1.jpg'],
+                    'formatted_title' => 'Linked Item',
+                    'formatted_description' => 'With a link',
+                    'formatted_caption' => '',
+                    'has_link' => true,
+                    'link' => 'https://test.com',
+                    'noFollow' => true,
+                    'sponsored' => true,
+                    'openInNewTab' => true,
+                    'title' => 'Linked Item',
+                    'description' => 'With a link',
+                    'caption' => ''
+                ]
+            ]
+        ];
+
+        $html = $parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('rel="nofollow"', $html);
+        $this->assertStringContainsString('rel="sponsored"', $html);
+        $this->assertStringContainsString('target="_blank"', $html);
     }
 }

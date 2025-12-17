@@ -11,10 +11,6 @@ use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Framework\Validation\Validator;
 use App\Models\Page;
-use App\Models\PageMetadata;
-use App\Models\PageSeo;
-use App\Models\PageSettings;
-use App\Models\PageSocial;
 use App\Repositories\AccessRoleRepository;
 use App\Repositories\BlockRepository;
 use App\Repositories\PageAuthorRepository;
@@ -511,6 +507,12 @@ class PageService
 
         if (!empty($requestData['gallery_slides'])) {
             $mainData['gallery_slides'] = json_encode($requestData['gallery_slides']);
+        }
+
+        if (!empty($requestData['zones'])) {
+            $mainData['zones'] = is_string($requestData['zones'])
+                ? $requestData['zones']
+                : json_encode($requestData['zones']);
         }
 
         return $mainData;

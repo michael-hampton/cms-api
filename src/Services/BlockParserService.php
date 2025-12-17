@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Database\Seeders\DTO\BatchParseResult;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
@@ -222,7 +223,7 @@ class BlockParserService
         }
 
         if (!empty($blockData['subscribersOnly']) && $blockData['subscribersOnly'] === true) {
-            if (!\App\Framework\Authorization\MemberAuth::check()) {
+            if (!MemberAuth::check()) {
                 return ''; // Return empty string if not logged in
             }
         }

@@ -52,6 +52,7 @@ class Page extends Model
         'approved_at',
         'created_by',
         'updated_by',
+        'zones'
     ];
 
     protected $alwaysInclude = [
@@ -86,6 +87,7 @@ class Page extends Model
         'clone_history' => 'array',
         'requires_approval' => 'boolean',
         'approved_at' => 'datetime',
+        'zones' => 'json',
     ];
 
     public function blocks(bool $relation = false)

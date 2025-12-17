@@ -132,55 +132,67 @@ class GalleryBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         if ($parsedData['layout'] === 'carousel') {
-            $html = "<div class=\"gallery-block gallery-carousel\">";
+            return $this->generateCarouselLayout($parsedData);
+        }
 
-            $html .= "<div class=\"carousel-container\">";
-            $html .= "<div class=\"carousel-slides\" id=\"carousel-{$this->generateId()}\">";
+        if ($parsedData['layout'] === 'list') {
+            return $this->generateListLayout($parsedData);
+        }
 
+        return $this->generateGridLayout($parsedData);
+    }
+
+    private function generateCarouselLayout(array $parsedData): string
+    {
+        $html = "<div class=\"gallery-block gallery-carousel\">";
+
+        $html .= "<div class=\"carousel-container\">";
+        $html .= "<div class=\"carousel-slides\" id=\"carousel-{$this->generateId()}\">";
+
+        foreach ($parsedData['slides'] as $index => $slide) {
+            $activeClass = $index === 0 ? ' active' : '';
+            $html .= "<div class=\"carousel-slide{$activeClass}\" data-slide=\"{$index}\">";
+
+            if (!empty($slide['image'])) {
+                $html .= "<div class=\"slide-image\">";
+                $html .= "<img src=\"{$slide['image']['src']}\" alt=\"{$slide['formatted_title']}\" class=\"carousel-image\">";
+                $html .= "</div>";
+            }
+
+            if (!empty($slide['title']) || !empty($slide['description'])) {
+                $html .= "<div class=\"slide-content\">";
+                if (!empty($slide['title'])) {
+                    $html .= "<h3 class=\"slide-title\">{$slide['formatted_title']}</h3>";
+                }
+                if (!empty($slide['description'])) {
+                    $html .= "<p class=\"slide-description\">{$slide['formatted_description']}</p>";
+                }
+                $html .= "</div>";
+            }
+
+            $html .= "</div>";
+        }
+
+        $html .= "</div>";
+
+        // Carousel controls
+        if (count($parsedData['slides']) > 1) {
+            $html .= "<button class=\"carousel-btn carousel-prev\" onclick=\"prevSlide(this)\">&larr;</button>";
+            $html .= "<button class=\"carousel-btn carousel-next\" onclick=\"nextSlide(this)\">&rarr;</button>";
+
+            // Indicators
+            $html .= "<div class=\"carousel-indicators\">";
             foreach ($parsedData['slides'] as $index => $slide) {
                 $activeClass = $index === 0 ? ' active' : '';
-                $html .= "<div class=\"carousel-slide{$activeClass}\" data-slide=\"{$index}\">";
-
-                if (!empty($slide['image'])) {
-                    $html .= "<div class=\"slide-image\">";
-                    $html .= "<img src=\"{$slide['image']['src']}\" alt=\"{$slide['formatted_title']}\" class=\"carousel-image\">";
-                    $html .= "</div>";
-                }
-
-                if (!empty($slide['title']) || !empty($slide['description'])) {
-                    $html .= "<div class=\"slide-content\">";
-                    if (!empty($slide['title'])) {
-                        $html .= "<h3 class=\"slide-title\">{$slide['formatted_title']}</h3>";
-                    }
-                    if (!empty($slide['description'])) {
-                        $html .= "<p class=\"slide-description\">{$slide['formatted_description']}</p>";
-                    }
-                    $html .= "</div>";
-                }
-
-                $html .= "</div>";
+                $html .= "<button class=\"indicator{$activeClass}\" onclick=\"goToSlide(this, {$index})\"></button>";
             }
-
             $html .= "</div>";
+        }
 
-            // Carousel controls
-            if (count($parsedData['slides']) > 1) {
-                $html .= "<button class=\"carousel-btn carousel-prev\" onclick=\"prevSlide(this)\">&larr;</button>";
-                $html .= "<button class=\"carousel-btn carousel-next\" onclick=\"nextSlide(this)\">&rarr;</button>";
+        $html .= "</div>";
 
-                // Indicators
-                $html .= "<div class=\"carousel-indicators\">";
-                foreach ($parsedData['slides'] as $index => $slide) {
-                    $activeClass = $index === 0 ? ' active' : '';
-                    $html .= "<button class=\"indicator{$activeClass}\" onclick=\"goToSlide(this, {$index})\"></button>";
-                }
-                $html .= "</div>";
-            }
-
-            $html .= "</div>";
-
-            // Add JavaScript for carousel functionality
-            $html .= "<script>
+        // Add JavaScript for carousel functionality
+        $html .= "<script>
         function nextSlide(btn) {
             const carousel = btn.parentElement.querySelector('.carousel-slides');
             const slides = carousel.querySelectorAll('.carousel-slide');
@@ -232,12 +244,73 @@ class GalleryBlockParser extends BaseBlockParser
         }
         </script>";
 
-            $html .= "</div>";
+        $html .= "</div>";
 
-            return $html;
+        return $html;
+    }
+
+    private function generateListLayout(array $parsedData): string
+    {
+        $html = "<div class=\"gallery-block gallery-list\">";
+
+        foreach ($parsedData['slides'] as $index => $slide) {
+            $html .= "<div class=\"gallery-list-item\" data-slide=\"{$index}\">";
+
+            if (!empty($slide['image'])) {
+                $html .= "<div class=\"list-item-image\">";
+
+                if ($slide['has_link']) {
+                    $linkAttrs = '';
+                    if ($slide['noFollow']) $linkAttrs .= ' rel="nofollow"';
+                    if ($slide['sponsored']) $linkAttrs .= ' rel="sponsored"';
+                    if ($slide['openInNewTab']) $linkAttrs .= ' target="_blank"';
+
+                    $html .= "<a href=\"{$slide['link']}\"{$linkAttrs}>";
+                }
+
+                if (!empty($slide['image']['src'])) {
+                    $html .= "<img src=\"{$slide['image']['src']}\" alt=\"{$slide['formatted_title']}\" class=\"list-image\">";
+                }
+
+                if ($slide['has_link']) {
+                    $html .= "</a>";
+                }
+
+                $html .= "</div>";
+            }
+
+            $html .= "<div class=\"list-item-content\">";
+
+            if (!empty($slide['title'])) {
+                $html .= "<h3 class=\"list-item-title\">";
+                if ($slide['has_link']) {
+                    $linkAttrs = '';
+                    if ($slide['noFollow']) $linkAttrs .= ' rel="nofollow"';
+                    if ($slide['sponsored']) $linkAttrs .= ' rel="sponsored"';
+                    if ($slide['openInNewTab']) $linkAttrs .= ' target="_blank"';
+
+                    $html .= "<a href=\"{$slide['link']}\"{$linkAttrs}>{$slide['formatted_title']}</a>";
+                } else {
+                    $html .= $slide['formatted_title'];
+                }
+                $html .= "</h3>";
+            }
+
+            if (!empty($slide['description'])) {
+                $html .= "<div class=\"list-item-description\">{$slide['formatted_description']}</div>";
+            }
+
+            if (!empty($slide['caption'])) {
+                $html .= "<div class=\"list-item-caption\">{$slide['formatted_caption']}</div>";
+            }
+
+            $html .= "</div>";
+            $html .= "</div>";
         }
 
-        return $this->generateGridLayout($parsedData);
+        $html .= "</div>";
+
+        return $html;
     }
 
     private function generateGridLayout(array $parsedData): string

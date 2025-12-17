@@ -19,14 +19,14 @@ class BlockRepository extends Repository
         return Block::class;
     }
 
-    public function getPageBlocks(int $pageId): array
+    public function getPageBlocks(int $pageId): Collection
     {
         return $this->where('page_id', $pageId)
             ->orderBy('order', 'asc')
             ->get();
     }
 
-    public function getBlocksByType(string $type): array
+    public function getBlocksByType(string $type): Collection
     {
         return $this->where('type', $type)->get();
     }

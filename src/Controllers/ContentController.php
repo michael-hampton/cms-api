@@ -11,12 +11,15 @@ use App\Models\Page;
 use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
+use App\Parsers\BlockRegistry;
 use App\Parsers\PageGridRenderer;
+use App\Repositories\BlockRepository;
 use App\Repositories\CommentRepository;
 use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
 use App\Services\BlockParserService;
 use App\Services\MenuRenderer;
+use App\Services\PageRenderService;
 use App\Services\SubscriptionModalService;
 use App\Services\Url\UrlResolutionResult;
 
@@ -28,7 +31,8 @@ class ContentController extends Controller
         private readonly PageViewRepository $pageViewRepository,
         private readonly PageGridRepository $pageGridRepository,
         private readonly ActivityTracking         $activityTracking,
-        private readonly SubscriptionModalService $modalService
+        private readonly SubscriptionModalService $modalService,
+        private readonly BlockRepository          $blockRepository,
     ) {
         parent::__construct();
     }
@@ -124,6 +128,15 @@ class ContentController extends Controller
         if (!$this->viewExists($viewPath)) {
             $viewPath = "estate/page";
         }
+
+        $pageRenderService = new PageRenderService(
+            $this->blockRepository,
+            new BlockRegistry(),
+            $this->blockParserService
+        );
+
+        $html = $pageRenderService->renderPage($page);
+        $data['html'] = $html;
 
         return $this->view($viewPath, $data);
     }

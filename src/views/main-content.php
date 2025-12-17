@@ -61,6 +61,10 @@ $pageGridAdded = false;
 
                         <?php endforeach; ?>
 
+                        <?php if ($html): ?>
+                            <?= $html ?>
+                        <?php endif; ?>
+
                         <!-- After the page header section -->
                         <?php if ($page->page_type === 'landing-page' && !empty($categories)): ?>
                             @include('categories-widget', ['page' => $page])
