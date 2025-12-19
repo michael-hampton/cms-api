@@ -1149,7 +1149,7 @@ $isLoggedIn = !empty($member);
     const API_BASE = '/api/' + SITE;
     const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? '' ?>';
     const IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
-    const MODAL_STORAGE_KEY = 'subscription_modal_last_shown';
+    const MODAL_STORAGE_KEY = 'subscription_modal_last_shown_' + SITE;
     const MODAL_COOLDOWN_HOURS = 24;
 
     let stripe = null;

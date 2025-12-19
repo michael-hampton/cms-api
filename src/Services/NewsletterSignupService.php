@@ -2,17 +2,20 @@
 
 namespace App\Services;
 
+use App\Framework\Support\SiteContext;
+use App\Repositories\NewsletterRepository;
 use App\Repositories\SubscriberRepository;
 
 class NewsletterSignupService
 {
-    private SubscriberRepository $repository;
     private int $siteId;
 
-    public function __construct(SubscriberRepository $repository, int $siteId)
+    public function __construct(
+        private readonly NewsletterRepository $newsletterRepository,
+        private readonly SubscriberRepository $repository
+    )
     {
-        $this->repository = $repository;
-        $this->siteId = $siteId;
+
     }
 
     public function validateEmail(string $email): bool
@@ -26,13 +29,27 @@ class NewsletterSignupService
         return hash('sha256', $email . ':' . $type . ':' . $salt);
     }
 
-    public function signup(string $email): array
+    public function signup(string $email, bool $autoConfirm = false, ?int $newsletterId = null, ?int $siteId = null): array
     {
+        $siteId = $siteId ?? SiteContext::getId();
+
         if (!$this->validateEmail($email)) {
             return ['success' => false, 'error' => 'Invalid email format'];
         }
 
-        $existing = $this->repository->findByEmail($email, $this->siteId);
+        // If no newsletter ID provided, get the default
+        if ($newsletterId === null) {
+
+            $defaultNewsletter = $this->newsletterRepository->getDefaultNewsletterForSite($siteId);
+
+            if (!$defaultNewsletter) {
+                return ['success' => false, 'error' => 'No newsletter available for subscription'];
+            }
+
+            $newsletterId = $defaultNewsletter->id;
+        }
+
+        $existing = $this->repository->findByEmailAndNewsletter($email, $newsletterId, $siteId);
 
         if ($existing) {
             if ($existing->isConfirmed()) {
@@ -46,26 +63,29 @@ class NewsletterSignupService
 
         $subscriber = $this->repository->create([
             'email' => $email,
-            'confirmed' => false,
+            'newsletter_id' => $newsletterId,
+            'confirmed' => $autoConfirm,
             'confirmation_token' => $confirmationToken,
             'unsubscribe_token' => $unsubscribeToken,
             'subscribed_at' => date('Y-m-d H:i:s'),
-            'site_id' => $this->siteId
+            'site_id' => $siteId
         ]);
 
         return [
             'success' => true,
             'email' => $email,
+            'newsletter_id' => $newsletterId,
             'confirmation_token' => $confirmationToken,
             'subscriber_id' => $subscriber->id
         ];
     }
 
-    public function confirm(string $token): array
+    public function confirm(string $token, ?int $siteId = null): array
     {
+        $siteId = $siteId ?? SiteContext::getId();
         $subscriber = $this->repository->findByConfirmationToken($token);
 
-        if (!$subscriber || $subscriber->site_id !== $this->siteId) {
+        if (!$subscriber || $subscriber->site_id !== $siteId) {
             return ['success' => false, 'error' => 'Invalid confirmation token'];
         }
 
@@ -74,11 +94,12 @@ class NewsletterSignupService
         return ['success' => true, 'email' => $subscriber->email];
     }
 
-    public function unsubscribe(string $token): array
+    public function unsubscribe(string $token, ?int $siteId = null): array
     {
+        $siteId = $siteId ?? SiteContext::getId();
         $subscriber = $this->repository->findByUnsubscribeToken($token);
 
-        if (!$subscriber || $subscriber->site_id !== $this->siteId) {
+        if (!$subscriber || $subscriber->site_id !== $siteId) {
             return ['success' => false, 'error' => 'Invalid unsubscribe token'];
         }
 
@@ -102,8 +123,9 @@ class NewsletterSignupService
         return ['success' => true, 'email' => $email];
     }
 
-    public function getConfirmedSubscribers(): array
+    public function getConfirmedSubscribers(?int $siteId = null): array
     {
-        return $this->repository->getConfirmedEmails($this->siteId);
+        $siteId = $siteId ?? SiteContext::getId();
+        return $this->repository->getConfirmedEmails($siteId);
     }
 }

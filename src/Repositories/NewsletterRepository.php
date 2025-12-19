@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Framework\Support\Collection;
+use App\Models\Model;
 use App\Models\Newsletter;
 
 class NewsletterRepository extends Repository
@@ -47,6 +48,22 @@ class NewsletterRepository extends Repository
             ->limit($perPage)
             ->offset($offset)
             ->get();
+    }
+
+    public function getActive(int $siteId): Collection
+    {
+        return Newsletter::where('site_id', $siteId)
+            ->where('active', true)
+            ->orderBy('title', 'asc')
+            ->get();
+    }
+
+    public function getDefaultNewsletterForSite(int $siteId): ?Model
+    {
+        return Newsletter::where('site_id', $siteId)
+            ->where('active', true)
+            ->where('is_default', true)
+            ->first();
     }
 
     protected function getModelClass(): string

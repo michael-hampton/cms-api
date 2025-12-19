@@ -272,7 +272,7 @@ $router->get('/{site}/member/wishlist', [MemberWishlistController::class, 'index
 
 $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController::class, 'getProductDetails']);
 
-$router->post('/default/{site}/newsletter/signup', NewsletterController::class, 'signup');
+$router->post('/{site}/default/newsletter/signup', NewsletterController::class, 'signup');
 
 
 

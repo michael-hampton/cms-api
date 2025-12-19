@@ -3,10 +3,20 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\Models\Member;
+use App\Models\Newsletter;
 use App\Models\Subscriber;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class NewsletterSignupControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+        $this->createNewsletter(['is_default' => true]);
+    }
+
     public function testSignupWithValidEmail(): void
     {
         $response = $this->postForSite('/api/newsletter/signup', [
@@ -17,7 +27,7 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $this->assertTrue($data['data']['success']);
+        $this->assertTrue($data['success']);
         $this->assertEquals('newuser@example.com', $data['data']['email']);
         $this->assertArrayHasKey('confirmation_token', $data['data']);
     }
@@ -368,5 +378,74 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
         // Check if email is stored in normalized form (typically lowercase)
         $member = Member::findByEmail('mixedcase@example.com', $this->siteId);
         $this->assertNotNull($member);
+    }
+
+    public function testSignupWithNewsletterIdSpecified(): void
+    {
+        // Create two newsletters
+        $newsletter1 = \App\Models\Newsletter::create([
+            'site_id' => $this->siteId,
+            'title' => 'Newsletter 1',
+            'interval' => 'weekly',
+            'active' => true,
+            'is_default' => true,
+            'content' => 'This is the newsletter content.',
+        ]);
+
+        $newsletter2 = \App\Models\Newsletter::create([
+            'site_id' => $this->siteId,
+            'title' => 'Newsletter 2',
+            'interval' => 'daily',
+            'active' => true,
+            'is_default' => false,
+            'content' => 'This is the newsletter content.',
+        ]);
+
+        // Subscribe to newsletter 2 specifically
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'specific@example.com',
+            'newsletter_id' => $newsletter2->id
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($newsletter2->id, $data['data']['newsletter_id']);
+
+        // Verify subscriber is linked to correct newsletter
+        $subscriber = Subscriber::findByEmail('specific@example.com', $this->siteId);
+        $this->assertEquals($newsletter2->id, $subscriber->newsletter_id);
+    }
+
+    public function testSignupWithoutNewsletterIdUsesDefault(): void
+    {
+        Newsletter::first()->delete();
+
+        // Create default newsletter
+        $defaultNewsletter = \App\Models\Newsletter::create([
+            'site_id' => $this->siteId,
+            'title' => 'Default Newsletter',
+            'interval' => 'weekly',
+            'active' => true,
+            'is_default' => true,
+            'content' => 'This is the newsletter content.',
+        ]);
+
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'default@example.com'
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($defaultNewsletter->id, $data['data']['newsletter_id']);
+
+        // Verify subscriber is linked to default newsletter
+        $subscriber = Subscriber::findByEmail('default@example.com', $this->siteId);
+        $this->assertEquals($defaultNewsletter->id, $subscriber->newsletter_id);
     }
 }

@@ -2,21 +2,29 @@
 
 namespace App\Tests\Unit\Services;
 
+use App\Models\Newsletter;
 use App\Models\Subscriber;
+use App\Repositories\NewsletterRepository;
 use App\Repositories\SubscriberRepository;
 use App\Services\NewsletterSignupService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Mockery;
 
 class NewsletterSignupServiceTest extends FunctionalTestCase
 {
     private NewsletterSignupService $service;
     private SubscriberRepository $repository;
+    private readonly NewsletterRepository $newsletterRepository;
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->repository = $this->createMock(SubscriberRepository::class);
-        $this->service = new NewsletterSignupService($this->repository, $this->siteId);
+        $this->repository = Mockery::mock(SubscriberRepository::class);
+        $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);
+        $this->service = new NewsletterSignupService(
+            $this->newsletterRepository,
+            $this->repository
+        );
     }
 
     public function testValidateEmailWithValidEmail(): void
@@ -50,16 +58,27 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testSignupWithNewEmail(): void
     {
-        $this->repository->expects($this->once())
-            ->method('findByEmail')
-            ->with('new@example.com', $this->siteId)
-            ->willReturn(null);
+        $this->repository
+            ->shouldReceive('findByEmailAndNewsletter')
+            ->once()
+            ->with('new@example.com', 1, $this->siteId)
+            ->andReturn(null);
 
-        $this->repository->expects($this->once())
-            ->method('create')
-            ->willReturn(new Subscriber(['email' => 'new@example.com']));
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn(new Subscriber(['email' => 'new@example.com']));
 
-        $result = $this->service->signup('new@example.com');
+        $newsletter = Mockery::mock(Newsletter::class)->makePartial();
+        $newsletter->id = 1;
+
+        $this->newsletterRepository
+            ->shouldReceive('getDefaultNewsletterForSite')
+            ->once()
+            ->with($this->siteId)
+            ->andReturn($newsletter);
+
+        $result = $this->service->signup('new@example.com', false, null, $this->siteId);
 
         $this->assertTrue($result['success']);
         $this->assertEquals('new@example.com', $result['email']);
@@ -68,13 +87,18 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testSignupWithExistingConfirmedEmail(): void
     {
-        $subscriber = new Subscriber(['email' => 'existing@example.com', 'confirmed' => true]);
+        $subscriber = new Subscriber([
+            'email' => 'existing@example.com',
+            'confirmed' => true
+        ]);
 
-        $this->repository->expects($this->once())
-            ->method('findByEmail')
-            ->willReturn($subscriber);
+        $this->repository
+            ->shouldReceive('findByEmailAndNewsletter')
+            ->once()
+            ->with('existing@example.com', 1, $this->siteId)
+            ->andReturn($subscriber);
 
-        $result = $this->service->signup('existing@example.com');
+        $result = $this->service->signup('existing@example.com', false, 1, $this->siteId);
 
         $this->assertFalse($result['success']);
         $this->assertEquals('Email already subscribed', $result['error']);
@@ -82,13 +106,18 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testSignupWithExistingPendingEmail(): void
     {
-        $subscriber = new Subscriber(['email' => 'pending@example.com', 'confirmed' => false]);
+        $subscriber = new Subscriber([
+            'email' => 'pending@example.com',
+            'confirmed' => false
+        ]);
 
-        $this->repository->expects($this->once())
-            ->method('findByEmail')
-            ->willReturn($subscriber);
+        $this->repository
+            ->shouldReceive('findByEmailAndNewsletter')
+            ->once()
+            ->with('pending@example.com', 1, $this->siteId)
+            ->andReturn($subscriber);
 
-        $result = $this->service->signup('pending@example.com');
+        $result = $this->service->signup('pending@example.com', false, 1, $this->siteId);
 
         $this->assertFalse($result['success']);
         $this->assertEquals('Confirmation pending', $result['error']);
@@ -103,26 +132,29 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
             'id' => 5
         ]);
 
-        $this->repository->expects($this->once())
-            ->method('findByConfirmationToken')
+        $this->repository
+            ->shouldReceive('findByConfirmationToken')
+            ->once()
             ->with('valid-token')
-            ->willReturn($subscriber);
+            ->andReturn($subscriber);
 
-        $this->repository->expects($this->once())
-            ->method('update')
-            ->with($subscriber->id, ['confirmed' => true]);
+        $this->repository
+            ->shouldReceive('update')
+            ->once()
+            ->with(5, ['confirmed' => true]);
 
-        $result = $this->service->confirm('valid-token');
+        $result = $this->service->confirm('valid-token', $this->siteId);
 
         $this->assertTrue($result['success']);
     }
 
     public function testConfirmWithInvalidToken(): void
     {
-        $this->repository->expects($this->once())
-            ->method('findByConfirmationToken')
+        $this->repository
+            ->shouldReceive('findByConfirmationToken')
+            ->once()
             ->with('invalid-token')
-            ->willReturn(null);
+            ->andReturn(null);
 
         $result = $this->service->confirm('invalid-token');
 
@@ -135,14 +167,15 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
         $subscriber = new Subscriber([
             'email' => 'test@example.com',
             'confirmed' => false,
-            'site_id' => 999, // Different site ID
+            'site_id' => 999,
             'id' => 5
         ]);
 
-        $this->repository->expects($this->once())
-            ->method('findByConfirmationToken')
+        $this->repository
+            ->shouldReceive('findByConfirmationToken')
+            ->once()
             ->with('valid-token')
-            ->willReturn($subscriber);
+            ->andReturn($subscriber);
 
         $result = $this->service->confirm('valid-token');
 
@@ -158,26 +191,29 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
             'id' => 5
         ]);
 
-        $this->repository->expects($this->once())
-            ->method('findByUnsubscribeToken')
+        $this->repository
+            ->shouldReceive('findByUnsubscribeToken')
+            ->once()
             ->with('unsub-token')
-            ->willReturn($subscriber);
+            ->andReturn($subscriber);
 
-        $this->repository->expects($this->once())
-            ->method('delete')
-            ->with($subscriber->id);
+        $this->repository
+            ->shouldReceive('delete')
+            ->once()
+            ->with(5);
 
-        $result = $this->service->unsubscribe('unsub-token');
+        $result = $this->service->unsubscribe('unsub-token', $this->siteId);
 
         $this->assertTrue($result['success']);
     }
 
     public function testUnsubscribeWithInvalidToken(): void
     {
-        $this->repository->expects($this->once())
-            ->method('findByUnsubscribeToken')
+        $this->repository
+            ->shouldReceive('findByUnsubscribeToken')
+            ->once()
             ->with('invalid-token')
-            ->willReturn(null);
+            ->andReturn(null);
 
         $result = $this->service->unsubscribe('invalid-token');
 
@@ -193,13 +229,15 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
             'id' => 5
         ]);
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository
+            ->shouldReceive('find')
+            ->once()
             ->with(5)
-            ->willReturn($subscriber);
+            ->andReturn($subscriber);
 
-        $this->repository->expects($this->once())
-            ->method('delete')
+        $this->repository
+            ->shouldReceive('delete')
+            ->once()
             ->with(5);
 
         $result = $this->service->unsubscribeById(5, $this->siteId);
@@ -212,14 +250,15 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
     {
         $subscriber = new Subscriber([
             'email' => 'test@example.com',
-            'site_id' => 999, // Different site ID
+            'site_id' => 999,
             'id' => 5
         ]);
 
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository
+            ->shouldReceive('find')
+            ->once()
             ->with(5)
-            ->willReturn($subscriber);
+            ->andReturn($subscriber);
 
         $result = $this->service->unsubscribeById(5, $this->siteId);
 
@@ -229,10 +268,11 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testUnsubscribeByIdWithNonExistentSubscriber(): void
     {
-        $this->repository->expects($this->once())
-            ->method('find')
+        $this->repository
+            ->shouldReceive('find')
+            ->once()
             ->with(999)
-            ->willReturn(null);
+            ->andReturn(null);
 
         $result = $this->service->unsubscribeById(999, $this->siteId);
 
@@ -242,17 +282,83 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testGetConfirmedSubscribers(): void
     {
-        $confirmedEmails = ['user1@example.com', 'user2@example.com', 'user3@example.com'];
+        $emails = ['user1@example.com', 'user2@example.com', 'user3@example.com'];
 
-        $this->repository->expects($this->once())
-            ->method('getConfirmedEmails')
+        $this->repository
+            ->shouldReceive('getConfirmedEmails')
+            ->once()
             ->with($this->siteId)
-            ->willReturn($confirmedEmails);
+            ->andReturn($emails);
 
-        $result = $this->service->getConfirmedSubscribers();
+        $result = $this->service->getConfirmedSubscribers($this->siteId);
 
-        $this->assertIsArray($result);
         $this->assertCount(3, $result);
-        $this->assertEquals($confirmedEmails, $result);
+        $this->assertEquals($emails, $result);
+    }
+
+    public function testSignupWithoutNewsletterIdUsesDefault(): void
+    {
+        $this->repository
+            ->shouldReceive('findByEmailAndNewsletter')
+            ->once()
+            ->with('test@example.com', 1, $this->siteId)
+            ->andReturn(null);
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn(new Subscriber([
+                'email' => 'test@example.com',
+                'newsletter_id' => 1,
+                'id' => 1
+            ]));
+
+        $newsletter = Mockery::mock(Newsletter::class)->makePartial();
+        $newsletter->id = 1;
+
+        $this->newsletterRepository
+            ->shouldReceive('getDefaultNewsletterForSite')
+            ->once()
+            ->with($this->siteId)
+            ->andReturn($newsletter);
+
+        $result = $this->service->signup('test@example.com', true, null, $this->siteId);
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('newsletter_id', $result);
+    }
+
+    public function testSignupWithNoDefaultNewsletterFails(): void
+    {
+        $this->newsletterRepository->shouldReceive('getDefaultNewsletterForSite')
+            ->with($this->siteId)
+            ->andReturn(null);
+
+        $result = $this->service->signup('test@example.com', true, null, $this->siteId);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('No newsletter available for subscription', $result['error']);
+    }
+
+    public function testSignupAllowsMultipleNewslettersForSameEmail(): void
+    {
+        $this->repository
+            ->shouldReceive('findByEmailAndNewsletter')
+            ->once()
+            ->with('test@example.com', $this->siteId, 1)
+            ->andReturn(null);
+
+        $this->repository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn(new Subscriber([
+                'email' => 'test@example.com',
+                'newsletter_id' => 1,
+                'id' => 1
+            ]));
+
+        $result = $this->service->signup('test@example.com', true, 1, $this->siteId);
+
+        $this->assertTrue($result['success']);
     }
 }

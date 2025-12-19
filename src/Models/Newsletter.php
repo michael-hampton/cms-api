@@ -21,6 +21,7 @@ class Newsletter extends Model
         'sort_order',
         'template',
         'created_at',
+        'is_default',
     ];
 
     protected $casts = [
@@ -28,7 +29,8 @@ class Newsletter extends Model
         'last_sent' => 'datetime',
         'page_filters' => 'array',
         'max_pages' => 'integer',
-        'created_at' => 'datetime'
+        'created_at' => 'datetime',
+        'is_default' => 'boolean',
     ];
 
     const INTERVAL_DAILY = 'daily';
@@ -86,5 +88,27 @@ class Newsletter extends Model
     public function isAutomated()
     {
         return true;
+    }
+
+    /**
+     * Get the default newsletter for a site
+     */
+    public static function getDefault(int $siteId): ?self
+    {
+        return static::where('site_id', $siteId)
+            ->where('is_default', true)
+            ->where('active', true)
+            ->first();
+    }
+
+    public function setAsDefault(): bool
+    {
+        // Unset any other default newsletters for this site
+        static::where('site_id', $this->site_id)
+            ->where('is_default', true)
+            ->update(['is_default' => false]);
+
+        // Set this one as default
+        return $this->update(['is_default' => true]);
     }
 }

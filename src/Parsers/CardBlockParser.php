@@ -52,8 +52,19 @@ class CardBlockParser extends BaseBlockParser
             'sponsored' => (bool)($data['sponsored'] ?? false),
             'openInNewTab' => (bool)($data['openInNewTab'] ?? false),
             'sponsorDeclaration' => $this->parseSponsorDeclaration($data['sponsorDeclaration'] ?? null),
-            'context' => $this->sanitize($data['context'] ?? 'default')
+            'context' => $this->sanitize($data['context'] ?? 'default'),
+            'itemsPerRow' => $this->parseItemsPerRow($data['itemsPerRow'] ?? null)
         ];
+    }
+
+    private function parseItemsPerRow($value): int
+    {
+        $value = (int)$value;
+        // Validate range 1-4
+        if ($value < 1 || $value > 4) {
+            return 3; // Default
+        }
+        return $value;
     }
 
     private function sanitize(string $value): string
@@ -116,9 +127,10 @@ class CardBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<div class=\"card-block card-block-{$parsedData['context']}\">";
+        $itemsPerRow = $parsedData['itemsPerRow'] ?? 3;
+        $containerClass = "card-block card-block-{$parsedData['context']} card-items-{$itemsPerRow}";
 
-        // Card Container
+        $html = "<div class=\"{$containerClass}\">";
         $html .= "<div class=\"card-container\">";
 
         // Image Section

@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.textContent = 'Creating Account...';
 
             try {
-                const response = await fetch(`/default/${SITE}/newsletter/signup`, {
+                const response = await fetch(`/${SITE}/default/newsletter/signup`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -259,6 +259,32 @@ document.addEventListener('DOMContentLoaded', function () {
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Create Account';
+            }
+        });
+    }
+
+    const createAccountCheckbox = document.getElementById('createAccount');
+    const accountFields = document.getElementById('accountFields');
+    const firstName = document.getElementById('firstName');
+    const lastName = document.getElementById('lastName');
+    const password = document.getElementById('accountPassword');
+
+    if (createAccountCheckbox) {
+        createAccountCheckbox.addEventListener('change', function () {
+            if (this.checked) {
+                accountFields.classList.add('show');
+                firstName.required = true;
+                lastName.required = true;
+                password.required = true;
+            } else {
+                accountFields.classList.remove('show');
+                firstName.required = false;
+                lastName.required = false;
+                password.required = false;
+                // Clear fields
+                firstName.value = '';
+                lastName.value = '';
+                password.value = '';
             }
         });
     }
@@ -321,45 +347,97 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const newsletterForm = document.getElementById('newsletterForm');
 
-    if (newsletterForm) {
-        newsletterForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
+    document.getElementById('newsletterForm')?.addEventListener('submit', async function (e) {
+        e.preventDefault();
 
-            const submitBtn = this.querySelector('.comment-submit');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Subscribing...';
+        const email = document.getElementById('newsletterEmail').value;
+        const createAccount = document.getElementById('createAccount').checked;
+        const firstName = document.getElementById('firstName')?.value || '';
+        const lastName = document.getElementById('lastName')?.value || '';
+        const password = document.getElementById('accountPassword')?.value || '';
+        const otherBrands = document.getElementById('otherBrands').checked;
+        const trustedPartners = document.getElementById('trustedPartners').checked;
 
-            const email = document.getElementById('newsletterEmail').value;
+        const messageEl = document.getElementById('newsletterMessage');
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
 
-            try {
-                const response = await fetch('/api/newsletter/subscribe', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({email})
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showMessage('newsletterMessage', 'Successfully subscribed to newsletter!', 'success');
-                    setTimeout(() => {
-                        closeNewsletterModal();
-                        showToast('Subscribed!', 'Welcome to our newsletter');
-                    }, 1500);
-                } else {
-                    showMessage('newsletterMessage', data.message || 'Failed to subscribe', 'error');
-                }
-            } catch (error) {
-                console.error('Error subscribing to newsletter:', error);
-                showMessage('newsletterMessage', 'An error occurred. Please try again.', 'error');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Subscribe Now';
+        // Validate account fields if creating account
+        if (createAccount) {
+            if (!firstName || !lastName || !password) {
+                showError('Please fill in all account fields');
+                return;
             }
-        });
-    }
+
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters');
+                return;
+            }
+        }
+
+        const submitBtn = document.getElementById('newsletterSubmitBtn');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = createAccount ? 'Creating Account...' : 'Subscribing...';
+
+        try {
+            const siteSlug = window.location.pathname.split('/')[1] || 'default';
+
+            const requestBody = {
+                email,
+                other_brands: otherBrands,
+                trusted_partners: trustedPartners
+            };
+
+            // Add account creation fields if checked
+            if (createAccount) {
+                requestBody.create_account = true;
+                requestBody.first_name = firstName;
+                requestBody.last_name = lastName;
+                requestBody.password = password;
+            }
+
+            console.log('Sending request:', requestBody);
+
+            const response = await fetch(`/${siteSlug}/default/newsletter/signup`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(requestBody)
+            });
+
+            const result = await response.json();
+            console.log('Received response:', result);
+
+            if (result.success) {
+                subscribedEmail = email;
+                availableNewsletters = result.data?.available_newsletters || [];
+
+                // Update success message if account was created
+                if (result.data?.account_created) {
+                    document.getElementById('successTitle').textContent = 'Welcome! Your account is ready.';
+                    document.getElementById('successMessage').textContent = 'Your newsletter subscription and account have been created successfully.';
+                } else {
+                    document.getElementById('successTitle').textContent = 'You are now subscribed.';
+                    document.getElementById('successMessage').textContent = 'Your newsletter sign-up was successful.';
+                }
+
+                // Build newsletter cards dynamically
+                buildNewsletterCards(availableNewsletters);
+
+                // Show success step
+                document.getElementById('newsletterStep1').style.display = 'none';
+                document.getElementById('newsletterStep2').style.display = 'block';
+            } else {
+                showError(result.message || 'Subscription failed. Please try again.');
+            }
+        } catch (error) {
+            console.error('Newsletter signup error:', error);
+            showError('An error occurred. Please try again.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    });
 });
 
 function flipPageCard(cardElement) {
@@ -529,17 +607,16 @@ function closeCommentModal() {
 }
 
 function openNewsletterModal() {
-    const modal = document.getElementById('newsletterModal');
-    modal.classList.add('active');
+    document.getElementById('newsletterModal').classList.add('show');
     document.body.style.overflow = 'hidden';
+    // Reset to step 1
+    document.getElementById('newsletterStep1').style.display = 'block';
+    document.getElementById('newsletterStep2').style.display = 'none';
 }
 
 function closeNewsletterModal() {
-    const modal = document.getElementById('newsletterModal');
-    modal.classList.remove('active');
+    document.getElementById('newsletterModal').classList.remove('show');
     document.body.style.overflow = '';
-    document.getElementById('newsletterForm').reset();
-    hideMessage('newsletterMessage');
 }
 
 // Utility Functions
@@ -570,6 +647,104 @@ function showToast(title, message, type = 'success') {
     setTimeout(() => {
         toast.classList.remove('active');
     }, 3000);
+}
+
+function showError(message) {
+    const messageEl = document.getElementById('newsletterMessage');
+    messageEl.textContent = message;
+    messageEl.style.display = 'block';
+    messageEl.style.background = '#fee2e2';
+    messageEl.style.color = '#991b1b';
+    messageEl.style.padding = '12px 16px';
+    messageEl.style.borderRadius = '8px';
+    messageEl.style.marginBottom = '16px';
+}
+
+// Build newsletter cards dynamically
+function buildNewsletterCards(newsletters) {
+    const grid = document.querySelector('.newsletters-grid');
+    if (!grid) return;
+
+    // Keep first card, remove others
+    const firstCard = grid.querySelector('.newsletter-card');
+    grid.innerHTML = '';
+    if (firstCard) {
+        grid.appendChild(firstCard);
+    }
+
+    const gradients = [
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+        'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)'
+    ];
+
+    newsletters.forEach((newsletter, index) => {
+        const card = document.createElement('div');
+        card.className = 'newsletter-card';
+        card.innerHTML = `
+            <div class="newsletter-card-image" style="background: ${gradients[index % gradients.length]};">
+                <div class="newsletter-card-badge">${escapeHtml(newsletter.frequency || 'REGULAR UPDATES')}</div>
+            </div>
+            <div class="newsletter-card-content">
+                <h4>${escapeHtml(newsletter.title)}</h4>
+                <p>${escapeHtml(newsletter.description || 'Stay updated with the latest content.')}</p>
+                <button class="newsletter-card-btn" onclick="subscribeToNewsletter(${newsletter.id}, this)">
+                    SIGNUP +
+                </button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+async function subscribeToNewsletter(newsletterId, button) {
+    if (!subscribedEmail) {
+        alert('Email not found. Please try again.');
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Subscribing...';
+
+    try {
+        const siteSlug = window.location.pathname.split('/')[1] || 'default';
+
+        const response = await fetch(`/${siteSlug}/default/newsletter/signup`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                email: subscribedEmail,
+                newsletter_id: newsletterId
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg> SELECTED`;
+            button.classList.add('selected');
+            button.disabled = false;
+            button.onclick = null;
+        } else {
+            button.textContent = 'Failed - Try Again';
+            button.disabled = false;
+        }
+    } catch (error) {
+        console.error('Subscription error:', error);
+        button.textContent = 'Error - Try Again';
+        button.disabled = false;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Close modals on overlay click

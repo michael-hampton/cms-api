@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Framework\Support\Collection;
+use App\Models\Model;
 use App\Models\Subscriber;
 
 class SubscriberRepository extends Repository
@@ -50,7 +51,7 @@ class SubscriberRepository extends Repository
             ->first();
     }
 
-    public function create(array $data): Subscriber
+    public function create(array $data): Model
     {
         return Subscriber::create($data);
     }

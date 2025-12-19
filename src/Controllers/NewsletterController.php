@@ -23,7 +23,8 @@ class NewsletterController extends Controller
     public function __construct(
         private readonly SubscriberRepository     $repository,
         private readonly EmailVerificationService $emailVerificationService,
-        private readonly NewsletterRepository     $newsletterRepository
+        private readonly NewsletterRepository    $newsletterRepository,
+        private readonly NewsletterSignupService $newsletterSignupService,
     )
     {
         parent::__construct();
@@ -46,6 +47,7 @@ class NewsletterController extends Controller
     {
         try {
             $siteId = $request->getSiteId();
+            $isDefault = $request->input('is_default', false);
 
             $data = [
                 'site_id' => $siteId,
@@ -53,6 +55,7 @@ class NewsletterController extends Controller
                 'content' => $request->input('content'),
                 'interval' => $request->input('interval'),
                 'active' => $request->input('active', true),
+                'is_default' => false, // Will be set below if needed
                 'content_type' => $request->input('content_type', 'manual'),
                 'max_pages' => $request->input('max_pages', 10),
                 'sort_by' => $request->input('sort_by', 'published_at'),
@@ -62,8 +65,13 @@ class NewsletterController extends Controller
 
             $newsletter = $this->newsletterRepository->create($data);
 
+            // If this should be the default, or if it's the first newsletter for this site
+            if ($isDefault || $this->newsletterRepository->where('site_id', $siteId)->count() === 1) {
+                $newsletter->setAsDefault();
+            }
+
             return $this->jsonResponse([
-                'newsletter' => $newsletter->toArray()
+                'newsletter' => $newsletter->fresh()->toArray()
             ], 201);
 
         } catch (\Exception $e) {
@@ -115,6 +123,12 @@ class NewsletterController extends Controller
             ], fn($value) => $value !== null);
 
             $updated = $this->newsletterRepository->update($id, $data);
+
+            // Handle is_default separately
+            if ($request->has('is_default') && $request->input('is_default')) {
+                $updated->setAsDefault();
+                $updated = $updated->fresh();
+            }
 
             return $this->successResponse('Newsletter updated successfully', [
                 'newsletter' => $updated->toArray()
@@ -216,16 +230,16 @@ class NewsletterController extends Controller
     {
         try {
             $siteId = $request->getSiteId();
-            $this->service = new NewsletterSignupService($this->repository, $siteId);
 
             $email = $request->input('email');
+            $newsletterId = $request->input('newsletter_id'); // Can be null
             $createAccount = $request->input('create_account', false);
             $firstName = $request->input('first_name');
             $lastName = $request->input('last_name');
             $password = $request->input('password');
 
-            // Newsletter signup
-            $result = $this->service->signup($email);
+            // Newsletter signup with optional newsletter_id
+            $result = $this->newsletterSignupService->signup($email, true, $newsletterId, $siteId);
 
             if (!$result['success']) {
                 return $this->errorResponse($result['error'], 400);
@@ -243,6 +257,7 @@ class NewsletterController extends Controller
                 if ($existingMember) {
                     return $this->successResponse('Newsletter subscription successful', [
                         'subscribed' => true,
+                        'newsletter_id' => $result['newsletter_id'],
                         'account_created' => false,
                         'message' => 'You already have an account. Please log in.',
                         'account_exists' => true
@@ -273,8 +288,14 @@ class NewsletterController extends Controller
                 try {
                     MemberAuth::login($member);
 
+                    // Get available newsletters
+                    $availableNewsletters = $this->formatNewslettersForResponse(
+                        $this->newsletterRepository->getActive($siteId)
+                    );
+
                     return $this->successResponse('Newsletter subscription and account created successfully', [
                         'subscribed' => true,
+                        'newsletter_id' => $result['newsletter_id'],
                         'account_created' => true,
                         'logged_in' => true,
                         'requires_verification' => true,
@@ -284,26 +305,40 @@ class NewsletterController extends Controller
                             'first_name' => $member->first_name,
                             'last_name' => $member->last_name,
                             'is_verified' => $member->isEmailVerified()
-                        ]
+                        ],
+                        'available_newsletters' => $availableNewsletters
                     ]);
                 } catch (\Exception $e) {
+                    $availableNewsletters = $this->formatNewslettersForResponse(
+                        $this->newsletterRepository->getActive($siteId)
+                    );
+
                     // Account created but login failed
                     return $this->successResponse('Account created successfully', [
                         'subscribed' => true,
+                        'newsletter_id' => $result['newsletter_id'],
                         'account_created' => true,
                         'logged_in' => false,
                         'message' => 'Account created. Please log in manually.',
-                        'requires_verification' => true
+                        'requires_verification' => true,
+                        'available_newsletters' => $availableNewsletters
                     ]);
                 }
             }
 
+            // Get available newsletters
+            $availableNewsletters = $this->formatNewslettersForResponse(
+                $this->newsletterRepository->getActive($siteId)
+            );
+
             // Newsletter only subscription
             return $this->successResponse('Newsletter subscription successful', [
                 'subscribed' => true,
+                'newsletter_id' => $result['newsletter_id'],
                 'account_created' => false,
                 'email' => $email,
-                'confirmation_token' => $result['confirmation_token']
+                'confirmation_token' => $result['confirmation_token'],
+                'available_newsletters' => $availableNewsletters
             ]);
 
         } catch (\Exception $e) {
@@ -314,10 +349,9 @@ class NewsletterController extends Controller
     public function confirm(Request $request): JsonResponse
     {
         $siteId = $request->getSiteId();
-        $this->service = new NewsletterSignupService($this->repository, $siteId);
 
         $token = $request->input('token');
-        $result = $this->service->confirm($token);
+        $result = $this->newsletterSignupService->confirm($token, $siteId);
 
         if ($result['success']) {
             return $this->successResponse('Subscription confirmed', $result);
@@ -330,18 +364,16 @@ class NewsletterController extends Controller
     {
         $siteId = $request->getSiteId();
 
-        $this->service = new NewsletterSignupService($this->repository, $siteId);
-
         // Support both token-based and subscriber_id-based unsubscribe
         $token = $request->input('token');
         $subscriberId = $request->input('subscriber_id');
 
         if ($subscriberId) {
             // Unsubscribe by subscriber ID (for logged-in users)
-            $result = $this->service->unsubscribeById($subscriberId, $siteId);
+            $result = $this->newsletterSignupService->unsubscribeById($subscriberId, $siteId);
         } elseif ($token) {
             // Unsubscribe by token (for email links)
-            $result = $this->service->unsubscribe($token);
+            $result = $this->newsletterSignupService->unsubscribe($token, $siteId);
         } else {
             return $this->errorResponse('Missing token or subscriber ID', 400);
         }
@@ -356,9 +388,8 @@ class NewsletterController extends Controller
     public function getSubscribers(Request $request): JsonResponse
     {
         $siteId = $request->getSiteId();
-        $this->service = new NewsletterSignupService($this->repository, $siteId);
 
-        $subscribers = $this->service->getConfirmedSubscribers();
+        $subscribers = $this->newsletterSignupService->getConfirmedSubscribers($siteId);
 
         return $this->jsonResponse([
             'subscribers' => $subscribers,
@@ -382,5 +413,41 @@ class NewsletterController extends Controller
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Format newsletters collection for API response
+     */
+    private function formatNewslettersForResponse($newsletters): array
+    {
+        $formatted = [];
+
+        foreach ($newsletters as $newsletter) {
+            $formatted[] = [
+                'id' => $newsletter->id,
+                'title' => $newsletter->title,
+                'description' => $newsletter->content ?? '',
+                'interval' => $newsletter->interval,
+                'frequency' => $this->getFrequencyLabel($newsletter->interval),
+                'is_subscribed' => false // TODO: Check actual subscription status
+            ];
+        }
+
+        return $formatted;
+    }
+
+    /**
+     * Convert interval to human-readable frequency label
+     */
+    private function getFrequencyLabel(string $interval): string
+    {
+        $labels = [
+            'daily' => 'FIVE TIMES A WEEK',
+            'weekly' => 'ONCE A WEEK',
+            'biweekly' => 'TWICE A MONTH',
+            'monthly' => 'ONCE A MONTH',
+        ];
+
+        return $labels[$interval] ?? strtoupper($interval);
     }
 }

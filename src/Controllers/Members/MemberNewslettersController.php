@@ -5,15 +5,20 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Mail\MailManager;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Repositories\NewsletterRepository;
 use App\Repositories\SubscriberRepository;
+use App\Services\NewsletterSignupService;
 
 class MemberNewslettersController extends Controller
 {
     public function __construct(
-        private SubscriberRepository $subscriberRepository,
-        private NewsletterRepository $newsletterRepository
+        private readonly SubscriberRepository    $subscriberRepository,
+        private readonly NewsletterRepository    $newsletterRepository,
+        private readonly NewsletterSignupService $newsletterSignupService,
     ) {
         parent::__construct();
     }
@@ -46,23 +51,45 @@ class MemberNewslettersController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $member = MemberAuth::member();
-        $subscriberId = $request->input('subscriber_id');
+        try {
+            $member = MemberAuth::member();
+            $siteId = SiteContext::getId();
+            $subscriberId = $request->input('subscriber_id');
 
-        $subscriber = $this->subscriberRepository->find($subscriberId);
+            // Use the service to handle unsubscription
+            $result = $this->newsletterSignupService->unsubscribeById($subscriberId, $siteId);
 
-        if (!$subscriber || $subscriber->email !== $member->email) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
-        }
+            if (!$result['success']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $result['error']
+                ], 404);
+            }
 
-        if ($this->subscriberRepository->delete($subscriberId)) {
+            // Verify the subscriber belongs to this member
+            $subscriber = $this->subscriberRepository->find($subscriberId);
+            if ($subscriber && $subscriber->email !== $member->email) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Subscription not found'
+                ], 404);
+            }
+
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Unsubscribed successfully'
             ]);
-        }
 
-        return $this->jsonResponse(['success' => false, 'message' => 'Failed to unsubscribe'], 500);
+        } catch (\Exception $e) {
+            Logger::error('Member newsletter unsubscription failed', [
+                'error' => $e->getMessage(),
+                'member_id' => $member->id ?? null
+            ]);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to unsubscribe: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function subscribe(Request $request)
@@ -71,43 +98,45 @@ class MemberNewslettersController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $member = MemberAuth::member();
-        $siteId = SiteContext::getId();
-        $newsletterId = $request->input('newsletter_id');
+        try {
+            $member = MemberAuth::member();
+            $siteId = SiteContext::getId();
+            $newsletterId = $request->input('newsletter_id');
 
-        // Check if newsletter exists and is active
-        $newsletter = $this->newsletterRepository->find($newsletterId);
+            // Use the service to handle subscription
+            $result = $this->newsletterSignupService->signup($member->email, true, $newsletterId);
 
-        if (!$newsletter || !$newsletter->active || $newsletter->site_id !== $siteId) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Newsletter not found'], 404);
-        }
+            if (!$result['success']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $result['error']
+                ], 400);
+            }
 
-        // Check if already subscribed
-        $existing = $this->subscriberRepository->findByEmailAndNewsletter($member->email, $newsletterId, $siteId);
+            // Send confirmation email
+            $this->sendSignupConfirmationEmail(
+                $member->email,
+                $result['confirmation_token'],
+                $member->first_name
+            );
 
-        if ($existing) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Already subscribed to this newsletter'], 400);
-        }
-
-        // Create subscription
-        $subscriber = $this->subscriberRepository->create([
-            'email' => $member->email,
-            'newsletter_id' => $newsletterId,
-            'site_id' => $siteId,
-            'confirmed' => true, // Auto-confirm for logged-in members
-            'confirmation_token' => bin2hex(random_bytes(16)),
-            'unsubscribe_token' => bin2hex(random_bytes(16)),
-            'subscribed_at' => date('Y-m-d H:i:s')
-        ]);
-
-        if ($subscriber) {
             return $this->jsonResponse([
                 'success' => true,
-                'message' => 'Successfully subscribed to newsletter'
+                'message' => 'Successfully subscribed to newsletter',
+                'newsletter_id' => $result['newsletter_id'],
+                'subscriber_id' => $result['subscriber_id']
             ]);
-        }
 
-        return $this->jsonResponse(['success' => false, 'message' => 'Failed to subscribe'], 500);
+        } catch (\Exception $e) {
+            Logger::error('Member newsletter subscription failed', [
+                'error' => $e->getMessage(),
+                'member_id' => $member->id ?? null
+            ]);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to subscribe: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function bulkSubscribe(Request $request)
@@ -116,61 +145,85 @@ class MemberNewslettersController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $member = MemberAuth::member();
-        $siteId = SiteContext::getId();
-        $newsletterIds = $request->input('newsletter_ids', []);
+        try {
+            $member = MemberAuth::member();
+            $siteId = SiteContext::getId();
+            $newsletterIds = $request->input('newsletter_ids', []);
 
-        if (empty($newsletterIds)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'No newsletters selected'], 400);
-        }
-
-        $successCount = 0;
-        $errors = [];
-
-        foreach ($newsletterIds as $newsletterId) {
-            // Check if newsletter exists and is active
-            $newsletter = $this->newsletterRepository->find($newsletterId);
-
-            if (!$newsletter || !$newsletter->active || $newsletter->site_id !== $siteId) {
-                $errors[] = "Newsletter ID $newsletterId not found or inactive";
-                continue;
+            if (empty($newsletterIds)) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'No newsletters selected'
+                ], 400);
             }
 
-            // Check if already subscribed
-            $existing = $this->subscriberRepository->findByEmailAndNewsletter($member->email, $newsletterId, $siteId);
+            $this->service = new NewsletterSignupService($this->subscriberRepository, $siteId);
 
-            if ($existing) {
-                continue; // Skip if already subscribed
+            $successCount = 0;
+            $errors = [];
+            $subscribedIds = [];
+
+            foreach ($newsletterIds as $newsletterId) {
+                // Use the service to handle subscription
+                $result = $this->service->signup($member->email, true, $newsletterId);
+
+                if ($result['success']) {
+                    $successCount++;
+                    $subscribedIds[] = $result['newsletter_id'];
+
+                    // Send confirmation email
+                    $this->sendSignupConfirmationEmail(
+                        $member->email,
+                        $result['confirmation_token'],
+                        $member->first_name
+                    );
+                } else {
+                    $errors[] = $result['error'];
+                }
             }
 
-            // Create subscription
-            $subscriber = $this->subscriberRepository->create([
-                'email' => $member->email,
-                'newsletter_id' => $newsletterId,
-                'site_id' => $siteId,
-                'confirmed' => true, // Auto-confirm for logged-in members
-                'confirmation_token' => bin2hex(random_bytes(16)),
-                'unsubscribe_token' => bin2hex(random_bytes(16)),
-                'subscribed_at' => date('Y-m-d H:i:s')
-            ]);
-
-            if ($subscriber) {
-                $successCount++;
+            if ($successCount > 0) {
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => "Successfully subscribed to $successCount newsletter(s)",
+                    'count' => $successCount,
+                    'newsletter_ids' => $subscribedIds
+                ]);
             }
-        }
 
-        if ($successCount > 0) {
             return $this->jsonResponse([
-                'success' => true,
-                'message' => "Successfully subscribed to $successCount newsletter(s)",
-                'count' => $successCount
+                'success' => false,
+                'message' => 'Failed to subscribe to newsletters',
+                'errors' => $errors
+            ], 400);
+
+        } catch (\Exception $e) {
+            Logger::error('Member bulk newsletter subscription failed', [
+                'error' => $e->getMessage(),
+                'member_id' => $member->id ?? null
+            ]);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to subscribe: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function sendSignupConfirmationEmail(string $email, string $token, ?string $firstName = null): void
+    {
+        $mailable = new NewsletterSignupConfirmationWithTracking(
+            $email,
+            $token,
+            $firstName
+        );
+
+        try {
+            MailManager::getInstance()->send($mailable);
+        } catch (\Exception $e) {
+            Logger::error('Failed to send newsletter confirmation email', [
+                'email' => $email,
+                'error' => $e->getMessage()
             ]);
         }
-
-        return $this->jsonResponse([
-            'success' => false,
-            'message' => 'Failed to subscribe to newsletters',
-            'errors' => $errors
-        ], 400);
     }
 }
