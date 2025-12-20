@@ -13,6 +13,7 @@ use App\Models\Member;
 use App\Models\MemberRole;
 use App\Repositories\NewsletterRepository;
 use App\Repositories\SubscriberRepository;
+use App\Services\CampaignService;
 use App\Services\EmailVerificationService;
 use App\Services\NewsletterSignupService;
 
@@ -25,6 +26,7 @@ class NewsletterController extends Controller
         private readonly EmailVerificationService $emailVerificationService,
         private readonly NewsletterRepository    $newsletterRepository,
         private readonly NewsletterSignupService $newsletterSignupService,
+        private readonly CampaignService         $campaignService,
     )
     {
         parent::__construct();
@@ -233,21 +235,53 @@ class NewsletterController extends Controller
 
             $email = $request->input('email');
             $newsletterId = $request->input('newsletter_id'); // Can be null
+            $campaignSlug = $request->input('campaign'); // NEW
             $createAccount = $request->input('create_account', false);
             $firstName = $request->input('first_name');
             $lastName = $request->input('last_name');
             $password = $request->input('password');
 
+            // Resolve campaign and newsletter using CampaignService
+            $resolution = $this->campaignService->resolveCampaignOrNewsletter(
+                $campaignSlug,
+                $newsletterId,
+                $siteId
+            );
+
+            if (!$resolution['success']) {
+                return $this->errorResponse($resolution['error'], 400);
+            }
+
+            $resolvedNewsletterId = $resolution['newsletter_id'];
+            $campaignId = $resolution['campaign_id'];
+            $campaign = $resolution['campaign'];
+
             // Newsletter signup with optional newsletter_id
-            $result = $this->newsletterSignupService->signup($email, true, $newsletterId, $siteId);
+            $result = $this->newsletterSignupService->signup(
+                $email,
+                true,
+                $resolvedNewsletterId,
+                $siteId,
+                $campaignId  // NEW
+            );
 
             if (!$result['success']) {
                 return $this->errorResponse($result['error'], 400);
             }
 
+            // Track campaign signup if campaign exists
+            if ($campaignId) {
+                $this->campaignService->trackCampaignSignup($campaignId);
+            }
+
             // Send confirmation email
-            $confirmationToken = $result['confirmation_token'];
-            $this->sendSignupConfirmationEmail($email, $confirmationToken, $firstName);
+            if (!isset($result['resubscribed']) || !$result['resubscribed']) {
+                $this->sendSignupConfirmationEmail(
+                    $email,
+                    $result['confirmation_token'],
+                    $firstName
+                );
+            }
 
             // Handle account creation if requested
             if ($createAccount && $firstName && $lastName && $password) {
@@ -260,7 +294,8 @@ class NewsletterController extends Controller
                         'newsletter_id' => $result['newsletter_id'],
                         'account_created' => false,
                         'message' => 'You already have an account. Please log in.',
-                        'account_exists' => true
+                        'account_exists' => true,
+                        'resubscribed' => $result['resubscribed'] ?? false
                     ]);
                 }
 
@@ -295,6 +330,7 @@ class NewsletterController extends Controller
 
                     return $this->successResponse('Newsletter subscription and account created successfully', [
                         'subscribed' => true,
+                        'resubscribed' => $result['resubscribed'] ?? false,
                         'newsletter_id' => $result['newsletter_id'],
                         'account_created' => true,
                         'logged_in' => true,
@@ -331,15 +367,26 @@ class NewsletterController extends Controller
                 $this->newsletterRepository->getActive($siteId)
             );
 
-            // Newsletter only subscription
-            return $this->successResponse('Newsletter subscription successful', [
+            $responseData = [
                 'subscribed' => true,
                 'newsletter_id' => $result['newsletter_id'],
+                'campaign_id' => $campaignId,
                 'account_created' => false,
                 'email' => $email,
                 'confirmation_token' => $result['confirmation_token'],
-                'available_newsletters' => $availableNewsletters
-            ]);
+                'available_newsletters' => $availableNewsletters,
+                'resubscribed' => $result['resubscribed'] ?? false
+            ];
+
+            if ($campaign) {
+                $responseData['campaign'] = [
+                    'name' => $campaign->name,
+                    'slug' => $campaign->slug,
+                    'gates_premium_content' => $campaign->gates_premium_content,
+                ];
+            }
+
+            return $this->successResponse('Newsletter subscription successful', $responseData);
 
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

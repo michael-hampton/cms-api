@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers;
 
+use App\Models\Campaign;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Models\Subscriber;
@@ -269,7 +270,8 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
             'confirmation_token' => 'conf-token',
             'unsubscribe_token' => 'unsub-token-123',
             'subscribed_at' => date('Y-m-d H:i:s'),
-            'site_id' => $this->siteId
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null // ADDED
         ]);
 
         $response = $this->postForSite('/api/newsletter/unsubscribe', [
@@ -281,9 +283,12 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['data']['success']);
 
-        // Verify deleted from database
-        $deleted = Subscriber::findByEmail('unsub@example.com', $this->siteId);
-        $this->assertNull($deleted);
+        // CHANGED: Verify it still exists but is unsubscribed
+        $stillExists = Subscriber::find($subscriber->id);
+
+        $this->assertNotNull($stillExists);
+        $this->assertNotNull($stillExists->unsubscribed_at);
+        $this->assertFalse($stillExists->isActive());
     }
 
     public function testUnsubscribeWithSubscriberId(): void
@@ -295,7 +300,8 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
             'confirmation_token' => 'conf-token',
             'unsubscribe_token' => 'unsub-token',
             'subscribed_at' => date('Y-m-d H:i:s'),
-            'site_id' => $this->siteId
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null // ADDED
         ]);
 
         $response = $this->postForSite('/api/newsletter/unsubscribe', [
@@ -307,9 +313,11 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['data']['success']);
 
-        // Verify deleted from database
-        $deleted = Subscriber::findByEmail('unsubid@example.com', $this->siteId);
-        $this->assertNull($deleted);
+        // CHANGED: Verify it still exists but is unsubscribed
+        $stillExists = Subscriber::find($subscriber->id);
+        $this->assertNotNull($stillExists);
+        $this->assertNotNull($stillExists->unsubscribed_at);
+        $this->assertFalse($stillExists->isActive());
     }
 
     public function testUnsubscribeWithMissingParameters(): void
@@ -447,5 +455,172 @@ class NewsletterSignupControllerTest extends FunctionalTestCase
         // Verify subscriber is linked to default newsletter
         $subscriber = Subscriber::findByEmail('default@example.com', $this->siteId);
         $this->assertEquals($defaultNewsletter->id, $subscriber->newsletter_id);
+    }
+
+    public function testSignupWithCampaign(): void
+    {
+        $newsletter = $this->createNewsletter(['is_default' => true]);
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Test Campaign',
+            'slug' => 'test-campaign',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true
+        ]);
+
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'campaign@example.com',
+            'campaign' => 'test-campaign'
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($campaign->id, $data['data']['campaign_id']);
+
+        // Verify subscriber was created with campaign
+        $subscriber = Subscriber::findByEmail('campaign@example.com', $this->siteId);
+        $this->assertNotNull($subscriber);
+        $this->assertEquals($campaign->id, $subscriber->campaign_id);
+    }
+
+    public function testSignupWithInvalidCampaign(): void
+    {
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'test@example.com',
+            'campaign' => 'nonexistent-campaign'
+        ]);
+
+        $this->assertResponseStatus(200, $response); // Still succeeds, uses default newsletter
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNull($data['data']['campaign_id']);
+    }
+
+    public function testSignupWithEndedCampaign(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Ended Campaign',
+            'slug' => 'ended',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'test@example.com',
+            'campaign' => 'ended'
+        ]);
+
+        $this->assertResponseStatus(200, $response); // Falls back to default
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNull($data['data']['campaign_id']);
+    }
+
+    public function testSignupCampaignOverridesNewsletterIdParameter(): void
+    {
+        $newsletter1 = $this->createNewsletter(['title' => 'Newsletter 1']);
+        $newsletter2 = $this->createNewsletter(['title' => 'Newsletter 2']);
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Campaign',
+            'slug' => 'campaign',
+            'newsletter_id' => $newsletter1->id,
+            'is_active' => true
+        ]);
+
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'test@example.com',
+            'campaign' => 'campaign',
+            'newsletter_id' => $newsletter2->id // Should be ignored
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+// Campaign's newsletter should be used
+        $this->assertEquals($newsletter1->id, $data['data']['newsletter_id']);
+        $this->assertEquals($campaign->id, $data['data']['campaign_id']);
+    }
+
+    public function testResubscribeAfterUnsubscribe(): void
+    {
+        $newsletter = Newsletter::first();
+
+        // Create unsubscribed subscriber
+        Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'site_id' => $this->siteId,
+            'newsletter_id' => $newsletter->id,
+            'unsubscribed_at' => date('Y-m-d H:i:s', strtotime('-1 week'))
+        ]);
+
+        // Attempt to sign up again
+        $response = $this->postForSite('/api/newsletter/signup', [
+            'email' => 'test@example.com',
+            'newsletter_id' => $newsletter->id
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['data']['resubscribed'] ?? false);
+
+        // Verify unsubscribed_at is cleared
+        $subscriber = Subscriber::where('email', 'test@example.com')
+            ->where('site_id', $this->siteId)
+            ->first();
+
+        $this->assertNotNull($subscriber);
+        $this->assertNull($subscriber->unsubscribed_at);
+        $this->assertTrue($subscriber->isActive());
+    }
+
+    public function testGetSubscribersExcludesUnsubscribed(): void
+    {
+        $newsletter = Newsletter::first();
+
+        // Create active subscriber
+        Subscriber::create([
+            'email' => 'active@example.com',
+            'confirmed' => true,
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'newsletter_id' => $newsletter->id,
+            'unsubscribe_token' => 'token1',
+            'unsubscribed_at' => null
+        ]);
+
+        // Create unsubscribed subscriber
+        Subscriber::create([
+            'email' => 'unsubscribed@example.com',
+            'confirmed' => true,
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'newsletter_id' => $newsletter->id,
+            'unsubscribe_token' => 'token2',
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $response = $this->getForSite('/api/newsletter/subscribers');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals(1, $data['data']['count']);
+        $this->assertContains('active@example.com', $data['data']['subscribers']);
+        $this->assertNotContains('unsubscribed@example.com', $data['data']['subscribers']);
     }
 }

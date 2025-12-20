@@ -353,4 +353,160 @@ class SubscriberRepositoryTest extends RepositoryTestCase
         $this->assertEquals('persist@example.com', $found->email);
         $this->assertEquals($newsletter->id, $found->newsletter_id);
     }
+
+    public function test_find_existing_returns_active_subscriber(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'newsletter_id' => $newsletter->id,
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null
+        ]);
+
+        $result = $this->repository->findExisting('test@example.com', $newsletter->id, $this->siteId);
+
+        $this->assertNotNull($result);
+        $this->assertEquals($subscriber->id, $result->id);
+        $this->assertTrue($result->isActive());
+    }
+
+    public function test_find_existing_returns_unsubscribed_subscriber(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'newsletter_id' => $newsletter->id,
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $result = $this->repository->findExisting('test@example.com', $newsletter->id, $this->siteId);
+
+        $this->assertNotNull($result);
+        $this->assertEquals($subscriber->id, $result->id);
+        $this->assertFalse($result->isActive());
+    }
+
+    public function test_unsubscribe_sets_unsubscribed_at(): void
+    {
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null
+        ]);
+
+        $result = $this->repository->unsubscribe($subscriber->id);
+
+        $this->assertTrue($result);
+
+        $updated = Subscriber::find($subscriber->id);
+        $this->assertNotNull($updated->unsubscribed_at);
+        $this->assertFalse($updated->isActive());
+    }
+
+    public function test_resubscribe_clears_unsubscribed_at(): void
+    {
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $result = $this->repository->resubscribe($subscriber->id);
+
+        $this->assertTrue($result);
+
+        $updated = Subscriber::find($subscriber->id);
+        $this->assertNull($updated->unsubscribed_at);
+        $this->assertTrue($updated->isActive());
+    }
+
+    public function test_resubscribe_updates_campaign_id(): void
+    {
+        $campaign = $this->createCampaign();
+        $campaign2 = $this->createCampaign();
+
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s'),
+            'campaign_id' => $campaign->id
+        ]);
+
+        $result = $this->repository->resubscribe($subscriber->id, $campaign2->id);
+
+        $this->assertTrue($result);
+
+        $updated = Subscriber::find($subscriber->id);
+        $this->assertEquals(2, $updated->campaign_id);
+    }
+
+    public function test_find_by_email_excludes_unsubscribed(): void
+    {
+        Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $result = $this->repository->findByEmail('test@example.com', $this->siteId);
+
+        $this->assertNull($result);
+    }
+
+    public function test_get_confirmed_emails_excludes_unsubscribed(): void
+    {
+        Subscriber::create([
+            'email' => 'confirmed-active@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token1',
+            'unsubscribe_token' => 'unsub1',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null
+        ]);
+
+        Subscriber::create([
+            'email' => 'confirmed-unsubscribed@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token2',
+            'unsubscribe_token' => 'unsub2',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $result = $this->repository->getConfirmedEmails($this->siteId);
+
+        $this->assertCount(1, $result);
+        $this->assertContains('confirmed-active@example.com', $result);
+        $this->assertNotContains('confirmed-unsubscribed@example.com', $result);
+    }
 }

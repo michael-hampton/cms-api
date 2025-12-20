@@ -111,4 +111,14 @@ class Newsletter extends Model
         // Set this one as default
         return $this->update(['is_default' => true]);
     }
+
+    public function isPremium(): bool
+    {
+        return $this->is_premium ?? false;
+    }
+
+    public function campaigns($relation = false)
+    {
+        return $this->hasMany(Campaign::class, 'newsletter_id', 'id', $relation);
+    }
 }

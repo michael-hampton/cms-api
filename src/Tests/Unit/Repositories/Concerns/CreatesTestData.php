@@ -9,6 +9,7 @@ use App\Models\Author;
 use App\Models\Badge;
 use App\Models\Block;
 use App\Models\Brand;
+use App\Models\Campaign;
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\ConsentAuditLog;
@@ -49,6 +50,7 @@ use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Models\ProductVoucher;
 use App\Models\RegionSet;
+use App\Models\Subscriber;
 use App\Models\SubscriptionPlan;
 use App\Models\Tag;
 use App\Models\Territory;
@@ -612,4 +614,32 @@ trait CreatesTestData
         ], $attributes));
     }
 
+    protected function createSubscriber(array $attributes = []): Subscriber
+    {
+        $defaults = [
+            'email' => 'subscriber' . uniqid() . '@example.com',
+            'confirmed' => true,
+            'confirmation_token' => bin2hex(random_bytes(16)),
+            'unsubscribe_token' => bin2hex(random_bytes(16)),
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId
+        ];
+
+        return Subscriber::create(array_merge($defaults, $attributes));
+    }
+
+    protected function createCampaign(array $attributes = []): Model
+    {
+        return Campaign::create(array_merge([
+            'name' => 'Test Campaign ' . uniqid(),
+            'slug' => 'test-campaign-' . uniqid(),
+            'description' => 'Test campaign description',
+            'is_active' => true,
+            'is_default' => false,
+            'site_id' => $this->siteId ?? 1,
+            'start_date' => now(),
+            'end_date' => now()
+        ]));
+
+    }
 }

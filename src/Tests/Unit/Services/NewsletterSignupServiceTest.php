@@ -58,8 +58,9 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testSignupWithNewEmail(): void
     {
+        // CHANGED: Use findExisting instead of findByEmailAndNewsletter
         $this->repository
-            ->shouldReceive('findByEmailAndNewsletter')
+            ->shouldReceive('findExisting')
             ->once()
             ->with('new@example.com', 1, $this->siteId)
             ->andReturn(null);
@@ -67,7 +68,7 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
         $this->repository
             ->shouldReceive('create')
             ->once()
-            ->andReturn(new Subscriber(['email' => 'new@example.com']));
+            ->andReturn(new Subscriber(['email' => 'new@example.com', 'id' => 1]));
 
         $newsletter = Mockery::mock(Newsletter::class)->makePartial();
         $newsletter->id = 1;
@@ -87,13 +88,15 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testSignupWithExistingConfirmedEmail(): void
     {
-        $subscriber = new Subscriber([
-            'email' => 'existing@example.com',
-            'confirmed' => true
-        ]);
+        $subscriber = Mockery::mock(Subscriber::class)->makePartial();
+        $subscriber->email = 'existing@example.com';
+        $subscriber->confirmed = true;
+        $subscriber->shouldReceive('isActive')->andReturn(true);
+        $subscriber->shouldReceive('isConfirmed')->andReturn(true);
 
+        // CHANGED: Use findExisting instead of findByEmailAndNewsletter
         $this->repository
-            ->shouldReceive('findByEmailAndNewsletter')
+            ->shouldReceive('findExisting')
             ->once()
             ->with('existing@example.com', 1, $this->siteId)
             ->andReturn($subscriber);
@@ -106,13 +109,15 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
 
     public function testSignupWithExistingPendingEmail(): void
     {
-        $subscriber = new Subscriber([
-            'email' => 'pending@example.com',
-            'confirmed' => false
-        ]);
+        $subscriber = Mockery::mock(Subscriber::class)->makePartial();
+        $subscriber->email = 'pending@example.com';
+        $subscriber->confirmed = false;
+        $subscriber->shouldReceive('isActive')->andReturn(true);
+        $subscriber->shouldReceive('isConfirmed')->andReturn(false);
 
+        // CHANGED: Use findExisting instead of findByEmailAndNewsletter
         $this->repository
-            ->shouldReceive('findByEmailAndNewsletter')
+            ->shouldReceive('findExisting')
             ->once()
             ->with('pending@example.com', 1, $this->siteId)
             ->andReturn($subscriber);
@@ -197,10 +202,12 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
             ->with('unsub-token')
             ->andReturn($subscriber);
 
+        // CHANGED: from delete to unsubscribe
         $this->repository
-            ->shouldReceive('delete')
+            ->shouldReceive('unsubscribe')
             ->once()
-            ->with(5);
+            ->with(5)
+            ->andReturn(true);
 
         $result = $this->service->unsubscribe('unsub-token', $this->siteId);
 
@@ -235,10 +242,12 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
             ->with(5)
             ->andReturn($subscriber);
 
+        // CHANGED: from delete to unsubscribe
         $this->repository
-            ->shouldReceive('delete')
+            ->shouldReceive('unsubscribe')
             ->once()
-            ->with(5);
+            ->with(5)
+            ->andReturn(true);
 
         $result = $this->service->unsubscribeById(5, $this->siteId);
 
@@ -299,7 +308,7 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
     public function testSignupWithoutNewsletterIdUsesDefault(): void
     {
         $this->repository
-            ->shouldReceive('findByEmailAndNewsletter')
+            ->shouldReceive('findExisting')
             ->once()
             ->with('test@example.com', 1, $this->siteId)
             ->andReturn(null);
@@ -343,7 +352,7 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
     public function testSignupAllowsMultipleNewslettersForSameEmail(): void
     {
         $this->repository
-            ->shouldReceive('findByEmailAndNewsletter')
+            ->shouldReceive('findExisting')
             ->once()
             ->with('test@example.com', $this->siteId, 1)
             ->andReturn(null);
@@ -360,5 +369,65 @@ class NewsletterSignupServiceTest extends FunctionalTestCase
         $result = $this->service->signup('test@example.com', true, 1, $this->siteId);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testSignupResubscribesPreviouslyUnsubscribedUser(): void
+    {
+        $existingSubscriber = Mockery::mock(Subscriber::class)->makePartial();
+        $existingSubscriber->id = 1;
+        $existingSubscriber->email = 'test@example.com';
+        $existingSubscriber->confirmed = true;
+        $existingSubscriber->unsubscribed_at = date('Y-m-d H:i:s');
+        $existingSubscriber->confirmation_token = 'existing-token';
+        $existingSubscriber->newsletter_id = 1;
+
+        $existingSubscriber->shouldReceive('isActive')->andReturn(false);
+        $existingSubscriber->shouldReceive('isConfirmed')->andReturn(true);
+        $existingSubscriber->shouldReceive('resubscribe')
+            ->with(null)
+            ->once()
+            ->andReturn(true);
+        $existingSubscriber->shouldReceive('update')
+            ->once()
+            ->andReturn(true);
+
+        $this->repository->shouldReceive('findExisting')
+            ->with('test@example.com', 1, $this->siteId)
+            ->once()
+            ->andReturn($existingSubscriber);
+
+        $result = $this->service->signup('test@example.com', true, 1, $this->siteId);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['resubscribed']);
+        $this->assertEquals('test@example.com', $result['email']);
+        $this->assertEquals(1, $result['newsletter_id']);
+    }
+
+    public function testSignupWithCampaignIdUpdatesCampaignOnResubscribe(): void
+    {
+        $existingSubscriber = Mockery::mock(Subscriber::class)->makePartial();
+        $existingSubscriber->id = 1;
+        $existingSubscriber->email = 'test@example.com';
+        $existingSubscriber->unsubscribed_at = date('Y-m-d H:i:s');
+        $existingSubscriber->campaign_id = 1;
+        $existingSubscriber->confirmation_token = 'token';
+
+        $existingSubscriber->shouldReceive('isActive')->andReturn(false);
+        $existingSubscriber->shouldReceive('isConfirmed')->andReturn(true);
+        $existingSubscriber->shouldReceive('resubscribe')
+            ->with(2)
+            ->once()
+            ->andReturn(true);
+        $existingSubscriber->shouldReceive('update')->andReturn(true);
+
+        $this->repository->shouldReceive('findExisting')
+            ->once()
+            ->andReturn($existingSubscriber);
+
+        $result = $this->service->signup('test@example.com', true, 1, $this->siteId, 2);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['resubscribed']);
     }
 }

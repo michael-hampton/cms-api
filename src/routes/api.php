@@ -5,6 +5,7 @@ use App\Controllers\AuthController;
 use App\Controllers\AuthorController;
 use App\Controllers\BlockController;
 use App\Controllers\BrandController;
+use App\Controllers\CampaignController;
 use App\Controllers\CartController;
 use App\Controllers\CategoryController;
 use App\Controllers\CommentController;
@@ -63,6 +64,14 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/bulk-update-status', PageController::class, 'bulkUpdateStatus');
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
+
+        $router->get('/campaigns', [CampaignController::class, 'index']);
+        $router->get('/campaigns/active', [CampaignController::class, 'getActive']);
+        $router->get('/campaigns/{id}', [CampaignController::class, 'show']);
+        $router->post('/campaigns', [CampaignController::class, 'create']);
+        $router->put('/campaigns/{id}', [CampaignController::class, 'update']);
+        $router->delete('/campaigns/{id}', [CampaignController::class, 'delete']);
+        $router->post('/campaigns/{id}/clone', [CampaignController::class, 'clone']);
 
         // Payment routes
         $router->get('/orders/{id}/payments', [OrderController::class, 'payments']);

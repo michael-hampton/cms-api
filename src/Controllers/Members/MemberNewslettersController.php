@@ -56,6 +56,16 @@ class MemberNewslettersController extends Controller
             $siteId = SiteContext::getId();
             $subscriberId = $request->input('subscriber_id');
 
+            // Verify the subscriber belongs to this member
+            $subscriber = $this->subscriberRepository->find($subscriberId);
+
+            if (!$subscriber || $subscriber->site_id !== $siteId || $subscriber->email !== $member->email) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Subscription not found'
+                ], 404);
+            }
+
             // Use the service to handle unsubscription
             $result = $this->newsletterSignupService->unsubscribeById($subscriberId, $siteId);
 
@@ -63,15 +73,6 @@ class MemberNewslettersController extends Controller
                 return $this->jsonResponse([
                     'success' => false,
                     'message' => $result['error']
-                ], 404);
-            }
-
-            // Verify the subscriber belongs to this member
-            $subscriber = $this->subscriberRepository->find($subscriberId);
-            if ($subscriber && $subscriber->email !== $member->email) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Subscription not found'
                 ], 404);
             }
 
@@ -104,7 +105,7 @@ class MemberNewslettersController extends Controller
             $newsletterId = $request->input('newsletter_id');
 
             // Use the service to handle subscription
-            $result = $this->newsletterSignupService->signup($member->email, true, $newsletterId);
+            $result = $this->newsletterSignupService->signup($member->email, true, $newsletterId, $siteId);
 
             if (!$result['success']) {
                 return $this->jsonResponse([
@@ -113,18 +114,23 @@ class MemberNewslettersController extends Controller
                 ], 400);
             }
 
-            // Send confirmation email
-            $this->sendSignupConfirmationEmail(
-                $member->email,
-                $result['confirmation_token'],
-                $member->first_name
-            );
+            // Send confirmation email only if not resubscribed (new subscription)
+            if (!isset($result['resubscribed']) || !$result['resubscribed']) {
+                $this->sendSignupConfirmationEmail(
+                    $member->email,
+                    $result['confirmation_token'],
+                    $member->first_name
+                );
+            }
 
             return $this->jsonResponse([
                 'success' => true,
-                'message' => 'Successfully subscribed to newsletter',
+                'message' => isset($result['resubscribed']) && $result['resubscribed']
+                    ? 'Successfully resubscribed to newsletter'
+                    : 'Successfully subscribed to newsletter',
                 'newsletter_id' => $result['newsletter_id'],
-                'subscriber_id' => $result['subscriber_id']
+                'subscriber_id' => $result['subscriber_id'],
+                'resubscribed' => $result['resubscribed'] ?? false
             ]);
 
         } catch (\Exception $e) {
@@ -157,36 +163,45 @@ class MemberNewslettersController extends Controller
                 ], 400);
             }
 
-            $this->service = new NewsletterSignupService($this->subscriberRepository, $siteId);
-
             $successCount = 0;
             $errors = [];
             $subscribedIds = [];
+            $resubscribedCount = 0;
 
             foreach ($newsletterIds as $newsletterId) {
                 // Use the service to handle subscription
-                $result = $this->service->signup($member->email, true, $newsletterId);
+                $result = $this->newsletterSignupService->signup($member->email, true, $newsletterId, $siteId);
 
                 if ($result['success']) {
                     $successCount++;
                     $subscribedIds[] = $result['newsletter_id'];
 
-                    // Send confirmation email
-                    $this->sendSignupConfirmationEmail(
-                        $member->email,
-                        $result['confirmation_token'],
-                        $member->first_name
-                    );
+                    if (isset($result['resubscribed']) && $result['resubscribed']) {
+                        $resubscribedCount++;
+                    } else {
+                        // Send confirmation email only for new subscriptions
+                        $this->sendSignupConfirmationEmail(
+                            $member->email,
+                            $result['confirmation_token'],
+                            $member->first_name
+                        );
+                    }
                 } else {
                     $errors[] = $result['error'];
                 }
             }
 
             if ($successCount > 0) {
+                $message = "Successfully subscribed to $successCount newsletter(s)";
+                if ($resubscribedCount > 0) {
+                    $message .= " ($resubscribedCount resubscribed)";
+                }
+
                 return $this->jsonResponse([
                     'success' => true,
-                    'message' => "Successfully subscribed to $successCount newsletter(s)",
+                    'message' => $message,
                     'count' => $successCount,
+                    'resubscribed_count' => $resubscribedCount,
                     'newsletter_ids' => $subscribedIds
                 ]);
             }

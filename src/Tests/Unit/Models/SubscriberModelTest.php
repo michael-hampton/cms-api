@@ -7,7 +7,7 @@ use App\Models\Subscriber;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
-class SubscriberTest extends FunctionalTestCase
+class SubscriberModelTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
@@ -203,4 +203,153 @@ class SubscriberTest extends FunctionalTestCase
 
         $this->assertInstanceOf(\DateTime::class, $subscriber->subscribed_at);
     }
+
+    public function test_unsubscribe_sets_unsubscribed_at(): void
+    {
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null
+        ]);
+
+        $this->assertNull($subscriber->unsubscribed_at);
+        $this->assertTrue($subscriber->isActive());
+
+        $subscriber->unsubscribe();
+        $subscriber = $subscriber->fresh();
+
+        $this->assertNotNull($subscriber->unsubscribed_at);
+        $this->assertFalse($subscriber->isActive());
+    }
+
+    public function test_resubscribe_clears_unsubscribed_at(): void
+    {
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->assertFalse($subscriber->isActive());
+
+        $subscriber->resubscribe();
+        $subscriber = $subscriber->fresh();
+
+        $this->assertNull($subscriber->unsubscribed_at);
+        $this->assertTrue($subscriber->isActive());
+    }
+
+    public function test_resubscribe_updates_campaign_id(): void
+    {
+        // Create a newsletter first to satisfy foreign key
+        $newsletter = $this->createNewsletter();
+
+        // Create campaigns to satisfy foreign key constraints
+        $campaign1 = \App\Models\Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Campaign 1',
+            'status' => 'active',
+            'slug' => 'campaign-1',
+        ]);
+
+        $campaign2 = \App\Models\Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Campaign 2',
+            'status' => 'active',
+            'slug' => 'campaign-2',
+        ]);
+
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'newsletter_id' => $newsletter->id, // Add newsletter_id
+            'unsubscribed_at' => date('Y-m-d H:i:s'),
+            'campaign_id' => $campaign1->id // Use real campaign ID
+        ]);
+
+        $subscriber->resubscribe($campaign2->id); // Use real campaign ID
+        $subscriber = $subscriber->fresh();
+
+        $this->assertNull($subscriber->unsubscribed_at);
+        $this->assertEquals($campaign2->id, $subscriber->campaign_id);
+    }
+
+    public function test_active_scope_excludes_unsubscribed(): void
+    {
+        Subscriber::create([
+            'email' => 'active@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token1',
+            'unsubscribe_token' => 'unsub1',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => null
+        ]);
+
+        Subscriber::create([
+            'email' => 'unsubscribed@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token2',
+            'unsubscribe_token' => 'unsub2',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $active = Subscriber::active()->get();
+
+        $this->assertCount(1, $active);
+        $this->assertEquals('active@example.com', $active->first()->email);
+    }
+
+    public function test_unsubscribed_at_casts_to_datetime(): void
+    {
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'unsubscribed_at' => '2024-01-01 10:00:00'
+        ]);
+
+        $this->assertInstanceOf(\DateTime::class, $subscriber->unsubscribed_at);
+    }
+
+    public function test_find_existing_returns_unsubscribed_record(): void
+    {
+        // Create a newsletter first to satisfy foreign key
+        $newsletter = $this->createNewsletter();
+
+        $subscriber = Subscriber::create([
+            'email' => 'test@example.com',
+            'confirmed' => true,
+            'confirmation_token' => 'token123',
+            'unsubscribe_token' => 'unsub123',
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'newsletter_id' => $newsletter->id, // Use real newsletter ID
+            'unsubscribed_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $found = Subscriber::findExisting('test@example.com', $newsletter->id, $this->siteId);
+
+        $this->assertNotNull($found);
+        $this->assertEquals($subscriber->id, $found->id);
+        $this->assertFalse($found->isActive());
+    }
+
 }
