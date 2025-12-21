@@ -706,7 +706,8 @@ class StripePaymentProcessor
                 ],
                 'metadata' => [
                     'order_id' => $orderData['order_id'] ?? null,
-                    'site_id' => $orderData['site_id'] ?? null
+                    'site_id' => $orderData['site_id'] ?? null,
+                    'subscription_id' => $orderData['subscription_id'] ?? null,
                 ]
             ]);
 
@@ -716,6 +717,10 @@ class StripePaymentProcessor
                 'payment_intent_id' => $paymentIntent->id
             ];
         } catch (ApiErrorException $e) {
+
+            echo $e->getMessage();
+            die;
+
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e)
@@ -1080,5 +1085,77 @@ class StripePaymentProcessor
         $voucher->update(['stripe_coupon_id' => $stripeCoupon->id]);
 
         return $stripeCoupon->id;
+    }
+
+    public function confirmPaymentIntent(string $paymentIntentId): array
+    {
+        try {
+            $paymentIntent = $this->stripe->paymentIntents->retrieve($paymentIntentId);
+
+            return [
+                'success' => true,
+                'status' => $paymentIntent->status,
+                'amount' => $paymentIntent->amount / 100,
+                'currency' => $paymentIntent->currency,
+            ];
+        } catch (ApiErrorException $e) {
+            return [
+                'success' => false,
+                'message' => $this->getUserFriendlyMessage($e),
+                'error_code' => $e->getStripeCode()
+            ];
+        }
+    }
+
+    public function handleOneTimeSubscriptionPayment(
+        string $paymentIntentId,
+        int    $subscriptionId,
+        int    $orderId,
+        int    $siteId
+    ): array
+    {
+        try {
+            $paymentIntent = $this->stripe->paymentIntents->retrieve($paymentIntentId);
+
+            if ($paymentIntent->status !== 'succeeded') {
+                return [
+                    'success' => false,
+                    'message' => 'Payment not completed'
+                ];
+            }
+
+            // Create payment record
+            $payment = $this->paymentRepository->create([
+                'order_id' => $orderId,
+                'subscription_id' => $subscriptionId,
+                'site_id' => $siteId,
+                'payment_method' => 'stripe',
+                'payment_provider' => 'stripe',
+                'transaction_id' => $paymentIntent->id,
+                'payment_intent_id' => $paymentIntent->id,
+                'status' => 'completed',
+                'amount' => $paymentIntent->amount / 100,
+                'currency' => strtoupper($paymentIntent->currency),
+                'paid_at' => date('Y-m-d H:i:s'),
+                'metadata' => [
+                    'subscription_id' => $subscriptionId,
+                    'order_id' => $orderId,
+                    'one_time_subscription' => true
+                ]
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $payment->id,
+                'transaction_id' => $paymentIntent->id,
+            ];
+
+        } catch (ApiErrorException $e) {
+            return [
+                'success' => false,
+                'message' => $this->getUserFriendlyMessage($e),
+                'error_code' => $e->getStripeCode()
+            ];
+        }
     }
 }

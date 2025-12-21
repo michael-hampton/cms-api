@@ -14,7 +14,8 @@ class CartItem extends Model
         'price',
         'options',
         'site_id',
-        'subtotal'
+        'subtotal',
+        'subscription_plan_id',
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class CartItem extends Model
         'options' => 'json',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'subscription_plan_id' => 'integer',
     ];
 
     public function product()
@@ -38,5 +40,15 @@ class CartItem extends Model
     public function getSubtotal(): float
     {
         return $this->price * $this->quantity;
+    }
+
+    public function subscriptionPlan()
+    {
+        return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
+    }
+
+    public function isSubscription(): bool
+    {
+        return $this->subscription_plan_id !== null;
     }
 }

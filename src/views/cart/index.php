@@ -583,21 +583,29 @@
                     <div id="cart-items-list">
                         <?php foreach ($items as $item): ?>
                             <div class="cart-item" data-item-id="<?= $item['id'] ?>">
-                                <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
-                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
-                                     class="item-image">
+                                <?php if (!empty($item['subscription_plan_id'])): ?>
+                                    <!-- Subscription item -->
+                                    <?php
+                                    $options = json_decode($item['options'], true);
+                                    $deliveryType = $options['delivery_type'] ?? 'digital';
+                                    $planName = $options['plan_name'] ?? 'Subscription';
+                                    ?>
+                                    <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor">
+                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                        </svg>
+                                    </div>
                                 <div class="item-details">
-                                    <a href="/shop/details/<?= htmlspecialchars($item['product_slug']) ?>" class="item-name">
-                                        <?= htmlspecialchars($item['product_name']) ?>
-                                    </a>
+                                    <div class="item-name"><?= htmlspecialchars($planName) ?></div>
+                                    <div class="item-meta">
+                                        <?= ucfirst($deliveryType) ?> Delivery
+                                        <?php if (isset($options['billing_period'])): ?>
+                                            • <?= htmlspecialchars($options['billing_period']) ?>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="item-price">
                                         <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
-                                    </div>
-                                    <div class="quantity-controls">
-                                        <button class="qty-btn" onclick="updateQuantity(<?= $item['id'] ?>, <?= $item['quantity'] - 1 ?>)">-</button>
-                                        <input type="number" class="qty-input" value="<?= $item['quantity'] ?>" min="1"
-                                               onchange="updateQuantity(<?= $item['id'] ?>, this.value)" />
-                                        <button class="qty-btn" onclick="updateQuantity(<?= $item['id'] ?>, <?= $item['quantity'] + 1 ?>)">+</button>
                                     </div>
                                 </div>
                                 <div class="item-actions">
@@ -608,6 +616,13 @@
                                         </svg>
                                     </button>
                                 </div>
+                                <?php else: ?>
+                                    <!-- Regular product item - existing code -->
+                                    <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                         alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                         class="item-image">
+                                    <!-- ... rest of existing product item code ... -->
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>

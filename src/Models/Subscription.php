@@ -25,7 +25,10 @@ class Subscription extends Model
         'payment_subscription_id',
         'voucher_id',
         'discount_amount',
-        'original_price'
+        'original_price',
+        'delivery_type',
+        'download_url',
+        'download_expires_at',
     ];
 
     protected $casts = [
@@ -35,6 +38,7 @@ class Subscription extends Model
         'price' => 'float',
         'next_billing_date' => 'datetime',
         'last_payment_date' => 'datetime',
+        'download_expires_at' => 'datetime',
     ];
 
     public function member($relation = false)
@@ -160,5 +164,49 @@ class Subscription extends Model
     public function hasVoucher(): bool
     {
         return $this->voucher_id !== null;
+    }
+
+    public function isOneTime(): bool
+    {
+        if ($this->relationLoaded('plan')) {
+            return $this->plan->isOneTime();
+        }
+
+        $plan = $this->plan()->first();
+        return $plan ? $plan->isOneTime() : false;
+    }
+
+    public function isDigital(): bool
+    {
+        return $this->delivery_type === 'digital';
+    }
+
+    public function isPrint(): bool
+    {
+        return $this->delivery_type === 'print';
+    }
+
+    public function hasValidDownload(): bool
+    {
+        if (!$this->download_url || !$this->download_expires_at) {
+            return false;
+        }
+
+        return $this->download_expires_at > new \DateTime();
+    }
+
+    public function generateDownloadUrl(string $baseUrl): void
+    {
+        if ($this->isDigital() && $this->plan && $this->plan->digital_download_url) {
+            $this->download_url = $this->plan->digital_download_url;
+            // Set expiration to 30 days from now
+            $this->download_expires_at = (new \DateTime())->modify('+30 days')->format('Y-m-d H:i:s');
+            $this->save();
+        }
+    }
+
+    public function order($relation = false)
+    {
+        return $this->hasOne(Order::class, 'one_time_subscription_id', 'id', $relation);
     }
 }

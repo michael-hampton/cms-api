@@ -30,6 +30,7 @@ use App\Controllers\Members\MemberSubscriptionsController;
 use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\NewsletterController;
 use App\Controllers\NewsletterWebController;
+use App\Controllers\OneTimeSubscriptionsController;
 use App\Controllers\PageLikeController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
@@ -166,6 +167,7 @@ $router->get('/api/{siteName}/consent/types/optional', 'App\Controllers\Members\
 
 $router->get('/cart', [CartController::class, 'page']);
 $router->get('/wishlist', [WishlistController::class, 'page']);
+$router->get('/{site}/cart', [CartController::class, 'page']);
 
 // API routes for Cart (JSON responses)
 $router->get('/api/{site}/cart', [CartController::class, 'index']);
@@ -274,7 +276,12 @@ $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController
 
 $router->post('/{site}/default/newsletter/signup', NewsletterController::class, 'signup');
 
+$router->get('/{site}/subscriptions/onetime', [OneTimeSubscriptionsController::class, 'index']);
+$router->get('/subscriptions/onetime/{id}', [OneTimeSubscriptionsController::class, 'show']);
 
+$router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);
+$router->post('/api/{site}/subscriptions/onetime/checkout', [OneTimeSubscriptionsController::class, 'checkout']);
+$router->post('/api/{site}/subscriptions/onetime/confirm-payment', [OneTimeSubscriptionsController::class, 'confirmPayment']);
 
 
 // Apply page member access check to content routes

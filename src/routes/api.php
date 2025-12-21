@@ -415,7 +415,6 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
 
-
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
 
         $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);

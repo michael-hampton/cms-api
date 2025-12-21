@@ -80,4 +80,17 @@ class CartRepository extends Repository
 
         return $query->first();
     }
+
+    public function findBySubscriptionPlan(?int $planId, ?int $userId, string $sessionId)
+    {
+        $query = CartItem::where('subscription_plan_id', $planId);
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        } else {
+            $query->where('session_id', $sessionId);
+        }
+
+        return $query->first();
+    }
 }

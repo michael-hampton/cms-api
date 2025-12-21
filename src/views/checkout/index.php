@@ -828,7 +828,7 @@
                     </div>
 
                     <!-- Payment Method -->
-                    <div class="form-section">
+                    <div class="form-section" id="payment-form-section">
                         <h2 class="section-title">Payment Method</h2>
                         <div class="payment-methods">
                             <label class="payment-method selected" data-method="card">
@@ -853,6 +853,14 @@
                                 </div>
                             </label>
                         </div>
+                    </div>
+
+                    <h2 class="section-title">Card Details</h2>
+                    <div class="form-group full-width">
+                        <label class="form-label">Card Information <span class="required">*</span></label>
+                        <div id="card-element"
+                             style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem;"></div>
+                        <div id="card-errors" class="form-error" role="alert"></div>
                     </div>
 
                     <!-- Card Details (shown when card is selected) -->
@@ -1004,9 +1012,12 @@
     </div>
 </div>
 
+<script src="https://js.stripe.com/v3/"></script>
+
 <script>
     const SITE = 'test-mike';
     const API_BASE = '/api/' + SITE;
+    const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
 
     const INITIAL_SUBTOTAL = parseFloat(document.getElementById('subtotal').textContent.replace('$', ''));
     const INITIAL_SHIPPING = parseFloat(document.getElementById('shipping').textContent.replace('$', '') || '0');
@@ -1016,6 +1027,80 @@
     let currentMember = null;
     let selectedAddressId = null;
     let appliedVoucher = null;
+
+    let stripe = null;
+    let elements = null;
+    let cardElement = null;
+    let clientSecret = null;
+    let paymentIntentId = null;
+    let subscriptionId = null;
+    let orderId = null;
+    let isOneTimeSubscription = false;
+
+    // Check if cart has one-time subscription
+    async function checkCartForSubscription() {
+        try {
+            const response = await fetch(`${API_BASE}/cart`);
+            const data = await response.json();
+
+            if (data.items) {
+                for (const item of data.items) {
+                    if (item.subscription_plan_id) {
+                        isOneTimeSubscription = true;
+                        break;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking cart:', error);
+        }
+    }
+
+    // Initialize Stripe
+    async function initStripe() {
+        if (!STRIPE_KEY || !isOneTimeSubscription) {
+            return;
+        }
+
+        stripe = Stripe(STRIPE_KEY);
+        elements = stripe.elements();
+
+        // Create card element
+        cardElement = elements.create('card', {
+            hidePostalCode: true,
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#1e293b',
+                    '::placeholder': {
+                        color: '#64748b',
+                    },
+                },
+            },
+        });
+
+        // Mount card element
+        const cardContainer = document.getElementById('card-element');
+        if (cardContainer) {
+            cardElement.mount('#card-element');
+
+            // Handle validation errors
+            cardElement.on('change', (event) => {
+                const displayError = document.getElementById('card-errors');
+                if (event.error) {
+                    displayError.textContent = event.error.message;
+                } else {
+                    displayError.textContent = '';
+                }
+            });
+        }
+
+        // Hide old card fields
+        const oldCardDetails = document.getElementById('card-details');
+        if (oldCardDetails) {
+            oldCardDetails.style.display = 'none';
+        }
+    }
 
     async function checkLoginStatus() {
         try {
@@ -1289,21 +1374,21 @@
             }
         }
 
-        // Validate card details if card payment is selected
-        if (data.payment_method === 'card') {
-            if (!data.card_number || data.card_number.replace(/\s/g, '').length < 13) {
-                hasErrors = true;
-                showAlert('Please enter a valid card number', 'error');
-            }
-            if (!data.card_expiry || !/^\d{2}\/\d{2}$/.test(data.card_expiry)) {
-                hasErrors = true;
-                showAlert('Please enter a valid expiry date (MM/YY)', 'error');
-            }
-            if (!data.card_cvv || data.card_cvv.length < 3) {
-                hasErrors = true;
-                showAlert('Please enter a valid CVV', 'error');
-            }
-        }
+        // // Validate card details if card payment is selected
+        // if (data.payment_method === 'card') {
+        //     if (!data.card_number || data.card_number.replace(/\s/g, '').length < 13) {
+        //         hasErrors = true;
+        //         showAlert('Please enter a valid card number', 'error');
+        //     }
+        //     if (!data.card_expiry || !/^\d{2}\/\d{2}$/.test(data.card_expiry)) {
+        //         hasErrors = true;
+        //         showAlert('Please enter a valid expiry date (MM/YY)', 'error');
+        //     }
+        //     if (!data.card_cvv || data.card_cvv.length < 3) {
+        //         hasErrors = true;
+        //         showAlert('Please enter a valid CVV', 'error');
+        //     }
+        // }
 
         if (hasErrors) {
             return;
@@ -1313,6 +1398,97 @@
         document.getElementById('loading-overlay').classList.add('show');
         this.disabled = true;
 
+        if (isOneTimeSubscription && stripe && cardElement) {
+            await handleStripeCheckout(data);
+        } else {
+            // Original checkout flow
+            await handleRegularCheckout(data);
+        }
+    });
+
+    async function handleStripeCheckout(data) {
+        document.getElementById('loading-overlay').classList.add('show');
+        document.getElementById('place-order-btn').disabled = true;
+
+        try {
+            // Process checkout to get payment intent
+            const response = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                showAlert(result.message || 'Checkout failed', 'error');
+                return;
+            }
+
+            const responseData = result.data;
+
+            clientSecret = responseData.client_secret;
+            subscriptionId = responseData.subscription_id;
+            orderId = responseData.order_id;
+
+            // Confirm payment with Stripe
+            const {error, paymentIntent} = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: cardElement,
+                    billing_details: {
+                        name: `${data.first_name} ${data.last_name}`,
+                        email: data.email,
+                        phone: data.phone,
+                    },
+                },
+            });
+
+            if (error) {
+                showAlert(error.message, 'error');
+                return;
+            }
+
+            if (paymentIntent.status === 'succeeded') {
+                // Confirm payment on backend
+                await confirmPayment(paymentIntent.id);
+            }
+
+        } catch (error) {
+            console.error('Stripe checkout error:', error);
+            showAlert('Payment failed. Please try again.', 'error');
+        } finally {
+            document.getElementById('loading-overlay').classList.remove('show');
+            document.getElementById('place-order-btn').disabled = false;
+        }
+    }
+
+    async function confirmPayment(paymentIntentId) {
+        try {
+            const response = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    payment_intent_id: paymentIntentId,
+                    subscription_id: subscriptionId,
+                    order_id: orderId
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Redirect to success page
+                window.location.href = `/subscriptions/onetime/${subscriptionId}`;
+            } else {
+                showAlert(result.message || 'Payment confirmation failed', 'error');
+            }
+        } catch (error) {
+            console.error('Payment confirmation error:', error);
+            showAlert('Failed to confirm payment', 'error');
+        }
+    }
+
+    async function handleRegularCheckout(data) {
         try {
             const response = await fetch(`${API_BASE}/checkout/process`, {
                 method: 'POST',
@@ -1337,7 +1513,7 @@
             document.getElementById('loading-overlay').classList.remove('show');
             this.disabled = false;
         }
-    });
+    }
 
     function showAlert(message, type = 'success') {
         const alertHtml = `
@@ -1475,6 +1651,12 @@
     checkLoginStatus();
     checkForAppliedVoucher();
     loadWishlistCount();
+
+    checkCartForSubscription().then(() => {
+        if (isOneTimeSubscription) {
+            initStripe();
+        }
+    });
 </script>
 </body>
 </html>

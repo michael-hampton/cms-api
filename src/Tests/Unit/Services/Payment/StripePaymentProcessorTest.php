@@ -1222,4 +1222,114 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         return $payment;
     }
 
+    public function testCreatePaymentIntentForOneTimeSubscription(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->client_secret = 'pi_test123_secret_abc';
+
+        $this->paymentIntentServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['amount'] === 9999
+                    && $data['currency'] === 'usd'
+                    && isset($data['metadata']['subscription_id'])
+                    && $data['metadata']['subscription_id'] === 1;
+            }))
+            ->andReturn($paymentIntent);
+
+        $result = $this->processor->createPaymentIntent([
+            'amount' => 99.99,
+            'currency' => 'USD',
+            'subscription_id' => 1,
+            'site_id' => 1
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('pi_test123', $result['payment_intent_id']);
+        $this->assertEquals('pi_test123_secret_abc', $result['client_secret']);
+    }
+
+    public function testHandleOneTimeSubscriptionPaymentSuccess(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->status = 'succeeded';
+        $paymentIntent->amount = 9999;
+        $paymentIntent->currency = 'usd';
+
+        $this->paymentIntentServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_test123')
+            ->andReturn($paymentIntent);
+
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 1;
+
+        $this->paymentRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['subscription_id'] === 1
+                    && $data['order_id'] === 1
+                    && $data['status'] === 'completed'
+                    && $data['amount'] === 99.99
+                    && isset($data['metadata']['one_time_subscription'])
+                    && $data['metadata']['one_time_subscription'] === true;
+            }))
+            ->andReturn($payment);
+
+        $result = $this->processor->handleOneTimeSubscriptionPayment(
+            'pi_test123',
+            1, // subscription_id
+            1, // order_id
+            1  // site_id
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(1, $result['payment_id']);
+        $this->assertEquals('pi_test123', $result['transaction_id']);
+    }
+
+    public function testHandleOneTimeSubscriptionPaymentFailsWhenNotSucceeded(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->status = 'requires_action';
+
+        $this->paymentIntentServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_test123')
+            ->andReturn($paymentIntent);
+
+        $result = $this->processor->handleOneTimeSubscriptionPayment(
+            'pi_test123',
+            1,
+            1,
+            1
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Payment not completed', $result['message']);
+    }
+
+    public function testConfirmPaymentIntentSuccess(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->status = 'succeeded';
+        $paymentIntent->amount = 9999;
+        $paymentIntent->currency = 'usd';
+
+        $this->paymentIntentServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_test123')
+            ->andReturn($paymentIntent);
+
+        $result = $this->processor->confirmPaymentIntent('pi_test123');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('succeeded', $result['status']);
+        $this->assertEquals(99.99, $result['amount']);
+        $this->assertEquals('usd', $result['currency']);
+    }
 }

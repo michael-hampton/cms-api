@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Framework\Session\Session;
 use App\Repositories\CartRepository;
 use App\Repositories\ProductRepository;
+use App\Repositories\SubscriptionPlanRepository;
 
 class CartService
 {
     public function __construct(
         private readonly CartRepository $cartRepository,
-        private readonly ProductRepository $productRepository
+        private readonly ProductRepository          $productRepository,
+        private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
     ) {}
 
     protected function getSessionId(): string
@@ -40,6 +42,7 @@ class CartService
                 'quantity' => $item->quantity,
                 'subtotal' => $item->subtotal,
                 'options' => $item->options,
+                'subscription_plan_id' => $item->subscription_plan_id,
             ];
         })->toArray();
     }
@@ -163,5 +166,60 @@ class CartService
         $authId = auth()->id();
         // Return null for guest users (don't use default value of 1)
         return $authId ?: null;
+    }
+
+    public function addOneTimeSubscription(
+        int    $planId,
+        string $deliveryType,
+        array  $options = []
+    ): array
+    {
+        $plan = $this->subscriptionPlanRepository->find($planId);
+
+        if (!$plan || !$plan->isOneTime()) {
+            return ['success' => false, 'message' => 'Invalid subscription plan'];
+        }
+
+        // Validate delivery type
+        $validDeliveryTypes = $plan->getDeliveryOptions();
+
+        if (!in_array($deliveryType, $validDeliveryTypes)) {
+            return ['success' => false, 'message' => 'Invalid delivery type'];
+        }
+
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        // Check if subscription plan already in cart
+        $existingItem = $this->cartRepository->findBySubscriptionPlan($planId, $userId, $sessionId);
+
+        if ($existingItem) {
+            return ['success' => false, 'message' => 'Subscription plan already in cart'];
+        }
+
+        $price = $plan->price;
+
+        $cartData = [
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'product_id' => null, // No product for subscriptions
+            'subscription_plan_id' => $planId,
+            'quantity' => 1,
+            'price' => $price,
+            'subtotal' => $price,
+            'options' => json_encode(array_merge($options, [
+                'delivery_type' => $deliveryType,
+                'plan_name' => $plan->name,
+                'billing_period' => $plan->billing_period,
+            ])),
+            'site_id' => $plan->site_id,
+        ];
+
+        $this->cartRepository->create($cartData);
+
+        return [
+            'success' => true,
+            'message' => 'Subscription added to cart'
+        ];
     }
 }

@@ -22,7 +22,10 @@ class SubscriptionPlan extends Model
         'is_active',
         'is_featured',
         'sort_order',
-        'stripe_price_id'
+        'stripe_price_id',
+        'plan_type',
+        'digital_download_url',
+        'print_shipping_required',
     ];
 
     protected $casts = [
@@ -31,7 +34,8 @@ class SubscriptionPlan extends Model
         'features' => 'array',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
-        'sort_order' => 'integer'
+        'sort_order' => 'integer',
+        'print_shipping_required' => 'boolean',
     ];
 
     public function site($relation = false)
@@ -99,5 +103,50 @@ class SubscriptionPlan extends Model
     public function scopeOrdered(QueryBuilder $query): QueryBuilder
     {
         return $query->orderBy('sort_order', 'asc')->orderBy('price', 'asc');
+    }
+
+    public function isRecurring(): bool
+    {
+        return $this->plan_type === 'recurring';
+    }
+
+    public function isOneTime(): bool
+    {
+        return $this->plan_type === 'onetime';
+    }
+
+    public function hasDigitalOption(): bool
+    {
+        return $this->digital_download_url && strlen($this->digital_download_url) > 0;
+    }
+
+    public function hasPrintOption(): bool
+    {
+        return $this->print_shipping_required;
+    }
+
+    public function getDeliveryOptions(): array
+    {
+        $options = [];
+
+        if ($this->hasDigitalOption()) {
+            $options[] = 'digital';
+        }
+
+        if ($this->hasPrintOption()) {
+            $options[] = 'print';
+        }
+
+        return $options;
+    }
+
+    public function scopeOneTime(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('plan_type', 'onetime');
+    }
+
+    public function scopeRecurring(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('plan_type', 'recurring');
     }
 }

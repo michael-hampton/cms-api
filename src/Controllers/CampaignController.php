@@ -30,6 +30,9 @@ class CampaignController extends Controller
                     'subscriber_count' => $this->campaignRepository->getSubscriberCount($campaign->id),
                     'is_currently_active' => $campaign->isActive(),
                     'has_ended' => $campaign->hasEnded(),
+                    'created_at' => $campaign->created_at->format('Y-m-d H:i:s'),
+                    'start_date' => $campaign->start_date->format('Y-m-d H:i:s'),
+                    'end_date' => $campaign->end_date->format('Y-m-d H:i:s'),
                 ]);
             });
 

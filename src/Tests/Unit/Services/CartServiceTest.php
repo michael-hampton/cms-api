@@ -2,20 +2,22 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Framework\Authorization\Auth;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\SubscriptionPlan;
 use App\Repositories\CartRepository;
 use App\Repositories\ProductRepository;
+use App\Repositories\SubscriptionPlanRepository;
 use App\Services\CartService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 
 class CartServiceTest extends FunctionalTestCase
 {
-    protected $cartRepository;
-    protected $productRepository;
-    protected CartService $service;
+    private $cartRepository;
+    private $productRepository;
+    private CartService $service;
+    private $subscriptionPlanRepository;
 
     protected function setUp(): void
     {
@@ -23,8 +25,13 @@ class CartServiceTest extends FunctionalTestCase
 
         $this->cartRepository = Mockery::mock(CartRepository::class);
         $this->productRepository = Mockery::mock(ProductRepository::class);
+        $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
 
-        $this->service = new CartService($this->cartRepository, $this->productRepository);
+        $this->service = new CartService(
+            $this->cartRepository,
+            $this->productRepository,
+            $this->subscriptionPlanRepository,
+        );
 
         $_SESSION['cart_session_id'] = 'test_session_123';
     }
@@ -353,4 +360,66 @@ class CartServiceTest extends FunctionalTestCase
 
         $this->assertEquals(0, $total);
     }
+
+    public function testAddOneTimeSubscriptionSuccess(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->shouldReceive('getAttribute')->with('id')->andReturn(1);
+        $plan->shouldReceive('getAttribute')->with('isOneTime')->andReturn(true);
+        $plan->shouldReceive('getAttribute')->with('price')->andReturn(99.99);
+        $plan->shouldReceive('getAttribute')->with('site_id')->andReturn(1);
+        $plan->shouldReceive('isOneTime')->andReturn(true);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital', 'print']);
+
+        $this->productRepository->shouldReceive('find')->never();
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->once()
+            ->andReturn(null);
+
+        $this->cartRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(new CartItem());
+
+        $result = $this->service->addOneTimeSubscription(1, 'digital');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Subscription added to cart', $result['message']);
+    }
+
+    public function testAddOneTimeSubscriptionFailsWithInvalidDeliveryType(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->shouldReceive('isOneTime')->andReturn(true);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital']);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $result = $this->service->addOneTimeSubscription(1, 'print');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Invalid delivery type', $result['message']);
+    }
+
+    public function testAddOneTimeSubscriptionFailsWhenAlreadyInCart(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->shouldReceive('isOneTime')->andReturn(true);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital']);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $existingItem = Mockery::mock(CartItem::class);
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->once()
+            ->andReturn($existingItem);
+
+        $result = $this->service->addOneTimeSubscription(1, 'digital');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Subscription plan already in cart', $result['message']);
+    }
+
 }

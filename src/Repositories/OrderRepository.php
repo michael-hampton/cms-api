@@ -111,4 +111,11 @@ class OrderRepository extends Repository
         return Order::with(['items', 'user', 'item.product', 'history', 'refunds']) // ADD 'history'
         ->find($id);
     }
+
+    public function updateSubscriptionForOrder(int $orderId, int $subscriptionId): ?int
+    {
+        return Order::where('id', $orderId)->update([
+            'one_time_subscription_id' => $subscriptionId
+        ]);
+    }
 }

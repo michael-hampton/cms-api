@@ -217,4 +217,25 @@ class CartController extends Controller
 
         return $this->jsonResponse($result, $result['success'] ? 200 : 400);
     }
+
+    public function addSubscription(Request $request)
+    {
+        $planId = $request->input('plan_id');
+        $deliveryType = $request->input('delivery_type');
+        $options = $request->input('options', []);
+
+        if (!$planId || !$deliveryType) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Plan ID and delivery type required'
+            ], 400);
+        }
+
+        $result = $this->cartService->addOneTimeSubscription($planId, $deliveryType, $options);
+
+        return $this->resourceResponse(array_merge($result, [
+            'count' => $this->cartService->getCount(),
+            'total' => $this->cartService->getTotal(),
+        ]));
+    }
 }
