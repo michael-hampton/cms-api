@@ -521,4 +521,214 @@ class SubscriptionModelTest extends FunctionalTestCase
         parent::setUp();
         $this->member = $this->createMember();
     }
+
+    public function test_is_one_time_returns_true_for_onetime_plan(): void
+    {
+        $plan = $this->createSubscriptionPlan(['plan_type' => 'onetime']);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => 'One Time Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 50.00,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertTrue($subscription->isOneTime());
+    }
+
+    public function test_is_one_time_returns_false_for_recurring_plan(): void
+    {
+        $plan = $this->createSubscriptionPlan(['plan_type' => 'recurring']);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => 'Monthly Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->isOneTime());
+    }
+
+    public function test_is_digital_returns_true(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Digital Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD',
+            'delivery_type' => 'digital'
+        ]);
+
+        $this->assertTrue($subscription->isDigital());
+    }
+
+    public function test_is_digital_returns_false(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Print Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 15.00,
+            'currency' => 'USD',
+            'delivery_type' => 'print'
+        ]);
+
+        $this->assertFalse($subscription->isDigital());
+    }
+
+    public function test_is_print_returns_true(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Print Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 15.00,
+            'currency' => 'USD',
+            'delivery_type' => 'print'
+        ]);
+
+        $this->assertTrue($subscription->isPrint());
+    }
+
+    public function test_is_print_returns_false(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Digital Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD',
+            'delivery_type' => 'digital'
+        ]);
+
+        $this->assertFalse($subscription->isPrint());
+    }
+
+    public function test_has_valid_download_returns_true(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Digital Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD',
+            'delivery_type' => 'digital',
+            'download_url' => 'https://example.com/download/file.pdf',
+            'download_expires_at' => date('Y-m-d H:i:s', strtotime('+7 days'))
+        ]);
+
+        $this->assertTrue($subscription->hasValidDownload());
+    }
+
+    public function test_has_valid_download_returns_false_when_expired(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Digital Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD',
+            'delivery_type' => 'digital',
+            'download_url' => 'https://example.com/download/file.pdf',
+            'download_expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        $this->assertFalse($subscription->hasValidDownload());
+    }
+
+    public function test_has_valid_download_returns_false_when_no_url(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Digital Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD',
+            'delivery_type' => 'digital',
+            'download_url' => null,
+            'download_expires_at' => date('Y-m-d H:i:s', strtotime('+7 days'))
+        ]);
+
+        $this->assertFalse($subscription->hasValidDownload());
+    }
+
+    public function test_generate_download_url_sets_url_and_expiration(): void
+    {
+        $plan = $this->createSubscriptionPlan([
+            'plan_type' => 'onetime',
+            'digital_download_url' => 'https://example.com/magazine.pdf'
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => 'Digital Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'USD',
+            'delivery_type' => 'digital'
+        ]);
+
+        $subscription->generateDownloadUrl('https://example.com');
+
+        $this->assertNotNull($subscription->download_url);
+        $this->assertEquals('https://example.com/magazine.pdf', $subscription->download_url);
+        $this->assertNotNull($subscription->download_expires_at);
+
+        $expiresAt = $subscription->download_expires_at;
+        $expectedExpiry = new \DateTime('+30 days');
+        $diff = $expiresAt->diff($expectedExpiry);
+        $this->assertLessThanOrEqual(1, $diff->days);
+    }
+
+    public function test_generate_download_url_does_nothing_for_print(): void
+    {
+        $plan = $this->createSubscriptionPlan([
+            'plan_type' => 'onetime',
+            'digital_download_url' => 'https://example.com/magazine.pdf'
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => 'Print Plan',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 15.00,
+            'currency' => 'USD',
+            'delivery_type' => 'print'
+        ]);
+
+        $subscription->generateDownloadUrl('https://example.com');
+
+        $this->assertNull($subscription->download_url);
+        $this->assertNull($subscription->download_expires_at);
+    }
 }

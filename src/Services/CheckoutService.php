@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Framework\Authorization\MemberAuthWrapper;
+use App\Services\Payment\StripePaymentProcessor;
 use Exception;
 
 class CheckoutService
@@ -13,8 +14,10 @@ class CheckoutService
         private readonly VoucherService $voucherService,
         private readonly ShippingService $shippingService,
         private readonly MemberAuthWrapper $memberAuthWrapper,
-        private readonly OrderCalculationService $calculationService // ADD THIS
+        private readonly OrderCalculationService $calculationService,
+        private readonly StripePaymentProcessor  $stripeProcessor // ADD THIS
     ) {}
+
 
     public function processCheckout(array $data, int $siteId): array
     {
@@ -39,6 +42,23 @@ class CheckoutService
         // Calculate totals
         $totals = $this->calculateTotals($cartItems, $data);
 
+        // Create Stripe payment intent
+        $paymentResult = $this->stripeProcessor->createPaymentIntent([
+            'amount' => $totals['total'],
+            'currency' => 'usd',
+            'site_id' => $siteId,
+            'metadata' => [
+                'checkout_type' => 'regular'
+            ]
+        ]);
+
+        if (!$paymentResult['success']) {
+            return [
+                'success' => false,
+                'message' => $paymentResult['message'] ?? 'Failed to create payment intent'
+            ];
+        }
+
         // Prepare order data
         $orderData = $this->prepareOrderData($data, $totals, $siteId);
 
@@ -51,7 +71,6 @@ class CheckoutService
 
             // Apply voucher if provided
             if (!empty($totals['voucher_id']) && $totals['discount'] > 0) {
-
                 $userId = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->member()->id : null;
                 $this->voucherService->applyVoucher(
                     $totals['voucher_id'],
@@ -61,13 +80,14 @@ class CheckoutService
                 );
             }
 
-            // Clear cart after successful order
-            $this->cartService->clear();
-
+            // Return payment intent details for client confirmation
             return [
                 'success' => true,
                 'message' => 'Order placed successfully',
+                'client_secret' => $paymentResult['client_secret'],
+                'payment_intent_id' => $paymentResult['payment_intent_id'],
                 'order_id' => $order->order_number,
+                'order_internal_id' => $order->id,
                 'total' => $totals['total']
             ];
         } catch (Exception $e) {
@@ -186,5 +206,35 @@ class CheckoutService
             ];
         }
         return $items;
+    }
+
+    public function confirmRegularCheckoutPayment(string $paymentIntentId, int $orderId): array
+    {
+        try {
+            $confirmResult = $this->stripeProcessor->confirmPaymentIntent($paymentIntentId);
+
+            if (!$confirmResult['success'] || $confirmResult['status'] !== 'succeeded') {
+                return [
+                    'success' => false,
+                    'message' => 'Payment confirmation failed'
+                ];
+            }
+
+            // Update order status
+            $this->orderService->updateOrderStatus($orderId, 'completed', 'paid');
+
+            // Clear cart after successful payment
+            $this->cartService->clear();
+
+            return [
+                'success' => true,
+                'message' => 'Order completed successfully'
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Payment confirmation error: ' . $e->getMessage()
+            ];
+        }
     }
 }

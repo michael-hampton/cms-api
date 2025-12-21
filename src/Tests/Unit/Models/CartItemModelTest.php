@@ -6,9 +6,11 @@ use App\Models\CartItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CartItemModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
     protected CartItem $cartItem;
 
     protected function setUp(): void
@@ -161,12 +163,12 @@ class CartItemModelTest extends FunctionalTestCase
 
     public function testCreateCartItem()
     {
-        $user = User::create(['name' => 'John', 'email' => '<EMAIL>', 'password' => '<PASSWORD>', 'site_id' => 1]);;
+        $member = $this->createMember();
         $product = Product::create(['name' => 'Test Product', 'price' => 99.99, 'site_id' => 1]);;
 
         $cartItem = CartItem::create([
             'session_id' => 'session_abc123',
-            'user_id' => $user->id,
+            'user_id' => $member->id,
             'product_id' => $product->id,
             'quantity' => 5,
             'price' => 99.99,
@@ -212,4 +214,153 @@ class CartItemModelTest extends FunctionalTestCase
         $this->assertIsArray($retrieved['customization']);
         $this->assertEquals('Hello', $retrieved['customization']['text']);
     }
+
+    public function test_subscription_plan_relationship(): void
+    {
+        $plan = $this->createSubscriptionPlan([
+            'name' => 'Premium Magazine',
+            'price' => 50.00
+        ]);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => null,
+            'subscription_plan_id' => $plan->id,
+            'quantity' => 1,
+            'price' => 50.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 50.00,
+        ]);
+
+        $loadedPlan = $cartItem->subscriptionPlan;
+
+        $this->assertNotNull($loadedPlan);
+        $this->assertEquals($plan->id, $loadedPlan->id);
+        $this->assertEquals('Premium Magazine', $loadedPlan->name);
+    }
+
+    public function test_subscription_plan_relationship_returns_null_when_not_subscription(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'subscription_plan_id' => null,
+            'quantity' => 2,
+            'price' => 25.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 25.00,
+        ]);
+
+        $loadedPlan = $cartItem->subscriptionPlan;
+
+        $this->assertNull($loadedPlan);
+    }
+
+    public function test_is_subscription_returns_true_when_subscription_plan_id_set(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => null,
+            'subscription_plan_id' => $plan->id,
+            'quantity' => 1,
+            'price' => 50.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 50.00,
+        ]);
+
+        $this->assertTrue($cartItem->isSubscription());
+    }
+
+    public function test_is_subscription_returns_false_when_subscription_plan_id_null(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'subscription_plan_id' => null,
+            'quantity' => 2,
+            'price' => 25.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 25.00,
+        ]);
+
+        $this->assertFalse($cartItem->isSubscription());
+    }
+
+    public function test_get_subtotal_calculates_correctly(): void
+    {
+        $product = $this->createProduct(['price' => 46.50]);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 3,
+            'price' => 15.50,
+            'site_id' => $this->siteId,
+            'subtotal' => 15.50,
+        ]);
+
+        $subtotal = $cartItem->getSubtotal();
+
+        $this->assertEquals(46.50, $subtotal);
+    }
+
+    public function test_product_relationship(): void
+    {
+        $product = $this->createProduct(['name' => 'Test Product']);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+        ]);
+
+        $loadedProduct = $cartItem->product;
+
+        $this->assertNotNull($loadedProduct);
+        $this->assertEquals($product->id, $loadedProduct->id);
+        $this->assertEquals('Test Product', $loadedProduct->name);
+    }
+
+    public function test_options_casts_to_json(): void
+    {
+        $options = [
+            'size' => 'Large',
+            'color' => 'Blue',
+            'delivery_type' => 'digital'
+        ];
+
+        $product = $this->createProduct($options);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 30.00,
+            'site_id' => $this->siteId,
+            'options' => $options,
+            'subtotal' => 30.00,
+        ]);
+
+        $this->assertIsArray($cartItem->options);
+        $this->assertEquals('Large', $cartItem->options['size']);
+        $this->assertEquals('Blue', $cartItem->options['color']);
+        $this->assertEquals('digital', $cartItem->options['delivery_type']);
+    }
+
 }

@@ -1058,7 +1058,8 @@
 
     // Initialize Stripe
     async function initStripe() {
-        if (!STRIPE_KEY || !isOneTimeSubscription) {
+        if (!STRIPE_KEY) {
+            console.error('Stripe key not configured');
             return;
         }
 
@@ -1099,6 +1100,12 @@
         const oldCardDetails = document.getElementById('card-details');
         if (oldCardDetails) {
             oldCardDetails.style.display = 'none';
+        }
+
+        // Hide payment method selection
+        const paymentSection = document.getElementById('payment-form-section');
+        if (paymentSection) {
+            paymentSection.style.display = 'none';
         }
     }
 
@@ -1217,100 +1224,6 @@
         document.querySelectorAll('[name="saved_address"]').forEach(radio => radio.checked = false);
     }
 
-    // Update place order handler
-    // Place order
-    document.getElementById('place-order-btn').addEventListener('click', async function () {
-        const form = document.getElementById('checkout-form');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
-
-        console.log('data', data);
-
-        // Clear previous errors
-        document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
-        document.getElementById('alert-container').innerHTML = '';
-
-        if (selectedAddressId) {
-            data.shipping_address_id = selectedAddressId;
-            delete data.address;
-            delete data.address2;
-            delete data.city;
-            delete data.state;
-            delete data.postal_code;
-            delete data.country;
-        }
-
-        const required = selectedAddressId
-            ? ['first_name', 'last_name', 'email', 'phone']
-            : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
-
-        let hasErrors = false;
-
-        for (const field of required) {
-            if (!data[field] || data[field].trim() === '') {
-                const errorEl = document.getElementById(`error-${field}`);
-                if (errorEl) {
-                    errorEl.textContent = 'This field is required';
-                }
-                hasErrors = true;
-            }
-        }
-
-        if (data.payment_method === 'card') {
-            if (!data.card_number || data.card_number.replace(/\s/g, '').length < 13) {
-                hasErrors = true;
-                showAlert('Please enter a valid card number', 'error');
-            }
-            if (!data.card_expiry || !/^\d{2}\/\d{2}$/.test(data.card_expiry)) {
-                hasErrors = true;
-                showAlert('Please enter a valid expiry date (MM/YY)', 'error');
-            }
-            if (!data.card_cvv || data.card_cvv.length < 3) {
-                hasErrors = true;
-                showAlert('Please enter a valid CVV', 'error');
-            }
-        }
-
-        if (hasErrors) {
-            return;
-        }
-
-        if (appliedVoucher) {
-            data.voucher_code = appliedVoucher.code;
-            data.voucher_id = appliedVoucher.voucher_id;
-            data.discount_amount = appliedVoucher.discount;
-        }
-
-        // Show loading
-        document.getElementById('loading-overlay').classList.add('show');
-        this.disabled = true;
-
-        try {
-            const response = await fetch(`${API_BASE}/checkout/process`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Redirect to success page
-                window.location.href = `/order-confirmation?order_id=${result.order_id}`;
-            } else {
-                showAlert(result.message || 'Failed to process order', 'error');
-            }
-        } catch (error) {
-            console.error('Checkout error:', error);
-            showAlert('An error occurred. Please try again.', 'error');
-        } finally {
-            document.getElementById('loading-overlay').classList.remove('show');
-            this.disabled = false;
-        }
-    });
-
     // Payment method selection
     document.querySelectorAll('.payment-method').forEach(method => {
         method.addEventListener('click', function () {
@@ -1360,8 +1273,20 @@
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         document.getElementById('alert-container').innerHTML = '';
 
-        // Validate required fields
-        const required = ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
+        if (selectedAddressId) {
+            data.saved_address = selectedAddressId;
+            delete data.address;
+            delete data.address2;
+            delete data.city;
+            delete data.state;
+            delete data.postal_code;
+            delete data.country;
+        }
+
+        const required = selectedAddressId
+            ? ['first_name', 'last_name', 'email', 'phone']
+            : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
+
         let hasErrors = false;
 
         for (const field of required) {
@@ -1374,34 +1299,24 @@
             }
         }
 
-        // // Validate card details if card payment is selected
-        // if (data.payment_method === 'card') {
-        //     if (!data.card_number || data.card_number.replace(/\s/g, '').length < 13) {
-        //         hasErrors = true;
-        //         showAlert('Please enter a valid card number', 'error');
-        //     }
-        //     if (!data.card_expiry || !/^\d{2}\/\d{2}$/.test(data.card_expiry)) {
-        //         hasErrors = true;
-        //         showAlert('Please enter a valid expiry date (MM/YY)', 'error');
-        //     }
-        //     if (!data.card_cvv || data.card_cvv.length < 3) {
-        //         hasErrors = true;
-        //         showAlert('Please enter a valid CVV', 'error');
-        //     }
-        // }
-
         if (hasErrors) {
             return;
+        }
+
+        if (appliedVoucher) {
+            data.voucher_code = appliedVoucher.code;
+            data.voucher_id = appliedVoucher.voucher_id;
+            data.discount_amount = appliedVoucher.discount;
         }
 
         // Show loading
         document.getElementById('loading-overlay').classList.add('show');
         this.disabled = true;
 
-        if (isOneTimeSubscription && stripe && cardElement) {
+        // Both flows now use Stripe
+        if (isOneTimeSubscription) {
             await handleStripeCheckout(data);
         } else {
-            // Original checkout flow
             await handleRegularCheckout(data);
         }
     });
@@ -1490,6 +1405,7 @@
 
     async function handleRegularCheckout(data) {
         try {
+            // First create the order and get payment intent
             const response = await fetch(`${API_BASE}/checkout/process`, {
                 method: 'POST',
                 headers: {
@@ -1500,18 +1416,57 @@
 
             const result = await response.json();
 
-            if (result.success) {
-                // Redirect to success page
-                window.location.href = `/order-confirmation?order_id=${result.order_id}`;
-            } else {
+            if (!result.success) {
                 showAlert(result.message || 'Failed to process order', 'error');
+                return;
             }
+
+            const clientSecret = result.client_secret;
+            const orderId = result.order_internal_id;
+
+            // Confirm payment with Stripe
+            const {error, paymentIntent} = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: cardElement,
+                    billing_details: {
+                        name: `${data.first_name} ${data.last_name}`,
+                        email: data.email,
+                        phone: data.phone,
+                    },
+                },
+            });
+
+            if (error) {
+                showAlert(error.message, 'error');
+                return;
+            }
+
+            if (paymentIntent.status === 'succeeded') {
+                // Confirm payment on backend
+                const confirmResponse = await fetch(`${API_BASE}/checkout/confirm-payment`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        payment_intent_id: paymentIntent.id,
+                        order_id: orderId
+                    })
+                });
+
+                const confirmResult = await confirmResponse.json();
+
+                if (confirmResult.success) {
+                    window.location.href = `/order-confirmation?order_id=${result.order_id}`;
+                } else {
+                    showAlert(confirmResult.message || 'Payment confirmation failed', 'error');
+                }
+            }
+
         } catch (error) {
             console.error('Checkout error:', error);
             showAlert('An error occurred. Please try again.', 'error');
         } finally {
             document.getElementById('loading-overlay').classList.remove('show');
-            this.disabled = false;
+            document.getElementById('place-order-btn').disabled = false;
         }
     }
 
@@ -1651,12 +1606,8 @@
     checkLoginStatus();
     checkForAppliedVoucher();
     loadWishlistCount();
-
-    checkCartForSubscription().then(() => {
-        if (isOneTimeSubscription) {
-            initStripe();
-        }
-    });
+    checkCartForSubscription();
+    initStripe();
 </script>
 </body>
 </html>

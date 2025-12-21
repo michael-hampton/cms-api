@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Services\Payment\StripePaymentProcessor;
-use Exception;
 
 class OneTimeSubscriptionCheckoutService
 {
@@ -115,11 +114,9 @@ class OneTimeSubscriptionCheckoutService
             ]);
 
             if (!$paymentResult['success']) {
-                echo '<pre>';
-                print_r($paymentResult);
-                die;
-                die('no');
-                throw new Exception($paymentResult['message'] ?? 'Failed to create payment intent');
+                return [
+                    'success' => false,
+                ];
             }
 
             // Create order

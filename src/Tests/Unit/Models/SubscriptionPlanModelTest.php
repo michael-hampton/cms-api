@@ -108,4 +108,296 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $this->assertEquals('one-time', $lifetimePlan->getBillingPeriodLabel());
     }
 
+    public function test_is_recurring_returns_true_for_recurring_plan(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Monthly Plan',
+            'slug' => 'monthly',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'plan_type' => 'recurring'
+        ]);
+
+        $this->assertTrue($plan->isRecurring());
+    }
+
+    public function test_is_recurring_returns_false_for_onetime_plan(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'One Time Plan',
+            'slug' => 'onetime',
+            'price' => 50.00,
+            'currency' => 'USD',
+            'billing_period' => 'lifetime',
+            'plan_type' => 'onetime'
+        ]);
+
+        $this->assertFalse($plan->isRecurring());
+    }
+
+    public function test_is_one_time_returns_true_for_onetime_plan(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'One Time Plan',
+            'slug' => 'onetime',
+            'price' => 50.00,
+            'currency' => 'USD',
+            'billing_period' => 'lifetime',
+            'plan_type' => 'onetime'
+        ]);
+
+        $this->assertTrue($plan->isOneTime());
+    }
+
+    public function test_is_one_time_returns_false_for_recurring_plan(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Monthly Plan',
+            'slug' => 'monthly',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'plan_type' => 'recurring'
+        ]);
+
+        $this->assertFalse($plan->isOneTime());
+    }
+
+    public function test_has_digital_option_returns_true_when_url_provided(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Digital Plan',
+            'slug' => 'digital',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => 'https://example.com/download/magazine.pdf'
+        ]);
+
+        $this->assertTrue($plan->hasDigitalOption());
+    }
+
+    public function test_has_digital_option_returns_false_when_no_url(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Print Plan',
+            'slug' => 'print',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => null
+        ]);
+
+        $this->assertFalse($plan->hasDigitalOption());
+    }
+
+    public function test_has_digital_option_returns_false_when_empty_url(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Plan',
+            'slug' => 'plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => ''
+        ]);
+
+        $this->assertFalse($plan->hasDigitalOption());
+    }
+
+    public function test_has_print_option_returns_true_when_shipping_required(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Print Plan',
+            'slug' => 'print',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true
+        ]);
+
+        $this->assertTrue($plan->hasPrintOption());
+    }
+
+    public function test_has_print_option_returns_false_when_shipping_not_required(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Digital Only',
+            'slug' => 'digital',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => false
+        ]);
+
+        $this->assertFalse($plan->hasPrintOption());
+    }
+
+    public function test_get_delivery_options_returns_both_when_available(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Hybrid Plan',
+            'slug' => 'hybrid',
+            'price' => 20.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => 'https://example.com/download/magazine.pdf',
+            'print_shipping_required' => true
+        ]);
+
+        $options = $plan->getDeliveryOptions();
+
+        $this->assertCount(2, $options);
+        $this->assertContains('digital', $options);
+        $this->assertContains('print', $options);
+    }
+
+    public function test_get_delivery_options_returns_digital_only(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Digital Plan',
+            'slug' => 'digital',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => 'https://example.com/download/magazine.pdf',
+            'print_shipping_required' => false
+        ]);
+
+        $options = $plan->getDeliveryOptions();
+
+        $this->assertCount(1, $options);
+        $this->assertContains('digital', $options);
+        $this->assertNotContains('print', $options);
+    }
+
+    public function test_get_delivery_options_returns_print_only(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Print Plan',
+            'slug' => 'print',
+            'price' => 15.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => null,
+            'print_shipping_required' => true
+        ]);
+
+        $options = $plan->getDeliveryOptions();
+
+        $this->assertCount(1, $options);
+        $this->assertContains('print', $options);
+        $this->assertNotContains('digital', $options);
+    }
+
+    public function test_get_delivery_options_returns_empty_when_none_available(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'No Delivery',
+            'slug' => 'no-delivery',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'digital_download_url' => null,
+            'print_shipping_required' => false
+        ]);
+
+        $options = $plan->getDeliveryOptions();
+
+        $this->assertCount(0, $options);
+    }
+
+    public function test_scope_one_time_filters_correctly(): void
+    {
+        SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'One Time 1',
+            'slug' => 'onetime-1',
+            'price' => 50.00,
+            'currency' => 'USD',
+            'billing_period' => 'lifetime',
+            'plan_type' => 'onetime'
+        ]);
+
+        SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'One Time 2',
+            'slug' => 'onetime-2',
+            'price' => 60.00,
+            'currency' => 'USD',
+            'billing_period' => 'lifetime',
+            'plan_type' => 'onetime'
+        ]);
+
+        SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Recurring',
+            'slug' => 'recurring',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'plan_type' => 'recurring'
+        ]);
+
+        $oneTimePlans = SubscriptionPlan::oneTime()->get();
+
+        $this->assertCount(2, $oneTimePlans);
+        foreach ($oneTimePlans as $plan) {
+            $this->assertEquals('onetime', $plan->plan_type);
+        }
+    }
+
+    public function test_scope_recurring_filters_correctly(): void
+    {
+        SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Monthly',
+            'slug' => 'monthly',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'plan_type' => 'recurring'
+        ]);
+
+        SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Yearly',
+            'slug' => 'yearly',
+            'price' => 100.00,
+            'currency' => 'USD',
+            'billing_period' => 'yearly',
+            'plan_type' => 'recurring'
+        ]);
+
+        SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'One Time',
+            'slug' => 'onetime',
+            'price' => 50.00,
+            'currency' => 'USD',
+            'billing_period' => 'lifetime',
+            'plan_type' => 'onetime'
+        ]);
+
+        $recurringPlans = SubscriptionPlan::recurring()->get();
+
+        $this->assertCount(2, $recurringPlans);
+        foreach ($recurringPlans as $plan) {
+            $this->assertEquals('recurring', $plan->plan_type);
+        }
+    }
 }

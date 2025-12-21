@@ -2,16 +2,16 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Framework\Authorization\MemberAuth;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Models\Member;
+use App\Models\Order;
 use App\Services\CartService;
 use App\Services\CheckoutService;
 use App\Services\OrderCalculationService;
 use App\Services\OrderService;
+use App\Services\Payment\StripePaymentProcessor;
 use App\Services\ShippingService;
 use App\Services\VoucherService;
-use App\Models\Order;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 
@@ -25,6 +25,8 @@ class CheckoutServiceTest extends FunctionalTestCase
     private $memberAuthWrapper;
     private $orderCalculationService;
 
+    private $stripePaymentService;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,6 +37,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->orderService = m::mock(OrderService::class);
         $this->voucherService = m::mock(VoucherService::class);
         $this->shippingService = m::mock(ShippingService::class);
+        $this->stripePaymentService = m::mock(StripePaymentProcessor::class);
 
         $this->service = new CheckoutService(
             $this->cartService,
@@ -42,7 +45,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             $this->voucherService,
             $this->shippingService,
             $this->memberAuthWrapper,
-            $this->orderCalculationService
+            $this->orderCalculationService,
+            $this->stripePaymentService,
         );
     }
 
@@ -146,6 +150,167 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->assertEquals('Cart is empty', $result['message']);
     }
 
+    public function testProcessCheckoutFailsWhenStripePaymentIntentFails()
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'City',
+            'postal_code' => '12345',
+            'country' => 'US',
+            'payment_method' => 'card'
+        ];
+
+        $cartItems = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'product_sku' => 'SKU1',
+                'price' => 50.00,
+                'quantity' => 2,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn($cartItems);
+
+        $this->cartService->shouldReceive('getTotal')
+            ->once()
+            ->andReturn(100.00);
+
+        $this->shippingService->shouldReceive('calculateShipping')
+            ->once()
+            ->with(100.00, $data)
+            ->andReturn(10.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 100.00,
+                'shipping' => 10.00,
+                'discount' => 0,
+                'tax' => 11.00,
+                'total' => 121.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->with(m::on(function ($params) {
+                return $params['amount'] === 121.00
+                    && $params['currency'] === 'usd'
+                    && $params['site_id'] === 1;
+            }))
+            ->andReturn([
+                'success' => false,
+                'message' => 'Card declined'
+            ]);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Card declined', $result['message']);
+    }
+
+    public function testProcessCheckoutSuccessfullyReturnsPaymentIntentDetails()
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'City',
+            'postal_code' => '12345',
+            'country' => 'US',
+            'payment_method' => 'card'
+        ];
+
+        $cartItems = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'product_sku' => 'SKU1',
+                'price' => 50.00,
+                'quantity' => 2,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn($cartItems);
+
+        $this->cartService->shouldReceive('getTotal')
+            ->once()
+            ->andReturn(100.00);
+
+        $this->shippingService->shouldReceive('calculateShipping')
+            ->once()
+            ->with(100.00, $data)
+            ->andReturn(10.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 100.00,
+                'shipping' => 10.00,
+                'discount' => 0,
+                'tax' => 11.00,
+                'total' => 121.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret_123',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
+
+        $this->orderService->shouldReceive('createOrder')
+            ->once()
+            ->with(m::on(function ($orderData) {
+                return $orderData['subtotal'] === 100.00
+                    && $orderData['shipping'] === 10.00
+                    && $orderData['tax'] === 11.00
+                    && $orderData['total'] === 121.00
+                    && $orderData['discount'] === 0;
+            }), m::any(), 1)
+            ->andReturn($mockOrder);
+
+        $this->memberAuthWrapper->shouldReceive('check')
+            ->once()
+            ->andReturn(true);
+
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
+
+        $this->memberAuthWrapper->shouldReceive('member')
+            ->once()
+            ->andReturn($member);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('pi_test_secret_123', $result['client_secret']);
+        $this->assertEquals('pi_test_123', $result['payment_intent_id']);
+        $this->assertEquals('ORD-123', $result['order_id']);
+        $this->assertEquals(1, $result['order_internal_id']);
+        $this->assertEquals(121.00, $result['total']);
+    }
+
+
     public function testProcessCheckoutSuccessfullyWithoutVoucher()
     {
         $data = [
@@ -199,9 +364,6 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
-        $this->cartService->shouldReceive('clear')
-            ->once();
-
         $this->memberAuthWrapper->shouldReceive('check')
             ->once()
             ->andReturn(true);
@@ -216,6 +378,14 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
             ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret_123',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -235,7 +405,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             'address' => '123 Main St',
             'city' => 'City',
             'postal_code' => '12345',
-            'country' => 'CA', // Canada
+            'country' => 'CA',
             'payment_method' => 'card'
         ];
 
@@ -250,16 +420,35 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
 
-        // Canada shipping should be 15.00
         $this->shippingService->shouldReceive('calculateShipping')
             ->once()
             ->with(50.00, $data)
             ->andReturn(15.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 15, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 50.00,
+                'shipping' => 15.00,
+                'discount' => 0,
+                'tax' => 6.50,
+                'total' => 71.50
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $this->memberAuthWrapper->shouldReceive('check')
             ->once()
@@ -277,13 +466,6 @@ class CheckoutServiceTest extends FunctionalTestCase
                 return $orderData['shipping'] === 15.00;
             }), m::any(), 1)
             ->andReturn($mockOrder);
-
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 15, 'discount' => 0])
-            ->andReturn(['subtotal' => 100.00, 'shipping' => 15.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
-
-        $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -314,16 +496,35 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(150.00);
 
-        // Free shipping over $100
         $this->shippingService->shouldReceive('calculateShipping')
             ->once()
             ->with(150.00, $data)
             ->andReturn(0.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 150, 'shipping' => 0, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 150.00,
+                'shipping' => 0.00,
+                'discount' => 0,
+                'tax' => 15.00,
+                'total' => 165.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $this->orderService->shouldReceive('createOrder')
             ->once()
@@ -335,11 +536,6 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with([], ['subtotal' => 150, 'shipping' => 0, 'discount' => 0])
-            ->andReturn(['subtotal' => 150.00, 'shipping' => 0.00, 'discount' => 0, 'tax' => 15.00, 'total' => 165.00]);
-
         $this->memberAuthWrapper->shouldReceive('check')
             ->once()
             ->andReturn(true);
@@ -349,8 +545,6 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->memberAuthWrapper->shouldReceive('member')
             ->once()
             ->andReturn($member);
-
-        $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -391,6 +585,25 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(100.00);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
 
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 10])
+            ->andReturn([
+                'subtotal' => 100.00,
+                'shipping' => 10.00,
+                'discount' => 10.00,
+                'tax' => 10.00,
+                'total' => 110.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
+
         $this->orderService->shouldReceive('createOrder')
             ->once()
             ->with(m::on(function($orderData) {
@@ -403,26 +616,20 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 10])
-            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 10.00, 'tax' => 10.00, 'total' => 110.00]);
-
         $this->voucherService->shouldReceive('applyVoucher')
             ->once()
-            ->with(5, null, 10.00, 1);
+            ->with(5, m::any(), 10.00, 1);
 
         $this->memberAuthWrapper->shouldReceive('check')
             ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
 
         $this->memberAuthWrapper->shouldReceive('member')
             ->twice()
             ->andReturn($member);
-
-        $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -448,7 +655,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             'last_name' => 'Doe',
             'email' => 'john@example.com',
             'phone' => '1234567890',
-            'saved_address' => 5 // Using saved address
+            'saved_address' => 5
         ];
 
         $cartItems = [
@@ -462,11 +669,31 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 50.00,
+                'shipping' => 10.00,
+                'discount' => 0,
+                'tax' => 6.00,
+                'total' => 66.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $this->orderService->shouldReceive('createOrder')
             ->once()
@@ -475,13 +702,6 @@ class CheckoutServiceTest extends FunctionalTestCase
                     && $orderData['shipping_address_id'] === 5;
             }), m::any(), 1)
             ->andReturn($mockOrder);
-
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
-            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
-
-        $this->cartService->shouldReceive('clear')->once();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -509,6 +729,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
@@ -520,10 +741,30 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
 
         $this->memberAuthWrapper->shouldReceive('member')
             ->once()
             ->andReturn($member);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->andReturn([
+                'subtotal' => 50.00,
+                'shipping' => 10.00,
+                'discount' => 0,
+                'tax' => 6.00,
+                'total' => 66.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $this->orderService->shouldReceive('createOrder')
             ->once()
@@ -533,17 +774,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
-        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
-            ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
-            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
-
-        $this->cartService->shouldReceive('clear')->once();
-
         $result = $this->service->processCheckout($data, 1);
 
         $this->assertTrue($result['success']);
     }
+
 
     public function testProcessCheckoutHandlesOrderCreationException()
     {
@@ -582,14 +817,28 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
 
-        $this->orderService->shouldReceive('createOrder')
-            ->once()
-            ->andThrow(new \Exception('Database error'));
-
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
             ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
-            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+            ->andReturn([
+                'subtotal' => 50.00,
+                'shipping' => 10.00,
+                'discount' => 0,
+                'tax' => 6.00,
+                'total' => 66.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
+
+        $this->orderService->shouldReceive('createOrder')
+            ->once()
+            ->andThrow(new \Exception('Database error'));
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -636,8 +885,6 @@ class CheckoutServiceTest extends FunctionalTestCase
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
-        $this->cartService->shouldReceive('clear')->once();
-
         $this->memberAuthWrapper->shouldReceive('check')
             ->once()
             ->andReturn(true);
@@ -652,6 +899,14 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->with([], ['subtotal' => 200, 'shipping' => 0, 'discount' => 0])
             ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 20.00, 'total' => 121.00]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -687,6 +942,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
         $this->memberAuthWrapper->shouldReceive('check')
@@ -700,21 +956,82 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
             ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
-            ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
+            ->andReturn([
+                'subtotal' => 50.00,
+                'shipping' => 10.00,
+                'discount' => 0,
+                'tax' => 6.00,
+                'total' => 66.00
+            ]);
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'pi_test_secret',
+                'payment_intent_id' => 'pi_test_123'
+            ]);
 
         $this->orderService->shouldReceive('createOrder')->once()->andReturn($mockOrder);
 
         // Voucher service should NOT be called
         $this->voucherService->shouldReceive('applyVoucher')->never();
 
-        $this->cartService->shouldReceive('clear')->once();
-
         $result = $this->service->processCheckout($data, 1);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testConfirmRegularCheckoutPaymentSucceeds()
+    {
+        $this->stripePaymentService->shouldReceive('confirmPaymentIntent')
+            ->once()
+            ->with('pi_test_123')
+            ->andReturn([
+                'success' => true,
+                'status' => 'succeeded'
+            ]);
+
+        $this->orderService->shouldReceive('updateOrderStatus')
+            ->once()
+            ->with(1, 'completed', 'paid');
+
+        $this->cartService->shouldReceive('clear')
+            ->once();
+
+        $result = $this->service->confirmRegularCheckoutPayment('pi_test_123', 1);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Order completed successfully', $result['message']);
+    }
+
+    public function testConfirmRegularCheckoutPaymentFailsWhenPaymentNotSucceeded()
+    {
+        $this->stripePaymentService->shouldReceive('confirmPaymentIntent')
+            ->once()
+            ->with('pi_test_123')
+            ->andReturn(['success' => true,
+                'status' => 'requires_action'
+            ]);
+        $result = $this->service->confirmRegularCheckoutPayment('pi_test_123', 1);
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Payment confirmation failed', $result['message']);
+    }
+
+    public function testConfirmRegularCheckoutPaymentHandlesException()
+    {
+        $this->stripePaymentService->shouldReceive('confirmPaymentIntent')
+            ->once()
+            ->with('pi_test_123')
+            ->andThrow(new \Exception('Network error'));
+
+        $result = $this->service->confirmRegularCheckoutPayment('pi_test_123', 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Payment confirmation error', $result['message']);
     }
 }
