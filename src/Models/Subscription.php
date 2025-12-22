@@ -6,6 +6,25 @@ use App\Framework\Database\QueryBuilder;
 
 class Subscription extends Model
 {
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Create window when paid subscription is created
+        static::created(function ($subscription) {
+            if ($subscription->type === 'paid') {
+                $subscription->createWindow();
+            }
+        });
+
+        // Update window when subscription status changes
+        static::updated(function ($subscription) {
+            if ($subscription->type === 'paid') {
+                $subscription->updateWindow();
+            }
+        });
+    }
+
     protected $table = 'subscriptions';
 
     protected $fillable = [
@@ -29,6 +48,7 @@ class Subscription extends Model
         'delivery_type',
         'download_url',
         'download_expires_at',
+        'type'
     ];
 
     protected $casts = [
@@ -208,5 +228,68 @@ class Subscription extends Model
     public function order($relation = false)
     {
         return $this->hasOne(Order::class, 'one_time_subscription_id', 'id', $relation);
+    }
+
+    public function createWindow(): ?Model
+    {
+        if ($this->type !== 'paid') {
+            return null;
+        }
+
+        return SubscriptionWindow::create([
+            'member_id' => $this->member_id,
+            'subscription_id' => $this->id,
+            'site_id' => $this->site_id,
+            'window_start' => $this->start_date->format('Y-m-d H:i:s'),
+            'window_end' => $this->end_date->format('Y-m-d H:i:s') ?? now(),
+            'type' => 'paid'
+        ]);
+    }
+
+    public function updateWindow(): void
+    {
+        // Only update windows for paid subscriptions
+        if ($this->type !== 'paid') {
+            return;
+        }
+
+        // Find existing window
+        $window = SubscriptionWindow::where('subscription_id', $this->id)->first();
+
+        if (!$window) {
+            // Create if doesn't exist
+            $this->createInitialWindow();
+            return;
+        }
+
+        // Update existing window
+        $window->update([
+            'window_end' => $this->end_date->format('Y-m-d H:i:s') ?? $this->start_date->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function closeWindow(): void
+    {
+        if ($this->type !== 'paid') {
+            return;
+        }
+
+        $window = SubscriptionWindow::where('subscription_id', $this->id)->first();
+
+        if ($window) {
+            $window->update([
+                'window_end' => now()
+            ]);
+        } else {
+            // Create window if it doesn't exist (backfill case)
+            SubscriptionWindow::create([
+                'member_id' => $this->member_id,
+                'subscription_id' => $this->id,
+                'site_id' => $this->site_id,
+                'window_start' => $this->start_date->format('Y-m-d H:i:s'),
+                'window_end' => new \DateTime(),
+                'type' => 'paid'
+            ]);
+        }
     }
 }

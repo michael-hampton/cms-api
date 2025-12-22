@@ -2,18 +2,21 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Repositories\CategoryRepository;
-use App\Repositories\PageRepository;
+use App\Services\ArticleAccessService;
 use App\Services\MenuRenderer;
+use App\Services\SubscriptionModalService;
 
 class CategoryPageController extends Controller
 {
     public function __construct(
-        private CategoryRepository $categoryRepository,
-        private PageRepository $pageRepository
+        private readonly CategoryRepository       $categoryRepository,
+        private readonly ArticleAccessService     $articleAccessService,
+        private readonly SubscriptionModalService $subscriptionModalService,
     ) {
         parent::__construct();
     }
@@ -72,8 +75,15 @@ class CategoryPageController extends Controller
         }
 
         $paginationData = $query->paginate($perPage, $currentPage);
+        $member = MemberAuth::getMember();
 
         $pages = $paginationData['data'];
+
+        $pages->map(function ($page) use ($member) {
+            $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
+            $page->access = $accessInfo;
+        });
+
         $pagination = [
             'current_page' => $paginationData['pagination']['current_page'],
             'per_page' => $paginationData['pagination']['per_page'],
@@ -83,6 +93,9 @@ class CategoryPageController extends Controller
             'to' => $paginationData['pagination']['to']
         ];
 
+        $siteId = SiteContext::getId();
+        $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
+
         return $this->view('estate/category', [
             'category' => $category,
             'pages' => $pages,
@@ -91,7 +104,8 @@ class CategoryPageController extends Controller
             'childCategories' => $childCategories,
             'pagination' => $pagination,
             'currentSort' => $sort,
-            'menuRenderer' => new MenuRenderer()
+            'menuRenderer' => new MenuRenderer(),
+            'subscriptionModalData' => $modalData,
         ]);
     }
 

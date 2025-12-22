@@ -16,6 +16,7 @@ use App\Framework\Validation\Rules\RequiredRule;
 use App\Models\Product;
 use App\Models\Wishlist;
 use App\Repositories\PageRepository;
+use App\Services\ArticleAccessService;
 use App\Services\BuildProductCardService;
 
 class PageGridBlockParser extends BaseBlockParser
@@ -360,17 +361,16 @@ class PageGridBlockParser extends BaseBlockParser
         return $baseClass;
     }
 
-    public function generateHtml(array $parsedData): string
+    public function generateHtml(array $parsedData, ?int $pageId = null, ?int $siteId = null): string
     {
-
         if ($parsedData['layout'] === 'carousel') {
             return $this->generateCarouselHtml($parsedData);
         }
 
-        return $this->generateBlock($parsedData);
+        return $this->generateBlock($parsedData, $siteId);
     }
 
-    public function generateBlock(array $parsedData): string
+    public function generateBlock(array $parsedData, ?int $siteId = null): string
     {
         $html = "<div class=\"page-grid-block {$parsedData['grid_class']}\">";
 
@@ -397,7 +397,7 @@ class PageGridBlockParser extends BaseBlockParser
         $html .= "<div class=\"page-grid-container\">";
 
         foreach ($parsedData['pages'] as $page) {
-            $html .= $this->generatePageCard($page, $parsedData);
+            $html .= $this->generatePageCard($page, $parsedData, $siteId);
         }
 
         $html .= "</div>";
@@ -440,16 +440,29 @@ class PageGridBlockParser extends BaseBlockParser
 
         foreach ($parsedData['pages'] as $page) {
             // Check if page is private
-            $isPrivate = $this->isPagePrivate($page['slug']);
-            $isLoggedIn = MemberAuth::check();
+            $member = MemberAuth::check() ? MemberAuth::getMember() : null;
+            $accessService = new ArticleAccessService();
 
-            $html .= "<div class=\"page-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\">";
+            // Get actual Page model
+            $pageModel = $this->pageRepository->findBySlug($page['slug'], SiteContext::getId());
+
+            $isLocked = false;
+
+            if ($pageModel) {
+                $accessInfo = $accessService->enrichPageWithAccessInfo($pageModel, $member);
+                $page['can_view'] = $accessInfo['can_view'];
+                $page['denial_reason'] = $accessInfo['denial_reason'];
+                $page['access_level'] = $accessInfo['access_level'];
+                $isLocked = !($page['can_view'] ?? true);
+            }
+
+            $html .= "<div class=\"page-card" . ($isLocked ? " page-card-private" : "") . "\">";
 
             if ($parsedData['showImage'] && !empty($page['image'])) {
                 $html .= "<div class=\"page-card-image\">";
 
                 // Add overlay for private content
-                if ($isPrivate && !$isLoggedIn) {
+                if ($isLocked) {
                     $html .= "<div class=\"private-overlay\"></div>";
                     $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
                 }
@@ -464,15 +477,15 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
             }
 
-            if (!$isPrivate || $isLoggedIn) {
+            if (!$isLocked) {
                 $html .= $this->generateToolbar();
             }
 
-            $html .= "<div class=\"page-card-content" . ($isPrivate && !$isLoggedIn ? " page-content-faded" : "") . "\">";
+            $html .= "<div class=\"page-card-content" . ($isLocked ? " page-content-faded" : "") . "\">";
 
             // Title
             $html .= "<h3 class=\"page-card-title\">";
-            if ($isPrivate && !$isLoggedIn) {
+            if ($isLocked) {
                 $html .= htmlspecialchars($page['title']);
             } else {
                 $html .= $this->addLink(htmlspecialchars($page['title']), $page['slug']);
@@ -480,7 +493,7 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</h3>";
 
             if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
-                $excerptClass = ($isPrivate && !$isLoggedIn) ? "page-card-excerpt page-excerpt-faded" : "page-card-excerpt";
+                $excerptClass = ($isLocked) ? "page-card-excerpt page-excerpt-faded" : "page-card-excerpt";
                 $html .= "<p class=\"{$excerptClass}\">{$page['formatted_excerpt']}</p>";
             }
 
@@ -492,10 +505,10 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
             }
 
-            if ($parsedData['showActions'] || ($isPrivate && !$isLoggedIn)) {
+            if (($parsedData['showActions'] && !empty($page['actions'])) || $isLocked) {
                 $html .= "<div class=\"page-card-actions\">";
 
-                if ($isPrivate && !$isLoggedIn) {
+                if ($isLocked) {
                     // Show subscription required button
                     $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
                     $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
@@ -548,19 +561,34 @@ class PageGridBlockParser extends BaseBlockParser
         return $html;
     }
 
-    private function generatePageCard(array $page, array $parsedData): string
+    private function generatePageCard(array $page, array $parsedData, ?int $siteId = null): string
     {
         $isProduct = !empty($page['price']);
+        $siteId = $siteId ?? SiteContext::getId();
 
         if ($isProduct) {
             return $this->generateProductCard($page, $parsedData);
         }
 
         // Check if page is private
-        $isPrivate = $this->isPagePrivate($page['slug']);
-        $isLoggedIn = MemberAuth::check();
+        $member = MemberAuth::check() ? MemberAuth::getMember() : null;
 
-        $html = "<div class=\"page-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\">";
+        $accessService = new ArticleAccessService();
+
+        // Get actual Page model
+        $pageModel = $this->pageRepository->findBySlug($page['slug'], $siteId);
+
+        if ($pageModel) {
+            $accessInfo = $accessService->enrichPageWithAccessInfo($pageModel, $member, $siteId);
+
+            $page['can_view'] = $accessInfo['can_view'];
+            $page['denial_reason'] = $accessInfo['denial_reason'];
+            $page['access_level'] = $accessInfo['access_level'];
+        }
+
+        $isLocked = !($page['can_view'] ?? true);
+
+        $html = "<div class=\"page-card" . ($isLocked ? " page-card-private" : "") . "\">";
 
         // Image section
         if ($parsedData['showImage'] && !empty($page['image'])) {
@@ -570,7 +598,7 @@ class PageGridBlockParser extends BaseBlockParser
             $titleText = htmlspecialchars($page['image']['title'] ?: $page['title']);
 
             // Add overlay for private content
-            if ($isPrivate && !$isLoggedIn) {
+            if ($isLocked) {
                 $html .= "<div class=\"private-overlay\"></div>";
                 $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
             }
@@ -593,16 +621,16 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        if (!$isPrivate || $isLoggedIn) {
+        if (!$isLocked) {
             $html .= $this->generateToolbar();
         }
 
         // Content section
-        $html .= "<div class=\"page-content" . ($isPrivate && !$isLoggedIn ? " page-content-faded" : "") . "\">";
+        $html .= "<div class=\"page-content" . ($isLocked ? " page-content-faded" : "") . "\">";
 
         // Title
         $html .= "<h3 class=\"page-title\">";
-        if ($isPrivate && !$isLoggedIn) {
+        if ($isLocked) {
             $html .= htmlspecialchars($page['title']);
         } else {
             $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
@@ -642,7 +670,7 @@ class PageGridBlockParser extends BaseBlockParser
 
         // Excerpt
         if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
-            $excerptClass = ($isPrivate && !$isLoggedIn) ? "page-excerpt page-excerpt-faded" : "page-excerpt";
+            $excerptClass = ($isLocked) ? "page-excerpt page-excerpt-faded" : "page-excerpt";
             $html .= "<div class=\"{$excerptClass}\">" . htmlspecialchars($page['excerpt']) . "</div>";
         }
 
@@ -656,10 +684,10 @@ class PageGridBlockParser extends BaseBlockParser
         }
 
         // Actions
-        if (($parsedData['showActions'] && !empty($page['actions'])) || $isPrivate && !$isLoggedIn) {
+        if (($parsedData['showActions'] && !empty($page['actions'])) || $isLocked) {
             $html .= "<div class=\"page-actions\">";
 
-            if ($isPrivate && !$isLoggedIn) {
+            if ($isLocked) {
                 // Show subscription required button
                 $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
                 $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";

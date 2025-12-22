@@ -37,6 +37,7 @@ class TagRepository extends Repository
     public function findBySlug(string $slug): ?Tag
     {
         $query = Tag::bySlug($slug);
+
         return $this->applySiteFilter($query)->first();
     }
 

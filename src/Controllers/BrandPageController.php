@@ -2,14 +2,25 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Models\Tag;
+use App\Services\ArticleAccessService;
 use App\Services\MenuRenderer;
+use App\Services\SubscriptionModalService;
 
 class BrandPageController extends Controller
 {
+    public function __construct(
+        private readonly ArticleAccessService     $articleAccessService,
+        private readonly SubscriptionModalService $subscriptionModalService,
+    )
+    {
+        parent::__construct();
+    }
+
     public function show(string $slug)
     {
         // check if has corresponding page tag
@@ -33,6 +44,13 @@ class BrandPageController extends Controller
             ->paginate($perPage, $currentPage);
 
         $pages = $paginationData['data'];
+        $member = MemberAuth::getMember();
+
+        $pages->map(function ($page) use ($member) {
+            $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
+            $page->access = $accessInfo;
+        });
+
         $pagination = [
             'current_page' => $paginationData['pagination']['current_page'],
             'per_page' => $paginationData['pagination']['per_page'],
@@ -48,12 +66,16 @@ class BrandPageController extends Controller
             ->with(['items'])
             ->first();
 
+        $siteId = SiteContext::getId();
+        $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
+
         return $this->view('brand.show', [
             'pages' => $pages,
             'tag' => $tag,
             'pagination' => $pagination,
             'menu' => $menu,
-            'menuRenderer' => new MenuRenderer()
+            'menuRenderer' => new MenuRenderer(),
+            'subscriptionModalData' => $modalData,
         ]);
     }
 

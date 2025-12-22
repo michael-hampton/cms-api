@@ -9831,6 +9831,77 @@ body.card-flipped {
     margin-top: auto;
 }
 
+.page-card-locked {
+    opacity: 0.85;
+}
+
+.access-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+.lock-icon {
+    color: white;
+    stroke-width: 2;
+}
+
+.content-faded {
+    position: relative;
+}
+
+.excerpt-blurred {
+    filter: blur(3px);
+    user-select: none;
+}
+
+.access-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.access-premium {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #7c5d00;
+}
+
+.access-member {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.btn-upgrade-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-upgrade-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+}
+
 
 
 

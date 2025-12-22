@@ -2,28 +2,31 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
-use App\Models\Tag;
 use App\Repositories\TagRepository;
+use App\Services\ArticleAccessService;
 use App\Services\MenuRenderer;
+use App\Services\SubscriptionModalService;
 use Exception;
 
 class TagViewController extends Controller
 {
-    private TagRepository $tagRepository;
-
-    public function __construct(TagRepository $tagRepository)
+    public function __construct(
+        private readonly TagRepository            $tagRepository,
+        private readonly ArticleAccessService     $articleAccessService,
+        private readonly SubscriptionModalService $subscriptionModalService,
+    )
     {
-        $this->tagRepository = $tagRepository;
         parent::__construct();
     }
 
     public function show(string $slug)
     {
         try {
-            $tag = Tag::where('slug', $slug)->first();
+            $tag = $this->tagRepository->findBySlug($slug);
 
             if (!$tag) {
                 return $this->notFound();
@@ -75,7 +78,16 @@ class TagViewController extends Controller
             $paginationData = $query->paginate($perPage, $currentPage);
 
             $pages = $paginationData['data'];
+            $member = MemberAuth::getMember();
+
+            $pages->map(function ($page) use ($member) {
+                $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
+                $page->access = $accessInfo;
+            });
+
             $pagination = $paginationData['pagination'];
+            $siteId = SiteContext::getId();
+            $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
 
             $menu = Menu::where('is_active', true)
                 ->where('site_id', SiteContext::getId())
@@ -90,7 +102,8 @@ class TagViewController extends Controller
                 'tag' => $tag,
                 'pagination' => $pagination,
                 'currentSort' => $sort,
-                'menuRenderer' => new MenuRenderer()
+                'menuRenderer' => new MenuRenderer(),
+                'subscriptionModalData' => $modalData,
             ]);
 
         } catch (Exception $e) {

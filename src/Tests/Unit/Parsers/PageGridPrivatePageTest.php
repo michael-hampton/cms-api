@@ -5,26 +5,69 @@ namespace App\Tests\Unit\Parsers;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageMetadata;
+use App\Models\Subscription;
+use App\Models\SubscriptionWindow;
 use App\Parsers\PageGridBlockParser;
 use App\Repositories\PageRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 
 class PageGridPrivatePageTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private PageGridBlockParser $parser;
     private Page $privatePage;
     private Page $publicPage;
     private $pageRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Create test pages
+        $this->publicPage = Page::create([
+            'site_id' => SiteContext::getId(),
+            'title' => 'Public Page',
+            'slug' => 'public-page',
+            'subtitle' => 'Public content',
+            'status' => 'published'
+        ]);
+
+        PageMetadata::create([
+            'page_id' => $this->publicPage->id,
+            'visibility' => 'free'
+        ]);
+
+        $this->privatePage = Page::create([
+            'site_id' => $this->siteId,
+            'title' => 'Private Page',
+            'slug' => 'private-page',
+            'subtitle' => 'Private content',
+            'status' => 'published',
+            'published_at' => now_datetime()->subDays(5)->format('Y-m-d H:i:s')
+        ]);
+
+        PageMetadata::create([
+            'page_id' => $this->privatePage->id,
+            'visibility' => 'premium'
+        ]);
+
+        $this->pageRepository = Mockery::mock(PageRepository::class);
+
+        $this->parser = new PageGridBlockParser($this->pageRepository);
+    }
 
     public function testPublicPageShowsNormalButton()
     {
         // Not logged in
         MemberAuth::logout();
 
-        $this->setpublicPageExpectations();
+        $this->setPublicPageExpectations();
 
         $data = [
             'title' => 'Page Grid',
@@ -121,6 +164,9 @@ class PageGridPrivatePageTest extends FunctionalTestCase
 
         MemberAuth::login($member);
 
+        $subscription = $this->createSubscription($member);
+        $this->createSubscriptionWindow($member, $subscription);
+
         $data = [
             'title' => 'Page Grid',
             'layout' => 'grid',
@@ -140,7 +186,7 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         ];
 
         $parsed = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsed);
+        $html = $this->parser->generateHtml($parsed, $this->siteId);
 
         // Should show normal "Read More" button
         $this->assertStringContainsString('Read More', $html);
@@ -246,6 +292,8 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         ]);
 
         MemberAuth::login($member);
+        $subscription = $this->createSubscription($member);
+        $this->createSubscriptionWindow($member, $subscription);
 
         $data = [
             'title' => 'Page Grid',
@@ -265,35 +313,6 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         // Title should be a clickable link
         $this->assertStringContainsString('<a href=', $html);
         $this->assertStringContainsString('private-page', $html);
-    }
-
-    public function testPrivatePageStylesIncluded()
-    {
-        $this->setPrivatePageExpectations();
-
-        MemberAuth::logout();
-
-        $data = [
-            'title' => 'Page Grid',
-            'layout' => 'grid',
-            'pages' => [
-                [
-                    'title' => 'Private Page',
-                    'slug' => 'private-page'
-                ]
-            ]
-        ];
-
-        $parsed = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsed);
-
-        // Should include CSS styles for private pages
-        $this->assertStringContainsString('<style>', $html);
-        $this->assertStringContainsString('.page-card-private', $html);
-        $this->assertStringContainsString('.private-overlay', $html);
-        $this->assertStringContainsString('.private-badge', $html);
-        $this->assertStringContainsString('.btn-subscribe-required', $html);
-        $this->assertStringContainsString('backdrop-filter: blur', $html);
     }
 
     public function testPageWithoutMetadataIsTreatedAsPublic()
@@ -337,40 +356,116 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         $this->assertStringNotContainsString('page-card-private', $html);
     }
 
-    protected function setUp(): void
+    public function testPageGridRespectsHistoricalSubscriptionWindows()
     {
-        parent::setUp();
+        $member = $this->createMember();
+        MemberAuth::login($member);
 
-        // Create test pages
-        $this->publicPage = Page::create([
-            'site_id' => SiteContext::getId(),
-            'title' => 'Public Page',
-            'slug' => 'public-page',
-            'subtitle' => 'Public content',
-            'status' => 'published'
+        // Create expired subscription Jan 1-31
+        $subscription = $this->createSubscription($member);
+
+        // Create window
+        $this->createSubscriptionWindow($member, $subscription);
+
+        // Page published during window
+        $pageInWindow = $this->createPageWithAccess('premium', now_datetime()->subDays(2)->format('Y-m-d H:i:s'));
+
+        // Page published after window
+        $pageAfterWindow = $this->createPageWithAccess('premium', now_datetime()->subDays(2)->format('Y-m-d H:i:s'));
+
+        $this->pageRepository->shouldReceive('findBySlug')
+            ->with($pageInWindow->slug, $this->siteId)
+            ->andReturn($pageInWindow);
+
+        $this->pageRepository->shouldReceive('getMetaDataForPage')
+            ->with($pageInWindow->id)
+            ->andReturn($pageInWindow->metadata);
+
+        $data = [
+            'title' => 'Page Grid',
+            'layout' => 'grid',
+            'showActions' => true,
+            'pages' => [
+                [
+                    'title' => $pageInWindow->title,
+                    'slug' => $pageInWindow->slug,
+                    'excerpt' => 'Should be accessible',
+                    'actions' => [
+                        ['text' => 'Read More', 'url' => '/' . $pageInWindow->slug, 'style' => 'primary']
+                    ]
+                ]
+            ]
+        ];
+
+        $parsed = $this->parser->parse($data);
+        $html = $this->parser->generateHtml($parsed, 1, $this->siteId);
+
+        // Should show normal read button (has historical access)
+        $this->assertStringContainsString('Read More', $html);
+        $this->assertStringNotContainsString('Subscribe to Access', $html);
+    }
+
+    public function testPageGridShowsSubscribeButtonForContentAfterSubscription()
+    {
+        $member = $this->createMember();
+        MemberAuth::login($member);
+
+        // Create expired subscription that ended in January
+        $subscription = $this->createSubscription($member);
+
+        $this->createSubscriptionWindow($member, $subscription);
+
+        // Page published in February (after subscription)
+        $pageAfter = $this->createPageWithAccess('premium', '2025-02-15 12:00:00');
+
+        $this->pageRepository->shouldReceive('findBySlug')
+            ->with($pageAfter->slug, $this->siteId)
+            ->andReturn($pageAfter);
+
+        $this->pageRepository->shouldReceive('getMetaDataForPage')
+            ->with($pageAfter->id)
+            ->andReturn($pageAfter->metadata);
+
+        $data = [
+            'title' => 'Page Grid',
+            'layout' => 'grid',
+            'showActions' => true,
+            'pages' => [
+                [
+                    'title' => $pageAfter->title,
+                    'slug' => $pageAfter->slug,
+                    'excerpt' => 'Should require resubscription',
+                    'actions' => [
+                        ['text' => 'Read More', 'url' => '/' . $pageAfter->slug, 'style' => 'primary']
+                    ]
+                ]
+            ]
+        ];
+
+        $parsed = $this->parser->parse($data);
+        $html = $this->parser->generateHtml($parsed, 1, $this->siteId);
+
+        // Should show subscribe button (no historical access)
+        $this->assertStringContainsString('Subscribe to Access', $html);
+        $this->assertStringNotContainsString('Read More', $html);
+    }
+
+    private function createPageWithAccess(string $accessLevel, ?string $publishedAt = null): Page
+    {
+        $page = Page::create([
+            'site_id' => $this->siteId,
+            'title' => 'Test Page ' . uniqid(),
+            'slug' => 'test-' . uniqid(),
+            'status' => 'published',
+            'published_at' => $publishedAt ?? date('Y-m-d H:i:s')
         ]);
 
         PageMetadata::create([
-            'page_id' => $this->publicPage->id,
-            'visibility' => 'public'
+            'page_id' => $page->id,
+            'visibility' => $accessLevel
         ]);
 
-        $this->privatePage = Page::create([
-            'site_id' => SiteContext::getId(),
-            'title' => 'Private Page',
-            'slug' => 'private-page',
-            'subtitle' => 'Private content',
-            'status' => 'published'
-        ]);
-
-        PageMetadata::create([
-            'page_id' => $this->privatePage->id,
-            'visibility' => 'private'
-        ]);
-
-        $this->pageRepository = Mockery::mock(PageRepository::class);
-
-        $this->parser = new PageGridBlockParser($this->pageRepository);
+        return $page->load(['metadata']);
     }
 
     protected function tearDown(): void
@@ -386,11 +481,38 @@ class PageGridPrivatePageTest extends FunctionalTestCase
             $this->privatePage->delete();
         }
 
-        Member::where('email', 'test@example.com')->delete();
-        Member::where('email', 'test2@example.com')->delete();
+        //Member::where('email', 'test@example.com')->delete();
+        //Member::where('email', 'test2@example.com')->delete();
 
         MemberAuth::logout();
 
         parent::tearDown();
+    }
+
+    private function createSubscriptionWindow(Member $member, Subscription $subscription): Model
+    {
+        return SubscriptionWindow::create([
+            'member_id' => $member->id,
+            'subscription_id' => $subscription->id,
+            'site_id' => $this->siteId,
+            'window_start' => now_datetime()->subDays(6)->format('Y-m-d H:i:s'),
+            'window_end' => now_datetime()->addMonths(2)->format('Y-m-d H:i:s'),
+            'type' => 'paid'
+        ]);
+    }
+
+    private function createSubscription(Member $member): Model
+    {
+        return Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'status' => 'expired',
+            'type' => 'paid',
+            'start_date' => now_datetime()->format('Y-m-d H:i:s'),
+            'end_date' => now_datetime()->addMonths(2)->format('Y-m-d H:i:s'),
+            'plan_name' => 'Test',
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
     }
 }

@@ -2,18 +2,26 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Author;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Repositories\CategoryRepository;
 use App\Repositories\TagRepository;
+use App\Services\ArticleAccessService;
 use App\Services\MenuRenderer;
+use App\Services\SubscriptionModalService;
 use Exception;
 
 class AuthorViewController extends Controller
 {
-    public function __construct(private CategoryRepository $categoryRepository, private TagRepository $tagRepository)
+    public function __construct(
+        private readonly CategoryRepository       $categoryRepository,
+        private readonly TagRepository            $tagRepository,
+        private readonly ArticleAccessService     $articleAccessService,
+        private readonly SubscriptionModalService $subscriptionModalService,
+    )
     {
         parent::__construct();
     }
@@ -73,9 +81,19 @@ class AuthorViewController extends Controller
             }
 
             $paginationData = $query->paginate($perPage, $currentPage);
+            $member = MemberAuth::getMember();
 
             $pages = $paginationData['data'];
+
+            // Enrich pages with access information
+            $pages->map(function ($page) use ($member) {
+                $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
+                $page->access = $accessInfo;
+            });
+
             $pagination = $paginationData['pagination'];
+            $siteId = SiteContext::getId();
+            $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
 
             // Render the author view
             return $this->view('estate/author', [
@@ -86,7 +104,8 @@ class AuthorViewController extends Controller
                 'currentSort' => $sort,
                 'categories' => $this->categoryRepository->getActive(),
                 'tags' => $this->tagRepository->all(),
-                'menuRenderer' => new MenuRenderer()
+                'menuRenderer' => new MenuRenderer(),
+                'subscriptionModalData' => $modalData,
             ]);
 
         } catch (Exception $e) {

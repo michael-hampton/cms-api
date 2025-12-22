@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Models\Category;
 use App\Models\Menu;
@@ -15,6 +16,7 @@ use App\Parsers\PageGridRenderer;
 use App\Repositories\CommentRepository;
 use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
+use App\Services\ArticleAccessService;
 use App\Services\BlockParserService;
 use App\Services\MenuRenderer;
 use App\Services\PageRenderService;
@@ -31,12 +33,23 @@ class ContentController extends Controller
         private readonly ActivityTracking         $activityTracking,
         private readonly SubscriptionModalService $modalService,
         private readonly PageRenderService $pageRenderService,
+        private readonly ArticleAccessService $articleAccessService,
     ) {
         parent::__construct();
     }
 
     public function show(Page $page, UrlResolutionResult $urlResolutionResult)
     {
+        $member = MemberAuth::getMember();
+        $memberId = $member ? $member->id : null;
+
+        $accessCheck = $this->articleAccessService->canView($page, $member);
+
+        if (!$accessCheck['can_view']) {
+            // Redirect to subscription page or show paywall
+            //return $this->showPaywall($page, $accessCheck['reason']);
+        }
+
         // Get site-specific menu
         $siteId = SiteContext::getId();
 
@@ -57,9 +70,6 @@ class ContentController extends Controller
             'blocks', 'categories', 'tags', 'metadata',
             'seo', 'settings', 'social', 'customFields', 'authors', 'products'
         ]);
-
-        $member = MemberAuth::getMember();
-        $memberId = $member ? $member->id : null;
 
         $modalData = $this->modalService->getModalData($member, $siteId);
 
@@ -127,7 +137,7 @@ class ContentController extends Controller
             $viewPath = "estate/page";
         }
 
-        $html = $this->pageRenderService->renderPage($page);
+        $html = $this->pageRenderService->renderPage($page, $siteId);
         $data['html'] = $html;
 
         return $this->view($viewPath, $data);
@@ -138,6 +148,26 @@ class ContentController extends Controller
 
         return $this->view('estate/sites', [
             'sites' => $sites
+        ]);
+    }
+
+    private function showPaywall(Page $page, string $reason): Response
+    {
+        $siteId = SiteContext::getId();
+        $member = MemberAuth::getMember();
+
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', $siteId)
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
+        return $this->view('estate/paywall', [
+            'page' => $page,
+            'reason' => $reason,
+            'menu' => $menu,
+            'member' => $member,
+            'menuRenderer' => new MenuRenderer()
         ]);
     }
 }

@@ -53,17 +53,17 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         // Mock block parser service - only blocks 3 and 4 should be rendered
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block3->page_id, Mockery::any(), $block3->order)
+            ->with($block3->page_id, Mockery::any(), $block3->order, false, $this->siteId)
             ->once()
             ->andReturn('<div>Block 3 content</div>');
 
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block4->page_id, Mockery::any(), $block4->order)
+            ->with($block4->page_id, Mockery::any(), $block4->order, false, $this->siteId)
             ->once()
             ->andReturn('<div>Block 4 content</div>');
 
         // Act
-        $html = $this->pageRenderService->renderPage($page);
+        $html = $this->pageRenderService->renderPage($page, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Zone content with blocks 1 and 2', $html['main']);
@@ -112,28 +112,28 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         // Expect main content blocks to be rendered
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($mainBlock1->page_id, Mockery::any(), $mainBlock1->order)
+            ->with($mainBlock1->page_id, Mockery::any(), $mainBlock1->order, false, $this->siteId)
             ->once()
             ->andReturn('<div class="main-block">Main Block 1</div>');
 
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($mainBlock2->page_id, Mockery::any(), $mainBlock2->order)
+            ->with($mainBlock2->page_id, Mockery::any(), $mainBlock2->order, false, $this->siteId)
             ->once()
             ->andReturn('<div class="main-block">Sidebar Block 1</div>');
 
         // Expect sidebar blocks to be rendered
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($sidebarBlock1->page_id, Mockery::any(), $sidebarBlock1->order)
+            ->with($sidebarBlock1->page_id, Mockery::any(), $sidebarBlock1->order, false, $this->siteId)
             ->once()
             ->andReturn('<div class="sidebar-block">Main Block 2</div>');
 
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($sidebarBlock2->page_id, Mockery::any(), $sidebarBlock2->order)
+            ->with($sidebarBlock2->page_id, Mockery::any(), $sidebarBlock2->order, false, $this->siteId)
             ->once()
             ->andReturn('<div class="sidebar-block">Sidebar Block 2</div>');
 
         // Act
-        $result = $this->pageRenderService->renderPage($page);
+        $result = $this->pageRenderService->renderPage($page, $this->siteId);
 
         // Assert - check structure includes both main and sidebar content
         $this->assertStringContainsString('Main Block 1', $result['main']);
@@ -162,24 +162,24 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         // Block 1 succeeds
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block1->page_id, Mockery::any(), $block1->order)
+            ->with($block1->page_id, Mockery::any(), $block1->order, false, $this->siteId)
             ->once()
             ->andReturn('<div>Block 1</div>');
 
         // Block 2 throws exception
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block2->page_id, Mockery::any(), $block2->order)
+            ->with($block2->page_id, Mockery::any(), $block2->order, false, $this->siteId)
             ->once()
             ->andThrow(new \Exception('Block 2 error'));
 
         // Block 3 succeeds
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block3->page_id, Mockery::any(), $block3->order)
+            ->with($block3->page_id, Mockery::any(), $block3->order, false, $this->siteId)
             ->once()
             ->andReturn('<div>Block 3</div>');
 
         // Act
-        $html = $this->pageRenderService->renderPage($page);
+        $html = $this->pageRenderService->renderPage($page, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Block 1', $html['main']);
@@ -206,22 +206,22 @@ class PageRenderServiceTest extends FunctionalTestCase
             ->andReturn(collect([$block1, $block2, $block3]));
 
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block1->page_id, Mockery::any(), 1)
+            ->with($block1->page_id, Mockery::any(), 1, false, $this->siteId)
             ->once()
             ->andReturn('<!-- Block 1 -->');
 
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block2->page_id, Mockery::any(), 2)
+            ->with($block2->page_id, Mockery::any(), 2, false, $this->siteId)
             ->once()
             ->andReturn('<!-- Block 2 -->');
 
         $this->blockParserService->shouldReceive('buildBlock')
-            ->with($block3->page_id, Mockery::any(), 3)
+            ->with($block3->page_id, Mockery::any(), 3, false, $this->siteId)
             ->once()
             ->andReturn('<!-- Block 3 -->');
 
         // Act
-        $html = $this->pageRenderService->renderPage($page);
+        $html = $this->pageRenderService->renderPage($page, $this->siteId);
 
         // Assert - check blocks appear in order
         $pos1 = strpos($html['main'], 'Block 1');

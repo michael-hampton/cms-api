@@ -92,5 +92,9 @@
 
 @include('components/modals')
 
+<?php if (isset($subscriptionModalData)): ?>
+    @include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])
+<?php endif; ?>
+
 </body>
 </html>

@@ -40,7 +40,6 @@ use App\Controllers\SubscriptionModalController;
 use App\Controllers\TagViewController;
 use App\Controllers\WebPageController;
 use App\Controllers\WishlistController;
-use App\Framework\Middleware\CheckPageMemberAccess;
 use App\Framework\Middleware\RequireMemberAuth;
 
 /*
@@ -95,7 +94,7 @@ $router->get('/{site}/reviews', [ReviewPageController::class, 'index']);
 $router->get('/{site}/buying-guides', [BuyingGuideController::class, 'index']);
 
 $router->get('/{site}/authors/{slug}', AuthorViewController::class, 'show');
-$router->get('/{siteName}/tags/{slug}', TagViewController::class, 'show');
+$router->get('/{siteName}/tags/{slug}', [TagViewController::class, 'show']);
 
 $router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);
 $router->get('/{site}/member/liked-pages', [MemberLikedPagesController::class, 'index']);
@@ -289,5 +288,5 @@ $router->post('/api/{site}/subscriptions/onetime/confirm-payment', [OneTimeSubsc
 //    ->middleware([CheckPageMemberAccess::class]);
 
 $router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
-    ->middleware([CheckPageMemberAccess::class])
+    //->middleware([CheckPageMemberAccess::class])
     ->where('regionSlug', 'asia-pacific|europe|americas');

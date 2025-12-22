@@ -1,7 +1,7 @@
 <?php
 // seeders/CampaignSeeder.php
 
-namespace App\Seeders;
+namespace App\Database\Seeders;
 
 use App\Framework\Database\Database;
 use App\Models\Newsletter;
@@ -44,7 +44,7 @@ class CampaignSeeder
                 'description' => 'Welcome new subscribers to our newsletter',
                 'newsletter_id' => $newsletter->id,
                 'is_active' => true,
-                'gates_premium_content' => false,
+                'gates_premium_content' => 0,
                 'start_date' => null,
                 'end_date' => null,
                 'tracking_params' => json_encode([
@@ -62,7 +62,7 @@ class CampaignSeeder
                 'description' => 'Subscribe to unlock premium content',
                 'newsletter_id' => $newsletter->id,
                 'is_active' => true,
-                'gates_premium_content' => true,
+                'gates_premium_content' => 1,
                 'start_date' => null,
                 'end_date' => null,
                 'tracking_params' => json_encode([
@@ -80,7 +80,7 @@ class CampaignSeeder
                 'description' => 'Newsletter signup from social media promotion',
                 'newsletter_id' => $newsletter->id,
                 'is_active' => true,
-                'gates_premium_content' => false,
+                'gates_premium_content' => 0,
                 'start_date' => date('Y-m-d H:i:s'),
                 'end_date' => date('Y-m-d H:i:s', strtotime('+30 days')),
                 'tracking_params' => json_encode([

@@ -85,8 +85,14 @@ abstract class Model
         $class = static::class;
 
         if (!isset($booted[$class])) {
+            $booted[$class] = true; // Set this IMMEDIATELY to prevent recursion
+
             static::bootTraits();
-            $booted[$class] = true;
+
+            // This connects your Subscription.php boot() method
+            if (method_exists($class, 'boot')) {
+                static::boot();
+            }
         }
 
         $this->database = $database ?? Database::getInstance();
@@ -1360,6 +1366,11 @@ abstract class Model
                 $booted[] = $method;
             }
         }
+    }
+
+    protected static function boot()
+    {
+        // Empty base method so child classes can safely call parent::boot()
     }
 
 }

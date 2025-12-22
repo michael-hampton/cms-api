@@ -20,7 +20,7 @@ class PageRenderService
      * Renders a page with proper separation of main content and sidebar blocks
      * Returns an array with 'main' and 'sidebar' HTML
      */
-    public function renderPage(Page $page): array
+    public function renderPage(Page $page, ?int $siteId = null): array
     {
         $mainHtml = '';
         $sidebarHtml = '';
@@ -43,7 +43,9 @@ class PageRenderService
                 $blockHtml = $this->blockParserService->buildBlock(
                     $block->page_id,
                     array_merge($block->data, ['type' => $block->type]),
-                    $block->order
+                    $block->order,
+                    false,
+                    $siteId
                 );
 
                 // Determine if this block should go in sidebar or main content

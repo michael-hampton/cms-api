@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Models;
 use App\Models\Member;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\SubscriptionWindow;
 use App\Models\Voucher;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -730,5 +731,114 @@ class SubscriptionModelTest extends FunctionalTestCase
 
         $this->assertNull($subscription->download_url);
         $this->assertNull($subscription->download_expires_at);
+    }
+
+    public function testPaidSubscriptionCreatesWindowOnCreation()
+    {
+        $member = $this->createMember();
+
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        // Window should be auto-created
+        $window = SubscriptionWindow::where('subscription_id', $subscription->id)->first();
+
+        $this->assertNotNull($window);
+        $this->assertEquals($member->id, $window->member_id);
+        $this->assertEquals('paid', $window->type);
+    }
+
+    public function testTrialSubscriptionDoesNotCreateWindow()
+    {
+        $member = $this->createMember();
+
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Trial',
+            'status' => 'active',
+            'type' => 'trial',
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'price' => 0,
+            'currency' => 'USD'
+        ]);
+
+        // No window should be created for trials
+        $window = SubscriptionWindow::where('subscription_id', $subscription->id)->first();
+
+        $this->assertNull($window);
+    }
+
+    public function testCloseWindowSetsEndDateToNow()
+    {
+        $member = $this->createMember();
+
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $originalWindow = SubscriptionWindow::where('subscription_id', $subscription->id)->first();
+        $originalEndDate = $originalWindow->window_end;
+
+        // Close the window
+        $subscription->closeWindow();
+
+        $updatedWindow = SubscriptionWindow::where('subscription_id', $subscription->id)->first();
+
+        $this->assertNotEquals($originalEndDate, $updatedWindow->window_end);
+        $this->assertEqualsWithDelta(
+            time(),
+            $updatedWindow->window_end->getTimestamp(),
+            5 // Within 5 seconds
+        );
+    }
+
+    public function testUpdateWindowChangesEndDate()
+    {
+        $member = $this->createMember();
+
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $window = SubscriptionWindow::where('subscription_id', $subscription->id)->first();
+        $originalEnd = $window->window_end;
+
+        // Update subscription end date
+        $newEndDate = date('Y-m-d H:i:s', strtotime('+2 months'));
+        $subscription->end_date = $newEndDate;
+        $subscription->save();
+
+        $window = $window->fresh();
+
+        $this->assertNotEquals($originalEnd, $window->window_end);
+
+        $this->assertEquals($newEndDate, $window->window_end->format('Y-m-d H:i:s'));
     }
 }

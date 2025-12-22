@@ -55,6 +55,10 @@ class SubscriptionCancellationService
                 }
             }
 
+            if ($subscription->type === 'paid') {
+                $subscription->closeWindow();
+            }
+
             // Update local subscription
             $updateData = [
                 'status' => 'cancelled',

@@ -388,16 +388,32 @@ if (!function_exists('class_uses_recursive')) {
         }
 
         $results = [];
+        $seen = [];
 
-        foreach (array_reverse(class_parents($class)) + [$class => $class] as $class) {
-            $results += trait_uses($class);
-        }
+        // Get all parent classes and the class itself
+        $classes = array_reverse(class_parents($class)) + [$class => $class];
 
-        foreach ($results as $trait) {
-            $results += trait_uses($trait);
+        foreach ($classes as $class) {
+            $results += trait_uses_recursive($class, $seen);
         }
 
         return array_unique($results);
+    }
+
+    function trait_uses_recursive($trait, &$seen): array
+    {
+        if (isset($seen[$trait])) {
+            return [];
+        }
+
+        $seen[$trait] = true;
+        $traits = class_uses($trait) ?: [];
+
+        foreach ($traits as $traitName) {
+            $traits += trait_uses_recursive($traitName, $seen);
+        }
+
+        return $traits;
     }
 
     if (!function_exists('mail_manager')) {

@@ -4,7 +4,6 @@ namespace App\Framework\Http;
 
 use App\Framework\Container;
 use App\Models\Page;
-use App\Services\Url\CheckPageMemberAccess;
 use App\Services\Url\UrlResolutionResult;
 use ReflectionMethod;
 use ReflectionParameter;
@@ -31,10 +30,10 @@ class ControllerDispatcher
             throw new \BadMethodCallException("Method [{$method}] does not exist on controller [{$controllerClass}]");
         }
 
-        if ((new CheckPageMemberAccess())->handle($request, $page)) {
-            $message = $page->non_member_message ?? 'This content requires a member login.';
-            return new Response(accessDenied($message), 403);
-        }
+//        if ((new CheckPageMemberAccess())->handle($request, $page)) {
+//            $message = $page->non_member_message ?? 'This content requires a member login.';
+//            return new Response(accessDenied($message), 403);
+//        }
 
         if ($page->custom_handler) {
             return $this->call($controller, $method);

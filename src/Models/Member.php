@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 
 class Member extends Model
@@ -159,7 +160,38 @@ class Member extends Model
         return $this->hasOne(Subscription::class, 'member_id', 'id', $relation)
             ->where('status', 'active')
             ->where('site_id', $siteId)
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>', date('Y-m-d H:i:s'));
+            })
+            ->orderBy('created_at', 'desc') // Most recent first
             ->first();
+    }
+
+    public function hasActiveSubscriptionOfType(string $type, ?int $siteId = null): bool
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        return Subscription::where('member_id', $this->id)
+            ->where('site_id', $siteId)
+            ->where('status', 'active')
+            ->where('type', $type)
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>', date('Y-m-d H:i:s'));
+            })
+            ->exists();
+    }
+
+    public function getSubscriptionWindows(?int $siteId = null): Collection
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        return SubscriptionWindow::where('member_id', $this->id)
+            ->where('site_id', $siteId)
+            ->where('type', 'paid') // Only paid subscriptions create retention windows
+            ->orderBy('window_start', 'desc')
+            ->get();
     }
 
     public function comments($relation = false)

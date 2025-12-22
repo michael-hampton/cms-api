@@ -48,4 +48,16 @@ class PageMetadata extends Model
         }
         return strtotime($this->expiry_date) < time();
     }
+
+    public function getAccessLevel(): string
+    {
+        // Map old visibility to new access levels
+        if ($this->visibility === 'public') {
+            return 'free';
+        } elseif ($this->visibility === 'private') {
+            return 'member'; // or 'premium' based on your logic
+        }
+
+        return $this->visibility ?? 'free';
+    }
 }

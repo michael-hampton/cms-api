@@ -206,9 +206,14 @@ class BlockParserService
         return $product->id;
     }
 
-    public function buildBlock(int $pageId, array $blockData, int $order, bool $isPreviewMode = false): string
+    public function buildBlock(
+        int   $pageId,
+        array $blockData,
+        int   $order,
+        bool  $isPreviewMode = false,
+        ?int  $siteId = null
+    ): string
     {
-
         $this->validateBlockType($blockData);
 
         $type = $blockData['type'];
@@ -230,7 +235,7 @@ class BlockParserService
 
         $parsedData = $parser->parse($blockData);
 
-        return $parser->generateHtml($parsedData, $pageId);
+        return $parser->generateHtml($parsedData, $pageId, $siteId);
     }
 
     public function updateBlock(int $blockId, array $blockData): Block

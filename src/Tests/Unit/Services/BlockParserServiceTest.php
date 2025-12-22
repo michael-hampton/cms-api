@@ -296,7 +296,7 @@ class BlockParserServiceTest extends FunctionalTestCase
         $parser->shouldReceive('getValidationRules')->andReturn([]);
         $parser->shouldReceive('parse')->andReturn(['content' => 'Hello World']);
         $parser->shouldReceive('generateHtml')
-            ->with(['content' => 'Hello World'], 1)
+            ->with(['content' => 'Hello World'], 1, $this->siteId)
             ->andReturn('<p>Hello World</p>');
 
         $this->blockRegistry->shouldReceive('getParser')
@@ -309,7 +309,7 @@ class BlockParserServiceTest extends FunctionalTestCase
         $this->validator->shouldReceive('validate')
             ->andReturn($validationResult);
 
-        $result = $this->service->buildBlock(1, $blockData, 0);
+        $result = $this->service->buildBlock(1, $blockData, 0, false, $this->siteId);
 
         $this->assertEquals('<p>Hello World</p>', $result);
     }
