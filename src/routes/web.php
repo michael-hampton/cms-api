@@ -31,7 +31,9 @@ use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\NewsletterController;
 use App\Controllers\NewsletterWebController;
 use App\Controllers\OneTimeSubscriptionsController;
+use App\Controllers\PageController;
 use App\Controllers\PageLikeController;
+use App\Controllers\PaymentController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
@@ -108,6 +110,9 @@ $router->get('/{siteName}/member/register', [MemberAuthController::class, 'showR
 $router->get('/{siteName}/member/login', [MemberAuthController::class, 'showLoginForm']);
 $router->post('/member/logout', [MemberAuthController::class, 'logout']);
 
+$router->get('/api/{siteName}/pages/search', [PageController::class, 'searchPages']);
+
+
 // Email verification routes
 $router->get('/member/verify-email-sent', [MemberAuthController::class, 'showVerifyEmailSent']);
 $router->get('/verify-email', [MemberAuthController::class, 'verifyEmail']);
@@ -129,6 +134,9 @@ $router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::clas
         ->name('member.reset-password.update');
 
     $router->post('/member/login', [MemberAuthController::class, 'login'])
+        ->name('member.login.submit');
+
+    $router->post('/{siteName}/member/login', [MemberAuthController::class, 'login'])
         ->name('member.login.submit');
 
     $router->post('/member/register', [MemberAuthController::class, 'register'])
@@ -281,6 +289,7 @@ $router->get('/subscriptions/onetime/{id}', [OneTimeSubscriptionsController::cla
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/subscriptions/onetime/checkout', [OneTimeSubscriptionsController::class, 'checkout']);
 $router->post('/api/{site}/subscriptions/onetime/confirm-payment', [OneTimeSubscriptionsController::class, 'confirmPayment']);
+$router->post('/api/{site}/checkout/confirm-payment', [PaymentController::class, 'confirmPayment']);
 
 
 // Apply page member access check to content routes

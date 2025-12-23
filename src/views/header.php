@@ -186,16 +186,8 @@ $siteSlug = $site ? $site->slug : 'default';
         </div>
     </div>
 
-    <!-- Search Overlay (existing code) -->
-    <div class="search-overlay" id="searchOverlay">
-        <div class="search-container">
-            <button class="search-close" onclick="toggleSearch()">×</button>
-            <form class="search-form" action="/search" method="GET">
-                <input type="search" name="q" placeholder="Search..." class="search-input" autofocus>
-                <button type="submit" class="search-submit">Search</button>
-            </form>
-        </div>
-    </div>
+    <!-- Enhanced Search Overlay -->
+    @include('components/search-overlay')
 </header>
 
 <script>

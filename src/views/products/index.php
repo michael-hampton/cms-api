@@ -11,7 +11,7 @@
     <!-- Header -->
     @include('header', ['menu' => $menu, 'menuRenderer' => $menuRenderer, 'title' => 'Shop'])]
 
-    @include('member-badge')
+    @include('components/member-badge')
 
     <!-- Main Content -->
     <main class="main-content">

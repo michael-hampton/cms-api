@@ -56,9 +56,9 @@ class OneTimeSubscriptionsController extends Controller
 
         $result = $this->stripeProcessor->handleOneTimeSubscriptionPayment(
             $paymentIntentId,
-            $subscriptionId,
             $orderId,
-            $siteId
+            $siteId,
+            $subscriptionId
         );
 
         if ($result['success']) {

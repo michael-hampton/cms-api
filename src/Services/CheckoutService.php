@@ -121,6 +121,7 @@ class CheckoutService
     private function calculateTotals(array $cartItems, array $data): array
     {
         $subtotal = $this->cartService->getTotal();
+
         $shipping = $this->shippingService->calculateShipping($subtotal, $data);
 
         $discount = 0;

@@ -79,4 +79,20 @@ class AuthorRepository extends Repository
     {
         return Author::where('id', '!=', $excludeId)->get();
     }
+
+    public function getBySiteId(int $siteId): array
+    {
+        $categories = Author::where('site_id', $siteId)
+            ->withCount('pages', function ($query) use ($siteId) {
+                $query->where('status', 'published')->where('site_id', $siteId);
+            })
+            ->orderBy('name', 'asc')
+            ->get();
+
+
+        return $categories->filter(function ($category) {
+            return $category->pages_count > 0;
+        })->toArray();
+
+    }
 }

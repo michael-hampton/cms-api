@@ -8,13 +8,18 @@ use App\Actions\BulkUpdatePage;
 use App\Actions\BulkUpdatePageStatus;
 use App\Actions\ClonePage;
 use App\Actions\ClonePageToSite;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Parsers\BlockRegistry;
+use App\Repositories\AuthorRepository;
+use App\Repositories\CategoryRepository;
 use App\Repositories\PageRepository;
+use App\Repositories\TagRepository;
 use App\Resources\PageResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\PageService;
@@ -22,14 +27,15 @@ use Exception;
 
 class PageController extends Controller
 {
-    private $pageService;
-    private $blockRegistry;
-
-    public function __construct(PageService $pageService, BlockRegistry $blockRegistry, private PageRepository $pageRepository)
+    public function __construct(
+        private readonly PageService        $pageService,
+        private readonly BlockRegistry      $blockRegistry,
+        private readonly PageRepository     $pageRepository,
+        private readonly CategoryRepository $categoryRepository,
+        private readonly TagRepository      $tagRepository,
+        private readonly AuthorRepository   $authorRepository,
+    )
     {
-        $this->pageService = $pageService;
-        $this->blockRegistry = $blockRegistry;
-
         parent::__construct();
     }
 
@@ -177,13 +183,104 @@ class PageController extends Controller
     {
         try {
             $query = $request->get('q', '');
+            $pageType = $request->get('page_type', '');
             $category = $request->get('category', '');
             $tag = $request->get('tag', '');
             $status = $request->get('status', 'published');
+            $limit = $request->get('limit', 50);
+            $offset = $request->get('offset', 0);
+            $siteId = $request->get('site_id') ?? SiteContext::getId();
 
-            $pages = $this->pageService->searchPages($query, $category, $tag, $status);
+            $criteria = SearchCriteriaParser::fromRequest($request, $request->get('site_name'));
 
-            return $this->jsonResponse(['pages' => $pages]);
+            // Add search query
+            if (!empty($query)) {
+                $criteria->setSearchQuery($query);
+            }
+
+            // Add filters
+            if (!empty($pageType)) {
+                $criteria->addFilter('page_type', $pageType);
+            }
+            if (!empty($category)) {
+                $criteria->addFilter('category_id', $category);
+            }
+            if (!empty($tag)) {
+                $criteria->addFilter('tag_id', $tag);
+            }
+            $criteria->addFilter('status', $status);
+
+            // Set pagination
+            $criteria->setPerPage($limit);
+            $criteria->setPage(floor($offset / $limit) + 1);
+
+            $result = $this->pageRepository->search($criteria);
+
+            // Get current member for access control
+            $accessService = Container::getInstance()->make(\App\Services\ArticleAccessService::class);
+
+            // Enrich pages with access information
+            $enrichedPages = $accessService->enrichPagesWithAccessInfo(
+                $result->getData(),
+                MemberAuth::getMember(),
+                $siteId
+            );
+
+            // Format results with images and time ago
+            $formattedData = array_map(function ($page) {
+                // Image resolution logic
+                $imageUrl = '';
+                $cropOverrides = $page['crop_overrides'] ?? null;
+                $resolvedImages = $page['resolved_images'] ?? null;
+                $useAsHero = ($page['listing_use_as_hero'] ?? false);
+
+                if ($useAsHero) {
+                    if (isset($cropOverrides['hero-banner']['imageUrl'])) {
+                        $imageUrl = $cropOverrides['hero-banner']['imageUrl'];
+                    } elseif (isset($resolvedImages['hero-banner']['image_url'])) {
+                        $imageUrl = $resolvedImages['hero-banner']['image_url'];
+                    }
+                } else {
+                    if (isset($cropOverrides['listing-card']['imageUrl'])) {
+                        $imageUrl = $cropOverrides['listing-card']['imageUrl'];
+                    } elseif (isset($resolvedImages['listing-card']['image_url'])) {
+                        $imageUrl = $resolvedImages['listing-card']['image_url'];
+                    }
+                }
+
+                $page['image_url'] = $imageUrl;
+
+                // Calculate time ago
+                $publishedAt = $page['published_at'] ?? null;
+                if ($publishedAt) {
+                    $page['time_ago'] = getTimeAgo($publishedAt);
+                }
+
+                // Access information is already included from enrichPagesWithAccessInfo
+                // It includes: access_level, can_view, denial_reason, access_reason
+
+                return $page;
+            }, $enrichedPages);
+
+            // Get all categories for filters
+            $allCategories = $this->categoryRepository->getBySiteId($siteId);
+            $allAuthors = $this->authorRepository->getBySiteId($siteId);
+            $allTags = $this->tagRepository->getBySiteId($siteId);
+
+            return $this->resourceResponse([
+                'results' => $formattedData,
+                'total' => $result->getTotal(),
+                'query' => $query,
+                'filters' => [
+                    'page_type' => $pageType,
+                    'category' => $category,
+                    'tag' => $tag
+                ],
+                'categories' => array_values($allCategories),
+                'authors' => array_values($allAuthors),
+                'tags' => array_values($allTags),
+                'has_more' => ($offset + $limit) < $result->getTotal()
+            ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

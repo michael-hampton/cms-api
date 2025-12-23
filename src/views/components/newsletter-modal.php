@@ -1,45 +1,3 @@
-<div class="modal-overlay" id="commentModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title">Leave a Comment</h3>
-            <button class="modal-close" onclick="closeCommentModal()">
-                <svg viewBox="0 0 24 24">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-        <div class="modal-body">
-            <div class="form-message" id="commentMessage"></div>
-            <form id="commentForm">
-                <input type="hidden" id="commentPageUrl" name="pageUrl">
-                <input type="hidden" id="commentPageId" name="pageId">
-
-                <div class="comment-form-group">
-                    <label class="comment-label">Name</label>
-                    <input type="text" class="comment-input" id="commentName" required placeholder="Your name">
-                </div>
-
-                <div class="comment-form-group">
-                    <label class="comment-label">Email</label>
-                    <input type="email" class="comment-input" id="commentEmail" required placeholder="your@email.com">
-                </div>
-
-                <div class="comment-form-group">
-                    <label class="comment-label">Comment</label>
-                    <textarea class="comment-textarea" id="commentText" required maxlength="1000"
-                              placeholder="Share your thoughts..."></textarea>
-                    <div class="comment-char-count">
-                        <span id="commentCharCount">0</span> / 1000 characters
-                    </div>
-                </div>
-
-                <button type="submit" class="comment-submit">Post Comment</button>
-            </form>
-        </div>
-    </div>
-</div>
-
 <!-- Newsletter Modal -->
 <div class="modal-overlay" id="newsletterModal">
     <div class="modal-content newsletter-modal-content">
@@ -52,14 +10,30 @@
 
         <!-- Step 1: Main Newsletter Form -->
         <div id="newsletterStep1">
-            <div class="newsletter-logo">
-                <img src="https://via.placeholder.com/150x50/6366f1/ffffff?text=FourFourTwo" alt="Logo">
-            </div>
-
             <div class="modal-header">
-                <h2 class="modal-title newsletter-title">Get the FourFourTwo Newsletter</h2>
-                <p class="newsletter-subtitle">The best features, fun and footballing quizzes, straight to your inbox
-                    every week.</p>
+                <div class="header-main-content">
+                    <div class="newsletter-logo">
+                        <svg width="120" height="40" viewBox="0 0 120 40" fill="none"
+                             xmlns="http://www.w3.org/2000/svg">
+                            <rect width="120" height="40" rx="8" fill="url(#gradient)"></rect>
+                            <text x="60" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+                                  fill="white" text-anchor="middle">
+                                <?= \App\Framework\Support\SiteContext::name() ?>
+                            </text>
+                            <defs>
+                                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1"></stop>
+                                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1"></stop>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <h2 class="modal-title newsletter-title">Get the <?= \App\Framework\Support\SiteContext::name() ?>
+                        Newsletter</h2>
+                </div>
+
+                <p class="newsletter-subtitle">The best features, updates, and exclusive content, straight to your
+                    inbox.</p>
             </div>
 
             <div class="modal-body">

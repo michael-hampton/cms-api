@@ -238,21 +238,4 @@ class CartController extends Controller
             'total' => $this->cartService->getTotal(),
         ]));
     }
-
-    public function confirmCheckoutPayment(Request $request)
-    {
-        $paymentIntentId = $request->input('payment_intent_id');
-        $orderId = $request->input('order_id');
-
-        if (!$paymentIntentId || !$orderId) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Missing required parameters'
-            ], 400);
-        }
-
-        $result = $this->checkoutService->confirmRegularCheckoutPayment($paymentIntentId, $orderId);
-
-        return $this->jsonResponse($result, $result['success'] ? 200 : 400);
-    }
 }

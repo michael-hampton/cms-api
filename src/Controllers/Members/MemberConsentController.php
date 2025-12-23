@@ -261,8 +261,9 @@ class MemberConsentController extends Controller
 
         $member = MemberAuth::getMember();
         $consentsToGrant = $request->input('consents', []);
+        $siteSlug = SiteContext::slug();
 
-        Session::put('consent_banner_shown', true);
+        Session::put('consent_banner_shown_' . $siteSlug, true);
 
         try {
             $results = [];

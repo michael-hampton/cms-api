@@ -258,7 +258,7 @@ class Subscription extends Model
 
         if (!$window) {
             // Create if doesn't exist
-            $this->createInitialWindow();
+            $this->createWindow();
             return;
         }
 

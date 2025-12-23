@@ -865,7 +865,7 @@
         <div class="container">
             <div style="display: flex; justify-content: space-between;">
                 @include('components/price-alert')
-                @include('member-badge')
+                @include('components/member-badge')
             </div>
 
             <!-- Breadcrumb -->

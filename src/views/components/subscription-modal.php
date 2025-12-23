@@ -1141,6 +1141,51 @@ $isLoggedIn = !empty($member);
     .sub-voucher-remove:hover {
         background: rgba(40, 167, 69, 0.1);
     }
+
+    /* Single Plan Layout Improvements */
+    .sub-plans:has(.sub-plan:only-child) {
+        display: flex;
+        justify-content: center;
+    }
+
+    .sub-plans:has(.sub-plan:only-child) .sub-plan {
+        max-width: 500px;
+        width: 100%;
+    }
+
+    .sub-plan:only-child {
+        transform: scale(1) !important;
+    }
+
+    .sub-plan:only-child .sub-plan-badge {
+        background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .sub-plan:only-child:hover {
+        transform: scale(1.02) !important;
+    }
+
+    /* Center single plan content */
+    .sub-plans:has(.sub-plan:only-child) {
+        padding: 2rem 0;
+    }
+
+    .sub-plan:only-child .sub-plan-header,
+    .sub-plan:only-child .sub-plan-price,
+    .sub-plan:only-child .sub-plan-features {
+        text-align: center;
+    }
+
+    .sub-plan:only-child .sub-plan-features {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .sub-plan:only-child .sub-plan-features li {
+        text-align: left;
+        max-width: 80%;
+    }
 </style>
 
 <script src="https://js.stripe.com/v3/"></script>
@@ -1151,6 +1196,7 @@ $isLoggedIn = !empty($member);
     const IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
     const MODAL_STORAGE_KEY = 'subscription_modal_last_shown_' + SITE;
     const MODAL_COOLDOWN_HOURS = 24;
+    forceVerification = false
 
     let stripe = null;
     let cardElement = null;
@@ -1333,7 +1379,7 @@ $isLoggedIn = !empty($member);
                 currentMember = result.member;
 
                 // Check if email verification is required
-                if (result.requires_verification) {
+                if (forceVerification && result.requires_verification) {
                     hideLoading();
                     showVerificationNotice(data.email);
                 } else {
@@ -1389,8 +1435,10 @@ $isLoggedIn = !empty($member);
 
         showLoading();
 
+        alert('here')
+
         try {
-            const response = await fetch('/member/login', {
+            const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug()?>/member/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)

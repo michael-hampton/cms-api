@@ -90,7 +90,8 @@
     <?php endif; ?>
 </div>
 
-@include('components/modals')
+@include('components/newsletter-modal')
+@include('components/comment-modal')
 
 <?php if (isset($subscriptionModalData)): ?>
     @include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])

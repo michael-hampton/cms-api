@@ -178,6 +178,7 @@ class MemberAuthController extends Controller
         $credentials = $request->validated();
 
         if (MemberAuth::attempt($credentials)) {
+
             $intendedUrl = $request->session()->get('intended_url', '/member/dashboard');
             $request->session()->forget('intended_url');
 

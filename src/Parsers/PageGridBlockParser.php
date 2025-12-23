@@ -754,11 +754,12 @@ class PageGridBlockParser extends BaseBlockParser
         // Check if page is private
         $isPrivate = $this->isPagePrivate($page['slug']) || $page['is_private'] ?? false;
         $isLoggedIn = MemberAuth::check();
-        $inWishlist = $isLoggedIn && Wishlist::where('product_id', $productData['id'])->where('site_id', SiteContext::getId())->exists();
+
+        $inWishlist = $isLoggedIn && !empty($productData) && Wishlist::where('product_id', $productData['id'])->where('site_id', SiteContext::getId())->exists();
         $wishlistClass = $inWishlist ? 'active' : '';
 
         // Use real product data if available
-        $price = $productData ? $productData['price'] : ($page['price'] ?? '');
+        $price = $productData ? $productData['price'] : (float)($page['price'] ?? 0);
         $salePrice = $productData ? $productData['sale_price'] : null;
         $discountPercentage = $productData ? $productData['discount_percentage'] : 0;
         $category = $productData && $productData['category'] ? $productData['category'] : null;
@@ -877,11 +878,13 @@ class PageGridBlockParser extends BaseBlockParser
                     $site = SiteContext::get();
                     $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
 
-                    $html .= "<a class=\"btn-wishlist {$wishlistClass}\" data-product-id=\"" . $productData['id'] . "\">";
-                    $html .= '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-heart" width="20" height="20">
+                    if (!empty($productData)) {
+                        $html .= "<a class=\"btn-wishlist {$wishlistClass}\" data-product-id=\"" . $productData['id'] . "\">";
+                        $html .= '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-heart" width="20" height="20">
                                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                                 </svg>';
-                    $html .= "</a>";
+                        $html .= "</a>";
+                    }
 
                     $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn-add-to-cart\">";
                     $html .= htmlspecialchars($action['text']);

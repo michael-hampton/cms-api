@@ -424,6 +424,46 @@ if (!function_exists('class_uses_recursive')) {
     }
 }
 
+if (!function_exists('getTimeAgo')) {
+    function getTimeAgo($datetime): string
+    {
+        if (is_string($datetime)) {
+            $timestamp = strtotime($datetime);
+        } elseif ($datetime instanceof \DateTime || $datetime instanceof \DateTimeImmutable) {
+            $timestamp = $datetime->getTimestamp();
+        } else {
+            return '';
+        }
+
+        $diff = time() - $timestamp;
+
+        if ($diff < 60) return 'just now';
+        if ($diff < 3600) {
+            $mins = floor($diff / 60);
+            return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
+        }
+        if ($diff < 86400) {
+            $hours = floor($diff / 3600);
+            return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+        }
+        if ($diff < 604800) {
+            $days = floor($diff / 86400);
+            return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+        }
+        if ($diff < 2419200) {
+            $weeks = floor($diff / 604800);
+            return $weeks . ' week' . ($weeks > 1 ? 's' : '') . ' ago';
+        }
+        if ($diff < 29030400) {
+            $months = floor($diff / 2419200);
+            return $months . ' month' . ($months > 1 ? 's' : '') . ' ago';
+        }
+
+        $years = floor($diff / 29030400);
+        return $years . ' year' . ($years > 1 ? 's' : '') . ' ago';
+    }
+}
+
 
 /**
  * Human readable difference between two dates.

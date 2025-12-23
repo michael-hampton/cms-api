@@ -9,7 +9,7 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
 
     // Check if member has responded to consent banner
     $session = new \App\Framework\Session\Session();
-    $hasResponded = $session->get('consent_banner_shown', false);
+    $hasResponded = $session->get('consent_banner_shown_' . \App\Framework\Support\SiteContext::slug(), false);
 
     // Or check in database if they have any consent records
     if (!$hasResponded) {

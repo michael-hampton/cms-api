@@ -14,17 +14,17 @@ $pageGridAdded = false;
 
                 <!-- Page Header -->
                 <div class="page-header">
-                    @include('page-title')
+                    @include('components/page-title')
 
                     @if($page->page_type !== 'landing-page')
 
                     <!-- Categories -->
-                    @include('categories', ['page' => $page])
+                    @include('components/category-pills', ['page' => $page])
 
                     <!-- Tags -->
                     @include('tags')
 
-                    @include('page-actions')
+                    @include('components/page-actions')
                     @endif
                 </div>
 
@@ -40,15 +40,15 @@ $pageGridAdded = false;
                             @include('categories-widget', ['page' => $page])
                         <?php endif; ?>
 
-                        @include('product-section')
+                        @include('components/product-section')
 
                         <!-- Blog Comments Section -->
                         @if($page->page_type !== 'landing-page')
-                        @include('comments')
+                        @include('components/comments')
                         @endif
 
                         <!-- Social Media Links -->
-                        @include('links')
+                        @include('components/links')
                     </div>
 
                     <!-- Sidebar -->
@@ -101,5 +101,6 @@ $pageGridAdded = false;
 <?php endif; ?>
 
 @include('components/newsletter-account-creation-modal')
-@include('components/modals')
+@include('components/newsletter-modal')
+@include('components/comment-modal')
 

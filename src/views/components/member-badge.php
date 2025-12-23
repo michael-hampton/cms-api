@@ -159,6 +159,8 @@
     }
 </style>
 
+@include('components/subscription-button')
+
 <?php if (!\App\Framework\Authorization\MemberAuth::check()): ?>
     <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/dashboard" class="account-cta-button">
 

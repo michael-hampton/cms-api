@@ -1109,9 +1109,9 @@ class StripePaymentProcessor
 
     public function handleOneTimeSubscriptionPayment(
         string $paymentIntentId,
-        int    $subscriptionId,
         int    $orderId,
-        int    $siteId
+        int  $siteId,
+        ?int $subscriptionId = null,
     ): array
     {
         try {

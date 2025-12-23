@@ -17,6 +17,7 @@ class PageSearchConfiguration extends SearchConfiguration implements SearchConfi
     {
         // Filters
         $this->addFilter(new InFilter('status', 'status'))
+            ->addFilter(new InFilter('page_type', 'page_type')) // Fixed: was 'template' -> 'page_type'
             ->addFilter(new RelationshipExistsFilter('content_type', 'metadata', 'content_type'))
             ->addFilter(new RelationshipFilter('region_set_id', 'regionSets', 'id'))
             ->addFilter(new RelationshipFilter('territory_id', 'territories', 'id'))
@@ -24,8 +25,10 @@ class PageSearchConfiguration extends SearchConfiguration implements SearchConfi
             ->addFilter(new RelationshipFilter('author', 'pageAuthors', 'author_id'))
             ->addFilter(new RelationshipExistsFilter('featured', 'metadata', 'featured'))
             ->addFilter(new RelationshipExistsFilter('visibility', 'metadata', 'visibility'))
-            ->addFilter(new RelationshipFilter('category', 'categories', 'id'))
-            ->addFilter(new RelationshipFilter('tag', 'tags', 'id'));
+            //->addFilter(new RelationshipFilter('category', 'categories', 'id'))
+            ->addFilter(new RelationshipFilter('category_id', 'categories', 'id')) // Added for consistency
+            ->addFilter(new RelationshipFilter('tag', 'tags', 'id'))
+            ->addFilter(new RelationshipFilter('tag_id', 'tags', 'id')); // Added for consistency
 
         self::applySiteFilter();
 
@@ -37,7 +40,11 @@ class PageSearchConfiguration extends SearchConfiguration implements SearchConfi
 
         // Searchable columns
         $this->addSearchableColumn('title')
-            ->addSearchableColumn('slug');
+            ->addSearchableColumn('subtitle')
+            ->addSearchableColumn('slug')
+            ->addSearchableColumn('meta_description')
+            ->addSearchableColumn('listing_synopsis')
+            ->addSearchableColumn('listing_title');
 
         // Default sort
         $this->setDefaultSort('date_created', 'desc');

@@ -4,11 +4,14 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
+use App\Models\Order;
 use App\Models\Subscription;
 use App\Repositories\PaymentRepository;
 use App\Requests\CreateSubscriptionPaymentRequest;
 use App\Requests\FailPaymentRequest;
 use App\Requests\RefundPaymentRequest;
+use App\Services\Payment\StripePaymentProcessor;
 use App\Services\PaymentService;
 use Exception;
 
@@ -16,7 +19,8 @@ class PaymentController extends Controller
 {
     public function __construct(
         private readonly PaymentService    $paymentService,
-        private readonly PaymentRepository $paymentRepository
+        private readonly PaymentRepository      $paymentRepository,
+        private readonly StripePaymentProcessor $stripePaymentProcessor,
     )
     {
         parent::__construct();
@@ -235,5 +239,35 @@ class PaymentController extends Controller
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
+    }
+
+    public function confirmPayment(Request $request)
+    {
+        $paymentIntentId = $request->input('payment_intent_id');
+        $orderId = $request->input('order_id');
+        $siteId = SiteContext::getId();
+
+        if (!$paymentIntentId || !$orderId) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Missing required parameters'
+            ], 400);
+        }
+
+        $result = $this->stripePaymentProcessor->handleOneTimeSubscriptionPayment(
+            $paymentIntentId,
+            $orderId,
+            $siteId
+        );
+
+        if ($result['success']) {
+            // Update order status
+            Order::where('id', $orderId)->update([
+                'status' => 'completed',
+                'payment_status' => 'paid'
+            ]);
+        }
+
+        return $this->jsonResponse($result, $result['success'] ? 200 : 400);
     }
 }

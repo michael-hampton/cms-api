@@ -1,6 +1,17 @@
 // Testimonial Carousel JavaScript
 let currentTestimonialIndex = 0;
 
+// Search params
+let searchTimeout;
+let currentOffset = 0;
+let currentQuery = '';
+let currentCategory = '';
+let currentAuthor = '';
+let currentTag = '';
+let currentTab = 'explore';
+const searchLimit = 20;
+let searchFirstLoad = true;
+
 function scrollTestimonials(button, direction) {
     const carousel = button.closest('.testimonial-carousel');
     const track = carousel.querySelector('[data-testimonial-track]');
@@ -143,7 +154,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function openNewsletterModal() {
         if (newsletterSignupModal) {
-            alert('yes')
             newsletterSignupModal.style.display = 'block';
             document.body.style.overflow = 'hidden';
 
@@ -437,6 +447,31 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.disabled = false;
             submitBtn.textContent = originalText;
         }
+    });
+
+    // Real-time search as user types
+    document.getElementById('searchInput').addEventListener('input', function (e) {
+        const query = e.target.value.trim();
+        const clearBtn = document.getElementById('searchClearBtn');
+
+        // Show/hide clear button
+        clearBtn.style.display = query ? 'flex' : 'none';
+
+        // Debounce search
+        clearTimeout(searchTimeout);
+
+        if (query.length === 0) {
+            clearSearch();
+            return;
+        }
+
+        if (query.length < 2) return; // Wait for at least 2 characters
+
+        searchTimeout = setTimeout(() => {
+            currentQuery = query;
+            currentOffset = 0;
+            performSearch();
+        }, 300); // 300ms delay
     });
 });
 
@@ -766,3 +801,481 @@ document.addEventListener('keydown', function (e) {
         closeAllDropdowns();
     }
 });
+
+/******************* Search ***************************/
+
+
+function toggleSearch() {
+    const overlay = document.getElementById('searchOverlay');
+    const input = document.getElementById('searchInput');
+
+    if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        // Reset search when closing
+        clearSearch();
+    } else {
+        overlay.classList.add('active');
+        setTimeout(() => input.focus(), 100);
+        performSearch();
+    }
+}
+
+function clearSearch() {
+    const input = document.getElementById('searchInput');
+    input.value = '';
+    currentQuery = '';
+    currentOffset = 0;
+    currentCategory = '';
+    currentAuthor = '';
+    currentTag = '';
+    searchFirstLoad = true
+
+    // Hide clear button
+    document.getElementById('searchClearBtn').style.display = 'none';
+
+    // Show empty state
+    document.getElementById('searchEmptyState').style.display = 'block';
+    document.getElementById('searchResultsHeader').style.display = 'none';
+    document.getElementById('searchLoadMore').style.display = 'none';
+    document.getElementById('searchNoResults').style.display = 'none';
+
+    // Clear results
+    document.getElementById('searchResultsGrid').innerHTML = '';
+    document.getElementById('shopResultsGrid').innerHTML = '';
+
+    // Reset category filter
+    document.querySelectorAll('.category-pill').forEach(pill => {
+        pill.classList.remove('active');
+        if (pill.dataset.category === '') {
+            pill.classList.add('active');
+        }
+    });
+
+    performSearch();
+}
+
+async function performSearch() {
+    const loading = document.getElementById('searchLoading');
+    const emptyState = document.getElementById('searchEmptyState');
+    const resultsHeader = document.getElementById('searchResultsHeader');
+    const noResults = document.getElementById('searchNoResults');
+    const searchResultsContainer = document.getElementById('searchResultsGrid')
+
+    // Show loading
+    loading.style.display = 'block';
+    emptyState.style.display = 'none';
+    resultsHeader.style.display = 'none';
+    noResults.style.display = 'none';
+    searchResultsContainer.style.display = 'none'
+
+    try {
+        const params = new URLSearchParams({
+            q: currentQuery,
+            limit: searchLimit,
+            offset: currentOffset,
+            site_name: SITE
+        });
+
+        if (currentCategory) {
+            params.append('category', currentCategory);
+        }
+
+        if (currentAuthor) {
+            params.append('author', currentAuthor);
+        }
+
+        if (currentTag) {
+            params.append('tag', currentTag);
+        }
+
+        const response = await fetch(`/api/${SITE}/pages/search?${params}`);
+        const data = await response.json();
+
+
+        // Hide loading
+        loading.style.display = 'none';
+
+        if (data.results && data.results.length > 0) {
+            searchResultsContainer.style.display = 'grid'
+            displayResults(data);
+
+            // Show categories if they exist
+            if (data.categories && data.categories.length > 0 && currentOffset === 0 && searchFirstLoad) {
+                displayCategories(data.categories);
+            }
+
+            if (data.authors && data.authors.length > 0 && currentOffset === 0 && searchFirstLoad) {
+                displayAuthors(data.authors);
+            }
+
+            if (data.tags && data.tags.length > 0 && currentOffset === 0 && searchFirstLoad) {
+                displayTags(data.tags);
+            }
+        } else if (currentOffset === 0) {
+            // No results found
+            noResults.style.display = 'block';
+        }
+        searchFirstLoad = false;
+    } catch (error) {
+        console.error('Search error:', error);
+        loading.style.display = 'none';
+        noResults.style.display = 'block';
+    }
+}
+
+function displayCategories(categories) {
+    const container = document.getElementById('searchCategories');
+    container.style.display = 'flex';
+
+    // Keep "All" button and add category pills
+    const allButton = container.querySelector('[data-category=""]');
+    container.innerHTML = '';
+    container.appendChild(allButton);
+
+    categories.forEach(cat => {
+        const pill = document.createElement('button');
+        pill.className = 'category-pill';
+        pill.dataset.category = cat.id;
+        pill.textContent = cat.name;
+        pill.onclick = () => filterByCategory(cat.id);
+        container.appendChild(pill);
+    });
+}
+
+function displayAuthors(authors) {
+    const container = document.getElementById('searchAuthors');
+    if (!container) return;
+
+    container.style.display = 'flex';
+    container.innerHTML = '';
+
+    // Add "All Authors" button
+    const allButton = document.createElement('button');
+    allButton.className = 'filter-pill active';
+    allButton.dataset.author = '';
+    allButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> All Authors';
+    allButton.onclick = () => filterByAuthor('');
+    container.appendChild(allButton);
+
+    authors.forEach(author => {
+        const pill = document.createElement('button');
+        pill.className = 'filter-pill';
+        pill.dataset.author = author.id;
+        pill.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> ${author.name}`;
+        pill.onclick = () => filterByAuthor(author.id);
+        container.appendChild(pill);
+    });
+}
+
+function displayTags(tags) {
+    const container = document.getElementById('searchTags');
+    if (!container) return;
+
+    container.style.display = 'flex';
+    container.innerHTML = '';
+
+    // Add "All Tags" button
+    const allButton = document.createElement('button');
+    allButton.className = 'filter-pill active';
+    allButton.dataset.tag = '';
+    allButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> All Tags';
+    allButton.onclick = () => filterByTag('');
+    container.appendChild(allButton);
+
+    tags.forEach(tag => {
+        const pill = document.createElement('button');
+        pill.className = 'filter-pill';
+        pill.dataset.tag = tag.id;
+        pill.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> ${tag.name}`;
+        pill.onclick = () => filterByTag(tag.id);
+        container.appendChild(pill);
+    });
+}
+
+function filterByCategory(categoryId) {
+    currentCategory = categoryId;
+    currentOffset = 0;
+
+    // Update active state - FIX: Convert both to strings for comparison
+    document.querySelectorAll('.category-pill').forEach(pill => {
+        const pillCategory = pill.dataset.category;
+        // Handle both empty string and actual category IDs
+        if (categoryId === '' && pillCategory === '') {
+            pill.classList.add('active');
+        } else if (String(categoryId) === String(pillCategory)) {
+            pill.classList.add('active');
+        } else {
+            pill.classList.remove('active');
+        }
+    });
+
+    performSearch();
+}
+
+function filterByAuthor(authorId) {
+    currentAuthor = authorId;
+    currentOffset = 0;
+
+    // Update active state
+    document.querySelectorAll('[data-author]').forEach(pill => {
+        pill.classList.remove('active');
+        if (String(authorId) === String(pill.dataset.author)) {
+            pill.classList.add('active');
+        }
+    });
+
+    performSearch();
+}
+
+function filterByTag(tagId) {
+    currentTag = tagId;
+    currentOffset = 0;
+
+    // Update active state
+    document.querySelectorAll('[data-tag]').forEach(pill => {
+        pill.classList.remove('active');
+        if (String(tagId) === String(pill.dataset.tag)) {
+            pill.classList.add('active');
+        }
+    });
+
+    performSearch();
+}
+
+function displayResults(data) {
+    const exploreGrid = document.getElementById('searchResultsGrid');
+    const shopGrid = document.getElementById('shopResultsGrid');
+    const resultsHeader = document.getElementById('searchResultsHeader');
+    const loadMore = document.getElementById('searchLoadMore');
+    const totalResults = document.getElementById('totalResults');
+    const exploreCount = document.getElementById('exploreCount');
+    const shopCount = document.getElementById('shopCount');
+    const noResults = document.getElementById('searchNoResults');
+
+    noResults.style.display = 'none';
+
+    // Show results header
+    resultsHeader.style.display = 'block';
+    totalResults.textContent = data.total;
+
+    // Clear grids if starting fresh
+    if (currentOffset === 0) {
+        exploreGrid.innerHTML = '';
+        shopGrid.innerHTML = '';
+    }
+
+    // Separate results by page type
+    let exploreResults = [];
+    let shopResults = [];
+    data.results.forEach(page => {
+        if (page.page_type === 'deal' || page.page_type === 'product') {
+            shopResults.push(page);
+        } else {
+            exploreResults.push(page);
+        }
+
+        page?.blocks.forEach((block) => {
+            if (block.type === 'deal' || block.type === 'product') {
+                shopResults.push(page);
+            }
+        })
+    });
+
+    // Update counts
+    exploreCount.textContent = exploreResults.length + (currentOffset > 0 ? parseInt(exploreGrid.children.length) : 0);
+    shopCount.textContent = shopResults.length + (currentOffset > 0 ? parseInt(shopGrid.children.length) : 0);
+
+// Render explore results
+    exploreResults.forEach(page => {
+        exploreGrid.appendChild(createResultCard(page));
+    });
+
+// Render shop results
+    shopResults.forEach(page => {
+        shopGrid.appendChild(createResultCard(page, true));
+    });
+
+// Show/hide load more button
+    if (data.has_more) {
+        loadMore.style.display = 'block';
+    } else {
+        loadMore.style.display = 'none';
+    }
+}
+
+function createResultCard(page, isShop = false) {
+    const card = document.createElement('div');
+    const isLocked = !page.can_view;
+    const accessLevel = page.access_level || 'free';
+
+    card.className = 'search-result-card' + (isLocked ? ' search-result-locked' : '');
+
+    // Add click handler for the entire card
+    if (!isLocked) {
+        card.style.cursor = 'pointer';
+        card.onclick = () => window.location.href = `/${SITE}${page.url || '/' + page.slug}`;
+    } else {
+        card.style.cursor = 'pointer';
+        card.onclick = () => showSubscriptionModal(page.denial_reason, page.title);
+    }
+
+    const categoryName = page.categories && page.categories.length > 0
+        ? (page.categories[0].name || '')
+        : '';
+
+    // Build access badge HTML
+    let accessBadgeHTML = '';
+    if (accessLevel !== 'free') {
+        const badgeText = accessLevel === 'premium' ? 'Premium' : 'Members Only';
+        const badgeIcon = accessLevel === 'premium'
+            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>'
+            : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>';
+
+        accessBadgeHTML = `
+            <span class="search-access-badge access-${accessLevel}">
+                ${badgeIcon}
+                ${badgeText}
+            </span>
+        `;
+    }
+
+    // Lock overlay for restricted content
+    const lockOverlayHTML = isLocked ? `
+        <div class="search-result-lock-overlay">
+            <svg class="lock-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+        </div>
+    ` : '';
+
+    card.innerHTML = `
+        <div class="search-result-image-wrapper">
+            ${page.image_url ? `
+                <img src="${page.image_url}" 
+                     alt="${page.title}" 
+                     class="search-result-image ${isLocked ? 'image-blurred' : ''}"
+                     style="${isLocked ? 'filter: blur(8px);' : ''}">
+            ` : `
+                <div class="search-result-image search-result-no-image">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                </div>
+            `}
+            ${lockOverlayHTML}
+            ${accessBadgeHTML}
+        </div>
+        <div class="search-result-content">
+            <div class="search-result-meta">
+                ${categoryName ? `<span class="result-category">${categoryName}</span>` : ''}
+                ${page.time_ago ? `<span class="result-time">${page.time_ago}</span>` : ''}
+            </div>
+            <h4 class="search-result-title ${isLocked ? 'title-locked' : ''}">${page.title}</h4>
+            ${page.meta_description ? `
+                <p class="search-result-excerpt ${isLocked ? 'excerpt-locked' : ''}">
+                    ${page.meta_description.substring(0, 120)}${page.meta_description.length > 120 ? '...' : ''}
+                </p>
+            ` : ''}
+            <div class="search-result-footer">
+                ${page.authors && page.authors.length > 0 ? `
+                    <span class="result-author">By ${page.authors[0].name}</span>
+                ` : '<span></span>'}
+                ${isLocked ? `
+                    <button class="result-unlock-btn" onclick="event.stopPropagation(); showSubscriptionModal('${page.denial_reason}', '${page.title.replace(/'/g, "\\'")}');">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        ${getDenialButtonText(page.denial_reason)}
+                    </button>
+                ` : `
+                    <a href="/${SITE}${page.url || '/' + page.slug}" 
+                       class="result-read-more" 
+                       onclick="event.stopPropagation();">
+                        ${isShop ? 'View Deal' : 'Read More'}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </a>
+                `}
+            </div>
+        </div>
+    `;
+
+    return card;
+}
+
+function getDenialButtonText(denialReason) {
+    switch (denialReason) {
+        case 'member_required':
+            return 'Sign Up';
+        case 'subscription_required':
+        case 'no_subscription_history':
+            return 'Subscribe';
+        case 'published_before_subscription':
+            return 'Upgrade';
+        case 'published_after_subscription':
+            return 'Resubscribe';
+        default:
+            return 'Unlock';
+    }
+}
+
+function showSubscriptionModal(denialReason, pageTitle) {
+    // Implement your subscription modal logic here
+    let message = '';
+
+    switch (denialReason) {
+        case 'member_required':
+            message = 'Create a free account to access this content.';
+            break;
+        case 'subscription_required':
+        case 'no_subscription_history':
+            message = 'Subscribe to access premium content like "' + pageTitle + '"';
+            break;
+        case 'published_before_subscription':
+            message = 'This article was published before your subscription. Upgrade to access our full archive.';
+            break;
+        case 'published_after_subscription':
+            message = 'This article was published after your subscription ended. Resubscribe to continue reading.';
+            break;
+        default:
+            message = 'Unlock this content with a subscription.';
+    }
+
+    // Example: Simple alert (replace with your actual modal)
+    alert(message);
+
+    // Or redirect to subscription page
+    // window.location.href = `/${SITE}/subscribe?reason=${denialReason}`;
+}
+
+function switchTab(tabName) {
+    currentTab = tabName;
+// Update tab buttons
+    document.querySelectorAll('.search-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+// Update tab content
+    document.querySelectorAll('.search-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === tabName + 'Content');
+    });
+}
+
+function loadMoreResults() {
+    currentOffset += searchLimit;
+    performSearch();
+}
+
+// Close search on escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.getElementById('searchOverlay').classList.contains('active')) {
+        toggleSearch();
+    }
+});
+
+

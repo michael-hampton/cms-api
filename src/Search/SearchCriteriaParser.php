@@ -7,10 +7,27 @@ use App\Models\Site;
 class SearchCriteriaParser
 {
     private const FILTER_PARAMS = [
-        'status', 'visibility', 'page_type', 'author',
-        'featured', 'categories', 'tag', 'parent',
-        'template', 'role', 'is_active', 'site_id', 'region_set_id',
-        'territory_id', 'merchant', 'brands', 'is_featured'
+        'status',
+        'visibility',
+        'page_type',
+        'author',
+        'featured',
+        'categories',
+        'category',
+        'category_id',
+        'tag',
+        'tag_id',
+        'parent',
+        'template',
+        'role',
+        'is_active',
+        'site_id',
+        'region_set_id',
+        'territory_id',
+        'merchant',
+        'brands',
+        'is_featured',
+        'content_type'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

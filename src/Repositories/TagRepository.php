@@ -163,4 +163,20 @@ class TagRepository extends Repository
 
         return $query->get();
     }
+
+    public function getBySiteId(int $siteId): array
+    {
+        $categories = Tag::where('site_id', $siteId)
+            ->withCount('pages', function ($query) use ($siteId) {
+                $query->where('status', 'published')->where('site_id', $siteId);
+            })
+            ->orderBy('name', 'asc')
+            ->get();
+
+
+        return $categories->filter(function ($category) {
+            return $category->pages_count > 0;
+        })->toArray();
+
+    }
 }

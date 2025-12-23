@@ -801,7 +801,7 @@ ol.list-items li::before {
     margin-bottom: 32px;
 }
 
-.form-group {
+/*.form-group {
     margin-bottom: 20px;
 }
 
@@ -856,7 +856,7 @@ ol.list-items li::before {
     color: var(--tech-secondary);
     transform: translateY(-2px);
     box-shadow: 0 8px 16px rgba(0, 102, 204, 0.2);
-}
+}*/
 
 /* Table Block - Technical Data Table */
 .table-block {
@@ -1649,7 +1649,7 @@ pre code {
     justify-content: center;
 }
 
-.nav-menu {
+/*.nav-menu {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -1874,7 +1874,6 @@ pre code {
     opacity: 0.3;
 }
 
-/* Responsive - Tech */
 @media (max-width: 992px) {
     .footer-main {
         grid-template-columns: repeat(2, 1fr);
@@ -1910,7 +1909,7 @@ pre code {
     .header-actions .subscribe-btn {
         display: none;
     }
-}
+}*/
 
 .page-grid-block {
     max-width: 1400px;

@@ -49,6 +49,7 @@
     <?php endif; ?>
 </div>
 
-@include('components/modals')
+@include('components/newsletter-modal')
+@include('components/comment-modal')
 </body>
 </html>

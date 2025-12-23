@@ -6,17 +6,22 @@ class OrderCalculationService
 {
     public function calculateOrderTotals(array $items, array $orderData = [], bool $applyDefaultTax = false): array
     {
-        $subtotal = 0;
+        $subtotal = $orderData['subtotal'];
         $itemTaxTotal = 0;
 
-        // Calculate item-level totals
-        foreach ($items as $item) {
-            $itemSubtotal = $item['unit_price'] * $item['quantity'];
-            $itemTax = $item['tax'] ?? 0;
+        if (!empty($items)) {
+            $subtotal = 0;
 
-            $subtotal += $itemSubtotal;
-            $itemTaxTotal += $itemTax;
+            // Calculate item-level totals
+            foreach ($items as $item) {
+                $itemSubtotal = $item['unit_price'] * $item['quantity'];
+                $itemTax = $item['tax'] ?? 0;
+
+                $subtotal += $itemSubtotal;
+                $itemTaxTotal += $itemTax;
+            }
         }
+
 
         $shipping = $orderData['shipping'] ?? 0;
         $discount = $orderData['discount'] ?? 0;

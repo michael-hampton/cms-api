@@ -135,12 +135,13 @@ class MigrateBlocksToProductsSeeder extends Seeder
     private function processBlock(Block $block, int $siteId, Page $page): void
     {
         $data = $block->data;
+        $hasProductIdOnBlock = false;
 
         // Skip if already has product_id
         if (!empty($data['product_id'])) {
             $this->stats['skipped']++;
             echo "  - Block {$block->id}: Already has product_id\n";
-            return;
+            $hasProductIdOnBlock = true;
         }
 
         // Skip if opted out
@@ -156,6 +157,12 @@ class MigrateBlocksToProductsSeeder extends Seeder
         if (empty($productDetails['name'])) {
             $this->stats['skipped']++;
             echo "  - Block {$block->id}: No product name\n";
+            return;
+        }
+
+        $product = Product::where('name', $productDetails['name'])->where('site_id', $siteId)->first();
+
+        if (!empty($product) && $hasProductIdOnBlock) {
             return;
         }
 
@@ -338,23 +345,37 @@ class MigrateBlocksToProductsSeeder extends Seeder
         // Find or create suitable category
         $categoryId = $this->findOrCreateCategory($details, $siteId, $page);
 
-        // Create product
-        $product = Product::create([
-            'name' => $details['name'],
-            'brand_id' => $brandId,
-            'category_id' => !empty($categoryId) ? $categoryId : null,
-            'price' => $details['price'],
-            'sale_price' => $details['sale_price'],
-            'description' => $details['description'],
-            'image' => $details['image'],
-            'site_id' => $siteId,
-            'is_active' => true,
-            'slug' => $slug
-        ]);
+        $category = Category::find($categoryId);
 
-        echo "    + Created new product\n";
+        if (empty($category)) {
+            die('here5');
+        }
 
-        return $product->id;
+        try {
+            // Create product
+            $product = Product::create([
+                'name' => $details['name'],
+                'brand_id' => $brandId,
+                'category_id' => !empty($categoryId) ? $categoryId : null,
+                'price' => $details['price'],
+                'sale_price' => $details['sale_price'],
+                'description' => $details['description'],
+                'image' => $details['image'],
+                'site_id' => $siteId,
+                'is_active' => true,
+                'slug' => $slug
+            ]);
+
+            echo "    + Created new product\n";
+
+            return $product->id;
+        } catch (\Exception $exception) {
+            echo $exception->getMessage();
+            var_dump($categoryId);
+            die('here');
+        }
+
+        return null;
     }
 
     private function findOrCreateBrand(string $brandName, int $siteId): int

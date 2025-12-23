@@ -92,7 +92,7 @@ class SubscriptionCheckoutService
                     $plan,
                     $data,
                     $paymentMethod,
-                    $voucher
+                    $voucher ?? null
                 );
 
                 if (!$paymentResult['success']) {
