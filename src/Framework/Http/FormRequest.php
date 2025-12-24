@@ -3,9 +3,11 @@
 namespace App\Framework\Http;
 
 use App\Framework\AuthenticatedUser;
+use App\Framework\Authorization\Auth;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
+use App\Framework\Validation\Rules\AcceptedRule;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\ConfirmedRule;
@@ -13,7 +15,6 @@ use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\ExistsRule;
 use App\Framework\Validation\Rules\InRule;
-use App\Framework\Validation\Rules\AcceptedRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
@@ -544,10 +545,7 @@ abstract class FormRequest extends Request
      */
     public function user(): ?AuthenticatedUser
     {
-        //todo temporary
-        return new AuthenticatedUser(1, 'Michael Hampton', 'michaelhamptondesign@yahoo.com', 'admin');
-
-        return $this->user;
+        return Auth::loadUserFromToken();
     }
 
     /**

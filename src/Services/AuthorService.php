@@ -6,10 +6,8 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
-use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Models\Author;
-use App\Models\Page;
 use App\Repositories\AuthorRepository;
 use Exception;
 
@@ -21,7 +19,8 @@ class AuthorService
         private readonly AuthorRepository   $authorRepository,
         private readonly ImageUploadService $imageUploadService,
         ?Database                           $database = null
-    ) {
+    )
+    {
         $this->database = $database ?? Database::getInstance();
     }
 
@@ -51,7 +50,7 @@ class AuthorService
 
     public function createAuthor(array $data, int $siteId, ?UploadedFile $avatarFile = null): Author
     {
-        return $this->database->transaction(function() use ($data, $avatarFile, $siteId) {
+        return $this->database->transaction(function () use ($data, $avatarFile, $siteId) {
             // Handle image upload
             if ($avatarFile && $avatarFile->isValid()) {
                 $data['avatar'] = $this->imageUploadService->upload($avatarFile);
@@ -64,13 +63,17 @@ class AuthorService
 
             $data['site_id'] = $siteId;
 
+            if (empty($data['seniority_date'])) {
+                $data['seniority_date'] = null;
+            }
+
             return $this->authorRepository->create($data);
         });
     }
 
     public function updateAuthor(int $id, array $data, ?UploadedFile $avatarFile = null): Author
     {
-        return $this->database->transaction(function() use ($id, $data, $avatarFile) {
+        return $this->database->transaction(function () use ($id, $data, $avatarFile) {
             $author = $this->authorRepository->find($id);
 
             if (!$author) {

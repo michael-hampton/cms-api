@@ -134,6 +134,7 @@ class Auth
     {
         // Get bearer token from headers
         $headers = getallheaders();
+
         $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
 
         if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
@@ -157,12 +158,12 @@ class Auth
             return null;
         }
 
-        self::$user = new AuthenticatedUser(
+        self::$user = (new AuthenticatedUser(
             $user->id,
             $user->name,
             $user->email,
             $user->role ?? 'user'
-        );
+        ))->fill($user->toArray());
         self::$user->exists = true;
 
         return self::$user;

@@ -34,6 +34,33 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     private $calculationService;
     private $database;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->cartService = Mockery::mock(CartService::class);
+        $this->subscriptionService = Mockery::mock(OneTimeSubscriptionService::class);
+        $this->orderService = Mockery::mock(OrderService::class);
+        $this->voucherService = Mockery::mock(VoucherService::class);
+        $this->shippingService = Mockery::mock(ShippingService::class);
+        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
+        $this->memberAuth = Mockery::mock(MemberAuthWrapper::class);
+        $this->calculationService = Mockery::mock(OrderCalculationService::class);
+        $this->database = Mockery::mock(Database::class);
+
+        $this->service = new OneTimeSubscriptionCheckoutService(
+            $this->cartService,
+            $this->subscriptionService,
+            $this->orderService,
+            $this->voucherService,
+            $this->shippingService,
+            $this->stripeProcessor,
+            $this->memberAuth,
+            $this->calculationService,
+            $this->database
+        );
+    }
+
     public function test_process_checkout_fails_when_not_authenticated(): void
     {
         $this->cartService->shouldReceive('getItems')
@@ -202,7 +229,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->andReturn($subscription);
 
         $this->shippingService->shouldReceive('calculateShipping')
-            ->once()
+            ->twice()
             ->with(50.00, [])
             ->andReturn(10.00);
 
@@ -385,33 +412,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $result = $this->service->processCheckout([], 1);
 
         $this->assertFalse($result['success']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->cartService = Mockery::mock(CartService::class);
-        $this->subscriptionService = Mockery::mock(OneTimeSubscriptionService::class);
-        $this->orderService = Mockery::mock(OrderService::class);
-        $this->voucherService = Mockery::mock(VoucherService::class);
-        $this->shippingService = Mockery::mock(ShippingService::class);
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
-        $this->memberAuth = Mockery::mock(MemberAuthWrapper::class);
-        $this->calculationService = Mockery::mock(OrderCalculationService::class);
-        $this->database = Mockery::mock(Database::class);
-
-        $this->service = new OneTimeSubscriptionCheckoutService(
-            $this->cartService,
-            $this->subscriptionService,
-            $this->orderService,
-            $this->voucherService,
-            $this->shippingService,
-            $this->stripeProcessor,
-            $this->memberAuth,
-            $this->calculationService,
-            $this->database
-        );
     }
 
     protected function tearDown(): void

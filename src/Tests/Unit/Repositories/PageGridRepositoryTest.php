@@ -355,7 +355,7 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertNotNull($found);
-        $this->assertEquals($grid->id, $found->id);
+        $this->assertEquals($grid->id, $found->first()->id);
     }
 
     public function test_get_active_grid_for_page_returns_grid_when_within_date_range(): void
@@ -377,7 +377,7 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertNotNull($found);
-        $this->assertEquals($grid->id, $found->id);
+        $this->assertEquals($grid->id, $found->first()->id);
     }
 
     public function test_get_active_grid_for_page_returns_null_when_before_start_date(): void
@@ -397,7 +397,7 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $found = $this->repository->getActiveGridForPage($page->id);
 
         // Assert
-        $this->assertNull($found);
+        $this->assertEmpty($found->toArray());
     }
 
     public function test_get_active_grid_for_page_returns_null_when_after_end_date(): void
@@ -417,7 +417,7 @@ class PageGridRepositoryTest extends RepositoryTestCase
         $found = $this->repository->getActiveGridForPage($page->id);
 
         // Assert
-        $this->assertNull($found);
+        $this->assertEmpty($found->toArray());
     }
 
     public function test_get_active_grid_for_page_returns_grid_with_only_start_date(): void
@@ -438,7 +438,7 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertNotNull($found);
-        $this->assertEquals($grid->id, $found->id);
+        $this->assertEquals($grid->id, $found->first()->id);
     }
 
     public function test_get_active_grid_for_page_returns_grid_with_only_end_date(): void
@@ -459,7 +459,7 @@ class PageGridRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertNotNull($found);
-        $this->assertEquals($grid->id, $found->id);
+        $this->assertEquals($grid->id, $found->first()->id);
     }
 
     public function test_get_active_grid_for_territory_returns_grid_when_no_dates_set(): void

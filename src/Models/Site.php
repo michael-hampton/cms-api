@@ -68,6 +68,11 @@ class Site extends Model
         return $this->hasMany(Category::class, 'site_id', 'id');
     }
 
+    public function products()
+    {
+        return $this->hasMany(Product::class, 'site_id', 'id');
+    }
+
     /**
      * Get tags for this site
      */

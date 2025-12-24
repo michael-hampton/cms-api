@@ -586,7 +586,7 @@
                                 <?php if (!empty($item['subscription_plan_id'])): ?>
                                     <!-- Subscription item -->
                                     <?php
-                                    $options = json_decode($item['options'], true);
+                                    $options = $item['options'];
                                     $deliveryType = $options['delivery_type'] ?? 'digital';
                                     $planName = $options['plan_name'] ?? 'Subscription';
                                     ?>
@@ -710,6 +710,7 @@
     const API_BASE = '/api/' + SITE;
     let cartData = null;
     let appliedVoucher = null;
+    let isOneTimeSubscription = false
 
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toast');
@@ -935,7 +936,7 @@
         if (appliedVoucher) {
             sessionStorage.setItem('appliedVoucher', JSON.stringify(appliedVoucher));
         }
-        window.location.href = '/checkout';
+        window.location.href = isOneTimeSubscription ? '/checkout?type=subscription' : '/checkout';
     }
 
     async function loadWishlistCount() {
@@ -949,8 +950,14 @@
     }
 
     // Initialize
-    loadCart();
+    //loadCart();
     loadWishlistCount();
+    checkCartForSubscription();
+
+    function checkCartForSubscription() {
+        const urlParams = new URLSearchParams(window.location.search);
+        isOneTimeSubscription = urlParams.get('type') === 'subscription';
+    }
 </script>
 
 </body>

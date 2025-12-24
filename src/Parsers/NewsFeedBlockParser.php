@@ -2,6 +2,7 @@
 
 namespace App\Parsers;
 
+use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\InRule;
@@ -171,8 +172,10 @@ class NewsFeedBlockParser extends BaseBlockParser
     {
         $html = "<article class=\"news-item\">";
 
+        $pageUrl = SiteContext::slug() . $item['pageUrl'];
+
         if (!empty($item['imageUrl'])) {
-            $html .= "<a href=\"{$item['pageUrl']}\" class=\"news-item-image-link\">";
+            $html .= "<a href=\"{$pageUrl}\" class=\"news-item-image-link\">";
             $html .= "<img src=\"{$item['imageUrl']}\" alt=\"{$item['title']}\" class=\"news-item-image\">";
             $html .= "</a>";
         }
@@ -184,7 +187,7 @@ class NewsFeedBlockParser extends BaseBlockParser
         }
 
         $html .= "<h3 class=\"news-item-title\">";
-        $html .= "<a href=\"{$item['pageUrl']}\">{$item['title']}</a>";
+        $html .= "<a href=\"{$pageUrl}\">{$item['title']}</a>";
         $html .= "</h3>";
 
         if ($settings['showExcerpt'] && !empty($item['excerpt'])) {

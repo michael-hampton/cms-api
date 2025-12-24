@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Framework\Support\Str;
 use App\Models\Concerns\TracksCreator;
 
 class PageGrid extends Model
@@ -56,7 +55,7 @@ class PageGrid extends Model
 
     protected $table = 'page_grids';
 
-    protected static function boot()
+    /*protected static function boot()
     {
         parent::boot();
 
@@ -71,7 +70,7 @@ class PageGrid extends Model
                 $pageGrid->slug = Str::slug($pageGrid->title);
             }
         });
-    }
+    }*/
 
     // Relationships
     public function creator()

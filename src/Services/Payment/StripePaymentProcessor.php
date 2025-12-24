@@ -1110,8 +1110,8 @@ class StripePaymentProcessor
     public function handleOneTimeSubscriptionPayment(
         string $paymentIntentId,
         int    $orderId,
-        int  $siteId,
-        ?int $subscriptionId = null,
+        int $siteId,
+            $subscriptionIds = null, // Can be single ID or array of IDs
     ): array
     {
         try {
@@ -1124,10 +1124,15 @@ class StripePaymentProcessor
                 ];
             }
 
+            // Normalize to array
+            if (!is_array($subscriptionIds)) {
+                $subscriptionIds = $subscriptionIds ? [$subscriptionIds] : [];
+            }
+
             // Create payment record
             $payment = $this->paymentRepository->create([
                 'order_id' => $orderId,
-                'subscription_id' => $subscriptionId,
+                'subscription_id' => count($subscriptionIds) === 1 ? $subscriptionIds[0] : null,
                 'site_id' => $siteId,
                 'payment_method' => 'stripe',
                 'payment_provider' => 'stripe',
@@ -1138,9 +1143,10 @@ class StripePaymentProcessor
                 'currency' => strtoupper($paymentIntent->currency),
                 'paid_at' => date('Y-m-d H:i:s'),
                 'metadata' => [
-                    'subscription_id' => $subscriptionId,
+                    'subscription_ids' => $subscriptionIds,
                     'order_id' => $orderId,
-                    'one_time_subscription' => true
+                    'one_time_subscription' => true,
+                    'multiple_subscriptions' => count($subscriptionIds) > 1
                 ]
             ]);
 

@@ -43,27 +43,44 @@ class OneTimeSubscriptionsController extends Controller
     public function confirmPayment(Request $request)
     {
         $paymentIntentId = $request->input('payment_intent_id');
-        $subscriptionId = $request->input('subscription_id');
         $orderId = $request->input('order_id');
         $siteId = SiteContext::getId();
 
-        if (!$paymentIntentId || !$subscriptionId || !$orderId) {
+        // Handle both single and multiple subscriptions
+        $subscriptionIds = $request->input('subscription_ids');
+        $subscriptionId = $request->input('subscription_id');
+
+        if (!$paymentIntentId || !$orderId) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Missing required parameters'
             ], 400);
         }
 
+        if (empty($subscriptionIds) && empty($subscriptionId)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Missing subscription information'
+            ], 400);
+        }
+
+        // Convert to array for uniform handling
+        if (!empty($subscriptionId)) {
+            $subscriptionIds = [$subscriptionId];
+        }
+
         $result = $this->stripeProcessor->handleOneTimeSubscriptionPayment(
             $paymentIntentId,
             $orderId,
             $siteId,
-            $subscriptionId
+            $subscriptionIds
         );
 
         if ($result['success']) {
-            // Activate subscription
-            $this->subscriptionService->activateSubscription($subscriptionId, $orderId);
+            // Activate all subscriptions
+            foreach ($subscriptionIds as $subId) {
+                $this->subscriptionService->activateSubscription($subId, $orderId);
+            }
 
             // Update order status
             \App\Models\Order::where('id', $orderId)->update([
@@ -73,6 +90,31 @@ class OneTimeSubscriptionsController extends Controller
         }
 
         return $this->jsonResponse($result, $result['success'] ? 200 : 400);
+    }
+
+    public function showMultiple(Request $request)
+    {
+        $subscriptionIds = $request->input('ids');
+
+        if (empty($subscriptionIds)) {
+            return $this->redirect('/');
+        }
+
+        $subscriptions = [];
+        foreach ($subscriptionIds as $id) {
+            $details = $this->subscriptionService->getSubscriptionWithDetails($id);
+            if ($details) {
+                $subscriptions[] = $details;
+            }
+        }
+
+        if (empty($subscriptions)) {
+            return $this->redirect('/');
+        }
+
+        return $this->view('subscriptions/onetime/multiple-details', [
+            'subscriptions' => $subscriptions
+        ]);
     }
 
     public function show(int $id)

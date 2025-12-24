@@ -123,7 +123,7 @@ class PageGridRepository extends Repository
     /**
      * Get active page grid for a specific page with optional date filtering
      */
-    public function getActiveGridForPage(int $pageId, ?string $startDate = null, ?string $endDate = null, ?int $siteId = null): ?PageGrid
+    public function getActiveGridForPage(int $pageId, ?string $startDate = null, ?string $endDate = null, ?int $siteId = null): ?Collection
     {
         $siteId = $siteId ?? $this->siteId;
 
@@ -137,7 +137,7 @@ class PageGridRepository extends Repository
         // Apply date filters
         $query = $this->applyDateFilters($query, $startDate, $endDate);
 
-        return $query->first();
+        return $query->get();
     }
 
     /**

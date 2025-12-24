@@ -12,7 +12,6 @@ use App\Models\Page;
 use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
-use App\Parsers\PageGridRenderer;
 use App\Repositories\CommentRepository;
 use App\Repositories\PageGridRepository;
 use App\Repositories\PageViewRepository;
@@ -117,17 +116,6 @@ class ContentController extends Controller
         // Use site-specific theme if available
         $theme = SiteContext::getTheme();
         $viewPath = "{$theme}/page";
-
-        $pageGrid = $this->pageGridRepository->getActiveGridForPage($page->id);
-
-        $pageGridHtml = null;
-        if ($pageGrid) {
-            // Pass the territory to the renderer
-            $pageGridHtml = (new PageGridRenderer())->render($pageGrid);
-        }
-
-        $data['pageGridHtml'] = $pageGridHtml;
-        $data['pageGrid'] = $pageGrid;
 
         $dealsService = new \App\Services\DealsService();
         $data['todaysDeals'] = $dealsService->getTodaysDeals(10);

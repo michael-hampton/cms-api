@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Page;
+use App\Parsers\PageGridRenderer;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\BlockRepository;
+use App\Repositories\PageGridRepository;
 
 class PageRenderService
 {
@@ -12,6 +14,7 @@ class PageRenderService
         private readonly BlockRepository    $blockRepository,
         private readonly BlockParserService $blockParserService,
         private readonly ZoneBlockParser    $zoneBlockParser,
+        private readonly PageGridRepository $pageGridRepository,
     )
     {
     }
@@ -33,13 +36,22 @@ class PageRenderService
         // Render remaining blocks that weren't used in zones
         $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
 
-        foreach ($pageBlocks as $block) {
+        $pageGrids = $this->pageGridRepository->getActiveGridForPage($page->id);
+
+        foreach ($pageBlocks as $index => $block) {
             // Skip blocks that were already rendered in zones
             if (in_array($block->id, $usedBlockIds)) {
                 continue;
             }
 
             try {
+
+                foreach ($pageGrids as $pageGrid) {
+                    if (!empty($pageGrid) && $pageGrid->order === ($index + 1)) {
+                        $mainHtml .= (new PageGridRenderer())->render($pageGrid);
+                    }
+                }
+
                 $blockHtml = $this->blockParserService->buildBlock(
                     $block->page_id,
                     array_merge($block->data, ['type' => $block->type]),

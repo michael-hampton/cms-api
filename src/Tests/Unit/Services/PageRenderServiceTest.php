@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\BlockRepository;
+use App\Repositories\PageGridRepository;
 use App\Services\BlockParserService;
 use App\Services\PageRenderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -17,7 +18,26 @@ class PageRenderServiceTest extends FunctionalTestCase
     private $blockParserService;
     private $zoneParser;
     private $pageRenderService;
-    private $container;
+    private $pageGridRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Mock dependencies
+        $this->blockRepository = Mockery::mock(BlockRepository::class);
+        $this->blockParserService = Mockery::mock(BlockParserService::class);
+        $this->zoneParser = Mockery::mock(ZoneBlockParser::class);
+        $this->pageGridRepository = Mockery::mock(PageGridRepository::class);
+
+        // Create service instance
+        $this->pageRenderService = new PageRenderService(
+            $this->blockRepository,
+            $this->blockParserService,
+            $this->zoneParser,
+            $this->pageGridRepository,
+        );
+    }
 
     public function test_it_renders_page_with_zones_and_excludes_used_blocks()
     {
@@ -38,6 +58,10 @@ class PageRenderServiceTest extends FunctionalTestCase
             'html' => '<div class="zone-content">Zone content with blocks 1 and 2</div>',
             'usedBlockIds' => [1, 2]
         ];
+
+        $this->pageGridRepository->shouldReceive('getActiveGridForPage')
+            ->with($page->id)
+            ->andReturn(collect());
 
         // Mock zone parser
         $this->zoneParser->shouldReceive('buildZonesHtml')
@@ -104,6 +128,10 @@ class PageRenderServiceTest extends FunctionalTestCase
             'usedBlockIds' => []
         ];
 
+        $this->pageGridRepository->shouldReceive('getActiveGridForPage')
+            ->with($page->id)
+            ->andReturn(collect());
+
         $this->zoneParser->shouldReceive('buildZonesHtml')
             ->andReturn($zonesResult);
 
@@ -154,6 +182,10 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         $zonesResult = ['html' => '', 'usedBlockIds' => []];
 
+        $this->pageGridRepository->shouldReceive('getActiveGridForPage')
+            ->with($page->id)
+            ->andReturn(collect());
+
         $this->zoneParser->shouldReceive('buildZonesHtml')
             ->andReturn($zonesResult);
 
@@ -199,6 +231,10 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         $zonesResult = ['html' => '', 'usedBlockIds' => []];
 
+        $this->pageGridRepository->shouldReceive('getActiveGridForPage')
+            ->with($page->id)
+            ->andReturn(collect());
+
         $this->zoneParser->shouldReceive('buildZonesHtml')
             ->andReturn($zonesResult);
 
@@ -230,23 +266,6 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         $this->assertLessThan($pos2, $pos1);
         $this->assertLessThan($pos3, $pos2);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Mock dependencies
-        $this->blockRepository = Mockery::mock(BlockRepository::class);
-        $this->blockParserService = Mockery::mock(BlockParserService::class);
-        $this->zoneParser = Mockery::mock(ZoneBlockParser::class);
-
-        // Create service instance
-        $this->pageRenderService = new PageRenderService(
-            $this->blockRepository,
-            $this->blockParserService,
-            $this->zoneParser,
-        );
     }
 
     protected function tearDown(): void

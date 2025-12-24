@@ -16,6 +16,7 @@
             --primary-color: #2563eb;
             --primary-dark: #1e40af;
             --success-color: #10b981;
+            --danger-color: #ef4444;
             --border-color: #e2e8f0;
             --bg-light: #f8fafc;
             --text-primary: #1e293b;
@@ -97,30 +98,104 @@
         .plan-name {
             font-size: 1.5rem;
             font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .plan-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .duration-options {
+            margin-bottom: 2rem;
+        }
+
+        .duration-option {
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .duration-option:hover {
+            border-color: var(--primary-color);
+        }
+
+        .duration-option.selected {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .duration-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+        }
+
+        .duration-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 0.5rem;
         }
 
-        .plan-price {
-            font-size: 3rem;
+        .duration-label {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .duration-price {
+            font-size: 1.5rem;
             font-weight: 700;
             color: var(--primary-color);
-            margin-bottom: 0.5rem;
         }
 
-        .plan-period {
+        .duration-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
             color: var(--text-secondary);
-            font-size: 1rem;
+        }
+
+        .duration-period {
+            font-size: 0.875rem;
+        }
+
+        .savings-badge {
+            background: var(--danger-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .original-price {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-left: 0.5rem;
         }
 
         .delivery-options {
             margin-bottom: 2rem;
         }
 
+        .delivery-section-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
         .delivery-option {
             border: 2px solid var(--border-color);
             border-radius: 0.5rem;
             padding: 1rem;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             cursor: pointer;
             transition: all 0.3s;
         }
@@ -220,7 +295,7 @@
         }
 
         .toast.error {
-            border-left: 4px solid #ef4444;
+            border-left: 4px solid var(--danger-color);
         }
 
         @keyframes slideIn {
@@ -242,10 +317,6 @@
             .hero h1 {
                 font-size: 2rem;
             }
-
-            .plan-price {
-                font-size: 2.5rem;
-            }
         }
     </style>
 </head>
@@ -266,36 +337,82 @@
             <div class="plan-card">
                 <div class="plan-header">
                     <div class="plan-name"><?= htmlspecialchars($plan['name']) ?></div>
-                    <div class="plan-price">
-                        $<?= number_format($plan['price'], 2) ?>
+                    <?php if (!empty($plan['description'])): ?>
+                        <div class="plan-description">
+                            <?= htmlspecialchars($plan['description']) ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Duration Options -->
+                <div class="duration-options">
+                    <div class="duration-option" data-plan="<?= $plan['id'] ?>">
+                        <input type="radio" name="duration_<?= $plan['id'] ?>" value="6"
+                               data-price="<?= $plan['price'] ?>" data-issues="6">
+                        <div class="duration-header">
+                            <span class="duration-label">6 month subscription</span>
+                            <div>
+                                <span class="duration-price">£<?= number_format($plan['price'], 2) ?></span>
+                            </div>
+                        </div>
+                        <div class="duration-details">
+                            <span class="duration-period">for 6 issues</span>
+                        </div>
                     </div>
-                    <div class="plan-period">
-                        <?= htmlspecialchars($plan['billing_period']) ?>
+
+                    <div class="duration-option" data-plan="<?= $plan['id'] ?>">
+                        <input type="radio" name="duration_<?= $plan['id'] ?>" value="12"
+                               data-price="<?= number_format($plan['price'] * 2 * 0.63, 2) ?>"
+                               data-issues="12" checked>
+                        <div class="duration-header">
+                            <span class="duration-label">1 year subscription</span>
+                            <div>
+                                <span class="original-price">£<?= number_format($plan['price'] * 2, 2) ?></span>
+                                <span class="duration-price">£<?= number_format($plan['price'] * 2 * 0.63, 2) ?></span>
+                            </div>
+                        </div>
+                        <div class="duration-details">
+                            <span class="duration-period">for one year / 12 issues</span>
+                            <span class="savings-badge">SAVE 37%</span>
+                        </div>
+                    </div>
+
+                    <div class="duration-option" data-plan="<?= $plan['id'] ?>">
+                        <input type="radio" name="duration_<?= $plan['id'] ?>" value="24"
+                               data-price="<?= number_format($plan['price'] * 4 * 0.56, 2) ?>"
+                               data-issues="24">
+                        <div class="duration-header">
+                            <span class="duration-label">2 year subscription</span>
+                            <div>
+                                <span class="original-price">£<?= number_format($plan['price'] * 4, 2) ?></span>
+                                <span class="duration-price">£<?= number_format($plan['price'] * 4 * 0.56, 2) ?></span>
+                            </div>
+                        </div>
+                        <div class="duration-details">
+                            <span class="duration-period">for two years / 24 issues</span>
+                            <span class="savings-badge">SAVE 44%</span>
+                        </div>
                     </div>
                 </div>
 
-                <?php if (!empty($plan['description'])): ?>
-                    <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
-                        <?= htmlspecialchars($plan['description']) ?>
-                    </p>
-                <?php endif; ?>
-
+                <!-- Delivery Options -->
                 <?php if (count($plan['delivery_options']) > 1): ?>
                     <div class="delivery-options">
-                        <label class="delivery-option" data-plan="<?= $plan['id'] ?>">
-                            <input type="radio" name="delivery_<?= $plan['id'] ?>" value="digital" checked>
+                        <div class="delivery-section-title">Delivery Method</div>
+                        <div class="delivery-option" data-plan="<?= $plan['id'] ?>">
+                            <input type="radio" name="delivery_<?= $plan['id'] ?>" value="print" checked>
                             <div>
-                                <span class="delivery-label">Digital Access</span>
-                                <span class="delivery-desc">Instant download link after payment</span>
+                                <span class="delivery-label">Print</span>
+                                <span class="delivery-desc">Print magazine delivered to your door</span>
                             </div>
-                        </label>
-                        <label class="delivery-option" data-plan="<?= $plan['id'] ?>">
-                            <input type="radio" name="delivery_<?= $plan['id'] ?>" value="print">
+                        </div>
+                        <div class="delivery-option" data-plan="<?= $plan['id'] ?>">
+                            <input type="radio" name="delivery_<?= $plan['id'] ?>" value="digital">
                             <div>
-                                <span class="delivery-label">Print Edition</span>
-                                <span class="delivery-desc">Shipped to your address</span>
+                                <span class="delivery-label">Digital</span>
+                                <span class="delivery-desc">Instant digital access</span>
                             </div>
-                        </label>
+                        </div>
                     </div>
                 <?php endif; ?>
 
@@ -311,7 +428,7 @@
                 <?php endif; ?>
 
                 <button class="btn" onclick="addToCart(<?= $plan['id'] ?>)">
-                    Add to Cart
+                    Add to basket
                 </button>
             </div>
         <?php endforeach; ?>
@@ -323,6 +440,20 @@
 <script>
     const SITE = 'test-mike';
     const API_BASE = '/api/' + SITE;
+
+    // Handle duration option selection
+    document.querySelectorAll('.duration-option').forEach(option => {
+        option.addEventListener('click', function () {
+            const planId = this.dataset.plan;
+            const radio = this.querySelector('input[type="radio"]');
+
+            document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
+                .forEach(opt => opt.classList.remove('selected'));
+
+            this.classList.add('selected');
+            radio.checked = true;
+        });
+    });
 
     // Handle delivery option selection
     document.querySelectorAll('.delivery-option').forEach(option => {
@@ -340,12 +471,20 @@
 
     // Set initial selected state
     document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
-        radio.closest('.delivery-option').classList.add('selected');
+        const parentOption = radio.closest('.duration-option') || radio.closest('.delivery-option');
+        if (parentOption) {
+            parentOption.classList.add('selected');
+        }
     });
 
     async function addToCart(planId) {
+        const durationRadio = document.querySelector(`input[name="duration_${planId}"]:checked`);
         const deliveryRadio = document.querySelector(`input[name="delivery_${planId}"]:checked`);
-        const deliveryType = deliveryRadio ? deliveryRadio.value : 'digital';
+
+        const duration = durationRadio ? durationRadio.value : '12';
+        const price = durationRadio ? durationRadio.dataset.price : null;
+        const issues = durationRadio ? durationRadio.dataset.issues : '12';
+        const deliveryType = deliveryRadio ? deliveryRadio.value : 'print';
 
         try {
             const response = await fetch(`${API_BASE}/cart/subscription`, {
@@ -353,7 +492,10 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     plan_id: planId,
-                    delivery_type: deliveryType
+                    delivery_type: deliveryType,
+                    duration_months: parseInt(duration),
+                    price: parseFloat(price),
+                    issues: parseInt(issues)
                 })
             });
 
@@ -362,7 +504,7 @@
             if (result.success) {
                 showToast('Added to cart! Redirecting to checkout...', 'success');
                 setTimeout(() => {
-                    window.location.href = '/checkout';
+                    window.location.href = '/checkout?type=subscription';
                 }, 1500);
             } else {
                 showToast(result.message || 'Failed to add to cart', 'error');
