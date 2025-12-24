@@ -46,7 +46,7 @@ class ContentController extends Controller
 
         if (!$accessCheck['can_view']) {
             // Redirect to subscription page or show paywall
-            //return $this->showPaywall($page, $accessCheck['reason']);
+            return $this->showPaywall($page, $accessCheck['reason']);
         }
 
         // Get site-specific menu
