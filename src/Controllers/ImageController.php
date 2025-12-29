@@ -3,10 +3,11 @@
 namespace App\Controllers;
 
 use App\Framework\Exceptions\ValidationException;
-use App\Framework\Http\Request;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
 use App\Repositories\ImageRepository;
 use App\Requests\CreateImageCategoryRequest;
+use App\Requests\CreateImageRequest;
 use App\Requests\UpdateImageRequest;
 use App\Search\SearchCriteriaParser;
 use App\Services\ImageService;
@@ -34,7 +35,7 @@ class ImageController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(CreateImageRequest $request, string $siteName): JsonResponse
     {
         try {
             $file = $request->file('image');
@@ -43,17 +44,7 @@ class ImageController extends Controller
                 return $this->errorResponse('No image file provided', 400);
             }
 
-            $metadata = [
-                'name' => $request->get('name'),
-                'credit' => $request->get('credit'),
-                'alt_text' => $request->get('alt_text'),
-                'caption' => $request->get('caption'),
-                'description' => $request->get('description'),
-                'categories' => $request->get('categories', []),
-                'site_id' => $request->get('site_id'),
-                'tags' => $request->get('tags', []),
-                'image_rights' => $request->get('image_rights'),
-            ];
+            $metadata = $request->validated();
 
             $image = $this->imageService->uploadImage($file, $metadata);
 
@@ -94,17 +85,7 @@ class ImageController extends Controller
     public function update(int $id, UpdateImageRequest $request, string $siteName): JsonResponse
     {
         try {
-            $metadata = [
-                'name' => $request->get('name'),
-                'credit' => $request->get('credit'),
-                'alt_text' => $request->get('alt_text'),
-                'caption' => $request->get('caption'),
-                'description' => $request->get('description'),
-                'categories' => $request->get('categories', []),
-                'site_id' => $request->get('site_id'),
-                'tags' => $request->get('tags', []),
-                'image_rights' => $request->get('image_rights'),
-            ];
+            $metadata = $request->validated();
 
             // Remove null values
             $metadata = array_filter($metadata, function($value) {

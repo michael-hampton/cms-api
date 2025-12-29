@@ -6,7 +6,7 @@ class OrderCalculationService
 {
     public function calculateOrderTotals(array $items, array $orderData = [], bool $applyDefaultTax = false): array
     {
-        $subtotal = $orderData['subtotal'];
+        $subtotal = $orderData['subtotal'] ?? 0;
         $itemTaxTotal = 0;
 
         if (!empty($items)) {

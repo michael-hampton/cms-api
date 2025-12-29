@@ -62,6 +62,7 @@ class Gate
                 $policy = new $policyClass();
 
                 if (method_exists($policy, $ability)) {
+
                     // Pass the user and a new instance of the model class to the policy method if the original was a string
                     if (is_string($model) && class_exists($modelClass)) {
                         $modelInstance = new $modelClass();
@@ -88,5 +89,46 @@ class Gate
         if (self::denies($ability, $arguments)) {
             throw new AuthorizationException("Access denied for ability: {$ability}");
         }
+    }
+
+    /**
+     * Check if a user can perform an ability without requiring arguments
+     */
+    public static function forUser($user, string $ability, $arguments = []): bool
+    {
+        // Prepend user to arguments if not already there
+        if (is_array($arguments)) {
+            array_unshift($arguments, $user);
+        } else {
+            $arguments = [$user, $arguments];
+        }
+
+        return self::check($ability, $arguments);
+    }
+
+    /**
+     * Authorize for a specific user
+     */
+    public static function authorizeForUser($user, string $ability, $arguments = []): void
+    {
+        if (!self::forUser($user, $ability, $arguments)) {
+            throw new AuthorizationException("Access denied for ability: {$ability}");
+        }
+    }
+
+    /**
+     * Get policy for a model class
+     */
+    public static function getPolicyFor($modelClass): ?string
+    {
+        // Handle simple class names
+        if (!class_exists($modelClass)) {
+            $namespacedClass = "App\\Models\\{$modelClass}";
+            if (class_exists($namespacedClass)) {
+                $modelClass = $namespacedClass;
+            }
+        }
+
+        return self::$policies[$modelClass] ?? null;
     }
 }

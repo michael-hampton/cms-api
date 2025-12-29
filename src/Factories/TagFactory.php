@@ -20,6 +20,7 @@ class TagFactory extends Factory
         return $this->withSiteId([
             'slug' => 'test-tag-' . uniqid(),
             'name' => 'Test Tag',
+            'usage_count' => 0,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
@@ -30,6 +31,7 @@ class TagFactory extends Factory
         return $this->state([
             'name' => $name,
             'slug' => strtolower(str_replace(' ', '-', $name)) . '-' . uniqid(),
+            'usage_count' => 0,
         ]);
     }
 }

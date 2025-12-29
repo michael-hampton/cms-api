@@ -16,7 +16,6 @@ use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 class PageControllerTest extends FunctionalTestCase
 {
     use CreatesTestData;
-
     public function testIndexReturnsPagesList()
     {
         $this->createPage();

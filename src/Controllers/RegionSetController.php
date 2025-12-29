@@ -15,6 +15,8 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\PageRepository;
 use App\Repositories\RegionSetRepository;
 use App\Requests\BulkDeleteRequest;
+use App\Requests\CreateRegionSetRequest;
+use App\Requests\UpdateRegionSetRequest;
 use App\Resources\PageResource;
 use App\Resources\RegionSetResource;
 use App\Search\SearchCriteriaParser;
@@ -51,10 +53,10 @@ class RegionSetController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(CreateRegionSetRequest $request, string $siteName): JsonResponse
     {
         try {
-            $requestData = $request->all();
+            $requestData = $request->validated();
             $regionSet = $this->service->create($requestData);
 
             return $this->jsonResponse(['region_set' => $regionSet->toArrayWithRelations()], 201);
@@ -84,10 +86,10 @@ class RegionSetController extends Controller
         }
     }
 
-    public function update(int $id, Request $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateRegionSetRequest $request, string $siteName): JsonResponse
     {
         try {
-            $requestData = $request->all();
+            $requestData = $request->validated();
             $regionSet = $this->service->update($id, $requestData);
 
             return $this->jsonResponse(['region_set' => $regionSet->toArrayWithRelations()]);

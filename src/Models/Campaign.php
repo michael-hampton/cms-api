@@ -3,10 +3,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\TracksCreator;
 use DateTime;
 
 class Campaign extends Model
 {
+    use TracksCreator;
+
     protected $table = 'campaigns';
 
     protected $fillable = [
@@ -21,7 +24,9 @@ class Campaign extends Model
         'end_date',
         'tracking_params',
         'created_at',
-        'updated_at'
+        'updated_at',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [

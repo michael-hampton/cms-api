@@ -50,7 +50,8 @@ class CampaignControllerTest extends FunctionalTestCase
             'description' => 'Test description',
             'newsletter_id' => $newsletter->id,
             'is_active' => true,
-            'gates_premium_content' => false
+            'gates_premium_content' => false,
+            'site_id' => $this->siteId,
         ]);
 
         $this->assertResponseStatus(201, $response);

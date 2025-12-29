@@ -88,9 +88,10 @@ class TagRepository extends Repository
         return $query->get();
     }
 
-    public function getTagCloud(int $limit = 50): Collection
+    public function getTagCloud(int $limit = 50, ?int $siteId = null): Collection
     {
         $models = $this->where('usage_count', '>', 0)
+            ->where('site_id', $siteId)
             ->orderBy('usage_count', 'desc')
             ->limit($limit)
             ->get();

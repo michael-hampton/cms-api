@@ -5,7 +5,7 @@ namespace App\Policies;
 use App\Framework\AuthenticatedUser;
 use App\Models\Model;
 
-class CategoryPolicy extends BasePolicy
+class CampaignPolicy extends BasePolicy
 {
     public function create(AuthenticatedUser $user): bool
     {
@@ -20,5 +20,10 @@ class CategoryPolicy extends BasePolicy
     public function delete(AuthenticatedUser $user, Model $model): bool
     {
         return $this->isAdmin($user) || $this->owns($user, $model);
+    }
+
+    public function clone(AuthenticatedUser $user, Model $model): bool
+    {
+        return $this->isEditor($user);
     }
 }

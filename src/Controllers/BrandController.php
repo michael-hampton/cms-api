@@ -12,6 +12,8 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
 use App\Requests\BulkDeleteRequest;
+use App\Requests\CreateBrandRequest;
+use App\Requests\UpdateBrandRequest;
 use App\Resources\BrandResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\BrandService;
@@ -37,10 +39,10 @@ class BrandController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(CreateBrandRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
+            $data = $request->validated();
             $logoFile = $request->file('logo');
             $siteId = Site::resolveSite($siteName);
 
@@ -77,10 +79,10 @@ class BrandController extends Controller
         }
     }
 
-    public function update(int $id, Request $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateBrandRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
+            $data = $request->validated();
             $logoFile = $request->file('logo');
 
             $brand = $this->brandService->updateBrand($id, $data, $logoFile);

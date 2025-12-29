@@ -106,6 +106,7 @@ abstract class FunctionalTestCase extends TestCase
                     'email' => 'test@example.com',
                     'password' => password_hash('password', PASSWORD_DEFAULT),
                     'site_id' => $this->siteId,
+                    'role' => 'admin',
                 ]);
             } else {
                 $user = new User($user);

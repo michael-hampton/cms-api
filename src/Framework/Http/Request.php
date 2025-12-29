@@ -21,7 +21,7 @@ class Request implements RequestInterface
     /**
      * @var \App\Framework\Support\Collection|bool|\DateTime|float|int|mixed|string|null
      */
-    private int $siteId;
+    protected int $siteId;
 
     public function __construct(array $data = [], array $files = [], array $routeParams = [])
     {
@@ -290,7 +290,7 @@ class Request implements RequestInterface
     }
 
     public function getHeader(string $key): ?string {
-        return $this->headers[$key] ?? null;;
+        return $this->headers[$key] ?? null;
     }
 
     public function setSite(Site $site): void

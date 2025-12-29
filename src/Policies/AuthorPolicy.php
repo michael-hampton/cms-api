@@ -5,15 +5,20 @@ namespace App\Policies;
 use App\Framework\AuthenticatedUser;
 use App\Models\Model;
 
-class AuthorPolicy
+class AuthorPolicy extends BasePolicy
 {
-    public function create(?AuthenticatedUser $user, Model $model): bool
+    public function create(AuthenticatedUser $user): bool
     {
-        return $user->role === 'admin';
+        return $this->isEditor($user);
     }
 
-    public function update(?AuthenticatedUser $user, Model $model): bool
+    public function update(AuthenticatedUser $user, Model $model): bool
     {
-        return $user->role === 'admin';
+        return $this->isEditor($user) || $this->owns($user, $model);
+    }
+
+    public function delete(AuthenticatedUser $user, Model $model): bool
+    {
+        return $this->isAdmin($user) || $this->owns($user, $model);
     }
 }

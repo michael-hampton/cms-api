@@ -3,8 +3,7 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
-use App\Framework\Support\Str;
-use App\Repositories\CategoryRepository;
+use App\Models\Image;
 
 class UpdateImageRequest extends FormRequest
 {
@@ -24,5 +23,10 @@ class UpdateImageRequest extends FormRequest
         if (empty($this->data['site_id'])) {
             $this->data['site_id'] = config('app.default_site_id');
         }
+    }
+
+    protected static function model(): string
+    {
+        return Image::class;
     }
 }

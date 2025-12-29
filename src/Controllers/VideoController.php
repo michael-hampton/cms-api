@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Requests\CreateVideoRequest;
 use App\Services\VideoService;
 
 class VideoController extends Controller
@@ -40,7 +41,7 @@ class VideoController extends Controller
         ]);
     }
 
-    public function upload(Request $request): JsonResponse
+    public function upload(CreateVideoRequest $request): JsonResponse
     {
         try {
             $file = $request->file('video');
@@ -51,10 +52,7 @@ class VideoController extends Controller
                 ], 400);
             }
 
-            $metadata = [
-                'title' => $request->input('title'),
-                'description' => $request->input('description')
-            ];
+            $metadata = $request->validated();
 
             $video = $this->videoService->uploadVideo($file, $metadata);
 

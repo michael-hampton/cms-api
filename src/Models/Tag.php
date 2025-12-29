@@ -38,15 +38,15 @@ class Tag extends Model
         'clone_history' => 'array',
     ];
 
-    public static function boot()
-    {
-        parent::boot();
-
-        static::created(function ($tag) {
-            $tag->usage_count = 0;
-            $tag->save();
-        });
-    }
+//    public static function boot()
+//    {
+//        parent::boot();
+//
+//        static::created(function ($tag) {
+//            $tag->usage_count = 0;
+//            $tag->save();
+//        });
+//    }
 
     public function pages($relation = false)
     {

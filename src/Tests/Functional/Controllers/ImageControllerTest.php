@@ -95,6 +95,7 @@ class ImageControllerTest extends FunctionalTestCase
             'original_name' => 'test.jpg'
         ]);;
         $response = $this->putForSite("/api/images/{$image->id}", ['alt_text' => 'Updated alt', 'caption' => 'New caption']);
+
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 

@@ -6,7 +6,10 @@ namespace App\Controllers;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
+use App\Framework\Support\SiteContext;
 use App\Repositories\CampaignRepository;
+use App\Requests\CreateCampaignRequest;
+use App\Requests\UpdateBrandRequest;
 use App\Services\CampaignService;
 
 class CampaignController extends Controller
@@ -31,8 +34,8 @@ class CampaignController extends Controller
                     'is_currently_active' => $campaign->isActive(),
                     'has_ended' => $campaign->hasEnded(),
                     'created_at' => $campaign->created_at->format('Y-m-d H:i:s'),
-                    'start_date' => $campaign->start_date->format('Y-m-d H:i:s'),
-                    'end_date' => $campaign->end_date->format('Y-m-d H:i:s'),
+                    'start_date' => $campaign->start_date?->format('Y-m-d H:i:s'),
+                    'end_date' => $campaign->end_date?->format('Y-m-d H:i:s'),
                 ]);
             });
 
@@ -65,10 +68,10 @@ class CampaignController extends Controller
         }
     }
 
-    public function create(Request $request): JsonResponse
+    public function create(CreateCampaignRequest $request): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
+            $siteId = SiteContext::getId();
 
             // Validate required fields
             $name = $request->input('name');
@@ -84,18 +87,7 @@ class CampaignController extends Controller
                 return $this->errorResponse('Campaign with this slug already exists', 400);
             }
 
-            $data = [
-                'site_id' => $siteId,
-                'name' => $name,
-                'slug' => $slug,
-                'description' => $request->input('description'),
-                'newsletter_id' => $request->input('newsletter_id'),
-                'is_active' => $request->input('is_active', true),
-                'gates_premium_content' => $request->input('gates_premium_content', false),
-                'start_date' => $request->input('start_date'),
-                'end_date' => $request->input('end_date'),
-                'tracking_params' => $request->input('tracking_params', []),
-            ];
+            $data = $request->validated();
 
             $campaign = $this->campaignRepository->create($data);
 
@@ -106,10 +98,10 @@ class CampaignController extends Controller
         }
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateBrandRequest $request, int $id): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
+            $siteId = SiteContext::getId();
             $campaign = $this->campaignRepository->find($id);
 
             if (!$campaign || $campaign->site_id !== $siteId) {
@@ -125,17 +117,7 @@ class CampaignController extends Controller
                 }
             }
 
-            $data = array_filter([
-                'name' => $request->input('name'),
-                'slug' => $newSlug,
-                'description' => $request->input('description'),
-                'newsletter_id' => $request->input('newsletter_id'),
-                'is_active' => $request->input('is_active'),
-                'gates_premium_content' => $request->input('gates_premium_content'),
-                'start_date' => $request->input('start_date'),
-                'end_date' => $request->input('end_date'),
-                'tracking_params' => $request->input('tracking_params'),
-            ], fn($value) => $value !== null);
+            $data = $request->validated();
 
             $updated = $this->campaignRepository->update($id, $data);
 

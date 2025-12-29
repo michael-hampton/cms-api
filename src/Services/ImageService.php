@@ -146,13 +146,11 @@ class ImageService
             throw new Exception('Image not found');
         }
 
+        $imageRights = ImageRights::values();
+
         // Validate image_rights if provided
-        if (!empty($metadata['image_rights'])) {
-            try {
-                ImageRights::from($metadata['image_rights']);
-            } catch (\ValueError $e) {
-                throw new ValidationException('Invalid image rights value');
-            }
+        if (!empty($metadata['image_rights']) && !in_array($metadata['image_rights'], $imageRights)) {
+            throw new ValidationException('Invalid image rights value');
         }
 
         // Update image
@@ -163,7 +161,7 @@ class ImageService
             $this->assignCategoriesToImage($image, $metadata['categories']);
         }
 
-        $this->imageRepository->syncTags($image, $metadata['tags']);
+        $this->imageRepository->syncTags($image, $metadata['tags'] ?? []);
 
         return $image->fresh();
     }

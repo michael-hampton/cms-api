@@ -14,6 +14,8 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\PageRepository;
 use App\Repositories\TerritoryRepository;
 use App\Requests\BulkDeleteRequest;
+use App\Requests\CreateTerritoryRequest;
+use App\Requests\UpdateTerritoryRequest;
 use App\Resources\PageResource;
 use App\Resources\TerritoryResource;
 use App\Search\SearchCriteriaParser;
@@ -50,10 +52,10 @@ class TerritoryController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(CreateTerritoryRequest $request, string $siteName): JsonResponse
     {
         try {
-            $requestData = $request->all();
+            $requestData = $request->validated();
             $territory = $this->service->create($requestData);
 
             return $this->jsonResponse(['territory' => $territory->toArrayWithRelations()], 201);
@@ -79,10 +81,10 @@ class TerritoryController extends Controller
         }
     }
 
-    public function update(int $id, Request $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateTerritoryRequest $request, string $siteName): JsonResponse
     {
         try {
-            $requestData = $request->all();
+            $requestData = $request->validated();
             $territory = $this->service->update($id, $requestData);
 
             return $this->jsonResponse(['territory' => $territory->toArrayWithRelations()]);

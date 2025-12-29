@@ -5,11 +5,11 @@ namespace App\Policies;
 use App\Framework\AuthenticatedUser;
 use App\Models\Model;
 
-class CategoryPolicy extends BasePolicy
+class VideoPolicy extends BasePolicy
 {
     public function create(AuthenticatedUser $user): bool
     {
-        return $this->isEditor($user);
+        return true; // All authenticated users can upload videos
     }
 
     public function update(AuthenticatedUser $user, Model $model): bool
@@ -19,6 +19,6 @@ class CategoryPolicy extends BasePolicy
 
     public function delete(AuthenticatedUser $user, Model $model): bool
     {
-        return $this->isAdmin($user) || $this->owns($user, $model);
+        return $this->isEditor($user) || $this->owns($user, $model);
     }
 }

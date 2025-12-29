@@ -11,6 +11,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Validator;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
@@ -152,7 +153,9 @@ class TagController extends Controller
     public function cloud(): JsonResponse
     {
         try {
-            $tags = $this->tagRepository->getTagCloud(100);
+            $siteId = SiteContext::getId();
+            $tags = $this->tagRepository->getTagCloud(100, $siteId);
+
             return $this->jsonResponse(['tags' => $tags->toArray()]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

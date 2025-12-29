@@ -4,9 +4,11 @@ namespace App\Framework\Http;
 
 use App\Framework\AuthenticatedUser;
 use App\Framework\Authorization\Auth;
+use App\Framework\Authorization\Gate;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
+use App\Framework\Support\HasModel;
 use App\Framework\Validation\Rules\AcceptedRule;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
@@ -35,6 +37,8 @@ use Exception;
 
 abstract class FormRequest extends Request
 {
+    use HasModel;
+
     protected array $data = [];
     protected array $validatedData = [];
     protected array $errors = [];
@@ -144,10 +148,45 @@ abstract class FormRequest extends Request
     abstract public function rules(): array;
 
     /**
+     * Get the policy class for authorization
+     */
+    protected function getPolicyClass(): ?string
+    {
+        return null; // Override in child classes
+    }
+
+    protected function getModelId(): mixed
+    {
+        return $this->input('id');
+    }
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
+        $user = $this->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        $ability = $this->getAbility();
+        $model = $this->getModelInstance();
+
+        // If we have a model instance, authorize against it
+        if ($model) {
+            return Gate::forUser($user, $ability, $model);
+        }
+
+        // If we have a model class only, allow create checks
+        $modelClass = $this->getModelClass();
+
+        if ($modelClass) {
+            return Gate::forUser($user, $ability, $modelClass);
+        }
+
+        // Old requests: no model awareness, allow
         return true;
     }
 
