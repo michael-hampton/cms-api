@@ -24,6 +24,8 @@ class PageLikeControllerTest extends FunctionalTestCase
 
     public function testToggleLikeRequiresAuthentication()
     {
+        $this->unauthenticateMember();
+
         $response = $this->postForSite("/api/pages/like/{$this->page->id}");
 
         $this->assertEquals(401, $response->getStatusCode());
