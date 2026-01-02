@@ -40,6 +40,7 @@ class MemberAuthController extends Controller
     public function register(MemberRegistrationRequest $request)
     {
         $siteId = SiteContext::getId();
+
         $validated = $request->validated();
 
         $existingMember = Member::findByEmail($validated['email'], $siteId);
@@ -318,7 +319,7 @@ class MemberAuthController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
 
         return $this->view('member/dashboard', [
             'member' => $member,

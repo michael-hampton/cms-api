@@ -165,6 +165,13 @@ abstract class FormRequest extends Request
      */
     public function authorize(): bool
     {
+        // If we have a model class only, allow create checks
+        $modelClass = $this->getModelClass();
+
+        if (empty($modelClass)) {
+            return true;
+        }
+
         $user = $this->user();
 
         if (!$user) {
@@ -178,9 +185,6 @@ abstract class FormRequest extends Request
         if ($model) {
             return Gate::forUser($user, $ability, $model);
         }
-
-        // If we have a model class only, allow create checks
-        $modelClass = $this->getModelClass();
 
         if ($modelClass) {
             return Gate::forUser($user, $ability, $modelClass);

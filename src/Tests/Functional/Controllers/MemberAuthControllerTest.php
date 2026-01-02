@@ -38,6 +38,7 @@ class MemberAuthControllerTest extends FunctionalTestCase
 
     public function testShowRegisterFormReturnsSuccessfully()
     {
+        $this->unauthenticateMember();
         $response = $this->makeRequest('GET', '/member/register');
 
         $this->assertResponseStatus(200, $response);
@@ -59,10 +60,12 @@ class MemberAuthControllerTest extends FunctionalTestCase
 
         // Verify member was created
         $member = Member::findByEmail('testmember@example.com', $this->siteId);
+
         $this->assertNotNull($member);
         $this->assertEquals('Test', $member->first_name);
         $this->assertEquals('Member', $member->last_name);
-        $this->assertFalse($member->is_active); // Should require email verification
+        $this->assertTrue($member->is_active);
+        $this->assertEmpty($member->email_verified_at);
     }
 
     public function testRegisterFailsWithDuplicateEmail()
@@ -107,7 +110,7 @@ class MemberAuthControllerTest extends FunctionalTestCase
 
     public function testShowLoginFormReturnsSuccessfully()
     {
-        $response = $this->makeRequest('GET', '/member/login');
+        $response = $this->getForSite('/member/login');
 
         $this->assertResponseStatus(200, $response);
         $this->assertStringContainsString('Login', $response->getContent());

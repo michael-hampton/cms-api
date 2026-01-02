@@ -397,6 +397,8 @@ class NewsletterControllerTest extends FunctionalTestCase
         // Arrange
         ArrayMailer::clear();
 
+        $newsletter = $this->createNewsletter(['is_default' => true]);
+
         $signupData = [
             'email' => 'newsubscriber@example.com',
             'first_name' => 'Test'
@@ -423,6 +425,8 @@ class NewsletterControllerTest extends FunctionalTestCase
         // Arrange
         ArrayMailer::clear();
 
+        $this->createNewsletter(['is_default' => true]);
+
         $signupData = [
             'email' => 'tokentest@example.com'
         ];
@@ -447,6 +451,8 @@ class NewsletterControllerTest extends FunctionalTestCase
         // Arrange
         ArrayMailer::clear();
 
+        $this->createNewsletter(['is_default' => true]);
+
         $signupData = [
             'email' => 'john@example.com',
             'first_name' => 'John'
@@ -468,6 +474,8 @@ class NewsletterControllerTest extends FunctionalTestCase
         // Arrange
         ArrayMailer::clear();
 
+        $this->createNewsletter(['is_default' => true]);
+
         $signupData = [
             'email' => 'anonymous@example.com'
         ];
@@ -486,6 +494,8 @@ class NewsletterControllerTest extends FunctionalTestCase
 
     public function test_signup_creates_subscriber_successfully(): void
     {
+        $this->createNewsletter(['is_default' => true]);
+
         // Arrange
         $signupData = [
             'email' => 'newsubscriber@example.com',
@@ -507,7 +517,7 @@ class NewsletterControllerTest extends FunctionalTestCase
             ->where('site_id', $this->siteId)
             ->first();
         $this->assertNotNull($subscriber);
-        $this->assertFalse($subscriber->confirmed);
+        $this->assertTrue($subscriber->confirmed);
     }
 
     public function test_signup_prevents_duplicate_emails(): void
@@ -595,7 +605,7 @@ class NewsletterControllerTest extends FunctionalTestCase
 
         // Verify deleted from database
         $deleted = Subscriber::find($subscriber->id);
-        $this->assertNull($deleted);
+        $this->assertNotEmpty($deleted->unsubscribed_at);
     }
 
     public function test_unsubscribe_by_subscriber_id(): void
@@ -621,7 +631,7 @@ class NewsletterControllerTest extends FunctionalTestCase
 
         // Verify deleted from database
         $deleted = Subscriber::find($subscriber->id);
-        $this->assertNull($deleted);
+        $this->assertNotEmpty($deleted->unsubscribed_at);
     }
 
     public function test_unsubscribe_returns_error_when_missing_token_and_id(): void

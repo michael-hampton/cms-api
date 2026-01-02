@@ -2,8 +2,6 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\Page;
-use App\Models\PageTag;
 use App\Models\Tag;
 use App\Repositories\TagRepository;
 use App\Search\SearchCriteria;
@@ -176,10 +174,11 @@ class TagRepositoryTest extends RepositoryTestCase
         $this->createTag(['name' => 'Tag 3', 'usage_count' => 25]);
 
         // Act
-        $tags = $this->repository->getTagCloud(10);
+        $tags = $this->repository->getTagCloud(10, $this->siteId);
 
         // Assert
         $tagsArray = $tags->toArray();
+
         $this->assertEquals(100, $tagsArray[0]['relative_size']);
         $this->assertEquals(50, $tagsArray[1]['relative_size']);
         $this->assertEquals(25, $tagsArray[2]['relative_size']);

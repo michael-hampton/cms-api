@@ -23,6 +23,10 @@ class ActivityTracking
 
         $member = MemberAuth::getMember();
 
+        if (empty($member)) {
+            return;
+        }
+
         $this->badgeService->trackActivity(
             $member,
             'comment',
@@ -69,6 +73,10 @@ class ActivityTracking
         }
 
         $member = MemberAuth::getMember();
+
+        if (empty($member)) {
+            return;
+        }
 
         $this->badgeService->trackActivity(
             $member,

@@ -65,6 +65,8 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
 
     public function testSubscribeRequiresAuthentication(): void
     {
+        $this->unauthenticateMember();
+
         $response = $this->postForSite('/member/subscription-plans/premium/subscribe');
 
         $this->assertEquals(302, $response->getStatusCode());
@@ -293,6 +295,8 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
 
     public function testValidateVoucherRequiresAuthentication(): void
     {
+        $this->unauthenticateMember();
+
         $response = $this->postForSite(
             '/member/subscription-plans/premium/validate-voucher',
             ['voucher_code' => 'TEST']

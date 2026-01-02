@@ -77,4 +77,13 @@ class Refund extends Model
     {
         return $this->status === 'cancelled';
     }
+
+    public function getFormattedAmountAttribute(): string
+    {
+        if (!$this->amount) {
+            return '';
+        }
+
+        return number_format((float)($this->amount ?? 0), 2);
+    }
 }

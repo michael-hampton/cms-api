@@ -240,8 +240,8 @@ class Subscription extends Model
             'member_id' => $this->member_id,
             'subscription_id' => $this->id,
             'site_id' => $this->site_id,
-            'window_start' => $this->start_date->format('Y-m-d H:i:s'),
-            'window_end' => $this->end_date->format('Y-m-d H:i:s') ?? now(),
+            'window_start' => $this->start_date?->format('Y-m-d H:i:s'),
+            'window_end' => $this->end_date?->format('Y-m-d H:i:s') ?? now(),
             'type' => 'paid'
         ]);
     }
@@ -264,7 +264,7 @@ class Subscription extends Model
 
         // Update existing window
         $window->update([
-            'window_end' => $this->end_date->format('Y-m-d H:i:s') ?? $this->start_date->format('Y-m-d H:i:s'),
+            'window_end' => $this->end_date?->format('Y-m-d H:i:s') ?? $this->start_date->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -287,7 +287,7 @@ class Subscription extends Model
                 'subscription_id' => $this->id,
                 'site_id' => $this->site_id,
                 'window_start' => $this->start_date->format('Y-m-d H:i:s'),
-                'window_end' => new \DateTime(),
+                'window_end' => now(),
                 'type' => 'paid'
             ]);
         }

@@ -4,13 +4,13 @@ Hello **<?= $customer_name ?>**,
 
 Good news! Your refund has been processed successfully.
 
-@promotion(✅ Refund Confirmed - $<?= number_format($refund->amount, 2) ?>)
+@promotion(✅ Refund Confirmed - $<?= number_format((float)$refund->amount ?? 0, 2) ?>)
 
 ## Refund Details
 
-**Refund Amount:** @price(<?= number_format($refund->amount, 2) ?>)
+**Refund Amount:** @price(<?= number_format((float)$refund->amount ?? 0, 2) ?>)
 **Original Order:** #<?= $order->order_number ?>
-**Refund Date:** <?= date('F j, Y', strtotime($refund->created_at)) ?>
+**Refund Date:** <?= $refund->created_at->format('F j, Y') ?>
 **Refund ID:** #<?= $refund->id ?>
 **Payment Method:** <?= ucfirst($refund->payment_method ?? 'Original payment method') ?>
 
@@ -18,7 +18,7 @@ Good news! Your refund has been processed successfully.
 
 ## Processing Timeline
 
-@panel(💰 Your refund of $<?= number_format($refund->amount, 2) ?> will appear in your account within 5-10 business days)
+@panel(💰 Your refund of $<?= number_format((float)$refund->amount ?? 0, 2) ?> will appear in your account within 5-10 business days)
 
 The exact timing depends on your bank or card issuer. Most refunds appear within 3-5 business days, but some may take up to 10 business days.
 

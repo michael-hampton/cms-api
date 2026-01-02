@@ -25,6 +25,7 @@ class PageLikeModelTest extends FunctionalTestCase
         $this->page = $this->createPage();
 
         $this->member = $this->createMember();
+        $this->actingAsMember($this->member);
     }
 
     public function testToggleLike()

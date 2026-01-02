@@ -7,6 +7,7 @@ use App\Framework\Support\Logger;
 use App\Mail\DealAlert;
 use App\Mail\ForgotPassword;
 use App\Mail\MemberSignupConfirmation;
+use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Mail\NewsletterSignupConfirmationWithTrackingTest;
 use App\Mail\NewsletterWelcome;
 use App\Mail\PriceAlert;
@@ -160,7 +161,7 @@ class EmailService
         try {
             return $this->mailManager
                 ->to($email)
-                ->send(new NewsletterSignupConfirmationWithTrackingTest($email, $confirmationToken, $firstName, $preferences));
+                ->send(new NewsletterSignupConfirmationWithTracking($email, $confirmationToken, $firstName, $preferences));
         } catch (\Exception $e) {
             Logger::error('Failed to send newsletter confirmation email', [
                 'email' => $email,

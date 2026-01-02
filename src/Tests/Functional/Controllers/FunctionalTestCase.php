@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\ApiApplication;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
@@ -89,6 +90,13 @@ abstract class FunctionalTestCase extends TestCase
     {
         Session::put('member_id', $member->id);
         Session::put('member_authenticated', true);
+    }
+
+    protected function unauthenticateMember(): void
+    {
+        MemberAuth::$member = null;
+        Session::forget('member_id');
+        Session::forget('member_authenticated');
     }
 
     /**

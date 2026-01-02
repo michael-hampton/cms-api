@@ -51,7 +51,7 @@ class UserControllerTest extends FunctionalTestCase
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
 
-        $this->assertCount(1, $data['items']);
+        $this->assertCount(2, $data['items']); //includes logged in user in auth header
         $this->assertEquals('admin', $data['items'][0]['role']);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Framework\ServiceProvider;
 
 use App\Framework\AutoDiscovery;
+use App\Framework\Support\Logger;
 
 /**
  * Parser Service Provider - Block parsers and registry
@@ -30,7 +31,7 @@ class ParserServiceProvider extends ServiceProvider
                     $registry->register($parser);
                 } catch (\Exception $e) {
                     // Log and continue - some parsers might have dependencies we can't resolve yet
-                    error_log("Could not register parser {$parserClass}: " . $e->getMessage());
+                    Logger::error("Could not register parser {$parserClass}: " . $e->getMessage());
                 }
             }
         }
