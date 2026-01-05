@@ -2,16 +2,19 @@
 
 namespace App\Controllers;
 
-use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\MemberRepository;
+use App\Services\Payment\StripePaymentProcessor;
 
 class MemberController extends Controller
 {
-    public function __construct(private readonly MemberRepository $memberRepository)
+    public function __construct(
+        private readonly MemberRepository       $memberRepository,
+        private readonly StripePaymentProcessor $stripeProcessor
+    )
     {
         parent::__construct();
     }
@@ -69,10 +72,33 @@ class MemberController extends Controller
 
             $data = $request->only(['first_name', 'last_name', 'display_name', 'email']);
 
+            // Check if email is being updated
+            $emailChanged = isset($data['email']) && $data['email'] !== $member->email;
+            $oldEmail = $member->email;
+
             $updatedMember = $this->memberRepository->updateAccountDetails($member->id, $data);
 
             if (!$updatedMember) {
                 return $this->back();
+            }
+
+            // Update Stripe customer email if changed and customer exists
+            if ($emailChanged && $updatedMember->stripe_customer_id) {
+                try {
+                    $this->stripeProcessor->updateCustomerEmail(
+                        $updatedMember->stripe_customer_id,
+                        $data['email']
+                    );
+                } catch (\Exception $e) {
+                    // Log error but don't fail the update
+                    \App\Framework\Support\Logger::error('Failed to update Stripe customer email', [
+                        'member_id' => $member->id,
+                        'stripe_customer_id' => $updatedMember->stripe_customer_id,
+                        'old_email' => $oldEmail,
+                        'new_email' => $data['email'],
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             return $this->redirect("/{$site->slug}/member/account-details");

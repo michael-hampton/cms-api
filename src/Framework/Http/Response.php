@@ -8,9 +8,9 @@ use Exception;
 
 class Response
 {
-    private $content;
-    private $statusCode;
-    private $headers;
+    private string $content;
+    private int $statusCode;
+    private array $headers;
 
     public function __construct(string $content = '', int $statusCode = 200, array $headers = [])
     {
@@ -46,6 +46,11 @@ class Response
     public function getHeaders(): array
     {
         return $this->headers;
+    }
+
+    public function getHeader(string $name): string
+    {
+        return $this->headers[$name] ?? '';
     }
 
     public function setHeader(string $name, string $value): self

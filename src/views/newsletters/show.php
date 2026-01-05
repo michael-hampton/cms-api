@@ -183,7 +183,7 @@
 </head>
 <body>
 <div class="container">
-    <a href="/newsletters" class="back-link">
+    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters" class="back-link">
         ← Back to All Newsletters
     </a>
 
@@ -191,9 +191,16 @@
         <div class="newsletter-date">
             <?= $newsletter->created_at->format('F d, Y') ?>
         </div>
-        <h1 class="newsletter-title">
-            <?= htmlspecialchars($newsletter->title ?? 'Newsletter') ?>
-        </h1>
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <h1 class="newsletter-title">
+                <?= htmlspecialchars($newsletter->title ?? 'Newsletter') ?>
+            </h1>
+            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>/download<?= $token ? '?token=' . $token : '' ?>"
+               class="download-btn"
+               style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                📥 Download PDF
+            </a>
+        </div>
         <div class="newsletter-meta">
             <span>📧 Newsletter</span>
             <?php if ($newsletter->isAutomated()): ?>

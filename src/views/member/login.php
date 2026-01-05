@@ -253,7 +253,7 @@
             <div class="message"><?= htmlspecialchars($msg) ?></div>
         <?php endif; ?>
 
-        <form method="POST" action="/member/login">
+        <form method="POST" action="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/login">
             @csrf
             <div class="form-group">
                 <label for="email">Email Address</label>

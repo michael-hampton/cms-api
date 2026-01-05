@@ -536,6 +536,94 @@
                     </div>
                 </div>
 
+                <?php
+                // Calculate renewal warnings
+                $showRenewalWarning = false;
+                $renewalWarningMessage = '';
+                $renewalWarningType = 'info';
+
+                if ($activeSubscription->next_billing_date) {
+                    $daysUntilRenewal = $activeSubscription->getDaysUntilRenewal();
+
+                    if ($daysUntilRenewal <= 7 && $daysUntilRenewal > 0) {
+                        $showRenewalWarning = true;
+                        $renewalWarningType = 'warning';
+                        $renewalWarningMessage = "Your subscription will renew in {$daysUntilRenewal} day" . ($daysUntilRenewal > 1 ? 's' : '');
+                    } elseif ($daysUntilRenewal <= 0) {
+                        $showRenewalWarning = true;
+                        $renewalWarningType = 'danger';
+                        $renewalWarningMessage = "Your subscription renewal is due";
+                    } elseif ($daysUntilRenewal <= 30) {
+                        $showRenewalWarning = true;
+                        $renewalWarningType = 'info';
+                        $renewalWarningMessage = "Your subscription will renew in {$daysUntilRenewal} days";
+                    }
+                }
+
+                // Check if subscription is set to cancel
+// A subscription is cancelling if it has an end_date in the future AND auto_renew is disabled
+// If auto_renew is true, the subscription will renew and not actually end
+                $isCancelling = $activeSubscription->status === 'active' &&
+                        $activeSubscription->end_date &&
+                        $activeSubscription->end_date > new \DateTime() &&
+                        !$activeSubscription->auto_renew; // Only show as cancelling if auto-renew is OFF
+                ?>
+
+                <?php if ($showRenewalWarning): ?>
+                    <div style="background: <?= $renewalWarningType === 'danger' ? '#fee2e2' : ($renewalWarningType === 'warning' ? '#fef3c7' : '#dbeafe') ?>;
+                            border-left: 4px solid <?= $renewalWarningType === 'danger' ? '#dc2626' : ($renewalWarningType === 'warning' ? '#f59e0b' : '#3b82f6') ?>;
+                            padding: 16px;
+                            border-radius: 8px;
+                            margin-bottom: 24px;
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;">
+            <span style="font-size: 24px;">
+                <?= $renewalWarningType === 'danger' ? '⚠️' : ($renewalWarningType === 'warning' ? '⏰' : 'ℹ️') ?>
+            </span>
+                        <div>
+                            <div style="font-weight: 600; color: <?= $renewalWarningType === 'danger' ? '#991b1b' : ($renewalWarningType === 'warning' ? '#92400e' : '#1e40af') ?>;">
+                                <?= $renewalWarningMessage ?>
+                            </div>
+                            <?php if ($activeSubscription->auto_renew): ?>
+                                <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
+                                    Auto-renewal is enabled. Payment will be processed automatically.
+                                </div>
+                            <?php else: ?>
+                                <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
+                                    Auto-renewal is disabled. You'll need to renew manually.
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($isCancelling): ?>
+                    <div style="background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;">
+                        <span style="font-size: 24px;">🔔</span>
+                        <div>
+                            <div style="font-weight: 600; color: #92400e;">
+                                Subscription Set to Cancel
+                            </div>
+                            <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
+                                Your access will end on <?= $activeSubscription->end_date->format('F d, Y') ?>.
+                                <?php if (!$activeSubscription->auto_renew): ?>
+                                    You can reactivate anytime before then.
+                                <?php else: ?>
+                                    However, auto-renewal is still enabled. The subscription will attempt to renew unless you disable auto-renewal.
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <div class="info-row">
                     <span class="info-label">Status</span>
                     <span class="badge badge-success">Active</span>
@@ -556,6 +644,15 @@
                     </span>
                 </div>
 
+                <?php if ($activeSubscription->next_billing_date): ?>
+                    <div class="info-row">
+                        <span class="info-label">Next Billing Date</span>
+                        <span class="info-value" style="font-weight: 800; color: #667eea;">
+                <?= $activeSubscription->next_billing_date->format('M d, Y') ?>
+            </span>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($activeSubscription->end_date): ?>
                     <div class="info-row">
                         <span class="info-label">End Date</span>
@@ -572,10 +669,110 @@
                     </span>
                 </div>
 
+                <div class="info-row">
+                    <span class="info-label">Delivery Type</span>
+                    <span class="info-value">
+        <?= $activeSubscription->isPrint() ? '📦 Print' : '💻 Digital' ?>
+    </span>
+                </div>
+
+                <?php if ($activeSubscription->isPrint()): ?>
+                    <div class="info-row">
+                        <span class="info-label">Shipping Address</span>
+                        <span class="info-value" style="font-size: 14px; line-height: 1.6;">
+            <?php
+            // First check if subscription has an associated order with shipping address
+            $shippingAddress = null;
+
+            if ($activeSubscription->one_time_subscription_id) {
+                // Look up the order associated with this subscription
+                $order = \App\Models\Order::where('one_time_subscription_id', $activeSubscription->id)
+                        ->first();
+
+                if ($order) {
+                    // Try to get address from order's relationship first
+                    if ($order->shipping_address_id) {
+                        $shippingAddress = \App\Models\Address::find($order->shipping_address_id);
+                    } elseif ($order->shipping_address && is_array($order->shipping_address)) {
+                        // Use the stored address array from order
+                        echo htmlspecialchars($order->shipping_address['address_line_1'] ?? $order->shipping_address['line1'] ?? '') . '<br>';
+                        if (!empty($order->shipping_address['address_line_2'] ?? $order->shipping_address['line2'] ?? '')) {
+                            echo htmlspecialchars($order->shipping_address['address_line_2'] ?? $order->shipping_address['line2']) . '<br>';
+                        }
+                        echo htmlspecialchars($order->shipping_address['city'] ?? '') . ', ';
+                        echo htmlspecialchars($order->shipping_address['postcode'] ?? '');
+                        $shippingAddress = 'displayed'; // Flag that we've shown it
+                    }
+                }
+            }
+
+            // If no order address found, fall back to member's default shipping address
+            if (!$shippingAddress || $shippingAddress !== 'displayed') {
+                if ($shippingAddress) {
+                    // We have an Address object
+                    echo htmlspecialchars($shippingAddress->address_line_1) . '<br>';
+                    if ($shippingAddress->address_line_2) {
+                        echo htmlspecialchars($shippingAddress->address_line_2) . '<br>';
+                    }
+                    echo htmlspecialchars($shippingAddress->city) . ', ' . htmlspecialchars($shippingAddress->postcode);
+                } else {
+                    // Try to get default shipping address from member
+                    $defaultAddress = \App\Models\Address::where('member_id', $member->id)
+                            ->where('site_id', \App\Framework\Support\SiteContext::getId())
+                            ->where('is_default', true)
+                            ->whereIn('type', ['shipping', 'both'])
+                            ->first();
+
+                    if ($defaultAddress) {
+                        echo htmlspecialchars($defaultAddress->address_line_1) . '<br>';
+                        if ($defaultAddress->address_line_2) {
+                            echo htmlspecialchars($defaultAddress->address_line_2) . '<br>';
+                        }
+                        echo htmlspecialchars($defaultAddress->city) . ', ' . htmlspecialchars($defaultAddress->postcode);
+                    } else {
+                        ?>
+                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/addresses"
+                           style="color: #667eea;">
+                            Add shipping address
+                        </a>
+                        <?php
+                    }
+                }
+            }
+            ?>
+        </span>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($activeSubscription->isDigital() && $activeSubscription->hasValidDownload()): ?>
+                    <div class="info-row">
+                        <span class="info-label">Digital Access</span>
+                        <span class="info-value">
+            <a href="<?= htmlspecialchars($activeSubscription->download_url) ?>"
+               style="color: #667eea; text-decoration: none; font-weight: 600;">
+                Download Now →
+            </a>
+        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Download Expires</span>
+                        <span class="info-value" style="font-size: 14px;">
+            <?= $activeSubscription->download_expires_at->format('M d, Y') ?>
+        </span>
+                    </div>
+                <?php endif; ?>
+
                 <div class="btn-group">
-                    <button class="btn btn-danger" onclick="cancelSubscription(<?= $activeSubscription->id ?>)">
-                        Cancel Subscription
-                    </button>
+                    <?php if ($isCancelling): ?>
+                        <button class="btn btn-primary"
+                                onclick="reactivateSubscription(<?= $activeSubscription->id ?>)">
+                            Reactivate Subscription
+                        </button>
+                    <?php else: ?>
+                        <button class="btn btn-danger" onclick="cancelSubscription(<?= $activeSubscription->id ?>)">
+                            Cancel Subscription
+                        </button>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <div class="subscription-status">
@@ -729,6 +926,7 @@
                 <thead>
                 <tr>
                     <th>Plan</th>
+                    <th>Type</th>
                     <th>Status</th>
                     <th>Start Date</th>
                     <th>End Date</th>
@@ -738,7 +936,20 @@
                 <tbody>
                 <?php foreach ($subscriptionHistory as $sub): ?>
                     <tr>
-                        <td style="font-weight: 600;"><?= htmlspecialchars($sub->plan_name) ?></td>
+                        <td style="font-weight: 600;">
+                            <?= htmlspecialchars($sub->plan_name) ?>
+                            <?php if ($sub->delivery_type): ?>
+                                <span style="font-size: 12px; color: #64748b; display: block; margin-top: 4px;">
+                                <?= $sub->isDigital() ? '💻 Digital' : '📦 Print' ?>
+                            </span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                        <span class="badge"
+                              style="background: <?= $sub->type === 'paid' ? '#e0e7ff' : '#f3f4f6' ?>; color: <?= $sub->type === 'paid' ? '#3730a3' : '#374151' ?>;">
+                            <?= ucfirst(htmlspecialchars($sub->type ?? 'standard')) ?>
+                        </span>
+                        </td>
                         <td>
                         <span class="badge badge-<?= $sub->status === 'active' ? 'success' : 'warning' ?>">
                             <?= ucfirst(htmlspecialchars($sub->status)) ?>

@@ -236,7 +236,7 @@ class Router
 
                 $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
 
-                Session::setPreviousUrl($routePath);
+                Session::setPreviousUrl($redirectPath);
 
                 return $this->runMiddleware($middlewareStack, $request, function ($request) use ($handler, $params) {
                     return $this->callAction($handler, $request, $params);

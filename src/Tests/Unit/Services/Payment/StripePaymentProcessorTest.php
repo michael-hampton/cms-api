@@ -1332,4 +1332,22 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertEquals(99.99, $result['amount']);
         $this->assertEquals('usd', $result['currency']);
     }
+
+    public function testUpdateCustomerEmail(): void
+    {
+        $customer = new \stdClass();
+        $customer->id = 'cus_test123';
+        $customer->email = 'new@example.com';
+
+        $this->customerServiceMock->shouldReceive('update')
+            ->once()
+            ->with('cus_test123', ['email' => 'new@example.com'])
+            ->andReturn($customer);
+
+        $result = $this->processor->updateCustomerEmail('cus_test123', 'new@example.com');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('cus_test123', $result['customer_id']);
+        $this->assertEquals('new@example.com', $result['email']);
+    }
 }

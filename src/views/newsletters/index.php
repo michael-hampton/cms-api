@@ -209,15 +209,17 @@
                             </p>
                         <?php endif; ?>
                         <div class="newsletter-footer">
-                            <!--                                <span class="newsletter-status -->
-                            <?php //= $newsletter->status === 'published' ? 'status-published' : 'status-draft' ?><!--">-->
-                            <!--                                    --><?php //= ucfirst($newsletter->status) ?>
-                            <!--                                </span>-->
-                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>"
-                               class="read-more"
-                               onclick="event.stopPropagation()">
-                                Read More →
-                            </a>
+                            <div style="display: flex; gap: 12px;">
+                                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>"
+                                   class="read-more">
+                                    Read More →
+                                </a>
+                                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>/download"
+                                   style="color: #667eea; font-size: 14px; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px;"
+                                   onclick="event.stopPropagation()">
+                                    📥 PDF
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>

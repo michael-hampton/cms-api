@@ -1164,4 +1164,29 @@ class StripePaymentProcessor
             ];
         }
     }
+
+    /**
+     * Update customer email in Stripe
+     */
+    public function updateCustomerEmail(string $customerId, string $newEmail): array
+    {
+        try {
+            $customer = $this->stripe->customers->update($customerId, [
+                'email' => $newEmail
+            ]);
+
+            return [
+                'success' => true,
+                'customer_id' => $customer->id,
+                'email' => $customer->email
+            ];
+        } catch (\Exception $e) {
+            error_log('Error updating Stripe customer email: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Failed to update customer email in Stripe'
+            ];
+        }
+    }
 }

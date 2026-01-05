@@ -534,6 +534,14 @@
                                     Active
                                 </div>
                             <?php endif; ?>
+                            <?php if ($newsletter->last_sent): ?>
+                                <div class="meta-item">
+                                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/newsletters/<?= $newsletter->id ?>"
+                                       style="color: #667eea; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                                        👁️ View Latest
+                                    </a>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 

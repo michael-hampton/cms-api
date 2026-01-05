@@ -177,10 +177,11 @@ class MemberAuthController extends Controller
     public function login(LoginRequest $request)
     {
         $credentials = $request->validated();
+        $site = SiteContext::slug();
 
         if (MemberAuth::attempt($credentials)) {
 
-            $intendedUrl = $request->session()->get('intended_url', '/member/dashboard');
+            $intendedUrl = $request->session()->get('intended_url', '/' . $site . '/member/dashboard');
             $request->session()->forget('intended_url');
 
             if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||

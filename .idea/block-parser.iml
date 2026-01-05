@@ -77,6 +77,12 @@
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/paypal/paypal-checkout-sdk" />
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/paypal/paypalhttp" />
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/stripe/stripe-php" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/dompdf/dompdf" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/dompdf/php-font-lib" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/dompdf/php-svg-lib" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/masterminds/html5" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/sabberworm/php-css-parser" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/thecodingmachine/safe" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

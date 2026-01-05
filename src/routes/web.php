@@ -12,6 +12,7 @@ use App\Controllers\ContentController;
 use App\Controllers\DealsController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\EventController;
+use App\Controllers\FaqController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
 use App\Controllers\Members\MemberActivityController;
@@ -262,7 +263,10 @@ $router->post('/api/{site}/subscription-plans/{slug}/validate-voucher', [MemberS
 $router->get('/{site}/newsletters', [NewsletterWebController::class, 'index']);
 $router->get('/{site}/newsletters/{id}', [NewsletterWebController::class, 'show']);
 $router->get('/{site}/newsletters/archive', [NewsletterWebController::class, 'archive']);
+$router->get('{site}/newsletters/{id}/download', [NewsletterWebController::class, 'downloadPdf']);
 
+//faqs
+$router->get('{site}/faqs', [FaqController::class, 'subscriptions']);
 
 // Member Newsletters Routes
 $router->get('/{site}/member/newsletters', [MemberNewslettersController::class, 'index']);

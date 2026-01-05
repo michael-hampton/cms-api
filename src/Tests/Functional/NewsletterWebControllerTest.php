@@ -186,4 +186,32 @@ class NewsletterWebControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('Unsubscribe from future emails', $content);
         $this->assertStringContainsString($token, $content);
     }
+
+    public function testDownloadPdfReturnsSuccessfully(): void
+    {
+        $newsletter = Newsletter::create([
+            'site_id' => $this->siteId,
+            'title' => 'Test Newsletter for PDF',
+            'content' => 'This is test content',
+            'content_type' => Newsletter::CONTENT_TYPE_MANUAL,
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'last_sent' => now()
+        ]);
+
+        $response = $this->getForSite("newsletters/{$newsletter->id}/download");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertStringContainsString('application/pdf', $response->getHeader('Content-Type') ?? '');
+
+        // Cleanup
+        $newsletter->delete();
+    }
+
+    public function testDownloadPdfReturns404ForNonExistentNewsletter(): void
+    {
+        $response = $this->getForSite('newsletters/99999/download');
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
 }
