@@ -602,6 +602,201 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertEquals('pi_test123_secret_abc', $result['client_secret']);
     }
 
+    public function testCreatePaymentIntentWithCustomerCreatesNewCustomer(): void
+    {
+        $member = $this->createMockMember(null);
+
+        $customer = $this->expectCustomerCreation($member);
+
+        $member->shouldReceive('update')
+            ->once()
+            ->with(['stripe_customer_id' => $customer->id])
+            ->andReturn(true);
+
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->client_secret = 'pi_test123_secret_abc';
+
+        $this->paymentIntentServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) use ($customer) {
+                return $data['amount'] === 9999
+                    && $data['currency'] === 'usd'
+                    && $data['customer'] === $customer->id
+                    && $data['setup_future_usage'] === 'off_session'
+                    && isset($data['metadata']['member_id']);
+            }))
+            ->andReturn($paymentIntent);
+
+        $result = $this->processor->createPaymentIntentWithCustomer([
+            'amount' => 99.99,
+            'currency' => 'USD',
+            'member' => $member,
+            'metadata' => [
+                'member_id' => $member->id,
+                'subscription_id' => 1
+            ]
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('pi_test123', $result['payment_intent_id']);
+        $this->assertEquals($customer->id, $result['customer_id']);
+    }
+
+    public function testCreatePaymentIntentWithCustomerUsesExistingCustomer(): void
+    {
+        $member = $this->createMockMember('cus_existing123');
+
+        $customer = $this->expectCustomerRetrieval('cus_existing123');
+
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->client_secret = 'pi_test123_secret_abc';
+
+        $this->paymentIntentServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['customer'] === 'cus_existing123'
+                    && $data['setup_future_usage'] === 'off_session';
+            }))
+            ->andReturn($paymentIntent);
+
+        $result = $this->processor->createPaymentIntentWithCustomer([
+            'amount' => 99.99,
+            'currency' => 'USD',
+            'member' => $member,
+            'metadata' => ['member_id' => $member->id]
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('cus_existing123', $result['customer_id']);
+    }
+
+    public function testCreatePaymentIntentWithCustomerWorksWithoutMember(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->client_secret = 'pi_test123_secret_abc';
+
+        $this->paymentIntentServiceMock->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return !isset($data['customer'])
+                    && !isset($data['setup_future_usage']);
+            }))
+            ->andReturn($paymentIntent);
+
+        $result = $this->processor->createPaymentIntentWithCustomer([
+            'amount' => 99.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayNotHasKey('customer_id', $result);
+    }
+
+    public function testHandleOneTimeSubscriptionPaymentSavesPaymentMethod(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->status = 'succeeded';
+        $paymentIntent->amount = 9999;
+        $paymentIntent->currency = 'usd';
+        $paymentIntent->customer = 'cus_test123';
+        $paymentIntent->payment_method = 'pm_test123';
+
+        $this->paymentIntentServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_test123')
+            ->andReturn($paymentIntent);
+
+        // Expect payment method retrieval
+        $paymentMethod = new \stdClass();
+        $paymentMethod->id = 'pm_test123';
+        $paymentMethod->customer = null; // Not yet attached
+
+        $this->paymentMethodServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_test123')
+            ->andReturn($paymentMethod);
+
+        // Expect payment method attachment
+        $this->paymentMethodServiceMock->shouldReceive('attach')
+            ->once()
+            ->with('pm_test123', ['customer' => 'cus_test123'])
+            ->andReturn($paymentMethod);
+
+        // Expect customer update to set default payment method
+        $customer = new \stdClass();
+        $customer->id = 'cus_test123';
+
+        $this->customerServiceMock->shouldReceive('update')
+            ->once()
+            ->with('cus_test123', [
+                'invoice_settings' => [
+                    'default_payment_method' => 'pm_test123'
+                ]
+            ])
+            ->andReturn($customer);
+
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 1;
+
+        $this->paymentRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['metadata']['stripe_customer_id'] === 'cus_test123'
+                    && $data['metadata']['payment_method_saved'] === true;
+            }))
+            ->andReturn($payment);
+
+        $result = $this->processor->handleOneTimeSubscriptionPayment(
+            'pi_test123',
+            1,
+            1,
+            1
+        );
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testHandleOneTimeSubscriptionPaymentContinuesIfSavingPaymentMethodFails(): void
+    {
+        $paymentIntent = new \stdClass();
+        $paymentIntent->id = 'pi_test123';
+        $paymentIntent->status = 'succeeded';
+        $paymentIntent->amount = 9999;
+        $paymentIntent->currency = 'usd';
+        $paymentIntent->customer = 'cus_test123';
+        $paymentIntent->payment_method = 'pm_test123';
+
+        $this->paymentIntentServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->andReturn($paymentIntent);
+
+        // Payment method retrieval fails
+        $this->paymentMethodServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->andThrow(new \Exception('Payment method not found'));
+
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 1;
+
+        $this->paymentRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($payment);
+
+        // Should still succeed even though saving payment method failed
+        $result = $this->processor->handleOneTimeSubscriptionPayment(
+            'pi_test123',
+            1,
+            1,
+            1
+        );
+
+        $this->assertTrue($result['success']);
+    }
+
     public function testProcessOneTimePaymentWithPaymentMethodId(): void
     {
         $paymentIntent = new \stdClass();
@@ -1349,5 +1544,67 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
         $this->assertEquals('cus_test123', $result['customer_id']);
         $this->assertEquals('new@example.com', $result['email']);
+    }
+
+    public function testUpdatePaymentMethodSucceeds(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        // Mock removing old payment method
+        $oldPaymentMethod = new \stdClass();
+        $oldPaymentMethod->id = 'pm_old123';
+        $oldPaymentMethod->customer = 'cus_test123';
+
+        $this->paymentMethodServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_old123')
+            ->andReturn($oldPaymentMethod);
+
+        $this->paymentMethodServiceMock->shouldReceive('detach')
+            ->once()
+            ->with('pm_old123')
+            ->andReturn($oldPaymentMethod);
+
+        // Mock adding new payment method
+        $this->expectPaymentMethodAttachment('pm_new456', 'cus_test123');
+
+        $customer = new \stdClass();
+        $customer->id = 'cus_test123';
+
+        $this->customerServiceMock->shouldReceive('update')
+            ->once()
+            ->with('cus_test123', [
+                'invoice_settings' => [
+                    'default_payment_method' => 'pm_new456'
+                ]
+            ])
+            ->andReturn($customer);
+
+        // Remove old
+        $removeResult = $this->processor->removePaymentMethod($member, 'pm_old123');
+        $this->assertTrue($removeResult['success']);
+
+        // Add new
+        $addResult = $this->processor->addPaymentMethod($member, 'pm_new456', true);
+        $this->assertTrue($addResult['success']);
+    }
+
+    public function testUpdatePaymentMethodFailsIfOldCardDoesNotBelongToMember(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $oldPaymentMethod = new \stdClass();
+        $oldPaymentMethod->id = 'pm_old123';
+        $oldPaymentMethod->customer = 'cus_different456'; // Different customer
+
+        $this->paymentMethodServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_old123')
+            ->andReturn($oldPaymentMethod);
+
+        $result = $this->processor->removePaymentMethod($member, 'pm_old123');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('unauthorized', $result['error_code']);
     }
 }

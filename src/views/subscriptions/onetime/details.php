@@ -167,6 +167,16 @@
         <p>Thank you for your purchase. Your subscription is now active.</p>
     </div>
 
+    <?php
+    $breakdown = $payment_breakdown ?? [
+            'subtotal' => $subscription['price'],
+            'discount' => $subscription['discount_amount'] ?? 0,
+            'shipping' => 0,
+            'tax' => 0,
+            'total' => $subscription['price']
+    ];
+    ?>
+
     <div class="card">
         <h2>Subscription Details</h2>
         <div class="detail-row">
@@ -192,8 +202,33 @@
             <span class="detail-value"><?= $subscription['end_date']->format('F j, Y') ?></span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Amount Paid:</span>
-            <span class="detail-value">$<?= number_format($subscription['price'], 2) ?></span>
+            <span class="detail-label">Subtotal:</span>
+            <span class="detail-value">$<?= number_format($breakdown['subtotal'], 2) ?></span>
+        </div>
+
+        <?php if ($breakdown['discount'] > 0): ?>
+            <div class="detail-row" style="color: var(--success-color);">
+                <span class="detail-label">Discount:</span>
+                <span class="detail-value">-$<?= number_format($breakdown['discount'], 2) ?></span>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($breakdown['shipping'] > 0): ?>
+            <div class="detail-row">
+                <span class="detail-label">Shipping:</span>
+                <span class="detail-value">$<?= number_format($breakdown['shipping'], 2) ?></span>
+            </div>
+        <?php endif; ?>
+
+        <div class="detail-row">
+            <span class="detail-label">Tax:</span>
+            <span class="detail-value">$<?= number_format($breakdown['tax'], 2) ?></span>
+        </div>
+
+        <div class="detail-row"
+             style="font-weight: 700; font-size: 1.125rem; padding-top: 1rem; margin-top: 1rem; border-top: 2px solid var(--border-color);">
+            <span class="detail-label">Total Paid:</span>
+            <span class="detail-value">$<?= number_format($breakdown['total'], 2) ?></span>
         </div>
 
         <?php if ($subscription['delivery_type'] === 'digital' && $can_download): ?>

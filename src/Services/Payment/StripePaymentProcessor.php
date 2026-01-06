@@ -137,6 +137,7 @@ class StripePaymentProcessor
             ];
 
         } catch (ApiErrorException $e) {
+
             error_log('Stripe API Error: ' . $e->getMessage());
 
             return [
@@ -717,9 +718,65 @@ class StripePaymentProcessor
                 'payment_intent_id' => $paymentIntent->id
             ];
         } catch (ApiErrorException $e) {
+            return [
+                'success' => false,
+                'message' => $this->getUserFriendlyMessage($e)
+            ];
+        }
+    }
 
-            echo $e->getMessage();
-            die;
+    /**
+     * Create payment intent with customer for one-time subscriptions
+     * This ensures payment methods are saved for future use
+     */
+    public function createPaymentIntentWithCustomer(array $orderData): array
+    {
+        try {
+            $customerId = null;
+
+            // Get or create customer if member provided
+            if (isset($orderData['member'])) {
+                $customerId = $this->getOrCreateCustomer($orderData['member'], []);
+            }
+
+            $paymentIntentData = [
+                'amount' => (int)($orderData['amount'] * 100),
+                'currency' => strtolower($orderData['currency'] ?? 'usd'),
+                'automatic_payment_methods' => [
+                    'enabled' => true,
+                ],
+                'metadata' => array_merge(
+                    $orderData['metadata'] ?? [],
+                    [
+                        'order_id' => $orderData['order_id'] ?? null,
+                        'site_id' => $orderData['site_id'] ?? null,
+                        'subscription_id' => $orderData['subscription_id'] ?? null,
+                    ]
+                ),
+            ];
+
+            // Add customer and setup for future usage
+            if ($customerId) {
+                $paymentIntentData['customer'] = $customerId;
+                $paymentIntentData['setup_future_usage'] = 'off_session';
+            }
+
+            $paymentIntent = $this->stripe->paymentIntents->create($paymentIntentData);
+
+            $result = [
+                'success' => true,
+                'client_secret' => $paymentIntent->client_secret,
+                'payment_intent_id' => $paymentIntent->id,
+            ];
+
+            // Only include customer_id if we have one
+            if ($customerId) {
+                $result['customer_id'] = $customerId;
+            }
+
+            return $result;
+        } catch (ApiErrorException $e) {
+            error_log('Stripe Payment Intent Error: ' . $e->getMessage());
 
             return [
                 'success' => false,
@@ -1111,7 +1168,7 @@ class StripePaymentProcessor
         string $paymentIntentId,
         int    $orderId,
         int $siteId,
-            $subscriptionIds = null, // Can be single ID or array of IDs
+        $subscriptionIds = null, // Can be single ID or array of IDs
     ): array
     {
         try {
@@ -1127,6 +1184,31 @@ class StripePaymentProcessor
             // Normalize to array
             if (!is_array($subscriptionIds)) {
                 $subscriptionIds = $subscriptionIds ? [$subscriptionIds] : [];
+            }
+
+            // If payment intent has a customer and payment method, ensure it's attached and set as default
+            if ($paymentIntent->customer && $paymentIntent->payment_method) {
+                try {
+                    // Retrieve payment method to check if it's already attached
+                    $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentIntent->payment_method);
+
+                    // If not attached to this customer, attach it
+                    if ($paymentMethod->customer !== $paymentIntent->customer) {
+                        $this->stripe->paymentMethods->attach($paymentIntent->payment_method, [
+                            'customer' => $paymentIntent->customer
+                        ]);
+                    }
+
+                    // Set as default payment method
+                    $this->stripe->customers->update($paymentIntent->customer, [
+                        'invoice_settings' => [
+                            'default_payment_method' => $paymentIntent->payment_method
+                        ]
+                    ]);
+                } catch (\Exception $e) {
+                    // Log but don't fail the payment if saving payment method fails
+                    error_log('Failed to save payment method: ' . $e->getMessage());
+                }
             }
 
             // Create payment record
@@ -1146,7 +1228,9 @@ class StripePaymentProcessor
                     'subscription_ids' => $subscriptionIds,
                     'order_id' => $orderId,
                     'one_time_subscription' => true,
-                    'multiple_subscriptions' => count($subscriptionIds) > 1
+                    'multiple_subscriptions' => count($subscriptionIds) > 1,
+                    'stripe_customer_id' => $paymentIntent->customer ?? null,
+                    'payment_method_saved' => !empty($paymentIntent->customer)
                 ]
             ]);
 

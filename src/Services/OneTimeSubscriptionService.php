@@ -139,7 +139,27 @@ class OneTimeSubscriptionService
         }
 
         $plan = $subscription->plan;
-        $order = $subscription->order()->first();
+        $order = $subscription->order()->last();
+
+        // Calculate actual payment breakdown
+        $subtotal = $subscription->price;
+        $discount = $subscription->discount_amount ?? 0;
+        $shipping = 0;
+        $tax = 0;
+
+        if ($order) {
+            $shipping = $order->shipping ?? 0;
+            $tax = $order->tax ?? 0;
+        } else {
+            // Fallback calculation if no order found
+            if ($subscription->delivery_type === 'print') {
+                $shipping = $subtotal >= 100 ? 0 : 10;
+            }
+            $taxableAmount = $subtotal - $discount + $shipping;
+            $tax = $taxableAmount * 0.1;
+        }
+
+        $finalTotal = $subtotal - $discount + $shipping + $tax;
 
         return [
             'subscription' => $subscription->toArray(),
@@ -147,6 +167,13 @@ class OneTimeSubscriptionService
             'order' => $order ? $order->toArray() : null,
             'can_download' => $subscription->hasValidDownload(),
             'download_expires_at' => $subscription->download_expires_at?->format('Y-m-d H:i:s'),
+            'payment_breakdown' => [
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'tax' => $tax,
+                'total' => $finalTotal
+            ]
         ];
     }
 }

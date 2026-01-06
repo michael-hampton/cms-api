@@ -438,7 +438,7 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    const SITE = 'test-mike';
+    const SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
     const API_BASE = '/api/' + SITE;
 
     // Handle duration option selection
@@ -504,7 +504,7 @@
             if (result.success) {
                 showToast('Added to cart! Redirecting to checkout...', 'success');
                 setTimeout(() => {
-                    window.location.href = '/checkout?type=subscription';
+                    window.location.href = '/' + SITE + '/checkout?type=subscription';
                 }, 1500);
             } else {
                 showToast(result.message || 'Failed to add to cart', 'error');

@@ -1019,7 +1019,7 @@
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>
-    const SITE = 'test-mike';
+    const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
     const API_BASE = '/api/' + SITE;
     const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
 
@@ -1118,7 +1118,7 @@
 
     async function loadSavedAddresses() {
         try {
-            const response = await fetch(`${SITE}/member/${currentMember.id}/addresses?type=shipping`);
+            const response = await fetch(`/${SITE}/member/${currentMember.id}/addresses?type=shipping`);
             const data = await response.json();
 
             if (data.items && data.items.length > 0) {
@@ -1347,6 +1347,7 @@
                         phone: data.phone,
                     },
                 },
+                setup_future_usage: 'off_session',
             });
 
             if (error) {

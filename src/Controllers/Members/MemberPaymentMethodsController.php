@@ -114,4 +114,47 @@ class MemberPaymentMethodsController extends Controller
             'message' => $result['message'] ?? 'Failed to remove payment method'
         ], $statusCode);
     }
+
+    public function update(Request $request, string $paymentMethodId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $newPaymentMethodId = $request->input('new_payment_method_id');
+        $setDefault = $request->input('set_default', false);
+
+        if (!$newPaymentMethodId) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'New payment method ID required'
+            ], 400);
+        }
+
+        // First, remove the old payment method
+        $removeResult = $this->stripeProcessor->removePaymentMethod($member, $paymentMethodId);
+
+        if (!$removeResult['success']) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to remove old payment method'
+            ], 500);
+        }
+
+        // Then add the new payment method
+        $addResult = $this->stripeProcessor->addPaymentMethod($member, $newPaymentMethodId, $setDefault);
+
+        if ($addResult['success']) {
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Payment method updated successfully'
+            ]);
+        }
+
+        return $this->jsonResponse([
+            'success' => false,
+            'message' => $addResult['message'] ?? 'Failed to add new payment method'
+        ], 500);
+    }
 }

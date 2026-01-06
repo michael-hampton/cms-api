@@ -157,7 +157,7 @@ class Member extends Model
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-        return $this->hasOne(Subscription::class, 'member_id', 'id', $relation)
+        return Subscription::where('member_id', $this->id)
             ->where('status', 'active')
             ->where('site_id', $siteId)
             ->where(function ($query) {

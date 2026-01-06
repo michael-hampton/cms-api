@@ -364,6 +364,10 @@
                                 Set as Default
                             </button>
                         <?php endif; ?>
+                        <button onclick="openUpdateCardModal('<?= htmlspecialchars($method['id']) ?>', '<?= htmlspecialchars($method['card']['brand']) ?>', '<?= htmlspecialchars($method['card']['last4']) ?>')"
+                                class="btn btn-secondary btn-sm">
+                            Update
+                        </button>
                         <button onclick="deletePaymentMethod('<?= htmlspecialchars($method['id']) ?>')"
                                 class="btn btn-danger btn-sm">
                             Remove
@@ -417,11 +421,73 @@
     </div>
 </div>
 
+<!-- Update Card Modal -->
+<div id="updateCardModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title">Update Payment Method</h2>
+            <button onclick="closeUpdateCardModal()" class="close-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <form id="update-payment-form">
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                    Current card: <strong><span id="current-card-info"></span></strong>
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">New Card Information</label>
+                    <div id="update-card-element" class="stripe-element"></div>
+                    <div id="update-card-errors"
+                         style="color: var(--danger-color); margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="update-set-default">
+                        <span>Set as default payment method</span>
+                    </label>
+                </div>
+
+                <input type="hidden" id="old-payment-method-id">
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeUpdateCardModal()" class="btn btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary" id="update-submit-btn">
+                    Update Card
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     const SITE = '<?= $site->slug ?? 'default' ?>';
     const stripe = Stripe('<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? '' ?>');
     const elements = stripe.elements();
+    const elements2 = stripe.elements();
     const cardElement = elements.create('card', {
+        hidePostalCode: true,
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#1f2937',
+                '::placeholder': {
+                    color: '#9ca3af',
+                },
+            },
+        },
+    });
+
+    const updateCardElement = elements2.create('card', {
         hidePostalCode: true,
         style: {
             base: {
@@ -439,6 +505,17 @@
 
         cardElement.on('change', function (event) {
             const displayError = document.getElementById('card-errors');
+            if (event.error) {
+                displayError.textContent = event.error.message;
+            } else {
+                displayError.textContent = '';
+            }
+        });
+
+        updateCardElement.mount('#update-card-element');
+
+        updateCardElement.on('change', function (event) {
+            const displayError = document.getElementById('update-card-errors');
             if (event.error) {
                 displayError.textContent = event.error.message;
             } else {
@@ -467,6 +544,32 @@
                 await handlePaymentMethod(paymentMethod.id);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Add Payment Method';
+            }
+        });
+
+        // Handle update form
+        const updateForm = document.getElementById('update-payment-form');
+        updateForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const submitBtn = document.getElementById('update-submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+
+            const {paymentMethod, error} = await stripe.createPaymentMethod({
+                type: 'card',
+                card: updateCardElement,
+            });
+
+            if (error) {
+                document.getElementById('update-card-errors').textContent = error.message;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update Card';
+            } else {
+                const oldPaymentMethodId = document.getElementById('old-payment-method-id').value;
+                await handleUpdatePaymentMethod(oldPaymentMethodId, paymentMethod.id);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update Card';
             }
         });
     });
@@ -585,6 +688,52 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function openUpdateCardModal(paymentMethodId, brand, last4) {
+        document.getElementById('updateCardModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+        document.getElementById('old-payment-method-id').value = paymentMethodId;
+        document.getElementById('current-card-info').textContent = `${brand.toUpperCase()} •••• ${last4}`;
+        updateCardElement.clear();
+        document.getElementById('update-card-errors').textContent = '';
+    }
+
+    function closeUpdateCardModal() {
+        document.getElementById('updateCardModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+        updateCardElement.clear();
+        document.getElementById('update-card-errors').textContent = '';
+    }
+
+    async function handleUpdatePaymentMethod(oldPaymentMethodId, newPaymentMethodId) {
+        const setDefault = document.getElementById('update-set-default').checked;
+
+        try {
+            const response = await fetch(`/${SITE}/member/payment-methods/${oldPaymentMethodId}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    new_payment_method_id: newPaymentMethodId,
+                    set_default: setDefault
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showAlert('Payment method updated successfully', 'success');
+                closeUpdateCardModal();
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert(data.message || 'Failed to update payment method', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Failed to update payment method', 'error');
+        }
     }
 </script>
 

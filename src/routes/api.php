@@ -15,6 +15,7 @@ use App\Controllers\EmailThemeController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
 use App\Controllers\MemberController;
+use App\Controllers\Members\MemberAddressController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\NewsletterController;
@@ -416,6 +417,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
 
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
+        $router->get('/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);
 
         $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
         $router->get('/pages/like-status/{pageId}', [PageLikeController::class, 'status']);

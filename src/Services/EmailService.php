@@ -12,9 +12,12 @@ use App\Mail\NewsletterSignupConfirmationWithTrackingTest;
 use App\Mail\NewsletterWelcome;
 use App\Mail\PriceAlert;
 use App\Mail\ResetPassword;
+use App\Mail\SupportConfirmation;
+use App\Mail\SupportNotification;
 use App\Models\EventSignup;
 use App\Models\Member;
 use App\Models\Product;
+use App\Models\SupportTicket;
 
 class EmailService
 {
@@ -184,6 +187,36 @@ class EmailService
         } catch (\Exception $e) {
             Logger::error('Failed to send newsletter welcome email', [
                 'email' => $email,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function sendSupportConfirmation(SupportTicket $supportTicket, Member $member): bool
+    {
+        try {
+            return $this->mailManager
+                ->to($member->email)
+                ->send(new SupportConfirmation($supportTicket, $member));
+        } catch (\Exception $e) {
+            Logger::error('Failed to send forgot password email', [
+                'email' => $member->email,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function sendSupportNotification(SupportTicket $supportTicket, Member $member): bool
+    {
+        try {
+            return $this->mailManager
+                ->to($member->email)
+                ->send(new SupportNotification($supportTicket, $member));
+        } catch (\Exception $e) {
+            Logger::error('Failed to send forgot password email', [
+                'email' => $member->email,
                 'error' => $e->getMessage()
             ]);
             return false;

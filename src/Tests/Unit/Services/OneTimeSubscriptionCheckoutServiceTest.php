@@ -135,7 +135,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->memberAuth->shouldReceive('member')
+        $this->memberAuth->shouldReceive('getMember')
             ->once()
             ->andReturn($member);
 
@@ -158,12 +158,20 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'total' => 55.00
             ]);
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
             ->once()
+            ->with(Mockery::on(function ($data) use ($member) {
+                return isset($data['amount'])
+                    && $data['amount'] === 55.00
+                    && isset($data['member'])
+                    && $data['member']->id === $member->id
+                    && isset($data['metadata']['member_id']);
+            }))
             ->andReturn([
                 'success' => true,
                 'client_secret' => 'pi_test_secret',
-                'payment_intent_id' => 'pi_test_123'
+                'payment_intent_id' => 'pi_test_123',
+                'customer_id' => 'cus_test123'
             ]);
 
         $this->orderService->shouldReceive('createOrder')
@@ -219,7 +227,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->memberAuth->shouldReceive('member')
+        $this->memberAuth->shouldReceive('getMember')
             ->once()
             ->andReturn($member);
 
@@ -244,12 +252,18 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'total' => 66.00
             ]);
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
             ->once()
+            ->with(Mockery::on(function ($data) use ($member) {
+                return isset($data['amount'])
+                    && isset($data['member'])
+                    && $data['member']->id === $member->id;
+            }))
             ->andReturn([
                 'success' => true,
                 'client_secret' => 'pi_test_secret',
-                'payment_intent_id' => 'pi_test_123'
+                'payment_intent_id' => 'pi_test_123',
+                'customer_id' => 'cus_test123'
             ]);
 
         $this->orderService->shouldReceive('createOrder')
@@ -299,7 +313,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->memberAuth->shouldReceive('member')
+        $this->memberAuth->shouldReceive('getMember')
             ->once()
             ->andReturn($member);
 
@@ -328,12 +342,13 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'total' => 49.50
             ]);
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
             ->once()
             ->andReturn([
                 'success' => true,
                 'client_secret' => 'pi_test_secret',
-                'payment_intent_id' => 'pi_test_123'
+                'payment_intent_id' => 'pi_test_123',
+                'customer_id' => 'cus_test123'
             ]);
 
         $this->orderService->shouldReceive('createOrder')
@@ -378,7 +393,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->memberAuth->shouldReceive('member')
+        $this->memberAuth->shouldReceive('getMember')
             ->once()
             ->andReturn($member);
 
@@ -396,7 +411,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'total' => 55.00
             ]);
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
             ->once()
             ->andReturn([
                 'success' => false,

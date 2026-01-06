@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Address;
 use App\Models\Member;
 use App\Repositories\AddressRepository;
 use App\Requests\CreateAddressRequest;
@@ -173,5 +174,24 @@ class MemberAddressController extends Controller
         } catch (Exception $e) {
             return $this->jsonResponse(['message' => 'Failed to set default address']);
         }
+    }
+
+    public function getCurrentAddress()
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false], 401);
+        }
+
+        $member = MemberAuth::member();
+        $address = Address::where('member_id', $member->id)
+            ->where('site_id', SiteContext::getId())
+            ->where('is_default', true)
+            ->whereIn('type', ['shipping', 'both'])
+            ->first();
+
+        return $this->jsonResponse([
+            'success' => true,
+            'address' => $address ? $address->toArray() : null
+        ]);
     }
 }

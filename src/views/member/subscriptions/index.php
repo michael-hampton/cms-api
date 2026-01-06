@@ -7,6 +7,9 @@
  * @var array $subscriptionSummary
  * @var \App\Framework\Support\Collection $plans
  */
+
+use App\Framework\Support\SiteContext;
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -624,6 +627,36 @@
                     </div>
                 <?php endif; ?>
 
+                <?php
+                if ($activeSubscription && !$activeSubscription->auto_renew && $activeSubscription->end_date) {
+                    $daysUntilEnd = (new \DateTime())->diff($activeSubscription->end_date)->days;
+                    $showRenewalPrompt = $daysUntilEnd <= 30 && $daysUntilEnd > 0;
+
+                    if ($showRenewalPrompt):
+                        ?>
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    text-align: center;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">⏰</div>
+                            <div style="font-weight: 700; font-size: 18px; margin-bottom: 8px;">
+                                Your subscription expires in <?= $daysUntilEnd ?> day<?= $daysUntilEnd > 1 ? 's' : '' ?>
+                            </div>
+                            <div style="font-size: 14px; margin-bottom: 16px; opacity: 0.9;">
+                                Renew now to continue enjoying uninterrupted access
+                            </div>
+                            <button onclick="openRenewalModal()" class="btn btn-primary"
+                                    style="background: white; color: #667eea;">
+                                Renew Subscription
+                            </button>
+                        </div>
+                    <?php
+                    endif;
+                }
+                ?>
+
                 <div class="info-row">
                     <span class="info-label">Status</span>
                     <span class="badge badge-success">Active</span>
@@ -975,6 +1008,72 @@
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Renewal Modal -->
+<div id="renewalModal"
+     style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.5); padding: 20px; overflow-y: auto;">
+    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <div style="padding: 24px; border-bottom: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 24px;">Renew Your Subscription</h2>
+                <button onclick="closeRenewalModal()"
+                        style="background: none; border: none; font-size: 24px; cursor: pointer; color: #64748b;">×
+                </button>
+            </div>
+        </div>
+
+        <div style="padding: 24px;">
+            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <div style="font-weight: 600; margin-bottom: 4px;">Current Plan</div>
+                <div style="color: #64748b; font-size: 14px;" id="currentPlanName"></div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 12px;">
+                    Choose Renewal Type
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <label style="border: 2px solid #e2e8f0; border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s;"
+                           class="renewal-option" data-type="fixed">
+                        <input type="radio" name="renewal_type" value="fixed" checked style="margin-right: 12px;">
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 4px;">Fixed Term</div>
+                            <div style="font-size: 14px; color: #64748b;">Choose 1 or 2 year subscription</div>
+                        </div>
+                    </label>
+                    <label style="border: 2px solid #e2e8f0; border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s;"
+                           class="renewal-option" data-type="auto">
+                        <input type="radio" name="renewal_type" value="auto" style="margin-right: 12px;">
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 4px;">Auto-Renewing</div>
+                            <div style="font-size: 14px; color: #64748b;">Automatically renews, cancel anytime</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div id="addressSection" style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 12px;">
+                    Delivery Address
+                </label>
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 12px;"
+                     id="currentAddress">
+                    Loading address...
+                </div>
+                <button onclick="updateAddress()" class="btn btn-secondary" style="font-size: 14px; padding: 8px 16px;">
+                    Update Address
+                </button>
+            </div>
+        </div>
+
+        <div style="padding: 24px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; justify-content: flex-end;">
+            <button onclick="closeRenewalModal()" class="btn btn-secondary">Cancel</button>
+            <button onclick="processRenewal()" class="btn btn-primary" id="renewalSubmitBtn">
+                Continue to Payment
+            </button>
+        </div>
+    </div>
+</div>
 <script>
     // Notification Helper
     function showNotification(message, type = 'info') {
@@ -1210,6 +1309,93 @@ ${optionsHTML}
                 resolve(config.showOptions ? selectedOption : true);
             });
         });
+    }
+
+    function openRenewalModal() {
+        const modal = document.getElementById('renewalModal');
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+
+        // Load current plan details
+        <?php if (isset($activeSubscription)): ?>
+        document.getElementById('currentPlanName').textContent = '<?= htmlspecialchars($activeSubscription->plan_name) ?> - <?= $activeSubscription->isPrint() ? "Print" : "Digital" ?>';
+
+        // Load address if print subscription
+        <?php if ($activeSubscription->isPrint()): ?>
+        loadCurrentAddress();
+        <?php else: ?>
+        document.getElementById('addressSection').style.display = 'none';
+        <?php endif; ?>
+        <?php endif; ?>
+
+        // Setup option selection
+        document.querySelectorAll('.renewal-option').forEach(option => {
+            option.addEventListener('click', function () {
+                document.querySelectorAll('.renewal-option').forEach(opt => {
+                    opt.style.borderColor = '#e2e8f0';
+                    opt.style.background = 'white';
+                });
+                this.style.borderColor = '#667eea';
+                this.style.background = '#f0f4ff';
+                this.querySelector('input').checked = true;
+            });
+        });
+    }
+
+    function closeRenewalModal() {
+        document.getElementById('renewalModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    async function loadCurrentAddress() {
+        try {
+            const response = await fetch('/<?= SiteContext::slug() ?>/api/member/current-address');
+            const data = await response.json();
+
+            if (data.success && data.address) {
+                const addr = data.address;
+                document.getElementById('currentAddress').innerHTML = `
+                ${escapeHtml(addr.address_line_1)}<br>
+                ${addr.address_line_2 ? escapeHtml(addr.address_line_2) + '<br>' : ''}
+                ${escapeHtml(addr.city)}, ${escapeHtml(addr.postcode)}
+            `;
+            }
+        } catch (error) {
+            console.error('Error loading address:', error);
+        }
+    }
+
+    function updateAddress() {
+        window.location.href = '/<?= SiteContext::slug() ?>/member/addresses?return=/<?= SiteContext::slug() ?>/member/subscriptions';
+    }
+
+    async function processRenewal() {
+        const renewalType = document.querySelector('input[name="renewal_type"]:checked').value;
+        const submitBtn = document.getElementById('renewalSubmitBtn');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+
+        try {
+            <?php if (isset($activeSubscription)): ?>
+            const planId = <?= $activeSubscription->plan_id ?>;
+            const deliveryType = '<?= $activeSubscription->delivery_type ?>';
+
+            // Redirect to checkout with renewal parameters
+            window.location.href = `/<?= SiteContext::slug() ?>/checkout?plan_id=${planId}&renewal=true&type=${renewalType}&delivery=${deliveryType}`;
+            <?php endif; ?>
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Continue to Payment';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
 </script>

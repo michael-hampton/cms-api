@@ -227,10 +227,10 @@ class Subscription extends Model
 
     public function order($relation = false)
     {
-        return $this->hasOne(Order::class, 'one_time_subscription_id', 'id', $relation);
+        return $this->hasMany(Order::class, 'one_time_subscription_id', 'id', $relation);
     }
 
-    public function createWindow(): ?Model
+    public function createWindow(): ?ModelgetSubscriptionWithDetails
     {
         if ($this->type !== 'paid') {
             return null;

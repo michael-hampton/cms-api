@@ -20,6 +20,7 @@ use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberConsentController;
 use App\Controllers\Members\MemberDashboardController;
+use App\Controllers\Members\MemberInvoiceController;
 use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
@@ -28,6 +29,7 @@ use App\Controllers\Members\MemberReadingHistoryController;
 use App\Controllers\Members\MemberSubscriptionPaymentsController;
 use App\Controllers\Members\MemberSubscriptionPlansController;
 use App\Controllers\Members\MemberSubscriptionsController;
+use App\Controllers\Members\MemberSupportController;
 use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\NewsletterController;
 use App\Controllers\NewsletterWebController;
@@ -241,6 +243,7 @@ $router->get('/{site}/member/payment-methods', [MemberPaymentMethodsController::
 $router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'store']);;
 $router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);;
 $router->delete('/{site}/member/payment-methods/{paymentMethodId}', [MemberPaymentMethodsController::class, 'destroy']);
+$router->post('/{site}/member/payment-methods/{id}/update', [MemberPaymentMethodsController::class, 'update']);
 
 $router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
 
@@ -272,6 +275,12 @@ $router->get('{site}/faqs', [FaqController::class, 'subscriptions']);
 $router->get('/{site}/member/newsletters', [MemberNewslettersController::class, 'index']);
 $router->post('/{site}/member/newsletters/unsubscribe', [MemberNewslettersController::class, 'unsubscribe']);
 $router->post('/{site}/member/newsletter/signup', [MemberNewslettersController::class, 'subscribe']);
+
+$router->get('/{site}/member/support', [MemberSupportController::class, 'index']);
+$router->post('/{site}/member/support/submit', [MemberSupportController::class, 'submit']);
+
+// Invoice routes
+$router->get('/{site}/member/invoices/{paymentId}/download', [MemberInvoiceController::class, 'download']);
 
 // Member Comments Routes
 $router->get('/{site}/member/comments', [MemberCommentsController::class, 'index']);

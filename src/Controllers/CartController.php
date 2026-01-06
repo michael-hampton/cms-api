@@ -46,6 +46,7 @@ class CartController extends Controller
     {
         $planId = $request->query('plan_id');
         $planSlug = $request->query('plan_slug');
+        $isRenewal = $request->query('renewal') === 'true';
 
         if ($planId || $planSlug) {
             if ($planSlug) {
@@ -54,6 +55,10 @@ class CartController extends Controller
             }
 
             if ($planId) {
+                // Handle renewal differently
+                if ($isRenewal) {
+                    return $this->subscriptionCheckout($planId, true);
+                }
                 return $this->subscriptionCheckout($planId);
             }
         }
@@ -169,7 +174,7 @@ class CartController extends Controller
         ]);
     }
 
-    private function subscriptionCheckout(int $planId)
+    private function subscriptionCheckout(int $planId, bool $isRenewal = false)
     {
         if (!MemberAuth::check()) {
             return $this->redirect('/member/login?redirect=/checkout?plan_id=' . $planId);
@@ -183,8 +188,8 @@ class CartController extends Controller
             return $this->redirect('/');
         }
 
-        // Check if already subscribed
-        if ($this->subscriptionCheckoutService->hasActiveSubscription($member->id, $planId)) {
+        // Check if already subscribed (skip for renewals)
+        if (!$isRenewal && $this->subscriptionCheckoutService->hasActiveSubscription($member->id, $planId)) {
             $_SESSION['flash_error'] = 'You already have an active subscription to this plan.';
             return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
         }

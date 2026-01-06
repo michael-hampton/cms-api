@@ -731,23 +731,59 @@
 
         <div class="order-summary">
             <div class="summary-item">
+                <span class="summary-label">Order Date</span>
+                <span class="summary-value"><?= $order->created_at->format('M d, Y') ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Invoice Number</span>
+                <span class="summary-value">#<?= htmlspecialchars($order->order_number) ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Account Number</span>
+                <span class="summary-value"><?= $order->user_id ?></span>
+            </div>
+            <div class="summary-item">
                 <span class="summary-label">Total Amount</span>
                 <span class="summary-value"><?= htmlspecialchars($order->currency) ?> <?= number_format($order->total ?? 0, 2) ?></span>
             </div>
             <div class="summary-item">
                 <span class="summary-label">Payment Status</span>
                 <span class="summary-value" style="color: <?= $order->isPaid() ? 'var(--success-color)' : 'var(--warning-color)' ?>">
-                    <?= $order->isPaid() ? 'Paid' : 'Pending' ?>
-                </span>
+            <?= $order->isPaid() ? 'Paid' : 'Pending' ?>
+        </span>
             </div>
             <div class="summary-item">
-                <span class="summary-label">Payment Method</span>
-                <span class="summary-value"><?= htmlspecialchars($order->payment_method ?: 'N/A') ?></span>
+                <span class="summary-label">Order Status</span>
+                <span class="summary-value"><?= ucfirst(htmlspecialchars($order->status)) ?></span>
             </div>
-            <div class="summary-item">
-                <span class="summary-label">Items</span>
-                <span class="summary-value"><?= $order->items->count() ?></span>
-            </div>
+            <?php if ($order->one_time_subscription_id): ?>
+                <?php
+                $subscription = \App\Models\Subscription::find($order->one_time_subscription_id);
+                if ($subscription && $subscription->plan):
+                    ?>
+                    <div class="summary-item">
+                        <span class="summary-label">Subscription Period</span>
+                        <span class="summary-value">
+                <?php
+                $start = new \DateTime($subscription->start_date);
+                $end = new \DateTime($subscription->end_date);
+                $interval = $start->diff($end);
+                $months = ($interval->y * 12) + $interval->m;
+                echo $months . ' month' . ($months > 1 ? 's' : '');
+                ?>
+            </span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Number of Issues</span>
+                        <span class="summary-value">
+                <?php
+                // Calculate issues based on billing period (typically monthly)
+                echo $months . ' issue' . ($months > 1 ? 's' : '');
+                ?>
+            </span>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -763,6 +799,40 @@
                                 <div class="item-meta">
                                     Quantity: <?= $item->quantity ?> × <?= htmlspecialchars($order->currency) ?> <?= number_format($item->price ?? 0, 2) ?>
                                 </div>
+                                <?php if (!empty($item->metadata)): ?>
+                                    <div class="item-description"
+                                         style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5;">
+                                        <?php
+                                        $metadata = is_string($item->metadata) ? json_decode($item->metadata, true) : $item->metadata;
+
+                                        // Display subscription details if available
+                                        if (isset($metadata['subscription_id'])):
+                                            $subId = $metadata['subscription_id'];
+                                            $subscription = \App\Models\Subscription::find($subId);
+                                            if ($subscription):
+                                                ?>
+                                                <strong>Subscription Details:</strong><br>
+                                                Type: <?= $subscription->isPrint() ? '📦 Print Edition' : '💻 Digital Edition' ?>
+                                                <br>
+                                                Period: <?= $subscription->start_date->format('M d, Y') ?> - <?= $subscription->end_date->format('M d, Y') ?>
+                                                <br>
+                                                <?php if ($subscription->delivery_type === 'print'): ?>
+                                                Delivery: Physical delivery to your address
+                                            <?php else: ?>
+                                                Delivery: Instant digital access
+                                            <?php endif; ?>
+                                            <?php
+                                            endif;
+                                        endif;
+
+                                        // Display product description if available
+                                        if (isset($metadata['description'])):
+                                            ?>
+                                            <br><strong>Description:</strong><br>
+                                            <?= nl2br(htmlspecialchars($metadata['description'])) ?>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             <div class="item-price">
                                 <?= htmlspecialchars($order->currency) ?> <?= number_format($item->quantity * $item->price, 2) ?>

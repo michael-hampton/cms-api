@@ -320,4 +320,29 @@ class Order extends Model
             ->exists();
     }
 
+    public function getSubscriptionDetails(): ?array
+    {
+        if (!$this->one_time_subscription_id) {
+            return null;
+        }
+
+        $subscription = Subscription::find($this->one_time_subscription_id);
+        if (!$subscription) {
+            return null;
+        }
+
+        $start = $subscription->start_date;
+        $end = $subscription->end_date;
+        $interval = $start->diff($end);
+        $months = ($interval->y * 12) + $interval->m;
+
+        return [
+            'subscription' => $subscription,
+            'months' => $months,
+            'issues' => $months, // Assuming monthly issues
+            'type' => $subscription->delivery_type,
+            'start_date' => $subscription->start_date,
+            'end_date' => $subscription->end_date
+        ];
+    }
 }

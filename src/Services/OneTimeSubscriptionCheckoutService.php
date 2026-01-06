@@ -51,7 +51,7 @@ class OneTimeSubscriptionCheckoutService
                 ];
             }
 
-            $member = $this->memberAuth->member();
+            $member = $this->memberAuth->getMember();
 
             // Process subscriptions
             $result = $this->processMultipleSubscriptions(
@@ -157,12 +157,13 @@ class OneTimeSubscriptionCheckoutService
             $subscriptionIds = array_map(fn($s) => $s['subscription']->id, $createdSubscriptions);
 
             // Create single Stripe payment intent for all subscriptions
-            $paymentResult = $this->stripeProcessor->createPaymentIntent([
+            $paymentResult = $this->stripeProcessor->createPaymentIntentWithCustomer([
                 'amount' => $totals['total'],
                 'currency' => strtolower($createdSubscriptions[0]['subscription']->currency),
                 'order_id' => null,
                 'subscription_id' => null, // Multiple subscriptions
                 'site_id' => $siteId,
+                'member' => $member,
                 'metadata' => [
                     'subscription_count' => count($createdSubscriptions),
                     'subscription_ids' => implode(',', $subscriptionIds),

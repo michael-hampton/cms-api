@@ -1,3 +1,8 @@
+<?php
+
+use App\Framework\Support\SiteContext;
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -661,6 +666,188 @@
             </a>
         </div>
 
+        <h2 class="section-title">Recent Activity</h2>
+
+        <div class="dashboard-grid">
+            <?php
+            // Get all orders including subscriptions
+            $recentOrders = \App\Models\Order::where('user_id', $member->id)
+                    ->where('site_id', SiteContext::getId())
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get();
+
+            // Get all subscriptions (active and expired)
+            $allSubscriptions = \App\Models\Subscription::where('member_id', $member->id)
+                    ->where('site_id', SiteContext::getId())
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get();
+
+            if ($recentOrders->count() > 0 || $allSubscriptions->count() > 0):
+                ?>
+                <div style="background: white; border-radius: 1rem; padding: 2rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border-color);">
+                        <button class="tab-btn active" onclick="switchTab('orders')" id="ordersTab"
+                                style="padding: 1rem; background: none; border: none; font-weight: 600; cursor: pointer; border-bottom: 3px solid var(--primary-color); margin-bottom: -2px;">
+                            Orders (<?= $recentOrders->count() ?>)
+                        </button>
+                        <button class="tab-btn" onclick="switchTab('subscriptions')" id="subscriptionsTab"
+                                style="padding: 1rem; background: none; border: none; font-weight: 600; cursor: pointer; color: var(--text-secondary);">
+                            Subscriptions (<?= $allSubscriptions->count() ?>)
+                        </button>
+                    </div>
+
+                    <!-- Orders Tab -->
+                    <div id="ordersContent" style="overflow-x: auto;">
+                        <?php if ($recentOrders->count() > 0): ?>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                <tr style="background: var(--bg-light);">
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Date
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Order #
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Type
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Total
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Status
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Action
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($recentOrders as $order): ?>
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        <td style="padding: 0.75rem;"><?= $order->created_at->format('M d, Y') ?></td>
+                                        <td style="padding: 0.75rem; font-weight: 600;">
+                                            #<?= htmlspecialchars($order->order_number) ?></td>
+                                        <td style="padding: 0.75rem;">
+                                            <?php if ($order->one_time_subscription_id): ?>
+                                                📋 Subscription
+                                            <?php else: ?>
+                                                🛍️ Order
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="padding: 0.75rem; font-weight: 600;">
+                                            <?= htmlspecialchars($order->currency) ?> <?= number_format($order->total, 2) ?>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                <span style="padding: 0.375rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600;
+                                        background: <?= $order->status === 'completed' ? '#d1fae5' : ($order->status === 'pending' ? '#fef3c7' : '#fee2e2') ?>;
+                                        color: <?= $order->status === 'completed' ? '#065f46' : ($order->status === 'pending' ? '#92400e' : '#991b1b') ?>;">
+                                    <?= ucfirst($order->status) ?>
+                                </span>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                            <a href="/<?= $site->slug ?>/member/orders/<?= $order->id ?>"
+                                               style="color: var(--primary-color); text-decoration: none; font-weight: 600;">
+                                                View Details →
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <div style="margin-top: 1rem; text-align: center;">
+                                <a href="/<?= $site->slug ?>/member/orders"
+                                   style="color: var(--primary-color); text-decoration: none; font-weight: 600;">
+                                    View All Orders →
+                                </a>
+                            </div>
+                        <?php else: ?>
+                            <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                <p>No orders yet</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Subscriptions Tab -->
+                    <div id="subscriptionsContent" style="display: none; overflow-x: auto;">
+                        <?php if ($allSubscriptions->count() > 0): ?>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                <tr style="background: var(--bg-light);">
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Plan
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Type
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Start Date
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        End Date
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Status
+                                    </th>
+                                    <th style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600;">
+                                        Action
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($allSubscriptions as $sub): ?>
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        <td style="padding: 0.75rem; font-weight: 600;">
+                                            <?= htmlspecialchars($sub->plan_name) ?>
+                                            <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal; margin-top: 0.25rem;">
+                                                <?= $sub->isPrint() ? '📦 Print' : '💻 Digital' ?>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                <span style="padding: 0.25rem 0.5rem; background: <?= $sub->type === 'paid' ? '#e0e7ff' : '#f3f4f6' ?>;
+                                        color: <?= $sub->type === 'paid' ? '#3730a3' : '#374151' ?>; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;">
+                                    <?= ucfirst($sub->type ?? 'standard') ?>
+                                </span>
+                                        </td>
+                                        <td style="padding: 0.75rem;"><?= $sub->start_date->format('M d, Y') ?></td>
+                                        <td style="padding: 0.75rem;">
+                                            <?= $sub->end_date ? $sub->end_date->format('M d, Y') : 'Ongoing' ?>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                <span style="padding: 0.375rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600;
+                                        background: <?= $sub->status === 'active' ? '#d1fae5' : ($sub->status === 'expired' ? '#fee2e2' : '#fef3c7') ?>;
+                                        color: <?= $sub->status === 'active' ? '#065f46' : ($sub->status === 'expired' ? '#991b1b' : '#92400e') ?>;">
+                                    <?= ucfirst($sub->status) ?>
+                                </span>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                            <a href="/<?= $site->slug ?>/member/subscriptions"
+                                               style="color: var(--primary-color); text-decoration: none; font-weight: 600;">
+                                                Manage →
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <div style="margin-top: 1rem; text-align: center;">
+                                <a href="/<?= $site->slug ?>/member/subscriptions"
+                                   style="color: var(--primary-color); text-decoration: none; font-weight: 600;">
+                                    View All Subscriptions →
+                                </a>
+                            </div>
+                        <?php else: ?>
+                            <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                <p>No subscriptions yet</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+
         <h2 class="section-title">Your Activity</h2>
 
         <?php if (!empty($stats)): ?>
@@ -700,6 +887,32 @@
 </div>
 
 <script>
+    function switchTab(tab) {
+        // Hide all content
+        document.getElementById('ordersContent').style.display = 'none';
+        document.getElementById('subscriptionsContent').style.display = 'none';
+
+        // Reset all tabs
+        document.getElementById('ordersTab').classList.remove('active');
+        document.getElementById('subscriptionsTab').classList.remove('active');
+        document.getElementById('ordersTab').style.borderBottom = 'none';
+        document.getElementById('subscriptionsTab').style.borderBottom = 'none';
+        document.getElementById('ordersTab').style.color = 'var(--text-secondary)';
+        document.getElementById('subscriptionsTab').style.color = 'var(--text-secondary)';
+
+        // Show selected content and activate tab
+        if (tab === 'orders') {
+            document.getElementById('ordersContent').style.display = 'block';
+            document.getElementById('ordersTab').classList.add('active');
+            document.getElementById('ordersTab').style.borderBottom = '3px solid var(--primary-color)';
+            document.getElementById('ordersTab').style.color = 'var(--text-primary)';
+        } else {
+            document.getElementById('subscriptionsContent').style.display = 'block';
+            document.getElementById('subscriptionsTab').classList.add('active');
+            document.getElementById('subscriptionsTab').style.borderBottom = '3px solid var(--primary-color)';
+            document.getElementById('subscriptionsTab').style.color = 'var(--text-primary)';
+        }
+    }
     async function resendVerification() {
         const btn = document.getElementById('resendBtn');
         btn.disabled = true;
