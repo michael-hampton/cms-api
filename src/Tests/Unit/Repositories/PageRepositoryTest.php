@@ -7,7 +7,6 @@ use App\Models\Category;
 use App\Models\CustomFieldDefinition;
 use App\Models\Page;
 use App\Models\PageAuthor;
-use App\Models\PageCategory;
 use App\Models\PageCustomField;
 use App\Models\PageMetadata;
 use App\Models\PageSeo;
@@ -832,5 +831,975 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals(5, $settings->menu_order);
         $this->assertIsFloat($settings->latitude);
         $this->assertEquals(51.5074, $settings->latitude);
+    }
+
+    public function test_search_calendar_pages_returns_published_pages_in_date_range(): void
+    {
+        // Arrange
+        $pageInRange = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $pageOutOfRange = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-02-15 10:00:00'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;
+
+        // Assert
+        $this->assertGreaterThan(0, count($result->getData()));
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($pageInRange->id, $pageIds);
+        $this->assertNotContains($pageOutOfRange->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_returns_scheduled_pages_in_date_range(): void
+    {
+        // Arrange
+        $pageInRange = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $pageOutOfRange = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-02-15 10:00:00'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);
+
+        // Assert
+        $this->assertGreaterThan(0, count($result->getData()));
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($pageInRange->id, $pageIds);
+        $this->assertNotContains($pageOutOfRange->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_status(): void
+    {
+        // Arrange
+        $publishedPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $scheduledPage = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-16 10:00:00'
+        ]);
+
+        // Act - only published
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status', 'published');
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($publishedPage->id, $pageIds);
+        $this->assertNotContains($scheduledPage->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_status_in(): void
+    {
+        // Arrange
+        $publishedPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $scheduledPage = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $draftPage = $this->createPage([
+            'status' => 'draft'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;;
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($publishedPage->id, $pageIds);
+        $this->assertContains($scheduledPage->id, $pageIds);
+        $this->assertNotContains($draftPage->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_author_ids(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor(['name' => 'Author 1']);
+        $author2 = $this->createAuthor(['name' => 'Author 2']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('author_ids', [$author1->id]);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_multiple_author_ids(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor(['name' => 'Author 1']);
+        $author2 = $this->createAuthor(['name' => 'Author 2']);
+        $author3 = $this->createAuthor(['name' => 'Author 3']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $page3 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-17 10:00:00'
+        ]);
+
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+        $this->attachAuthorToPage($page3, $author3);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('author_ids', [$author1->id, $author2->id]);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertContains($page2->id, $pageIds);
+        $this->assertNotContains($page3->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_page_types(): void
+    {
+        // Arrange
+        $blogPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'page_type' => 'blog'
+        ]);
+
+        $eventPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'page_type' => 'event'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('page_types', ['blog']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;;
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($blogPage->id, $pageIds);
+        $this->assertNotContains($eventPage->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_multiple_page_types(): void
+    {
+        // Arrange
+        $blogPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'page_type' => 'blog'
+        ]);
+
+        $eventPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'page_type' => 'event'
+        ]);
+
+        $articlePage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-17 10:00:00',
+            'page_type' => 'article'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('page_types', ['blog', 'event']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($blogPage->id, $pageIds);
+        $this->assertContains($eventPage->id, $pageIds);
+        $this->assertNotContains($articlePage->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_tag_ids(): void
+    {
+        // Arrange
+        $tag1 = $this->createTag(['name' => 'Tech']);
+        $tag2 = $this->createTag(['name' => 'News']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $this->attachTagToPage($page1, $tag1);
+        $this->attachTagToPage($page2, $tag2);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('tag_ids', [$tag1->id]);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_filters_by_site_ids(): void
+    {
+        // Arrange
+        $site2 = $this->createSite();
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'site_id' => $site2->id
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('site_ids', [$this->siteId]);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria);
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_applies_default_site_filter_when_no_site_ids(): void
+    {
+        // Arrange
+        $site2 = $this->createSite();
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'site_id' => $site2->id
+        ]);
+
+        // Act - no site_ids filter, should use default site filter
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_orders_by_date_ascending(): void
+    {
+        // Arrange
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-20 10:00:00',
+            'title' => 'Latest'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-15 10:00:00',
+            'title' => 'Middle'
+        ]);
+
+        $page3 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-10 10:00:00',
+            'title' => 'Earliest'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;
+
+        // Assert
+        $data = $result->getData();
+        $this->assertGreaterThanOrEqual(3, count($data));
+
+        $pageIds = array_column($data, 'id');
+        $page3Index = array_search($page3->id, $pageIds);
+        $page2Index = array_search($page2->id, $pageIds);
+        $page1Index = array_search($page1->id, $pageIds);
+
+        $this->assertLessThan($page2Index, $page3Index);
+        $this->assertLessThan($page1Index, $page2Index);
+    }
+
+    public function test_search_calendar_pages_excludes_draft_pages(): void
+    {
+        // Arrange
+        $publishedPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $draftPage = $this->createPage([
+            'status' => 'draft'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;;
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($publishedPage->id, $pageIds);
+        $this->assertNotContains($draftPage->id, $pageIds);
+    }
+
+//    public function test_search_calendar_pages_loads_author_relationships(): void
+//    {
+//        // Arrange
+//        $author = $this->createAuthor(['name' => 'Test Author']);
+//
+//        $page = $this->createPage([
+//            'status' => 'published',
+//            'published_at' => '2025-01-15 10:00:00'
+//        ]);
+//
+//        $this->attachAuthorToPage($page, $author);
+//
+//        // Act
+//        $criteria = new SearchCriteria();
+//        $criteria->addFilter('date_range', [
+//            'start' => '2025-01-01 00:00:00',
+//            'end' => '2025-01-31 23:59:59'
+//        ]);
+//        $criteria->addFilter('status_in', ['scheduled', 'published']);
+//        $criteria->setPerPage(100);
+//
+//        $result = $this->repository->searchCalendarPages($criteria);
+//
+//        // Assert
+//        $data = $result->getData();
+//
+//        echo '<pre>';
+//        print_r($data);
+//        die;
+//
+//        $foundPage = collect($data)->where('id', $page->id)->first();
+//
+//        $this->assertNotNull($foundPage);
+//        $this->assertNotEmpty($foundPage['author']);
+//        $this->assertEquals('Test Author', $foundPage['author']['name']);
+//    }
+
+    public function test_search_calendar_pages_combines_multiple_filters(): void
+    {
+        // Arrange
+        $author = $this->createAuthor(['name' => 'Test Author']);
+        $tag = $this->createTag(['name' => 'Tech']);
+
+        $matchingPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'page_type' => 'blog'
+        ]);
+
+        $nonMatchingPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'page_type' => 'article'
+        ]);
+
+        $this->attachAuthorToPage($matchingPage, $author);
+        $this->attachTagToPage($matchingPage, $tag);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('author_ids', [$author->id]);
+        $criteria->addFilter('page_types', ['blog']);
+        $criteria->addFilter('tag_ids', [$tag->id]);
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;;
+
+        // Assert
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($matchingPage->id, $pageIds);
+        $this->assertNotContains($nonMatchingPage->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_handles_empty_filters(): void
+    {
+        // Arrange
+        $page = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->addFilter('author_ids', []); // Empty array
+        $criteria->addFilter('page_types', []); // Empty array
+        $criteria->addFilter('tag_ids', []); // Empty array
+        $criteria->setPerPage(100);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;;;
+
+        // Assert - should ignore empty filters and return all pages
+        $pageIds = array_column($result->getData(), 'id');
+        $this->assertContains($page->id, $pageIds);
+    }
+
+    public function test_search_calendar_pages_respects_per_page_limit(): void
+    {
+        // Arrange
+        for ($i = 0; $i < 15; $i++) {
+            $this->createPage([
+                'status' => 'published',
+                'published_at' => '2025-01-' . str_pad($i + 1, 2, '0', STR_PAD_LEFT) . ' 10:00:00',
+                'slug' => 'page-' . $i
+            ]);
+        }
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('date_range', [
+            'start' => '2025-01-01 00:00:00',
+            'end' => '2025-01-31 23:59:59'
+        ]);
+        $criteria->addFilter('status_in', ['scheduled', 'published']);
+        $criteria->setPerPage(10);
+
+        $result = $this->repository->searchCalendarPages($criteria, $this->siteId);;;;;
+
+        // Assert
+        $this->assertLessThanOrEqual(10, count($result->getData()));
+        $this->assertGreaterThanOrEqual(15, $result->getTotal());
+    }
+
+    public function test_search_pipeline_returns_all_stages(): void
+    {
+        // Arrange
+        $this->createPage(['status' => 'draft', 'title' => 'Draft Page']);
+        $this->createPage(['status' => 'waiting_approval', 'title' => 'Review Page']);
+        $this->createPage(['status' => 'scheduled', 'title' => 'Scheduled Page']);
+        $this->createPage(['status' => 'published', 'title' => 'Published Page']);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertArrayHasKey('draft', $results);
+        $this->assertArrayHasKey('waiting_approval', $results);
+        $this->assertArrayHasKey('scheduled', $results);
+        $this->assertArrayHasKey('published', $results);
+    }
+
+    public function test_search_pipeline_groups_pages_by_status(): void
+    {
+        // Arrange
+        $this->createPage(['status' => 'draft', 'title' => 'Draft 1']);
+        $this->createPage(['status' => 'draft', 'title' => 'Draft 2']);
+        $this->createPage(['status' => 'waiting_approval', 'title' => 'Review 1']);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertCount(2, $results['draft']['cards']);
+        $this->assertCount(1, $results['waiting_approval']['cards']);
+        $this->assertEquals(2, $results['draft']['total']);
+        $this->assertEquals(1, $results['waiting_approval']['total']);
+    }
+
+    public function test_search_pipeline_includes_stage_limits(): void
+    {
+        // Act
+        $criteria = new SearchCriteria();
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertEquals(10, $results['draft']['limit']);
+        $this->assertEquals(5, $results['waiting_approval']['limit']);
+        $this->assertNull($results['scheduled']['limit']);
+        $this->assertNull($results['published']['limit']);
+    }
+
+    public function test_search_pipeline_filters_by_author(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor(['name' => 'Author 1']);
+        $author2 = $this->createAuthor(['name' => 'Author 2']);
+
+        $page1 = $this->createPage(['status' => 'draft', 'title' => 'Page 1']);
+        $page2 = $this->createPage(['status' => 'draft', 'title' => 'Page 2']);
+
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('author', $author1->id);
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertCount(1, $results['draft']['cards']);
+        $draftPageIds = array_column($results['draft']['cards'], 'id');
+        $this->assertContains($page1->id, $draftPageIds);
+        $this->assertNotContains($page2->id, $draftPageIds);
+    }
+
+    public function test_search_pipeline_filters_by_search_query(): void
+    {
+        // Arrange
+        $this->createPage(['status' => 'draft', 'title' => 'Angular Tutorial']);
+        $this->createPage(['status' => 'draft', 'title' => 'React Guide']);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->setSearchQuery('Angular');
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertCount(1, $results['draft']['cards']);
+        $this->assertStringContainsString('Angular', $results['draft']['cards'][0]['title']);
+    }
+
+    public function test_search_pipeline_filters_by_page_type(): void
+    {
+        // Arrange
+        $this->createPage(['status' => 'draft', 'page_type' => 'blog', 'title' => 'Blog Post']);
+        $this->createPage(['status' => 'draft', 'page_type' => 'article', 'title' => 'Article']);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('page_type', 'blog');
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertCount(1, $results['draft']['cards']);
+        $this->assertEquals('blog', $results['draft']['cards'][0]['page_type']);
+    }
+
+    public function test_search_pipeline_filters_by_site(): void
+    {
+        // Arrange
+        $site2 = $this->createSite();
+
+        $page1 = $this->createPage(['status' => 'draft', 'site_id' => $this->siteId]);
+        $page2 = $this->createPage(['status' => 'draft', 'site_id' => $site2->id]);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('site_id', $this->siteId);
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $draftPageIds = array_column($results['draft']['cards'], 'id');
+        $this->assertContains($page1->id, $draftPageIds);
+        $this->assertNotContains($page2->id, $draftPageIds);
+    }
+
+    public function test_search_pipeline_loads_relationships(): void
+    {
+        // Arrange
+        $author = $this->createAuthor(['name' => 'Test Author']);
+        $tag = $this->createTag(['name' => 'Test Tag']);
+
+        $page = $this->createPage(['status' => 'draft']);
+        $this->attachAuthorToPage($page, $author);
+        $this->attachTagToPage($page, $tag);
+        $this->createPageMetadata($page->id);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $draftCard = $results['draft']['cards'][0];
+        $this->assertNotEmpty($draftCard['page_authors']);
+        $this->assertNotEmpty($draftCard['tags']);
+        $this->assertNotEmpty($draftCard['metadata']);
+    }
+
+    public function test_update_page_status_changes_status(): void
+    {
+        // Arrange
+        $page = $this->createPage(['status' => 'draft']);
+
+        // Act
+        $success = $this->repository->updatePageStatus($page->id, 'waiting_approval');
+
+        // Assert
+        $this->assertTrue($success);
+        $this->assertDatabaseHas('pages', [
+            'id' => $page->id,
+            'status' => 'waiting_approval'
+        ]);
+    }
+
+    public function test_update_page_status_returns_false_for_invalid_page(): void
+    {
+        // Act
+        $success = $this->repository->updatePageStatus(99999, 'waiting_approval');
+
+        // Assert
+        $this->assertFalse($success);
+    }
+
+    public function test_update_page_status_sets_scheduled_at_when_moving_to_scheduled(): void
+    {
+        // Arrange
+        $page = $this->createPage(['status' => 'draft', 'scheduled_at' => null]);
+
+        // Act
+        $this->repository->updatePageStatus($page->id, 'scheduled');
+
+        // Assert
+        $this->assertDatabaseHas('pages', [
+            'id' => $page->id,
+            'status' => 'scheduled'
+        ]);
+
+        $updatedPage = $this->repository->find($page->id);
+        $this->assertNotNull($updatedPage->scheduled_at);
+    }
+
+    public function test_update_page_status_sets_published_at_when_moving_to_published(): void
+    {
+        // Arrange
+        $page = $this->createPage(['status' => 'draft', 'published_at' => null]);
+
+        // Act
+        $this->repository->updatePageStatus($page->id, 'published');
+
+        // Assert
+        $this->assertDatabaseHas('pages', [
+            'id' => $page->id,
+            'status' => 'published'
+        ]);
+
+        $updatedPage = $this->repository->find($page->id);
+        $this->assertNotNull($updatedPage->published_at);
+    }
+
+    public function test_update_page_status_does_not_overwrite_existing_scheduled_at(): void
+    {
+        // Arrange
+        $scheduledAt = '2025-01-15 10:00:00';
+        $page = $this->createPage([
+            'status' => 'draft',
+            'scheduled_at' => $scheduledAt
+        ]);
+
+        // Act
+        $this->repository->updatePageStatus($page->id, 'scheduled');
+
+        // Assert
+        $updatedPage = $this->repository->find($page->id);
+        $this->assertEquals($scheduledAt, $updatedPage->scheduled_at);
+    }
+
+    public function test_get_pipeline_metrics_returns_stage_counts(): void
+    {
+        // Arrange
+        $this->createPages(3, ['status' => 'draft']);
+        $this->createPages(2, ['status' => 'waiting_approval']);
+        $this->createPages(1, ['status' => 'scheduled']);
+        $this->createPages(5, ['status' => 'published']);
+
+        // Act
+        $metrics = $this->repository->getPipelineMetrics($this->siteId);
+
+        // Assert
+        $this->assertArrayHasKey('stage_counts', $metrics);
+        $this->assertEquals(3, $metrics['stage_counts']['draft']);
+        $this->assertEquals(2, $metrics['stage_counts']['waiting_approval']);
+        $this->assertEquals(1, $metrics['stage_counts']['scheduled']);
+        $this->assertEquals(5, $metrics['stage_counts']['published']);
+    }
+
+    public function test_get_pipeline_metrics_returns_throughput(): void
+    {
+        // Arrange
+        $thirtyOneDaysAgo = date('Y-m-d H:i:s', strtotime('-31 days'));
+        $twentyDaysAgo = date('Y-m-d H:i:s', strtotime('-20 days'));
+
+        $this->createPage([
+            'status' => 'published',
+            'published_at' => $twentyDaysAgo
+        ]);
+        $this->createPage([
+            'status' => 'published',
+            'published_at' => $thirtyOneDaysAgo
+        ]);
+
+        // Act
+        $metrics = $this->repository->getPipelineMetrics($this->siteId);
+
+        // Assert
+        $this->assertArrayHasKey('throughput', $metrics);
+        $this->assertEquals(1, $metrics['throughput']);
+    }
+
+    public function test_get_pipeline_metrics_identifies_bottlenecks(): void
+    {
+        // Arrange - Create 8 draft pages (80% of 10 limit)
+        $this->createPages(8, ['status' => 'draft']);
+
+        // Act
+        $metrics = $this->repository->getPipelineMetrics($this->siteId);
+
+        // Assert
+        $this->assertArrayHasKey('bottlenecks', $metrics);
+        $this->assertContains('Draft', $metrics['bottlenecks']);
+    }
+
+    public function test_get_pipeline_metrics_identifies_multiple_bottlenecks(): void
+    {
+        // Arrange
+        $this->createPages(8, ['status' => 'draft']); // 80% of 10
+        $this->createPages(4, ['status' => 'waiting_approval']); // 80% of 5
+
+        // Act
+        $metrics = $this->repository->getPipelineMetrics($this->siteId);
+
+        // Assert
+        $this->assertCount(2, $metrics['bottlenecks']);
+        $this->assertContains('Draft', $metrics['bottlenecks']);
+        $this->assertContains('In Review', $metrics['bottlenecks']);
+    }
+
+    public function test_get_pipeline_metrics_filters_by_site(): void
+    {
+        // Arrange
+        $site2 = $this->createSite();
+
+        $this->createPages(3, ['status' => 'draft', 'site_id' => $this->siteId]);
+        $this->createPages(5, ['status' => 'draft', 'site_id' => $site2->id]);
+
+        // Act
+        $metrics = $this->repository->getPipelineMetrics($this->siteId);
+
+        // Assert
+        $this->assertEquals(3, $metrics['stage_counts']['draft']);
+    }
+
+    public function test_get_pipeline_metrics_returns_avg_time_per_stage(): void
+    {
+        // Act
+        $metrics = $this->repository->getPipelineMetrics($this->siteId);
+
+        // Assert
+        $this->assertArrayHasKey('avg_time_per_stage', $metrics);
+        $this->assertArrayHasKey('draft', $metrics['avg_time_per_stage']);
+        $this->assertArrayHasKey('waiting_approval', $metrics['avg_time_per_stage']);
+        $this->assertArrayHasKey('scheduled', $metrics['avg_time_per_stage']);
+        $this->assertArrayHasKey('published', $metrics['avg_time_per_stage']);
+    }
+
+    public function test_search_pipeline_returns_empty_stages_when_no_pages(): void
+    {
+        // Act
+        $criteria = new SearchCriteria();
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertCount(0, $results['draft']['cards']);
+        $this->assertCount(0, $results['waiting_approval']['cards']);
+        $this->assertCount(0, $results['scheduled']['cards']);
+        $this->assertCount(0, $results['published']['cards']);
+    }
+
+    public function test_search_pipeline_combines_multiple_filters(): void
+    {
+        // Arrange
+        $author = $this->createAuthor(['name' => 'Test Author']);
+
+        $matchingPage = $this->createPage([
+            'status' => 'draft',
+            'page_type' => 'blog',
+            'title' => 'Angular Tutorial'
+        ]);
+
+        $nonMatchingPage1 = $this->createPage([
+            'status' => 'draft',
+            'page_type' => 'article',
+            'title' => 'Angular Guide'
+        ]);
+
+        $nonMatchingPage2 = $this->createPage([
+            'status' => 'draft',
+            'page_type' => 'blog',
+            'title' => 'React Tutorial'
+        ]);
+
+        $this->attachAuthorToPage($matchingPage, $author);
+        $this->attachAuthorToPage($nonMatchingPage1, $author);
+
+        // Act
+        $criteria = new SearchCriteria();
+        $criteria->addFilter('page_type', 'blog');
+        $criteria->addFilter('author', $author->id);
+        $criteria->setSearchQuery('Angular');
+
+        $results = $this->repository->searchPipeline($criteria);
+
+        // Assert
+        $this->assertCount(1, $results['draft']['cards']);
+        $draftPageIds = array_column($results['draft']['cards'], 'id');
+        $this->assertContains($matchingPage->id, $draftPageIds);
     }
 }

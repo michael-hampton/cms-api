@@ -52,7 +52,8 @@ class Page extends Model
         'approved_at',
         'created_by',
         'updated_by',
-        'zones'
+        'zones',
+        'scheduled_at'
     ];
 
     protected $alwaysInclude = [

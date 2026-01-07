@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Actions;
+
+use App\Repositories\PageRepository;
+use App\Repositories\PageTagRepository;
+use App\Repositories\TagRepository;
+
+class BulkAddTagsToPages
+{
+    public function __construct(
+        private readonly PageRepository    $pageRepository,
+        private readonly PageTagRepository $pageTagRepository,
+        private readonly TagRepository     $tagRepository
+    )
+    {
+    }
+
+    public function handle(array $pageIds, array $tagIds, int $siteId): array
+    {
+        $results = [];
+
+        // Get tag names from tag IDs once at the start
+        $tagNames = [];
+        foreach ($tagIds as $tagId) {
+            $tag = $this->tagRepository->find($tagId);
+            if ($tag) {
+                $tagNames[] = $tag->name;
+            }
+        }
+
+        // Early return if no valid tags
+        if (empty($tagNames)) {
+            foreach ($pageIds as $pageId) {
+                $results[$pageId] = [
+                    'success' => false,
+                    'error' => 'No valid tags provided'
+                ];
+            }
+            return $results;
+        }
+
+        foreach ($pageIds as $pageId) {
+            try {
+                $page = $this->pageRepository->find($pageId);
+
+                if (!$page) {
+                    $results[$pageId] = [
+                        'success' => false,
+                        'error' => 'Page not found'
+                    ];
+                    continue;
+                }
+
+                // Get existing tag names for this page
+                $existingTags = $this->pageTagRepository
+                    ->getTagsForPage($pageId)
+                    ->pluck('name')
+                    ->toArray();
+
+                // Merge existing with new tag names (avoiding duplicates)
+                $allTagNames = array_unique(array_merge($existingTags, $tagNames));
+
+                // Sync tags with tag names
+                $this->pageTagRepository->syncTags($pageId, $allTagNames, $siteId);
+
+                $results[$pageId] = ['success' => true];
+            } catch (\Exception $e) {
+                $results[$pageId] = [
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        return $results;
+    }
+}

@@ -533,4 +533,255 @@ class PageController extends Controller
         }
     }
 
+    public function getCalendarPages(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $startDate = $request->get('start_date');
+            $endDate = $request->get('end_date');
+            $excludeStatus = $request->get('exclude_status');
+            $authors = $request->get('authors');
+            $types = $request->get('types');
+            $sites = $request->get('sites');
+            $tags = $request->get('tags');
+
+            if (!$startDate || !$endDate) {
+                return $this->errorResponse('start_date and end_date are required', 422);
+            }
+
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+
+            // Date range filter for published_at or scheduled_at
+            $criteria->addFilter('date_range', [
+                'start' => $startDate,
+                'end' => $endDate
+            ]);
+
+            // Status filter
+            if ($excludeStatus === 'scheduled') {
+                $criteria->addFilter('status', 'published');
+            } elseif ($excludeStatus === 'published') {
+                $criteria->addFilter('status', 'scheduled');
+            } else {
+                // Include both scheduled and published
+                $criteria->addFilter('status_in', ['scheduled', 'published']);
+            }
+
+            // Author filter
+            if (!empty($authors)) {
+                $authorIds = is_array($authors) ? $authors : explode(',', $authors);
+                $criteria->addFilter('author_ids', $authorIds);
+            }
+
+            // Type filter
+            if (!empty($types)) {
+                $typeList = is_array($types) ? $types : explode(',', $types);
+                $criteria->addFilter('page_types', $typeList);
+            }
+
+            // Site filter
+            if (!empty($sites)) {
+                $siteIds = is_array($sites) ? $sites : explode(',', $sites);
+                $criteria->addFilter('site_ids', $siteIds);
+            }
+
+            // Tag filter
+            if (!empty($tags)) {
+                $tagIds = is_array($tags) ? $tags : explode(',', $tags);
+                $criteria->addFilter('tag_ids', $tagIds);
+            }
+
+            // Get all results (no pagination for calendar)
+            $criteria->setPerPage(1000);
+
+            $result = $this->pageRepository->searchCalendarPages($criteria);
+
+            // Format results
+            $formattedPages = array_map(function ($page) {
+                return [
+                    'id' => $page['id'],
+                    'title' => $page['title'],
+                    'status' => $page['status'],
+                    'published_at' => $page['published_at'],
+                    'scheduled_at' => $page['scheduled_at'] ?? null,
+                    'page_type' => $page['page_type'],
+                    'author' => isset($page['author']) ? [
+                        'id' => $page['author']['id'] ?? null,
+                        'name' => $page['author']['name'] ?? null
+                    ] : null,
+                    'site' => [
+                        'id' => $page['site_id'] ?? null,
+                        'name' => $page['site']['name'] ?? null
+                    ]
+                ];
+            }, $result->getData());
+
+            return $this->resourceResponse([
+                'success' => true,
+                'items' => $formattedPages,
+                'total' => count($formattedPages)
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    // In src/Controllers/PageController.php
+
+    public function bulkAddTags(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $tagIds = $request->input('tag_ids', []);
+        $siteId = $this->getSiteId(); // Your method to get current site ID
+
+        $action = new BulkAddTagsToPages(
+            $this->pageRepository,
+            $this->pageTagRepository,
+            $this->tagRepository
+        );
+
+        $results = $action->handle($pageIds, $tagIds, $siteId);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+    public function bulkRemoveTags(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $tagIds = $request->input('tag_ids', []);
+        $siteId = $this->getSiteId(); // Your method to get current site ID
+
+        $action = new BulkRemoveTagsFromPages(
+            $this->pageRepository,
+            $this->pageTagRepository,
+            $this->tagRepository
+        );
+
+        $results = $action->handle($pageIds, $tagIds, $siteId);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+    public function bulkChangeAuthor(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $authorId = $request->input('author_id');
+
+        $action = new BulkChangePageAuthor($this->pageRepository);
+
+        $results = $action->handle($pageIds, $authorId);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+    public function bulkAddContributors(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $contributorIds = $request->input('contributor_ids', []);
+
+        $action = new BulkAddContributorsToPages(
+            $this->pageRepository,
+            $this->pageAuthorRepository
+        );
+
+        $results = $action->handle($pageIds, $contributorIds);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+    public function bulkRemoveContributors(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $contributorIds = $request->input('contributor_ids', []);
+
+        $action = new BulkRemoveContributorsFromPages(
+            $this->pageRepository,
+            $this->pageAuthorRepository
+        );
+
+        $results = $action->handle($pageIds, $contributorIds);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+    public function bulkUpdateRegions(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $regionSetIds = $request->input('region_set_ids', []);
+        $territoryIds = $request->input('territory_ids', []);
+
+        $action = new BulkUpdatePageRegions(
+            $this->pageRepository,
+            $this->pageRegionSetRepository,
+            $this->pageTerritoryRepository
+        );
+
+        $results = $action->handle($pageIds, $regionSetIds, $territoryIds);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+    public function bulkClone(Request $request): JsonResponse
+    {
+        $pageIds = $request->input('page_ids', []);
+        $options = [
+            'withPrefix' => $request->input('with_prefix', true),
+            'asDraft' => $request->input('as_draft', true),
+        ];
+
+        $clonePage = new ClonePage(
+            $this->pageRepository,
+            $this->database,
+            $this->pageHistory
+        );
+
+        $action = new BulkClonePages($clonePage, $this->pageRepository);
+
+        $results = $action->handle($pageIds, $options);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => ['results' => $results]
+        ]);
+    }
+
+//    public function bulkExport(Request $request): JsonResponse
+//    {
+//        $pageIds = $request->input('page_ids', []);
+//        $format = $request->input('format', 'json');
+//        $includeBlocks = $request->input('include_blocks', true);
+//
+//        $action = new BulkExportPages(
+//            $this->pageRepository,
+//            $this->blockRepository
+//        );
+
+//        $content = $action->handle($pageIds, $format, $includeBlocks);
+//
+//        $filename = 'pages-export.' . $format;
+//        $mimeType = $format === 'csv' ? 'text/csv' : 'application/json';
+
+//        return new Response($content, 200, [
+//            'Content-Type' => $mimeType,
+//            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+//        ]);
+//    }
+
 }

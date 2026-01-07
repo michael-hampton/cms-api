@@ -668,4 +668,209 @@ class PageRepository extends Repository
     {
         return PageMetadata::where('page_id', $pageId)->first();
     }
+
+    /**
+     * Search pages specifically for calendar view
+     * Handles date range filtering across published_at and scheduled_at
+     */
+    public function searchCalendarPages(SearchCriteria $criteria, ?int $siteId = null): PaginatedResult
+    {
+        $query = Page::with([
+            'author',
+            'pageAuthors',
+            'pageAuthors.author',
+            'site'
+        ]);
+
+        // Handle date range filter - use whereRaw with named parameters
+        $dateRange = $criteria->getFilter('date_range');
+        if ($dateRange) {
+            $startDate = $dateRange['start'];
+            $endDate = $dateRange['end'];
+
+            $query->whereRaw(
+                "((status = 'published' AND published_at BETWEEN :start_date_1 AND :end_date_1) OR (status = 'scheduled' AND scheduled_at BETWEEN :start_date_2 AND :end_date_2))",
+                [
+                    'start_date_1' => $startDate,
+                    'end_date_1' => $endDate,
+                    'start_date_2' => $startDate,
+                    'end_date_2' => $endDate
+                ]
+            );
+        }
+
+        // Handle status filter
+        $statusIn = $criteria->getFilter('status_in');
+        if ($statusIn) {
+            $query->whereIn('status', $statusIn);
+        } else {
+            $status = $criteria->getFilter('status');
+            if ($status) {
+                $query->where('status', $status);
+            }
+        }
+
+        // Handle author filter
+        $authorIds = $criteria->getFilter('author_ids');
+        if ($authorIds && !empty($authorIds)) {
+            $query->whereHas('pageAuthors', function ($q) use ($authorIds) {
+                $q->whereIn('author_id', $authorIds);
+            });
+        }
+
+        // Handle page type filter
+        $pageTypes = $criteria->getFilter('page_types');
+        if ($pageTypes && !empty($pageTypes)) {
+            $query->whereIn('page_type', $pageTypes);
+        }
+
+        // Handle tag filter
+        $tagIds = $criteria->getFilter('tag_ids');
+        if ($tagIds && !empty($tagIds)) {
+            $query->whereHas('tags', function ($q) use ($tagIds) {
+                $q->whereIn('tags.id', $tagIds);
+            });
+        }
+
+        $siteId = $siteId ?? $this->siteId;
+
+        // Handle site filter
+        $siteIds = $criteria->getFilter('site_ids');
+        if ($siteIds && !empty($siteIds)) {
+            $query->whereIn('site_id', $siteIds);
+        } else {
+            $query->where('site_id', $siteId);
+        }
+
+        // Order by date (published_at or scheduled_at)
+        $query->orderByRaw('COALESCE(published_at, scheduled_at) ASC');
+
+        return $this->searchEngine->search($query, $criteria);
+    }
+
+    /**
+     * Search pages for pipeline view with stage-specific filtering
+     */
+    public function searchPipeline(SearchCriteria $criteria): array
+    {
+        $config = SearchConfigurationFactory::create('pipeline');
+        $this->searchEngine = new SearchEngine($config);
+
+        // Get all stages
+        $stages = [
+            'draft' => ['status' => 'draft', 'limit' => 10],
+            'waiting_approval' => ['status' => 'waiting_approval', 'limit' => 5],
+            'scheduled' => ['status' => 'scheduled', 'limit' => null],
+            'published' => ['status' => 'published', 'limit' => null]
+        ];
+
+        $results = [];
+
+        foreach ($stages as $stageId => $stageConfig) {
+            // Clone criteria for each stage
+            $stageCriteria = clone $criteria;
+
+            // Override status filter for this stage
+            $filters = $stageCriteria->getFilters();
+            $filters['status'] = $stageConfig['status'];
+
+            // Create new criteria with stage-specific status
+            $stageCriteria = new SearchCriteria(
+                filters: $filters,
+                sortBy: $criteria->getSortBy(),
+                sortOrder: $criteria->getSortOrder(),
+                page: 1,
+                perPage: 1000,
+                searchQuery: $criteria->getSearchQuery()
+            );
+
+            $query = Page::with([
+                'pageAuthors',
+                'pageAuthors.author',
+                'metadata',
+                'tags'
+            ]);
+
+            $stageResult = $this->searchEngine->search($query, $stageCriteria);
+
+            $results[$stageId] = [
+                'cards' => $stageResult->getData(),
+                'total' => $stageResult->getTotal(),
+                'limit' => $stageConfig['limit']
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * Update page status for pipeline stage movement
+     */
+    public function updatePageStatus(int $pageId, string $status): bool
+    {
+        $page = Page::find($pageId);
+
+        if (!$page) {
+            return false;
+        }
+
+        $page->status = $status;
+
+        // If moving to scheduled or published, update timestamps
+        if ($status === 'scheduled' && !$page->scheduled_at) {
+            $page->scheduled_at = date('Y-m-d H:i:s');
+        } elseif ($status === 'published' && !$page->published_at) {
+            $page->published_at = date('Y-m-d H:i:s');
+        }
+
+        return $page->save();
+    }
+
+    /**
+     * Get pipeline metrics
+     */
+    public function getPipelineMetrics(?int $siteId = null): array
+    {
+        $siteId = $siteId ?? $this->siteId;
+
+        $query = Page::where('site_id', $siteId);
+
+        $stageCounts = [
+            'draft' => (clone $query)->where('status', 'draft')->count(),
+            'waiting_approval' => (clone $query)->where('status', 'waiting_approval')->count(),
+            'scheduled' => (clone $query)->where('status', 'scheduled')->count(),
+            'published' => (clone $query)->where('status', 'published')->count(),
+        ];
+
+        // Calculate average time in each stage (mock for now - would need status_history table)
+        $avgTimePerStage = [
+            'draft' => rand(1, 5),
+            'waiting_approval' => rand(1, 3),
+            'scheduled' => rand(1, 2),
+            'published' => 0
+        ];
+
+        // Calculate throughput (pages published in last 30 days)
+        $thirtyDaysAgo = date('Y-m-d H:i:s', strtotime('-30 days'));
+        $throughput = Page::where('site_id', $siteId)
+            ->where('status', 'published')
+            ->where('published_at', '>=', $thirtyDaysAgo)
+            ->count();
+
+        // Identify bottlenecks (stages at 80% or more of capacity)
+        $bottlenecks = [];
+        if ($stageCounts['draft'] >= 8) { // 80% of 10
+            $bottlenecks[] = 'Draft';
+        }
+        if ($stageCounts['waiting_approval'] >= 4) { // 80% of 5
+            $bottlenecks[] = 'In Review';
+        }
+
+        return [
+            'stage_counts' => $stageCounts,
+            'avg_time_per_stage' => $avgTimePerStage,
+            'throughput' => $throughput,
+            'bottlenecks' => $bottlenecks
+        ];
+    }
 }

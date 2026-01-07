@@ -10,6 +10,7 @@ use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
+use App\Search\Configurations\PipelineSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
@@ -35,6 +36,7 @@ class SearchConfigurationFactory
         'page_grid' => PageGridSearchConfiguration::class,
         'refund' => EmailThemeSearchConfiguration::class,
         'email-theme' => EmailThemeSearchConfiguration::class,
+        'pipeline' => PipelineSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

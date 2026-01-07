@@ -26,6 +26,7 @@ use App\Controllers\PageHistoryController;
 use App\Controllers\PageLikeController;
 use App\Controllers\PaymentController;
 use App\Controllers\PaymentMethodController;
+use App\Controllers\PipelineController;
 use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
@@ -64,7 +65,14 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/bulk-delete', PageController::class, 'bulkDelete');
         $router->post('/pages/bulk-update-status', PageController::class, 'bulkUpdateStatus');
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
+        $router->get('/pages/calendar', [PageController::class, 'getCalendarPages']);;
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
+
+        // Pipeline routes
+        $router->get('/api/{siteName}/pipeline', [PipelineController::class, 'index']);
+        $router->get('/api/{siteName}/pipeline/metrics', [PipelineController::class, 'metrics']);
+        $router->patch('/api/{siteName}/pipeline/{id}/stage', [PipelineController::class, 'updateStage']);
+        $router->post('/api/{siteName}/pipeline/bulk-update-stage', [PipelineController::class, 'bulkUpdateStage']);
 
         $router->get('/campaigns', [CampaignController::class, 'index']);
         $router->get('/campaigns/active', [CampaignController::class, 'getActive']);

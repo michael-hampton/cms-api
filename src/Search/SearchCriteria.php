@@ -18,6 +18,11 @@ class SearchCriteria
         return $this->filters;
     }
 
+    public function hasFilter(string $key): bool
+    {
+        return isset($this->filters[$key]);
+    }
+
     public function getFilter(string $key, mixed $default = null): mixed
     {
         return $this->filters[$key] ?? $default;
@@ -53,7 +58,7 @@ class SearchCriteria
         return ($this->page - 1) * $this->perPage;
     }
 
-    public function addFilter(string $column, string $value): void
+    public function addFilter(string $column, mixed $value): void
     {
         $this->filters[$column] = $value;
     }
