@@ -32,12 +32,20 @@ class BulkRemoveTagsFromPagesActionTest extends FunctionalTestCase
         // Then mock page lookup
         $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page1);
 
-        $existingTag10 = (object)['id' => 10, 'name' => 'Tag 10'];
-        $existingTag20 = (object)['id' => 20, 'name' => 'Tag 20'];
-        $existingTag30 = (object)['id' => 30, 'name' => 'Tag 30'];
+        $existingTag10 = Mockery::mock(Tag::class)->makePartial();
+        $existingTag10->id = 10;
+        $existingTag10->name = 'Tag 10';
 
-        $this->pageTagRepository->shouldReceive('getTagsForPage')->with(1)
-            ->andReturn(collect([$existingTag10, $existingTag20, $existingTag30]));
+        $existingTag20 = Mockery::mock(Tag::class)->makePartial();
+        $existingTag20->id = 20;
+        $existingTag20->name = 'Tag 20';
+
+        $existingTag30 = Mockery::mock(Tag::class)->makePartial();
+        $existingTag30->id = 30;
+        $existingTag30->name = 'Tag 30';
+
+        $this->pageTagRepository->shouldReceive('getPageTags')->with(1, 1)
+            ->andReturn([$existingTag10, $existingTag20, $existingTag30]);
 
         $this->pageTagRepository->shouldReceive('syncTags')
             ->once()

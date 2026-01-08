@@ -16,6 +16,7 @@ use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 class PageControllerTest extends FunctionalTestCase
 {
     use CreatesTestData;
+
     public function testIndexReturnsPagesList()
     {
         $this->createPage();
@@ -29,7 +30,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testIndexWithSearchCriteria()
     {
-       $this->createPage(['status' => 'published']);
+        $this->createPage(['status' => 'published']);
         $this->createPage(['status' => 'draft']);
 
         $response = $this->getForSite('/api/pages?status=published');
@@ -94,7 +95,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testShowReturnsPageBySlug()
     {
-       $this->createPage(['slug' => 'test-page']);
+        $this->createPage(['slug' => 'test-page']);
         $response = $this->getForSite('/api/pages/test-page');
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
@@ -469,7 +470,7 @@ class PageControllerTest extends FunctionalTestCase
                 'main' => ['title' => 'Multi-Author Page', 'authors' => [1, 2]],
                 'meta' => [
                     'slug' => 'multi-author',
-                    'status' => 'draft',$author3->id,
+                    'status' => 'draft', $author3->id,
                     'authors' => [$author1->id, $author2->id],
                     'contributors' => [$author3->id]
                 ]
@@ -799,7 +800,7 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->attachRegionSetToPage($sourcePage, $regionSet);
 
-       $this->attachTerritoryToPage($sourcePage, $territory);
+        $this->attachTerritoryToPage($sourcePage, $territory);
 
         $newSite = $this->createSite();
         $targetSiteId = $newSite->id;
@@ -867,7 +868,7 @@ class PageControllerTest extends FunctionalTestCase
     {
         $sourcePage = $this->createPage();
 
-       $this->createBlock($sourcePage->id, ['type' => 'text']);
+        $this->createBlock($sourcePage->id, ['type' => 'text']);
         $this->createBlock($sourcePage->id, ['type' => 'image']);
         $this->createBlock($sourcePage->id, ['type' => 'text']);
 
@@ -1204,7 +1205,8 @@ class PageControllerTest extends FunctionalTestCase
     }
 
 
-    private function createSite() {
+    private function createSite()
+    {
         return Site::create([
             'name' => 'Test Site 2',
             'slug' => 'test-site-2',
@@ -2219,651 +2221,614 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals($existingProduct->id, $blockData['product_id']);
     }
 
-    /**
-     * public function testGetCalendarPagesReturnsPublishedAndScheduledPages(): void
-     * {
-     * // Arrange
-     * $publishedPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'title' => 'Published Page'
-     * ]);
-     *
-     * $scheduledPage = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-01-20 10:00:00',
-     * 'title' => 'Scheduled Page'
-     * ]);
-     *
-     * $draftPage = $this->createPage([
-     * 'status' => 'draft',
-     * 'title' => 'Draft Page'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $this->assertTrue($data['data']['success']);
-     * $this->assertArrayHasKey('items', $data['data']);
-     * $this->assertGreaterThanOrEqual(2, count($data['data']['items']));
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($publishedPage->id, $pageIds);
-     * $this->assertContains($scheduledPage->id, $pageIds);
-     * $this->assertNotContains($draftPage->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesReturns422WithoutStartDate(): void
-     * {
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(422, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     * $this->assertStringContainsString('start_date and end_date are required', $data['error']);
-     * }
-     *
-     * public function testGetCalendarPagesReturns422WithoutEndDate(): void
-     * {
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01');
-     *
-     * // Assert
-     * $this->assertEquals(422, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     * $this->assertStringContainsString('start_date and end_date are required', $data['error']);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersPagesByDateRange(): void
-     * {
-     * // Arrange
-     * $pageInRange = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $pageOutOfRange = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-02-15 10:00:00'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($pageInRange->id, $pageIds);
-     * $this->assertNotContains($pageOutOfRange->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesExcludesScheduledWhenRequested(): void
-     * {
-     * // Arrange
-     * $publishedPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $scheduledPage = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-01-20 10:00:00'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&exclude_status=scheduled');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($publishedPage->id, $pageIds);
-     * $this->assertNotContains($scheduledPage->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesExcludesPublishedWhenRequested(): void
-     * {
-     * // Arrange
-     * $publishedPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $scheduledPage = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-01-20 10:00:00'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&exclude_status=published');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertNotContains($publishedPage->id, $pageIds);
-     * $this->assertContains($scheduledPage->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByAuthor(): void
-     * {
-     * // Arrange
-     * $author1 = $this->createAuthor(['name' => 'Author 1']);
-     * $author2 = $this->createAuthor(['name' => 'Author 2']);
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00'
-     * ]);
-     *
-     * $this->attachAuthorToPage($page1, $author1);
-     * $this->attachAuthorToPage($page2, $author2);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&authors={$author1->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertNotContains($page2->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByMultipleAuthors(): void
-     * {
-     * // Arrange
-     * $author1 = $this->createAuthor(['name' => 'Author 1']);
-     * $author2 = $this->createAuthor(['name' => 'Author 2']);
-     * $author3 = $this->createAuthor(['name' => 'Author 3']);
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00'
-     * ]);
-     *
-     * $page3 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-17 10:00:00'
-     * ]);
-     *
-     * $this->attachAuthorToPage($page1, $author1);
-     * $this->attachAuthorToPage($page2, $author2);
-     * $this->attachAuthorToPage($page3, $author3);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&authors={$author1->id},{$author2->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertContains($page2->id, $pageIds);
-     * $this->assertNotContains($page3->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByPageType(): void
-     * {
-     * // Arrange
-     * $blogPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'page_type' => 'blog'
-     * ]);
-     *
-     * $articlePage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00',
-     * 'page_type' => 'article'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&types=blog');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($blogPage->id, $pageIds);
-     * $this->assertNotContains($articlePage->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByMultiplePageTypes(): void
-     * {
-     * // Arrange
-     * $blogPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'page_type' => 'blog'
-     * ]);
-     *
-     * $articlePage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00',
-     * 'page_type' => 'article'
-     * ]);
-     *
-     * $eventPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-17 10:00:00',
-     * 'page_type' => 'event'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&types=blog,article');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($blogPage->id, $pageIds);
-     * $this->assertContains($articlePage->id, $pageIds);
-     * $this->assertNotContains($eventPage->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersBySite(): void
-     * {
-     * // Arrange
-     * $site2 = $this->createSite();
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'site_id' => $this->siteId
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00',
-     * 'site_id' => $site2->id
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&sites={$this->siteId}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertNotContains($page2->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByMultipleSites(): void
-     * {
-     * // Arrange
-     * $site2 = $this->createSite();
-     * $site3 = $this->createSite();
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'site_id' => $this->siteId
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00',
-     * 'site_id' => $site2->id
-     * ]);
-     *
-     * $page3 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-17 10:00:00',
-     * 'site_id' => $site3->id
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&sites={$this->siteId},{$site2->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertContains($page2->id, $pageIds);
-     * $this->assertNotContains($page3->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByTags(): void
-     * {
-     * // Arrange
-     * $tag1 = $this->createTag(['name' => 'Tech']);
-     * $tag2 = $this->createTag(['name' => 'News']);
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00'
-     * ]);
-     *
-     * $this->attachTagToPage($page1, $tag1);
-     * $this->attachTagToPage($page2, $tag2);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&tags={$tag1->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertNotContains($page2->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesFiltersByMultipleTags(): void
-     * {
-     * // Arrange
-     * $tag1 = $this->createTag(['name' => 'Tech']);
-     * $tag2 = $this->createTag(['name' => 'News']);
-     * $tag3 = $this->createTag(['name' => 'Opinion']);
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00'
-     * ]);
-     *
-     * $page3 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-17 10:00:00'
-     * ]);
-     *
-     * $this->attachTagToPage($page1, $tag1);
-     * $this->attachTagToPage($page2, $tag2);
-     * $this->attachTagToPage($page3, $tag3);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&tags={$tag1->id},{$tag2->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertContains($page2->id, $pageIds);
-     * $this->assertNotContains($page3->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesCombinesMultipleFilters(): void
-     * {
-     * // Arrange
-     * $author = $this->createAuthor(['name' => 'Test Author']);
-     * $tag = $this->createTag(['name' => 'Tech']);
-     *
-     * $matchingPage = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'page_type' => 'blog'
-     * ]);
-     *
-     * $nonMatchingPage1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00',
-     * 'page_type' => 'article' // Different type
-     * ]);
-     *
-     * $nonMatchingPage2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-17 10:00:00',
-     * 'page_type' => 'blog' // Missing tag
-     * ]);
-     *
-     * $this->attachAuthorToPage($matchingPage, $author);
-     * $this->attachTagToPage($matchingPage, $tag);
-     * $this->attachAuthorToPage($nonMatchingPage1, $author);
-     * $this->attachTagToPage($nonMatchingPage1, $tag);
-     *
-     * // Act
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&authors={$author->id}&types=blog&tags={$tag->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($matchingPage->id, $pageIds);
-     * $this->assertNotContains($nonMatchingPage1->id, $pageIds);
-     * $this->assertNotContains($nonMatchingPage2->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesIncludesPageDetails(): void
-     * {
-     * // Arrange
-     * $author = $this->createAuthor(['name' => 'Test Author']);
-     *
-     * $page = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00',
-     * 'title' => 'Test Page',
-     * 'page_type' => 'blog'
-     * ]);
-     *
-     * $this->attachAuthorToPage($page, $author);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $foundPage = null;
-     * foreach ($data['data']['items'] as $item) {
-     * if ($item['id'] === $page->id) {
-     * $foundPage = $item;
-     * break;
-     * }
-     * }
-     *
-     * $this->assertNotNull($foundPage);
-     * $this->assertEquals('Test Page', $foundPage['title']);
-     * $this->assertEquals('published', $foundPage['status']);
-     * $this->assertEquals('2025-01-15 10:00:00', $foundPage['published_at']);
-     * $this->assertEquals('blog', $foundPage['page_type']);
-     * $this->assertArrayHasKey('author', $foundPage);
-     * $this->assertArrayHasKey('site', $foundPage);
-     * }
-     *
-     * public function testGetCalendarPagesIncludesScheduledAtForScheduledPages(): void
-     * {
-     * // Arrange
-     * $page = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-01-20 10:00:00',
-     * 'title' => 'Scheduled Page'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $foundPage = null;
-     * foreach ($data['data']['items'] as $item) {
-     * if ($item['id'] === $page->id) {
-     * $foundPage = $item;
-     * break;
-     * }
-     * }
-     *
-     * $this->assertNotNull($foundPage);
-     * $this->assertEquals('scheduled', $foundPage['status']);
-     * $this->assertEquals('2025-01-20 10:00:00', $foundPage['scheduled_at']);
-     * }
-     *
-     * public function testGetCalendarPagesReturnsEmptyArrayWhenNoResults(): void
-     * {
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-12-01&end_date=2025-12-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $this->assertTrue($data['data']['success']);
-     * $this->assertCount(0, $data['data']['items']);
-     * $this->assertEquals(0, $data['data']['total']);
-     * }
-     *
-     * public function testGetCalendarPagesReturnsCorrectTotal(): void
-     * {
-     * // Arrange
-     * $this->createPages(5, [
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $this->assertTrue($data['data']['success']);
-     * $this->assertEquals(5, $data['data']['total']);
-     * $this->assertCount(5, $data['data']['items']);
-     * }
-     *
-     * public function testGetCalendarPagesHandlesScheduledAtDateRange(): void
-     * {
-     * // Arrange
-     * $scheduledInRange = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $scheduledOutOfRange = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-02-15 10:00:00'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($scheduledInRange->id, $pageIds);
-     * $this->assertNotContains($scheduledOutOfRange->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesAcceptsArrayForAuthors(): void
-     * {
-     * // Arrange
-     * $author1 = $this->createAuthor();
-     * $author2 = $this->createAuthor();
-     *
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-15 10:00:00'
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-16 10:00:00'
-     * ]);
-     *
-     * $this->attachAuthorToPage($page1, $author1);
-     * $this->attachAuthorToPage($page2, $author2);
-     *
-     * // Act - Using array syntax
-     * $response = $this->getForSite("/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31&authors[]={$author1->id}&authors[]={$author2->id}");
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $pageIds = array_column($data['data']['items'], 'id');
-     * $this->assertContains($page1->id, $pageIds);
-     * $this->assertContains($page2->id, $pageIds);
-     * }
-     *
-     * public function testGetCalendarPagesOrdersByDateAscending(): void
-     * {
-     * // Arrange
-     * $page1 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-20 10:00:00',
-     * 'title' => 'Latest'
-     * ]);
-     *
-     * $page2 = $this->createPage([
-     * 'status' => 'scheduled',
-     * 'scheduled_at' => '2025-01-15 10:00:00',
-     * 'title' => 'Middle'
-     * ]);
-     *
-     * $page3 = $this->createPage([
-     * 'status' => 'published',
-     * 'published_at' => '2025-01-10 10:00:00',
-     * 'title' => 'Earliest'
-     * ]);
-     *
-     * // Act
-     * $response = $this->getForSite('/api/calendar-pages?start_date=2025-01-01&end_date=2025-01-31');
-     *
-     * // Assert
-     * $this->assertEquals(200, $response->getStatusCode());
-     * $data = json_decode($response->getContent(), true);
-     *
-     * $items = $data['data']['items'];
-     * $page3Index = null;
-     * $page2Index = null;
-     * $page1Index = null;
-     *
-     * foreach ($items as $index => $item) {
-     * if ($item['id'] === $page3->id) $page3Index = $index;
-     * if ($item['id'] === $page2->id) $page2Index = $index;
-     * if ($item['id'] === $page1->id) $page1Index = $index;
-     * }
-     *
-     * $this->assertNotNull($page3Index);
-     * $this->assertNotNull($page2Index);
-     * $this->assertNotNull($page1Index);
-     * $this->assertLessThan($page2Index, $page3Index);
-     * $this->assertLessThan($page1Index, $page2Index);
-     * }
-     */
+
+    public function testGetCalendarPagesReturnsPublishedAndScheduledPages(): void
+    {
+        // Arrange
+        $publishedPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'title' => 'Published Page'
+        ]);
+
+        $scheduledPage = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-20 10:00:00',
+            'title' => 'Scheduled Page'
+        ]);
+
+        $draftPage = $this->createPage([
+            'status' => 'draft',
+            'title' => 'Draft Page'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertGreaterThanOrEqual(2, count($data['items']));
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($publishedPage->id, $pageIds);
+        $this->assertContains($scheduledPage->id, $pageIds);
+        $this->assertNotContains($draftPage->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesReturns422WithoutStartDate(): void
+    {
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('start_date and end_date are required', $data['error']);
+    }
+
+    public function testGetCalendarPagesReturns422WithoutEndDate(): void
+    {
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01');
+
+        // Assert
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('start_date and end_date are required', $data['error']);
+    }
+
+    public function testGetCalendarPagesFiltersPagesByDateRange(): void
+    {
+        // Arrange
+        $pageInRange = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $pageOutOfRange = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-02-15 10:00:00'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($pageInRange->id, $pageIds);
+        $this->assertNotContains($pageOutOfRange->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesExcludesScheduledWhenRequested(): void
+    {
+        // Arrange
+        $publishedPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $scheduledPage = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-20 10:00:00'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&exclude_status=scheduled');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($publishedPage->id, $pageIds);
+        $this->assertNotContains($scheduledPage->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesExcludesPublishedWhenRequested(): void
+    {
+        // Arrange
+        $publishedPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $scheduledPage = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-20 10:00:00'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&exclude_status=published');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertNotContains($publishedPage->id, $pageIds);
+        $this->assertContains($scheduledPage->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesFiltersByAuthor(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor(['name' => 'Author 1']);
+        $author2 = $this->createAuthor(['name' => 'Author 2']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+
+        // Act
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&authors={$author1->id}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesFiltersByMultipleAuthors(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor(['name' => 'Author 1']);
+        $author2 = $this->createAuthor(['name' => 'Author 2']);
+        $author3 = $this->createAuthor(['name' => 'Author 3']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $page3 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-17 10:00:00'
+        ]);
+
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+        $this->attachAuthorToPage($page3, $author3);
+
+        // Act
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&authors={$author1->id},{$author2->id}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertContains($page2->id, $pageIds);
+        $this->assertNotContains($page3->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesFiltersByPageType(): void
+    {
+        // Arrange
+        $blogPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'page_type' => 'blog'
+        ]);
+
+        $articlePage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'page_type' => 'article'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&types=blog');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($blogPage->id, $pageIds);
+        $this->assertNotContains($articlePage->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesFiltersByMultiplePageTypes(): void
+    {
+        // Arrange
+        $blogPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'page_type' => 'blog'
+        ]);
+
+        $articlePage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'page_type' => 'article'
+        ]);
+
+        $eventPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-17 10:00:00',
+            'page_type' => 'event'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&types=blog,article');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($blogPage->id, $pageIds);
+        $this->assertContains($articlePage->id, $pageIds);
+        $this->assertNotContains($eventPage->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesFiltersBySite(): void
+    {
+        // Arrange
+        $site2 = $this->createSite();
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'site_id' => $this->siteId
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'site_id' => $site2->id
+        ]);
+
+        // Act
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&sites={$this->siteId}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesFiltersByTags(): void
+    {
+        // Arrange
+        $tag1 = $this->createTag(['name' => 'Tech']);
+        $tag2 = $this->createTag(['name' => 'News']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $this->attachTagToPage($page1, $tag1);
+        $this->attachTagToPage($page2, $tag2);
+
+        // Act
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&tags={$tag1->id}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertNotContains($page2->id, $pageIds);
+    }
+
+
+    public function testGetCalendarPagesFiltersByMultipleTags(): void
+    {
+        // Arrange
+        $tag1 = $this->createTag(['name' => 'Tech']);
+        $tag2 = $this->createTag(['name' => 'News']);
+        $tag3 = $this->createTag(['name' => 'Opinion']);
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $page3 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-17 10:00:00'
+        ]);
+
+        $this->attachTagToPage($page1, $tag1);
+        $this->attachTagToPage($page2, $tag2);
+        $this->attachTagToPage($page3, $tag3);
+
+        // Act
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&tags={$tag1->id},{$tag2->id}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertContains($page2->id, $pageIds);
+        $this->assertNotContains($page3->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesCombinesMultipleFilters(): void
+    {
+        // Arrange
+        $author = $this->createAuthor(['name' => 'Test Author']);
+        $tag = $this->createTag(['name' => 'Tech']);
+
+        $matchingPage = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'page_type' => 'blog'
+        ]);
+
+        $nonMatchingPage1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00',
+            'page_type' => 'article' // Different type
+        ]);
+
+        $nonMatchingPage2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-17 10:00:00',
+            'page_type' => 'blog' // Missing tag
+        ]);
+
+        $this->attachAuthorToPage($matchingPage, $author);
+        $this->attachTagToPage($matchingPage, $tag);
+        $this->attachAuthorToPage($nonMatchingPage1, $author);
+        $this->attachTagToPage($nonMatchingPage1, $tag);
+
+        // Act
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&authors={$author->id}&types=blog&tags={$tag->id}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($matchingPage->id, $pageIds);
+        $this->assertNotContains($nonMatchingPage1->id, $pageIds);
+        $this->assertNotContains($nonMatchingPage2->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesIncludesPageDetails(): void
+    {
+        // Arrange
+        $author = $this->createAuthor(['name' => 'Test Author']);
+
+        $page = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'title' => 'Test Page',
+            'page_type' => 'blog'
+        ]);
+
+        $this->attachAuthorToPage($page, $author);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $foundPage = null;
+        foreach ($data['items'] as $item) {
+            if ($item['id'] === $page->id) {
+                $foundPage = $item;
+                break;
+            }
+        }
+
+        $this->assertNotNull($foundPage);
+        $this->assertEquals('Test Page', $foundPage['title']);
+        $this->assertEquals('published', $foundPage['status']);
+        $this->assertEquals('2025-01-15 10:00:00', $foundPage['published_at']);
+        $this->assertEquals('blog', $foundPage['page_type']);
+        $this->assertArrayHasKey('author', $foundPage);
+        $this->assertArrayHasKey('site', $foundPage);
+    }
+
+    public function testGetCalendarPagesIncludesScheduledAtForScheduledPages(): void
+    {
+        // Arrange
+        $page = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-20 10:00:00',
+            'title' => 'Scheduled Page'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $foundPage = null;
+        foreach ($data['items'] as $item) {
+            if ($item['id'] === $page->id) {
+                $foundPage = $item;
+                break;
+            }
+        }
+
+        $this->assertNotNull($foundPage);
+        $this->assertEquals('scheduled', $foundPage['status']);
+        $this->assertEquals('2025-01-20 10:00:00', $foundPage['scheduled_at']);
+    }
+
+    public function testGetCalendarPagesReturnsEmptyArrayWhenNoResults(): void
+    {
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-12-01&end_date=2025-12-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertCount(0, $data['items']);
+        $this->assertEquals(0, $data['total']);
+    }
+
+    public function testGetCalendarPagesReturnsCorrectTotal(): void
+    {
+        // Arrange
+        $this->createPages(5, [
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(5, $data['total']);
+        $this->assertCount(5, $data['items']);
+    }
+
+    public function testGetCalendarPagesHandlesScheduledAtDateRange(): void
+    {
+        // Arrange
+        $scheduledInRange = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $scheduledOutOfRange = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-02-15 10:00:00'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($scheduledInRange->id, $pageIds);
+        $this->assertNotContains($scheduledOutOfRange->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesAcceptsArrayForAuthors(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor();
+        $author2 = $this->createAuthor();
+
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-16 10:00:00'
+        ]);
+
+        $this->attachAuthorToPage($page1, $author1);
+        $this->attachAuthorToPage($page2, $author2);
+
+        // Act - Using array syntax
+        $response = $this->getForSite("/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31&authors[]={$author1->id}&authors[]={$author2->id}");
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $pageIds = array_column($data['items'], 'id');
+        $this->assertContains($page1->id, $pageIds);
+        $this->assertContains($page2->id, $pageIds);
+    }
+
+    public function testGetCalendarPagesOrdersByDateAscending(): void
+    {
+        // Arrange
+        $page1 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-20 10:00:00',
+            'title' => 'Latest'
+        ]);
+
+        $page2 = $this->createPage([
+            'status' => 'scheduled',
+            'scheduled_at' => '2025-01-15 10:00:00',
+            'title' => 'Middle'
+        ]);
+
+        $page3 = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-10 10:00:00',
+            'title' => 'Earliest'
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $items = $data['items'];
+        $page3Index = null;
+        $page2Index = null;
+        $page1Index = null;
+
+        foreach ($items as $index => $item) {
+            if ($item['id'] === $page3->id) $page3Index = $index;
+            if ($item['id'] === $page2->id) $page2Index = $index;
+            if ($item['id'] === $page1->id) $page1Index = $index;
+        }
+
+        $this->assertNotNull($page3Index);
+        $this->assertNotNull($page2Index);
+        $this->assertNotNull($page1Index);
+        $this->assertLessThan($page2Index, $page3Index);
+        $this->assertLessThan($page1Index, $page2Index);
+    }
 }

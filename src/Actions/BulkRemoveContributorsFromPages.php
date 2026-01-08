@@ -14,7 +14,7 @@ class BulkRemoveContributorsFromPages
     {
     }
 
-    public function handle(array $pageIds, array $contributorIds): array
+    public function handle(array $pageIds, array $contributorIds, int $siteId, string $role = 'contributor'): array
     {
         $results = [];
 
@@ -30,17 +30,14 @@ class BulkRemoveContributorsFromPages
                     continue;
                 }
 
-                // Get existing contributors
-                $existingContributorIds = $this->pageAuthorRepository
-                    ->getAuthorsForPage($pageId)
-                    ->pluck('author_id')
-                    ->toArray();
+                // Get existing contributors for this role
+                $existingContributorIds = $this->pageAuthorRepository->getAuthorsForPage($pageId, 'contributor');
 
                 // Remove specified contributors
                 $remainingContributorIds = array_diff($existingContributorIds, $contributorIds);
 
                 // Sync remaining contributors
-                $this->pageAuthorRepository->syncAuthors($pageId, $remainingContributorIds);
+                $this->pageAuthorRepository->syncAuthors($pageId, array_values($remainingContributorIds), $role, $siteId);
 
                 $results[$pageId] = ['success' => true];
             } catch (\Exception $e) {

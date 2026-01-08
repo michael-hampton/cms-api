@@ -2,17 +2,19 @@
 
 namespace App\Actions;
 
+use App\Repositories\PageAuthorRepository;
 use App\Repositories\PageRepository;
 
-class BulkChangePageAuthor
+class BulkChangePageAuthors
 {
     public function __construct(
-        private readonly PageRepository $pageRepository
+        private readonly PageRepository       $pageRepository,
+        private readonly PageAuthorRepository $pageAuthorRepository
     )
     {
     }
 
-    public function handle(array $pageIds, int $authorId): array
+    public function handle(array $pageIds, int $authorId, int $siteId, string $role = 'author'): array
     {
         $results = [];
 
@@ -28,9 +30,8 @@ class BulkChangePageAuthor
                     continue;
                 }
 
-                $this->pageRepository->update($pageId, [
-                    'author_id' => $authorId
-                ]);
+                // Use syncAuthors to replace all authors for this role with the new author
+                $this->pageAuthorRepository->syncAuthors($pageId, [$authorId], $role, $siteId);
 
                 $results[$pageId] = ['success' => true];
             } catch (\Exception $e) {

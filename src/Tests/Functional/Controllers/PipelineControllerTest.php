@@ -13,7 +13,7 @@ class PipelineControllerTest extends FunctionalTestCase
     {
         // Arrange
         $this->createPage(['status' => 'draft', 'title' => 'Draft Page']);
-        $this->createPage(['status' => 'in-review', 'title' => 'Review Page']);
+        $this->createPage(['status' => 'waiting_approval', 'title' => 'Review Page']);
         $this->createPage(['status' => 'scheduled', 'title' => 'Scheduled Page']);
         $this->createPage(['status' => 'published', 'title' => 'Published Page']);
 
@@ -24,10 +24,14 @@ class PipelineControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
+        echo '<pre>';
+        print_r($data);
+        die;
+
         $this->assertTrue($data['data']['success']);
         $this->assertArrayHasKey('stages', $data['data']);
         $this->assertArrayHasKey('draft', $data['data']['stages']);
-        $this->assertArrayHasKey('in-review', $data['data']['stages']);
+        $this->assertArrayHasKey('waiting_approval', $data['data']['stages']);
         $this->assertArrayHasKey('scheduled', $data['data']['stages']);
         $this->assertArrayHasKey('published', $data['data']['stages']);
     }
@@ -37,7 +41,7 @@ class PipelineControllerTest extends FunctionalTestCase
         // Arrange
         $this->createPage(['status' => 'draft', 'title' => 'Draft 1']);
         $this->createPage(['status' => 'draft', 'title' => 'Draft 2']);
-        $this->createPage(['status' => 'in-review', 'title' => 'Review 1']);
+        $this->createPage(['status' => 'waiting_approval', 'title' => 'Review 1']);
 
         // Act
         $response = $this->getForSite('/api/pipeline');
@@ -47,9 +51,9 @@ class PipelineControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertCount(2, $data['data']['stages']['draft']['cards']);
-        $this->assertCount(1, $data['data']['stages']['in-review']['cards']);
+        $this->assertCount(1, $data['data']['stages']['waiting_approval']['cards']);
         $this->assertEquals(2, $data['data']['stages']['draft']['total']);
-        $this->assertEquals(1, $data['data']['stages']['in-review']['total']);
+        $this->assertEquals(1, $data['data']['stages']['waiting_approval']['total']);
     }
 
     public function testIndexIncludesStageLimits(): void
@@ -62,7 +66,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(10, $data['data']['stages']['draft']['limit']);
-        $this->assertEquals(5, $data['data']['stages']['in-review']['limit']);
+        $this->assertEquals(5, $data['data']['stages']['waiting_approval']['limit']);
         $this->assertNull($data['data']['stages']['scheduled']['limit']);
         $this->assertNull($data['data']['stages']['published']['limit']);
     }
@@ -145,7 +149,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $draftCard = $data['data']['stages']['draft']['cards'][0];
-        $this->assertNotEmpty($draftCard['page_authors']);
+        $this->assertNotEmpty($draftCard['pageAuthors']);
         $this->assertNotEmpty($draftCard['tags']);
         $this->assertNotEmpty($draftCard['metadata']);
     }
@@ -198,7 +202,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertCount(0, $data['data']['stages']['draft']['cards']);
-        $this->assertCount(0, $data['data']['stages']['in-review']['cards']);
+        $this->assertCount(0, $data['data']['stages']['waiting_approval']['cards']);
         $this->assertCount(0, $data['data']['stages']['scheduled']['cards']);
         $this->assertCount(0, $data['data']['stages']['published']['cards']);
     }
@@ -209,8 +213,8 @@ class PipelineControllerTest extends FunctionalTestCase
         $page = $this->createPage(['status' => 'draft']);
 
         // Act
-        $response = $this->postForSite("/api/pipeline/{$page->id}/stage", [
-            'status' => 'in-review'
+        $response = $this->putForSite("/api/pipeline/{$page->id}/stage", [
+            'status' => 'waiting_approval'
         ]);
 
         // Assert
@@ -223,7 +227,7 @@ class PipelineControllerTest extends FunctionalTestCase
         // Verify database
         $this->assertDatabaseHas('pages', [
             'id' => $page->id,
-            'status' => 'in-review'
+            'status' => 'waiting_approval'
         ]);
     }
 
@@ -233,7 +237,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $page = $this->createPage(['status' => 'draft', 'scheduled_at' => null]);
 
         // Act
-        $response = $this->postForSite("/api/pipeline/{$page->id}/stage", [
+        $response = $this->putForSite("/api/pipeline/{$page->id}/stage", [
             'status' => 'scheduled'
         ]);
 
@@ -251,7 +255,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $page = $this->createPage(['status' => 'draft', 'published_at' => null]);
 
         // Act
-        $response = $this->postForSite("/api/pipeline/{$page->id}/stage", [
+        $response = $this->putForSite("/api/pipeline/{$page->id}/stage", [
             'status' => 'published'
         ]);
 
@@ -269,7 +273,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $page = $this->createPage(['status' => 'draft']);
 
         // Act
-        $response = $this->postForSite("/api/pipeline/{$page->id}/stage", []);
+        $response = $this->putForSite("/api/pipeline/{$page->id}/stage", []);
 
         // Assert
         $this->assertEquals(422, $response->getStatusCode());
@@ -283,7 +287,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $page = $this->createPage(['status' => 'draft']);
 
         // Act
-        $response = $this->postForSite("/api/pipeline/{$page->id}/stage", [
+        $response = $this->putForSite("/api/pipeline/{$page->id}/stage", [
             'status' => 'invalid-status'
         ]);
 
@@ -296,8 +300,8 @@ class PipelineControllerTest extends FunctionalTestCase
     public function testUpdateStageReturns404ForNonexistentPage(): void
     {
         // Act
-        $response = $this->postForSite('/api/pipeline/99999/stage', [
-            'status' => 'in-review'
+        $response = $this->putForSite('/api/pipeline/99999/stage', [
+            'status' => 'waiting_approval'
         ]);
 
         // Assert
@@ -310,7 +314,7 @@ class PipelineControllerTest extends FunctionalTestCase
     {
         // Arrange
         $this->createPages(3, ['status' => 'draft']);
-        $this->createPages(2, ['status' => 'in-review']);
+        $this->createPages(2, ['status' => 'waiting_approval']);
         $this->createPages(1, ['status' => 'scheduled']);
         $this->createPages(5, ['status' => 'published']);
 
@@ -327,7 +331,7 @@ class PipelineControllerTest extends FunctionalTestCase
         $metrics = $data['data']['metrics'];
         $this->assertArrayHasKey('stage_counts', $metrics);
         $this->assertEquals(3, $metrics['stage_counts']['draft']);
-        $this->assertEquals(2, $metrics['stage_counts']['in-review']);
+        $this->assertEquals(2, $metrics['stage_counts']['waiting_approval']);
         $this->assertEquals(1, $metrics['stage_counts']['scheduled']);
         $this->assertEquals(5, $metrics['stage_counts']['published']);
 
@@ -382,7 +386,7 @@ class PipelineControllerTest extends FunctionalTestCase
     {
         // Arrange
         $this->createPages(8, ['status' => 'draft']); // 80% of 10
-        $this->createPages(4, ['status' => 'in-review']); // 80% of 5
+        $this->createPages(4, ['status' => 'waiting_approval']); // 80% of 5
 
         // Act
         $response = $this->getForSite('/api/pipeline/metrics');
@@ -407,7 +411,7 @@ class PipelineControllerTest extends FunctionalTestCase
         // Act
         $response = $this->postForSite('/api/pipeline/bulk-update-stage', [
             'page_ids' => [$page1->id, $page2->id, $page3->id],
-            'status' => 'in-review'
+            'status' => 'waiting_approval'
         ]);
 
         // Assert
@@ -419,16 +423,16 @@ class PipelineControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('3 pages updated', $data['data']['message']);
 
         // Verify database
-        $this->assertDatabaseHas('pages', ['id' => $page1->id, 'status' => 'in-review']);
-        $this->assertDatabaseHas('pages', ['id' => $page2->id, 'status' => 'in-review']);
-        $this->assertDatabaseHas('pages', ['id' => $page3->id, 'status' => 'in-review']);
+        $this->assertDatabaseHas('pages', ['id' => $page1->id, 'status' => 'waiting_approval']);
+        $this->assertDatabaseHas('pages', ['id' => $page2->id, 'status' => 'waiting_approval']);
+        $this->assertDatabaseHas('pages', ['id' => $page3->id, 'status' => 'waiting_approval']);
     }
 
     public function testBulkUpdateStageReturns422WithoutPageIds(): void
     {
         // Act
         $response = $this->postForSite('/api/pipeline/bulk-update-stage', [
-            'status' => 'in-review'
+            'status' => 'waiting_approval'
         ]);
 
         // Assert
@@ -479,7 +483,7 @@ class PipelineControllerTest extends FunctionalTestCase
         // Act
         $response = $this->postForSite('/api/pipeline/bulk-update-stage', [
             'page_ids' => [$existingPage->id, $nonExistentPageId],
-            'status' => 'in-review'
+            'status' => 'waiting_approval'
         ]);
 
         // Assert
@@ -488,7 +492,7 @@ class PipelineControllerTest extends FunctionalTestCase
 
         // Should update only the existing page
         $this->assertEquals(1, $data['data']['updated']);
-        $this->assertDatabaseHas('pages', ['id' => $existingPage->id, 'status' => 'in-review']);
+        $this->assertDatabaseHas('pages', ['id' => $existingPage->id, 'status' => 'waiting_approval']);
     }
 
     public function testBulkUpdateStageToScheduledSetsScheduledAt(): void
@@ -541,24 +545,24 @@ class PipelineControllerTest extends FunctionalTestCase
 
     public function testUpdateStageAllowsValidStatusTransitions(): void
     {
-        // Test draft -> in-review
+        // Test draft -> waiting_approval
         $page1 = $this->createPage(['status' => 'draft']);
-        $response = $this->postForSite("/api/pipeline/{$page1->id}/stage", ['status' => 'in-review']);
+        $response = $this->putForSite("/api/pipeline/{$page1->id}/stage", ['status' => 'waiting_approval']);
         $this->assertEquals(200, $response->getStatusCode());
 
-        // Test in-review -> scheduled
-        $page2 = $this->createPage(['status' => 'in-review']);
-        $response = $this->postForSite("/api/pipeline/{$page2->id}/stage", ['status' => 'scheduled']);
+        // Test waiting_approval -> scheduled
+        $page2 = $this->createPage(['status' => 'waiting_approval']);
+        $response = $this->putForSite("/api/pipeline/{$page2->id}/stage", ['status' => 'scheduled']);
         $this->assertEquals(200, $response->getStatusCode());
 
         // Test scheduled -> published
         $page3 = $this->createPage(['status' => 'scheduled']);
-        $response = $this->postForSite("/api/pipeline/{$page3->id}/stage", ['status' => 'published']);
+        $response = $this->putForSite("/api/pipeline/{$page3->id}/stage", ['status' => 'published']);
         $this->assertEquals(200, $response->getStatusCode());
 
-        // Test in-review -> draft (backward)
-        $page4 = $this->createPage(['status' => 'in-review']);
-        $response = $this->postForSite("/api/pipeline/{$page4->id}/stage", ['status' => 'draft']);
+        // Test waiting_approval -> draft (backward)
+        $page4 = $this->createPage(['status' => 'waiting_approval']);
+        $response = $this->putForSite("/api/pipeline/{$page4->id}/stage", ['status' => 'draft']);
         $this->assertEquals(200, $response->getStatusCode());
     }
 

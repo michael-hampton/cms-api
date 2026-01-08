@@ -2,9 +2,16 @@
 
 namespace App\Controllers;
 
+use App\Actions\BulkAddContributorsToPages;
+use App\Actions\BulkAddTagsToPages;
 use App\Actions\BulkApprovePages;
+use App\Actions\BulkChangePageAuthors;
+use App\Actions\BulkClonePages;
 use App\Actions\BulkDeletePages;
+use App\Actions\BulkRemoveContributorsFromPages;
+use App\Actions\BulkRemoveTagsFromPages;
 use App\Actions\BulkUpdatePage;
+use App\Actions\BulkUpdatePageRegions;
 use App\Actions\BulkUpdatePageStatus;
 use App\Actions\ClonePage;
 use App\Actions\ClonePageToSite;
@@ -601,7 +608,7 @@ class PageController extends Controller
                     'id' => $page['id'],
                     'title' => $page['title'],
                     'status' => $page['status'],
-                    'published_at' => $page['published_at'],
+                    'published_at' => $page['published_at']?->format('Y-m-d H:i:s'),
                     'scheduled_at' => $page['scheduled_at'] ?? null,
                     'page_type' => $page['page_type'],
                     'author' => isset($page['author']) ? [
@@ -625,19 +632,13 @@ class PageController extends Controller
         }
     }
 
-    // In src/Controllers/PageController.php
-
     public function bulkAddTags(Request $request): JsonResponse
     {
         $pageIds = $request->input('page_ids', []);
         $tagIds = $request->input('tag_ids', []);
-        $siteId = $this->getSiteId(); // Your method to get current site ID
+        $siteId = SiteContext::getId();
 
-        $action = new BulkAddTagsToPages(
-            $this->pageRepository,
-            $this->pageTagRepository,
-            $this->tagRepository
-        );
+        $action = Container::getInstance()->make(BulkAddTagsToPages::class);
 
         $results = $action->handle($pageIds, $tagIds, $siteId);
 
@@ -651,13 +652,9 @@ class PageController extends Controller
     {
         $pageIds = $request->input('page_ids', []);
         $tagIds = $request->input('tag_ids', []);
-        $siteId = $this->getSiteId(); // Your method to get current site ID
+        $siteId = SiteContext::getId();
 
-        $action = new BulkRemoveTagsFromPages(
-            $this->pageRepository,
-            $this->pageTagRepository,
-            $this->tagRepository
-        );
+        $action = Container::getInstance()->make(BulkRemoveTagsFromPages::class);
 
         $results = $action->handle($pageIds, $tagIds, $siteId);
 
@@ -672,7 +669,7 @@ class PageController extends Controller
         $pageIds = $request->input('page_ids', []);
         $authorId = $request->input('author_id');
 
-        $action = new BulkChangePageAuthor($this->pageRepository);
+        $action = Container::getInstance()->make(BulkChangePageAuthors::class);
 
         $results = $action->handle($pageIds, $authorId);
 
@@ -687,10 +684,7 @@ class PageController extends Controller
         $pageIds = $request->input('page_ids', []);
         $contributorIds = $request->input('contributor_ids', []);
 
-        $action = new BulkAddContributorsToPages(
-            $this->pageRepository,
-            $this->pageAuthorRepository
-        );
+        $action = Container::getInstance()->make(BulkAddContributorsToPages::class);
 
         $results = $action->handle($pageIds, $contributorIds);
 
@@ -705,10 +699,7 @@ class PageController extends Controller
         $pageIds = $request->input('page_ids', []);
         $contributorIds = $request->input('contributor_ids', []);
 
-        $action = new BulkRemoveContributorsFromPages(
-            $this->pageRepository,
-            $this->pageAuthorRepository
-        );
+        $action = Container::getInstance()->make(BulkRemoveContributorsFromPages::class);
 
         $results = $action->handle($pageIds, $contributorIds);
 
@@ -724,11 +715,7 @@ class PageController extends Controller
         $regionSetIds = $request->input('region_set_ids', []);
         $territoryIds = $request->input('territory_ids', []);
 
-        $action = new BulkUpdatePageRegions(
-            $this->pageRepository,
-            $this->pageRegionSetRepository,
-            $this->pageTerritoryRepository
-        );
+        $action = Container::getInstance()->make(BulkUpdatePageRegions::class);
 
         $results = $action->handle($pageIds, $regionSetIds, $territoryIds);
 
@@ -746,13 +733,7 @@ class PageController extends Controller
             'asDraft' => $request->input('as_draft', true),
         ];
 
-        $clonePage = new ClonePage(
-            $this->pageRepository,
-            $this->database,
-            $this->pageHistory
-        );
-
-        $action = new BulkClonePages($clonePage, $this->pageRepository);
+        $action = Container::getInstance()->make(BulkClonePages::class);
 
         $results = $action->handle($pageIds, $options);
 

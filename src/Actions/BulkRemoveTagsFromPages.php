@@ -16,6 +16,7 @@ class BulkRemoveTagsFromPages
     {
     }
 
+    // BulkRemoveTagsFromPages.php
     public function handle(array $pageIds, array $tagIds, int $siteId): array
     {
         $results = [];
@@ -52,11 +53,11 @@ class BulkRemoveTagsFromPages
                     continue;
                 }
 
-                // Get existing tag names
-                $existingTagNames = $this->pageTagRepository
-                    ->getTagsForPage($pageId)
-                    ->pluck('name')
-                    ->toArray();
+                // Get existing tag names using getPageTags
+                $existingTags = $this->pageTagRepository->getPageTags($pageId, $siteId);
+                $existingTagNames = array_map(function ($tag) {
+                    return $tag->name;
+                }, $existingTags);
 
                 // Remove specified tag names
                 $remainingTagNames = array_diff($existingTagNames, $tagNamesToRemove);

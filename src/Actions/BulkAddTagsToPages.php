@@ -52,14 +52,14 @@ class BulkAddTagsToPages
                     continue;
                 }
 
-                // Get existing tag names for this page
-                $existingTags = $this->pageTagRepository
-                    ->getTagsForPage($pageId)
-                    ->pluck('name')
-                    ->toArray();
+                // Get existing tag names for this page using getPageTags
+                $existingTags = $this->pageTagRepository->getPageTags($pageId, $siteId);
+                $existingTagNames = array_map(function ($tag) {
+                    return $tag->name;
+                }, $existingTags);
 
                 // Merge existing with new tag names (avoiding duplicates)
-                $allTagNames = array_unique(array_merge($existingTags, $tagNames));
+                $allTagNames = array_unique(array_merge($existingTagNames, $tagNames));
 
                 // Sync tags with tag names
                 $this->pageTagRepository->syncTags($pageId, $allTagNames, $siteId);

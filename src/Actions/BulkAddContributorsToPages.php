@@ -14,7 +14,8 @@ class BulkAddContributorsToPages
     {
     }
 
-    public function handle(array $pageIds, array $contributorIds): array
+    // BulkAddContributorsToPages.php
+    public function handle(array $pageIds, array $contributorIds, int $siteId, string $role = 'contributor'): array
     {
         $results = [];
 
@@ -30,11 +31,8 @@ class BulkAddContributorsToPages
                     continue;
                 }
 
-                // Get existing contributors
-                $existingContributorIds = $this->pageAuthorRepository
-                    ->getAuthorsForPage($pageId)
-                    ->pluck('author_id')
-                    ->toArray();
+                // Get existing contributors for this role
+                $existingContributorIds = $this->pageAuthorRepository->getAuthorsForPage($pageId, 'contributor');
 
                 // Merge with new contributors
                 $allContributorIds = array_unique(
@@ -42,7 +40,7 @@ class BulkAddContributorsToPages
                 );
 
                 // Sync contributors
-                $this->pageAuthorRepository->syncAuthors($pageId, $allContributorIds);
+                $this->pageAuthorRepository->syncAuthors($pageId, $allContributorIds, $role, $siteId);
 
                 $results[$pageId] = ['success' => true];
             } catch (\Exception $e) {

@@ -16,7 +16,7 @@ class BulkUpdatePageRegions
     {
     }
 
-    public function handle(array $pageIds, array $regionSetIds, array $territoryIds): array
+    public function handle(array $pageIds, array $regionSetIds, array $territoryIds, int $siteId): array
     {
         $results = [];
 
@@ -34,12 +34,12 @@ class BulkUpdatePageRegions
 
                 // Sync region sets
                 if (!empty($regionSetIds)) {
-                    $this->pageRegionSetRepository->syncRegionSets($pageId, $regionSetIds);
+                    $this->pageRegionSetRepository->syncRegionSets($pageId, $regionSetIds, $siteId);
                 }
 
                 // Sync territories
                 if (!empty($territoryIds)) {
-                    $this->pageTerritoryRepository->syncTerritories($pageId, $territoryIds);
+                    $this->pageTerritoryRepository->syncTerritories($pageId, $territoryIds, $siteId);
                 }
 
                 $results[$pageId] = ['success' => true];

@@ -2,7 +2,6 @@
 
 namespace App\Repositories;
 
-use App\Framework\Support\Collection;
 use App\Models\PageAuthor;
 
 class PageAuthorRepository extends Repository
@@ -28,5 +27,15 @@ class PageAuthorRepository extends Repository
                 'sort_order' => $index
             ]);
         }
+    }
+
+    public function getAuthorsForPage(int $pageId, string $role): array
+    {
+        return PageAuthor::where('page_id', $pageId)
+            ->where('role', $role)
+            ->orderBy('sort_order')
+            ->get()
+            ->pluck('author_id')
+            ->toArray();
     }
 }

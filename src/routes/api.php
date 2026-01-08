@@ -69,10 +69,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
 
         // Pipeline routes
-        $router->get('/api/{siteName}/pipeline', [PipelineController::class, 'index']);
-        $router->get('/api/{siteName}/pipeline/metrics', [PipelineController::class, 'metrics']);
-        $router->patch('/api/{siteName}/pipeline/{id}/stage', [PipelineController::class, 'updateStage']);
-        $router->post('/api/{siteName}/pipeline/bulk-update-stage', [PipelineController::class, 'bulkUpdateStage']);
+        $router->get('/pipeline', [PipelineController::class, 'index']);
+        $router->get('/pipeline/metrics', [PipelineController::class, 'metrics']);
+        $router->put('/pipeline/{id}/stage', [PipelineController::class, 'updateStage']);
+        $router->post('/pipeline/bulk-update-stage', [PipelineController::class, 'bulkUpdateStage']);
 
         $router->get('/campaigns', [CampaignController::class, 'index']);
         $router->get('/campaigns/active', [CampaignController::class, 'getActive']);

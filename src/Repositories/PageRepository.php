@@ -736,6 +736,7 @@ class PageRepository extends Repository
 
         // Handle site filter
         $siteIds = $criteria->getFilter('site_ids');
+
         if ($siteIds && !empty($siteIds)) {
             $query->whereIn('site_id', $siteIds);
         } else {
@@ -794,7 +795,12 @@ class PageRepository extends Repository
             $stageResult = $this->searchEngine->search($query, $stageCriteria);
 
             $results[$stageId] = [
-                'cards' => $stageResult->getData(),
+                'cards' => collect($stageResult->getData())->map(function ($page) {
+                    return [
+                        ...$page,
+                        'published_at' => $page['published_at'] ? $page['published_at']->format('Y-m-d H:i:s') : null,
+                    ];
+                }),
                 'total' => $stageResult->getTotal(),
                 'limit' => $stageConfig['limit']
             ];

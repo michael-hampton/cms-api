@@ -42,7 +42,7 @@ class PipelineController extends Controller
                 return $this->errorResponse('Status is required', 422);
             }
 
-            $validStatuses = ['draft', 'in-review', 'scheduled', 'published'];
+            $validStatuses = ['draft', 'waiting_approval', 'scheduled', 'published'];
             if (!in_array($status, $validStatuses)) {
                 return $this->errorResponse('Invalid status', 422);
             }
@@ -92,7 +92,7 @@ class PipelineController extends Controller
                 return $this->errorResponse('Status is required', 422);
             }
 
-            $validStatuses = ['draft', 'in-review', 'scheduled', 'published'];
+            $validStatuses = ['draft', 'waiting_approval', 'scheduled', 'published'];
             if (!in_array($status, $validStatuses)) {
                 return $this->errorResponse('Invalid status', 422);
             }

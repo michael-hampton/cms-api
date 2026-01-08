@@ -29,44 +29,50 @@ class BulkAddTagsToPagesActionTest extends FunctionalTestCase
 
         $tag40 = Mockery::mock(Tag::class)->makePartial();
         $tag40->id = 40;
-        $tag40->name = 'Tag 40';
+        $tag40->name = '40';
 
-        // Mock tag lookups first
+        // Mock tag lookups
         $this->tagRepository->shouldReceive('find')->with(30)->andReturn($tag30);
         $this->tagRepository->shouldReceive('find')->with(40)->andReturn($tag40);
 
-        // Then mock page lookups
+        // Mock page lookups
         $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page1);
         $this->pageRepository->shouldReceive('find')->with(2)->andReturn($page2);
 
-        $existingTag10 = (object)['id' => 10, 'name' => 'Tag 10'];
-        $existingTag20 = (object)['id' => 20, 'name' => 'Tag 20'];
+        $existingTag10 = Mockery::mock(Tag::class)->makePartial();
+        $existingTag10->name = 'Tag 10';
 
-        $this->pageTagRepository->shouldReceive('getTagsForPage')->with(1)
-            ->andReturn(collect([$existingTag10]));
-        $this->pageTagRepository->shouldReceive('getTagsForPage')->with(2)
-            ->andReturn(collect([$existingTag20]));
+        $existingTag20 = Mockery::mock(Tag::class)->makePartial();
+        $existingTag20->name = 'Tag 20';
 
+        $this->pageTagRepository->shouldReceive('getPageTags')->with(1, 1)->andReturn([$existingTag10]);
+        $this->pageTagRepository->shouldReceive('getPageTags')->with(2, 1)->andReturn([$existingTag20]);
+
+        // Improved Verification for Page 1
         $this->pageTagRepository->shouldReceive('syncTags')
             ->with(1, Mockery::on(function ($tagNames) {
-                // Check that the array contains the expected tags
-                sort($tagNames);
-                return $tagNames === ['Tag 10', 'Tag 30', 'Tag 40'];
+                $expected = ['Tag 10', 'Tag 30', '40'];
+                return count($tagNames) === count($expected) &&
+                    empty(array_diff($tagNames, $expected)) &&
+                    empty(array_diff($expected, $tagNames));
             }), 1)
             ->once();
 
+        // Improved Verification for Page 2
         $this->pageTagRepository->shouldReceive('syncTags')
             ->with(2, Mockery::on(function ($tagNames) {
-                // Check that the array contains the expected tags
-                sort($tagNames);
-                return $tagNames === ['Tag 20', 'Tag 30', 'Tag 40'];
+                $expected = ['Tag 20', 'Tag 30', '40'];
+                return count($tagNames) === count($expected) &&
+                    empty(array_diff($tagNames, $expected)) &&
+                    empty(array_diff($expected, $tagNames));
             }), 1)
             ->once();
 
         $results = $this->service->handle([1, 2], [30, 40], 1);
 
-        $this->assertTrue($results[1]['success']);
-        $this->assertTrue($results[2]['success']);
+        // If this fails, this will show you the error message from the catch block
+        $this->assertTrue($results[1]['success'], "Page 1 failed: " . ($results[1]['error'] ?? 'Unknown Error'));
+        $this->assertTrue($results[2]['success'], "Page 2 failed: " . ($results[2]['error'] ?? 'Unknown Error'));
     }
 
     public function testBulkAddTagsHandlesPageNotFound()
