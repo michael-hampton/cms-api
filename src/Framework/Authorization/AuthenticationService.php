@@ -47,12 +47,13 @@ class AuthenticationService
         $savedToken = $this->tokenRepository->create($token);
 
         return new AuthenticationResponse(
-            $plainTextToken,
-            'bearer',
-            $user->id,
-            $user->name,
-            $user->email,
-            $user->site_id
+            accessToken: $plainTextToken,
+            tokenType: 'bearer',
+            userId: $user->id,
+            userName: $user->name,
+            userEmail: $user->email,
+            siteId: $user->site_id,
+            role: $user->role
         );
     }
 

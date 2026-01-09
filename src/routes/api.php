@@ -137,12 +137,20 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/products/{id}/pages', [ProductController::class, 'pages']);
 
         // Approval workflow routes
-        $router->post('/pages/{id}/approve', PageController::class, 'approve');
-        $router->post('/pages/{id}/reject', PageController::class, 'reject');
-        $router->post('/pages/{id}/put-on-hold', PageController::class, 'putOnHold');
-        $router->post('/pages/{id}/make-private', PageController::class, 'makePrivate');
-        $router->post('/pages/{id}/make-internal', PageController::class, 'makeInternal');
-        $router->post('/pages/bulk-approve', PageController::class, 'bulkApprove');
+        $router->post('/pages/{id}/approve', [PageController::class, 'approve']);
+        $router->post('/pages/{id}/reject', [PageController::class, 'reject']);
+        $router->post('/pages/{id}/put-on-hold', [PageController::class, 'putOnHold']);
+        $router->post('/pages/{id}/make-private', [PageController::class, 'makePrivate']);
+        $router->post('/pages/{id}/make-internal', [PageController::class, 'makeInternal']);
+        $router->post('/pages/bulk-approve', [PageController::class, 'bulkApprove']);
+        $router->post('/pages/bulk-schedule', [PageController::class, 'bulkSchedule']);
+        $router->post('/pages/bulk-add-tags', [PageController::class, 'bulkAddTags']);
+        $router->post('/pages/bulk-remove-tags', [PageController::class, 'bulkRemoveTags']);
+        $router->post('/pages/bulk-change-author', [PageController::class, 'bulkChangeAuthor']);
+        $router->post('/pages/bulk-add-contributors', [PageController::class, 'bulkAddContributors']);
+        $router->post('/pages/bulk-remove-contributors', [PageController::class, 'bulkRemoveContributors']);
+        $router->post('/pages/bulk-update-regions', [PageController::class, 'bulkUpdateRegions']);
+        $router->post('/pages/bulk-clone', [PageController::class, 'bulkClone']);
 
         $router->get('/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;
 

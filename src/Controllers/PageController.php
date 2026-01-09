@@ -10,6 +10,7 @@ use App\Actions\BulkClonePages;
 use App\Actions\BulkDeletePages;
 use App\Actions\BulkRemoveContributorsFromPages;
 use App\Actions\BulkRemoveTagsFromPages;
+use App\Actions\BulkSchedulePages;
 use App\Actions\BulkUpdatePage;
 use App\Actions\BulkUpdatePageRegions;
 use App\Actions\BulkUpdatePageStatus;
@@ -54,9 +55,9 @@ class PageController extends Controller
             // Format blocks in the paginated data
             $formattedData = $result->getData();
 
-            $formattedData = array_map(function($page) {
+            $formattedData = array_map(function ($page) {
                 if (!empty($page['blocks'])) {
-                    $page['blocks'] = array_map(function($block) {
+                    $page['blocks'] = array_map(function ($block) {
                         return [
                             'data' => [...$block['data'], 'type' => $block['type']],
                             'type' => $block['type'],
@@ -129,6 +130,16 @@ class PageController extends Controller
     {
         try {
             $requestData = $request->all();
+            $siteId = SiteContext::getId();
+
+            //check if page exists before trying to update it
+            $page = $this->pageRepository->find($id);
+
+            if (empty($page)) {
+                $page = $this->pageService->createPageWithAllData($requestData, $siteId);
+                return $this->jsonResponse(['page' => $page->toArray()]);
+            }
+
             $page = $this->pageService->updatePageWithAllData($id, $requestData, $request->get('site_id'));
 
             return $this->jsonResponse(['page' => $page->toArray()]);
@@ -618,7 +629,10 @@ class PageController extends Controller
                     'site' => [
                         'id' => $page['site_id'] ?? null,
                         'name' => $page['site']['name'] ?? null
-                    ]
+                    ],
+                    'authors' => isset($page['pageAuthors']) ? array_map(function ($pageAuthor) {
+                        return $pageAuthor['author'];
+                    }, $page['pageAuthors']) : null,
                 ];
             }, $result->getData());
 
@@ -642,7 +656,7 @@ class PageController extends Controller
 
         $results = $action->handle($pageIds, $tagIds, $siteId);
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'success' => true,
             'data' => ['results' => $results]
         ]);
@@ -658,7 +672,7 @@ class PageController extends Controller
 
         $results = $action->handle($pageIds, $tagIds, $siteId);
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'success' => true,
             'data' => ['results' => $results]
         ]);
@@ -668,12 +682,13 @@ class PageController extends Controller
     {
         $pageIds = $request->input('page_ids', []);
         $authorId = $request->input('author_id');
+        $siteId = SiteContext::getId();
 
         $action = Container::getInstance()->make(BulkChangePageAuthors::class);
 
-        $results = $action->handle($pageIds, $authorId);
+        $results = $action->handle($pageIds, $authorId, $siteId);
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'success' => true,
             'data' => ['results' => $results]
         ]);
@@ -683,10 +698,11 @@ class PageController extends Controller
     {
         $pageIds = $request->input('page_ids', []);
         $contributorIds = $request->input('contributor_ids', []);
+        $siteId = SiteContext::getId();
 
         $action = Container::getInstance()->make(BulkAddContributorsToPages::class);
 
-        $results = $action->handle($pageIds, $contributorIds);
+        $results = $action->handle($pageIds, $contributorIds, $siteId);
 
         return $this->jsonResponse([
             'success' => true,
@@ -698,10 +714,11 @@ class PageController extends Controller
     {
         $pageIds = $request->input('page_ids', []);
         $contributorIds = $request->input('contributor_ids', []);
+        $siteId = SiteContext::getId();
 
         $action = Container::getInstance()->make(BulkRemoveContributorsFromPages::class);
 
-        $results = $action->handle($pageIds, $contributorIds);
+        $results = $action->handle($pageIds, $contributorIds, $siteId);
 
         return $this->jsonResponse([
             'success' => true,
@@ -714,10 +731,11 @@ class PageController extends Controller
         $pageIds = $request->input('page_ids', []);
         $regionSetIds = $request->input('region_set_ids', []);
         $territoryIds = $request->input('territory_ids', []);
+        $siteId = SiteContext::getId();
 
         $action = Container::getInstance()->make(BulkUpdatePageRegions::class);
 
-        $results = $action->handle($pageIds, $regionSetIds, $territoryIds);
+        $results = $action->handle($pageIds, $regionSetIds, $territoryIds, $siteId);
 
         return $this->jsonResponse([
             'success' => true,
@@ -737,10 +755,38 @@ class PageController extends Controller
 
         $results = $action->handle($pageIds, $options);
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'success' => true,
             'data' => ['results' => $results]
         ]);
+    }
+
+    public function bulkSchedule(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $schedules = $request->get('schedules', []);
+
+            if (empty($schedules)) {
+                return $this->errorResponse('No schedules provided', 422);
+            }
+
+            // Validate schedule format
+            foreach ($schedules as $schedule) {
+                if (!isset($schedule['page_id']) || !isset($schedule['scheduled_date'])) {
+                    return $this->errorResponse('Invalid schedule format. Each schedule must have page_id and scheduled_date', 422);
+                }
+            }
+
+            $handler = Container::getInstance()->make(BulkSchedulePages::class);
+            $results = $handler->handle($schedules);
+
+            return $this->jsonResponse([
+                'message' => 'Pages scheduled successfully',
+                'results' => $results
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 
 //    public function bulkExport(Request $request): JsonResponse

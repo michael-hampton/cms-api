@@ -21,6 +21,7 @@ use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberConsentController;
 use App\Controllers\Members\MemberDashboardController;
 use App\Controllers\Members\MemberInvoiceController;
+use App\Controllers\Members\MemberIssueDeliveriesController;
 use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
@@ -189,8 +190,11 @@ $router->delete('/api/{site}/cart/clear', [CartController::class, 'clear']);
 $router->get('/checkout', [CartController::class, 'checkoutPage']);
 $router->get('/{siteName}/checkout', [CartController::class, 'checkoutPage']);
 $router->post('/api/{site}/checkout/process', [CartController::class, 'processCheckout']);
-$router->post('/{site_slug}/member/subscriptions/{id}/reactivate', [MemberSubscriptionsController::class, 'reactivate']);
+$router->post('/{site}/member/subscriptions/{id}/reactivate', [MemberSubscriptionsController::class, 'reactivate']);
+$router->get('/{site}/member/subscriptions/{subscriptionId}/issue-deliveries', [MemberIssueDeliveriesController::class, 'index']);
 
+$router->post('/member/subscriptions/{id}/update-billing-date', [MemberSubscriptionsController::class, 'updateBillingDate']);
+$router->post('/member/subscriptions/{id}/preview-billing-change', [MemberSubscriptionsController::class, 'previewBillingDateChange']);
 
 // API routes for Wishlist (JSON responses)
 $router->get('/api/{site}/wishlist', [WishlistController::class, 'index']);

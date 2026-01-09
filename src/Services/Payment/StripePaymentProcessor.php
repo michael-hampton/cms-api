@@ -1168,7 +1168,7 @@ class StripePaymentProcessor
         string $paymentIntentId,
         int    $orderId,
         int $siteId,
-        $subscriptionIds = null, // Can be single ID or array of IDs
+            $subscriptionIds = null, // Can be single ID or array of IDs
     ): array
     {
         try {
@@ -1270,6 +1270,204 @@ class StripePaymentProcessor
             return [
                 'success' => false,
                 'message' => 'Failed to update customer email in Stripe'
+            ];
+        }
+    }
+
+    /**
+     * Check if payment method is expiring soon
+     */
+    public function isPaymentMethodExpiring($paymentMethod, int $monthsThreshold = 2): bool
+    {
+        if (!isset($paymentMethod->card)) {
+            return false;
+        }
+
+        $card = $paymentMethod->card;
+        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
+        $expiryDate->modify('last day of this month');
+
+        $now = new \DateTime();
+        $threshold = (clone $now)->modify("+{$monthsThreshold} months");
+
+        return $expiryDate <= $threshold && $expiryDate >= $now;
+    }
+
+    /**
+     * Check if payment method is expired
+     */
+    public function isPaymentMethodExpired($paymentMethod): bool
+    {
+        if (!isset($paymentMethod->card)) {
+            return false;
+        }
+
+        $card = $paymentMethod->card;
+        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
+        $expiryDate->modify('last day of this month');
+
+        return $expiryDate < new \DateTime();
+    }
+
+    /**
+     * Get payment methods with expiry warnings
+     */
+    public function getPaymentMethodsWithWarnings($member, array $customerPaymentMethods): array
+    {
+        //$result = $this->getCustomerPaymentMethods($member);
+
+        if (!$customerPaymentMethods['success']) {
+            return $customerPaymentMethods;
+        }
+
+        $warnings = [];
+        foreach ($customerPaymentMethods['payment_methods'] as $method) {
+            if ($this->isPaymentMethodExpired($method)) {
+                $warnings[] = [
+                    'payment_method' => $method,
+                    'status' => 'expired',
+                    'message' => 'This card has expired and needs to be updated'
+                ];
+            } elseif ($this->isPaymentMethodExpiring($method)) {
+                $warnings[] = [
+                    'payment_method' => $method,
+                    'status' => 'expiring',
+                    'message' => 'This card expires soon (' . $method->card->exp_month . '/' . $method->card->exp_year . ')'
+                ];
+            }
+        }
+
+        $result['warnings'] = $warnings;
+        $result['has_warnings'] = !empty($warnings);
+
+        return $result;
+    }
+
+    /**
+     * Update subscription billing cycle anchor (payment date)
+     */
+    public function updateBillingCycleAnchor(
+        string $stripeSubscriptionId,
+        int    $dayOfMonth,
+        bool   $prorate = true
+    ): array
+    {
+        try {
+            // Get current subscription
+            $subscription = $this->stripe->subscriptions->retrieve(
+                $stripeSubscriptionId);
+
+            if ($subscription->status === 'canceled') {
+                return [
+                    'success' => false,
+                    'message' => 'Cannot update billing date for cancelled subscription'
+                ];
+            }    // Calculate next billing date with the desired day
+            $now = new \DateTime();
+            $targetDate = new \DateTime();    // Set to the desired day of current month
+            $targetDate->setDate(
+                $targetDate->format('Y'),
+                $targetDate->format('m'),
+                min($dayOfMonth, (int)$targetDate->format('t')) // Don't exceed days in month
+            );    // If the target date has passed this month, move to next month
+            if ($targetDate <= $now) {
+                $targetDate->modify('+1 month');
+                $targetDate->setDate(
+                    $targetDate->format('Y'),
+                    $targetDate->format('m'),
+                    min($dayOfMonth, (int)$targetDate->format('t'))
+                );
+            }    // Update subscription with new billing cycle anchor
+            $updatedSubscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'billing_cycle_anchor' => $targetDate->getTimestamp(),
+                'proration_behavior' => $prorate ? 'create_prorations' : 'none'
+            ]);
+            return [
+                'success' => true,
+                'subscription' => $updatedSubscription,
+                'new_billing_date' => $targetDate->format('Y-m-d'),
+                'message' => 'Billing date updated successfully'
+            ];
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => $e->getStripeCode()
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'An error occurred while updating billing date'
+            ];
+        }
+    }
+
+    /**
+     * Calculate proration amount for billing date change
+     */
+    public function calculateBillingDateProration(
+        string $stripeSubscriptionId,
+        int    $newDayOfMonth
+    ): array
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId);
+
+            $now = new \DateTime();
+            $currentPeriodEnd = new \DateTime();
+            $currentPeriodEnd->setTimestamp($subscription->current_period_end);
+
+            // Calculate target date
+            $targetDate = new \DateTime();
+            $targetDate->setDate(
+                $targetDate->format('Y'),
+                $targetDate->format('m'),
+                min($newDayOfMonth, (int)$targetDate->format('t'))
+            );
+
+            if ($targetDate <= $now) {
+                $targetDate->modify('+1 month');
+                $targetDate->setDate(
+                    $targetDate->format('Y'),
+                    $targetDate->format('m'),
+                    min($newDayOfMonth, (int)$targetDate->format('t'))
+                );
+            }
+
+            // Calculate days difference
+            $interval = $now->diff($targetDate);
+            $daysToNewDate = $interval->days;
+
+            $currentInterval = $now->diff($currentPeriodEnd);
+            $daysInCurrentPeriod = $currentInterval->days;
+
+            // Get subscription price
+            $amount = $subscription->items->data[0]->price->unit_amount / 100;
+
+            // Simple proration calculation
+            $dailyRate = $amount / 30; // Simplified daily rate
+
+            if ($daysToNewDate < $daysInCurrentPeriod) {
+                // Moving date earlier - credit
+                $prorationAmount = -($dailyRate * ($daysInCurrentPeriod - $daysToNewDate));
+            } else {
+                // Moving date later - charge
+                $prorationAmount = $dailyRate * ($daysToNewDate - $daysInCurrentPeriod);
+            }
+
+            return [
+                'success' => true,
+                'current_period_end' => $currentPeriodEnd->format('Y-m-d'),
+                'new_billing_date' => $targetDate->format('Y-m-d'),
+                'proration_amount' => round($prorationAmount, 2),
+                'is_credit' => $prorationAmount < 0,
+                'days_difference' => $daysToNewDate - $daysInCurrentPeriod
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
             ];
         }
     }

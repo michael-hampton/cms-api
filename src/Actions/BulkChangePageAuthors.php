@@ -14,7 +14,7 @@ class BulkChangePageAuthors
     {
     }
 
-    public function handle(array $pageIds, int $authorId, int $siteId, string $role = 'author'): array
+    public function handle(array $pageIds, int $authorId, int $siteId, string $role = 'primary'): array
     {
         $results = [];
 

@@ -30,11 +30,16 @@ class MemberPaymentMethodsController extends Controller
         // Get payment methods from Stripe via processor
         $result = $this->stripeProcessor->getCustomerPaymentMethods($member);
 
+        // Get warnings for expiring/expired cards
+        $warningsResult = $this->stripeProcessor->getPaymentMethodsWithWarnings($member, $result);
+
         return $this->view('member/subscriptions/payment-methods', [
             'member' => $member,
             'site' => SiteContext::get(),
             'paymentMethods' => $result['payment_methods'] ?? [],
-            'defaultPaymentMethodId' => $result['default_payment_method_id'] ?? null
+            'defaultPaymentMethodId' => $result['default_payment_method_id'] ?? null,
+            'warnings' => $warningsResult['warnings'] ?? [],
+            'hasWarnings' => $warningsResult['has_warnings'] ?? false
         ]);
     }
 

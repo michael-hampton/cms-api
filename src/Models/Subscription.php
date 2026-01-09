@@ -292,4 +292,9 @@ class Subscription extends Model
             ]);
         }
     }
+
+    public function issueDeliveries($relation = false)
+    {
+        return $this->hasMany(IssueDelivery::class, 'subscription_id', 'id', $relation);
+    }
 }

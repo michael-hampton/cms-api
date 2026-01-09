@@ -44,6 +44,12 @@
             padding: 2rem;
         }
 
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+        }
+
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -330,6 +336,25 @@
 
     <div id="alert-container"></div>
 
+    <?php if ($hasWarnings): ?>
+        <div style="margin-bottom: 2rem;">
+            <?php foreach ($warnings as $warning): ?>
+                <div class="alert <?= $warning['status'] === 'expired' ? 'alert-error' : 'alert-warning' ?>">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <div>
+                        <strong><?= $warning['status'] === 'expired' ? 'Card Expired' : 'Card Expiring Soon' ?></strong>
+                        <p style="margin-top: 4px;"><?= htmlspecialchars($warning['message']) ?>. Please update your
+                            payment method to avoid subscription interruption.</p>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
     <?php if (empty($paymentMethods)): ?>
         <div class="empty-state">
             <div class="empty-state-icon">💳</div>
@@ -353,7 +378,32 @@
                             Expires <?= htmlspecialchars($method['card']['exp_month']) ?>
                             /<?= htmlspecialchars($method['card']['exp_year']) ?>
                         </div>
-                        <?php if ($method['id'] === $defaultPaymentMethodId): ?>
+
+                        <?php
+                        // Check if this card is expiring or expired
+                        $isExpired = false;
+                        $isExpiring = false;
+                        foreach ($warnings as $warning) {
+                            if ($warning['payment_method']->id === $method['id']) {
+                                if ($warning['status'] === 'expired') {
+                                    $isExpired = true;
+                                } elseif ($warning['status'] === 'expiring') {
+                                    $isExpiring = true;
+                                }
+                            }
+                        }
+                        ?>
+
+                        <?php if ($isExpired): ?>
+                            <br>
+                            <span style="color: var(--danger-color); font-weight: 600; font-size: 13px;">⚠️ Expired - Update Required</span>
+                        <?php elseif ($isExpiring): ?>
+                            <br>
+                            <span style="color: var(--warning-color); font-weight: 600; font-size: 13px;">⏰ Expiring Soon</span>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($method['id'] === $defaultPaymentMethodId): ?>
                             <span class="default-badge">Default</span>
                         <?php endif; ?>
                     </div>

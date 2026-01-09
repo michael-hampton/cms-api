@@ -2831,4 +2831,414 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertLessThan($page2Index, $page3Index);
         $this->assertLessThan($page1Index, $page2Index);
     }
+
+    public function testBulkSchedulePages()
+    {
+        $page1 = $this->createPage(['status' => 'draft']);
+        $page2 = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite('/api/pages/bulk-schedule', [
+            'schedules' => [
+                [
+                    'page_id' => $page1->id,
+                    'scheduled_date' => '2025-01-15 10:00:00'
+                ],
+                [
+                    'page_id' => $page2->id,
+                    'scheduled_date' => '2025-01-20 15:00:00'
+                ]
+            ]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('results', $data['data']);
+        $this->assertTrue($data['data']['results'][$page1->id]['success']);
+        $this->assertTrue($data['data']['results'][$page2->id]['success']);
+
+        // Verify pages were updated
+        $updatedPage1 = Page::find($page1->id);
+        $updatedPage2 = Page::find($page2->id);
+
+        $this->assertEquals('scheduled', $updatedPage1->status);
+        $this->assertEquals('2025-01-15 10:00:00', $updatedPage1->scheduled_at);
+        $this->assertEquals('scheduled', $updatedPage2->status);
+        $this->assertEquals('2025-01-20 15:00:00', $updatedPage2->scheduled_at);
+    }
+
+    public function testBulkScheduleReturns422WithoutSchedules()
+    {
+        $response = $this->postForSite('/api/pages/bulk-schedule', []);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkScheduleReturns422WithInvalidFormat()
+    {
+        $response = $this->postForSite('/api/pages/bulk-schedule', [
+            'schedules' => [
+                ['page_id' => 1] // Missing scheduled_date
+            ]
+        ]);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkScheduleHandlesPartialFailures()
+    {
+        $page1 = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite('/api/pages/bulk-schedule', [
+            'schedules' => [
+                [
+                    'page_id' => $page1->id,
+                    'scheduled_date' => '2025-01-15 10:00:00'
+                ],
+                [
+                    'page_id' => 999, // Non-existent page
+                    'scheduled_date' => '2025-01-20 15:00:00'
+                ]
+            ]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['data']['results'][$page1->id]['success']);
+        $this->assertFalse($data['data']['results'][999]['success']);
+    }
+
+    public function testBulkAddTagsToPages()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $tag1 = $this->createTag(['name' => 'Tag 1']);
+        $tag2 = $this->createTag(['name' => 'Tag 2']);
+
+        $response = $this->postForSite('/api/pages/bulk-add-tags', [
+            'page_ids' => [$page1->id, $page2->id],
+            'tag_ids' => [$tag1->id, $tag2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('results', $data['data']);
+
+        $page = $page1->fresh();
+
+        $tags = $page->tags->toArray();
+        $this->assertCount(2, $tags);
+        $this->assertEquals($tags[0]['id'], $tag1->id);
+        $this->assertEquals($tags[1]['id'], $tag2->id);
+    }
+
+    public function testBulkRemoveTagsFromPages()
+    {
+        $page = $this->createPage();
+        $tag = $this->createTag();
+        $this->attachTagToPage($page, $tag);
+
+        $response = $this->postForSite('/api/pages/bulk-remove-tags', [
+            'page_ids' => [$page->id],
+            'tag_ids' => [$tag->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $page = $page->fresh();
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(0, $page->tags->count());
+    }
+
+    public function testBulkChangePageAuthor()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $oldAuthor = $this->createAuthor();
+        $newAuthor = $this->createAuthor();
+
+        $this->attachAuthorToPage($page1, $oldAuthor, ['role' => 'primary']);
+        $this->attachAuthorToPage($page2, $oldAuthor, ['role' => 'primary']);
+
+        $response = $this->postForSite('/api/pages/bulk-change-author', [
+            'page_ids' => [$page1->id, $page2->id],
+            'author_id' => $newAuthor->id
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        $page = $page1->fresh();
+        $page2 = $page2->fresh();
+
+        $authors = $page->pageAuthors->toArray();
+        $page2Authors = $page2->pageAuthors->toArray();
+
+        $this->assertCount(1, $authors);
+        $this->assertEquals($authors[0]['author_id'], $newAuthor->id);
+
+        $this->assertCount(1, $page2Authors);
+        $this->assertEquals($page2Authors[0]['author_id'], $newAuthor->id);
+    }
+
+    public function testBulkAddContributorsToPages()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $contributor1 = $this->createAuthor();
+        $contributor2 = $this->createAuthor();
+
+        $response = $this->postForSite('/api/pages/bulk-add-contributors', [
+            'page_ids' => [$page1->id, $page2->id],
+            'contributor_ids' => [$contributor1->id, $contributor2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        $page = $page1->fresh();
+        $page2 = $page2->fresh();
+
+        $authors = $page->pageAuthors->where('role', 'contributor')->toArray();
+
+        $page2Authors = $page2->pageAuthors->where('role', 'contributor')->toArray();
+
+        $this->assertCount(2, $authors);
+        $this->assertEquals($authors[0]['author_id'], $contributor1->id);
+        $this->assertEquals($authors[1]['author_id'], $contributor2->id);
+
+        $this->assertCount(2, $page2Authors);
+        $this->assertEquals($page2Authors[0]['author_id'], $contributor1->id);
+        $this->assertEquals($page2Authors[1]['author_id'], $contributor2->id);
+    }
+
+    public function testBulkRemoveContributorsFromPages()
+    {
+        $page = $this->createPage();
+        $contributor = $this->createAuthor();
+        $this->attachAuthorToPage($page, $contributor, ['role' => 'contributor']);
+
+        $response = $this->postForSite('/api/pages/bulk-remove-contributors', [
+            'page_ids' => [$page->id],
+            'contributor_ids' => [$contributor->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(0, $page->pageAuthors->where('role', 'contributor')->count());
+    }
+
+    public function testBulkUpdatePageRegions()
+    {
+        $page1 = $this->createPage();
+        $page2 = $this->createPage();
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory();
+
+        $response = $this->postForSite('/api/pages/bulk-update-regions', [
+            'page_ids' => [$page1->id, $page2->id],
+            'region_set_ids' => [$regionSet->id],
+            'territory_ids' => [$territory->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        $page1 = $page1->fresh();
+        $page2 = $page2->fresh();
+
+        $page1RegionSets = $page1->regionSets->toArray();
+        $page2RegionSets = $page2->regionSets->toArray();
+
+        $this->assertCount(1, $page1RegionSets);
+        $this->assertCount(1, $page2RegionSets);
+
+        $this->assertEquals($page1RegionSets[0]['id'], $regionSet->id);
+        $this->assertEquals($page2RegionSets[0]['id'], $regionSet->id);
+    }
+
+    public function testBulkClonePages()
+    {
+        $page1 = $this->createPage(['title' => 'Page 1']);
+        $page2 = $this->createPage(['title' => 'Page 2']);
+
+        $response = $this->postForSite('/api/pages/bulk-clone', [
+            'page_ids' => [$page1->id, $page2->id],
+            'with_prefix' => true,
+            'as_draft' => true
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('results', $data['data']);
+
+        $this->assertDatabaseHas('pages', ['title' => 'Page 1 (Copy)']);
+    }
+
+    public function testBulkCloneWithoutPrefix()
+    {
+        $page = $this->createPage(['title' => 'Original']);
+
+        $response = $this->postForSite('/api/pages/bulk-clone', [
+            'page_ids' => [$page->id],
+            'with_prefix' => false,
+            'as_draft' => true
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        $count = Page::where('title', 'Original')->count();
+        $this->assertequals(2, $count);
+    }
+
+    public function testBulkCloneAsPublished()
+    {
+        $page = $this->createPage(['title' => 'Original', 'status' => 'published']);
+
+        $response = $this->postForSite('/api/pages/bulk-clone', [
+            'page_ids' => [$page->id],
+            'with_prefix' => true,
+            'as_draft' => false
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        $this->assertDatabaseHas('pages', ['title' => 'Original (Copy)']);
+    }
+
+    public function testBulkAddTagsWithEmptyPageIds()
+    {
+        $tag = $this->createTag();
+
+        $response = $this->postForSite('/api/pages/bulk-add-tags', [
+            'page_ids' => [],
+            'tag_ids' => [$tag->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEmpty($data['data']['results']);
+    }
+
+    public function testBulkAddTagsWithEmptyTagIds()
+    {
+        $page = $this->createPage();
+
+        $response = $this->postForSite('/api/pages/bulk-add-tags', [
+            'page_ids' => [$page->id],
+            'tag_ids' => []
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['data']['results']);
+        $this->assertEmpty($data['data']['results'][1]['success']);
+    }
+
+    public function testBulkRemoveTagsWithNonexistentTag()
+    {
+        $page = $this->createPage();
+
+        $response = $this->postForSite('/api/pages/bulk-remove-tags', [
+            'page_ids' => [$page->id],
+            'tag_ids' => [999] // Non-existent tag
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['data']['results']);
+        $this->assertEmpty($data['data']['results'][1]['success']);
+    }
+
+    public function testBulkChangeAuthorWithNonexistentAuthor()
+    {
+        $page = $this->createPage();
+
+        $response = $this->postForSite('/api/pages/bulk-change-author', [
+            'page_ids' => [$page->id],
+            'author_id' => 999 // Non-existent author
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['data']['results']);
+        $this->assertEmpty($data['data']['results'][1]['success']);
+    }
+
+    public function testBulkRemoveContributorsNotAssigned()
+    {
+        $page = $this->createPage();
+        $contributor = $this->createAuthor();
+
+        $response = $this->postForSite('/api/pages/bulk-remove-contributors', [
+            'page_ids' => [$page->id],
+            'contributor_ids' => [$contributor->id] // Not assigned
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+    }
+
+    public function testBulkCloneHandlesFailures()
+    {
+        $response = $this->postForSite('/api/pages/bulk-clone', [
+            'page_ids' => [999], // Non-existent page
+            'with_prefix' => true,
+            'as_draft' => true
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $this->assertDatabaseMissing('pages', ['title' => 'Page 1 (Copy)']);
+    }
+
+    public function testBulkUpdateRegionsWithEmptyRegions()
+    {
+        $page = $this->createPage();
+
+        $response = $this->postForSite('/api/pages/bulk-update-regions', [
+            'page_ids' => [$page->id],
+            'region_set_ids' => [],
+            'territory_ids' => []
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        $page = $page->fresh();
+        $this->assertEmpty($page->pageRegions);
+
+    }
+
 }

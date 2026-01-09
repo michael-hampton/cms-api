@@ -9,6 +9,7 @@ use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
 use App\Framework\Authorization\LoginRequest;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Requests\MemberRegistrationRequest;
 
 class AuthController extends Controller
 {
@@ -18,7 +19,7 @@ class AuthController extends Controller
         parent::__construct();
     }
 
-    public function login(\App\Requests\MemberRegistrationRequest $request): JsonResponse
+    public function login(MemberRegistrationRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -37,7 +38,7 @@ class AuthController extends Controller
                 'id' => $response->userId,
                 'name' => $response->userName,
                 'email' => $response->userEmail,
-                'role' => 'user', // or fetch from user object
+                'role' => $response->role,
             ]);
 
             return $this->jsonResponse($response->toArray(), 200);

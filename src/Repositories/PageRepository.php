@@ -799,6 +799,9 @@ class PageRepository extends Repository
                     return [
                         ...$page,
                         'published_at' => $page['published_at'] ? $page['published_at']->format('Y-m-d H:i:s') : null,
+                        'authors' => $page['pageAuthors'] ? collect($page['pageAuthors'])->map(function ($pageAuthor) {
+                            return $pageAuthor['author'];
+                        })->toArray() : []
                     ];
                 }),
                 'total' => $stageResult->getTotal(),

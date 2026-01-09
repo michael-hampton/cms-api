@@ -10,7 +10,8 @@ class AuthenticationResponse
         public readonly int $userId,
         public readonly string $userName,
         public readonly string $userEmail,
-        public readonly int $siteId
+        public readonly int    $siteId,
+        public readonly string $role
     ) {}
 
     public function toArray(): array
@@ -23,6 +24,7 @@ class AuthenticationResponse
                 'name' => $this->userName,
                 'email' => $this->userEmail,
                 'site_id' => $this->siteId,
+                'role' => $this->role
             ],
         ];
     }

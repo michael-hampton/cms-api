@@ -1607,4 +1607,34 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertFalse($result['success']);
         $this->assertEquals('unauthorized', $result['error_code']);
     }
+
+    public function testIsPaymentMethodExpiring(): void
+    {
+        $paymentMethod = new \stdClass();
+        $paymentMethod->card = new \stdClass();
+
+        // Card expiring in 1 month
+        $nextMonth = new \DateTime('+1 month');
+        $paymentMethod->card->exp_month = (int)$nextMonth->format('m');
+        $paymentMethod->card->exp_year = (int)$nextMonth->format('Y');
+
+        $isExpiring = $this->processor->isPaymentMethodExpiring($paymentMethod, 2);
+
+        $this->assertTrue($isExpiring);
+    }
+
+    public function testIsPaymentMethodExpired(): void
+    {
+        $paymentMethod = new \stdClass();
+        $paymentMethod->card = new \stdClass();
+
+        // Card expired last month
+        $lastMonth = new \DateTime('-1 month');
+        $paymentMethod->card->exp_month = (int)$lastMonth->format('m');
+        $paymentMethod->card->exp_year = (int)$lastMonth->format('Y');
+
+        $isExpired = $this->processor->isPaymentMethodExpired($paymentMethod);
+
+        $this->assertTrue($isExpired);
+    }
 }

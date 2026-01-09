@@ -10,6 +10,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\CategoryRepository;
 use App\Repositories\SubscriptionRepository;
 use App\Services\MemberSubscriptionService;
+use App\Services\SubscriptionBillingService;
 use App\Services\SubscriptionCancellationService;
 use App\Services\SubscriptionPlanService;
 
@@ -20,8 +21,8 @@ class MemberSubscriptionsController extends Controller
         private readonly MemberSubscriptionService $subscriptionService,
         private readonly CategoryRepository        $categoryRepository,
         private readonly SubscriptionPlanService         $subscriptionPlanService,
-        private readonly SubscriptionCancellationService $cancellationService
-
+        private readonly SubscriptionCancellationService $cancellationService,
+        private readonly SubscriptionBillingService      $subscriptionBillingService
     )
     {
         parent::__construct();
@@ -33,7 +34,7 @@ class MemberSubscriptionsController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
         $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId);
@@ -470,6 +471,105 @@ class MemberSubscriptionsController extends Controller
 
             $_SESSION['flash_success'] = 'Your subscription preferences have been updated.';
             return $this->redirect("/member/subscriptions/manage/{$token}");
+        }
+    }
+
+    public function updateBillingDate(Request $request, int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $member->id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
+        }
+
+        $dayOfMonth = (int)$request->input('day_of_month');
+
+        if ($dayOfMonth < 1 || $dayOfMonth > 31) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Please select a day between 1 and 31'
+            ], 400);
+        }
+
+        try {
+            $result = $this->subscriptionBillingService->updateBillingDate($subscriptionId, $dayOfMonth);
+
+            if ($result['success']) {
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Billing date updated successfully',
+                    'data' => [
+                        'new_billing_date' => $result['new_billing_date']
+                    ]
+                ]);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $result['message'] ?? 'Failed to update billing date'
+            ], 500);
+
+        } catch (\Exception $e) {
+            Logger::error('Failed to update billing date', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function previewBillingDateChange(Request $request, int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $member->id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
+        }
+
+        $dayOfMonth = (int)$request->input('day_of_month');
+
+        if ($dayOfMonth < 1 || $dayOfMonth > 31) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Please select a day between 1 and 31'
+            ], 400);
+        }
+
+        try {
+
+            $preview = $this->subscriptionBillingService->previewBillingDateChange($subscriptionId, $dayOfMonth);
+
+            if ($preview['success']) {
+                return $this->jsonResponse([
+                    'success' => true,
+                    'data' => $preview
+                ]);
+            }
+
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $preview['message'] ?? 'Failed to preview billing date change'
+            ], 500);
+
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to preview billing date change'
+            ], 500);
         }
     }
 }
