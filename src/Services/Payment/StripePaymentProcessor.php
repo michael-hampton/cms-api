@@ -1312,9 +1312,11 @@ class StripePaymentProcessor
     /**
      * Get payment methods with expiry warnings
      */
-    public function getPaymentMethodsWithWarnings($member, array $customerPaymentMethods): array
+    public function getPaymentMethodsWithWarnings($member, array $customerPaymentMethods = []): array
     {
-        //$result = $this->getCustomerPaymentMethods($member);
+        if (empty($customerPaymentMethods)) {
+            $customerPaymentMethods = $this->getCustomerPaymentMethods($member);
+        }
 
         if (!$customerPaymentMethods['success']) {
             return $customerPaymentMethods;
@@ -1338,6 +1340,7 @@ class StripePaymentProcessor
         }
 
         $result['warnings'] = $warnings;
+        $result['success'] = count($warnings) === 0;
         $result['has_warnings'] = !empty($warnings);
 
         return $result;

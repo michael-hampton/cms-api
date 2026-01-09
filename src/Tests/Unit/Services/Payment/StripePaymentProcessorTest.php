@@ -1637,4 +1637,41 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $this->assertTrue($isExpired);
     }
+
+    public function testGetPaymentMethodsWithWarnings(): void
+    {
+        $member = $this->createMockMember('cus_test123');
+
+        $customer = new \stdClass();
+        $customer->invoice_settings = new \stdClass();
+        $customer->invoice_settings->default_payment_method = 'pm_test123';
+
+        $this->customerServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->andReturn($customer);
+
+        // Expiring card
+        $expiringCard = new \stdClass();
+        $expiringCard->id = 'pm_test123';
+        $expiringCard->card = new \stdClass();
+        $nextMonth = new \DateTime('+1 month');
+        $expiringCard->card->exp_month = (int)$nextMonth->format('m');
+        $expiringCard->card->exp_year = (int)$nextMonth->format('Y');
+        $expiringCard->card->brand = 'visa';
+        $expiringCard->card->last4 = '4242';
+
+        $paymentMethodsData = new \stdClass();
+        $paymentMethodsData->data = [$expiringCard];
+
+        $this->paymentMethodServiceMock->shouldReceive('all')
+            ->once()
+            ->andReturn($paymentMethodsData);
+
+        $result = $this->processor->getPaymentMethodsWithWarnings($member);
+
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['has_warnings']);
+        $this->assertCount(1, $result['warnings']);
+        $this->assertEquals('expiring', $result['warnings'][0]['status']);
+    }
 }
