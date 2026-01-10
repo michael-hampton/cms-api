@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Members;
+namespace App\Controllers\Members\Subscriptions;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
@@ -457,7 +457,7 @@ class MemberSubscriptionsController extends Controller
                 return $this->jsonResponse([
                     'success' => true,
                     'message' => 'Preferences updated successfully',
-                    'data' => ['preference' => $updated]
+                    'preference' => $updated
                 ]);
             }
 

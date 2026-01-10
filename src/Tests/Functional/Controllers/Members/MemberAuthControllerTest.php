@@ -1,9 +1,11 @@
 <?php
-namespace App\Tests\Functional\Controllers;
+
+namespace App\Tests\Functional\Controllers\Members;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Models\Member;
 use App\Models\MemberRole;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class MemberAuthControllerTest extends FunctionalTestCase
 {

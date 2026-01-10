@@ -120,11 +120,11 @@ class CategoryPageController extends Controller
         ]);
     }
 
-    private function notFound()
-    {
-        http_response_code(404);
-        return $this->view('estate/404', [
-            'menu' => Menu::where('is_active', true)->with(['items'])->first()
-        ]);
-    }
+//    private function notFound()
+//    {
+//        http_response_code(404);
+//        return $this->view('estate/404', [
+//            'menu' => Menu::where('is_active', true)->with(['items'])->first()
+//        ]);
+//    }
 }

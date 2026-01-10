@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Tests\Functional\Controllers;
+namespace App\Tests\Functional\Controllers\Members\Newsletters;
 
 use App\Models\Campaign;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Models\Subscriber;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class NewsletterSignupControllerTest extends FunctionalTestCase

@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Tests\Functional\Controllers;
+namespace App\Tests\Functional\Controllers\Members;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Session\Session;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MemberConsentControllerTest extends FunctionalTestCase

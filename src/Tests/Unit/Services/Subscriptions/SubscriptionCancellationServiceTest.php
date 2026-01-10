@@ -1,5 +1,4 @@
 <?php
-// src/Tests/Unit/Services/SubscriptionCancellationServiceTest.php
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
@@ -242,7 +241,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->andReturn($mockSubscription);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('already ended and cannot be reactivated');
+        $this->expectExceptionMessage('Subscription entitlement period has ended. Please purchase a new subscription.');
 
         $this->service->reactivateSubscription($subscriptionId);
     }
@@ -733,7 +732,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->andReturn($subscription);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('already ended and cannot be reactivated');
+        $this->expectExceptionMessage('Subscription entitlement period has ended. Please purchase a new subscription.');
 
         $this->service->reactivateSubscription(1);
     }

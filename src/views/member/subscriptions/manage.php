@@ -298,7 +298,7 @@
     <div class="card">
         <div class="member-info">
             <strong>Email:</strong> <?= htmlspecialchars($member->email) ?><br>
-            <strong>Member Since:</strong> <?= date('M d, Y', strtotime($member->created_at)) ?>
+            <strong>Member Since:</strong> <?= $member->created_at->format('M j, Y') ?>
         </div>
     </div>
 

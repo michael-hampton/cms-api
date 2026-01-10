@@ -256,6 +256,7 @@
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Method</th>
+                    <th>Transaction Id</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -293,6 +294,7 @@
                                 </a>
                             <?php endif; ?>
                         </td>
+                        <td><?= $payment->transaction_id ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

@@ -529,6 +529,197 @@
         </div>
     <?php endforeach; ?>
 
+    <!-- Global Communication Preferences Section -->
+    <div class="consent-category">
+        <div class="category-header">
+            <div class="category-icon preferences">
+                📧
+            </div>
+            <div>
+                <h2 class="category-title">Email & Communication Preferences</h2>
+                <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                    Control what types of emails and communications you receive from us
+                </p>
+            </div>
+        </div>
+
+        <div class="consent-item">
+            <div class="consent-header">
+                <div class="consent-info">
+                    <div class="consent-name">
+                        Marketing Emails
+                    </div>
+                    <div class="consent-description">
+                        Receive promotional content, product updates, and marketing communications
+                    </div>
+
+                    <?php
+                    $marketingEnabled = $member->getCommunicationPreference('marketing_emails', true);
+                    ?>
+                    <span class="consent-status <?= $marketingEnabled ? 'granted' : 'not-granted' ?>">
+                    <?= $marketingEnabled ? '✓ Active' : '✕ Not Active' ?>
+                </span>
+
+                    <div class="consent-meta">
+                        <div class="meta-item">
+                            <span>ℹ️</span>
+                            <span>Controls all marketing and promotional emails</span>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="toggle-switch">
+                    <input
+                            type="checkbox"
+                            <?= $marketingEnabled ? 'checked' : '' ?>
+                            onchange="toggleCommunicationPreference(this, 'marketing_emails')"
+                            data-preference="marketing_emails"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="consent-item">
+            <div class="consent-header">
+                <div class="consent-info">
+                    <div class="consent-name">
+                        Newsletter Subscription
+                    </div>
+                    <div class="consent-description">
+                        Receive our regular newsletter with updates, articles, and curated content
+                    </div>
+
+                    <?php
+                    $newsletterEnabled = $member->getCommunicationPreference('newsletter', true);
+                    ?>
+                    <span class="consent-status <?= $newsletterEnabled ? 'granted' : 'not-granted' ?>">
+                    <?= $newsletterEnabled ? '✓ Active' : '✕ Not Active' ?>
+                </span>
+
+                    <div class="consent-meta">
+                        <div class="meta-item">
+                            <span>📬</span>
+                            <span>
+                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions/preferences"
+                               style="color: var(--primary-color); text-decoration: none;">
+                                Manage newsletter preferences →
+                            </a>
+                        </span>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="toggle-switch">
+                    <input
+                            type="checkbox"
+                            <?= $newsletterEnabled ? 'checked' : '' ?>
+                            onchange="toggleCommunicationPreference(this, 'newsletter')"
+                            data-preference="newsletter"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="consent-item">
+            <div class="consent-header">
+                <div class="consent-info">
+                    <div class="consent-name">
+                        Special Offers & Promotions
+                    </div>
+                    <div class="consent-description">
+                        Be the first to know about exclusive deals, discounts, and special offers
+                    </div>
+
+                    <?php
+                    $offersEnabled = $member->getCommunicationPreference('special_offers', true);
+                    ?>
+                    <span class="consent-status <?= $offersEnabled ? 'granted' : 'not-granted' ?>">
+                    <?= $offersEnabled ? '✓ Active' : '✕ Not Active' ?>
+                </span>
+                </div>
+
+                <label class="toggle-switch">
+                    <input
+                            type="checkbox"
+                            <?= $offersEnabled ? 'checked' : '' ?>
+                            onchange="toggleCommunicationPreference(this, 'special_offers')"
+                            data-preference="special_offers"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="consent-item">
+            <div class="consent-header">
+                <div class="consent-info">
+                    <div class="consent-name">
+                        Product Updates
+                    </div>
+                    <div class="consent-description">
+                        Get notified about new features, improvements, and product announcements
+                    </div>
+
+                    <?php
+                    $productEnabled = $member->getCommunicationPreference('product_updates', true);
+                    ?>
+                    <span class="consent-status <?= $productEnabled ? 'granted' : 'not-granted' ?>">
+                    <?= $productEnabled ? '✓ Active' : '✕ Not Active' ?>
+                </span>
+                </div>
+
+                <label class="toggle-switch">
+                    <input
+                            type="checkbox"
+                            <?= $productEnabled ? 'checked' : '' ?>
+                            onchange="toggleCommunicationPreference(this, 'product_updates')"
+                            data-preference="product_updates"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="consent-item">
+            <div class="consent-header">
+                <div class="consent-info">
+                    <div class="consent-name">
+                        Third-Party Communications
+                    </div>
+                    <div class="consent-description">
+                        Allow carefully selected partners to send you relevant offers and information
+                    </div>
+
+                    <?php
+                    $thirdPartyEnabled = $member->getCommunicationPreference('third_party_communications', false);
+                    ?>
+                    <span class="consent-status <?= $thirdPartyEnabled ? 'granted' : 'not-granted' ?>">
+                    <?= $thirdPartyEnabled ? '✓ Active' : '✕ Not Active' ?>
+                </span>
+
+                    <div class="consent-meta">
+                        <div class="meta-item">
+                            <span>⚠️</span>
+                            <span>We never sell your data. Partners are carefully vetted.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="toggle-switch">
+                    <input
+                            type="checkbox"
+                            <?= $thirdPartyEnabled ? 'checked' : '' ?>
+                            onchange="toggleCommunicationPreference(this, 'third_party_communications')"
+                            data-preference="third_party_communications"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
     <div class="data-rights">
         <h2 class="rights-title">
             <span>⚖️</span>
@@ -575,6 +766,7 @@
 <script>
     const SITE = '<?= $site->slug ?? 'default' ?>';
     let pendingChanges = {};
+    let communicationChanges = {};
 
     function toggleConsent(checkbox, consentCode) {
         pendingChanges[consentCode] = checkbox.checked;
@@ -582,36 +774,64 @@
         showSavePrompt();
     }
 
+    function toggleCommunicationPreference(checkbox, preferenceKey) {
+        communicationChanges[preferenceKey] = checkbox.checked;
+        updateLastModified();
+        showSavePrompt();
+    }
+
     async function saveAllConsents() {
-        if (Object.keys(pendingChanges).length === 0) {
+        if (Object.keys(pendingChanges).length === 0 && Object.keys(communicationChanges).length === 0) {
             showAlert('No changes to save', 'error');
             return;
         }
 
         try {
-            const response = await fetch(`/${SITE}/member/consent/update`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    consents: pendingChanges
-                })
-            });
+            // Save consents
+            if (Object.keys(pendingChanges).length > 0) {
+                const consentResponse = await fetch(`/${SITE}/member/consent/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        consents: pendingChanges
+                    })
+                });
 
-            const data = await response.json();
-
-            if (data.success) {
-                showAlert('✓ Consent preferences saved successfully', 'success');
-                pendingChanges = {};
-                hideSavePrompt();
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                showAlert('✕ Failed to save preferences: ' + data.message, 'error');
+                const consentData = await consentResponse.json();
+                if (!consentData.success) {
+                    throw new Error(consentData.message);
+                }
             }
+
+            // Save communication preferences
+            if (Object.keys(communicationChanges).length > 0) {
+                const commResponse = await fetch(`/${SITE}/member/communication-preferences`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        preferences: communicationChanges
+                    })
+                });
+
+                const commData = await commResponse.json();
+                if (!commData.success) {
+                    throw new Error(commData.message);
+                }
+            }
+
+            showAlert('✓ All preferences saved successfully', 'success');
+            pendingChanges = {};
+            communicationChanges = {};
+            hideSavePrompt();
+            setTimeout(() => location.reload(), 1500);
+
         } catch (error) {
-            console.error('Error saving consents:', error);
-            showAlert('✕ Failed to save preferences', 'error');
+            console.error('Error saving preferences:', error);
+            showAlert('✕ Failed to save preferences: ' + error.message, 'error');
         }
     }
 

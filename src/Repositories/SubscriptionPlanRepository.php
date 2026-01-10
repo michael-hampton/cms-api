@@ -92,4 +92,31 @@ class SubscriptionPlanRepository extends Repository
     {
         return SubscriptionPlan::class;
     }
+
+    /**
+     * Get upgrade plans for a given plan
+     */
+    public function getUpgradePlansFor(int $planId): Collection
+    {
+        return SubscriptionPlan::where('upgrade_from_plan_id', $planId)
+            ->where('is_upgrade_option', true)
+            ->where('is_active', true)
+            ->orderBy('price', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get all plans with Insider access
+     */
+    public function getInsiderPlans(?int $siteId = null): Collection
+    {
+        $query = SubscriptionPlan::where('includes_insider', true)
+            ->where('is_active', true);
+
+        if ($siteId) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query->orderBy('price', 'asc')->get();
+    }
 }

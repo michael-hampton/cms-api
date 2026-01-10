@@ -55,7 +55,11 @@ class Subscription extends Model
         'delivery_pause_reason',
         'cancelled_at',
         'current_period_start',
-        'current_period_end'
+        'current_period_end',
+        'includes_digital_access',
+        'upgraded_from_plan_id',
+        'upgraded_at',
+        'upgrade_price_difference',
     ];
 
     protected $casts = [
@@ -71,7 +75,10 @@ class Subscription extends Model
         'delivery_pause_end' => 'datetime',
         'cancelled_at' => 'datetime',
         'current_period_start' => 'datetime',
-        'current_period_end' => 'datetime'
+        'current_period_end' => 'datetime',
+        'includes_digital_access' => 'boolean',
+        'upgraded_at' => 'datetime',
+        'upgrade_price_difference' => 'float',
     ];
 
     public function member($relation = false)
@@ -386,5 +393,44 @@ class Subscription extends Model
         return $this->isPrint()
             && $this->isActive()
             && $this->isDeliveryPaused();
+    }
+
+    /**
+     * Check if subscription includes Insider digital access
+     */
+    public function hasInsiderAccess(): bool
+    {
+        return $this->includes_digital_access || $this->isDigital();
+    }
+
+    /**
+     * Check if this subscription was upgraded
+     */
+    public function wasUpgraded(): bool
+    {
+        return $this->upgraded_from_plan_id !== null;
+    }
+
+    /**
+     * Get the original plan if upgraded
+     */
+    public function originalPlan()
+    {
+        if (!$this->upgraded_from_plan_id) {
+            return null;
+        }
+
+        return $this->belongsTo(SubscriptionPlan::class, 'upgraded_from_plan_id', 'id');
+    }
+
+    /**
+     * Check if subscription is eligible for upgrade to Insider
+     */
+    public function canUpgradeToInsider(): bool
+    {
+        return $this->isPrint()
+            && !$this->includes_digital_access
+            && $this->isActive()
+            && !$this->isCancelled();
     }
 }

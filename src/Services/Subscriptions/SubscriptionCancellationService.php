@@ -170,9 +170,21 @@ class SubscriptionCancellationService
                 throw new Exception('Can only reactivate cancelled subscriptions');
             }
 
-            // Check if subscription has already ended
-            if ($subscription->end_date && $subscription->end_date < new \DateTime()) {
-                throw new Exception('Subscription has already ended and cannot be reactivated. Please create a new subscription.');
+            // CRITICAL: Check if still within entitlement period
+            $now = new \DateTime();
+            if ($subscription->end_date && $subscription->end_date < $now) {
+                throw new Exception('Subscription entitlement period has ended. Please purchase a new subscription.');
+            }
+
+            // Check days remaining
+            $daysRemaining = null;
+            if ($subscription->end_date) {
+                $interval = $now->diff($subscription->end_date);
+                $daysRemaining = $interval->days;
+
+                if ($daysRemaining <= 0) {
+                    throw new Exception('Subscription entitlement period has ended. Please purchase a new subscription.');
+                }
             }
 
             // Reactivate in Stripe if subscription has Stripe ID
@@ -191,10 +203,12 @@ class SubscriptionCancellationService
                 }
             }
 
-            // Calculate new end date based on billing period
-            $newEndDate = null;
+            // Calculate new end date based on remaining time or billing period
+            $newEndDate = $subscription->plan->billing_period === 'lifetime' ? null : $subscription->end_date; // Keep original end date
+
+            // If they still have auto_renew enabled, calculate next billing
             if ($subscription->plan && $subscription->plan->billing_period !== 'lifetime') {
-                $newEndDate = new \DateTime();
+                $newEndDate = clone $now;
                 match ($subscription->plan->billing_period) {
                     'monthly' => $newEndDate->modify('+1 month'),
                     'quarterly' => $newEndDate->modify('+3 months'),
@@ -206,22 +220,27 @@ class SubscriptionCancellationService
             $updated = $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'active',
                 'auto_renew' => true,
+                'cancelled_at' => null, // Clear cancellation timestamp
                 'end_date' => $newEndDate?->format('Y-m-d H:i:s'),
                 'next_billing_date' => $newEndDate?->format('Y-m-d H:i:s')
             ]);
+
 
             if (!$updated) {
                 throw new Exception('Failed to update subscription status');
             }
 
-            Logger::info("Subscription reactivated", [
+            Logger::info("Subscription reactivated within entitlement period", [
                 'subscription_id' => $subscriptionId,
+                'days_remaining' => $daysRemaining,
                 'stripe_subscription_id' => $subscription->getStripeSubscriptionId()
             ]);
 
             return [
                 'success' => true,
-                'subscription' => $this->subscriptionRepository->find($subscriptionId)
+                'subscription' => $this->subscriptionRepository->find($subscriptionId),
+                'days_remaining' => $daysRemaining,
+                'message' => $daysRemaining ? "Reactivated with {$daysRemaining} days remaining" : 'Reactivated successfully'
             ];
         });
     }

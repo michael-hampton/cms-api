@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Tests\Functional\Controllers;
+namespace App\Tests\Functional\Controllers\Members;
 
 use App\Models\Member;
 use App\Models\Subscription;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MemberSupportControllerTest extends FunctionalTestCase

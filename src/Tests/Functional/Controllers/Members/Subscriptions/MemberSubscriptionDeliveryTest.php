@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Tests\Functional\Controllers;
+namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
 use App\Models\Member;
 use App\Models\Subscription;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MemberSubscriptionDeliveryTest extends FunctionalTestCase
@@ -18,7 +19,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+14 days'))->format('Y-m-d');
 
-        $response = $this->post(
+        $response = $this->postForSiteUnauthenticated(
             "/member/subscriptions/{$this->subscription->id}/pause-delivery",
             [
                 'pause_start' => $pauseStart,
@@ -44,7 +45,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $pauseStart = (new \DateTime('+7 days'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+1 day'))->format('Y-m-d');
 
-        $response = $this->post(
+        $response = $this->postForSiteUnauthenticated(
             "/member/subscriptions/{$this->subscription->id}/pause-delivery",
             [
                 'pause_start' => $pauseStart,
@@ -64,7 +65,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+100 days'))->format('Y-m-d');
 
-        $response = $this->post(
+        $response = $this->postForSiteUnauthenticated(
             "/member/subscriptions/{$this->subscription->id}/pause-delivery",
             [
                 'pause_start' => $pauseStart,
@@ -87,7 +88,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $this->subscription->delivery_pause_end = new \DateTime('+14 days')->format('Y-m-d H:i:s');
         $this->subscription->save();
 
-        $response = $this->post(
+        $response = $this->postForSiteUnauthenticated(
             "/member/subscriptions/{$this->subscription->id}/resume-delivery"
         );
 
@@ -120,7 +121,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+14 days'))->format('Y-m-d');
 
-        $response = $this->post(
+        $response = $this->postForSiteUnauthenticated(
             "/member/subscriptions/{$digitalSubscription->id}/pause-delivery",
             [
                 'pause_start' => $pauseStart,
@@ -153,7 +154,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+14 days'))->format('Y-m-d');
 
-        $response = $this->post(
+        $response = $this->postForSiteUnauthenticated(
             "/member/subscriptions/{$otherSubscription->id}/pause-delivery",
             [
                 'pause_start' => $pauseStart,
@@ -171,7 +172,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $this->subscription->delivery_pause_end = new \DateTime('+14 days')->format('Y-m-d H:i:s');
         $this->subscription->save();
 
-        $response = $this->get(
+        $response = $this->getForSiteUnauthenticated(
             "/member/subscriptions/{$this->subscription->id}/pause-status"
         );
 
@@ -184,6 +185,52 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $this->assertTrue($data['can_resume']);
         $this->assertNotNull($data['pause_start']);
         $this->assertNotNull($data['pause_end']);
+    }
+
+    public function testPauseDeliveryRequiresAuthentication(): void
+    {
+        $this->unauthenticateMember();
+
+        $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
+        $pauseEnd = (new \DateTime('+14 days'))->format('Y-m-d');
+
+        $response = $this->postForSite(
+            "/member/subscriptions/{$this->subscription->id}/pause-delivery",
+            [
+                'pause_start' => $pauseStart,
+                'pause_end' => $pauseEnd
+            ]
+        );
+
+        $this->assertEquals(401, $response->getStatusCode());
+    }
+
+    public function testGetPauseStatusWhenNotPaused(): void
+    {
+        $response = $this->getForSiteUnauthenticated(
+            "/member/subscriptions/{$this->subscription->id}/pause-status"
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertFalse($data['is_paused']);
+        $this->assertTrue($data['can_pause']);
+        $this->assertFalse($data['can_resume']);
+        $this->assertNull($data['pause_start']);
+        $this->assertNull($data['pause_end']);
+    }
+
+    public function testResumeDeliveryRequiresAuthentication(): void
+    {
+        $this->unauthenticateMember();
+
+        $response = $this->postForSite(
+            "/member/subscriptions/{$this->subscription->id}/resume-delivery"
+        );
+
+        $this->assertEquals(401, $response->getStatusCode());
     }
 
     protected function setUp(): void

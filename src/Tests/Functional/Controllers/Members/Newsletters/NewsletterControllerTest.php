@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional\Controllers;
+namespace App\Tests\Functional\Controllers\Members\Newsletters;
 
 use App\Framework\Mail\ArrayMailer;
 use App\Framework\Mail\MailManager;
@@ -8,6 +8,7 @@ use App\Framework\Support\Config;
 use App\Models\Newsletter;
 use App\Models\Site;
 use App\Models\Subscriber;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class NewsletterControllerTest extends FunctionalTestCase
@@ -686,7 +687,7 @@ class NewsletterControllerTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        $config = include __DIR__ . '/../../../config/mail.php';
+        $config = include __DIR__ . '/../../../../../config/mail.php';
         $config['driver'] = 'array';
 
         Config::set('mail', $config);

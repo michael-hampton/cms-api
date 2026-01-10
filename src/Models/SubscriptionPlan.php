@@ -26,6 +26,9 @@ class SubscriptionPlan extends Model
         'plan_type',
         'digital_download_url',
         'print_shipping_required',
+        'includes_insider',
+        'is_upgrade_option',
+        'upgrade_from_plan_id',
     ];
 
     protected $casts = [
@@ -36,6 +39,8 @@ class SubscriptionPlan extends Model
         'is_featured' => 'boolean',
         'sort_order' => 'integer',
         'print_shipping_required' => 'boolean',
+        'includes_insider' => 'boolean',
+        'is_upgrade_option' => 'boolean',
     ];
 
     public function site($relation = false)
@@ -148,5 +153,33 @@ class SubscriptionPlan extends Model
     public function scopeRecurring(QueryBuilder $query): QueryBuilder
     {
         return $query->where('plan_type', 'recurring');
+    }
+
+    /**
+     * Check if plan includes Insider access
+     */
+    public function includesInsider(): bool
+    {
+        return $this->includes_insider;
+    }
+
+    /**
+     * Check if this is an upgrade plan
+     */
+    public function isUpgradePlan(): bool
+    {
+        return $this->is_upgrade_option;
+    }
+
+    /**
+     * Get the plan this upgrades from
+     */
+    public function upgradesFromPlan()
+    {
+        if (!$this->upgrade_from_plan_id) {
+            return null;
+        }
+
+        return $this->belongsTo(SubscriptionPlan::class, 'upgrade_from_plan_id', 'id');
     }
 }

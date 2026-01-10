@@ -15,7 +15,7 @@ use App\Controllers\EmailThemeController;
 use App\Controllers\EstateWebsiteController;
 use App\Controllers\ImageController;
 use App\Controllers\MemberController;
-use App\Controllers\Members\MemberAddressController;
+use App\Controllers\Members\Subscriptions\MemberAddressController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
 use App\Controllers\NewsletterController;

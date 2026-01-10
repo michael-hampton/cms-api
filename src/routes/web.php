@@ -21,17 +21,18 @@ use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberConsentController;
 use App\Controllers\Members\MemberDashboardController;
 use App\Controllers\Members\MemberInvoiceController;
-use App\Controllers\Members\MemberIssueDeliveriesController;
 use App\Controllers\Members\MemberLikedPagesController;
-use App\Controllers\Members\MemberNewslettersController;
 use App\Controllers\Members\MemberOrdersController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\MemberReadingHistoryController;
-use App\Controllers\Members\MemberSubscriptionPaymentsController;
-use App\Controllers\Members\MemberSubscriptionPlansController;
-use App\Controllers\Members\MemberSubscriptionsController;
 use App\Controllers\Members\MemberSupportController;
 use App\Controllers\Members\MemberWishlistController;
+use App\Controllers\Members\Newsletters\MemberNewslettersController;
+use App\Controllers\Members\Subscriptions\MemberIssueDeliveriesController;
+use App\Controllers\Members\Subscriptions\MemberSubscriptionPaymentsController;
+use App\Controllers\Members\Subscriptions\MemberSubscriptionPlansController;
+use App\Controllers\Members\Subscriptions\MemberSubscriptionsController;
+use App\Controllers\Members\Subscriptions\MemberSubscriptionUpgradeController;
 use App\Controllers\NewsletterController;
 use App\Controllers\NewsletterWebController;
 use App\Controllers\OneTimeSubscriptionsController;
@@ -192,6 +193,12 @@ $router->get('/{siteName}/checkout', [CartController::class, 'checkoutPage']);
 $router->post('/api/{site}/checkout/process', [CartController::class, 'processCheckout']);
 $router->post('/{site}/member/subscriptions/{id}/reactivate', [MemberSubscriptionsController::class, 'reactivate']);
 $router->get('/{site}/member/subscriptions/{subscriptionId}/issue-deliveries', [MemberIssueDeliveriesController::class, 'index']);
+
+$router->get('/{site}/member/subscriptions/{subscriptionId}/upgrade', [MemberSubscriptionUpgradeController::class, 'index']);
+$router->post('/{site}/member/subscriptions/{subscriptionId}/upgrade', [MemberSubscriptionUpgradeController::class, 'upgrade']);
+$router->post('/{site}/member/subscriptions/{subscriptionId}/upgrade/preview', [MemberSubscriptionUpgradeController::class, 'preview']);
+
+
 
 $router->post('/{site}/member/subscriptions/{subscriptionId}/update-billing-date', [MemberSubscriptionsController::class, 'updateBillingDate']);
 $router->post('/{site}/member/subscriptions/{subscriptionId}/preview-billing-change', [MemberSubscriptionsController::class, 'previewBillingDateChange']);

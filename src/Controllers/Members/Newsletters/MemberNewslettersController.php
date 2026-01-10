@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Members;
+namespace App\Controllers\Members\Newsletters;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;

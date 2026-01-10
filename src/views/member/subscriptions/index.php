@@ -530,6 +530,7 @@ use App\Framework\Support\SiteContext;
 
             <?php if ($activeSubscription): ?>
                 <?php
+                $defaultHasWarning = false;
                 // Check if default payment method is expiring/expired
                 if ($member->stripe_customer_id) {
                     $stripeProcessor = new \App\Services\Payment\StripePaymentProcessor(
@@ -667,12 +668,15 @@ use App\Framework\Support\SiteContext;
                                 Subscription Set to Cancel
                             </div>
                             <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
-                                Your access will end on <?= $activeSubscription->end_date->format('F d, Y') ?>.
-                                <?php if (!$activeSubscription->auto_renew): ?>
-                                    You can reactivate anytime before then.
-                                <?php else: ?>
-                                    However, auto-renewal is still enabled. The subscription will attempt to renew unless you disable auto-renewal.
-                                <?php endif; ?>
+                                <?php
+                                $daysRemaining = $activeSubscription->end_date ?
+                                        (new \DateTime())->diff($activeSubscription->end_date)->days : null;
+                                ?>
+                                Your access will end on <?= $activeSubscription->end_date->format('F d, Y') ?>
+                                <?php if ($daysRemaining): ?>
+                                    (<strong style="color: #667eea;"><?= $daysRemaining ?> days remaining</strong>)
+                                <?php endif; ?>.
+                                You can reactivate anytime before then to continue your subscription.
                             </div>
                         </div>
                     </div>
@@ -761,6 +765,60 @@ use App\Framework\Support\SiteContext;
                 </div>
 
                 <?php if ($activeSubscription->isPrint()): ?>
+
+                    <?php if ($activeSubscription->isPrint()): ?>
+                        <?php
+                        // Get next upcoming delivery
+                        $issueDeliveryRepo = new \App\Repositories\IssueDeliveryRepository();
+                        $nextDelivery = $issueDeliveryRepo->getUpcomingDeliveries($activeSubscription->id, 1)->first();
+                        ?>
+
+                        <div class="info-row">
+                            <span class="info-label">Next Issue Delivery</span>
+                            <span class="info-value" style="display: flex; align-items: center; gap: 8px;">
+            <?php if ($nextDelivery): ?>
+                <span style="font-weight: 800; color: #667eea; font-size: 18px;">
+                    <?= $nextDelivery->estimated_delivery_date->format('M d, Y') ?>
+                </span>
+                <span class="badge"
+                      style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; font-size: 11px;">
+                    Issue #<?= $nextDelivery->issue_number ?>
+                </span>
+                <?php
+                $daysUntil = (new \DateTime())->diff($nextDelivery->estimated_delivery_date)->days;
+                if ($daysUntil <= 7 && $daysUntil >= 0):
+                    ?>
+                    <span style="font-size: 13px; color: #f59e0b; font-weight: 600;">
+                        (<?= $daysUntil ?> day<?= $daysUntil != 1 ? 's' : '' ?> away)
+                    </span>
+                <?php endif; ?>
+            <?php else: ?>
+                <span style="color: #64748b; font-size: 14px;">
+                    <?php if ($activeSubscription->end_date && $activeSubscription->end_date < new \DateTime()): ?>
+                        Subscription ended
+                    <?php else: ?>
+                        Schedule being prepared
+                    <?php endif; ?>
+                </span>
+            <?php endif; ?>
+        </span>
+                        </div>
+
+                        <?php if ($nextDelivery && $nextDelivery->tracking_info && !empty($nextDelivery->tracking_info['tracking_number'])): ?>
+                            <div class="info-row">
+                                <span class="info-label">Tracking</span>
+                                <span class="info-value">
+                <a href="<?= htmlspecialchars($nextDelivery->tracking_info['tracking_url'] ?? '#') ?>"
+                   target="_blank"
+                   style="color: #667eea; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                    <?= htmlspecialchars($nextDelivery->tracking_info['tracking_number']) ?>
+                    <span style="font-size: 12px;">↗</span>
+                </a>
+            </span>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+
                     <?php if ($activeSubscription->isDeliveryPaused()): ?>
                         <div style="background: #fef3c7;
             border-left: 4px solid #f59e0b;

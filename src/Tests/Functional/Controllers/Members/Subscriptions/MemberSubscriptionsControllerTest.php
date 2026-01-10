@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Tests\Functional\Controllers;
+namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Session\Session;
 use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
 use App\Models\Subscription;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MemberSubscriptionsControllerTest extends FunctionalTestCase
@@ -264,6 +265,7 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite(
             "/member/subscriptions/{$subscription->id}/cancel",
+            ['cancel_at_period_end' => false]
         );
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -512,6 +514,96 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
 
         $this->assertTrue($data['success']);
         $this->assertFalse($data['subscription_reactivated']);
+    }
+
+    public function testManageByTokenDisplaysPreferences(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => true,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => true
+        ]);
+
+        $response = $this->getForSite("/member/subscriptions/manage/{$token}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $content = $response->getContent();
+        $this->assertStringContainsString('Save Preferences', $content);
+        $this->assertStringContainsString('newsletter_frequency', $content);
+    }
+
+    public function testManageByTokenReturnsInvalidForBadToken(): void
+    {
+        $response = $this->getForSite('/member/subscriptions/manage/invalid-token');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $content = $response->getContent();
+        $this->assertStringContainsString('Invalid', $content);
+    }
+
+    public function testUpdateByTokenSuccessfully(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        MemberSubscriptionPreference::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'email_notifications' => true,
+            'newsletter_frequency' => 'weekly',
+            'unsubscribe_token' => $token,
+            'is_active' => true
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/manage/{$token}",
+            [
+                'email_notifications' => false,
+                'newsletter_frequency' => 'monthly'
+            ],
+            [],
+            ['X-Requested-With' => 'XMLHttpRequest']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals('monthly', $data['data']['preference']['newsletter_frequency']);
+    }
+
+    public function testUpdateBillingDateRequiresAuthentication(): void
+    {
+        $this->logout();
+        $response = $this->postForSite(
+            '/member/subscriptions/1/update-billing-date',
+            ['day_of_month' => 15]
+        );
+
+        $this->assertEquals(401, $response->getStatusCode());
+    }
+
+    public function testUpdateBillingDateValidatesDayRange(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+        $response = $this->postForSite(
+            "/member/subscriptions/{$subscription->id}/update-billing-date",
+            ['day_of_month' => 35]
+        );
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
     }
 
     protected function setUp(): void

@@ -97,19 +97,49 @@ class NewsletterSendService
 
         $sent = 0;
         $failed = [];
+        $skipped = [];
 
         foreach ($allSubscribers as $email) {
             try {
                 $member = $this->memberRepository->findByEmail($email);
 
                 if ($member) {
+                    // NEW: Check global newsletter preference
                     if (!$member->getCommunicationPreference('newsletter', true)) {
-                        continue; // Skip this email
+                        $skipped[] = [
+                            'email' => $email,
+                            'reason' => 'Newsletter preference disabled in global settings'
+                        ];
+                        continue;
                     }
 
+                    // NEW: Check global marketing preference
                     if (!$member->wantsMarketingEmails()) {
-                        continue; // Skip this email
+                        $skipped[] = [
+                            'email' => $email,
+                            'reason' => 'Marketing emails disabled in global settings'
+                        ];
+                        continue;
                     }
+
+                    // Existing MemberSubscriptionPreference check
+                    /* $preference = $this->preferenceRepository->findByMemberEmail($email, $siteId);
+                     if ($preference && !$preference->is_active) {
+                         $skipped[] = [
+                             'email' => $email,
+                             'reason' => 'Subscription preference inactive'
+                         ];
+                         continue;
+                     }
+
+                     // Check if member's preference matches newsletter frequency
+                     if ($preference && $preference->newsletter_frequency !== $newsletter->interval) {
+                         $skipped[] = [
+                             'email' => $email,
+                             'reason' => "Frequency mismatch: wants {$preference->newsletter_frequency}, newsletter is {$newsletter->interval}"
+                         ];
+                         continue;
+                     }*/
                 }
 
                 // Get unsubscribe token for this email
@@ -145,6 +175,7 @@ class NewsletterSendService
             'success' => true,
             'newsletter_id' => $newsletter->id,
             'recipients' => $sent,
+            'skipped' => $skipped,
             'failed' => $failed,
             'pages_included' => $newsletter->isAutomated() ? $pages->count() : 0
         ];

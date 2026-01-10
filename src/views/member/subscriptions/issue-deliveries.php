@@ -6,6 +6,23 @@
  * @var \App\Framework\Support\Collection $upcomingDeliveries
  * @var \App\Framework\Support\Collection $pastDeliveries
  */
+
+// Combine all deliveries for calendar view
+$allDeliveries = $upcomingDeliveries->merge($pastDeliveries);
+
+// Group deliveries by month
+$deliveriesByMonth = [];
+foreach ($allDeliveries as $delivery) {
+    $monthKey = $delivery->estimated_delivery_date->format('Y-m');
+    if (!isset($deliveriesByMonth[$monthKey])) {
+        $deliveriesByMonth[$monthKey] = [];
+    }
+    $deliveriesByMonth[$monthKey][] = $delivery;
+}
+
+// Get current month or first month with deliveries
+$currentMonth = isset($_GET['month']) ? $_GET['month'] : (count($deliveriesByMonth) > 0 ? array_key_first($deliveriesByMonth) : date('Y-m'));
+$currentDate = new \DateTime($currentMonth . '-01');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -30,7 +47,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -69,128 +86,282 @@
             padding: 20px;
             border-radius: 12px;
             margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
         }
 
-        .info-row {
+        .info-item {
             display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #e2e8f0;
+            flex-direction: column;
+            gap: 4px;
         }
 
-        .info-row:last-child {
-            border-bottom: none;
+        .info-label {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-size: 15px;
+            color: #1e293b;
+            font-weight: 700;
         }
 
         .card {
             background: white;
             border-radius: 20px;
             padding: 32px;
-            margin-bottom: 24px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
         }
 
-        .card h2 {
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .current-month {
             font-size: 24px;
             font-weight: 700;
             color: #1e293b;
-            margin-bottom: 24px;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .view-toggle button {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .view-toggle button.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-weight: 700;
+            color: #64748b;
+            padding: 16px 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 2px solid #f1f5f9;
+            border-radius: 12px;
+            padding: 8px;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .calendar-day:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .calendar-day.other-month {
+            opacity: 0.3;
+        }
+
+        .calendar-day.today {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #f0f4ff, #faf5ff);
+        }
+
+        .calendar-day.has-delivery {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+        }
+
+        .calendar-day.has-delivery.delivered {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
+
+        .day-number {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .calendar-day.today .day-number {
+            color: #667eea;
+        }
+
+        .delivery-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .delivery-indicator.delivered {
+            background: #94a3b8;
+        }
+
+        .delivery-info {
+            margin-top: auto;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .delivery-info.scheduled {
+            color: #667eea;
+        }
+
+        .delivery-info.in-transit {
+            color: #f59e0b;
+        }
+
+        .delivery-info.delivered {
+            color: #10b981;
+        }
+
+        .issue-badge {
+            background: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            display: inline-block;
+            margin-top: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .legend {
+            display: flex;
+            gap: 24px;
+            margin-top: 24px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
         }
 
-        .deliveries-timeline {
-            position: relative;
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
         }
 
-        .delivery-item {
-            position: relative;
-            padding: 24px;
+        .legend-dot.scheduled {
+            background: #667eea;
+        }
+
+        .legend-dot.in-transit {
+            background: #f59e0b;
+        }
+
+        .legend-dot.delivered {
+            background: #10b981;
+        }
+
+        .list-view {
+            display: none;
+        }
+
+        .list-view.active {
+            display: block;
+        }
+
+        .delivery-list-item {
+            padding: 20px;
             margin-bottom: 16px;
             background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-            border-radius: 16px;
+            border-radius: 12px;
             border-left: 4px solid #667eea;
             transition: all 0.3s;
         }
 
-        .delivery-item:hover {
+        .delivery-list-item:hover {
             transform: translateX(4px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        .delivery-item.delivered {
+        .delivery-list-item.delivered {
             border-left-color: #10b981;
             opacity: 0.7;
         }
 
-        .delivery-item.in-transit {
+        .delivery-list-item.in-transit {
             border-left-color: #f59e0b;
             background: linear-gradient(135deg, #fef3c7, #fde68a);
-        }
-
-        .delivery-item.overdue {
-            border-left-color: #ef4444;
-            background: linear-gradient(135deg, #fee2e2, #fecaca);
-        }
-
-        .delivery-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 12px;
-        }
-
-        .issue-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1e293b;
-        }
-
-        .status-badge {
-            padding: 6px 14px;
-            border-radius: 24px;
-            font-size: 13px;
-            font-weight: 700;
-            background: white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .status-badge.scheduled {
-            color: #667eea;
-        }
-
-        .status-badge.in-transit {
-            color: #f59e0b;
-        }
-
-        .status-badge.delivered {
-            color: #10b981;
-        }
-
-        .delivery-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .detail-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .detail-label {
-            font-size: 13px;
-            color: #64748b;
-            font-weight: 600;
-        }
-
-        .detail-value {
-            font-size: 15px;
-            color: #1e293b;
-            font-weight: 600;
         }
 
         .empty-state {
@@ -205,14 +376,42 @@
             opacity: 0.4;
         }
 
-        @media (max-width: 768px) {
-            .delivery-header {
-                flex-direction: column;
-                gap: 12px;
+        @media (max-width: 1024px) {
+            .calendar {
+                gap: 4px;
             }
 
-            .delivery-details {
-                grid-template-columns: 1fr;
+            .calendar-day {
+                min-height: 100px;
+                padding: 6px;
+            }
+
+            .day-number {
+                font-size: 16px;
+            }
+
+            .delivery-info {
+                font-size: 10px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .calendar-header {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .calendar {
+                gap: 6px;
+            }
+
+            .calendar-day {
+                min-height: 80px;
+            }
+
+            .issue-badge {
+                font-size: 9px;
+                padding: 2px 6px;
             }
         }
     </style>
@@ -227,130 +426,226 @@
             ← Back to Subscriptions
         </a>
 
-        <h1>📦 Issue Delivery Schedule</h1>
+        <h1>📅 Issue Delivery Schedule</h1>
         <p>Track your upcoming and past issue deliveries</p>
 
         <div class="subscription-info">
-            <div class="info-row">
-                <span style="color: #64748b; font-weight: 600;">Subscription</span>
-                <span style="color: #1e293b; font-weight: 700;"><?= htmlspecialchars($subscription->plan_name) ?></span>
+            <div class="info-item">
+                <span class="info-label">Subscription</span>
+                <span class="info-value"><?= htmlspecialchars($subscription->plan_name) ?></span>
             </div>
-            <div class="info-row">
-                <span style="color: #64748b; font-weight: 600;">Delivery Type</span>
-                <span style="color: #1e293b; font-weight: 700;">📦 Print</span>
+            <div class="info-item">
+                <span class="info-label">Delivery Type</span>
+                <span class="info-value">📦 Print</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Total Deliveries</span>
+                <span class="info-value"><?= $allDeliveries->count() ?></span>
             </div>
             <?php if ($subscription->end_date): ?>
-                <div class="info-row">
-                    <span style="color: #64748b; font-weight: 600;">Subscription End</span>
-                    <span style="color: #1e293b; font-weight: 700;"><?= $subscription->end_date->format('M d, Y') ?></span>
+                <div class="info-item">
+                    <span class="info-label">Subscription End</span>
+                    <span class="info-value"><?= $subscription->end_date->format('M d, Y') ?></span>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 
-    <!-- Upcoming Deliveries -->
-    <div class="card">
-        <h2>
-            <span>📅</span>
-            Upcoming Issues
-        </h2>
-
-        <?php if ($upcomingDeliveries->isEmpty()): ?>
+    <?php if ($allDeliveries->isEmpty()): ?>
+        <div class="card">
             <div class="empty-state">
                 <div class="empty-state-icon">📭</div>
-                <h3>No Upcoming Deliveries</h3>
-                <p>Your delivery schedule will appear here</p>
+                <h3>No Deliveries Scheduled</h3>
+                <p>Your delivery schedule will appear here once issues are scheduled</p>
             </div>
-        <?php else: ?>
-            <div class="deliveries-timeline">
-                <?php foreach ($upcomingDeliveries as $delivery): ?>
+        </div>
+    <?php else: ?>
+        <div class="card">
+            <div class="calendar-header">
+                <div class="calendar-nav">
                     <?php
+                    $prevMonth = (clone $currentDate)->modify('-1 month');
+                    $nextMonth = (clone $currentDate)->modify('+1 month');
+                    $hasPrevMonth = isset($deliveriesByMonth[$prevMonth->format('Y-m')]) || $prevMonth->format('Y-m') >= date('Y-m', strtotime('-6 months'));
+                    $hasNextMonth = isset($deliveriesByMonth[$nextMonth->format('Y-m')]) || $nextMonth->format('Y-m') <= date('Y-m', strtotime('+12 months'));
+                    ?>
+                    <button class="nav-btn"
+                            onclick="changeMonth('<?= $prevMonth->format('Y-m') ?>')" <?= !$hasPrevMonth ? 'disabled' : '' ?>>
+                        ← Previous
+                    </button>
+                    <div class="current-month">
+                        <?= $currentDate->format('F Y') ?>
+                    </div>
+                    <button class="nav-btn"
+                            onclick="changeMonth('<?= $nextMonth->format('Y-m') ?>')" <?= !$hasNextMonth ? 'disabled' : '' ?>>
+                        Next →
+                    </button>
+                </div>
+
+                <div class="view-toggle">
+                    <button class="active" onclick="toggleView('calendar')">Calendar</button>
+                    <button onclick="toggleView('list')">List</button>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="calendarView">
+                <div class="calendar">
+                    <?php
+                    $daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    foreach ($daysOfWeek as $day): ?>
+                        <div class="calendar-day-header"><?= $day ?></div>
+                    <?php endforeach;
+
+                    // Get first day of month and number of days
+                    $firstDay = (int)$currentDate->format('w');
+                    $daysInMonth = (int)$currentDate->format('t');
+                    $today = new \DateTime();
+
+                    // Get deliveries for current month
+                    $monthDeliveries = $deliveriesByMonth[$currentMonth] ?? [];
+                    $deliveriesByDay = [];
+                    foreach ($monthDeliveries as $delivery) {
+                        $day = (int)$delivery->estimated_delivery_date->format('d');
+                        if (!isset($deliveriesByDay[$day])) {
+                            $deliveriesByDay[$day] = [];
+                        }
+                        $deliveriesByDay[$day][] = $delivery;
+                    }
+
+                    // Previous month padding
+                    $prevMonthDate = (clone $currentDate)->modify('-1 month');
+                    $prevMonthDays = (int)$prevMonthDate->format('t');
+                    for ($i = $firstDay - 1; $i >= 0; $i--):
+                        $day = $prevMonthDays - $i;
+                        ?>
+                        <div class="calendar-day other-month">
+                            <div class="day-number"><?= $day ?></div>
+                        </div>
+                    <?php endfor;
+
+                    // Current month days
+                    for ($day = 1; $day <= $daysInMonth; $day++):
+                        $dayDate = new \DateTime($currentMonth . '-' . str_pad($day, 2, '0', STR_PAD_LEFT));
+                        $isToday = $dayDate->format('Y-m-d') === $today->format('Y-m-d');
+                        $hasDelivery = isset($deliveriesByDay[$day]);
+                        $delivery = $hasDelivery ? $deliveriesByDay[$day][0] : null;
+                        $status = $delivery ? $delivery->calculateStatus() : '';
+                        $isDelivered = $delivery && $status === 'Delivered';
+                        ?>
+                        <div class="calendar-day <?= $isToday ? 'today' : '' ?> <?= $hasDelivery ? 'has-delivery' : '' ?> <?= $isDelivered ? 'delivered' : '' ?>">
+                            <div class="day-number"><?= $day ?></div>
+                            <?php if ($hasDelivery): ?>
+                                <div class="delivery-indicator <?= $isDelivered ? 'delivered' : '' ?>"></div>
+                                <?php foreach ($deliveriesByDay[$day] as $del): ?>
+                                    <div class="delivery-info <?= strtolower(str_replace(' ', '-', $del->calculateStatus())) ?>">
+                                        <?= htmlspecialchars($del->issue_title) ?>
+                                        <div class="issue-badge">#<?= $del->issue_number ?></div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endfor;
+
+                    // Next month padding
+                    $remainingCells = 42 - ($firstDay + $daysInMonth); // 6 weeks * 7 days
+                    for ($day = 1; $day <= $remainingCells; $day++):
+                        ?>
+                        <div class="calendar-day other-month">
+                            <div class="day-number"><?= $day ?></div>
+                        </div>
+                    <?php endfor; ?>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-dot scheduled"></div>
+                        <span>Scheduled</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot in-transit"></div>
+                        <span>In Transit</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot delivered"></div>
+                        <span>Delivered</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List View -->
+            <div id="listView" class="list-view">
+                <?php foreach ($monthDeliveries as $delivery):
                     $status = $delivery->calculateStatus();
                     $statusClass = strtolower(str_replace(' ', '-', $status));
-                    $isOverdue = $delivery->isOverdue();
                     ?>
-                    <div class="delivery-item <?= $statusClass ?> <?= $isOverdue ? 'overdue' : '' ?>">
-                        <div class="delivery-header">
-                            <div class="issue-title">
-                                <?= htmlspecialchars($delivery->issue_title) ?>
-                                <?php if ($isOverdue): ?>
-                                    <span style="color: #ef4444; font-size: 14px;">(Overdue)</span>
-                                <?php endif; ?>
+                    <div class="delivery-list-item <?= $statusClass ?>">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 18px; color: #1e293b; margin-bottom: 4px;">
+                                    <?= htmlspecialchars($delivery->issue_title) ?>
+                                </div>
+                                <div style="color: #64748b; font-size: 14px;">
+                                    Issue #<?= $delivery->issue_number ?>
+                                </div>
                             </div>
-                            <span class="status-badge <?= $statusClass ?>">
+                            <span style="background: white; padding: 6px 14px; border-radius: 24px; font-size: 13px; font-weight: 700;">
                                 <?= $delivery->getStatusLabel() ?>
                             </span>
                         </div>
 
-                        <div class="delivery-details">
-                            <div class="detail-item">
-                                <span class="detail-label">Issue Number</span>
-                                <span class="detail-value">#<?= $delivery->issue_number ?></span>
-                            </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
                             <?php if ($delivery->on_sale_date): ?>
-                                <div class="detail-item">
-                                    <span class="detail-label">On Sale Date</span>
-                                    <span class="detail-value"><?= $delivery->on_sale_date->format('M d, Y') ?></span>
+                                <div>
+                                    <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px;">
+                                        ON SALE DATE
+                                    </div>
+                                    <div style="font-weight: 700; color: #1e293b;"><?= $delivery->on_sale_date->format('M d, Y') ?></div>
                                 </div>
                             <?php endif; ?>
-                            <div class="detail-item">
-                                <span class="detail-label">Est. Delivery</span>
-                                <span class="detail-value"><?= $delivery->estimated_delivery_date->format('M d, Y') ?></span>
+                            <div>
+                                <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px;">EST.
+                                    DELIVERY
+                                </div>
+                                <div style="font-weight: 700; color: #1e293b;"><?= $delivery->estimated_delivery_date->format('M d, Y') ?></div>
                             </div>
                         </div>
 
                         <?php if ($delivery->tracking_info && !empty($delivery->tracking_info['notes'])): ?>
-                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-                                <span class="detail-label">Notes</span>
-                                <p style="margin-top: 8px; color: #1e293b;"><?= htmlspecialchars($delivery->tracking_info['notes']) ?></p>
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 14px; color: #64748b;">
+                                <strong>Note:</strong> <?= htmlspecialchars($delivery->tracking_info['notes']) ?>
                             </div>
                         <?php endif; ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Past Deliveries -->
-    <?php if (!$pastDeliveries->isEmpty()): ?>
-        <div class="card">
-            <h2>
-                <span>✓</span>
-                Past Issues
-            </h2>
-
-            <div class="deliveries-timeline">
-                <?php foreach ($pastDeliveries as $delivery): ?>
-                    <?php
-                    $status = $delivery->calculateStatus();
-                    $statusClass = strtolower(str_replace(' ', '-', $status));
-                    ?>
-                    <div class="delivery-item delivered">
-                        <div class="delivery-header">
-                            <div class="issue-title">
-                                <?= htmlspecialchars($delivery->issue_title) ?>
-                            </div>
-                            <span class="status-badge delivered">
-                            ✓ Delivered
-                        </span>
-                        </div>
-
-                        <div class="delivery-details">
-                            <div class="detail-item">
-                                <span class="detail-label">Issue Number</span>
-                                <span class="detail-value">#<?= $delivery->issue_number ?></span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Delivered</span>
-                                <span class="detail-value"><?= $delivery->estimated_delivery_date->format('M d, Y') ?></span>
-                            </div>
-                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+    function changeMonth(month) {
+        window.location.href = window.location.pathname + '?month=' + month;
+    }
+
+    function toggleView(view) {
+        const calendarView = document.getElementById('calendarView');
+        const listView = document.getElementById('listView');
+        const buttons = document.querySelectorAll('.view-toggle button');
+
+        buttons.forEach(btn => btn.classList.remove('active'));
+
+        if (view === 'calendar') {
+            calendarView.style.display = 'block';
+            listView.classList.remove('active');
+            buttons[0].classList.add('active');
+        } else {
+            calendarView.style.display = 'none';
+            listView.classList.add('active');
+            buttons[1].classList.add('active');
+        }
+    }
+</script>
 
 </body>
 </html>

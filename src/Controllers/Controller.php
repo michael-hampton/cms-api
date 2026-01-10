@@ -149,4 +149,27 @@ abstract class Controller
 
         return new RedirectResponse($previousUrl);
     }
+
+    /**
+     * Return a 404 Not Found response.
+     *
+     * @param string|null $message Optional error message
+     * @param bool $json Whether to return a JSON response (default: false)
+     */
+    protected function notFound(string $message = 'Resource not found', bool $json = false): Response|JsonResponse
+    {
+        if ($json) {
+            return $this->errorResponse($message, 404);
+        }
+
+        // Check if a 404 view exists
+        $viewName = 'errors/404';
+        if ($this->viewExists($viewName)) {
+            return $this->view($viewName, ['message' => $message]);
+        }
+
+        // Fallback plain HTML if no view exists
+        $html = "<h1>404 Not Found</h1><p>{$message}</p>";
+        return Response::html($html, 404);
+    }
 }
