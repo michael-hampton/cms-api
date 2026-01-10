@@ -92,7 +92,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $subscription->shouldReceive('update')
             ->once()
-            ->with(['status' => 'active']);
+            ->with([
+                'status' => 'active',
+                'current_period_start' => now_datetime()->format('Y-m-d H:i:s'),
+                'current_period_end' => now_datetime()->format('Y-m-d H:i:s'),
+            ]);
 
         $member->shouldReceive('update')
             ->once()
@@ -1207,7 +1211,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $subscription->shouldReceive('update')
             ->once()
-            ->with(['status' => 'active']);
+            ->with([
+                'status' => 'active',
+                'current_period_start' => now_datetime()->format('Y-m-d H:i:s'),
+                'current_period_end' => now_datetime()->format('Y-m-d H:i:s'),
+            ]);
 
         $member->shouldReceive('update')
             ->once()

@@ -11,7 +11,7 @@ use App\Framework\Support\SiteContext;
 use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Repositories\NewsletterRepository;
 use App\Repositories\SubscriberRepository;
-use App\Services\NewsletterSignupService;
+use App\Services\Newsletter\NewsletterSignupService;
 
 class MemberNewslettersController extends Controller
 {

@@ -597,6 +597,8 @@
             </div>
         </form>
     </div>
+
+    @include('member/components/global-communication-preferences', ['preferences' => $preferences])
 </div>
 </body>
 </html>

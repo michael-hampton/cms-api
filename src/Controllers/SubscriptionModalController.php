@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Services\SubscriptionModalService;
+use App\Services\Subscriptions\SubscriptionModalService;
 
 class SubscriptionModalController extends Controller
 {

@@ -15,7 +15,7 @@ use App\Repositories\NewsletterRepository;
 use App\Repositories\SubscriberRepository;
 use App\Services\CampaignService;
 use App\Services\EmailVerificationService;
-use App\Services\NewsletterSignupService;
+use App\Services\Newsletter\NewsletterSignupService;
 
 class NewsletterController extends Controller
 {

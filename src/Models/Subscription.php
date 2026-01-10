@@ -48,7 +48,14 @@ class Subscription extends Model
         'delivery_type',
         'download_url',
         'download_expires_at',
-        'type'
+        'type',
+        'delivery_paused',
+        'delivery_pause_start',
+        'delivery_pause_end',
+        'delivery_pause_reason',
+        'cancelled_at',
+        'current_period_start',
+        'current_period_end'
     ];
 
     protected $casts = [
@@ -59,6 +66,12 @@ class Subscription extends Model
         'next_billing_date' => 'datetime',
         'last_payment_date' => 'datetime',
         'download_expires_at' => 'datetime',
+        'delivery_paused' => 'boolean',
+        'delivery_pause_start' => 'datetime',
+        'delivery_pause_end' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'current_period_start' => 'datetime',
+        'current_period_end' => 'datetime'
     ];
 
     public function member($relation = false)
@@ -68,9 +81,28 @@ class Subscription extends Model
 
     public function isActive(): bool
     {
+        // A subscription is only active if:
+        // 1. Status is 'active'
+        // 2. AND (no end_date OR end_date is in the future)
+        // 3. AND (no start_date OR start_date is in the past or today)
+        if ($this->status !== 'active') {
+            return false;
+        }
 
-        return $this->status === 'active' &&
-            ($this->end_date === null || $this->end_date > new \DateTime());
+        $now = new \DateTime();
+
+        // Check if subscription has started
+        if ($this->start_date && $this->start_date > $now) {
+            return false;
+        }
+
+        // Check if subscription has ended
+        if ($this->end_date && $this->end_date < $now) {
+            return false;
+        }
+
+        return true;
+
     }
 
     public function isCancelled(): bool
@@ -230,7 +262,7 @@ class Subscription extends Model
         return $this->hasMany(Order::class, 'one_time_subscription_id', 'id', $relation);
     }
 
-    public function createWindow(): ?ModelgetSubscriptionWithDetails
+    public function createWindow(): ?SubscriptionWindow
     {
         if ($this->type !== 'paid') {
             return null;
@@ -286,7 +318,7 @@ class Subscription extends Model
                 'member_id' => $this->member_id,
                 'subscription_id' => $this->id,
                 'site_id' => $this->site_id,
-                'window_start' => $this->start_date->format('Y-m-d H:i:s'),
+                'window_start' => $this->start_date?->format('Y-m-d H:i:s'),
                 'window_end' => now(),
                 'type' => 'paid'
             ]);
@@ -296,5 +328,63 @@ class Subscription extends Model
     public function issueDeliveries($relation = false)
     {
         return $this->hasMany(IssueDelivery::class, 'subscription_id', 'id', $relation);
+    }
+
+    /**
+     * Check if delivery is currently paused
+     */
+    public function isDeliveryPaused(): bool
+    {
+        if (!$this->delivery_paused) {
+            return false;
+        }
+
+        $now = new \DateTime();
+
+        // Check if we're within the pause period
+        if ($this->delivery_pause_start && $this->delivery_pause_start > $now) {
+            return false; // Pause hasn't started yet
+        }
+
+        if ($this->delivery_pause_end && $this->delivery_pause_end < $now) {
+            return false; // Pause has ended
+        }
+
+        return true;
+    }
+
+    /**
+     * Get days until pause ends
+     */
+    public function getDaysUntilPauseEnds(): ?int
+    {
+        if (!$this->isDeliveryPaused() || !$this->delivery_pause_end) {
+            return null;
+        }
+
+        $now = new \DateTime();
+        $interval = $now->diff($this->delivery_pause_end);
+
+        return $interval->invert ? 0 : $interval->days;
+    }
+
+    /**
+     * Can delivery be paused?
+     */
+    public function canPauseDelivery(): bool
+    {
+        return $this->isPrint()
+            && $this->isActive()
+            && !$this->isDeliveryPaused();
+    }
+
+    /**
+     * Can delivery be resumed?
+     */
+    public function canResumeDelivery(): bool
+    {
+        return $this->isPrint()
+            && $this->isActive()
+            && $this->isDeliveryPaused();
     }
 }

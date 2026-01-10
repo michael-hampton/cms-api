@@ -19,7 +19,7 @@ use App\Services\ArticleAccessService;
 use App\Services\BlockParserService;
 use App\Services\MenuRenderer;
 use App\Services\PageRenderService;
-use App\Services\SubscriptionModalService;
+use App\Services\Subscriptions\SubscriptionModalService;
 use App\Services\Url\UrlResolutionResult;
 
 class ContentController extends Controller

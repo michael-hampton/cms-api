@@ -9,7 +9,7 @@ use App\Models\Page;
 use App\Models\Tag;
 use App\Services\ArticleAccessService;
 use App\Services\MenuRenderer;
-use App\Services\SubscriptionModalService;
+use App\Services\Subscriptions\SubscriptionModalService;
 
 class BrandPageController extends Controller
 {

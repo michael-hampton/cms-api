@@ -3,7 +3,7 @@
 namespace App\Console;
 
 use App\Framework\Support\Logger;
-use App\Services\SubscriptionPaymentService;
+use App\Services\Subscriptions\SubscriptionPaymentService;
 
 class ProcessSubscriptionRenewals
 {

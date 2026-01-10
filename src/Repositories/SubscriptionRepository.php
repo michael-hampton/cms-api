@@ -22,6 +22,15 @@ class SubscriptionRepository extends Repository
         return Subscription::where('member_id', $memberId)
             ->where('site_id', $siteId)
             ->where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhereRaw('end_date >= NOW()');
+            })
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhereRaw('start_date <= NOW()');
+            })
+
             ->first();
     }
 

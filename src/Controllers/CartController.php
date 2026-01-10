@@ -8,7 +8,7 @@ use App\Framework\Support\SiteContext;
 use App\Services\CartService;
 use App\Services\CheckoutService;
 use App\Services\OrderService;
-use App\Services\SubscriptionCheckoutService;
+use App\Services\Subscriptions\SubscriptionCheckoutService;
 
 class CartController extends Controller
 {

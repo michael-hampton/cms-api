@@ -389,6 +389,8 @@ use App\Framework\Support\SiteContext;
 @include('member._header')
 
 <div class="container">
+    @include('member/components/dashboard-banner')
+
     <?php if ($msg = message()): ?>
         <div class="message success">
             <span>✓</span>
@@ -884,7 +886,12 @@ use App\Framework\Support\SiteContext;
             </div>
         <?php endif; ?>
     <?php endif; ?>
+
+    @include('member/components/recommended-section')
+    @include('member/components/trending-section')
+    @include('member/components/back-to-top')
 </div>
+
 
 <script>
     function switchTab(tab) {

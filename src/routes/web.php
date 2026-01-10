@@ -193,8 +193,16 @@ $router->post('/api/{site}/checkout/process', [CartController::class, 'processCh
 $router->post('/{site}/member/subscriptions/{id}/reactivate', [MemberSubscriptionsController::class, 'reactivate']);
 $router->get('/{site}/member/subscriptions/{subscriptionId}/issue-deliveries', [MemberIssueDeliveriesController::class, 'index']);
 
-$router->post('/member/subscriptions/{id}/update-billing-date', [MemberSubscriptionsController::class, 'updateBillingDate']);
-$router->post('/member/subscriptions/{id}/preview-billing-change', [MemberSubscriptionsController::class, 'previewBillingDateChange']);
+$router->post('/{site}/member/subscriptions/{subscriptionId}/update-billing-date', [MemberSubscriptionsController::class, 'updateBillingDate']);
+$router->post('/{site}/member/subscriptions/{subscriptionId}/preview-billing-change', [MemberSubscriptionsController::class, 'previewBillingDateChange']);
+
+$router->get('/{site}/member/profile/communication-preferences', [MemberController::class, 'communicationPreferences']);
+$router->post('/{site}/member/profile/communication-preferences', [MemberController::class, 'updateCommunicationPreferences']);
+
+// Delivery Pause/Resume
+$router->post('/{site}/member/subscriptions/{subscriptionId}/pause-delivery', [MemberSubscriptionsController::class, 'pauseDelivery']);
+$router->post('/{site}/member/subscriptions/{subscriptionId}/resume-delivery', [MemberSubscriptionsController::class, 'resumeDelivery']);
+$router->get('/{site}/member/subscriptions/{subscriptionId}/pause-status', [MemberSubscriptionsController::class, 'getPauseStatus']);
 
 // API routes for Wishlist (JSON responses)
 $router->get('/api/{site}/wishlist', [WishlistController::class, 'index']);

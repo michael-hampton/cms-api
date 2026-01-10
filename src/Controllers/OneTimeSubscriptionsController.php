@@ -4,9 +4,9 @@ namespace App\Controllers;
 
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Services\OneTimeSubscriptionCheckoutService;
-use App\Services\OneTimeSubscriptionService;
 use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Subscriptions\OneTimeSubscriptionCheckoutService;
+use App\Services\Subscriptions\OneTimeSubscriptionService;
 
 class OneTimeSubscriptionsController extends Controller
 {

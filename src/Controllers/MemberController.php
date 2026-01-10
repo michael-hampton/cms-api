@@ -8,12 +8,14 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\MemberRepository;
 use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Subscriptions\MemberSubscriptionService;
 
 class MemberController extends Controller
 {
     public function __construct(
         private readonly MemberRepository       $memberRepository,
-        private readonly StripePaymentProcessor $stripeProcessor
+        private readonly StripePaymentProcessor    $stripeProcessor,
+        private readonly MemberSubscriptionService $subscriptionService
     )
     {
         parent::__construct();
@@ -51,7 +53,7 @@ class MemberController extends Controller
     public function accountDetails()
     {
         $site = SiteContext::get();
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
 
         // Get fresh member instance with relationships
         $memberWithRelations = $this->memberRepository
@@ -60,7 +62,8 @@ class MemberController extends Controller
         return $this->view('member/account-details', [
             'site' => $site,
             'member' => $memberWithRelations ?? $member,
-            'pageTitle' => 'Account Details'
+            'pageTitle' => 'Account Details',
+            'preferences' => $member->communication_preferences ?? []
         ]);
     }
 
@@ -108,5 +111,52 @@ class MemberController extends Controller
         } catch (\Exception $e) {
             return $this->back();
         }
+    }
+
+    public function communicationPreferences()
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
+        $member = MemberAuth::member();
+
+        return $this->view('member/profile/communication-preferences', [
+            'member' => $member,
+            'site' => SiteContext::get(),
+            'preferences' => $member->communication_preferences ?? []
+        ]);
+    }
+
+    public function updateCommunicationPreferences(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+
+        $preferences = [
+            'marketing_emails' => $request->input('marketing_emails', false),
+            'special_offers' => $request->input('special_offers', false),
+            'third_party_communications' => $request->input('third_party_communications', false),
+            'product_updates' => $request->input('product_updates', false),
+            'newsletter' => $request->input('newsletter', false)
+        ];
+
+        $updated = $this->subscriptionService->updateCommunicationPreferences(
+            $member->id,
+            $preferences
+        );
+
+        if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Communication preferences updated successfully'
+            ]);
+        }
+
+        $_SESSION['flash_success'] = 'Communication preferences updated successfully';
+        return $this->redirect('/' . SiteContext::slug() . '/member/account-details');
     }
 }

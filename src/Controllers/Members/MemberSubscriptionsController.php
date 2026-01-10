@@ -9,10 +9,11 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\CategoryRepository;
 use App\Repositories\SubscriptionRepository;
-use App\Services\MemberSubscriptionService;
-use App\Services\SubscriptionBillingService;
-use App\Services\SubscriptionCancellationService;
-use App\Services\SubscriptionPlanService;
+use App\Services\Subscriptions\MemberSubscriptionService;
+use App\Services\Subscriptions\SubscriptionBillingService;
+use App\Services\Subscriptions\SubscriptionCancellationService;
+use App\Services\Subscriptions\SubscriptionDeliveryService;
+use App\Services\Subscriptions\SubscriptionPlanService;
 
 class MemberSubscriptionsController extends Controller
 {
@@ -22,7 +23,9 @@ class MemberSubscriptionsController extends Controller
         private readonly CategoryRepository        $categoryRepository,
         private readonly SubscriptionPlanService         $subscriptionPlanService,
         private readonly SubscriptionCancellationService $cancellationService,
-        private readonly SubscriptionBillingService      $subscriptionBillingService
+        private readonly SubscriptionBillingService  $subscriptionBillingService,
+        private readonly SubscriptionDeliveryService $deliveryService
+
     )
     {
         parent::__construct();
@@ -554,22 +557,99 @@ class MemberSubscriptionsController extends Controller
             $preview = $this->subscriptionBillingService->previewBillingDateChange($subscriptionId, $dayOfMonth);
 
             if ($preview['success']) {
-                return $this->jsonResponse([
+                return $this->resourceResponse([
                     'success' => true,
                     'data' => $preview
                 ]);
             }
 
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => $preview['message'] ?? 'Failed to preview billing date change'
             ], 500);
 
         } catch (\Exception $e) {
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => false,
                 'message' => 'Failed to preview billing date change'
             ], 500);
         }
+    }
+
+    public function pauseDelivery(Request $request, int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $member->id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
+        }
+
+        try {
+            $pauseStart = new \DateTime($request->input('pause_start'));
+            $pauseEnd = new \DateTime($request->input('pause_end'));
+            $reason = $request->input('reason');
+
+            $result = $this->deliveryService->pauseDelivery(
+                $subscriptionId,
+                $pauseStart,
+                $pauseEnd,
+                $reason
+            );
+
+            return $this->resourceResponse($result);
+        } catch (\Exception $e) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    public function resumeDelivery(Request $request, int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $member->id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found'], 404);
+        }
+
+        try {
+            $result = $this->deliveryService->resumeDelivery($subscriptionId);
+
+            return $this->resourceResponse($result);
+        } catch (\Exception $e) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    public function getPauseStatus(int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $member->id) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Subscription not found'], 404);
+        }
+
+        $status = $this->deliveryService->getPauseStatus($subscriptionId);
+
+        return $this->resourceResponse($status);
     }
 }

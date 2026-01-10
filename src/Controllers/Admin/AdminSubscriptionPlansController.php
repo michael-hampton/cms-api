@@ -6,7 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\SubscriptionPlanRepository;
-use App\Services\SubscriptionPlanService;
+use App\Services\Subscriptions\SubscriptionPlanService;
 
 class AdminSubscriptionPlansController extends Controller
 {

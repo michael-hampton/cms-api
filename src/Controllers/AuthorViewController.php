@@ -11,7 +11,7 @@ use App\Repositories\CategoryRepository;
 use App\Repositories\TagRepository;
 use App\Services\ArticleAccessService;
 use App\Services\MenuRenderer;
-use App\Services\SubscriptionModalService;
+use App\Services\Subscriptions\SubscriptionModalService;
 use Exception;
 
 class AuthorViewController extends Controller

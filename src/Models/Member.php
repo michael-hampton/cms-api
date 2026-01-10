@@ -24,7 +24,8 @@ class Member extends Model
         'created_at',
         'total_points',
         'activity_stats',
-        'stripe_customer_id'
+        'stripe_customer_id',
+        'communication_preferences'
     ];
 
     protected $hidden = [
@@ -38,6 +39,7 @@ class Member extends Model
         'is_active' => 'boolean',
         'last_login_at' => 'datetime',
         'created_at' => 'datetime',
+        'communication_preferences' => 'array'
     ];
 
     public $table = 'members';
@@ -319,5 +321,58 @@ class Member extends Model
             'unsubscribe_token' => $token,
             'is_active' => true
         ]);
+    }
+
+    /**
+     * Get communication preference for a specific key
+     */
+    public function getCommunicationPreference(string $key, $default = true): bool
+    {
+        $preferences = $this->communication_preferences ?? [];
+        return $preferences[$key] ?? $default;
+    }
+
+    /**
+     * Check if member wants to receive marketing emails
+     */
+    public function wantsMarketingEmails(): bool
+    {
+        return $this->getCommunicationPreference('marketing_emails', true);
+    }
+
+    /**
+     * Check if member wants special offers
+     */
+    public function wantsSpecialOffers(): bool
+    {
+        return $this->getCommunicationPreference('special_offers', true);
+    }
+
+    /**
+     * Check if member wants third party communications
+     */
+    public function wantsThirdPartyCommunications(): bool
+    {
+        return $this->getCommunicationPreference('third_party_communications', false);
+    }
+
+    /**
+     * Always receive transactional emails
+     */
+    public function wantsTransactionalEmails(): bool
+    {
+        return true; // Always send transactional emails
+    }
+
+    /**
+     * Update communication preferences
+     */
+    public function updateCommunicationPreferences(array $preferences): bool
+    {
+        $this->communication_preferences = array_merge(
+            $this->communication_preferences ?? [],
+            $preferences
+        );
+        return $this->save();
     }
 }

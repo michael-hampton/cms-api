@@ -10,7 +10,7 @@ use App\Repositories\PaymentRepository;
 use App\Repositories\SubscriptionPlanRepository;
 use App\Repositories\SubscriptionRepository;
 use App\Resources\SubscriptionResource;
-use App\Services\SubscriptionPlanService;
+use App\Services\Subscriptions\SubscriptionPlanService;
 use Exception;
 
 class SubscriptionController extends Controller
