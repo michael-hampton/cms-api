@@ -51,7 +51,7 @@ class MemberCommentsController extends Controller
         if ($this->commentRepository->deleteComment($commentId)) {
 
             $activityTracking = new \App\Events\ActivityTracking(
-                new \App\Services\BadgeService(new BadgeRepository())
+                new \App\Services\Members\BadgeService(new BadgeRepository())
             );
             $activityTracking->trackComment($comment);
 

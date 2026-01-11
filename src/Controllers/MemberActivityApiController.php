@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Repositories\Members\MemberActivityRepository;
-use App\Services\BadgeService;
+use App\Services\Members\BadgeService;
 
 class MemberActivityApiController extends Controller
 {

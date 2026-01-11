@@ -4,7 +4,7 @@ namespace App\Events;
 
 use App\Framework\Authorization\MemberAuth;
 use App\Models\Member;
-use App\Services\BadgeService;
+use App\Services\Members\BadgeService;
 
 class ActivityTracking
 {

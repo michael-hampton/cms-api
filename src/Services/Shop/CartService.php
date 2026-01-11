@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Shop;
 
 use App\Framework\Session\Session;
-use App\Repositories\CartRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Shop\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 
 class CartService

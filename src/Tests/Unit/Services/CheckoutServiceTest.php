@@ -5,13 +5,13 @@ namespace App\Tests\Unit\Services;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Models\Member;
 use App\Models\Order;
-use App\Services\CartService;
-use App\Services\CheckoutService;
 use App\Services\Cms\VoucherService;
 use App\Services\Members\OrderCalculationService;
 use App\Services\Members\OrderService;
 use App\Services\Payment\StripePaymentProcessor;
-use App\Services\ShippingService;
+use App\Services\Shop\CartService;
+use App\Services\Shop\CheckoutService;
+use App\Services\Shop\ShippingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

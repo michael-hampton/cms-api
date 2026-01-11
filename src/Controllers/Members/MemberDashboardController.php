@@ -17,7 +17,7 @@ use App\Repositories\Members\PageViewRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\BadgeService;
+use App\Services\Members\BadgeService;
 
 class MemberDashboardController extends Controller
 {

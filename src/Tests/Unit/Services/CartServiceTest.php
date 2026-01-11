@@ -5,10 +5,10 @@ namespace App\Tests\Unit\Services;
 use App\Models\CartItem;
 use App\Models\Product;
 use App\Models\SubscriptionPlan;
-use App\Repositories\CartRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Shop\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
-use App\Services\CartService;
+use App\Services\Shop\CartService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

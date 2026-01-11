@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\CartItem;
-use App\Repositories\CartRepository;
+use App\Repositories\Shop\CartRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CartRepositoryTest extends RepositoryTestCase

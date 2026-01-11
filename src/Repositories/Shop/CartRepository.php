@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Repositories;
+namespace App\Repositories\Shop;
 
 use App\Framework\Support\Collection;
 use App\Models\CartItem;
 use App\Models\Model;
+use App\Repositories\Repository;
 
 class CartRepository extends Repository
 {

@@ -8,7 +8,7 @@ use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberPoint;
 use App\Repositories\Members\BadgeRepository;
-use App\Services\BadgeService;
+use App\Services\Members\BadgeService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

@@ -5,9 +5,9 @@ namespace App\Controllers;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Services\CartService;
-use App\Services\CheckoutService;
 use App\Services\Members\OrderService;
+use App\Services\Shop\CartService;
+use App\Services\Shop\CheckoutService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
 
 class CartController extends Controller

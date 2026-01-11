@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Members;
 
 use App\Framework\Support\SiteContext;
 use App\Models\Badge;

@@ -6,7 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\MemberActivityRepository;
-use App\Services\BadgeService;
+use App\Services\Members\BadgeService;
 
 class MemberActivityController extends Controller
 {
