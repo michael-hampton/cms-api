@@ -9,6 +9,7 @@ use App\Models\MemberBadge;
 use App\Models\MemberPoint;
 use App\Repositories\Members\BadgeRepository;
 use App\Services\Members\BadgeService;
+use App\Services\Rewards\RewardsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 
@@ -16,6 +17,25 @@ class BadgeServiceTest extends FunctionalTestCase
 {
     private BadgeRepository $badgeRepository;
     private BadgeService $service;
+    private RewardsService $rewardsService;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->badgeRepository = Mockery::mock(BadgeRepository::class);
+        $this->rewardsService = Mockery::mock(RewardsService::class);
+        $this->service = new BadgeService(
+            $this->badgeRepository,
+            $this->rewardsService
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function testTrackActivityCreatesActivityRecord()
     {
@@ -205,6 +225,7 @@ class BadgeServiceTest extends FunctionalTestCase
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
+        $member->site_id = $this->siteId;
 
         $badge = Mockery::mock(Badge::class)->makePartial();
         $badge->id = 1;
@@ -244,6 +265,7 @@ class BadgeServiceTest extends FunctionalTestCase
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
+        $member->site_id = $this->siteId;
 
         $badge = Mockery::mock(Badge::class)->makePartial();
         $badge->id = 1;
@@ -373,17 +395,5 @@ class BadgeServiceTest extends FunctionalTestCase
         $this->assertCount(5, $result['next_badges']);
     }
 
-    protected function setUp(): void
-    {
-        parent::setUp();
 
-        $this->badgeRepository = Mockery::mock(BadgeRepository::class);
-        $this->service = new BadgeService($this->badgeRepository);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 }

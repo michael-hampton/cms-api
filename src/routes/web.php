@@ -14,6 +14,7 @@ use App\Controllers\EventController;
 use App\Controllers\FaqController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
+use App\Controllers\Members\GiftedArticlesController;
 use App\Controllers\Members\MemberActivityController;
 use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberCommentsController;
@@ -27,6 +28,7 @@ use App\Controllers\Members\MemberReadingHistoryController;
 use App\Controllers\Members\MemberSupportController;
 use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\Members\Newsletters\MemberNewslettersController;
+use App\Controllers\Members\RewardsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPlansController;
 use App\Controllers\Members\Subscriptions\MemberIssueDeliveriesController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionPaymentsController;
@@ -96,6 +98,16 @@ $router->get('/{site}/member/activity', [MemberActivityController::class, 'index
 $router->get('/{site}/member/activity/badges', [MemberActivityController::class, 'badges']);
 $router->get('/{site}/member/account-details', [MemberController::class, 'accountDetails']);
 $router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
+
+$router->get('/{site}/member/rewards', [RewardsController::class, 'index']);
+$router->get('/{site}/member/rewards/{id}', [RewardsController::class, 'show']); // View single reward details
+$router->post('/{site}/member/rewards/{rewardId}/claim', [RewardsController::class, 'claim']);
+
+
+$router->get('/{site}/member/gifted-articles', [GiftedArticlesController::class, 'index']);
+$router->get('/{site}/gift-article/{pageSlug}', [GiftedArticlesController::class, 'showGiftForm']);
+$router->post('/{site}/gift-article/{pageSlug}', [GiftedArticlesController::class, 'giftArticle']);
+$router->get('/{site}/gift/{token}', [GiftedArticlesController::class, 'claim']);
 
 $router->get('/{site}/reviews', [ReviewPageController::class, 'index']);
 $router->get('/{site}/buying-guides', [BuyingGuideController::class, 'index']);

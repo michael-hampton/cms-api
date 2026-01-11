@@ -55,4 +55,14 @@ class Date extends \DateTime
     {
         return $this->setTime(0, 0, 0);
     }
+
+    public function subHours(int $hours): self
+    {
+        return $this->sub(new DateInterval("PT{$hours}H"));
+    }
+
+    public function addHours(int $hours): self
+    {
+        return $this->add(new DateInterval("PT{$hours}H"));
+    }
 }

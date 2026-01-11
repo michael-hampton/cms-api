@@ -189,35 +189,36 @@
     }
 </style>
 
+<?php
+/** @var \App\Framework\Support\Collection $recommendedPages */
+if (empty($recommendedPages) || $recommendedPages->count() === 0) {
+    return;
+}
+?>
 <div class="content-section">
     <div class="section-header">
         <h2 class="section-title">Recommended For You</h2>
-        <button class="nav-arrow">→</button>
+        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/pages" class="nav-arrow"
+           style="text-decoration: none;">→</a>
     </div>
 
     <div class="content-grid">
-        <article class="content-card">
-            <div class="content-image">
-                <span class="content-badge">Stories</span>
-                <img src="https://via.placeholder.com/300x200" alt="Article thumbnail">
-            </div>
-            <h3 class="content-title">Liverpool dealt Alexander Isak fitness blow after striker no-show</h3>
-        </article>
-
-        <article class="content-card">
-            <div class="content-image">
-                <span class="content-badge">Stories</span>
-                <img src="https://via.placeholder.com/300x200" alt="Article thumbnail">
-            </div>
-            <h3 class="content-title">From Isak to Pogba and all in between: The 100 most expensive transfers EVER</h3>
-        </article>
-
-        <article class="content-card">
-            <div class="content-image">
-                <span class="content-badge">Stories</span>
-                <img src="https://via.placeholder.com/300x200" alt="Article thumbnail">
-            </div>
-            <h3 class="content-title">The Liverpool 2025/26 third kit is out - and it's incredibly unusual</h3>
-        </article>
+        <?php foreach ($recommendedPages as $page): ?>
+            <article class="content-card"
+                     onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($page->slug) ?>'">
+                <div class="content-image">
+                    <?php if ($page->categories && $page->categories->count() > 0): ?>
+                        <span class="content-badge"><?= htmlspecialchars($page->categories->first()->name) ?></span>
+                    <?php endif; ?>
+                    <?php if ($page->metadata && $page->metadata->featured_image): ?>
+                        <img src="<?= htmlspecialchars($page->metadata->featured_image) ?>"
+                             alt="<?= htmlspecialchars($page->title) ?>">
+                    <?php else: ?>
+                        <img src="https://via.placeholder.com/300x200" alt="<?= htmlspecialchars($page->title) ?>">
+                    <?php endif; ?>
+                </div>
+                <h3 class="content-title"><?= htmlspecialchars($page->title) ?></h3>
+            </article>
+        <?php endforeach; ?>
     </div>
 </div>

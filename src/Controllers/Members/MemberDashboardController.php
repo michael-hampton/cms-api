@@ -18,6 +18,8 @@ use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Members\BadgeService;
+use App\Services\Recommendations\ContentRecommendationService;
+use App\Services\Rewards\RewardsService;
 
 class MemberDashboardController extends Controller
 {
@@ -32,7 +34,9 @@ class MemberDashboardController extends Controller
         private readonly PageViewRepository       $pageViewRepository,
         private readonly PageLikeRepository       $pageLikeRepository,
         private readonly BadgeService             $badgeService,
-        private readonly MemberActivityRepository $activityRepository
+        private readonly MemberActivityRepository     $activityRepository,
+        private readonly ContentRecommendationService $contentRecommendationService,
+        private readonly RewardsService               $rewardService
     ) {
         parent::__construct();
     }
@@ -43,7 +47,7 @@ class MemberDashboardController extends Controller
             return $this->redirect('/' . SiteContext::slug() . '/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
         $memberObj = Member::with(['badges', 'points'])->find($member->id);
@@ -53,6 +57,29 @@ class MemberDashboardController extends Controller
         $recentActivities = $this->activityRepository->getMemberActivities($member->id, 20);
 
         $activityTrends = $this->badgeService->getActivityTrends($memberObj, 30);
+
+        $recommendedPages = [];
+        $trendingPages = [];
+        $trendingConversations = [];
+
+        if ($member->isEmailVerified()) {
+            try {
+                $recommendedPages = $this->contentRecommendationService
+                    ->getRecommendedForMember($member, $siteId, 6);
+
+                $trendingPages = $this->contentRecommendationService
+                    ->getTrendingContent($siteId, 3);
+
+                $trendingConversations = $this->contentRecommendationService
+                    ->getTrendingConversations($siteId, 3);
+            } catch (\Exception $e) {
+                // Log error but don't break dashboard
+                \App\Framework\Support\Logger::error('Failed to load recommendations', [
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
 
         // Get counts for dashboard cards
         $stats = [
@@ -65,8 +92,7 @@ class MemberDashboardController extends Controller
             'likes' => $this->pageLikeRepository->getMemberLikeCount($member->id, $siteId),
         ];
 
-        // Get recommended pages
-        $recommendedPages = $this->pageRepository->getFeaturedPages(6, $siteId);
+        $unclaimedRewards = $this->rewardService->getUnclaimedRewards($member, $siteId);
 
         return $this->view('member/dashboard', [
             'member' => $memberObj,
@@ -76,7 +102,10 @@ class MemberDashboardController extends Controller
             'progress' => $progress,
             'activity_trends' => $activityTrends,
             'recent_activities' => $recentActivities,
-            'badges' => $memberObj->badges ?? collect()
+            'badges' => $memberObj->badges ?? collect(),
+            'trendingPages' => $trendingPages,
+            'trendingConversations' => $trendingConversations,
+            'unclaimedRewards' => $unclaimedRewards,
         ]);
     }
 

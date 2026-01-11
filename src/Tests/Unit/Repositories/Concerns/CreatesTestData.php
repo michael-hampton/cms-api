@@ -17,10 +17,13 @@ use App\Models\ConsentType;
 use App\Models\ConsentWithdrawalRequest;
 use App\Models\CustomFieldDefinition;
 use App\Models\EmailTheme;
+use App\Models\GiftedArticle;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberConsent;
+use App\Models\MemberGiftAllowance;
+use App\Models\MemberReward;
 use App\Models\Merchant;
 use App\Models\Model;
 use App\Models\Newsletter;
@@ -50,6 +53,7 @@ use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Models\ProductVoucher;
 use App\Models\RegionSet;
+use App\Models\RewardDefinition;
 use App\Models\Subscriber;
 use App\Models\SubscriptionPlan;
 use App\Models\Tag;
@@ -641,5 +645,57 @@ trait CreatesTestData
             'end_date' => now()
         ]));
 
+    }
+
+    protected function createGiftedArticle(array $attributes = []): Model
+    {
+        return GiftedArticle::create(array_merge([
+            'page_id' => $this->createPage()->id,
+            'gifted_by_member_id' => $this->createMember()->id,
+            'site_id' => $this->siteId,
+            'recipient_email' => 'recipient@example.com',
+            'gift_token' => bin2hex(random_bytes(32)),
+            'gifted_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'status' => 'pending'
+        ], $attributes));
+    }
+
+    protected function createMemberReward(array $attributes = []): Model
+    {
+        return MemberReward::create(array_merge([
+            'member_id' => $this->createMember()->id,
+            'reward_definition_id' => $this->createRewardDefinition()->id,
+            'site_id' => $this->siteId,
+            'status' => 'pending',
+            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ], $attributes));
+    }
+
+    protected function createMemberGiftAllowance(array $attributes = []): Model
+    {
+        return MemberGiftAllowance::create(array_merge([
+            'member_id' => $this->createMember()->id,
+            'site_id' => $this->siteId,
+            'annual_gift_limit' => 10,
+            'gifts_used_this_year' => 0,
+            'year_start_date' => now_datetime()->format('Y-m-d')
+        ], $attributes));
+    }
+
+    protected function createRewardDefinition(array $attributes = []): Model
+    {
+        return RewardDefinition::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Reward',
+            'description' => 'Test reward description',
+            'reward_type' => 'points',
+            'reward_config' => ['points' => 100],
+            'criteria_type' => 'manual',
+            'criteria_config' => [],
+            'max_claims_per_member' => 1,
+            'status' => 'active',
+            'slug' => 'test-reward',
+            'criteria' => []
+        ], $attributes));
     }
 }

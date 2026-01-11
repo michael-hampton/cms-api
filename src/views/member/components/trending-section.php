@@ -189,74 +189,51 @@
     }
 </style>
 
+<?php
+/** @var \App\Framework\Support\Collection $trendingConversations */
+if (empty($trendingConversations) || $trendingConversations->count() === 0) {
+    return;
+}
+?>
 <div class="content-section">
     <div class="section-header">
         <div>
             <h2 class="section-title">Trending Conversations</h2>
-            <p style="color: var(--text-secondary); font-size: 0.9375rem;">Let's make the internet a better place.
-                Please follow our community guidelines.</p>
+            <p style="color: var(--text-secondary); font-size: 0.9375rem;">Join the most popular discussions</p>
         </div>
-        <button class="nav-arrow">→</button>
+        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/pages" class="nav-arrow"
+           style="text-decoration: none;">→</a>
     </div>
 
     <div class="content-grid">
-        <article class="conversation-card">
-            <div class="content-image">
-                <span class="content-badge">Stories</span>
-                <img src="https://via.placeholder.com/300x200" alt="Conversation thumbnail">
-            </div>
-            <p class="conversation-text">"I'm still not sure there's that much ability there. He's okay, but I don't
-                really see what his standout quality is. I just don't know what he does really well. Roy Keane had him
-                off his head." Jamie Carragher brutally slams Manchester United star</p>
-            <div class="conversation-stats">
-                <button class="stat-btn">
-                    <span>👍</span>
-                    <span>1.2k</span>
-                </button>
-                <button class="stat-btn">
-                    <span>💬</span>
-                    <span>45</span>
-                </button>
-            </div>
-        </article>
-
-        <article class="conversation-card">
-            <div class="content-image">
-                <span class="content-badge">Stories</span>
-                <img src="https://via.placeholder.com/300x200" alt="Conversation thumbnail">
-            </div>
-            <p class="conversation-text">Jack Grealish did it, £100m when he left Villa. So what is the big deal about
-                Alexander Isak going to Liverpool? I just don't get it. If Newcastle could understand Isak told he was
-                RIGHT to push for Reds move</p>
-            <div class="conversation-stats">
-                <button class="stat-btn">
-                    <span>👍</span>
-                    <span>1.2k</span>
-                </button>
-                <button class="stat-btn">
-                    <span>💬</span>
-                    <span>45</span>
-                </button>
-            </div>
-        </article>
-
-        <article class="conversation-card">
-            <div class="content-image">
-                <span class="content-badge">Stories</span>
-                <img src="https://via.placeholder.com/300x200" alt="Conversation thumbnail">
-            </div>
-            <p class="conversation-text">Everything you need to know regarding Tottenham Hotspur's potential
-                takeover</p>
-            <div class="conversation-stats">
-                <button class="stat-btn">
-                    <span>👍</span>
-                    <span>1.2k</span>
-                </button>
-                <button class="stat-btn">
-                    <span>💬</span>
-                    <span>45</span>
-                </button>
-            </div>
-        </article>
+        <?php foreach ($trendingConversations as $page): ?>
+            <article class="conversation-card"
+                     onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($page->slug) ?>'">
+                <div class="content-image">
+                    <?php if ($page->categories && $page->categories->count() > 0): ?>
+                        <span class="content-badge"><?= htmlspecialchars($page->categories->first()->name) ?></span>
+                    <?php endif; ?>
+                    <?php if ($page->metadata && $page->metadata->featured_image): ?>
+                        <img src="<?= htmlspecialchars($page->metadata->featured_image) ?>"
+                             alt="<?= htmlspecialchars($page->title) ?>">
+                    <?php else: ?>
+                        <img src="https://via.placeholder.com/300x200" alt="<?= htmlspecialchars($page->title) ?>">
+                    <?php endif; ?>
+                </div>
+                <p class="conversation-text">
+                    <?= htmlspecialchars(strlen($page->title) > 150 ? substr($page->title, 0, 150) . '...' : $page->title) ?>
+                </p>
+                <div class="conversation-stats">
+                    <button class="stat-btn" onclick="event.stopPropagation();">
+                        <span>👍</span>
+                        <span><?= number_format($page->like_count_24h ?? 0) ?></span>
+                    </button>
+                    <button class="stat-btn" onclick="event.stopPropagation();">
+                        <span>💬</span>
+                        <span><?= number_format($page->comment_count_24h ?? 0) ?></span>
+                    </button>
+                </div>
+            </article>
+        <?php endforeach; ?>
     </div>
 </div>

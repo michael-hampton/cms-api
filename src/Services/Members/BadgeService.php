@@ -2,6 +2,7 @@
 
 namespace App\Services\Members;
 
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\Badge;
 use App\Models\Member;
@@ -9,14 +10,15 @@ use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberPoint;
 use App\Repositories\Members\BadgeRepository;
+use App\Services\Rewards\RewardsService;
 
 class BadgeService
 {
-    private BadgeRepository $badgeRepository;
-
-    public function __construct(BadgeRepository $badgeRepository)
+    public function __construct(
+        private readonly BadgeRepository $badgeRepository,
+        private readonly RewardsService  $rewardsService
+    )
     {
-        $this->badgeRepository = $badgeRepository;
     }
 
     public function trackActivity(
@@ -106,6 +108,21 @@ class BadgeService
                 'badge',
                 $badge->id
             );
+        }
+
+        try {
+            $newRewards = $this->rewardsService->checkAndAwardRewards($member, $member->site_id);
+
+            if (!empty($newRewards)) {
+                // Store in session to show notification
+                $_SESSION['new_rewards_earned'] = count($newRewards);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Failed to check rewards after badge award', [
+                'member_id' => $member->id,
+                'badge_id' => $badge->id,
+                'error' => $e->getMessage()
+            ]);
         }
 
         return $memberBadge;

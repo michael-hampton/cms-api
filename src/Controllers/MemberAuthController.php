@@ -86,6 +86,23 @@ class MemberAuthController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
 
+        // Auto-claim any pending gifts sent to this email
+        try {
+            $giftingService = new \App\Services\Members\ArticleGiftingService(
+                new \App\Repositories\Members\GiftedArticleRepository()
+            );
+            $claimedCount = $giftingService->autoClaimGiftsOnSignup($member);
+
+            if ($claimedCount > 0) {
+                $request->session()->put('gifted_articles_claimed', $claimedCount);
+            }
+        } catch (\Exception $e) {
+            \App\Framework\Support\Logger::error('Failed to auto-claim gifts', [
+                'member_id' => $member->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+
         $requiresVerification = true;
 
         if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||

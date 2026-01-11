@@ -34,7 +34,7 @@ class Request implements RequestInterface
             $this->headers = apache_request_headers();
         }
 
-        if(empty($headers)) {
+        if (empty($headers)) {
             foreach ($_SERVER as $key => $value) {
                 if (str_starts_with($key, 'HTTP_')) {
                     $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))));
@@ -264,11 +264,11 @@ class Request implements RequestInterface
                     $type = $typeMatch[1] ?? 'application/octet-stream';
 
                     $files[$name] = [
-                        'name'     => $filename,
-                        'type'     => $type,
+                        'name' => $filename,
+                        'type' => $type,
                         'tmp_name' => $this->writeTempFile($body, $filename),
-                        'error'    => 0,
-                        'size'     => strlen($body),
+                        'error' => 0,
+                        'size' => strlen($body),
                     ];
                 } elseif ($name) {
                     $data[$name] = $body;
@@ -289,7 +289,8 @@ class Request implements RequestInterface
         return $tmp;
     }
 
-    public function getHeader(string $key): ?string {
+    public function getHeader(string $key): ?string
+    {
         return $this->headers[$key] ?? null;
     }
 
@@ -378,7 +379,7 @@ class Request implements RequestInterface
 
         // Common truthy values (true, "true", "1", 1, "on", "yes")
         $truthy = [true, 'true', 1, '1', 'on', 'yes', 'y'];
-        $falsy  = [false, 'false', 0, '0', 'off', 'no', 'n'];
+        $falsy = [false, 'false', 0, '0', 'off', 'no', 'n'];
 
         if (in_array($value, $truthy, true)) {
             return true;
@@ -388,7 +389,7 @@ class Request implements RequestInterface
             return false;
         }
 
-        return (bool) $default;
+        return (bool)$default;
     }
 
     public function merge(array $data): void
@@ -504,5 +505,12 @@ class Request implements RequestInterface
     public function userAgent(): ?string
     {
         return $_SERVER['HTTP_USER_AGENT'] ?? $this->header('User-Agent') ?? null;
+    }
+
+    public function wantsJson()
+    {
+        return $this->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
+            $this->getHeader('Content-Type') === 'application/json' ||
+            $this->getHeader('Accept') === 'application/json';
     }
 }
