@@ -82,6 +82,11 @@ class SubscriptionCancellationService
                 $this->createProRatedRefund($subscription);
             }
 
+            if (!$cancelAtPeriodEnd) {
+                // **REVOKE ALL PREMIUM ACCESS IMMEDIATELY**
+                $this->subscriptionRepository->revokeAllPremiumAccess($subscriptionId);
+            }
+
             Logger::info("Subscription cancelled", [
                 'subscription_id' => $subscriptionId,
                 'stripe_subscription_id' => $subscription->getStripeSubscriptionId(),
@@ -204,7 +209,7 @@ class SubscriptionCancellationService
             }
 
             // Calculate new end date based on remaining time or billing period
-            $newEndDate = $subscription->plan->billing_period === 'lifetime' ? null : $subscription->end_date; // Keep original end date
+            $newEndDate = $subscription->plan?->billing_period === 'lifetime' ? null : $subscription->end_date; // Keep original end date
 
             // If they still have auto_renew enabled, calculate next billing
             if ($subscription->plan && $subscription->plan->billing_period !== 'lifetime') {
@@ -230,6 +235,9 @@ class SubscriptionCancellationService
                 throw new Exception('Failed to update subscription status');
             }
 
+            // **REFRESH PREMIUM ACCESS** (in case plan changed or access expired)
+            $this->refreshPremiumAccess($subscription);
+
             Logger::info("Subscription reactivated within entitlement period", [
                 'subscription_id' => $subscriptionId,
                 'days_remaining' => $daysRemaining,
@@ -243,5 +251,26 @@ class SubscriptionCancellationService
                 'message' => $daysRemaining ? "Reactivated with {$daysRemaining} days remaining" : 'Reactivated successfully'
             ];
         });
+    }
+
+    /**
+     * Refresh premium access based on current plan
+     */
+    private function refreshPremiumAccess(Subscription $subscription): void
+    {
+        if (!$subscription->plan) {
+            return;
+        }
+
+        $premiumGrants = $subscription->plan->getPremiumAccessGrants();
+
+        foreach ($premiumGrants as $grant) {
+            // Re-grant to ensure it's active and not expired
+            $subscription->grantPremiumAccess(
+                $grant['type'],
+                $grant['identifier'],
+                $grant['expires_at'] ?? null
+            );
+        }
     }
 }

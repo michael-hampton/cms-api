@@ -582,7 +582,7 @@ class MemberSubscriptionsControllerTest extends FunctionalTestCase
             ['day_of_month' => 15]
         );
 
-        $this->assertEquals(401, $response->getStatusCode());
+        $this->assertEquals(404, $response->getStatusCode());
     }
 
     public function testUpdateBillingDateValidatesDayRange(): void

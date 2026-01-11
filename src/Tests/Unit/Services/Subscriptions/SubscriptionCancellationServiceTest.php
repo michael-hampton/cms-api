@@ -130,6 +130,10 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             }))
             ->andReturn($mockSubscription);
 
+        $this->subscriptionRepository->shouldReceive('revokeAllPremiumAccess')
+            ->once()
+            ->with($subscriptionId);
+
         $result = $this->service->cancelSubscription($subscriptionId, [
             'cancel_at_period_end' => false
         ]);
@@ -311,6 +315,10 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->with($subscriptionId)
             ->andReturn($mockSubscription);
 
+        $this->subscriptionRepository->shouldReceive('revokeAllPremiumAccess')
+            ->once()
+            ->with($subscriptionId);
+
         $this->stripeProcessor->shouldReceive('cancelSubscription')
             ->once()
             ->with('sub_stripe123', false)
@@ -400,6 +408,10 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->twice()
             ->with(1)
             ->andReturn($subscription);
+
+        $this->subscriptionRepository->shouldReceive('revokeAllPremiumAccess')
+            ->once()
+            ->with(1);
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
@@ -755,6 +767,10 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->twice()
             ->with(1)
             ->andReturn($subscription);
+
+        $this->subscriptionRepository->shouldReceive('revokeAllPremiumAccess')
+            ->once()
+            ->with(1);
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()

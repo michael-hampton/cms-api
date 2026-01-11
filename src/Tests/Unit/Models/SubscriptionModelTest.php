@@ -3,8 +3,10 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\SubscriptionPremiumAccess;
 use App\Models\SubscriptionWindow;
 use App\Models\Voucher;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -840,5 +842,394 @@ class SubscriptionModelTest extends FunctionalTestCase
         $this->assertNotEquals($originalEnd, $window->window_end);
 
         $this->assertEquals($newEndDate, $window->window_end->format('Y-m-d H:i:s'));
+    }
+
+    public function testHasPremiumAccessReturnsTrueWhenGranted(): void
+    {
+        $subscription = $this->createSubscription($this->member);
+
+        SubscriptionPremiumAccess::create([
+            'subscription_id' => $subscription->id,
+            'premium_type' => 'newsletter',
+            'premium_identifier' => 'insider',
+            'is_active' => true
+        ]);
+
+        $this->assertTrue($subscription->hasPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testHasPremiumAccessReturnsFalseWhenNotGranted(): void
+    {
+        $subscription = $this->createSubscription($this->member);
+
+        $this->assertFalse($subscription->hasPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testHasPremiumAccessReturnsFalseWhenInactive(): void
+    {
+        $subscription = $this->createSubscription($this->member);
+
+        SubscriptionPremiumAccess::create([
+            'subscription_id' => $subscription->id,
+            'premium_type' => 'newsletter',
+            'premium_identifier' => 'insider',
+            'is_active' => false
+        ]);
+
+        $this->assertFalse($subscription->hasPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testHasPremiumAccessReturnsFalseWhenExpired(): void
+    {
+        $subscription = $this->createSubscription($this->member);
+
+        SubscriptionPremiumAccess::create([
+            'subscription_id' => $subscription->id,
+            'premium_type' => 'newsletter',
+            'premium_identifier' => 'insider',
+            'is_active' => true,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+        ]);
+
+        $this->assertFalse($subscription->hasPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testGrantPremiumAccessCreatesNewAccess(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => now_datetime()->format('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $access = $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $this->assertNotNull($access);
+        $this->assertEquals('newsletter', $access->premium_type);
+        $this->assertEquals('insider', $access->premium_identifier);
+        $this->assertTrue($access->is_active);
+    }
+
+    public function testGrantPremiumAccessUpdatesExisting(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        // Create inactive access
+        SubscriptionPremiumAccess::create([
+            'subscription_id' => $subscription->id,
+            'premium_type' => 'newsletter',
+            'premium_identifier' => 'insider',
+            'is_active' => false
+        ]);
+
+        // Re-grant should reactivate
+        $access = $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $this->assertTrue($access->is_active);
+
+        // Should only have one record
+        $count = SubscriptionPremiumAccess::where('subscription_id', $subscription->id)
+            ->where('premium_type', 'newsletter')
+            ->where('premium_identifier', 'insider')
+            ->count();
+
+        $this->assertEquals(1, $count);
+    }
+
+    public function testRevokePremiumAccessDeactivatesAccess(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+        ]);
+
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $result = $subscription->revokePremiumAccess('newsletter', 'insider');
+
+        $this->assertTrue($result);
+        $this->assertFalse($subscription->hasPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testGetPremiumNewslettersReturnsIdentifiers(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+        $subscription->grantPremiumAccess('newsletter', 'tech-weekly');
+        $subscription->grantPremiumAccess('archive', 'full'); // Different type
+
+        $newsletters = $subscription->getPremiumNewsletters();
+
+        $this->assertCount(2, $newsletters);
+        $this->assertContains('insider', $newsletters);
+        $this->assertContains('tech-weekly', $newsletters);
+        $this->assertNotContains('full', $newsletters);
+    }
+
+    public function testHasAnyPremiumNewsletterReturnsTrueWhenHasAny(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $this->assertTrue($subscription->hasAnyPremiumNewsletter());
+    }
+
+    public function testHasAnyPremiumNewsletterReturnsFalseWhenNone(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->hasAnyPremiumNewsletter());
+    }
+
+    public function testHasInsiderAccessBackwardCompatibility(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'delivery_type' => 'print'
+        ]);
+
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $this->assertTrue($subscription->hasInsiderAccess());
+    }
+
+    public function testHasInsiderAccessViaLegacyField(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+            'includes_digital_access' => true
+        ]);
+
+        $this->assertTrue($subscription->hasInsiderAccess());
+    }
+
+    public function testCanUpgradeToPremiumReturnsTrueWhenEligible(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Basic',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 19.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertTrue($subscription->canUpgradeToPremium('newsletter', 'insider'));
+    }
+
+    public function testCanUpgradeToPremiumReturnsFalseWhenAlreadyHas(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $this->assertFalse($subscription->canUpgradeToPremium('newsletter', 'insider'));
+    }
+
+    public function testCanUpgradeToPremiumReturnsFalseWhenInactive(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Basic',
+            'status' => 'expired',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 year')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'price' => 19.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->canUpgradeToPremium('newsletter', 'insider'));
+    }
+
+    public function testCanUpgradeToPremiumReturnsFalseWhenCancelled(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Basic',
+            'status' => 'cancelled',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 19.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->canUpgradeToPremium('newsletter', 'insider'));
+    }
+
+    public function testGetAvailableUpgradesReturnsUpgradePlans(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'name' => 'Basic',
+            'price' => 19.99
+        ]);
+
+        $upgradePlan = $this->createSubscriptionPlan([
+            'name' => 'Premium',
+            'price' => 39.99,
+            'is_upgrade_option' => true,
+            'upgrade_from_plan_id' => $currentPlan->id,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+                ['type' => 'archive', 'identifier' => 'full']
+            ]
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $currentPlan->id,
+            'plan_name' => 'Basic',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 19.99,
+            'currency' => 'USD'
+        ]);
+
+        $upgrades = $subscription->getAvailableUpgrades();
+
+        $this->assertCount(1, $upgrades);
+        $this->assertEquals($upgradePlan->id, $upgrades[0]['plan']->id);
+        $this->assertCount(2, $upgrades[0]['new_access']);
+    }
+
+    public function testGetAvailableUpgradesFiltersAlreadyOwnedAccess(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'name' => 'Basic',
+            'price' => 19.99
+        ]);
+
+        $upgradePlan = $this->createSubscriptionPlan([
+            'name' => 'Premium',
+            'price' => 39.99,
+            'is_upgrade_option' => true,
+            'upgrade_from_plan_id' => $currentPlan->id,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+                ['type' => 'newsletter', 'identifier' => 'tech-weekly']
+            ]
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $currentPlan->id,
+            'plan_name' => 'Basic',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 19.99,
+            'currency' => 'USD'
+        ]);
+
+        // Already has insider
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+
+        $upgrades = $subscription->getAvailableUpgrades();
+
+        $this->assertCount(1, $upgrades);
+        // Should only show tech-weekly as new access
+        $this->assertCount(1, $upgrades[0]['new_access']);
+
+        $this->assertEquals('tech-weekly', $upgrades[0]['new_access'][1]['identifier']);
+    }
+
+    public function testPremiumAccessRelationship(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $subscription->grantPremiumAccess('newsletter', 'insider');
+        $subscription->grantPremiumAccess('newsletter', 'tech-weekly');
+
+        $premiumAccess = $subscription->premiumAccess;
+
+        $this->assertCount(2, $premiumAccess);
+    }
+
+    private function createSubscription(Member $member, array $attributes = []): Model
+    {
+        return Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
     }
 }

@@ -400,4 +400,183 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
             $this->assertEquals('recurring', $plan->plan_type);
         }
     }
+
+    public function testGetPremiumAccessGrantsReturnsArray(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'price' => 39.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+                ['type' => 'archive', 'identifier' => 'full']
+            ]
+        ]);
+
+        $grants = $plan->getPremiumAccessGrants();
+
+        $this->assertCount(2, $grants);
+        $this->assertEquals('newsletter', $grants[0]['type']);
+        $this->assertEquals('insider', $grants[0]['identifier']);
+    }
+
+//    public function testGetPremiumAccessGrantsBackwardCompatibility(): void
+//    {
+//        $plan = SubscriptionPlan::create([
+//            'site_id' => $this->siteId,
+//            'name' => 'Insider Plan',
+//            'slug' => 'insider',
+//            'price' => 29.99,
+//            'currency' => 'USD',
+//            'billing_period' => 'monthly',
+//            'is_active' => true,
+//            'includes_insider' => true
+//        ]);
+//
+//        $grants = $plan->getPremiumAccessGrants();
+//
+//        $this->assertCount(1, $grants);
+//        $this->assertEquals('newsletter', $grants[0]['type']);
+//        $this->assertEquals('insider', $grants[0]['identifier']);
+//    }
+
+    public function testGrantsPremiumAccessReturnsTrueWhenGranted(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'price' => 39.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+                ['type' => 'newsletter', 'identifier' => 'tech-weekly']
+            ]
+        ]);
+
+        $this->assertTrue($plan->grantsPremiumAccess('newsletter', 'insider'));
+        $this->assertTrue($plan->grantsPremiumAccess('newsletter', 'tech-weekly'));
+    }
+
+    public function testGrantsPremiumAccessReturnsFalseWhenNotGranted(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Basic Plan',
+            'slug' => 'basic',
+            'price' => 19.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true
+        ]);
+
+        $this->assertFalse($plan->grantsPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testAddPremiumAccessAddsNewGrant(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'price' => 39.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => []
+        ]);
+
+        $plan->addPremiumAccess('newsletter', 'insider');
+
+        $plan = $plan->fresh();
+        $this->assertTrue($plan->grantsPremiumAccess('newsletter', 'insider'));
+    }
+
+    public function testAddPremiumAccessDoesNotDuplicate(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'price' => 39.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider']
+            ]
+        ]);
+
+        $plan->addPremiumAccess('newsletter', 'insider');
+
+        $plan = $plan->fresh();
+        $grants = $plan->getPremiumAccessGrants();
+
+        $this->assertCount(1, $grants);
+    }
+
+    public function testRemovePremiumAccessRemovesGrant(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'price' => 39.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+                ['type' => 'newsletter', 'identifier' => 'tech-weekly']
+            ]
+        ]);
+
+        $plan->removePremiumAccess('newsletter', 'insider');
+
+        $plan = $plan->fresh();
+        $this->assertFalse($plan->grantsPremiumAccess('newsletter', 'insider'));
+        $this->assertTrue($plan->grantsPremiumAccess('newsletter', 'tech-weekly'));
+    }
+
+    public function testIncludesInsiderAttributeBackwardCompatibility(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Insider Plan',
+            'slug' => 'insider',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider']
+            ]
+        ]);
+
+        $this->assertTrue($plan->includes_insider);
+    }
+
+    public function testPremiumAccessCastsToArray(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium',
+            'price' => 39.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider']
+            ]
+        ]);
+
+        $this->assertIsArray($plan->premium_access);
+    }
 }

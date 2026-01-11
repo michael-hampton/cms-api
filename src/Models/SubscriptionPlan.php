@@ -29,6 +29,7 @@ class SubscriptionPlan extends Model
         'includes_insider',
         'is_upgrade_option',
         'upgrade_from_plan_id',
+        'premium_access'
     ];
 
     protected $casts = [
@@ -41,6 +42,7 @@ class SubscriptionPlan extends Model
         'print_shipping_required' => 'boolean',
         'includes_insider' => 'boolean',
         'is_upgrade_option' => 'boolean',
+        'premium_access' => 'array',
     ];
 
     public function site($relation = false)
@@ -182,4 +184,80 @@ class SubscriptionPlan extends Model
 
         return $this->belongsTo(SubscriptionPlan::class, 'upgrade_from_plan_id', 'id');
     }
+
+    /**
+     * Get premium access grants this plan provides
+     */
+    public function getPremiumAccessGrants(): array
+    {
+        if (!$this->premium_access) {
+            // Backward compatibility
+//            if ($this->includes_insider) {
+//                return [
+//                    ['type' => 'newsletter', 'identifier' => 'insider']
+//                ];
+//            }
+            return [];
+        }
+
+        return $this->premium_access;
+    }
+
+    /**
+     * Check if plan grants specific premium access
+     */
+    public function grantsPremiumAccess(string $type, string $identifier): bool
+    {
+        $grants = $this->getPremiumAccessGrants();
+
+        foreach ($grants as $grant) {
+            if ($grant['type'] === $type && $grant['identifier'] === $identifier) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Backward compatibility
+     */
+    public function getIncludesInsiderAttribute(): bool
+    {
+        return $this->grantsPremiumAccess('newsletter', 'insider');
+    }
+
+    /**
+     * Add premium access to plan
+     */
+    public function addPremiumAccess(string $type, string $identifier): void
+    {
+        $grants = $this->premium_access ?? [];
+
+        // Check if already exists
+        foreach ($grants as $grant) {
+            if ($grant['type'] === $type && $grant['identifier'] === $identifier) {
+                return;
+            }
+        }
+
+        $grants[] = ['type' => $type, 'identifier' => $identifier];
+        $this->premium_access = $grants;
+        $this->save();
+    }
+
+    /**
+     * Remove premium access from plan
+     */
+    public function removePremiumAccess(string $type, string $identifier): void
+    {
+        $grants = $this->premium_access ?? [];
+
+        $this->premium_access = array_values(array_filter($grants, function ($grant) use ($type, $identifier) {
+            return !($grant['type'] === $type && $grant['identifier'] === $identifier);
+        }));
+
+        $this->save();
+    }
+
 }

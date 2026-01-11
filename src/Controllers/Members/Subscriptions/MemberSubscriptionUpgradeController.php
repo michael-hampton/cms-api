@@ -23,28 +23,30 @@ class MemberSubscriptionUpgradeController extends Controller
      */
     public function index(int $subscriptionId)
     {
-
-
         if (!MemberAuth::check()) {
             return $this->redirect('/member/login');
         }
 
         $member = MemberAuth::getMember();
 
-        try {
-            $upgradeInfo = $this->upgradeService->getUpgradeOptions($subscriptionId);
+        // Optional: filter by specific premium type from query params
+        $premiumType = $_GET['premium_type'] ?? null;
+        $premiumIdentifier = $_GET['premium_identifier'] ?? null;
 
-            // Verify subscription belongs to member
-            if (isset($upgradeInfo['current_subscription']) &&
-                $upgradeInfo['current_subscription']['id'] !== $subscriptionId) {
-                return $this->notFound();
-            }
+        try {
+            $upgradeInfo = $this->upgradeService->getUpgradeOptions(
+                $subscriptionId,
+                $premiumType,
+                $premiumIdentifier
+            );
 
             return $this->view('member/subscriptions/upgrade', [
                 'member' => $member,
                 'site' => SiteContext::get(),
                 'upgradeInfo' => $upgradeInfo,
-                'subscriptionId' => $subscriptionId
+                'subscriptionId' => $subscriptionId,
+                'premiumType' => $premiumType,
+                'premiumIdentifier' => $premiumIdentifier,
             ]);
 
         } catch (\Exception $e) {

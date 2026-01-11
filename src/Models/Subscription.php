@@ -60,6 +60,7 @@ class Subscription extends Model
         'upgraded_from_plan_id',
         'upgraded_at',
         'upgrade_price_difference',
+        'premium_access'
     ];
 
     protected $casts = [
@@ -79,6 +80,7 @@ class Subscription extends Model
         'includes_digital_access' => 'boolean',
         'upgraded_at' => 'datetime',
         'upgrade_price_difference' => 'float',
+        'premium_access' => 'array',
     ];
 
     public function member($relation = false)
@@ -400,7 +402,32 @@ class Subscription extends Model
      */
     public function hasInsiderAccess(): bool
     {
-        return $this->includes_digital_access || $this->isDigital();
+        return $this->hasPremiumAccess('newsletter', 'insider') ||
+            $this->includes_digital_access ||
+            $this->isDigital();
+    }
+
+    /**
+     * Check if subscription is eligible for upgrade to any premium content
+     */
+    public function canUpgradeToPremium(string $type, string $identifier): bool
+    {
+        // Already has this premium access
+        if ($this->hasPremiumAccess($type, $identifier)) {
+            return false;
+        }
+
+        // Must be active
+        if (!$this->isActive()) {
+            return false;
+        }
+
+        // Not cancelled
+        if ($this->isCancelled()) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -424,13 +451,134 @@ class Subscription extends Model
     }
 
     /**
-     * Check if subscription is eligible for upgrade to Insider
+     * Backward compatibility wrapper
      */
     public function canUpgradeToInsider(): bool
     {
-        return $this->isPrint()
-            && !$this->includes_digital_access
-            && $this->isActive()
-            && !$this->isCancelled();
+        return $this->canUpgradeToPremium('newsletter', 'insider') && $this->isPrint();
+    }
+
+    /**
+     * Get available upgrade paths for this subscription
+     */
+    public function getAvailableUpgrades(): array
+    {
+        if (!$this->plan) {
+            return [];
+        }
+
+        $currentAccess = $this->premiumAccess(true)
+            ->get()
+            ->map(fn($access) => $access->premium_type . ':' . $access->premium_identifier)
+            ->toArray();
+
+        // Get plans that offer premium access this subscription doesn't have
+        $upgradePlans = SubscriptionPlan::where('site_id', $this->site_id)
+            ->where('is_active', true)
+            ->where('is_upgrade_option', true)
+            ->where(function ($q) {
+                $q->where('upgrade_from_plan_id', $this->plan_id)
+                    ->orWhereNull('upgrade_from_plan_id'); // Universal upgrades
+            })
+            ->get();
+
+        $available = [];
+        foreach ($upgradePlans as $plan) {
+            $planAccess = $plan->getPremiumAccessGrants();
+
+            // Find what new access this plan would grant
+            $newAccess = array_filter($planAccess, function ($access) use ($currentAccess) {
+                $key = $access['type'] . ':' . $access['identifier'];
+                return !in_array($key, $currentAccess);
+            });
+
+            if (!empty($newAccess)) {
+                $available[] = [
+                    'plan' => $plan,
+                    'new_access' => $newAccess
+                ];
+            }
+        }
+
+        return $available;
+    }
+
+    /**
+     * Get all premium access grants for this subscription
+     */
+    public function premiumAccess($relation = false)
+    {
+        return $this->hasMany(SubscriptionPremiumAccess::class, 'subscription_id', 'id', $relation)
+            ->where('is_active', true);
+    }
+
+    /**
+     * Check if subscription has specific premium access
+     */
+    public function hasPremiumAccess(string $type, string $identifier): bool
+    {
+        return SubscriptionPremiumAccess::where('subscription_id', $this->id)
+            ->where('premium_type', $type)
+            ->where('premium_identifier', $identifier)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+    }
+
+    /**
+     * Grant premium access
+     */
+    public function grantPremiumAccess(string $type, string $identifier, ?\DateTime $expiresAt = null): SubscriptionPremiumAccess
+    {
+        return SubscriptionPremiumAccess::updateOrCreate(
+            [
+                'subscription_id' => $this->id,
+                'premium_type' => $type,
+                'premium_identifier' => $identifier
+            ],
+            [
+                'granted_at' => now_datetime()->format('Y-m-d H:i:s'),
+                'expires_at' => $expiresAt?->format('Y-m-d H:i:s'),
+                'is_active' => true
+            ]
+        );
+    }
+
+    /**
+     * Revoke premium access
+     */
+    public function revokePremiumAccess(string $type, string $identifier): bool
+    {
+        return SubscriptionPremiumAccess::where('subscription_id', $this->id)
+            ->where('premium_type', $type)
+            ->where('premium_identifier', $identifier)
+            ->update(['is_active' => 0]);
+    }
+
+    /**
+     * Get all active premium newsletters
+     */
+    public function getPremiumNewsletters(): array
+    {
+        return SubscriptionPremiumAccess::active()
+            ->where('subscription_id', $this->id)
+            ->where('premium_type', 'newsletter')
+            ->get()
+            ->pluck('premium_identifier')
+            ->toArray();
+    }
+
+    /**
+     * Check if has any premium newsletter access
+     */
+    public function hasAnyPremiumNewsletter(): bool
+    {
+        return SubscriptionPremiumAccess::active()
+            ->where('subscription_id', $this->id)
+            ->where('premium_type', 'newsletter')
+            ->exists();
     }
 }

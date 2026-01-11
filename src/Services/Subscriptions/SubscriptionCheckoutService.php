@@ -3,6 +3,7 @@
 namespace App\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -133,7 +134,7 @@ class SubscriptionCheckoutService
         $startDate = new \DateTime();
         $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
 
-        return $this->subscriptionRepository->create([
+        $subscription = $this->subscriptionRepository->create([
             'member_id' => $memberId,
             'site_id' => $siteId,
             'plan_id' => $plan->id,
@@ -148,6 +149,38 @@ class SubscriptionCheckoutService
             'currency' => $plan->currency,
             'auto_renew' => $plan->billing_period !== 'lifetime'
         ]);
+
+        // **GRANT PREMIUM ACCESS FROM PLAN**
+        $this->grantPlanPremiumAccess($subscription, $plan);
+
+        return $subscription;
+    }
+
+    /**
+     * Grant all premium access defined in the plan
+     */
+    private function grantPlanPremiumAccess(Subscription $subscription, SubscriptionPlan $plan): void
+    {
+        $premiumGrants = $plan->getPremiumAccessGrants();
+
+        foreach ($premiumGrants as $grant) {
+            $subscription->grantPremiumAccess(
+                $grant['type'],
+                $grant['identifier'],
+                $grant['expires_at'] ?? null
+            );
+
+            Logger::info('Premium access granted on subscription creation', [
+                'subscription_id' => $subscription->id,
+                'premium_type' => $grant['type'],
+                'premium_identifier' => $grant['identifier']
+            ]);
+        }
+
+        // Backward compatibility - set includes_digital_access if insider granted
+        if ($plan->grantsPremiumAccess('newsletter', 'insider')) {
+            $subscription->update(['includes_digital_access' => true]);
+        }
     }
 
     private function calculateEndDate(\DateTime $startDate, string $billingPeriod): ?\DateTime

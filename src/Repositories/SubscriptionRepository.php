@@ -94,7 +94,7 @@ class SubscriptionRepository extends Repository
             };
         }
 
-        return Subscription::create(array_merge([
+        $subscription = Subscription::create(array_merge([
             'member_id' => $memberId,
             'site_id' => $siteId,
             'plan_id' => $planId,
@@ -107,6 +107,38 @@ class SubscriptionRepository extends Repository
             'currency' => $plan->currency,
             'auto_renew' => $plan->billing_period !== 'lifetime'
         ], $additionalData));
+
+        // **GRANT PREMIUM ACCESS FROM PLAN**
+        $this->grantPlanPremiumAccess($subscription, $plan);
+
+        return $subscription;
+    }
+
+    /**
+     * Grant all premium access defined in the plan
+     */
+    private function grantPlanPremiumAccess(Subscription $subscription, SubscriptionPlan $plan): void
+    {
+        $premiumGrants = $plan->getPremiumAccessGrants();
+
+        foreach ($premiumGrants as $grant) {
+            $subscription->grantPremiumAccess(
+                $grant['type'],
+                $grant['identifier'],
+                $grant['expires_at'] ?? null
+            );
+
+            \App\Framework\Support\Logger::info('Premium access granted on subscription creation', [
+                'subscription_id' => $subscription->id,
+                'premium_type' => $grant['type'],
+                'premium_identifier' => $grant['identifier']
+            ]);
+        }
+
+        // Backward compatibility - set includes_digital_access if insider granted
+        if ($plan->grantsPremiumAccess('newsletter', 'insider')) {
+            $subscription->update(['includes_digital_access' => true]);
+        }
     }
 
     public function hasActiveSubscriptionToPlan(int $memberId, int $planId, ?int $siteId = null, bool $allowCancelled = true): bool
@@ -215,5 +247,36 @@ class SubscriptionRepository extends Repository
             ->where('status', 'cancelled')
             ->orderBy('updated_at', 'DESC')
             ->first();
+    }
+
+    /**
+     * Revoke all premium access for a subscription
+     */
+    public function revokeAllPremiumAccess(int $subscriptionId): void
+    {
+        $subscription = $this->find($subscriptionId);
+
+        if (!$subscription) {
+            return;
+        }
+
+        // Get premium access - handle both Collection and Relation
+        $relation = $subscription->premiumAccess();
+        $premiumAccess = $relation instanceof Collection ? $relation : $relation->get();
+
+        foreach ($premiumAccess as $access) {
+            $subscription->revokePremiumAccess(
+                $access->premium_type,
+                $access->premium_identifier
+            );
+
+            \App\Framework\Support\Logger::info('Premium access revoked on cancellation', [
+                'subscription_id' => $subscription->id,
+                'premium_type' => $access->premium_type,
+                'premium_identifier' => $access->premium_identifier
+            ]);
+        }
+
+        $subscription->update(['includes_digital_access' => false]);
     }
 }

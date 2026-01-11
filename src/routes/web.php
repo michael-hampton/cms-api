@@ -1,6 +1,5 @@
 <?php
 
-use App\Controllers\Admin\AdminSubscriptionPlansController;
 use App\Controllers\AuthorViewController;
 use App\Controllers\BlockController;
 use App\Controllers\BrandPageController;
@@ -28,6 +27,7 @@ use App\Controllers\Members\MemberReadingHistoryController;
 use App\Controllers\Members\MemberSupportController;
 use App\Controllers\Members\MemberWishlistController;
 use App\Controllers\Members\Newsletters\MemberNewslettersController;
+use App\Controllers\Members\Subscriptions\AdminSubscriptionPlansController;
 use App\Controllers\Members\Subscriptions\MemberIssueDeliveriesController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionPaymentsController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionPlansController;
