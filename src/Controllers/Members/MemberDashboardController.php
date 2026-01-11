@@ -92,6 +92,8 @@ class MemberDashboardController extends Controller
             'likes' => $this->pageLikeRepository->getMemberLikeCount($member->id, $siteId),
         ];
 
+        $this->rewardService->checkAndAwardRewards($member, $siteId);
+
         $unclaimedRewards = $this->rewardService->getUnclaimedRewards($member, $siteId);
 
         return $this->view('member/dashboard', [

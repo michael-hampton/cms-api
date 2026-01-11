@@ -29,7 +29,8 @@ class RewardDefinition extends Model
 
     public function checkCriteria(Member $member): bool
     {
-        if (!$this->criteria || empty($this->criteria)) {
+
+        if (!$this->criteria || !is_array($this->criteria)) {
             return false;
         }
 

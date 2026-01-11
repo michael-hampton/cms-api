@@ -48,7 +48,7 @@ class RewardsRepository extends Repository
 
     public function createMemberReward(array $data): MemberReward
     {
-        $data['earned_at'] = $data['earned_at'] ?? now_datetime();
+        $data['earned_at'] = $data['earned_at'] ?? now_datetime()->format('Y-m-d H:i:s');
         $data['status'] = $data['status'] ?? 'pending';
 
         return MemberReward::create($data);
@@ -118,7 +118,7 @@ class RewardsRepository extends Repository
         $rewards = $query->orderBy('earned_at', 'desc')
             ->skip(($page - 1) * $perPage)
             ->take($perPage)
-            ->toSql();
+            ->get();
 
         return [
             'data' => $rewards,

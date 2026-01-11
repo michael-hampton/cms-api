@@ -109,7 +109,7 @@ class RewardsService
             'reward_definition_id' => $definition->id,
             'site_id' => $siteId,
             'reward_data' => $rewardData,
-            'expires_at' => $expiresAt
+            'expires_at' => $expiresAt?->toDateTimeString() ?? null
         ]);
 
         // Assign voucher if applicable

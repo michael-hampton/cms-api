@@ -1,6 +1,7 @@
 <?php
 // API routes (return arrays -> converted to JSON)
 use App\Controllers\AddressController;
+use App\Controllers\Admin\RewardDefinitionsAdminController;
 use App\Controllers\Admin\RewardsAdminController;
 use App\Controllers\AuthController;
 use App\Controllers\AuthorController;
@@ -74,6 +75,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/rewards/{rewardId}', [RewardsAdminController::class, 'show']);
         $router->put('/rewards/{rewardId}', [RewardsAdminController::class, 'update']);
         $router->post('/rewards/{rewardId}/decline', [RewardsAdminController::class, 'decline']);
+
+        $router->get('/reward-definitions', [RewardDefinitionsAdminController::class, 'index']);
+        $router->get('/reward-definitions/search', [RewardDefinitionsAdminController::class, 'search']);
+        $router->get('/reward-definitions/{definitionId}', [RewardDefinitionsAdminController::class, 'show']);
+        $router->put('/reward-definitions/{definitionId}', [RewardDefinitionsAdminController::class, 'update']);
+        $router->post('/reward-definitions', [RewardDefinitionsAdminController::class, 'create']);
+        $router->delete('/reward-definitions/{definitionId}', [RewardDefinitionsAdminController::class, 'delete']);
 
         // Pipeline routes
         $router->get('/pipeline', [PipelineController::class, 'index']);

@@ -818,12 +818,9 @@ class QueryBuilder
         }
 
         // Handle table.column format
-        if (strpos($column, '.') !== false) {
-            $parts = explode('.', $column);
-            $table = $parts[0];
-            $col = $parts[1];
+        if (is_string($column) && strpos($column, '.') !== false) {
+            [$table, $col] = explode('.', $column, 2);
 
-            // Quote column part if it's a reserved word
             if (in_array(strtolower($col), $this->reservedWords)) {
                 return "`{$table}`.`{$col}`";
             }
@@ -1607,6 +1604,12 @@ class QueryBuilder
             'value' => $jsonValue,
         ];
 
+        return $this;
+    }
+
+    public function selectRaw(string $expression): self
+    {
+        $this->selects[] = new RawExpression($expression);
         return $this;
     }
 
