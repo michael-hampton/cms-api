@@ -9,7 +9,7 @@ use App\Models\Page;
 use App\Models\PageMetadata;
 use App\Models\Subscription;
 use App\Models\SubscriptionWindow;
-use App\Services\ArticleAccessService;
+use App\Services\Cms\ArticleAccessService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

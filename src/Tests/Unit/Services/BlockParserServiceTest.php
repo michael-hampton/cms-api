@@ -10,9 +10,9 @@ use App\Framework\Validation\Validator;
 use App\Models\Block;
 use App\Parsers\BlockRegistry;
 use App\Parsers\TextBlockParser;
-use App\Repositories\BlockRepository;
-use App\Repositories\PageRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\BlockParserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

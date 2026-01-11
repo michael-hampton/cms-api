@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Services\OrderCalculationService;
+use App\Services\Members\OrderCalculationService;
 use PHPUnit\Framework\TestCase;
 
 class OrderCalculationServiceTest extends TestCase

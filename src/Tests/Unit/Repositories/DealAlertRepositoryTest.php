@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\DealAlert;
-use App\Repositories\DealAlertRepository;
+use App\Repositories\Product\DealAlertRepository;
 
 class DealAlertRepositoryTest extends RepositoryTestCase
 {

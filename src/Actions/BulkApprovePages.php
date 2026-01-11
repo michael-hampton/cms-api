@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Services\PageService;
+use App\Services\Cms\PageService;
 
 class BulkApprovePages
 {

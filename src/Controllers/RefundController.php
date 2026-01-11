@@ -6,7 +6,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Requests\CreateRefundRequest;
-use App\Services\RefundService;
+use App\Services\Members\RefundService;
 use Exception;
 
 class RefundController extends Controller

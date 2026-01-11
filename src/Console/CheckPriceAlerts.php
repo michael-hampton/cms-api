@@ -2,7 +2,7 @@
 
 namespace App\Console;
 
-use App\Services\PriceAlertService;
+use App\Services\Product\PriceAlertService;
 
 class CheckPriceAlerts
 {

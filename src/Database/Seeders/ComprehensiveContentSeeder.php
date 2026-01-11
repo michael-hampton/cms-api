@@ -11,10 +11,10 @@ use App\Models\Page;
 use App\Models\PageCustomField;
 use App\Models\Product;
 use App\Models\Site;
-use App\Repositories\BlockRepository;
-use App\Repositories\CategoryRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\TagRepository;
 
 class ComprehensiveContentSeeder extends Seeder
 {
@@ -37,7 +37,7 @@ class ComprehensiveContentSeeder extends Seeder
         $this->blockRepository = new BlockRepository();
         $this->tagRepository = new TagRepository();
         $this->categoryRepository = new CategoryRepository();
-        $this->blockParserService = (new Container())->resolve(\App\Services\BlockParserService::class);
+        $this->blockParserService = (new Container())->resolve(\App\Services\Cms\BlockParserService::class);
 
         parent::__construct();
     }

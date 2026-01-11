@@ -5,9 +5,9 @@ namespace App\Tests\Unit\Services;
 
 use App\Framework\Database\Database;
 use App\Models\EmailTheme;
-use App\Repositories\EmailThemeRepository;
-use App\Services\EmailThemeService;
-use App\Services\ImageUploadService;
+use App\Repositories\Cms\EmailThemeRepository;
+use App\Services\Cms\EmailThemeService;
+use App\Services\Cms\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

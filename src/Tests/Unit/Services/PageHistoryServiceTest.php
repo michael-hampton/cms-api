@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Services;
 
 use App\Models\Page;
 use App\Models\PageHistory;
-use App\Repositories\PageHistoryRepository;
-use App\Repositories\PageRepository;
-use App\Services\PageHistoryService;
+use App\Repositories\Cms\PageHistoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\PageHistoryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

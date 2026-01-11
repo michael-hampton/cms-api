@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Framework\Authorization\MemberAuthWrapper;
+use App\Services\Cms\VoucherService;
+use App\Services\Members\OrderCalculationService;
+use App\Services\Members\OrderService;
 use App\Services\Payment\StripePaymentProcessor;
 use Exception;
 

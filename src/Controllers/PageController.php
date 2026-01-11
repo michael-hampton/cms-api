@@ -24,13 +24,13 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Parsers\BlockRegistry;
-use App\Repositories\AuthorRepository;
-use App\Repositories\CategoryRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\AuthorRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\TagRepository;
 use App\Resources\PageResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\PageService;
+use App\Services\Cms\PageService;
 use Exception;
 
 class PageController extends Controller
@@ -235,7 +235,7 @@ class PageController extends Controller
             $result = $this->pageRepository->search($criteria);
 
             // Get current member for access control
-            $accessService = Container::getInstance()->make(\App\Services\ArticleAccessService::class);
+            $accessService = Container::getInstance()->make(\App\Services\Cms\ArticleAccessService::class);
 
             // Enrich pages with access information
             $enrichedPages = $accessService->enrichPagesWithAccessInfo(

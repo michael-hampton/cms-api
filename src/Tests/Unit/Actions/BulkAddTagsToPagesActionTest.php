@@ -5,9 +5,9 @@ namespace App\Tests\Unit\Actions;
 use App\Actions\BulkAddTagsToPages;
 use App\Models\Page;
 use App\Models\Tag;
-use App\Repositories\PageRepository;
-use App\Repositories\PageTagRepository;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\PageTagRepository;
+use App\Repositories\Cms\TagRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

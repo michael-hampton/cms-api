@@ -3,7 +3,7 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\TagRepository;
 
 class BulkDeleteTag
 {

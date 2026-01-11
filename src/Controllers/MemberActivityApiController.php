@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Framework\Authorization\MemberAuth;
-use App\Repositories\MemberActivityRepository;
+use App\Repositories\Members\MemberActivityRepository;
 use App\Services\BadgeService;
 
 class MemberActivityApiController extends Controller

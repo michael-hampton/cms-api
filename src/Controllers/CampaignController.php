@@ -7,10 +7,10 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
-use App\Repositories\CampaignRepository;
+use App\Repositories\Cms\CampaignRepository;
 use App\Requests\CreateCampaignRequest;
 use App\Requests\UpdateBrandRequest;
-use App\Services\CampaignService;
+use App\Services\Cms\CampaignService;
 
 class CampaignController extends Controller
 {

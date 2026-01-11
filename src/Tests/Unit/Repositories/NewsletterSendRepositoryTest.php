@@ -4,7 +4,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\NewsletterSend;
-use App\Repositories\NewsletterSendRepository;
+use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class NewsletterSendRepositoryTest extends RepositoryTestCase

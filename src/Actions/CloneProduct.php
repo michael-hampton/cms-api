@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Framework\Support\Str;
-use App\Repositories\ProductRepository;
-use App\Services\ImageUploadService;
+use App\Repositories\Product\ProductRepository;
+use App\Services\Cms\ImageUploadService;
 
 class CloneProduct
 {

@@ -6,7 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
-use App\Repositories\SiteRepository;
+use App\Repositories\Cms\SiteRepository;
 
 class UpdateSiteRequest extends FormRequest
 {

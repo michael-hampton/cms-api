@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\Payment;
 use App\Models\Subscription;
-use App\Repositories\PaymentRepository;
+use App\Repositories\Members\PaymentRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PaymentRepositoryTest extends RepositoryTestCase

@@ -6,7 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Badge;
-use App\Repositories\BadgeRepository;
+use App\Repositories\Members\BadgeRepository;
 
 class BadgeController extends Controller
 {

@@ -5,7 +5,7 @@ namespace App\Requests;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
-use App\Repositories\CategoryRepository;
+use App\Repositories\Cms\CategoryRepository;
 
 class CreateCategoryRequest extends FormRequest
 {

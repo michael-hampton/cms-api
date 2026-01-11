@@ -7,8 +7,8 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
-use App\Repositories\CategoryRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Services\Subscriptions\SubscriptionBillingService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
@@ -138,7 +138,7 @@ class MemberSubscriptionsController extends Controller
         //$preference = $this->subscriptionService->getPreferencesForMember(0, 0);
 
         // Find by token instead
-        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $repo = new \App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository();
         $preference = $repo->findByToken($token);
 
         if (!$preference) {
@@ -156,7 +156,7 @@ class MemberSubscriptionsController extends Controller
 
     public function unsubscribe(Request $request, string $token)
     {
-        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $repo = new \App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository();
         $preference = $repo->findByToken($token);
 
         if (!$preference) {
@@ -218,7 +218,7 @@ class MemberSubscriptionsController extends Controller
 
     public function resubscribe(Request $request, string $token)
     {
-        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $repo = new \App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository();
         $preference = $repo->findByToken($token);
 
         if (!$preference) {
@@ -391,7 +391,7 @@ class MemberSubscriptionsController extends Controller
 
     public function manageByToken(string $token)
     {
-        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $repo = new \App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository();
         $preference = $repo->findByToken($token);
 
         if (!$preference) {
@@ -423,7 +423,7 @@ class MemberSubscriptionsController extends Controller
 
     public function updateByToken(Request $request, string $token)
     {
-        $repo = new \App\Repositories\MemberSubscriptionPreferenceRepository();
+        $repo = new \App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository();
         $preference = $repo->findByToken($token);
 
         if (!$preference) {

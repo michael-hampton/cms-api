@@ -2,13 +2,11 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
-use App\Models\Brand;
-use App\Models\Category;
-use App\Repositories\BrandRepository;
-use App\Repositories\CategoryRepository;
-use App\Services\DealAlertService;
-use App\Services\DealsService;
-use App\Services\PriceAlertService;
+use App\Repositories\Cms\BrandRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Services\Product\DealAlertService;
+use App\Services\Product\DealsService;
+use App\Services\Product\PriceAlertService;
 
 class DealsController extends Controller
 {

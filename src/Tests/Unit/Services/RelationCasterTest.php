@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Services\RelationCaster;
+use App\Services\Cms\RelationCaster;
 use DateTime;
 use PHPUnit\Framework\TestCase;
 

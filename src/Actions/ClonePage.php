@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\PageRepository;
-use App\Services\PageHistoryService;
+use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\PageHistoryService;
 
 class ClonePage
 {

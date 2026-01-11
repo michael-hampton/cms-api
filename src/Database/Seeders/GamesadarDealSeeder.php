@@ -10,11 +10,11 @@ use App\Models\PageCategory;
 use App\Models\PageTag;
 use App\Models\Site;
 use App\Models\Tag;
-use App\Repositories\BlockRepository;
-use App\Repositories\CategoryRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\TagRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\TagRepository;
+use App\Services\Cms\BlockParserService;
 
 class GamesadarDealSeeder extends Seeder
 {

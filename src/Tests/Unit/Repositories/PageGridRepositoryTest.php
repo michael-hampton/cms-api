@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageGrid;
-use App\Repositories\PageGridRepository;
+use App\Repositories\Cms\PageGridRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

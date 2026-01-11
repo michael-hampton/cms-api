@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Support\Collection;
 use App\Models\Member;
-use App\Repositories\SubscriptionPlanRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionModalService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;

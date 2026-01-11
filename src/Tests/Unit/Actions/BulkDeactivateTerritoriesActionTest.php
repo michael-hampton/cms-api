@@ -2,12 +2,10 @@
 
 namespace App\Tests\Unit\Actions;
 
-use App\Actions\BulkActivateTerritories;
 use App\Actions\BulkDeactivateTerritories;
 use App\Framework\Database\Database;
 use App\Models\Territory;
-use App\Repositories\TerritoryRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Repositories\Cms\TerritoryRepository;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

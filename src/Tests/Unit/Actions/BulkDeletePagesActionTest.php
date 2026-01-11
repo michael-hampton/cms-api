@@ -3,8 +3,7 @@
 namespace App\Tests\Unit\Actions;
 
 use App\Actions\BulkDeletePages;
-use App\Models\Page;
-use App\Services\PageService;
+use App\Services\Cms\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;

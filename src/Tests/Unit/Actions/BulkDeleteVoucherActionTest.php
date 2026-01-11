@@ -3,10 +3,9 @@
 namespace App\Tests\Unit\Actions;
 
 use App\Actions\BulkDeleteVoucher;
-use App\Actions\CloneVoucher;
 use App\Framework\Database\Database;
 use App\Models\Voucher;
-use App\Repositories\VoucherRepository;
+use App\Repositories\Cms\VoucherRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;

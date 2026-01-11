@@ -4,8 +4,8 @@ namespace App\Controllers;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
-use App\Repositories\BlockRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Services\Cms\BlockParserService;
 use Exception;
 
 class BlockController extends Controller

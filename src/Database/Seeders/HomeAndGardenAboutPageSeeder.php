@@ -5,11 +5,11 @@ namespace App\Database\Seeders;
 use App\Framework\Container;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\Page;
-use App\Repositories\BlockRepository;
-use App\Repositories\CategoryRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\TagRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\TagRepository;
+use App\Services\Cms\BlockParserService;
 
 class HomeAndGardenAboutPageSeeder extends Seeder
 {

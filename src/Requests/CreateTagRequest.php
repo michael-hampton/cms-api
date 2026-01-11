@@ -4,7 +4,7 @@ namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\TagRepository;
 
 class CreateTagRequest extends FormRequest
 {

@@ -3,8 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\FeaturedDeal;
-use App\Models\Product;
-use App\Repositories\DealsRepository;
+use App\Repositories\Product\DealsRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class DealsRepositoryTest extends RepositoryTestCase

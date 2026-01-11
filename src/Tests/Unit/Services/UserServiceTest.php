@@ -4,15 +4,14 @@ namespace App\Tests\Unit\Services;
 
 use App\Framework\Support\Hash;
 use App\Models\User;
-use App\Repositories\UserRepository;
-use App\Repositories\UserRepositoryInterface;
+use App\Repositories\Cms\UserRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Search\PaginatedResult;
 use App\Search\SearchCriteria;
-use App\Services\UserService;
+use App\Services\Cms\UserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 
 class UserServiceTest extends FunctionalTestCase
 {

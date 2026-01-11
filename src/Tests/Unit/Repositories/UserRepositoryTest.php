@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\User;
-use App\Repositories\UserRepository;
+use App\Repositories\Cms\UserRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

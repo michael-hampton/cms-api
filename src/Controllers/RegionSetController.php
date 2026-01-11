@@ -12,15 +12,15 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PageRepository;
-use App\Repositories\RegionSetRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\RegionSetRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateRegionSetRequest;
 use App\Requests\UpdateRegionSetRequest;
 use App\Resources\PageResource;
 use App\Resources\RegionSetResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\RegionSetService;
+use App\Services\Cms\RegionSetService;
 use Exception;
 
 class RegionSetController extends Controller

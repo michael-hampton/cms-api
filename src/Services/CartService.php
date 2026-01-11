@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Framework\Session\Session;
 use App\Repositories\CartRepository;
-use App\Repositories\ProductRepository;
-use App\Repositories\SubscriptionPlanRepository;
+use App\Repositories\Product\ProductRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 
 class CartService
 {

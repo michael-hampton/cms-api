@@ -5,7 +5,7 @@ namespace App\Requests;
 use App\Framework\Http\FormRequest;
 use App\Models\Video;
 use App\Policies\VideoPolicy;
-use App\Repositories\VideoRepository;
+use App\Repositories\Cms\VideoRepository;
 
 class UpdateVideoRequest extends FormRequest
 {

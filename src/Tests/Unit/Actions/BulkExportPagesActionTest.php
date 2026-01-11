@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Actions;
 
 use App\Actions\BulkExportPages;
 use App\Models\Page;
-use App\Repositories\BlockRepository;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

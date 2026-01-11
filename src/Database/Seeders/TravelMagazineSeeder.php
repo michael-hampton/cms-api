@@ -11,11 +11,11 @@ use App\Models\Page;
 use App\Models\PageCustomField;
 use App\Models\Site;
 use App\Models\Territory;
-use App\Repositories\BlockRepository;
-use App\Repositories\CategoryRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\TagRepository;
 use App\Parsers\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\TagRepository;
 
 class TravelMagazineSeeder extends Seeder
 {

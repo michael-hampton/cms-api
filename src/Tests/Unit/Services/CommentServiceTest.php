@@ -5,8 +5,8 @@ namespace App\Tests\Unit\Services;
 
 use App\Models\Comment;
 use App\Models\Member;
-use App\Repositories\CommentRepository;
-use App\Repositories\MemberRepository;
+use App\Repositories\Members\CommentRepository;
+use App\Repositories\Members\MemberRepository;
 use App\Services\CommentService;
 use App\Services\NotificationService;
 use Mockery;

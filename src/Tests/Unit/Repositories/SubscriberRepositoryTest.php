@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Subscriber;
-use App\Repositories\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class SubscriberRepositoryTest extends RepositoryTestCase

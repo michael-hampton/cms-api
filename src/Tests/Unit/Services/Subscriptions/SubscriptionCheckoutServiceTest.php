@@ -6,13 +6,13 @@ use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
-use App\Repositories\PaymentMethodRepository;
-use App\Repositories\SubscriptionPlanRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Members\PaymentMethodRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Cms\VoucherService;
 use App\Services\Payment\PayPalPaymentProcessor;
 use App\Services\Payment\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
-use App\Services\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

@@ -11,13 +11,13 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
-use App\Repositories\AuthorRepository;
+use App\Repositories\Cms\AuthorRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateAuthorRequest;
 use App\Requests\UpdateAuthorRequest;
 use App\Resources\AuthorResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\AuthorService;
+use App\Services\Cms\AuthorService;
 use Exception;
 
 class AuthorController extends Controller

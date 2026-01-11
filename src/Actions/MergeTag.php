@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\TagRepository;
 
 class MergeTag
 {

@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageRepository;
 
 class BulkClonePages
 {

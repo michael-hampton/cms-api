@@ -6,9 +6,9 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
-use App\Repositories\TagRepository;
-use App\Services\ArticleAccessService;
-use App\Services\MenuRenderer;
+use App\Repositories\Cms\TagRepository;
+use App\Services\Cms\ArticleAccessService;
+use App\Services\Cms\MenuRenderer;
 use App\Services\Subscriptions\SubscriptionModalService;
 use Exception;
 

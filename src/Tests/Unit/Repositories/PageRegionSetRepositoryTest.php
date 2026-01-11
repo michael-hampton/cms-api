@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageRegionSet;
 use App\Models\RegionSet;
-use App\Repositories\PageRegionSetRepository;
+use App\Repositories\Cms\PageRegionSetRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageRegionSetRepositoryTest extends RepositoryTestCase

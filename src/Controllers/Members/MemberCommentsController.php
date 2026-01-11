@@ -6,8 +6,8 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\BadgeRepository;
-use App\Repositories\CommentRepository;
+use App\Repositories\Members\BadgeRepository;
+use App\Repositories\Members\CommentRepository;
 
 class MemberCommentsController extends Controller
 {

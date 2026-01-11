@@ -7,10 +7,10 @@ use App\Framework\Support\Collection;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\ReviewHelpful;
-use App\Repositories\ProductRepository;
+use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ReviewRepository;
 use App\Repositories\ReviewHelpfulRepository;
-use App\Repositories\ReviewRepository;
-use App\Services\ReviewService;
+use App\Services\Product\ReviewService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

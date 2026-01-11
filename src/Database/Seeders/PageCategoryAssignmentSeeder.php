@@ -6,7 +6,7 @@ use App\Framework\Database\Seeder\Seeder;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\PageCategory;
-use App\Repositories\CategoryRepository;
+use App\Repositories\Cms\CategoryRepository;
 
 class PageCategoryAssignmentSeeder extends Seeder
 {

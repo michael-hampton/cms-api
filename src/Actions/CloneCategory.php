@@ -5,7 +5,7 @@ namespace App\Actions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Str;
 use App\Models\Category;
-use App\Repositories\CategoryRepository;
+use App\Repositories\Cms\CategoryRepository;
 
 class CloneCategory
 {

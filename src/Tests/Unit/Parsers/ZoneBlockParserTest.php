@@ -5,8 +5,8 @@ namespace App\Tests\Unit\Parsers;
 use App\Models\Block;
 use App\Models\Page;
 use App\Parsers\ZoneBlockParser;
-use App\Repositories\BlockRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Services\Cms\BlockParserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

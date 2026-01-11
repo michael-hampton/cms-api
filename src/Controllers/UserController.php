@@ -8,7 +8,7 @@ use App\Framework\Http\Request;
 use App\Requests\StoreUserRequest;
 use App\Requests\UpdateUserRequest;
 use App\Search\SearchCriteriaParser;
-use App\Services\UserService;
+use App\Services\Cms\UserService;
 use Exception;
 
 class UserController extends Controller

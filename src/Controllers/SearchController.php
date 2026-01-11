@@ -6,7 +6,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Resources\PageResource;
 
 class SearchController extends Controller

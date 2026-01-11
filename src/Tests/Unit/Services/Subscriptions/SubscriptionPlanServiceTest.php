@@ -5,8 +5,8 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\SubscriptionPlanRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionPlanService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -24,7 +24,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
 
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
-        $this->voucherServiceMock = Mockery::mock(\App\Services\VoucherService::class);
+        $this->voucherServiceMock = Mockery::mock(\App\Services\Cms\VoucherService::class);
 
         $this->service = new SubscriptionPlanService(
             $this->planRepository,

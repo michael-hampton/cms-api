@@ -6,7 +6,7 @@ use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
 use App\Models\Brand;
 use App\Policies\BrandPolicy;
-use App\Repositories\BrandRepository;
+use App\Repositories\Cms\BrandRepository;
 
 class UpdateBrandRequest extends FormRequest
 {

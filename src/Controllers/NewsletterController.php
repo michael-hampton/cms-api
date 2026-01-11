@@ -11,9 +11,9 @@ use App\Framework\Support\SiteContext;
 use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Models\Member;
 use App\Models\MemberRole;
-use App\Repositories\NewsletterRepository;
-use App\Repositories\SubscriberRepository;
-use App\Services\CampaignService;
+use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Services\Cms\CampaignService;
 use App\Services\EmailVerificationService;
 use App\Services\Newsletter\NewsletterSignupService;
 

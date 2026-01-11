@@ -3,11 +3,10 @@
 namespace App\Tests\Unit\Services;
 
 use App\Models\Product;
-use App\Models\ProductMerchant;
 use App\Models\ProductVariant;
-use App\Repositories\PriceAlertRepository;
-use App\Repositories\ProductRepository;
-use App\Services\PriceAlertService;
+use App\Repositories\Product\PriceAlertRepository;
+use App\Repositories\Product\ProductRepository;
+use App\Services\Product\PriceAlertService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

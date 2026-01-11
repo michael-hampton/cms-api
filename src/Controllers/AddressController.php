@@ -2,11 +2,10 @@
 
 namespace App\Controllers;
 
-use App\Framework\Authorization\MemberAuth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\AddressRepository;
+use App\Repositories\Members\AddressRepository;
 use App\Requests\CreateAddressRequest;
 use App\Requests\UpdateAddressRequest;
 use Exception;

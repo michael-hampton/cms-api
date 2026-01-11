@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\Address;
 use App\Models\Member;
-use App\Repositories\AddressRepository;
+use App\Repositories\Members\AddressRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class AddressRepositoryTest extends RepositoryTestCase

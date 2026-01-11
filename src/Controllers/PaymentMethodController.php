@@ -6,7 +6,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PaymentMethodRepository;
+use App\Repositories\Members\PaymentMethodRepository;
 use App\Requests\CreatePaymentMethodRequest;
 use App\Requests\UpdatePaymentMethodRequest;
 use Exception;

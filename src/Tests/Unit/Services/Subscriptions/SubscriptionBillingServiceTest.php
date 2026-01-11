@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
 use App\Models\Subscription;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Payment\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionBillingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;

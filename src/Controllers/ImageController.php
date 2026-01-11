@@ -5,12 +5,12 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Repositories\ImageRepository;
+use App\Repositories\Cms\ImageRepository;
 use App\Requests\CreateImageCategoryRequest;
 use App\Requests\CreateImageRequest;
 use App\Requests\UpdateImageRequest;
 use App\Search\SearchCriteriaParser;
-use App\Services\ImageService;
+use App\Services\Cms\ImageService;
 use Exception;
 
 class ImageController extends Controller

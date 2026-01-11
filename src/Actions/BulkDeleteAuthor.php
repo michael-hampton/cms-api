@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\AuthorRepository;
-use App\Services\ImageUploadService;
+use App\Repositories\Cms\AuthorRepository;
+use App\Services\Cms\ImageUploadService;
 
 class BulkDeleteAuthor
 {

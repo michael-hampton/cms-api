@@ -3,16 +3,15 @@
 namespace App\Tests\Unit\Actions;
 
 use App\Actions\BulkUpdateOrderStatus;
-use App\Actions\CloneOrder;
 use App\Framework\Database\Database;
 use App\Models\Order;
-use App\Repositories\AddressRepository;
-use App\Repositories\MemberRepository;
-use App\Repositories\OrderItemRepository;
-use App\Repositories\OrderRepository;
-use App\Services\OrderCalculationService;
-use App\Services\OrderHistoryService;
-use App\Services\OrderService;
+use App\Repositories\Members\AddressRepository;
+use App\Repositories\Members\MemberRepository;
+use App\Repositories\Members\OrderItemRepository;
+use App\Repositories\Members\OrderRepository;
+use App\Services\Members\OrderCalculationService;
+use App\Services\Members\OrderHistoryService;
+use App\Services\Members\OrderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery as m;

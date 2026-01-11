@@ -4,8 +4,8 @@ namespace App\Actions;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Str;
-use App\Repositories\RegionSetRepository;
-use App\Repositories\TerritoryRepository;
+use App\Repositories\Cms\RegionSetRepository;
+use App\Repositories\Cms\TerritoryRepository;
 
 class CloneRegionSet
 {

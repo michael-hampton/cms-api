@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageTag;
 use App\Models\Tag;
-use App\Repositories\PageTagRepository;
+use App\Repositories\Cms\PageTagRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageTagRepositoryTest extends RepositoryTestCase

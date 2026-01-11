@@ -7,7 +7,7 @@ use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
 use App\Models\Campaign;
 use App\Policies\CampaignPolicy;
-use App\Repositories\CampaignRepository;
+use App\Repositories\Cms\CampaignRepository;
 
 class UpdateCampaignRequest extends FormRequest
 {

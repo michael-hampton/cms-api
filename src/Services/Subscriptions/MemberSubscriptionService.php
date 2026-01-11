@@ -5,9 +5,9 @@ namespace App\Services\Subscriptions;
 use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
-use App\Repositories\MemberRepository;
-use App\Repositories\MemberSubscriptionPreferenceRepository;
-use App\Repositories\SubscriberRepository;
+use App\Repositories\Members\MemberRepository;
+use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
 
 class MemberSubscriptionService
 {

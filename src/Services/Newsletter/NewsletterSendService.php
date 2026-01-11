@@ -4,13 +4,13 @@
 namespace App\Services\Newsletter;
 
 use App\Framework\Support\SiteContext;
-use App\Repositories\MemberRepository;
-use App\Repositories\MemberSubscriptionPreferenceRepository;
-use App\Repositories\NewsletterRepository;
-use App\Repositories\NewsletterSendRepository;
-use App\Repositories\SubscriberRepository;
-use App\Services\BlockParserService;
-use App\Services\EmailService;
+use App\Repositories\Members\MemberRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Newsletters\NewsletterSendRepository;
+use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Services\Cms\BlockParserService;
+use App\Services\Members\EmailService;
 use App\Services\Subscriptions\MemberSubscriptionService;
 
 class NewsletterSendService

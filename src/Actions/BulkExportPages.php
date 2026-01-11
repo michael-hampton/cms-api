@@ -2,8 +2,8 @@
 
 namespace App\Actions;
 
-use App\Repositories\BlockRepository;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\PageRepository;
 
 class BulkExportPages
 {

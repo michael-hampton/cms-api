@@ -9,9 +9,9 @@ use App\Models\PageMetadata;
 use App\Models\PageSeo;
 use App\Models\PageSettings;
 use App\Models\PageSocial;
-use App\Repositories\BlockRepository;
-use App\Repositories\PageCustomFieldRepository;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\PageCustomFieldRepository;
+use App\Repositories\Cms\PageRepository;
 use Exception;
 
 class MergePages

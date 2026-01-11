@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Http\Request;
 use App\Models\Site;
-use App\Services\WishlistService;
+use App\Services\Members\WishlistService;
 
 class WishlistController extends Controller
 {

@@ -4,7 +4,7 @@ namespace App\Actions;
 
 use App\Actions\Traits\UpdateRegionSetActiveStatus;
 use App\Framework\Database\Database;
-use App\Repositories\RegionSetRepository;
+use App\Repositories\Cms\RegionSetRepository;
 
 class BulkActivateRegionSets
 {

@@ -4,7 +4,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\EmailTheme;
-use App\Repositories\EmailThemeRepository;
+use App\Repositories\Cms\EmailThemeRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class EmailThemeRepositoryTest extends RepositoryTestCase

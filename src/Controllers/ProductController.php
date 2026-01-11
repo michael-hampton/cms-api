@@ -9,12 +9,12 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\ProductVariant;
-use App\Repositories\ProductRepository;
+use App\Repositories\Product\ProductRepository;
 use App\Requests\CreateProductRequest;
 use App\Requests\UpdateProductRequest;
 use App\Resources\ProductResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\ProductService;
+use App\Services\Product\ProductService;
 use Exception;
 
 class ProductController extends Controller

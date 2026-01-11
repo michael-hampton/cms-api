@@ -14,13 +14,13 @@ use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Validator;
 use App\Models\Tag;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\TagRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateTagRequest;
 use App\Requests\UpdateTagRequest;
 use App\Resources\TagResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\TagService;
+use App\Services\Cms\TagService;
 use Exception;
 
 class TagController extends Controller

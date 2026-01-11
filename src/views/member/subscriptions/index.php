@@ -534,7 +534,7 @@ use App\Framework\Support\SiteContext;
                 // Check if default payment method is expiring/expired
                 if ($member->stripe_customer_id) {
                     $stripeProcessor = new \App\Services\Payment\StripePaymentProcessor(
-                            new \App\Repositories\PaymentRepository()
+                            new \App\Repositories\Members\PaymentRepository()
                     );
                     $warningsResult = $stripeProcessor->getPaymentMethodsWithWarnings($member);
 
@@ -813,7 +813,7 @@ use App\Framework\Support\SiteContext;
                     <?php if ($activeSubscription->isPrint()): ?>
                         <?php
                         // Get next upcoming delivery
-                        $issueDeliveryRepo = new \App\Repositories\IssueDeliveryRepository();
+                        $issueDeliveryRepo = new \App\Repositories\Subscriptions\IssueDeliveryRepository();
                         $nextDelivery = $issueDeliveryRepo->getUpcomingDeliveries($activeSubscription->id, 1)->first();
                         ?>
 

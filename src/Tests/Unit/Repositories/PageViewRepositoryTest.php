@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Repositories;
 use App\Models\Member;
 use App\Models\Page;
 use App\Models\PageView;
-use App\Repositories\PageViewRepository;
+use App\Repositories\Members\PageViewRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

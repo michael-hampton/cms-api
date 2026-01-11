@@ -3,8 +3,8 @@
 namespace App\Services\Subscriptions;
 
 use App\Models\Member;
-use App\Repositories\SubscriptionPlanRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class SubscriptionModalService
 {

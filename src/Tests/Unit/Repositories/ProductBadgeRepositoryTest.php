@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\ProductBadge;
-use App\Repositories\ProductBadgeRepository;
+use App\Repositories\Product\ProductBadgeRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class ProductBadgeRepositoryTest extends RepositoryTestCase

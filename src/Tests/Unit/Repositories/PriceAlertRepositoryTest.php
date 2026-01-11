@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PriceAlert;
-use App\Repositories\PriceAlertRepository;
+use App\Repositories\Product\PriceAlertRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PriceAlertRepositoryTest extends RepositoryTestCase

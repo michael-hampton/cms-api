@@ -39,8 +39,8 @@ use App\Policies\TerritoryPolicy;
 use App\Policies\UserPolicy;
 use App\Policies\VideoPolicy;
 use App\Policies\VoucherPolicy;
-use App\Repositories\UserRepository;
-use App\Repositories\UserRepositoryInterface;
+use App\Repositories\Cms\UserRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthServiceProvider extends ServiceProvider
 {

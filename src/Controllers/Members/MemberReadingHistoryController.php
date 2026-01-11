@@ -5,7 +5,7 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PageViewRepository;
+use App\Repositories\Members\PageViewRepository;
 
 class MemberReadingHistoryController extends Controller
 {

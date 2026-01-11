@@ -5,11 +5,10 @@ namespace App\Tests\Unit\Services;
 use App\Framework\Support\Str;
 use App\Models\Menu;
 use App\Models\Territory;
-use App\Repositories\MenuRepository;
-use App\Services\MenuService;
+use App\Repositories\Cms\MenuRepository;
+use App\Services\Cms\MenuService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
 class MenuServiceTest extends FunctionalTestCase
 {

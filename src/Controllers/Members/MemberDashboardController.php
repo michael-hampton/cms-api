@@ -7,16 +7,16 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Models\Address;
 use App\Models\Member;
-use App\Repositories\CommentRepository;
-use App\Repositories\MemberActivityRepository;
-use App\Repositories\MemberRepository;
-use App\Repositories\NewsletterRepository;
-use App\Repositories\OrderRepository;
-use App\Repositories\PageLikeRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\PageViewRepository;
-use App\Repositories\SubscriberRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Members\CommentRepository;
+use App\Repositories\Members\MemberActivityRepository;
+use App\Repositories\Members\MemberRepository;
+use App\Repositories\Members\OrderRepository;
+use App\Repositories\Members\PageLikeRepository;
+use App\Repositories\Members\PageViewRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\BadgeService;
 
 class MemberDashboardController extends Controller

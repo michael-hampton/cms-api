@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Services;
 
 use App\Models\Product;
 use App\Models\Wishlist;
-use App\Repositories\ProductRepository;
-use App\Repositories\WishlistRepository;
-use App\Services\WishlistService;
+use App\Repositories\Members\WishlistRepository;
+use App\Repositories\Product\ProductRepository;
+use App\Services\Members\WishlistService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

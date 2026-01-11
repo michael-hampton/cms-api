@@ -13,7 +13,7 @@ use App\Models\PageSeo;
 use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Models\Tag;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use DateTime;

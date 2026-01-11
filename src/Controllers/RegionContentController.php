@@ -5,12 +5,11 @@ namespace App\Controllers;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
-use App\Models\PageGrid;
 use App\Models\Territory;
 use App\Parsers\PageGridRenderer;
-use App\Repositories\CommentRepository;
-use App\Repositories\PageGridRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\PageGridRepository;
+use App\Repositories\Members\CommentRepository;
+use App\Services\Cms\BlockParserService;
 
 class RegionContentController extends Controller
 {

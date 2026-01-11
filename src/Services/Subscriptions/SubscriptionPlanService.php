@@ -6,9 +6,9 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\SubscriptionPlanRepository;
-use App\Repositories\SubscriptionRepository;
-use App\Services\VoucherService;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Cms\VoucherService;
 
 class SubscriptionPlanService
 {

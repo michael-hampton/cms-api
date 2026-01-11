@@ -12,8 +12,8 @@ use App\Requests\ChangePasswordRequest;
 use App\Requests\LoginRequest;
 use App\Requests\MemberRegistrationRequest;
 use App\Requests\ResetPasswordRequest;
+use App\Services\Cms\MenuRenderer;
 use App\Services\EmailVerificationService;
-use App\Services\MenuRenderer;
 use App\Services\PasswordResetService;
 
 class MemberAuthController extends Controller

@@ -8,7 +8,7 @@ use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\ConsentType;
-use App\Services\ConsentService;
+use App\Services\Members\ConsentService;
 
 class MemberConsentController extends Controller
 {

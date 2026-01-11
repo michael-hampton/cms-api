@@ -4,7 +4,7 @@ namespace App\Framework\Authorization;
 
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
-use App\Repositories\UserRepositoryInterface;
+use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthenticationService
 {

@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Services;
 
 use App\Models\Campaign;
 use App\Models\Newsletter;
-use App\Repositories\CampaignRepository;
-use App\Repositories\NewsletterRepository;
-use App\Services\CampaignService;
+use App\Repositories\Cms\CampaignRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
+use App\Services\Cms\CampaignService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

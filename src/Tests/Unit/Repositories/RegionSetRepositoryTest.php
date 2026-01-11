@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageRegionSet;
-use App\Repositories\RegionSetRepository;
+use App\Repositories\Cms\RegionSetRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\BrandRepository;
-use App\Services\ImageUploadService;
+use App\Repositories\Cms\BrandRepository;
+use App\Services\Cms\ImageUploadService;
 
 class MergeBrand
 {

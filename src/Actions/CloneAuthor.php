@@ -5,8 +5,8 @@ namespace App\Actions;
 use App\Framework\Database\Database;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
-use App\Repositories\AuthorRepository;
-use App\Services\ImageUploadService;
+use App\Repositories\Cms\AuthorRepository;
+use App\Services\Cms\ImageUploadService;
 
 class CloneAuthor
 {

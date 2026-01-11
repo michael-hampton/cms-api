@@ -2,10 +2,8 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\Author;
-use App\Models\Page;
 use App\Models\PageAuthor;
-use App\Repositories\PageAuthorRepository;
+use App\Repositories\Cms\PageAuthorRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageAuthorRepositoryTest extends RepositoryTestCase

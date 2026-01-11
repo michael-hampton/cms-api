@@ -5,7 +5,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Models\ProductBadge;
-use App\Repositories\ProductBadgeRepository;
+use App\Repositories\Product\ProductBadgeRepository;
 
 class ProductBadgeController extends Controller
 {

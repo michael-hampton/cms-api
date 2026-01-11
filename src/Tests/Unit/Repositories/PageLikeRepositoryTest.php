@@ -4,8 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\Member;
 use App\Models\Page;
-use App\Models\PageLike;
-use App\Repositories\PageLikeRepository;
+use App\Repositories\Members\PageLikeRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

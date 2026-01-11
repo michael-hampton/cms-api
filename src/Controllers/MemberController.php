@@ -6,7 +6,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\MemberRepository;
+use App\Repositories\Members\MemberRepository;
 use App\Services\Payment\StripePaymentProcessor;
 use App\Services\Subscriptions\MemberSubscriptionService;
 

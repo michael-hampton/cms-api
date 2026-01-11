@@ -16,7 +16,7 @@ use App\Requests\CreateBrandRequest;
 use App\Requests\UpdateBrandRequest;
 use App\Resources\BrandResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\BrandService;
+use App\Services\Cms\BrandService;
 use Exception;
 
 class BrandController extends Controller

@@ -6,7 +6,7 @@ use App\Framework\Mail\ArrayMailer;
 use App\Framework\Support\Config;
 use App\Models\Member;
 use App\Models\Product;
-use App\Services\EmailService;
+use App\Services\Members\EmailService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class EmailWorkflowTest extends FunctionalTestCase

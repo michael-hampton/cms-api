@@ -7,8 +7,8 @@ use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
 use App\Models\Territory;
 use App\Policies\TerritoryPolicy;
-use App\Repositories\RegionSetRepository;
-use App\Repositories\TerritoryRepository;
+use App\Repositories\Cms\RegionSetRepository;
+use App\Repositories\Cms\TerritoryRepository;
 
 class CreateTerritoryRequest extends FormRequest
 {

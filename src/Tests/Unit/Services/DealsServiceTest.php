@@ -2,8 +2,8 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Repositories\DealsRepository;
-use App\Services\DealsService;
+use App\Repositories\Product\DealsRepository;
+use App\Services\Product\DealsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery as m;

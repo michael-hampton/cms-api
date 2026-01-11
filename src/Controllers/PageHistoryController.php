@@ -6,7 +6,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Models\Site;
 use App\Resources\PageHistoryResource;
-use App\Services\PageHistoryService;
+use App\Services\Cms\PageHistoryService;
 use Exception;
 
 class PageHistoryController extends Controller

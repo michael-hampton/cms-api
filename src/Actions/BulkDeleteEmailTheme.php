@@ -4,7 +4,7 @@ namespace App\Actions;
 
 use App\Framework\Database\Database;
 use App\Models\EmailTheme;
-use App\Services\ImageUploadService;
+use App\Services\Cms\ImageUploadService;
 
 class BulkDeleteEmailTheme
 {

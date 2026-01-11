@@ -11,15 +11,15 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PageRepository;
-use App\Repositories\TerritoryRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\TerritoryRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateTerritoryRequest;
 use App\Requests\UpdateTerritoryRequest;
 use App\Resources\PageResource;
 use App\Resources\TerritoryResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\TerritoryService;
+use App\Services\Cms\TerritoryService;
 use Exception;
 
 class TerritoryController extends Controller

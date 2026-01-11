@@ -3,8 +3,8 @@
 namespace App\Tests\Unit\Services;
 
 use App\Models\DealAlert;
-use App\Repositories\DealAlertRepository;
-use App\Services\DealAlertService;
+use App\Repositories\Product\DealAlertRepository;
+use App\Services\Product\DealAlertService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

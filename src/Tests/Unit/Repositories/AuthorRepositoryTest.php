@@ -2,9 +2,7 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\Author;
-use App\Models\Page;
-use App\Repositories\AuthorRepository;
+use App\Repositories\Cms\AuthorRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

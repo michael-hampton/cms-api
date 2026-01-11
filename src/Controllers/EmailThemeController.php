@@ -11,13 +11,13 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
-use App\Repositories\EmailThemeRepository;
+use App\Repositories\Cms\EmailThemeRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateEmailThemeRequest;
 use App\Requests\UpdateEmailThemeRequest;
 use App\Resources\EmailThemeResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\EmailThemeService;
+use App\Services\Cms\EmailThemeService;
 use Exception;
 
 class EmailThemeController extends Controller

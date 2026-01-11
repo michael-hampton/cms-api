@@ -5,10 +5,10 @@ namespace App\Tests\Unit\Services;
 use App\Models\Block;
 use App\Models\Page;
 use App\Parsers\ZoneBlockParser;
-use App\Repositories\BlockRepository;
-use App\Repositories\PageGridRepository;
-use App\Services\BlockParserService;
-use App\Services\PageRenderService;
+use App\Repositories\Cms\BlockRepository;
+use App\Repositories\Cms\PageGridRepository;
+use App\Services\Cms\BlockParserService;
+use App\Services\Cms\PageRenderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

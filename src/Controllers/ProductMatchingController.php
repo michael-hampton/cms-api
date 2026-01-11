@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Services\ProductMatchingService;
+use App\Services\Product\ProductMatchingService;
 
 class ProductMatchingController extends Controller
 {

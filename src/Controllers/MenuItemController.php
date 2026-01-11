@@ -7,7 +7,7 @@ use App\Framework\Http\JsonResponse;
 use App\Requests\CreateMenuItemRequest;
 use App\Requests\ReorderMenuItemsRequest;
 use App\Requests\UpdateMenuItemRequest;
-use App\Services\MenuService;
+use App\Services\Cms\MenuService;
 
 class MenuItemController extends Controller
 {

@@ -5,8 +5,8 @@ namespace App\Services\Subscriptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
-use App\Repositories\PaymentRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Members\PaymentRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Payment\StripePaymentProcessor;
 use Exception;
 

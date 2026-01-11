@@ -4,10 +4,10 @@ namespace App\Controllers;
 
 use App\Framework\Http\Request;
 use App\Models\Page;
-use App\Services\ProductService;
-use App\Services\ReviewService;
+use App\Services\Members\WishlistService;
+use App\Services\Product\ProductService;
+use App\Services\Product\ReviewService;
 use App\Services\Url\UrlResolutionResult;
-use App\Services\WishlistService;
 
 class ProductViewController extends Controller
 {

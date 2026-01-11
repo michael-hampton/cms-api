@@ -3,8 +3,6 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
-use App\Framework\Support\Str;
-use App\Repositories\CategoryRepository;
 
 class CreateImageCategoryRequest extends FormRequest
 {

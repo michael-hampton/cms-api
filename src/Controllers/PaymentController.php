@@ -7,12 +7,12 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Order;
 use App\Models\Subscription;
-use App\Repositories\PaymentRepository;
+use App\Repositories\Members\PaymentRepository;
 use App\Requests\CreateSubscriptionPaymentRequest;
 use App\Requests\FailPaymentRequest;
 use App\Requests\RefundPaymentRequest;
+use App\Services\Members\PaymentService;
 use App\Services\Payment\StripePaymentProcessor;
-use App\Services\PaymentService;
 use Exception;
 
 class PaymentController extends Controller

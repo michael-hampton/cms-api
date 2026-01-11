@@ -10,11 +10,11 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Refund;
-use App\Repositories\OrderRepository;
-use App\Repositories\ProductRepository;
-use App\Repositories\RefundRepository;
-use App\Services\OrderHistoryService;
-use App\Services\RefundService;
+use App\Repositories\Members\OrderRepository;
+use App\Repositories\Members\RefundRepository;
+use App\Repositories\Product\ProductRepository;
+use App\Services\Members\OrderHistoryService;
+use App\Services\Members\RefundService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

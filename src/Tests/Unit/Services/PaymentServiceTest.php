@@ -6,11 +6,11 @@ use App\Framework\Database\Database;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
-use App\Repositories\OrderRepository;
-use App\Repositories\PaymentMethodRepository;
-use App\Repositories\PaymentRepository;
-use App\Repositories\SubscriptionRepository;
-use App\Services\PaymentService;
+use App\Repositories\Members\OrderRepository;
+use App\Repositories\Members\PaymentMethodRepository;
+use App\Repositories\Members\PaymentRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Members\PaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

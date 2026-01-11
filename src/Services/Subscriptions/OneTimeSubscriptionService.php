@@ -4,9 +4,9 @@ namespace App\Services\Subscriptions;
 
 use App\Framework\Database\Database;
 use App\Models\Subscription;
-use App\Repositories\OrderRepository;
-use App\Repositories\SubscriptionPlanRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Members\OrderRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use Exception;
 
 class OneTimeSubscriptionService

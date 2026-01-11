@@ -6,7 +6,7 @@ use App\Models\Member;
 use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class SubscriptionRepositoryTest extends RepositoryTestCase

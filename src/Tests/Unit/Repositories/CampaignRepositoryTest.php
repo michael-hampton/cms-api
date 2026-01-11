@@ -4,7 +4,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Campaign;
-use App\Repositories\CampaignRepository;
+use App\Repositories\Cms\CampaignRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CampaignRepositoryTest extends RepositoryTestCase

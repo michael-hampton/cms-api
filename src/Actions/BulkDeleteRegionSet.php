@@ -3,7 +3,7 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\RegionSetRepository;
+use App\Repositories\Cms\RegionSetRepository;
 
 class BulkDeleteRegionSet
 {

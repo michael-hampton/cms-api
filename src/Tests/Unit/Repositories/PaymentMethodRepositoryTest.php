@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PaymentMethod;
-use App\Repositories\PaymentMethodRepository;
+use App\Repositories\Members\PaymentMethodRepository;
 
 class PaymentMethodRepositoryTest extends RepositoryTestCase
 {

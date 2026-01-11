@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Services;
 
 use App\Models\Brand;
 use App\Models\Product;
-use App\Repositories\ProductRepository;
-use App\Services\ProductMatchingService;
+use App\Repositories\Product\ProductRepository;
+use App\Services\Product\ProductMatchingService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

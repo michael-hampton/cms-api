@@ -7,9 +7,9 @@ use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Models\Page;
 use App\Parsers\BlockRegistry;
-use App\Repositories\PageRepository;
-use App\Services\BlockParserService;
-use App\Services\PageService;
+use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\BlockParserService;
+use App\Services\Cms\PageService;
 use Exception;
 
 class WebPageController extends Controller

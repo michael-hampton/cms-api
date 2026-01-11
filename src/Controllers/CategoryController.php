@@ -13,13 +13,13 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Validation\Validator;
 use App\Models\Category;
-use App\Repositories\CategoryRepository;
+use App\Repositories\Cms\CategoryRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateCategoryRequest;
 use App\Requests\UpdateCategoryRequest;
 use App\Resources\CategoryResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\CategoryService;
+use App\Services\Cms\CategoryService;
 use Exception;
 
 class CategoryController extends Controller

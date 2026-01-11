@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Framework\Http\Request;
 use App\Framework\Http\StreamedResponse;
 use App\Framework\Support\SiteContext;
-use App\Repositories\NewsletterRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use Dompdf\Dompdf;
 use Dompdf\Options;

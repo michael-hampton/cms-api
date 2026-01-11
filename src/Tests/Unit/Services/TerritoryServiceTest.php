@@ -6,11 +6,10 @@ use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Models\Page;
 use App\Models\Territory;
-use App\Repositories\PageRepository;
-use App\Repositories\PageTerritoryRepository;
-use App\Repositories\TerritoryRepository;
-use App\Services\RegionSetService;
-use App\Services\TerritoryService;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\PageTerritoryRepository;
+use App\Repositories\Cms\TerritoryRepository;
+use App\Services\Cms\TerritoryService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

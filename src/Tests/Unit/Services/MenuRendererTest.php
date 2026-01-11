@@ -5,10 +5,9 @@ namespace App\Tests\Unit\Services;
 use App\Framework\Support\Collection;
 use App\Models\Menu;
 use App\Models\MenuItem;
-use App\Services\MenuRenderer;
+use App\Services\Cms\MenuRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
 class MenuRendererTest extends FunctionalTestCase
 {

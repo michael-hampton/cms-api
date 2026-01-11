@@ -4,7 +4,7 @@ namespace App\Database\Seeders;
 
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\Page;
-use App\Repositories\BlockRepository;
+use App\Repositories\Cms\BlockRepository;
 
 class GoCompareZoneSeeder extends Seeder
 {

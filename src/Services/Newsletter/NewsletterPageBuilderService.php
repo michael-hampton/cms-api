@@ -5,7 +5,7 @@ namespace App\Services\Newsletter;
 use App\Framework\Support\Collection;
 use App\Models\Newsletter;
 use App\Models\Page;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageRepository;
 
 class NewsletterPageBuilderService
 {

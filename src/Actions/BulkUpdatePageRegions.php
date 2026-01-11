@@ -2,9 +2,9 @@
 
 namespace App\Actions;
 
-use App\Repositories\PageRegionSetRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\PageTerritoryRepository;
+use App\Repositories\Cms\PageRegionSetRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\PageTerritoryRepository;
 
 class BulkUpdatePageRegions
 {

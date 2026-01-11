@@ -3,7 +3,7 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\CategoryRepository;
+use App\Repositories\Cms\CategoryRepository;
 
 class BulkDeleteCategory
 {

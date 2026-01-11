@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\OrderHistory;
-use App\Repositories\OrderHistoryRepository;
+use App\Repositories\Members\OrderHistoryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderHistoryRepositoryTest extends RepositoryTestCase

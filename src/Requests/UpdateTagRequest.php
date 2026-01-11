@@ -4,7 +4,7 @@ namespace App\Requests;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\TagRepository;
 
 class UpdateTagRequest extends FormRequest
 {

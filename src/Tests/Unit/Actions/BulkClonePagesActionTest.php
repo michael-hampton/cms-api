@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Actions;
 use App\Actions\BulkClonePages;
 use App\Actions\ClonePage;
 use App\Models\Page;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

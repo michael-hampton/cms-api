@@ -2,10 +2,9 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\ProductVoucher;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
-use App\Repositories\VoucherRepository;
+use App\Repositories\Cms\VoucherRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

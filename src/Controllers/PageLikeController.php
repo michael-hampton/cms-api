@@ -7,7 +7,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\Page;
-use App\Repositories\PageLikeRepository;
+use App\Repositories\Members\PageLikeRepository;
 
 class PageLikeController extends Controller
 {

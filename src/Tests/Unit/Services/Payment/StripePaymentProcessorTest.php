@@ -6,7 +6,7 @@ use App\Models\Member;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\PaymentRepository;
+use App\Repositories\Members\PaymentRepository;
 use App\Services\Payment\StripePaymentProcessor;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;

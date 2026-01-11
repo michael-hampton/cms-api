@@ -7,11 +7,11 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Product;
-use App\Repositories\ProductRepository;
-use App\Services\MenuRenderer;
-use App\Services\ProductService;
-use App\Services\ReviewService;
-use App\Services\WishlistService;
+use App\Repositories\Product\ProductRepository;
+use App\Services\Cms\MenuRenderer;
+use App\Services\Members\WishlistService;
+use App\Services\Product\ProductService;
+use App\Services\Product\ReviewService;
 
 class ProductDetailController extends Controller
 {

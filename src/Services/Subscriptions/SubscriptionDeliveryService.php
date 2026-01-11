@@ -3,8 +3,8 @@
 namespace App\Services\Subscriptions;
 
 use App\Framework\Database\Database;
-use App\Repositories\IssueDeliveryRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class SubscriptionDeliveryService
 {

@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
-use App\Services\MenuRenderer;
+use App\Services\Cms\MenuRenderer;
 
 class BuyingGuideController extends Controller
 {

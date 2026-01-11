@@ -4,9 +4,8 @@ namespace App\Actions;
 
 use App\Enums\PageStatus;
 use App\Framework\Support\SiteContext;
-use App\Models\Site;
-use App\Repositories\PageRepository;
-use App\Services\PageService;
+use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\PageService;
 
 class BulkUpdatePageStatus
 {

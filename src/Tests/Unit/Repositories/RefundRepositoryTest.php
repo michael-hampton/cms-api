@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\Refund;
 use App\Models\RefundItem;
-use App\Repositories\RefundRepository;
+use App\Repositories\Members\RefundRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
-use App\Services\ReviewService;
+use App\Services\Product\ReviewService;
 
 class ReviewController extends Controller
 {

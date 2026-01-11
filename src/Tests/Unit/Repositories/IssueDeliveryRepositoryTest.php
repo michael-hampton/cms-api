@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\IssueDelivery;
-use App\Repositories\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class IssueDeliveryRepositoryTest extends RepositoryTestCase

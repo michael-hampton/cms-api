@@ -4,8 +4,8 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Repositories\PageRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\BlockParserService;
 
 class PreviewController extends Controller
 {

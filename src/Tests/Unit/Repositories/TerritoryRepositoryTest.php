@@ -2,11 +2,8 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\Page;
 use App\Models\PageTerritory;
-use App\Models\RegionSet;
-use App\Models\Territory;
-use App\Repositories\TerritoryRepository;
+use App\Repositories\Cms\TerritoryRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

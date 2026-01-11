@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Repositories;
 
 use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
-use App\Repositories\MemberSubscriptionPreferenceRepository;
+use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MemberSubscriptionPreferenceRepositoryTest extends RepositoryTestCase

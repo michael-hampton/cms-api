@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Site;
-use App\Repositories\SiteRepository;
+use App\Repositories\Cms\SiteRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class SiteRepositoryTest extends RepositoryTestCase

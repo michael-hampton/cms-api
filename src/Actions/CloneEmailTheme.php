@@ -10,7 +10,7 @@ use App\Models\EmailThemeAsset;
 use App\Models\EmailThemeColor;
 use App\Models\EmailThemeFont;
 use App\Models\EmailThemeSetting;
-use App\Services\ImageUploadService;
+use App\Services\Cms\ImageUploadService;
 
 class CloneEmailTheme
 {

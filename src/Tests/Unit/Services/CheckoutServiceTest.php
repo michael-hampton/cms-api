@@ -7,11 +7,11 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Services\CartService;
 use App\Services\CheckoutService;
-use App\Services\OrderCalculationService;
-use App\Services\OrderService;
+use App\Services\Cms\VoucherService;
+use App\Services\Members\OrderCalculationService;
+use App\Services\Members\OrderService;
 use App\Services\Payment\StripePaymentProcessor;
 use App\Services\ShippingService;
-use App\Services\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

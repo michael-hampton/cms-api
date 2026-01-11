@@ -8,7 +8,7 @@ use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
-use App\Repositories\ProductRepository;
+use App\Repositories\Product\ProductRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

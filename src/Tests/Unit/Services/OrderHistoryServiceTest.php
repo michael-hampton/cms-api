@@ -2,9 +2,9 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Repositories\OrderHistoryRepository;
-use App\Services\OrderHistoryService;
 use App\Models\OrderHistory;
+use App\Repositories\Members\OrderHistoryRepository;
+use App\Services\Members\OrderHistoryService;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 

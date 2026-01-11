@@ -2,11 +2,11 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Services\SiteService;
-use App\Repositories\SiteRepository;
 use App\Models\Site;
-use PHPUnit\Framework\TestCase;
+use App\Repositories\Cms\SiteRepository;
+use App\Services\Cms\SiteService;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 class SiteServiceTest extends TestCase
 {

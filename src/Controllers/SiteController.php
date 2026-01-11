@@ -9,7 +9,7 @@ use App\Requests\CreateSiteRequest;
 use App\Requests\UpdateContactInfoRequest;
 use App\Requests\UpdateSiteRequest;
 use App\Requests\UpdateSocialMediaRequest;
-use App\Services\SiteService;
+use App\Services\Cms\SiteService;
 
 class SiteController extends Controller
 {

@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Repositories;
 use App\Models\Image;
 use App\Models\ImageCategory;
 use App\Models\ImageTag;
-use App\Repositories\ImageRepository;
+use App\Repositories\Cms\ImageRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageProduct;
-use App\Repositories\PageProductRepository;
+use App\Repositories\Cms\PageProductRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageProductRepositoryTest extends RepositoryTestCase

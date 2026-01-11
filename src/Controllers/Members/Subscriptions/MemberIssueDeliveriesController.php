@@ -5,8 +5,8 @@ namespace App\Controllers\Members\Subscriptions;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
-use App\Repositories\IssueDeliveryRepository;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class MemberIssueDeliveriesController extends Controller
 {

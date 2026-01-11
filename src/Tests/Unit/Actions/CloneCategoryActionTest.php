@@ -6,7 +6,7 @@ use App\Actions\CloneCategory;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Category;
-use App\Repositories\CategoryRepository;
+use App\Repositories\Cms\CategoryRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;

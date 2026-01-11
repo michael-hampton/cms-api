@@ -10,8 +10,8 @@ use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Models\Page;
-use App\Repositories\BlockRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Services\Cms\BlockParserService;
 
 class ZoneBlockParser extends BaseBlockParser
 {

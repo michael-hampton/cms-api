@@ -6,7 +6,7 @@ use App\Models\ConsentAuditLog;
 use App\Models\ConsentType;
 use App\Models\ConsentWithdrawalRequest;
 use App\Models\MemberConsent;
-use App\Services\ConsentService;
+use App\Services\Members\ConsentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;

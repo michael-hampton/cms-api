@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Requests\CreateVideoRequest;
-use App\Services\VideoService;
+use App\Services\Cms\VideoService;
 
 class VideoController extends Controller
 {

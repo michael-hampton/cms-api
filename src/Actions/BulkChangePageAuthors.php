@@ -2,8 +2,8 @@
 
 namespace App\Actions;
 
-use App\Repositories\PageAuthorRepository;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageAuthorRepository;
+use App\Repositories\Cms\PageRepository;
 
 class BulkChangePageAuthors
 {

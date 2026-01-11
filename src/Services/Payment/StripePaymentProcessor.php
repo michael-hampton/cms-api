@@ -7,7 +7,7 @@ use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
-use App\Repositories\PaymentRepository;
+use App\Repositories\Members\PaymentRepository;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 
@@ -564,7 +564,7 @@ class StripePaymentProcessor
      */
     private function createRefundRecord(Payment $payment, float $refundAmount, string $stripeRefundId): void
     {
-        $refundRepo = new \App\Repositories\RefundRepository();
+        $refundRepo = new \App\Repositories\Members\RefundRepository();
 
         // Check if refund already exists for this charge
         $existingRefund = \App\Models\Refund::where('site_id', $payment->site_id)

@@ -6,7 +6,7 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
-use App\Repositories\OrderRepository;
+use App\Repositories\Members\OrderRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

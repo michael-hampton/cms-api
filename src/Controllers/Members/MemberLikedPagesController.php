@@ -5,7 +5,7 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PageLikeRepository;
+use App\Repositories\Members\PageLikeRepository;
 
 class MemberLikedPagesController extends Controller
 {

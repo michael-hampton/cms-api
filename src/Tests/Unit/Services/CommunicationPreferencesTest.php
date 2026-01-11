@@ -3,9 +3,9 @@
 namespace App\Tests\Unit\Services;
 
 use App\Models\Member;
-use App\Repositories\MemberRepository;
-use App\Repositories\MemberSubscriptionPreferenceRepository;
-use App\Repositories\SubscriberRepository;
+use App\Repositories\Members\MemberRepository;
+use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;

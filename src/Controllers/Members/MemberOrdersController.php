@@ -6,7 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\OrderRepository;
+use App\Repositories\Members\OrderRepository;
 
 class MemberOrdersController extends Controller
 {

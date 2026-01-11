@@ -2,14 +2,10 @@
 
 namespace App\Framework\Authorization;
 
-use App\Controllers\Controller;
 use App\Framework\Http\MiddlewareInterface;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
-use App\Framework\ServiceProvider\ServiceProvider;
-use App\Repositories\UserRepository;
-use App\Repositories\UserRepositoryInterface;
-use Closure;
+use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthenticateWithToken implements MiddlewareInterface
 {

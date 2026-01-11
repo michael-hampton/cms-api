@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Services\Newsletters;
 
 use App\Models\Newsletter;
 use App\Models\Subscriber;
-use App\Repositories\NewsletterRepository;
-use App\Repositories\SubscriberRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Newsletter\NewsletterSignupService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;

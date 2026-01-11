@@ -3,8 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\PageTerritory;
-use App\Models\Territory;
-use App\Repositories\PageTerritoryRepository;
+use App\Repositories\Cms\PageTerritoryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageTerritoryRepositoryTest extends RepositoryTestCase

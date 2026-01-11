@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Repositories;
 use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\Site;
-use App\Repositories\MenuRepository;
+use App\Repositories\Cms\MenuRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class MenuRepositoryTest extends RepositoryTestCase

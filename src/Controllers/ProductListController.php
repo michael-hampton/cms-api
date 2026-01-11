@@ -9,11 +9,11 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Product;
-use App\Repositories\ProductRepository;
+use App\Repositories\Product\ProductRepository;
 use App\Search\SearchCriteria;
-use App\Services\BuildProductCardService;
-use App\Services\MenuRenderer;
-use App\Services\ProductService;
+use App\Services\Cms\MenuRenderer;
+use App\Services\Product\BuildProductCardService;
+use App\Services\Product\ProductService;
 
 class ProductListController extends Controller
 {

@@ -3,7 +3,7 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
-use App\Repositories\CustomFieldDefinitionRepository;
+use App\Repositories\Cms\CustomFieldDefinitionRepository;
 
 class UpdateCustomFieldDefinitionRequest extends FormRequest
 {

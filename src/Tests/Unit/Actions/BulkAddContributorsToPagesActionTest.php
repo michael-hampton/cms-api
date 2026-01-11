@@ -5,8 +5,8 @@ namespace App\Tests\Unit\Actions;
 use App\Actions\BulkAddContributorsToPages;
 use App\Models\Page;
 use App\Models\PageAuthor;
-use App\Repositories\PageAuthorRepository;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageAuthorRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

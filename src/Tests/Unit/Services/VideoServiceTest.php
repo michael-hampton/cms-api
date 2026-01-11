@@ -5,15 +5,14 @@ namespace App\Tests\Unit\Services;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
 use App\Models\Video;
-use App\Repositories\VideoRepository;
+use App\Repositories\Cms\VideoRepository;
 use App\Search\PaginatedResult;
 use App\Search\SearchCriteria;
-use App\Services\VideoService;
-use App\Services\VideoUploadService;
+use App\Services\Cms\VideoService;
+use App\Services\Cms\VideoUploadService;
 use Exception;
 use Mockery;
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
-use PHPUnit\Framework\Constraint\IsInstanceOf;
 use PHPUnit\Framework\TestCase;
 
 // Mock the global 'config' function used in the constructor

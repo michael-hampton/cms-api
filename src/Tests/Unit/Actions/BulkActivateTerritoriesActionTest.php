@@ -5,11 +5,7 @@ namespace App\Tests\Unit\Actions;
 use App\Actions\BulkActivateTerritories;
 use App\Framework\Database\Database;
 use App\Models\Territory;
-use App\Repositories\PageRepository;
-use App\Repositories\PageTerritoryRepository;
-use App\Repositories\TerritoryRepository;
-use App\Services\TerritoryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Repositories\Cms\TerritoryRepository;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

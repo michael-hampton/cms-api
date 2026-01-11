@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\SubscriptionPlan;
-use App\Repositories\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class SubscriptionPlanRepositoryTest extends FunctionalTestCase

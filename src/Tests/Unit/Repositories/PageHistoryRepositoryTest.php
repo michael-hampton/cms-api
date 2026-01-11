@@ -2,10 +2,8 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\Page;
 use App\Models\PageHistory;
-use App\Models\User;
-use App\Repositories\PageHistoryRepository;
+use App\Repositories\Cms\PageHistoryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageHistoryRepositoryTest extends RepositoryTestCase

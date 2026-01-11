@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Actions;
 
 use App\Actions\BulkUpdatePageRegions;
 use App\Models\Page;
-use App\Repositories\PageRegionSetRepository;
-use App\Repositories\PageRepository;
-use App\Repositories\PageTerritoryRepository;
+use App\Repositories\Cms\PageRegionSetRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\PageTerritoryRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

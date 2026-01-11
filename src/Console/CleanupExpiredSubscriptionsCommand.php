@@ -3,7 +3,7 @@
 namespace App\Console;
 
 use App\Framework\Database\Database;
-use App\Repositories\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class CleanupExpiredSubscriptionsCommand
 {

@@ -8,14 +8,12 @@ use App\Framework\Support\Collection;
 use App\Models\Image;
 use App\Models\ImageCategory;
 use App\Models\ImageTag;
-use App\Models\Tag;
-use App\Repositories\ImageRepository;
-use App\Services\ImageService;
-use App\Services\ImageUploadService;
+use App\Repositories\Cms\ImageRepository;
+use App\Services\Cms\ImageService;
+use App\Services\Cms\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Exception;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
 class ImageServiceTest extends FunctionalTestCase
 {

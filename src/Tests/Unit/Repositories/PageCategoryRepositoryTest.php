@@ -3,9 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Category;
-use App\Models\Page;
-use App\Models\PageCategory;
-use App\Repositories\PageCategoryRepository;
+use App\Repositories\Cms\PageCategoryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class PageCategoryRepositoryTest extends RepositoryTestCase

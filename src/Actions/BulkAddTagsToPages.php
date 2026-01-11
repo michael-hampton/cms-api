@@ -2,9 +2,9 @@
 
 namespace App\Actions;
 
-use App\Repositories\PageRepository;
-use App\Repositories\PageTagRepository;
-use App\Repositories\TagRepository;
+use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\PageTagRepository;
+use App\Repositories\Cms\TagRepository;
 
 class BulkAddTagsToPages
 {

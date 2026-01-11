@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\OrderRepository;
-use App\Services\OrderService;
+use App\Repositories\Members\OrderRepository;
+use App\Services\Members\OrderService;
 use Exception;
 
 class CloneOrder

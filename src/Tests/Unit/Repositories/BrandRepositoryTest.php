@@ -2,9 +2,7 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\Models\Brand;
-use App\Models\Product;
-use App\Repositories\BrandRepository;
+use App\Repositories\Cms\BrandRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

@@ -5,11 +5,11 @@ namespace App\Controllers;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Repositories\MenuRepository;
+use App\Repositories\Cms\MenuRepository;
 use App\Requests\CreateMenuRequest;
 use App\Requests\UpdateMenuRequest;
 use App\Resources\MenuResource;
-use App\Services\MenuService;
+use App\Services\Cms\MenuService;
 
 class MenuController extends Controller
 {

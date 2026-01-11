@@ -6,7 +6,7 @@ use App\Models\Badge;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberPoint;
-use App\Repositories\BadgeRepository;
+use App\Repositories\Members\BadgeRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class BadgeRepositoryTest extends RepositoryTestCase

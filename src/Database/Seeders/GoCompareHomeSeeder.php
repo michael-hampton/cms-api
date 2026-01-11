@@ -6,8 +6,8 @@ use App\Framework\Container;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\Page;
 use App\Models\Site;
-use App\Repositories\BlockRepository;
-use App\Services\BlockParserService;
+use App\Repositories\Cms\BlockRepository;
+use App\Services\Cms\BlockParserService;
 
 class GoCompareHomeSeeder extends Seeder
 {

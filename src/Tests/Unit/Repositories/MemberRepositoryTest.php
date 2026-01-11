@@ -3,8 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Member;
-use App\Repositories\MemberRepository;
-use App\Search\SearchCriteria;
+use App\Repositories\Members\MemberRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use function PHPUnit\Framework\assertEquals;
 

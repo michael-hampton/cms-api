@@ -5,7 +5,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Subscriptions\SubscriptionPlanService;
 
 class AdminSubscriptionPlansController extends Controller

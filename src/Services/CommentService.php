@@ -3,8 +3,8 @@ namespace App\Services;
 
 use App\Framework\Support\Collection;
 use App\Models\Comment;
-use App\Repositories\CommentRepository;
-use App\Repositories\MemberRepository;
+use App\Repositories\Members\CommentRepository;
+use App\Repositories\Members\MemberRepository;
 
 class CommentService
 {

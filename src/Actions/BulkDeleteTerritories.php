@@ -3,7 +3,7 @@
 namespace App\Actions;
 
 use App\Framework\Database\Database;
-use App\Repositories\TerritoryRepository;
+use App\Repositories\Cms\TerritoryRepository;
 
 class BulkDeleteTerritories
 {

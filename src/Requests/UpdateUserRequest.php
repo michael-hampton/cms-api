@@ -5,8 +5,7 @@ namespace App\Requests;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
 use App\Models\Site;
-use App\Repositories\AuthorRepository;
-use App\Repositories\UserRepository;
+use App\Repositories\Cms\UserRepository;
 
 class UpdateUserRequest extends FormRequest
 {

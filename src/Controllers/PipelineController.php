@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Repositories\PageRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Search\SearchCriteriaParser;
 use Exception;
 

@@ -12,13 +12,13 @@ use App\Models\Page;
 use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
-use App\Repositories\CommentRepository;
-use App\Repositories\PageGridRepository;
-use App\Repositories\PageViewRepository;
-use App\Services\ArticleAccessService;
-use App\Services\BlockParserService;
-use App\Services\MenuRenderer;
-use App\Services\PageRenderService;
+use App\Repositories\Cms\PageGridRepository;
+use App\Repositories\Members\CommentRepository;
+use App\Repositories\Members\PageViewRepository;
+use App\Services\Cms\ArticleAccessService;
+use App\Services\Cms\BlockParserService;
+use App\Services\Cms\MenuRenderer;
+use App\Services\Cms\PageRenderService;
 use App\Services\Subscriptions\SubscriptionModalService;
 use App\Services\Url\UrlResolutionResult;
 
@@ -117,7 +117,7 @@ class ContentController extends Controller
         $theme = SiteContext::getTheme();
         $viewPath = "{$theme}/page";
 
-        $dealsService = new \App\Services\DealsService();
+        $dealsService = new \App\Services\Product\DealsService();
         $data['todaysDeals'] = $dealsService->getTodaysDeals(10);
 
         // Fallback to default theme if theme view doesn't exist

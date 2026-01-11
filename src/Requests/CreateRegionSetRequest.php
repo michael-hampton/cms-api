@@ -7,7 +7,7 @@ use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
 use App\Models\RegionSet;
 use App\Policies\RegionSetPolicy;
-use App\Repositories\RegionSetRepository;
+use App\Repositories\Cms\RegionSetRepository;
 
 class CreateRegionSetRequest extends FormRequest
 {
