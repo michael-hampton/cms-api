@@ -16,14 +16,19 @@ class MemberReward extends Model
         'expires_at',
         'reward_data',
         'notes',
-        'slug'
+        'slug',
+        'admin_notes',
+        'declined_by_admin_id',
+        'declined_at',
+        'decline_reason'
     ];
 
     protected $casts = [
         'earned_at' => 'datetime',
         'claimed_at' => 'datetime',
         'expires_at' => 'datetime',
-        'reward_data' => 'array'
+        'reward_data' => 'array',
+        'declined_at' => 'datetime'
     ];
 
     public function member($relation = false)
@@ -67,5 +72,26 @@ class MemberReward extends Model
     {
         return $this->status === 'expired' ||
             ($this->expires_at && $this->expires_at < now_datetime());
+    }
+
+    public function isDeclined(): bool
+    {
+        return $this->status === 'declined';
+    }
+
+    public function decline(int $adminId, string $reason, ?string $notes = null): bool
+    {
+        return $this->update([
+            'status' => 'declined',
+            'declined_by_admin_id' => $adminId,
+            'declined_at' => now_datetime()->toDateTimeString(),
+            'decline_reason' => $reason,
+            'admin_notes' => $notes
+        ]);
+    }
+
+    public function declinedBy($relation = false)
+    {
+        return $this->belongsTo(User::class, 'declined_by_admin_id', 'id', $relation);
     }
 }

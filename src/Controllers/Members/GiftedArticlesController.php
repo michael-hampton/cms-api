@@ -160,4 +160,43 @@ class GiftedArticlesController extends Controller
             'message' => $result['message']
         ]);
     }
+
+    public function getGiftModal(Request $request, string $pageSlug)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Please login to gift articles'
+            ], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
+
+        $page = Page::where('slug', $pageSlug)
+            ->where('site_id', $siteId)
+            ->where('status', 'published')
+            ->first();
+
+        if (!$page) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Article not found'
+            ], 404);
+        }
+
+        $allowance = $this->giftingService->canMemberGift($member, $siteId);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'data' => [
+                'page' => [
+                    'id' => $page->id,
+                    'title' => $page->title,
+                    'slug' => $page->slug
+                ],
+                'allowance' => $allowance
+            ]
+        ]);
+    }
 }

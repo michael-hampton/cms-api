@@ -44,6 +44,14 @@ class ArticleGiftingService
             ];
         }
 
+        // NEW: Prevent self-gifting
+        if (strtolower(trim($recipientEmail)) === strtolower(trim($gifter->email))) {
+            return [
+                'success' => false,
+                'message' => 'You cannot gift an article to yourself'
+            ];
+        }
+
         // Check if this article was already gifted to this email by this member
         $existing = $this->giftRepository->findExistingGift(
             $page->id,
@@ -146,5 +154,17 @@ class ArticleGiftingService
     public function autoClaimGiftsOnSignup(Member $member): int
     {
         return $this->giftRepository->claimPendingGiftsForEmail($member->email, $member->id);
+    }
+
+    public function checkAndClaimGiftForPage(Member $member, Page $page): ?GiftedArticle
+    {
+        $gift = $this->giftRepository->findPendingGiftForMemberAndPage($member->id, $member->email, $page->id);
+
+        if ($gift && !$gift->isClaimed()) {
+            $gift->claim($member->id);
+            return $gift;
+        }
+
+        return null;
     }
 }

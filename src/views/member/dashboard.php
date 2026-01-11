@@ -983,10 +983,28 @@ use App\Framework\Support\SiteContext;
             </div>
         <?php endif; ?>
     <?php endif; ?>
+
+    <div id="giftModal"
+         style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;">
+            <div style="padding: 30px;">
+                <button onclick="closeGiftModal()"
+                        style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 28px; cursor: pointer; color: #666;">
+                    &times;
+                </button>
+
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🎁 Gift This Article</h2>
+
+                <div id="giftModalContent"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 
 <script>
+    let currentGiftPage = null;
+
     function switchTab(tab) {
         // Hide all content
         document.getElementById('ordersContent').style.display = 'none';
@@ -1070,6 +1088,175 @@ use App\Framework\Support\SiteContext;
             btn.innerHTML = '<span>📧</span> Resend Verification Email';
             btn.disabled = false;
         }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // Close modal on outside click
+        document.getElementById('giftModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'giftModal') {
+                closeGiftModal();
+            }
+        });
+    })
+
+    async function handleModalGiftSubmit(e) {
+        e.preventDefault();
+
+        const email = document.getElementById('modal_recipient_email').value.trim();
+        const message = document.getElementById('modal_personal_message').value.trim();
+        const messagesDiv = document.getElementById('giftModalMessages');
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+
+        try {
+            const response = await fetch(`/<?= $site->slug ?>/gift-article/${currentGiftPage.slug}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    recipient_email: email,
+                    personal_message: message
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.data && data.data.success) {
+                messagesDiv.innerHTML = `
+                <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                    ✓ ${data.data.message}
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                    <strong>Share Link:</strong>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="text" value="${data.data.share_link}" readonly
+                            style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                        <button onclick="navigator.clipboard.writeText('${data.data.share_link}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000)"
+                            style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Copy</button>
+                    </div>
+                </div>
+            `;
+                e.target.style.display = 'none';
+
+                setTimeout(() => {
+                    closeGiftModal();
+                    window.location.reload();
+                }, 3000);
+            } else {
+                throw new Error(data.data?.message || 'Failed to send gift');
+            }
+        } catch (error) {
+            messagesDiv.innerHTML = `
+            <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                ⚠ ${error.message}
+            </div>
+        `;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send Gift';
+        }
+    }
+
+    function openGiftModal(pageSlug, pageTitle) {
+        const modal = document.getElementById('giftModal');
+        const content = document.getElementById('giftModalContent');
+
+        content.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner"></div><p>Loading...</p></div>';
+        modal.style.display = 'flex';
+
+        fetch(`/<?= $site->slug ?>/member/gift-modal/${pageSlug}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    currentGiftPage = data.data.page;
+                    const allowance = data.data.allowance;
+
+                    content.innerHTML = `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-weight: 600; color: #2c3e50; margin-bottom: 5px;">${pageTitle}</div>
+                        <div style="font-size: 14px; color: #666;">Share this article with someone special</div>
+                    </div>
+
+                    ${!allowance.can_gift ? `
+                        <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; border-radius: 4px; margin-bottom: 20px; color: #721c24;">
+                            <strong>Gift limit reached!</strong> You've used all ${allowance.annual_limit} of your annual article gifts.
+                        </div>
+                    ` : allowance.remaining_gifts <= 2 ? `
+                        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin-bottom: 20px; color: #856404;">
+                            <strong>Almost there!</strong> You have ${allowance.remaining_gifts} gift${allowance.remaining_gifts !== 1 ? 's' : ''} remaining this year.
+                        </div>
+                    ` : `
+                        <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                            You have <strong>${allowance.remaining_gifts}</strong> gifts remaining out of ${allowance.annual_limit} this year.
+                        </div>
+                    `}
+
+                    ${allowance.can_gift ? `
+                        <div id="giftModalMessages"></div>
+
+                        <form id="modalGiftForm">
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Recipient's Email Address *</label>
+                                <input type="email" id="modal_recipient_email" required
+                                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box;"
+                                    placeholder="friend@example.com">
+                            </div>
+
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Personal Message (Optional)</label>
+                                <textarea id="modal_personal_message" maxlength="500"
+                                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; resize: vertical; min-height: 100px; font-family: inherit;"
+                                    placeholder="Add a personal note to your gift..."></textarea>
+                                <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                                    <span id="modal_charCount">0</span>/500 characters
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px;">
+                                <button type="submit" class="btn btn-primary" style="flex: 1;">Send Gift</button>
+                                <button type="button" onclick="closeGiftModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+                            </div>
+                        </form>
+                    ` : `
+                        <button onclick="closeGiftModal()" class="btn btn-secondary" style="width: 100%;">Close</button>
+                    `}
+                `;
+
+                    if (allowance.can_gift) {
+                        const textarea = document.getElementById('modal_personal_message');
+                        const charCount = document.getElementById('modal_charCount');
+                        textarea.addEventListener('input', () => {
+                            charCount.textContent = textarea.value.length;
+                        });
+
+                        document.getElementById('modalGiftForm').addEventListener('submit', handleModalGiftSubmit);
+                    }
+                } else {
+                    content.innerHTML = `
+                    <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                        ${data.message || 'Failed to load gift form'}
+                    </div>
+                    <button onclick="closeGiftModal()" class="btn btn-secondary" style="width: 100%;">Close</button>
+                `;
+                }
+            })
+            .catch(error => {
+                content.innerHTML = `
+                <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                    An error occurred. Please try again.
+                </div>
+                <button onclick="closeGiftModal()" class="btn btn-secondary" style="width: 100%;">Close</button>
+            `;
+            });
+    }
+
+    function closeGiftModal() {
+        document.getElementById('giftModal').style.display = 'none';
+        currentGiftPage = null;
     }
 </script>
 </body>

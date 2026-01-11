@@ -286,6 +286,77 @@ class GiftedArticlesControllerTest extends FunctionalTestCase
         $this->assertStringContainsString($this->page->slug, $response->getHeaders()['Location'] ?? '');
     }
 
+    public function testGiftArticleFailsWhenGiftingToSelf(): void
+    {
+        $this->actingAsMember($this->member);
+        $this->createMemberGiftAllowance([
+            'member_id' => $this->member->id,
+            'annual_gift_limit' => 10,
+            'gifts_used_this_year' => 0
+        ]);
+
+        $response = $this->postForSiteUnauthenticated(
+            "/gift-article/{$this->page->slug}",
+            ['recipient_email' => $this->member->email],
+            [],
+            ['Accept' => 'application/json']
+        );
+
+        $this->assertResponseStatus(400, $response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['data']['success']);
+        $this->assertStringContainsString('cannot gift', $data['data']['message']);
+    }
+
+    public function testGetGiftModalReturnsPageAndAllowanceData(): void
+    {
+        $this->actingAsMember($this->member);
+        $this->createMemberGiftAllowance([
+            'member_id' => $this->member->id,
+            'annual_gift_limit' => 10,
+            'gifts_used_this_year' => 3
+        ]);
+
+        $response = $this->getForSite(
+            "/member/gift-modal/{$this->page->slug}",
+            [],
+            ['Accept' => 'application/json']
+        );
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEquals($this->page->slug, $data['data']['page']['slug']);
+        $this->assertEquals(7, $data['data']['allowance']['remaining_gifts']);
+    }
+
+    public function testGetGiftModalRequiresAuthentication(): void
+    {
+        $this->unauthenticateMember();
+
+        $response = $this->getForSiteUnauthenticated(
+            "/member/gift-modal/{$this->page->slug}",
+            [],
+            ['Accept' => 'application/json']
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function testGetGiftModalReturns404ForInvalidPage(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $response = $this->getForSite(
+            "/member/gift-modal/non-existent-slug",
+            [],
+            ['Accept' => 'application/json']
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

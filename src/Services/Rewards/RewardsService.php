@@ -149,6 +149,16 @@ class RewardsService
         }
 
         if ($reward->isClaimed()) {
+            // Track view even if already claimed
+            $this->rewardsRepository->trackClick(
+                $reward->id,
+                $member->id,
+                $reward->site_id,
+                'view',
+                $_SERVER['REMOTE_ADDR'] ?? null,
+                $_SERVER['HTTP_USER_AGENT'] ?? null
+            );
+
             return [
                 'success' => true,
                 'already_claimed' => true,
@@ -158,6 +168,16 @@ class RewardsService
         }
 
         $reward->claim();
+
+        // Track claim
+        $this->rewardsRepository->trackClick(
+            $reward->id,
+            $member->id,
+            $reward->site_id,
+            'claim',
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        );
 
         return [
             'success' => true,

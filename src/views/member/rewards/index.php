@@ -638,6 +638,27 @@
 </div>
 
 <script>
+    // Update the existing copyVoucherCode or add if missing
+    function copyVoucherCode(rewardId, code) {
+        navigator.clipboard.writeText(code).then(() => {
+            // Track the copy action
+            fetch(`/<?= htmlspecialchars($site->slug) ?>/member/rewards/${rewardId}/track/copy_code`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+
+            alert('Voucher code copied to clipboard!');
+        });
+    }
+
+    // Track view when reward modal/detail is opened
+    function trackRewardView(rewardId) {
+        fetch(`/<?= htmlspecialchars($site->slug) ?>/member/rewards/${rewardId}/track/view`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+    }
+
     async function claimReward(rewardId) {
         if (!confirm('Are you sure you want to claim this reward?')) {
             return;

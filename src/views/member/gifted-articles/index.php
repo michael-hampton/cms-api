@@ -370,10 +370,17 @@
                         <?php if ($gift->personal_message): ?>
                             <p style="font-style: italic;">"<?= htmlspecialchars($gift->personal_message) ?>"</p>
                         <?php endif; ?>
-                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($gift->page->slug) ?>"
-                           class="btn btn-primary">
-                            Read Article
-                        </a>
+
+                        <?php if ($gift->status === 'pending'): ?>
+                            <a href="/gift/<?= htmlspecialchars($gift->gift_token) ?>" class="btn btn-primary">
+                                Claim & Read Article
+                            </a>
+                        <?php else: ?>
+                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($gift->page->slug) ?>"
+                               class="btn btn-primary">
+                                Read Article
+                            </a>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             </div>

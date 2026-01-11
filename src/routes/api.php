@@ -1,6 +1,7 @@
 <?php
 // API routes (return arrays -> converted to JSON)
 use App\Controllers\AddressController;
+use App\Controllers\Admin\RewardsAdminController;
 use App\Controllers\AuthController;
 use App\Controllers\AuthorController;
 use App\Controllers\BlockController;
@@ -67,6 +68,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/pages/calendar', [PageController::class, 'getCalendarPages']);;
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
+
+        $router->get('/rewards', [RewardsAdminController::class, 'index']);
+        $router->get('/rewards/search', [RewardsAdminController::class, 'search']);
+        $router->get('/rewards/{rewardId}', [RewardsAdminController::class, 'show']);
+        $router->put('/rewards/{rewardId}', [RewardsAdminController::class, 'update']);
+        $router->post('/rewards/{rewardId}/decline', [RewardsAdminController::class, 'decline']);
 
         // Pipeline routes
         $router->get('/pipeline', [PipelineController::class, 'index']);

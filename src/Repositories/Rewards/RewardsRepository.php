@@ -4,6 +4,7 @@ namespace App\Repositories\Rewards;
 
 use App\Framework\Support\Collection;
 use App\Models\MemberReward;
+use App\Models\RewardClick;
 use App\Models\RewardDefinition;
 use App\Models\RewardVoucherCode;
 use App\Repositories\Repository;
@@ -73,6 +74,95 @@ class RewardsRepository extends Repository
     {
         return MemberReward::with(['rewardDefinition', 'voucherCode'])
             ->find($rewardId);
+    }
+
+    public function searchRewards(int $siteId, array $filters = [], int $page = 1, int $perPage = 50): array
+    {
+        $query = MemberReward::where('site_id', $siteId)
+            ->with(['member', 'rewardDefinition', 'voucherCode']);
+
+        // Filter by status
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        // Filter by member
+        if (!empty($filters['member_id'])) {
+            $query->where('member_id', $filters['member_id']);
+        }
+
+        // Filter by reward definition
+        if (!empty($filters['reward_definition_id'])) {
+            $query->where('reward_definition_id', $filters['reward_definition_id']);
+        }
+
+        // Filter by date range
+        if (!empty($filters['date_from'])) {
+            $query->where('earned_at', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $query->where('earned_at', '<=', $filters['date_to']);
+        }
+
+        // Search by member name or email
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->whereHas('member', function ($q) use ($search) {
+                $q->where('first_name', 'LIKE', "%{$search}%")
+                    ->orWhere('last_name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $total = $query->count();
+        $rewards = $query->orderBy('earned_at', 'desc')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->toSql();
+
+        return [
+            'data' => $rewards,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'last_page' => ceil($total / $perPage)
+        ];
+    }
+
+    public function getRewardStats(int $siteId): array
+    {
+        return [
+            'total' => MemberReward::where('site_id', $siteId)->count(),
+            'pending' => MemberReward::where('site_id', $siteId)->where('status', 'pending')->count(),
+            'claimed' => MemberReward::where('site_id', $siteId)->where('status', 'claimed')->count(),
+            'expired' => MemberReward::where('site_id', $siteId)->where('status', 'expired')->count(),
+            'declined' => MemberReward::where('site_id', $siteId)->where('status', 'declined')->count()
+        ];
+    }
+
+    public function trackClick(int $memberRewardId, int $memberId, int $siteId, string $action, ?string $ipAddress = null, ?string $userAgent = null): void
+    {
+        RewardClick::create([
+            'member_reward_id' => $memberRewardId,
+            'member_id' => $memberId,
+            'site_id' => $siteId,
+            'action' => $action,
+            'ip_address' => $ipAddress,
+            'user_agent' => $userAgent
+        ]);
+    }
+
+    public function getRewardClickStats(int $memberRewardId): array
+    {
+        $clicks = RewardClick::where('member_reward_id', $memberRewardId)->get();
+
+        return [
+            'total_clicks' => $clicks->count(),
+            'views' => $clicks->where('action', 'view')->count(),
+            'claims' => $clicks->where('action', 'claim')->count(),
+            'code_copies' => $clicks->where('action', 'copy_code')->count(),
+            'unique_members' => $clicks->unique('member_id')->count()
+        ];
     }
 
     protected function getModelClass(): string

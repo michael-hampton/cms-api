@@ -233,6 +233,11 @@ if (empty($trendingConversations) || $trendingConversations->count() === 0) {
                         <span><?= number_format($page->comment_count_24h ?? 0) ?></span>
                     </button>
                 </div>
+
+                <button onclick="openGiftModal('<?= htmlspecialchars($page->slug) ?>', '<?= htmlspecialchars($page->title) ?>')"
+                        class="btn btn-secondary" style="margin-top: 10px;">
+                    🎁 Gift This Article
+                </button>
             </article>
         <?php endforeach; ?>
     </div>

@@ -103,11 +103,13 @@ $router->get('/{site}/member/rewards', [RewardsController::class, 'index']);
 $router->get('/{site}/member/rewards/{id}', [RewardsController::class, 'show']); // View single reward details
 $router->post('/{site}/member/rewards/{rewardId}/claim', [RewardsController::class, 'claim']);
 
+$router->post('/{site}/member/rewards/{rewardId}/track/{action}', [RewardsController::class, 'trackClick']);
 
 $router->get('/{site}/member/gifted-articles', [GiftedArticlesController::class, 'index']);
 $router->get('/{site}/gift-article/{pageSlug}', [GiftedArticlesController::class, 'showGiftForm']);
 $router->post('/{site}/gift-article/{pageSlug}', [GiftedArticlesController::class, 'giftArticle']);
 $router->get('/{site}/gift/{token}', [GiftedArticlesController::class, 'claim']);
+$router->get('/{site}/member/gift-modal/{pageSlug}', [GiftedArticlesController::class, 'getGiftModal']);
 
 $router->get('/{site}/reviews', [ReviewPageController::class, 'index']);
 $router->get('/{site}/buying-guides', [BuyingGuideController::class, 'index']);

@@ -204,9 +204,9 @@ if (empty($recommendedPages) || $recommendedPages->count() === 0) {
 
     <div class="content-grid">
         <?php foreach ($recommendedPages as $page): ?>
-            <article class="content-card"
+            <article class="content-card">
+                <div class="content-image"
                      onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($page->slug) ?>'">
-                <div class="content-image">
                     <?php if ($page->categories && $page->categories->count() > 0): ?>
                         <span class="content-badge"><?= htmlspecialchars($page->categories->first()->name) ?></span>
                     <?php endif; ?>
@@ -217,7 +217,13 @@ if (empty($recommendedPages) || $recommendedPages->count() === 0) {
                         <img src="https://via.placeholder.com/300x200" alt="<?= htmlspecialchars($page->title) ?>">
                     <?php endif; ?>
                 </div>
-                <h3 class="content-title"><?= htmlspecialchars($page->title) ?></h3>
+                <h3 class="content-title"
+                    onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= htmlspecialchars($page->slug) ?>'"><?= htmlspecialchars($page->title) ?></h3>
+
+                <button onclick="openGiftModal('<?= htmlspecialchars($page->slug) ?>', '<?= htmlspecialchars($page->title) ?>')"
+                        class="btn btn-secondary" style="margin-top: 10px;">
+                    🎁 Gift This Article
+                </button>
             </article>
         <?php endforeach; ?>
     </div>

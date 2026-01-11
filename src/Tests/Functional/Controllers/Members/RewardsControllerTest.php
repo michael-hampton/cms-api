@@ -175,6 +175,45 @@ class RewardsControllerTest extends FunctionalTestCase
         $this->assertFalse($data['data']['success']);
     }
 
+    public function testTrackClickRecordsAction(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $rewardDef = $this->createRewardDefinition();
+        $reward = $this->createMemberReward([
+            'member_id' => $this->member->id,
+            'reward_definition_id' => $rewardDef->id,
+            'status' => 'claimed'
+        ]);
+
+        $response = $this->postForSiteUnauthenticated(
+            "/member/rewards/{$reward->id}/track/view");
+
+        $this->assertResponseOk($response);
+
+        $this->assertDatabaseHas('reward_clicks', [
+            'member_reward_id' => $reward->id,
+            'member_id' => $this->member->id,
+            'action' => 'view'
+        ]);
+    }
+
+    public function testTrackClickRequiresValidAction(): void
+    {
+        $this->actingAsMember($this->member);
+
+        $rewardDef = $this->createRewardDefinition();
+        $reward = $this->createMemberReward([
+            'member_id' => $this->member->id,
+            'reward_definition_id' => $rewardDef->id
+        ]);
+
+        $response = $this->postForSiteUnauthenticated(
+            "/member/rewards/{$reward->id}/track/invalid_action");
+
+        $this->assertResponseStatus(400, $response);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

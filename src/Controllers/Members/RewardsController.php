@@ -6,12 +6,14 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Rewards\RewardsService;
 
 class RewardsController extends Controller
 {
     public function __construct(
-        private RewardsService $rewardsService
+        private readonly RewardsService    $rewardsService,
+        private readonly RewardsRepository $rewardsRepository
     )
     {
         parent::__construct();
@@ -61,5 +63,38 @@ class RewardsController extends Controller
 
         return $this->redirect('/member/rewards')
             ->withErrors(['message' => $result['message']]);
+    }
+
+    public function trackClick(Request $request, int $rewardId, string $action)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
+
+        $reward = $this->rewardsService->getMemberRewards($member, $siteId)
+            ->where('id', $rewardId)->first();
+
+        if (!$reward) {
+            return $this->jsonResponse(['success' => false], 404);
+        }
+
+        $validActions = ['view', 'copy_code'];
+        if (!in_array($action, $validActions)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Invalid action'], 400);
+        }
+
+        $this->rewardsRepository->trackClick(
+            $rewardId,
+            $member->id,
+            $siteId,
+            $action,
+            $request->ip(),
+            $request->userAgent()
+        );
+
+        return $this->jsonResponse(['success' => true]);
     }
 }

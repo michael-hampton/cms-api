@@ -57,7 +57,9 @@ class RewardsServiceTest extends FunctionalTestCase
         $member = new Member(['id' => 1]);
 
         $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->id = 1;
         $reward->member_id = 1;
+        $reward->site_id = $this->siteId;
         $reward->shouldReceive('isExpired')->once()->andReturn(false);
         $reward->shouldReceive('isClaimed')->once()->andReturn(false);
         $reward->shouldReceive('claim')->once()->andReturn(true);
@@ -67,6 +69,11 @@ class RewardsServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($reward);
+
+        $this->repository
+            ->shouldReceive('trackClick')
+            ->once()
+            ->with(1, $this->siteId, 1, 'claim', null, null);
 
         $result = $this->service->claimReward(1, $member);
 
@@ -136,6 +143,8 @@ class RewardsServiceTest extends FunctionalTestCase
 
         $reward = Mockery::mock(MemberReward::class)->makePartial();
         $reward->member_id = 1;
+        $reward->id = 1;
+        $reward->site_id = $this->siteId;
         $reward->shouldReceive('isExpired')->once()->andReturn(false);
         $reward->shouldReceive('isClaimed')->once()->andReturn(true);
 
@@ -144,6 +153,11 @@ class RewardsServiceTest extends FunctionalTestCase
             ->once()
             ->with(1)
             ->andReturn($reward);
+
+        $this->repository
+            ->shouldReceive('trackClick')
+            ->once()
+            ->with(1, $this->siteId, 1, 'view', null, null);
 
         $result = $this->service->claimReward(1, $member);
 
@@ -247,6 +261,40 @@ class RewardsServiceTest extends FunctionalTestCase
         $result = $this->service->checkAndAwardRewards($member, $siteId);
 
         $this->assertCount(0, $result);
+    }
+
+    public function testClaimRewardTracksClick(): void
+    {
+        $member = new Member(['id' => 1]);
+
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->member_id = 1;
+        $reward->site_id = 1;
+        $reward->id = 1;
+        $reward->shouldReceive('isExpired')->once()->andReturn(false);
+        $reward->shouldReceive('isClaimed')->once()->andReturn(false);
+        $reward->shouldReceive('claim')->once()->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('findMemberRewardById')
+            ->once()
+            ->andReturn($reward);
+
+        $this->repository
+            ->shouldReceive('trackClick')
+            ->once()
+            ->with(
+                $reward->id,
+                $member->id,
+                1,
+                'claim',
+                Mockery::any(),
+                Mockery::any()
+            );
+
+        $result = $this->service->claimReward($reward->id, $member);
+
+        $this->assertTrue($result['success']);
     }
 
     protected function setUp(): void

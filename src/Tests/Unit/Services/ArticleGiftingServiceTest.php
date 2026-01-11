@@ -463,6 +463,128 @@ class ArticleGiftingServiceTest extends TestCase
         $this->assertEquals(0, $result);
     }
 
+    public function testGiftArticleFailsWhenGiftingToSelf(): void
+    {
+        $gifter = Mockery::mock(Member::class)->makePartial();
+        $gifter->id = 1;
+        $gifter->email = 'user@example.com';
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $siteId = 1;
+
+        $allowance = Mockery::mock(MemberGiftAllowance::class);
+        $allowance->shouldReceive('canGift')->once()->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getOrCreateAllowance')
+            ->once()
+            ->with($gifter->id, $siteId)
+            ->andReturn($allowance);
+
+        $result = $this->service->giftArticle(
+            $gifter,
+            $page,
+            'user@example.com', // Same as gifter's email
+            $siteId
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('cannot gift an article to yourself', $result['message']);
+    }
+
+    public function testGiftArticleFailsWhenGiftingToSelfCaseInsensitive(): void
+    {
+        $gifter = Mockery::mock(Member::class)->makePartial();
+        $gifter->id = 1;
+        $gifter->email = 'User@Example.com';
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $siteId = 1;
+
+        $allowance = Mockery::mock(MemberGiftAllowance::class);
+        $allowance->shouldReceive('canGift')->once()->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getOrCreateAllowance')
+            ->once()
+            ->andReturn($allowance);
+
+        $result = $this->service->giftArticle(
+            $gifter,
+            $page,
+            'user@example.com', // Different case
+            $siteId
+        );
+
+        $this->assertFalse($result['success']);
+    }
+
+    public function testCheckAndClaimGiftForPageClaimsPendingGift(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+        $member->email = 'user@example.com';
+
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+
+        $gift = Mockery::mock(GiftedArticle::class)->makePartial();
+        $gift->shouldReceive('isClaimed')->once()->andReturn(false);
+        $gift->shouldReceive('claim')->once()->with($member->id)->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('findPendingGiftForMemberAndPage')
+            ->once()
+            ->with($member->id, $member->email, $page->id)
+            ->andReturn($gift);
+
+        $result = $this->service->checkAndClaimGiftForPage($member, $page);
+
+        $this->assertSame($gift, $result);
+    }
+
+    public function testCheckAndClaimGiftForPageReturnsNullIfNoGift(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+        $member->email = 'user@example.com';
+
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+
+        $this->repository
+            ->shouldReceive('findPendingGiftForMemberAndPage')
+            ->once()
+            ->with($member->id, $member->email, $page->id)
+            ->andReturn(null);
+
+        $result = $this->service->checkAndClaimGiftForPage($member, $page);
+
+        $this->assertNull($result);
+    }
+
+    public function testCheckAndClaimGiftForPageReturnsNullIfAlreadyClaimed(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+        $member->email = 'user@example.com';
+
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+
+        $gift = Mockery::mock(GiftedArticle::class)->makePartial();
+        $gift->shouldReceive('isClaimed')->once()->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('findPendingGiftForMemberAndPage')
+            ->once()
+            ->andReturn($gift);
+
+        $result = $this->service->checkAndClaimGiftForPage($member, $page);
+
+        $this->assertNull($result);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

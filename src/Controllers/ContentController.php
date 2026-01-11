@@ -14,11 +14,13 @@ use App\Models\PageView;
 use App\Models\Site;
 use App\Repositories\Cms\PageGridRepository;
 use App\Repositories\Members\CommentRepository;
+use App\Repositories\Members\GiftedArticleRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Services\Cms\ArticleAccessService;
 use App\Services\Cms\BlockParserService;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\PageRenderService;
+use App\Services\Members\ArticleGiftingService;
 use App\Services\Subscriptions\SubscriptionModalService;
 use App\Services\Url\UrlResolutionResult;
 
@@ -83,6 +85,16 @@ class ContentController extends Controller
 
         $this->activityTracking->trackPageView($page);
 
+        // Check and auto-claim gift if member is logged in
+        $claimedGift = null;
+        if (MemberAuth::check()) {
+            $member = MemberAuth::getMember();
+            $giftingService = new ArticleGiftingService(
+                new GiftedArticleRepository()
+            );
+            $claimedGift = $giftingService->checkAndClaimGiftForPage($member, $page);
+        }
+
         $data = [
             'menu' => $menu,
             'footerMenu' => $footerMenu,
@@ -91,7 +103,8 @@ class ContentController extends Controller
             'site' => SiteContext::get(),
             'member' => $member,
             'subscriptionModalData' => $modalData,
-            'menuRenderer' => new Menurenderer()
+            'menuRenderer' => new MenuRenderer(),
+            'claimedGift' => $claimedGift
         ];
 
         $data['allCategories'] = Category::where('site_id', $siteId)
