@@ -2,9 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkActivateTerritories;
-use App\Actions\BulkDeactivateTerritories;
-use App\Actions\BulkDeleteTerritories;
+use App\Actions\Territory\BulkActivateTerritories;
+use App\Actions\Territory\BulkDeactivateTerritories;
+use App\Actions\Territory\BulkDeleteTerritories;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;

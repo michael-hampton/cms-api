@@ -2,9 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteTag;
-use App\Actions\CloneTag;
-use App\Actions\MergeTag;
+use App\Actions\Tag\BulkDeleteTag;
+use App\Actions\Tag\CloneTag;
+use App\Actions\Tag\MergeTag;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;

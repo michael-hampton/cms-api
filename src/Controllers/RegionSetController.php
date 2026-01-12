@@ -2,10 +2,10 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkActivateRegionSets;
-use App\Actions\BulkDeactivateRegionSets;
-use App\Actions\BulkDeleteRegionSet;
-use App\Actions\CloneRegionSet;
+use App\Actions\RegionSet\BulkActivateRegionSets;
+use App\Actions\RegionSet\BulkDeactivateRegionSets;
+use App\Actions\RegionSet\BulkDeleteRegionSet;
+use App\Actions\RegionSet\CloneRegionSet;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;

@@ -2,8 +2,8 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteCategory;
-use App\Actions\CloneCategory;
+use App\Actions\Category\BulkDeleteCategory;
+use App\Actions\Category\CloneCategory;
 use App\Exceptions\CannotDeleteException;
 use App\Exceptions\CategoryAssignmentException;
 use App\Framework\Container;

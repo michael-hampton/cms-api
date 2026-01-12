@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Actions\CloneOrder;
+use App\Actions\Order\CloneOrder;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
@@ -272,7 +272,7 @@ class OrderController extends Controller
         try {
             $data = $request->validated();
 
-            $bulkUpdateStatus = Container::getInstance()->make(\App\Actions\BulkUpdateOrderStatus::class);
+            $bulkUpdateStatus = Container::getInstance()->make(\App\Actions\Order\BulkUpdateOrderStatus::class);
 
             $result = $bulkUpdateStatus->handle($data['ids'], $data['status']);
 

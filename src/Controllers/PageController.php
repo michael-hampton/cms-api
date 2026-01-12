@@ -2,20 +2,20 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkAddContributorsToPages;
-use App\Actions\BulkAddTagsToPages;
-use App\Actions\BulkApprovePages;
-use App\Actions\BulkChangePageAuthors;
-use App\Actions\BulkClonePages;
-use App\Actions\BulkDeletePages;
-use App\Actions\BulkRemoveContributorsFromPages;
-use App\Actions\BulkRemoveTagsFromPages;
-use App\Actions\BulkSchedulePages;
-use App\Actions\BulkUpdatePage;
-use App\Actions\BulkUpdatePageRegions;
-use App\Actions\BulkUpdatePageStatus;
-use App\Actions\ClonePage;
-use App\Actions\ClonePageToSite;
+use App\Actions\Pages\BulkAddContributorsToPages;
+use App\Actions\Pages\BulkAddTagsToPages;
+use App\Actions\Pages\BulkApprovePages;
+use App\Actions\Pages\BulkChangePageAuthors;
+use App\Actions\Pages\BulkClonePages;
+use App\Actions\Pages\BulkDeletePages;
+use App\Actions\Pages\BulkRemoveContributorsFromPages;
+use App\Actions\Pages\BulkRemoveTagsFromPages;
+use App\Actions\Pages\BulkSchedulePages;
+use App\Actions\Pages\BulkUpdatePage;
+use App\Actions\Pages\BulkUpdatePageRegions;
+use App\Actions\Pages\BulkUpdatePageStatus;
+use App\Actions\Pages\ClonePage;
+use App\Actions\Pages\ClonePageToSite;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;

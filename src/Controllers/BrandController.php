@@ -2,9 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteBrand;
-use App\Actions\CloneBrand;
-use App\Actions\MergeBrand;
+use App\Actions\Brand\BulkDeleteBrand;
+use App\Actions\Brand\CloneBrand;
+use App\Actions\Brand\MergeBrand;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;

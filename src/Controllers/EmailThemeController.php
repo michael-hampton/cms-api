@@ -3,8 +3,8 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteEmailTheme;
-use App\Actions\CloneEmailTheme;
+use App\Actions\EmailTheme\BulkDeleteEmailTheme;
+use App\Actions\EmailTheme\CloneEmailTheme;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;

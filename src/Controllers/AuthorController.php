@@ -2,9 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteAuthor;
-use App\Actions\CloneAuthor;
-use App\Actions\MergeAuthor;
+use App\Actions\Author\BulkDeleteAuthor;
+use App\Actions\Author\CloneAuthor;
+use App\Actions\Author\MergeAuthor;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;

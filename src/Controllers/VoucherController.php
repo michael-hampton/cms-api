@@ -2,8 +2,8 @@
 
 namespace App\Controllers;
 
-use App\Actions\BulkDeleteVoucher;
-use App\Actions\CloneVoucher;
+use App\Actions\Voucher\BulkDeleteVoucher;
+use App\Actions\Voucher\CloneVoucher;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
@@ -211,7 +211,7 @@ class VoucherController extends Controller
         try {
             $data = $request->validated();
 
-            $handler = Container::getInstance()->make(\App\Actions\BulkUpdateVoucherStatus::class);
+            $handler = Container::getInstance()->make(\App\Actions\Voucher\BulkUpdateVoucherStatus::class);
 
             $result = $handler->handle($data['ids'], $data['status']);
 

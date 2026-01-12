@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Actions\CloneProduct;
+use App\Actions\Product\CloneProduct;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
