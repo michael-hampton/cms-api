@@ -1232,4 +1232,125 @@ class SubscriptionModelTest extends FunctionalTestCase
             'currency' => 'USD'
         ]);
     }
+
+    public function testGrantLowerTierPlansGrantsAccessToAllCheaperPlans(): void
+    {
+        $member = $this->createMember();
+
+        // Create plans at different price points
+        $basicPlan = $this->createSubscriptionPlan([
+            'name' => 'Basic',
+            'price' => 9.99,
+            'site_id' => $this->siteId,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider2'],
+            ]
+        ]);
+
+        $standardPlan = $this->createSubscriptionPlan([
+            'name' => 'Standard',
+            'price' => 19.99,
+            'site_id' => $this->siteId,
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+            ]
+        ]);
+
+        $premiumPlan = $this->createSubscriptionPlan([
+            'name' => 'Premium',
+            'price' => 39.99,
+            'site_id' => $this->siteId
+        ]);
+
+        // Create subscription to premium plan
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $premiumPlan->id,
+            'plan_name' => $premiumPlan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $premiumPlan->price,
+            'currency' => 'USD'
+        ]);
+
+        $grantedAccess = $subscription->grantLowerTierPlans();
+
+        // Should have granted access from both lower-tier plans
+        $this->assertCount(2, $grantedAccess);
+
+        $planNames = array_column($grantedAccess, 'plan');
+        $this->assertContains('Basic', $planNames);
+        $this->assertContains('Standard', $planNames);
+    }
+
+    public function testGrantLowerTierPlansDoesNotGrantHigherTierAccess(): void
+    {
+        $member = $this->createMember();
+
+        $basicPlan = $this->createSubscriptionPlan([
+            'name' => 'Basic',
+            'price' => 9.99
+        ]);
+
+        $premiumPlan = $this->createSubscriptionPlan([
+            'name' => 'Premium',
+            'price' => 39.99
+        ]);
+
+        // Create subscription to basic plan
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $basicPlan->id,
+            'plan_name' => $basicPlan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $basicPlan->price,
+            'currency' => 'USD'
+        ]);
+
+        $grantedAccess = $subscription->grantLowerTierPlans();
+
+        // Should not grant any access (no plans cheaper than basic)
+        $this->assertEmpty($grantedAccess);
+    }
+
+    public function testGrantLowerTierPlansDoesNotDuplicateExistingAccess(): void
+    {
+        $member = $this->createMember();
+
+        $basicPlan = $this->createSubscriptionPlan([
+            'name' => 'Basic',
+            'price' => 9.99
+        ]);
+
+        $premiumPlan = $this->createSubscriptionPlan([
+            'name' => 'Premium',
+            'price' => 39.99
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $premiumPlan->id,
+            'plan_name' => $premiumPlan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $premiumPlan->price,
+            'currency' => 'USD'
+        ]);
+
+        // Manually grant access from basic plan
+        $subscription->grantPremiumAccess('newsletter', 'basic-newsletter');
+
+        $grantedAccess = $subscription->grantLowerTierPlans();
+
+        // Should not re-grant already existing access
+        $identifiers = array_map(function ($item) {
+            return $item['access']->premium_identifier;
+        }, $grantedAccess);
+
+        $this->assertNotContains('basic-newsletter', $identifiers);
+    }
 }

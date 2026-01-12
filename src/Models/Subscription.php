@@ -581,4 +581,55 @@ class Subscription extends Model
             ->where('premium_type', 'newsletter')
             ->exists();
     }
+
+    /**
+     * Grant all lower-tier plans for free when upgrading from a higher-tier plan
+     */
+    public function grantLowerTierPlans(): array
+    {
+        if (!$this->plan) {
+            return [];
+        }
+
+        // Get all active plans for this site
+        $allPlans = SubscriptionPlan::where('site_id', $this->site_id)
+            ->where('is_active', true)
+            ->where('id', '!=', $this->plan_id)
+            ->get();
+
+        // Filter plans that are cheaper than current plan
+        $lowerTierPlans = $allPlans->filter(function ($plan) {
+            return $plan->price < $this->plan->price;
+        });
+
+        $grantedAccess = [];
+
+        foreach ($lowerTierPlans as $plan) {
+            $premiumGrants = $plan->getPremiumAccessGrants();
+
+            foreach ($premiumGrants as $grant) {
+
+                // Check if we already have this access
+                $exists = $this->premiumAccess(true)
+                    ->where('premium_type', $grant['type'])
+                    ->where('premium_identifier', $grant['identifier'])
+                    ->get();
+
+                if ($exists->count() === 0) {
+                    $access = $this->grantPremiumAccess(
+                        $grant['type'],
+                        $grant['identifier'],
+                        $grant['expires_at'] ?? null
+                    );
+
+                    $grantedAccess[] = [
+                        'plan' => $plan->name,
+                        'access' => $access
+                    ];
+                }
+            }
+        }
+
+        return $grantedAccess;
+    }
 }

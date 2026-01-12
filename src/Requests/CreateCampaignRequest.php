@@ -49,7 +49,22 @@ class CreateCampaignRequest extends FormRequest
 
                 $existing = $this->campaignRepository->findBySlug($slug, $siteId);
                 if ($existing) {
-                    throw new ValidationException('Slug already exists');
+                    throw new ValidationException('Slug already exists', ['slug' => 'Slug already exists.']);
+                }
+
+                $startDate = $request->get('start_date');
+                $endDate = $request->get('end_date');
+
+                if (!empty($startDate) && !empty($endDate)) {
+                    $startDate = new \DateTime($startDate);
+                    $endDate = new \DateTime($endDate);
+
+                    if ($endDate < $startDate) {
+                        throw new ValidationException(
+                            'End date must be later than start date',
+                            ['end_date' => 'End date must be later than start date.']
+                        );
+                    }
                 }
             }
         ];

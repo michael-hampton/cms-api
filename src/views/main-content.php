@@ -112,3 +112,7 @@ $pageGridAdded = false;
     </div>
 <?php endif; ?>
 
+<?php if (isset($member) && $member): ?>
+    @include('components/badge-earned-modal')
+<?php endif; ?>
+

@@ -11,10 +11,13 @@ use App\Repositories\Members\BadgeRepository;
 use App\Services\Members\BadgeService;
 use App\Services\Rewards\RewardsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 
 class BadgeServiceTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private BadgeRepository $badgeRepository;
     private BadgeService $service;
     private RewardsService $rewardsService;
@@ -395,5 +398,80 @@ class BadgeServiceTest extends FunctionalTestCase
         $this->assertCount(5, $result['next_badges']);
     }
 
+    public function testAwardBadgeSetsSessionFlag(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Test Badge',
+            'slug' => 'test-badge',
+            'description' => 'Test Description',
+            'icon' => '🏆',
+            'points' => 10,
+            'criteria' => [],
+            'is_active' => true,
+            'category' => 'test'
+        ]);
+
+        $this->badgeRepository->shouldReceive('createMemberBadge')
+            ->once()
+            ->andReturn(Mockery::mock(\App\Models\MemberBadge::class)->makePartial());
+
+        $this->badgeRepository->shouldReceive('createMemberPoint')
+            ->once()
+            ->andReturn(Mockery::mock(\App\Models\MemberPoint::class)->makePartial());
+
+        $this->rewardsService->shouldReceive('checkAndAwardRewards')
+            ->once()
+            ->andReturn([]);
+
+        $memberBadge = $this->service->awardBadge($member, $badge);
+
+        $this->assertArrayHasKey('show_badge_modal', $_SESSION);
+        $this->assertArrayHasKey('new_badge_data', $_SESSION);
+    }
+
+    public function testAwardBadgeSetsSessionForModal(): void
+    {
+        $member = $this->createMember();
+        $memberBadge = Mockery::mock(MemberBadge::class);
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Test Badge',
+            'slug' => 'test-badge',
+            'description' => 'Test Description',
+            'icon' => '🏆',
+            'points' => 100,
+            'criteria' => [],
+            'is_active' => true,
+            'category' => 'test'
+        ]);
+
+        $this->badgeRepository->shouldReceive('createMemberBadge')
+            ->once()
+            ->andReturn($memberBadge);
+
+        $memberPoint = Mockery::mock(MemberPoint::class)->makePartial();
+        $memberPoint->points = 100;
+
+        $this->badgeRepository->shouldReceive('createMemberPoint')
+            ->once()
+            ->andReturn($memberPoint);
+
+        $this->rewardsService->shouldReceive('checkAndAwardRewards')
+            ->once()
+            ->andReturn([]);
+
+        $this->service->awardBadge($member, $badge);
+
+        $this->assertTrue($_SESSION['show_badge_modal']);
+        $this->assertArrayHasKey('new_badge_data', $_SESSION);
+        $this->assertEquals('Test Badge', $_SESSION['new_badge_data']['name']);
+        $this->assertEquals('Test Description', $_SESSION['new_badge_data']['description']);
+        $this->assertEquals('🏆', $_SESSION['new_badge_data']['icon']);
+        $this->assertEquals(100, $_SESSION['new_badge_data']['points']);
+    }
 
 }

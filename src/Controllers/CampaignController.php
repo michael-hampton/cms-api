@@ -3,6 +3,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
@@ -73,13 +74,8 @@ class CampaignController extends Controller
         try {
             $siteId = SiteContext::getId();
 
-            // Validate required fields
-            $name = $request->input('name');
-            $slug = $request->input('slug');
-
-            if (!$name || !$slug) {
-                return $this->errorResponse('Name and slug are required', 400);
-            }
+            $data = $request->validated();
+            $slug = $data['slug'];
 
             // Check for duplicate slug
             $existing = $this->campaignRepository->findBySlug($slug, $siteId);
@@ -87,11 +83,11 @@ class CampaignController extends Controller
                 return $this->errorResponse('Campaign with this slug already exists', 400);
             }
 
-            $data = $request->validated();
-
             $campaign = $this->campaignRepository->create($data);
 
             return $this->jsonResponse(['campaign' => $campaign->toArray()], 201);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (\Exception $e) {
             Logger::error('Failed to create campaign', ['error' => $e->getMessage()]);
             return $this->errorResponse('Failed to create campaign: ' . $e->getMessage(), 500);
@@ -195,6 +191,44 @@ class CampaignController extends Controller
             return $this->resourceResponse(['campaigns' => $campaigns]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function pause(Request $request, int $id): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $result = $this->campaignService->pauseCampaign($id, $siteId);
+
+            if (!$result['success']) {
+                return $this->errorResponse($result['error'], $result['code']);
+            }
+
+            return $this->successResponse($result['message'], [
+                'campaign' => $result['campaign']->toArray()
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Failed to pause campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            return $this->errorResponse('Failed to pause campaign: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function resume(Request $request, int $id): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $result = $this->campaignService->resumeCampaign($id, $siteId);
+
+            if (!$result['success']) {
+                return $this->errorResponse($result['error'], $result['code']);
+            }
+
+            return $this->successResponse($result['message'], [
+                'campaign' => $result['campaign']->toArray()
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Failed to resume campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            return $this->errorResponse('Failed to resume campaign: ' . $e->getMessage(), 500);
         }
     }
 }

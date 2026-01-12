@@ -96,6 +96,28 @@ class MemberDashboardController extends Controller
 
         $unclaimedRewards = $this->rewardService->getUnclaimedRewards($member, $siteId);
 
+        $giftedArticles = [];
+        if ($member->isEmailVerified()) {
+            try {
+                $giftingService = new \App\Services\Members\ArticleGiftingService(
+                    new \App\Repositories\Members\GiftedArticleRepository()
+                );
+
+                $gifts = $giftingService->getGiftedArticlesForMember($member, $siteId);
+                $giftedArticles = [
+                    'received' => $gifts['received']->take(5), // Show latest 5
+                    'given' => $gifts['given']->take(5),
+                    'received_count' => $gifts['received']->count(),
+                    'given_count' => $gifts['given']->count(),
+                ];
+            } catch (\Exception $e) {
+                \App\Framework\Support\Logger::error('Failed to load gifted articles', [
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         return $this->view('member/dashboard', [
             'member' => $memberObj,
             'site' => SiteContext::get(),
@@ -108,6 +130,7 @@ class MemberDashboardController extends Controller
             'trendingPages' => $trendingPages,
             'trendingConversations' => $trendingConversations,
             'unclaimedRewards' => $unclaimedRewards,
+            'giftedArticles' => $giftedArticles,
         ]);
     }
 

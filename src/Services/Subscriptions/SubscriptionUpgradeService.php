@@ -297,14 +297,12 @@ class SubscriptionUpgradeService
                 throw new Exception('Invalid upgrade plan');
             }
 
-            // Verify the upgrade plan is compatible
             if ($upgradePlan->upgrade_from_plan_id && $upgradePlan->upgrade_from_plan_id !== $subscription->plan_id) {
                 throw new Exception('Upgrade plan does not match current subscription');
             }
 
             $priceDifference = $this->calculateUpgradePrice($subscription, $upgradePlan);
 
-            // Process payment for upgrade if there's a price difference
             $paymentResult = null;
             if ($priceDifference > 0) {
                 $paymentResult = $this->processUpgradePayment(
@@ -319,7 +317,6 @@ class SubscriptionUpgradeService
                 }
             }
 
-            // Update subscription
             $updated = $this->subscriptionRepository->update($subscriptionId, [
                 'upgraded_from_plan_id' => $subscription->plan_id,
                 'plan_id' => $upgradePlanId,
@@ -333,7 +330,6 @@ class SubscriptionUpgradeService
                 throw new Exception('Failed to update subscription');
             }
 
-            // Grant all premium access from the new plan
             $premiumGrants = $upgradePlan->getPremiumAccessGrants();
             $grantedAccess = [];
 
@@ -345,7 +341,6 @@ class SubscriptionUpgradeService
                 );
                 $grantedAccess[] = $access;
 
-                // Backward compatibility
                 if ($grant['type'] === 'newsletter' && $grant['identifier'] === 'insider') {
                     $this->subscriptionRepository->update($subscriptionId, [
                         'includes_digital_access' => true
@@ -353,7 +348,9 @@ class SubscriptionUpgradeService
                 }
             }
 
-            // Update Stripe subscription if exists
+            // NEW: Grant lower-tier plan access for free
+            $lowerTierAccess = $subscription->grantLowerTierPlans;
+
             if ($subscription->hasStripeSubscription()) {
                 $this->updateStripeSubscription($subscription, $upgradePlan);
             }
@@ -363,6 +360,7 @@ class SubscriptionUpgradeService
                 'from_plan' => $subscription->plan_id,
                 'to_plan' => $upgradePlanId,
                 'premium_grants' => $premiumGrants,
+                'lower_tier_grants' => $lowerTierAccess,
                 'price_difference' => $priceDifference
             ]);
 
@@ -370,6 +368,7 @@ class SubscriptionUpgradeService
                 'success' => true,
                 'subscription' => $this->subscriptionRepository->find($subscriptionId),
                 'premium_access_granted' => $grantedAccess,
+                'lower_tier_access_granted' => $lowerTierAccess,
                 'price_charged' => round($priceDifference, 2),
                 'payment_result' => $paymentResult,
                 'message' => 'Successfully upgraded subscription'

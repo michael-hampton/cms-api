@@ -17,6 +17,7 @@ use App\Controllers\MemberController;
 use App\Controllers\Members\GiftedArticlesController;
 use App\Controllers\Members\MemberActivityController;
 use App\Controllers\Members\MemberAddressController;
+use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberConsentController;
 use App\Controllers\Members\MemberDashboardController;
@@ -98,6 +99,8 @@ $router->get('/{site}/member/activity', [MemberActivityController::class, 'index
 $router->get('/{site}/member/activity/badges', [MemberActivityController::class, 'badges']);
 $router->get('/{site}/member/account-details', [MemberController::class, 'accountDetails']);
 $router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
+$router->get('/{site}/member/new-badges', [MemberBadgeController::class, 'getNewBadges']);
+$router->post('/{site}/member/badge-shown', [MemberBadgeController::class, 'markBadgeShown']);
 
 $router->get('/{site}/member/rewards', [RewardsController::class, 'index']);
 $router->get('/{site}/member/rewards/{id}', [RewardsController::class, 'show']); // View single reward details

@@ -115,6 +115,14 @@ class GiftedArticleRepository extends Repository
             ->first();
     }
 
+    public function getPendingGiftsForMember(mixed $id, mixed $email)
+    {
+        return GiftedArticle::where('recipient_email', strtolower(trim($email)))
+            ->where('status', 'pending')
+            ->with(['page', 'giftedBy'])
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return GiftedArticle::class;

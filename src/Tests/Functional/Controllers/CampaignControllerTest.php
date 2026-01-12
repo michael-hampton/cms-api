@@ -40,6 +40,41 @@ class CampaignControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['campaigns']);
     }
 
+    public function test_show_returns_campaign_with_stats(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Test Campaign',
+            'slug' => 'test-campaign',
+            'campaign_type' => 'email',
+            'campaign_id' => 'TEST123',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'status' => 'active'
+        ]);
+
+        $response = $this->getForSite("/api/campaigns/{$campaign->id}");
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('campaign', $data);
+        $this->assertEquals('Test Campaign', $data['campaign']['name']);
+        $this->assertEquals('TEST123', $data['campaign']['campaign_id']);
+        $this->assertArrayHasKey('subscriber_count', $data['campaign']);
+    }
+
+    public function test_show_returns_404_for_nonexistent_campaign(): void
+    {
+        $response = $this->getForSite('/api/campaigns/99999');
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+
     public function test_create_campaign_with_valid_data(): void
     {
         $newsletter = $this->createNewsletter();
@@ -66,6 +101,44 @@ class CampaignControllerTest extends FunctionalTestCase
         $this->assertNotNull($campaign);
     }
 
+    public function test_create_campaign_validates_date_range(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite('/api/campaigns', [
+            'name' => 'Test Campaign',
+            'slug' => 'test-campaign',
+            'campaign_type' => 'email',
+            'newsletter_id' => $newsletter->id,
+            'start_date' => '2024-12-31',
+            'end_date' => '2024-01-01',
+            'site_id' => $this->siteId,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('end_date', $data['errors']);
+    }
+
+    public function test_create_campaign_requires_name(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite('/api/campaigns', [
+            'slug' => 'test-slug',
+            'campaign_type' => 'email',
+            'newsletter_id' => $newsletter->id
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('name', $data['errors']);
+    }
+
     public function test_create_campaign_rejects_duplicate_slug(): void
     {
         $newsletter = $this->createNewsletter();
@@ -84,10 +157,11 @@ class CampaignControllerTest extends FunctionalTestCase
             'newsletter_id' => $newsletter->id
         ]);
 
-        $this->assertResponseStatus(400, $response);
+        $this->assertResponseStatus(422, $response);
 
         $data = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('already exists', $data['error']);
+
+        $this->assertArrayHasKey('slug', $data['errors']);
     }
 
     public function test_update_campaign(): void
@@ -112,6 +186,69 @@ class CampaignControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Updated Name', $data['data']['campaign']['name']);
         $this->assertFalse($data['data']['campaign']['is_active']);
+    }
+
+    public function test_pause_campaign(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Active Campaign',
+            'slug' => 'active',
+            'campaign_type' => 'email',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'status' => 'active'
+        ]);
+
+        $response = $this->postForSite("/api/campaigns/{$campaign->id}/pause", []);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('paused', $data['data']['campaign']['status']);
+        $this->assertFalse($data['data']['campaign']['is_active']);
+
+        // Verify in database
+        $updated = Campaign::find($campaign->id);
+        $this->assertEquals('paused', $updated->status);
+        $this->assertFalse($updated->is_active);
+    }
+
+    public function test_resume_campaign(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Paused Campaign',
+            'slug' => 'paused',
+            'campaign_type' => 'email',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => false,
+            'status' => 'paused'
+        ]);
+
+        $response = $this->postForSite("/api/campaigns/{$campaign->id}/resume", []);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('active', $data['data']['campaign']['status']);
+        $this->assertTrue($data['data']['campaign']['is_active']);
+
+        // Verify in database
+        $updated = Campaign::find($campaign->id);
+        $this->assertEquals('active', $updated->status);
+        $this->assertTrue($updated->is_active);
+    }
+
+    public function test_resume_campaign_returns_404_for_nonexistent(): void
+    {
+        $response = $this->postForSite('/api/campaigns/99999/resume', []);
+
+        $this->assertResponseStatus(404, $response);
     }
 
     public function test_delete_campaign_without_subscribers(): void

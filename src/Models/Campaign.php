@@ -20,6 +20,9 @@ class Campaign extends Model
         'newsletter_id',
         'is_active',
         'gates_premium_content',
+        'status',
+        'campaign_type',
+        'campaign_id',
         'start_date',
         'end_date',
         'tracking_params',
@@ -123,5 +126,19 @@ class Campaign extends Model
         $params = $this->tracking_params ?? [];
         $params[$key] = $value;
         $this->tracking_params = $params;
+    }
+
+    public function pause(): void
+    {
+        $this->status = 'paused';
+        $this->is_active = false;
+        $this->updated_at = new \DateTime();
+    }
+
+    public function resume(): void
+    {
+        $this->status = 'active';
+        $this->is_active = true;
+        $this->updated_at = new \DateTime();
     }
 }

@@ -44,13 +44,13 @@ class ArticleGiftingService
             ];
         }
 
-        // NEW: Prevent self-gifting
-        if (strtolower(trim($recipientEmail)) === strtolower(trim($gifter->email))) {
-            return [
-                'success' => false,
-                'message' => 'You cannot gift an article to yourself'
-            ];
-        }
+        // Prevent self-gifting
+//        if (strtolower(trim($recipientEmail)) === strtolower(trim($gifter->email))) {
+//            return [
+//                'success' => false,
+//                'message' => 'You cannot gift an article to yourself'
+//            ];
+//        }
 
         // Check if this article was already gifted to this email by this member
         $existing = $this->giftRepository->findExistingGift(

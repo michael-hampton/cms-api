@@ -156,4 +156,87 @@ class CampaignService
 
         return $campaign->gatesPremiumContent() && $campaign->isActive();
     }
+
+    public function pauseCampaign(int $campaignId, int $siteId): array
+    {
+        $campaign = $this->campaignRepository->find($campaignId);
+
+        if (!$campaign || $campaign->site_id !== $siteId) {
+            return [
+                'success' => false,
+                'error' => 'Campaign not found',
+                'code' => 404
+            ];
+        }
+
+        $campaign->pause();
+        $updated = $this->campaignRepository->update($campaignId, [
+            'status' => 'paused',
+            'is_active' => false
+        ]);
+
+        return [
+            'success' => true,
+            'campaign' => $updated,
+            'message' => 'Campaign paused successfully'
+        ];
+    }
+
+    public function canDeleteCampaign(int $campaignId): array
+    {
+        $subscriberCount = $this->campaignRepository->getSubscriberCount($campaignId);
+
+        if ($subscriberCount > 0) {
+            return [
+                'can_delete' => false,
+                'reason' => "Cannot delete campaign with {$subscriberCount} subscribers. Deactivate instead."
+            ];
+        }
+
+        return [
+            'can_delete' => true
+        ];
+    }
+
+    public function getCampaignWithStats(int $campaignId, int $siteId): ?array
+    {
+        $campaign = $this->campaignRepository->find($campaignId);
+
+        if (!$campaign || $campaign->site_id !== $siteId) {
+            return null;
+        }
+
+        return [
+            'campaign' => $campaign->toArray(),
+            'subscriber_count' => $this->campaignRepository->getSubscriberCount($campaignId),
+            'is_currently_active' => $campaign->isActive(),
+            'has_ended' => $campaign->hasEnded(),
+        ];
+    }
+
+    public function resumeCampaign(int $campaignId, int $siteId): array
+    {
+        $campaign = $this->campaignRepository->find($campaignId);
+
+        if (!$campaign || $campaign->site_id !== $siteId) {
+            return [
+                'success' => false,
+                'error' => 'Campaign not found',
+                'code' => 404
+            ];
+        }
+
+        $campaign->resume();
+        $updated = $this->campaignRepository->update($campaignId, [
+            'status' => 'active',
+            'is_active' => true
+        ]);
+
+        return [
+            'success' => true,
+            'campaign' => $updated,
+            'message' => 'Campaign resumed successfully'
+        ];
+    }
+
 }

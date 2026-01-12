@@ -3,6 +3,20 @@
  * @var \App\Models\Member $member
  * @var \App\Models\Site $site
  */
+
+
+// At the top of _header.php, add:
+use App\Repositories\Members\GiftedArticleRepository;
+use App\Repositories\Rewards\RewardsRepository;
+use App\Services\Members\NotificationService;
+
+$notificationService = new NotificationService(
+        new RewardsRepository(),
+        new GiftedArticleRepository()
+);
+
+$notifications = $notificationService->getNotifications($member, $site->id);
+$notificationCount = count($notifications);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -399,6 +413,215 @@
                 gap: 0.5rem;
             }
         }
+
+        .notification-bell {
+            position: relative;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            width: 2.75rem;
+            height: 2.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .notification-bell:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .notification-bell svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            stroke: var(--text-secondary);
+        }
+
+        .notification-bell:hover svg {
+            stroke: var(--primary-color);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--danger-color);
+            color: white;
+            font-size: 0.625rem;
+            font-weight: 700;
+            padding: 0.125rem 0.375rem;
+            border-radius: 10px;
+            min-width: 1.125rem;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-xl);
+            width: 380px;
+            max-height: 500px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+            border: 1px solid var(--border-color);
+        }
+
+        .notification-dropdown.active {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .notification-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .notification-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .notification-clear {
+            font-size: 0.8125rem;
+            color: var(--primary-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-weight: 600;
+        }
+
+        .notification-clear:hover {
+            text-decoration: underline;
+        }
+
+        .notification-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .notification-item {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s ease;
+            text-decoration: none;
+            display: block;
+            color: inherit;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-item:hover {
+            background: var(--bg-light);
+        }
+
+        .notification-item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .notification-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-item-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .notification-item-message {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .notification-priority {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.625rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        .notification-priority.high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .notification-priority.medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .notification-priority.low {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .notification-empty {
+            padding: 3rem 1.25rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .notification-empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .notification-dropdown {
+                width: calc(100vw - 2rem);
+                right: -1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -430,6 +653,59 @@
                         <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
                 </button>
+
+                <div style="position: relative;">
+                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <?php if ($notificationCount > 0): ?>
+                            <span class="notification-badge"><?= $notificationCount ?></span>
+                        <?php endif; ?>
+                    </button>
+
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <span class="notification-title">Notifications</span>
+                            <?php if ($notificationCount > 0): ?>
+                                <button class="notification-clear" onclick="clearAllNotifications()">Clear all</button>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if (empty($notifications)): ?>
+                            <div class="notification-empty">
+                                <div class="notification-empty-icon">🔔</div>
+                                <p>No new notifications</p>
+                            </div>
+                        <?php else: ?>
+                            <ul class="notification-list">
+                                <?php foreach ($notifications as $notification): ?>
+                                    <a href="<?= htmlspecialchars($notification['url']) ?>"
+                                       class="notification-item"
+                                       onclick="notificationClicked('<?= htmlspecialchars($notification['type']) ?>')">
+                                        <div class="notification-item-header">
+                                            <span class="notification-icon"><?= $notification['icon'] ?></span>
+                                            <div class="notification-content">
+                                                <div class="notification-item-title">
+                                                    <?= htmlspecialchars($notification['title']) ?>
+                                                </div>
+                                                <div class="notification-item-message">
+                                                    <?= htmlspecialchars($notification['message']) ?>
+                                                </div>
+                                                <?php if (isset($notification['priority'])): ?>
+                                                    <span class="notification-priority <?= $notification['priority'] ?>">
+                                        <?= $notification['priority'] ?>
+                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </a>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                    </div>
+                </div>
 
                 <form method="POST" action="/member/logout" style="display: inline;">
                     <button type="submit" class="btn-logout">
@@ -647,6 +923,42 @@
     window.addEventListener('resize', function () {
         if (window.innerWidth > 768) {
             document.getElementById('navContainer').classList.remove('active');
+        }
+    });
+
+    function toggleNotifications() {
+        const dropdown = document.getElementById('notificationDropdown');
+        dropdown.classList.toggle('active');
+    }
+
+    function notificationClicked(type) {
+        // Mark as seen
+        fetch('/<?= $site->slug ?>/member/notifications/mark-seen', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({type: type})
+        });
+    }
+
+    function clearAllNotifications() {
+        if (confirm('Clear all notifications?')) {
+            fetch('/<?= $site->slug ?>/member/notifications/clear-all', {
+                method: 'POST'
+            }).then(() => {
+                window.location.reload();
+            });
+        }
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function (event) {
+        const dropdown = document.getElementById('notificationDropdown');
+        const bell = event.target.closest('.notification-bell');
+
+        if (!bell && !dropdown.contains(event.target)) {
+            dropdown.classList.remove('active');
         }
     });
 </script>

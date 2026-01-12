@@ -95,6 +95,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/campaigns', [CampaignController::class, 'create']);
         $router->put('/campaigns/{id}', [CampaignController::class, 'update']);
         $router->delete('/campaigns/{id}', [CampaignController::class, 'delete']);
+        $router->post('/campaigns/{id}/pause', [CampaignController::class, 'pause']);
+        $router->post('/campaigns/{id}/resume', [CampaignController::class, 'resume']);
         $router->post('/campaigns/{id}/clone', [CampaignController::class, 'clone']);
 
         // Payment routes
