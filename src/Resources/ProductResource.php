@@ -100,6 +100,8 @@ class ProductResource extends JsonResource
                     'key' => $spec['key'],
                     'value' => $spec['value'],
                     'sort_order' => $spec['sort_order'],
+                    'specification_group_id' => $spec['specification_group_id'] ?? null,
+                    'specification_group_name' => $spec['specification_group_name'] ?? ''
                 ]);
             }),
             'priceHistory' => $this->whenLoaded('priceHistory', function ($priceHistory) {

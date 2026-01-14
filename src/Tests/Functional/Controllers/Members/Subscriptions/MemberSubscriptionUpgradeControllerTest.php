@@ -303,6 +303,123 @@ class MemberSubscriptionUpgradeControllerTest extends FunctionalTestCase
         $this->assertGreaterThan(0, $updated->upgrade_price_difference);
     }
 
+    public function testDowngradeChargesNothing(): void
+    {
+        // Create expensive plan
+        $premiumPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Premium Plan',
+            'slug' => 'premium-' . uniqid(),
+            'price' => 99.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true
+        ]);
+
+        // Create cheaper "downgrade" plan
+        $basicPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Basic Plan',
+            'slug' => 'basic-' . uniqid(),
+            'price' => 19.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'is_upgrade_option' => true,
+            'upgrade_from_plan_id' => $premiumPlan->id
+        ]);
+
+        // Subscribe to premium
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $premiumPlan->id,
+            'plan_name' => $premiumPlan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $premiumPlan->price,
+            'currency' => 'USD'
+        ]);
+
+        // "Upgrade" (actually downgrade) to basic
+        $response = $this->postForSite(
+            "/member/subscriptions/{$subscription->id}/upgrade",
+            [
+                'upgrade_plan_id' => $basicPlan->id,
+                'payment_method_id' => 'pm_test123'
+            ]
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+
+        // Should charge nothing (or possibly issue a credit, but at minimum 0)
+        $this->assertLessThanOrEqual(0, $data['data']['price_charged']);
+
+        // Verify subscription was updated
+        $updated = Subscription::find($subscription->id);
+        $this->assertEquals($basicPlan->id, $updated->plan_id);
+        $this->assertEquals($basicPlan->price, $updated->price);
+    }
+
+    public function testSamePriceUpgradeChargesNothing(): void
+    {
+        $plan1 = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Plan A',
+            'slug' => 'plan-a',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'premium_access_grants' => json_encode([
+                ['type' => 'newsletter', 'identifier' => 'basic']
+            ])
+        ]);
+
+        $plan2 = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Plan B',
+            'slug' => 'plan-b',
+            'price' => 29.99, // Same price
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+            'is_upgrade_option' => true,
+            'upgrade_from_plan_id' => $plan1->id,
+            'premium_access_grants' => json_encode([
+                ['type' => 'newsletter', 'identifier' => 'premium']
+            ])
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan1->id,
+            'plan_name' => $plan1->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => $plan1->price,
+            'currency' => 'USD'
+        ]);
+
+        $response = $this->postForSite(
+            "/member/subscriptions/{$subscription->id}/upgrade",
+            [
+                'upgrade_plan_id' => $plan2->id,
+                'payment_method_id' => 'pm_test123'
+            ]
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Should charge nothing since same price
+        $this->assertEquals(0, $data['data']['price_charged']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

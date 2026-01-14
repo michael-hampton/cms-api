@@ -198,7 +198,7 @@ class BadgeService
         ];
     }
 
-    private function calculateBadgeProgress(Member $member, Badge $badge): array
+    public function calculateBadgeProgress(Member $member, Badge $badge): array
     {
         $criteria = $badge->criteria;
         $totalCriteria = count($criteria);

@@ -274,7 +274,7 @@ class DealsService
         $paginatedDeals = array_slice($deals, $offset, $perPage);
 
         return [
-            'deals' => $paginatedDeals,
+            'data' => $paginatedDeals,
             'total' => $total,
             'pagination' => [
                 'currentPage' => (int) $page,

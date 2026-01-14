@@ -7,8 +7,10 @@ use App\Models\Merchant;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductSpecification;
+use App\Models\ProductSpecificationGroup;
 use App\Models\ProductVariant;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -17,11 +19,13 @@ class ProductRepositoryTest extends RepositoryTestCase
     use CreatesTestData;
 
     private ProductRepository $repository;
+    private ProductSpecificationGroupRepository $specificationGroupRepository;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = new ProductRepository();
+        $this->specificationGroupRepository = new ProductSpecificationGroupRepository();
+        $this->repository = new ProductRepository($this->specificationGroupRepository);;
     }
 
     public function test_it_can_search_products_with_relationships(): void
@@ -1332,5 +1336,74 @@ class ProductRepositoryTest extends RepositoryTestCase
         $pages = $this->repository->getProductPages($product->id);
 
         $this->assertCount(0, $pages);
+    }
+
+    public function test_sync_specifications_creates_groups(): void
+    {
+        $product = $this->createProduct();
+
+        $specs = [
+            ['category' => 'Technical', 'key' => 'Weight', 'value' => '1kg', 'sort_order' => 0],
+            ['category' => 'Technical', 'key' => 'Power', 'value' => '100W', 'sort_order' => 1],
+        ];
+
+        $this->repository->syncSpecifications($product->id, $specs);
+
+        // Verify group was created
+        $group = ProductSpecificationGroup::whereRaw('LOWER(name) = ?', ['technical'])->first();
+        $this->assertNotNull($group);
+
+        // Verify specifications are linked to group
+        $productSpecs = ProductSpecification::where('product_id', $product->id)->get();
+        $this->assertCount(2, $productSpecs);
+
+        foreach ($productSpecs as $spec) {
+            $this->assertEquals($group->id, $spec->specification_group_id);
+        }
+    }
+
+    public function test_sync_specifications_reuses_existing_groups(): void
+    {
+        $product = $this->createProduct();
+
+        // Create existing group
+        $existingGroup = ProductSpecificationGroup::create([
+            'name' => 'Dimensions',
+            'slug' => 'dimensions'
+        ]);
+
+        $specs = [
+            ['category' => 'dimensions', 'key' => 'Width', 'value' => '10cm', 'sort_order' => 0],
+        ];
+
+        $this->repository->syncSpecifications($product->id, $specs);
+
+        // Verify no duplicate group was created
+        $groupCount = ProductSpecificationGroup::whereRaw('LOWER(name) = ?', ['dimensions'])->count();
+        $this->assertEquals(1, $groupCount);
+
+        // Verify specification uses existing group
+        $spec = ProductSpecification::where('product_id', $product->id)->first();
+        $this->assertEquals($existingGroup->id, $spec->specification_group_id);
+    }
+
+    public function testSyncSpecificationsCreatesGroupsCaseInsensitive()
+    {
+        $product = $this->createProduct();
+
+        $specifications = [
+            ['category' => 'Dimensions', 'key' => 'Width', 'value' => '10cm', 'sort_order' => 0],
+            ['category' => 'dimensions', 'key' => 'Height', 'value' => '20cm', 'sort_order' => 1],
+        ];
+
+        $this->repository->syncSpecifications($product->id, $specifications);
+
+        // Verify only one group was created (case-insensitive)
+        $groupCount = ProductSpecificationGroup::whereRaw('LOWER(name) = ?', ['dimensions'])->count();
+        $this->assertEquals(1, $groupCount);
+
+        // Verify both specifications were created
+        $specs = ProductSpecification::where('product_id', $product->id)->get();
+        $this->assertCount(2, $specs);
     }
 }

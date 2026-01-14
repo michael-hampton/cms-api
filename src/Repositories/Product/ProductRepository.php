@@ -24,7 +24,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 {
     private SearchEngine $searchEngine;
 
-    public function __construct()
+    public function __construct(private readonly ProductSpecificationGroupRepository $specificationGroupRepository)
     {
         parent::__construct();
         $config = SearchConfigurationFactory::create('product');
@@ -341,15 +341,23 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         ProductVariant::where('product_id', $productId)->delete();
     }
 
-// Specification operations
     public function syncSpecifications(int $productId, array $specifications): void
     {
         ProductSpecification::where('product_id', $productId)->delete();
 
         foreach ($specifications as $specData) {
+            // Get or create specification group
+            $groupId = null;
+            if (!empty($specData['category'])) {
+                $group = $this->specificationGroupRepository
+                    ->findOrCreateByName($specData['category']);
+                $groupId = $group->id;
+            }
+
             ProductSpecification::create([
                 'product_id' => $productId,
-                'category' => $specData['category'],
+                'specification_group_id' => $groupId,
+                'category' => $specData['category'] ?? 'General',
                 'key' => $specData['key'],
                 'value' => $specData['value'],
                 'sort_order' => $specData['sort_order'] ?? 0,

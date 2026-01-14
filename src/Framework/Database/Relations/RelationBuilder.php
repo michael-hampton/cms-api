@@ -307,9 +307,6 @@ class RelationBuilder implements RelationBuilderInterface
         $relatedModel = $this->getRelatedModelClass();
         $tempModel = new $relatedModel();
 
-        var_dump($relatedModel);
-        die;
-
         if (!method_exists($tempModel, $relation)) {
             throw new BadMethodCallException("Relationship {$relation} does not exist on {$relatedModel}");
         }

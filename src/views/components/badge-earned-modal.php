@@ -1,22 +1,55 @@
 <?php
-// Create new file: src/views/components/badge-earned-modal.php
+// Update src/views/components/badge-earned-modal.php
+// Replace the initial check with this:
+
 /**
  * Badge Earned Celebration Modal
- * Shows when a member earns a new badge
- * @var array|null $newBadge
+ * Shows when a member earns a new badge OR has unviewed badges
+ * @var Member $member
  */
 
-if (!isset($_SESSION['show_badge_modal']) || !$_SESSION['show_badge_modal']) {
+use App\Models\Member;
+
+// Check if we should show modal for new badge OR first-time viewing of existing badges
+$shouldShowModal = false;
+$newBadge = null;
+$_SESSION['show_badge_modal'] = false;
+
+// Priority 1: Show newly earned badge
+if (isset($_SESSION['show_badge_modal']) && $_SESSION['show_badge_modal']) {
+    $newBadge = $_SESSION['new_badge_data'] ?? null;
+    if ($newBadge) {
+        $shouldShow = true;
+    }
+}
+
+// Priority 2: Show first unviewed badge if member has never seen the modal
+if (!isset($newBadge) && isset($member)) {
+    // Check if member has badges but has never been shown the modal
+    $memberBadges = $member->badges ?? collect();
+
+    if ($memberBadges->count() > 0) {
+        // Check if we've ever shown a badge modal to this user
+        if (!isset($_SESSION['badge_modal_ever_shown'])) {
+            // Show the most recent badge
+            $latestBadge = $memberBadges->sortByDesc('earned_at')->first();
+            $_SESSION['show_badge_modal'] = true;
+            $_SESSION['new_badge_data'] = [
+                    'id' => $latestBadge->badge->id,
+                    'name' => $latestBadge->badge->name,
+                    'description' => $latestBadge->badge->description,
+                    'icon' => $latestBadge->badge->icon ?? '🏆',
+                    'points' => $latestBadge->badge->points,
+                    'earned_at' => $latestBadge->earned_at?->format('Y-m-d H:i:s')
+            ];
+        }
+    }
+}
+
+if (!$_SESSION['show_badge_modal']) {
     return;
 }
 
-$newBadge = $_SESSION['new_badge_data'] ?? null;
-if (!$newBadge) {
-    unset($_SESSION['show_badge_modal']);
-    return;
-}
-
-die('yes');
 ?>
 
     <style>
@@ -403,19 +436,6 @@ die('yes');
             }, 300);
         }
 
-        @keyframes
-        fadeOut
-        {
-            from
-            {
-                opacity: 1;
-            }
-            to
-            {
-                opacity: 0;
-            }
-        }
-
         // Auto-close after 10 seconds
         setTimeout(() => {
             if (document.getElementById('badgeModal')) {
@@ -423,9 +443,3 @@ die('yes');
             }
         }, 10000);
     </script>
-
-<?php
-// Clear the session data
-unset($_SESSION['show_badge_modal']);
-unset($_SESSION['new_badge_data']);
-?>

@@ -474,4 +474,313 @@ class BadgeServiceTest extends FunctionalTestCase
         $this->assertEquals(100, $_SESSION['new_badge_data']['points']);
     }
 
+    public function testCalculateBadgeProgressReturnsCorrectPercentage(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Comment Badge',
+            'slug' => 'comment-badge',
+            'description' => 'Post 10 comments',
+            'icon' => '💬',
+            'points' => 100,
+            'criteria' => [
+                ['type' => 'comments_count', 'operator' => '>=', 'value' => 10]
+            ],
+            'is_active' => true,
+            'category' => 'engagement'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getCommentsCount')
+            ->with($member)
+            ->once()
+            ->andReturn(5);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(0, $progress['percentage']); // 0% because criteria not met
+        $this->assertEquals(0, $progress['met']);
+        $this->assertEquals(1, $progress['total']);
+        $this->assertCount(1, $progress['details']);
+        $this->assertEquals(5, $progress['details'][0]['current']);
+        $this->assertEquals(10, $progress['details'][0]['target']);
+        $this->assertFalse($progress['details'][0]['met']);
+        $this->assertEquals(50, $progress['details'][0]['percentage']); // 5/10 = 50%
+    }
+
+    public function testCalculateBadgeProgressWithMultipleCriteria(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Super Engager',
+            'slug' => 'super-engager',
+            'description' => 'Post comments and give likes',
+            'icon' => '⭐',
+            'points' => 200,
+            'criteria' => [
+                ['type' => 'comments_count', 'operator' => '>=', 'value' => 10],
+                ['type' => 'likes_given', 'operator' => '>=', 'value' => 20]
+            ],
+            'is_active' => true,
+            'category' => 'engagement'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getCommentsCount')
+            ->with($member)
+            ->once()
+            ->andReturn(10);
+
+        $this->badgeRepository->shouldReceive('getLikesGivenCount')
+            ->with($member)
+            ->once()
+            ->andReturn(15);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(50, $progress['percentage']); // 1 of 2 criteria met = 50%
+        $this->assertEquals(1, $progress['met']);
+        $this->assertEquals(2, $progress['total']);
+        $this->assertCount(2, $progress['details']);
+
+        // First criteria (comments) - met
+        $this->assertEquals(10, $progress['details'][0]['current']);
+        $this->assertEquals(10, $progress['details'][0]['target']);
+        $this->assertTrue($progress['details'][0]['met']);
+        $this->assertEquals(100, $progress['details'][0]['percentage']);
+
+        // Second criteria (likes) - not met
+        $this->assertEquals(15, $progress['details'][1]['current']);
+        $this->assertEquals(20, $progress['details'][1]['target']);
+        $this->assertFalse($progress['details'][1]['met']);
+        $this->assertEquals(75, $progress['details'][1]['percentage']); // 15/20 = 75%
+    }
+
+    public function testCalculateBadgeProgressWhenAllCriteriaMet(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Complete Badge',
+            'slug' => 'complete-badge',
+            'description' => 'Complete all tasks',
+            'icon' => '🏆',
+            'points' => 500,
+            'criteria' => [
+                ['type' => 'comments_count', 'operator' => '>=', 'value' => 5],
+                ['type' => 'pages_read', 'operator' => '>=', 'value' => 10]
+            ],
+            'is_active' => true,
+            'category' => 'achievement'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getCommentsCount')
+            ->with($member)
+            ->once()
+            ->andReturn(10);
+
+        $this->badgeRepository->shouldReceive('getDistinctPagesRead')
+            ->with($member)
+            ->once()
+            ->andReturn(15);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(100, $progress['percentage']); // 2 of 2 criteria met = 100%
+        $this->assertEquals(2, $progress['met']);
+        $this->assertEquals(2, $progress['total']);
+        $this->assertTrue($progress['details'][0]['met']);
+        $this->assertTrue($progress['details'][1]['met']);
+    }
+
+    public function testCalculateBadgeProgressWithMemberDaysCriteria(): void
+    {
+        $member = $this->createMember();
+        $member->created_at = now_datetime()->subDays(15)->format('Y-m-d H:i:s');
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Veteran',
+            'slug' => 'veteran',
+            'description' => 'Member for 30 days',
+            'icon' => '🎖️',
+            'points' => 100,
+            'criteria' => [
+                ['type' => 'member_days', 'operator' => '>=', 'value' => 30]
+            ],
+            'is_active' => true,
+            'category' => 'loyalty'
+        ]);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(0, $progress['percentage']); // Criteria not met
+        $this->assertEquals(0, $progress['met']);
+        $this->assertEquals(1, $progress['total']);
+        $this->assertEquals(15, $progress['details'][0]['current']);
+        $this->assertEquals(30, $progress['details'][0]['target']);
+        $this->assertFalse($progress['details'][0]['met']);
+        $this->assertEquals(50, $progress['details'][0]['percentage']); // 15/30 = 50%
+    }
+
+    public function testCalculateBadgeProgressWithOrdersCriteria(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Frequent Buyer',
+            'slug' => 'frequent-buyer',
+            'description' => 'Make 5 purchases',
+            'icon' => '🛒',
+            'points' => 150,
+            'criteria' => [
+                ['type' => 'orders_count', 'operator' => '>=', 'value' => 5]
+            ],
+            'is_active' => true,
+            'category' => 'commerce'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getCompletedOrdersCount')
+            ->with($member->id)
+            ->once()
+            ->andReturn(3);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(0, $progress['percentage']);
+        $this->assertEquals(0, $progress['met']);
+        $this->assertEquals(3, $progress['details'][0]['current']);
+        $this->assertEquals(5, $progress['details'][0]['target']);
+        $this->assertEquals(60, $progress['details'][0]['percentage']); // 3/5 = 60%
+    }
+
+    public function testCalculateBadgeProgressWithTotalSpentCriteria(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Big Spender',
+            'slug' => 'big-spender',
+            'description' => 'Spend £500',
+            'icon' => '💰',
+            'points' => 300,
+            'criteria' => [
+                ['type' => 'total_spent', 'operator' => '>=', 'value' => 500]
+            ],
+            'is_active' => true,
+            'category' => 'commerce'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getTotalSpent')
+            ->with($member->id)
+            ->once()
+            ->andReturn(350.00);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(0, $progress['percentage']);
+        $this->assertEquals(0, $progress['met']);
+        $this->assertEquals(350.00, $progress['details'][0]['current']);
+        $this->assertEquals(500, $progress['details'][0]['target']);
+        $this->assertEquals(70, $progress['details'][0]['percentage']); // 350/500 = 70%
+    }
+
+    public function testCalculateBadgeProgressWithZeroTarget(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Edge Case Badge',
+            'slug' => 'edge-case',
+            'description' => 'Edge case test',
+            'icon' => '🔧',
+            'points' => 10,
+            'criteria' => [
+                ['type' => 'comments_count', 'operator' => '>=', 'value' => 0]
+            ],
+            'is_active' => true,
+            'category' => 'test'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getCommentsCount')
+            ->with($member)
+            ->once()
+            ->andReturn(5);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(100, $progress['percentage']); // Criteria met (5 >= 0)
+        $this->assertEquals(1, $progress['met']);
+        $this->assertEquals(0, $progress['details'][0]['percentage']); // Zero target means 0% progress display
+    }
+
+    public function testCalculateBadgeProgressWithDifferentOperators(): void
+    {
+        $member = $this->createMember();
+
+        // Test with "less than" operator
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Minimal Badge',
+            'slug' => 'minimal',
+            'description' => 'Keep it minimal',
+            'icon' => '📉',
+            'points' => 50,
+            'criteria' => [
+                ['type' => 'comments_count', 'operator' => '<', 'value' => 5]
+            ],
+            'is_active' => true,
+            'category' => 'special'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getCommentsCount')
+            ->with($member)
+            ->once()
+            ->andReturn(3);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(100, $progress['percentage']); // Criteria met (3 < 5)
+        $this->assertEquals(1, $progress['met']);
+        $this->assertTrue($progress['details'][0]['met']);
+    }
+
+    public function testCalculateBadgeProgressWithPagesReadCriteria(): void
+    {
+        $member = $this->createMember();
+
+        $badge = \App\Models\Badge::create([
+            'site_id' => $this->siteId,
+            'name' => 'Avid Reader',
+            'slug' => 'avid-reader',
+            'description' => 'Read 50 different pages',
+            'icon' => '📚',
+            'points' => 200,
+            'criteria' => [
+                ['type' => 'pages_read', 'operator' => '>=', 'value' => 50]
+            ],
+            'is_active' => true,
+            'category' => 'reading'
+        ]);
+
+        $this->badgeRepository->shouldReceive('getDistinctPagesRead')
+            ->with($member)
+            ->once()
+            ->andReturn(30);
+
+        $progress = $this->service->calculateBadgeProgress($member, $badge);
+
+        $this->assertEquals(0, $progress['percentage']);
+        $this->assertEquals(0, $progress['met']);
+        $this->assertEquals(30, $progress['details'][0]['current']);
+        $this->assertEquals(50, $progress['details'][0]['target']);
+        $this->assertEquals(60, $progress['details'][0]['percentage']); // 30/50 = 60%
+    }
+
 }

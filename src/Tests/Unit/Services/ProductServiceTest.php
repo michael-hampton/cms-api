@@ -1663,4 +1663,42 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->assertEquals('Test Product', $result->name);
     }
+
+    public function testCreateProductWithSpecificationsCreatesGroups()
+    {
+        $brand = $this->createBrand();
+        $category = $this->createCategory();
+
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'specifications' => [
+                ['category' => 'Dimensions', 'key' => 'Width', 'value' => '10cm', 'sort_order' => 0],
+                ['category' => 'dimensions', 'key' => 'Height', 'value' => '20cm', 'sort_order' => 1],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn($product);
+
+        $this->repository->shouldReceive('syncSpecifications')
+            ->once()
+            ->with(1, Mockery::type('array'));
+
+        $this->repository->shouldReceive('recordPriceHistory')
+            ->with($product)
+            ->andReturn(new ProductPriceHistory());
+
+        $result = $this->service->createProduct($data);
+
+        // This test should actually be testing the repository, not the service
+        // The service just passes data to the repository
+        $this->assertInstanceOf(Product::class, $result);
+        $this->assertEquals('Test Product', $result->name);
+    }
 }

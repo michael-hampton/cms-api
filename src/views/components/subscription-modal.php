@@ -75,7 +75,7 @@ $isLoggedIn = !empty($member);
 
                         <div class="sub-plan-price">
                             <span class="sub-price-currency"><?= htmlspecialchars($plan->currency) ?></span>
-                            <span class="sub-price-amount"><?= number_format($plan->price, 0) ?></span>
+                            <span class="sub-price-amount"><?= round($plan->price, 2) ?></span>
                             <span class="sub-price-period">/<?= htmlspecialchars($plan->billing_period === 'month' ? 'mo' : 'yr') ?></span>
                         </div>
 

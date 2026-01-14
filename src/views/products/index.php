@@ -117,6 +117,56 @@
                         </div>
                     </div>
 
+                    <!-- Specification Filters -->
+                    <?php if (!empty($specificationGroups)): ?>
+                        <?php foreach ($specificationGroups as $specGroup): ?>
+                            <div class="sidebar-section collapsible" data-section="spec-<?= $specGroup['slug'] ?>">
+                                <button type="button" class="section-toggle"
+                                        onclick="toggleSection('spec-<?= $specGroup['slug'] ?>')">
+                                    <h3 class="sidebar-title">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor" stroke-width="2">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                        </svg>
+                                        <?= htmlspecialchars($specGroup['name']) ?>
+                                    </h3>
+                                    <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="section-content">
+                                    <div class="filter-list" id="spec-<?= $specGroup['slug'] ?>-list">
+                                        <?php foreach (array_slice($specGroup['specifications'], 0, 5) as $spec): ?>
+                                            <?php foreach ($spec['values'] as $value): ?>
+                                                <label class="filter-checkbox-label">
+                                                    <input type="checkbox"
+                                                           class="filter-checkbox"
+                                                           name="spec_<?= $specGroup['id'] ?>[]"
+                                                           value="<?= htmlspecialchars($value) ?>"
+                                                           data-group="<?= $specGroup['id'] ?>"
+                                                           data-key="<?= htmlspecialchars($spec['key']) ?>">
+                                                    <span class="filter-name"><?= htmlspecialchars($spec['key']) ?>: <?= htmlspecialchars($value) ?></span>
+                                                    <span class="filter-count"><?= $spec['count'] ?></span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <?php if (count($specGroup['specifications']) > 5): ?>
+                                        <button type="button" class="show-more-btn"
+                                                data-filter="spec-<?= $specGroup['slug'] ?>">
+                                            Show More
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
                     <div class="sidebar-section collapsible" data-section="price-range">
                         <button type="button" class="section-toggle" onclick="toggleSection('price-range')">
                             <h3 class="sidebar-title">
@@ -223,6 +273,11 @@
 
 <!-- Toast Notification -->
 <div id="toast" class="toast"></div>
+
+<script id="all-specification-groups" type="application/json">
+    <?= json_encode($specificationGroups ?? []) ?>
+
+</script>
 
 <script>
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'

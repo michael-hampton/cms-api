@@ -890,63 +890,10 @@ use App\Framework\Support\SiteContext;
     @include('member/components/recommended-section')
     @include('member/components/trending-section')
     @include('member/components/gifted-articles-section')
-    @include('member/components/back-to-top')
 
-    <?php if (isset($unclaimedRewards) && $unclaimedRewards->count() > 0): ?>
-        <div class="card"
-             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: 2rem;">
-            <h2 style="color: white; display: flex; align-items: center; gap: 12px;">
-                <span style="font-size: 36px;">🎁</span>
-                You have <?= $unclaimedRewards->count() ?> unclaimed
-                reward<?= $unclaimedRewards->count() > 1 ? 's' : '' ?>!
-            </h2>
-            <div style="display: grid; gap: 16px; margin-top: 20px;">
-                <?php foreach ($unclaimedRewards as $reward): ?>
-                    <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 12px;">
-                        <h3 style="color: white; margin-bottom: 8px;">
-                            <?= htmlspecialchars($reward->rewardDefinition->name) ?>
-                        </h3>
-                        <p style="opacity: 0.9; margin-bottom: 16px;">
-                            <?= htmlspecialchars($reward->rewardDefinition->description) ?>
-                        </p>
-                        <?php if ($reward->reward_data): ?>
-                            <div style="background: rgba(255,255,255,0.3); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-                                <?php if (isset($reward->reward_data['voucher_code'])): ?>
-                                    <div>
-                                        <strong>Provider:</strong> <?= htmlspecialchars($reward->reward_data['provider']) ?>
-                                    </div>
-                                    <div>
-                                        <strong>Value:</strong> <?= htmlspecialchars($reward->reward_data['currency']) ?> <?= number_format($reward->reward_data['value'], 2) ?>
-                                    </div>
-                                <?php elseif (isset($reward->reward_data['discount_value'])): ?>
-                                    <div><strong>Discount:</strong>
-                                        <?= $reward->reward_data['discount_type'] === 'percentage' ? '' : '$' ?>
-                                        <?= htmlspecialchars($reward->reward_data['discount_value']) ?>
-                                        <?= $reward->reward_data['discount_type'] === 'percentage' ? '%' : '' ?> OFF
-                                    </div>
-                                <?php elseif (isset($reward->reward_data['points'])): ?>
-                                    <div>
-                                        <strong>Points:</strong> <?= htmlspecialchars($reward->reward_data['points']) ?>
-                                        points
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/rewards/<?= $reward->id ?>/claim"
-                           class="btn" style="background: white; color: #667eea; display: inline-block;"
-                           onclick="event.preventDefault(); claimReward(<?= $reward->id ?>)">
-                            Claim Reward
-                        </a>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/rewards"
-               class="btn"
-               style="background: rgba(255,255,255,0.2); color: white; margin-top: 16px; border: 2px solid white;">
-                View All Rewards
-            </a>
-        </div>
-    <?php endif; ?>
+    @include('member/components/rewards-section')
+
+    @include('member/components/back-to-top')
 
     <div id="giftModal"
          style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">

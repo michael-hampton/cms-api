@@ -103,6 +103,9 @@ $isAuthenticated = $memberAuth !== null;
             <?php endif; ?>
         </div>
 
+        @include('components.comment-badge-section', ['isAuthenticated' => $isAuthenticated, 'nextCommentBadge' =>
+        $nextCommentBadge])
+
         <!-- Comment Form -->
         <div class="comment-form-wrapper">
             <?php if ($isAuthenticated): ?>

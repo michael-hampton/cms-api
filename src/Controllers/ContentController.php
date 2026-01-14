@@ -6,6 +6,7 @@ use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
+use App\Models\Badge;
 use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Page;
@@ -13,6 +14,7 @@ use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
 use App\Repositories\Cms\PageGridRepository;
+use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\Members\GiftedArticleRepository;
 use App\Repositories\Members\PageViewRepository;
@@ -35,6 +37,7 @@ class ContentController extends Controller
         private readonly SubscriptionModalService $modalService,
         private readonly PageRenderService $pageRenderService,
         private readonly ArticleAccessService $articleAccessService,
+        private readonly BadgeRepository $badgeRepository
     ) {
         parent::__construct();
     }
@@ -115,6 +118,41 @@ class ContentController extends Controller
             ->get();
 
         $data['comments'] = $this->commentRepository->getCommentsForPage($page->id, true);
+
+        if ($member) {
+            $badgeService = app(\App\Services\Members\BadgeService::class);
+            $siteId = SiteContext::getId();
+
+            // Get commenting badges
+            $commentingBadges = Badge::where('site_id', $siteId)
+                ->where('is_active', true)
+                ->where('category', 'engagement')
+                ->get()
+                ->filter(function ($badge) {
+                    return collect($badge->criteria)
+                        ->contains(fn($criteria) => ($criteria['type'] ?? null) === 'comments_count');
+                })
+                ->sortBy(function ($badge) {
+                    return collect($badge->criteria)
+                        ->firstWhere('type', 'comments_count')['value'] ?? PHP_INT_MAX;
+                })
+                ->all();
+
+            // Find next badge to earn
+            $nextCommentBadge = null;
+            $badgeProgress = null;
+
+            foreach ($commentingBadges as $badge) {
+                if (!$this->badgeRepository->getEarnedBadges($member)->contains('id', $badge->id)) {
+                    $nextCommentBadge = $badge;
+                    $badgeProgress = $badgeService->calculateBadgeProgress($member, $badge);
+                    break;
+                }
+            }
+
+            $data['nextCommentBadge'] = $nextCommentBadge;
+            $data['commentBadgeProgress'] = $badgeProgress;
+        }
 
         // Add like information if member is logged in
         if ($member) {

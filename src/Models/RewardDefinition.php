@@ -122,4 +122,32 @@ class RewardDefinition extends Model
             ->where('is_used', false)
             ->whereNull('assigned_to_member_id');
     }
+
+    // Add this method to RewardsController or create a view helper
+    public function formatCriterion(array $criterion): string
+    {
+        $type = $criterion['type'] ?? '';
+        $operator = $criterion['operator'] ?? '>=';
+        $value = $criterion['value'] ?? 0;
+
+        $operatorText = match ($operator) {
+            '>=' => 'at least',
+            '>' => 'more than',
+            '<=' => 'at most',
+            '<' => 'less than',
+            '==' => 'exactly',
+            default => ''
+        };
+
+        return match ($type) {
+            'badges_earned' => "Earn {$operatorText} {$value} badge" . ($value != 1 ? 's' : ''),
+            'points_earned' => "Earn {$operatorText} {$value} points",
+            'comments_count' => "Post {$operatorText} {$value} comment" . ($value != 1 ? 's' : ''),
+            'orders_completed' => "Complete {$operatorText} {$value} order" . ($value != 1 ? 's' : ''),
+            'member_days' => "Be a member for {$operatorText} {$value} day" . ($value != 1 ? 's' : ''),
+            'subscriptions_count' => "Have {$operatorText} {$value} active subscription" . ($value != 1 ? 's' : ''),
+            'signup' => "Sign up for an account",
+            default => "Complete required action"
+        };
+    }
 }

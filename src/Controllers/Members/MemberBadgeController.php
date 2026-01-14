@@ -61,4 +61,27 @@ class MemberBadgeController extends Controller
 
         return $this->jsonResponse(['success' => true]);
     }
+
+    public function markAsShown(Request $request): JsonResponse
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false], 401);
+        }
+
+        // Mark that the user has been shown the badge modal at least once
+        $_SESSION['badge_modal_ever_shown'] = true;
+
+        // If there was a specific badge shown, mark it
+        if (isset($_SESSION['new_badge_data'])) {
+            $badgeId = $_SESSION['new_badge_data']['id'] ?? null;
+            if ($badgeId) {
+                if (!isset($_SESSION['badge_modal_shown_ids'])) {
+                    $_SESSION['badge_modal_shown_ids'] = [];
+                }
+                $_SESSION['badge_modal_shown_ids'][] = $badgeId;
+            }
+        }
+
+        return $this->jsonResponse(['success' => true]);
+    }
 }

@@ -185,4 +185,88 @@ class RewardsService
             'message' => 'Reward claimed successfully!'
         ];
     }
+
+    public function getTopRewards(Member $member, int $siteId): Collection
+    {
+        $allDefinitions = $this->rewardsRepository->getActiveRewardDefinitions($siteId);
+        $earnedRewardIds = $this->rewardsRepository
+            ->getMemberRewards($member->id, $siteId)
+            ->pluck('reward_definition_id')
+            ->toArray();
+
+        return $allDefinitions->filter(function ($definition) use ($earnedRewardIds, $member) {
+            // Filter out already earned rewards
+            if (in_array($definition->id, $earnedRewardIds)) {
+                return false;
+            }
+
+            // Only show rewards the member hasn't qualified for yet
+            return !$definition->checkCriteria($member);
+        })->take(5);
+    }
+
+    public function getRewardStats(Member $member, int $siteId): array
+    {
+        $allRewards = $this->rewardsRepository->getMemberRewards($member->id, $siteId);
+
+        $activeRewards = $allRewards->filter(function ($reward) {
+            return !in_array($reward->status, ['declined', 'expired']) && !$reward->isClaimed();
+        });
+
+        $claimedRewards = $allRewards->filter(fn($r) => $r->isClaimed());
+
+        // Calculate total gift card value from claimed rewards
+        $giftCardTotal = $claimedRewards->reduce(function ($carry, $reward) {
+            $rewardData = $reward->reward_data;
+
+            // Make sure reward_data is an array
+            if (!is_array($rewardData)) {
+                return $carry;
+            }
+
+            // Check for voucher value
+            if (isset($rewardData['value']) && is_numeric($rewardData['value'])) {
+                return $carry + (float)$rewardData['value'];
+            }
+
+            // Check for discount value (if fixed amount)
+            if (isset($rewardData['discount_value']) &&
+                isset($rewardData['discount_type']) &&
+                $rewardData['discount_type'] === 'fixed' &&
+                is_numeric($rewardData['discount_value'])) {
+                return $carry + (float)$rewardData['discount_value'];
+            }
+
+            return $carry;
+        }, 0);
+
+        // Get currency from first claimed reward or default to GBP
+        $currency = 'GBP';
+        $currencySymbol = '£';
+
+        $firstClaimed = $claimedRewards->first();
+        if ($firstClaimed && is_array($firstClaimed->reward_data) && isset($firstClaimed->reward_data['currency'])) {
+            $currency = $firstClaimed->reward_data['currency'];
+            $currencySymbol = $this->getCurrencySymbol($currency);
+        }
+
+        return [
+            'active_count' => $activeRewards->count(),
+            'claimed_count' => $claimedRewards->count(),
+            'gift_card_total' => $giftCardTotal,
+            'currency' => $currency,
+            'currency_symbol' => $currencySymbol
+        ];
+    }
+
+    private function getCurrencySymbol(string $currency): string
+    {
+        $symbols = [
+            'GBP' => '£',
+            'USD' => '$',
+            'EUR' => '€',
+        ];
+
+        return $symbols[$currency] ?? $currency;
+    }
 }

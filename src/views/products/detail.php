@@ -1066,19 +1066,19 @@
                     <div class="tab-content" id="specifications-tab">
                         <div class="product-specifications">
                             <?php
-                            $specsByCategory = [];
+                            $specsByGroup = [];
                             foreach ($product->specifications as $spec) {
-                                $category = $spec->category ?? 'General';
-                                if (!isset($specsByCategory[$category])) {
-                                    $specsByCategory[$category] = [];
+                                $groupName = $spec->categoryName; // Uses the new accessor
+                                if (!isset($specsByGroup[$groupName])) {
+                                    $specsByGroup[$groupName] = [];
                                 }
-                                $specsByCategory[$category][] = $spec;
+                                $specsByGroup[$groupName][] = $spec;
                             }
                             ?>
 
-                            <?php foreach ($specsByCategory as $category => $specs): ?>
+                            <?php foreach ($specsByGroup as $groupName => $specs): ?>
                                 <div class="spec-category">
-                                    <h3 class="spec-category-title"><?= htmlspecialchars($category) ?></h3>
+                                    <h3 class="spec-category-title"><?= htmlspecialchars($groupName) ?></h3>
                                     <div class="spec-list">
                                         <?php foreach ($specs as $spec): ?>
                                             <div class="spec-item">
@@ -1182,11 +1182,18 @@
                             } elseif ($currentPrice >= $highestPrice * 0.95) {
                                 $priceRating = 'high';
                             }
+
+                            if ($highestPrice > $lowestPrice) {
+                                $pricePosition = (($currentPrice - $lowestPrice) / ($highestPrice - $lowestPrice)) * 100;
+                            } else {
+                                // No price variation — all prices are the same
+                                $pricePosition = 50;
+                            }
                             ?>
 
                             <div class="price-indicator">
                                 <div class="price-indicator-bar">
-                                    <div class="price-marker" style="left: <?= (($currentPrice - $lowestPrice) / ($highestPrice - $lowestPrice)) * 100 ?>%">
+                                    <div class="price-marker" style="left: <?= $pricePosition ?>%">
                                         <span class="price-marker-label">Current</span>
                                     </div>
                                 </div>

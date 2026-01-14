@@ -199,7 +199,7 @@ class ImageUploadService
     {
         $relativePath = parse_url($relativePath, PHP_URL_PATH);
         $projectRoot = $this->fileSystem->dirName(__DIR__);
-        return $projectRoot . '/' . ltrim($relativePath, '/');
+        return getcwd() . '/' . ltrim($relativePath, '/');
     }
 
 }

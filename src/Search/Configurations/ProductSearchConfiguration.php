@@ -17,7 +17,16 @@ class ProductSearchConfiguration extends SearchConfiguration implements SearchCo
         // Filters
         $this->addFilter(new InFilter('categories', 'category_id'))
             ->addFilter(new InFilter('brands', 'brand_id'))
-            ->addFilter(new CustomFilter('merchant', function($query, $value) {
+            ->addFilter(new CustomFilter('specifications', function ($query, $value) {
+                return $query->whereHas('specifications', function ($q) use ($value) {
+                    // Check if values are numeric (IDs) or strings (names)
+                    if (is_numeric($value[0])) {
+                        $q->whereIn('id', $value);
+                    } else {
+                        $q->whereIn('name', $value);
+                    }
+                });
+            }))->addFilter(new CustomFilter('merchant', function ($query, $value) {
                 // Handle comma-separated string or array
                 if (is_string($value) && str_contains($value, ',')) {
                     $value = explode(',', $value);

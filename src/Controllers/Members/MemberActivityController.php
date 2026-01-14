@@ -5,14 +5,16 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
+use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\MemberActivityRepository;
 use App\Services\Members\BadgeService;
 
 class MemberActivityController extends Controller
 {
     public function __construct(
-        private BadgeService             $badgeService,
-        private MemberActivityRepository $activityRepository
+        private readonly BadgeService             $badgeService,
+        private readonly MemberActivityRepository $activityRepository,
+        private readonly BadgeRepository          $badgeRepository
     )
     {
         parent::__construct();
@@ -47,12 +49,29 @@ class MemberActivityController extends Controller
         }
 
         $member = MemberAuth::getMember();
-
         $member->load(['badges']);
+
+        $siteId = SiteContext::getId();
+
+        // Get all badges for the site
+        $allBadges = $this->badgeRepository->getActiveBadges($siteId);
+        $earnedBadges = $member->badges;
+        $unearnedBadges = $allBadges->filter(function ($badge) use ($earnedBadges) {
+            return !$earnedBadges->contains('id', $badge->id);
+        });
+
+        // Get categories
+        $categories = $allBadges->pluck('category')
+            ->unique()
+            ->filter()
+            ->all();
 
         return $this->view('member/activity/badges', [
             'member' => $member,
-            'site' => $member->site
+            'site' => SiteContext::get(),
+            'earnedBadges' => $earnedBadges,
+            'unearnedBadges' => $unearnedBadges,
+            'categories' => $categories
         ]);
     }
 }

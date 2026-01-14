@@ -44,7 +44,7 @@ $pageGridAdded = false;
 
                         <!-- Blog Comments Section -->
                         @if($page->page_type !== 'landing-page')
-                        @include('components/comments')
+                        @include('components/comments', ['nextCommentBadge' => $nextCommentBadge])
                         @endif
 
                         <!-- Social Media Links -->

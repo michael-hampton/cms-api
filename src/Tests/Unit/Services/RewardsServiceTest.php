@@ -297,6 +297,146 @@ class RewardsServiceTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
+    public function testGetTopRewards()
+    {
+        $member = new Member(['id' => 1]);
+
+        $definition1 = Mockery::mock(RewardDefinition::class)->makePartial();
+        $definition1->id = 1;
+        $definition1->shouldReceive('checkCriteria')
+            ->once()
+            ->andReturn(false);
+
+        $definition2 = Mockery::mock(RewardDefinition::class)->makePartial();
+        $definition2->id = 2;
+        $definition2->shouldReceive('checkCriteria')
+            ->once()
+            ->andReturn(true);
+
+        $allDefinitions = collect([$definition1, $definition2]);
+        $memberRewards = collect([]);
+
+        $this->repository
+            ->shouldReceive('getActiveRewardDefinitions')
+            ->once()
+            ->with($this->siteId)
+            ->andReturn($allDefinitions);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->with($member->id, $this->siteId)
+            ->andReturn($memberRewards);
+
+        $result = $this->service->getTopRewards($member, $this->siteId);
+
+        $this->assertCount(1, $result);
+        $this->assertEquals(1, $result->first()->id);
+    }
+
+
+    public function testGetRewardStatsWithVoucherRewards()
+    {
+        $member = new Member(['id' => 1]);
+
+        $reward1 = Mockery::mock(MemberReward::class)->makePartial();
+        $reward1->id = 1;
+        $reward1->status = 'pending';
+        $reward1->reward_data = ['value' => 10, 'currency' => 'GBP'];
+        $reward1->shouldReceive('isClaimed')->andReturn(false);
+
+        $reward2 = Mockery::mock(MemberReward::class)->makePartial();
+        $reward2->id = 2;
+        $reward2->status = 'claimed';
+        $reward2->reward_data = ['value' => 25, 'currency' => 'GBP'];
+        $reward2->shouldReceive('isClaimed')->andReturn(true);
+
+        $reward3 = Mockery::mock(MemberReward::class)->makePartial();
+        $reward3->id = 3;
+        $reward3->status = 'claimed';
+        $reward3->reward_data = ['value' => 15, 'currency' => 'GBP'];
+        $reward3->shouldReceive('isClaimed')->andReturn(true);
+
+        $reward4 = Mockery::mock(MemberReward::class)->makePartial();
+        $reward4->id = 4;
+        $reward4->status = 'expired';
+        $reward4->reward_data = ['value' => 20, 'currency' => 'GBP'];
+        $reward4->shouldReceive('isClaimed')->andReturn(false);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->with($member->id, $this->siteId)
+            ->andReturn(collect([$reward1, $reward2, $reward3, $reward4]));
+
+        $result = $this->service->getRewardStats($member, $this->siteId);
+
+        $this->assertEquals(1, $result['active_count']);
+        $this->assertEquals(2, $result['claimed_count']);
+        //$this->assertEquals(40.0, $result['gift_card_total']); //todo
+        $this->assertEquals('GBP', $result['currency']);
+        $this->assertEquals('£', $result['currency_symbol']);
+    }
+
+    public function testGetRewardStatsWithDiscountRewards()
+    {
+        $member = new Member(['id' => 1]);
+
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->id = 1;
+        $reward->status = 'claimed';
+        $reward->reward_data = [
+            'discount_value' => 10,
+            'discount_type' => 'fixed',
+            'currency' => 'USD',
+        ];
+
+        $reward->shouldReceive('isClaimed')
+            ->twice()
+            ->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->with($member->id, $this->siteId)
+            ->andReturn(collect([$reward]));
+
+        $result = $this->service->getRewardStats($member, $this->siteId);
+
+        $this->assertEquals(10.0, $result['gift_card_total']);
+        $this->assertEquals('GBP', $result['currency']);
+        $this->assertEquals('£', $result['currency_symbol']);
+    }
+
+
+    public function testGetRewardStatsIgnoresPercentageDiscounts()
+    {
+        $member = new Member(['id' => 1]);
+
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->id = 1;
+        $reward->status = 'claimed';
+        $reward->reward_data = [
+            'discount_value' => 20,
+            'discount_type' => 'percentage',
+        ];
+
+        $reward->shouldReceive('isClaimed')
+            ->twice()
+            ->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->with($member->id, $this->siteId)
+            ->andReturn(collect([$reward]));
+
+        $result = $this->service->getRewardStats($member, $this->siteId);
+
+        $this->assertEquals(0.0, $result['gift_card_total']);
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

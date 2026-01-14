@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Product;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Search\SearchCriteria;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\BuildProductCardService;
@@ -96,11 +97,18 @@ class ProductListController extends Controller
             ->with(['items'])
             ->first();
 
+        $siteId = SiteContext::getId();
+
+        // Get specification groups with counts
+        $specRepository = app(ProductSpecificationGroupRepository::class);
+        $specificationGroups = $specRepository->getAllWithCounts($siteId);
+
         return $this->view('products.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
             'menu' => $menu,
             'menuRenderer' => new MenuRenderer(),
+            'specificationGroups' => $specificationGroups->toArray(),
         ]);
     }
 
@@ -108,13 +116,17 @@ class ProductListController extends Controller
     {
         $categoryIds = array_filter(explode(',', $request->input('category_ids', '')));
         $brandIds = array_filter(explode(',', $request->input('brand_ids', '')));
+        $specIds = array_filter(explode(',', $request->input('spec_ids', '')));
+
+        $filters = array_filter([
+            'categories' => $categoryIds,
+            'brands' => $brandIds,
+            'specifications' => $specIds,
+            'on_sale' => $request->input('on_sale'),
+        ], static fn($value) => $value !== null && $value !== [] && $value !== '');
 
         $criteria = new SearchCriteria(
-            filters: [
-                'category_ids' => $categoryIds,
-                'brand_ids' => $brandIds,
-                'on_sale' => $request->input('on_sale'),
-            ],
+            filters: $filters,
             sortBy: $request->input('sort_by', 'created_at'),
             sortOrder: $request->input('sort_order', 'desc'),
             page: $request->input('page', 1),

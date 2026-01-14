@@ -138,7 +138,9 @@ class Product extends Model
 
     public function specifications()
     {
-        return $this->hasMany(ProductSpecification::class)->orderBy('sort_order');
+        return $this->hasMany(ProductSpecification::class)
+            ->with(['specificationGroup'])
+            ->orderBy('sort_order');
     }
 
     public function inclusions()
@@ -208,5 +210,15 @@ class Product extends Model
             $query->whereNull('valid_until')
                 ->orWhere('valid_until', '>=', now());
         });
+    }
+
+    public function specificationGroups()
+    {
+        return $this->belongsToMany(
+            ProductSpecificationGroup::class,
+            'product_specifications',
+            'product_id',
+            'specification_group_id'
+        )->distinct();
     }
 }

@@ -8,6 +8,7 @@ use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
+use App\Models\ProductSpecificationGroup;
 use App\Models\ProductVariant;
 use App\Models\Site;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -1661,5 +1662,59 @@ class ProductControllerTest extends FunctionalTestCase
         $this->assertIsArray($pageData['type']);
         $this->assertContains('product', $pageData['type']);
         $this->assertContains('deal', $pageData['type']);
+    }
+
+    public function testGetSpecificationGroupsEndpoint(): void
+    {
+        ProductSpecificationGroup::create([
+            'name' => 'Technical',
+            'slug' => 'technical',
+            'is_active' => true
+        ]);
+
+        ProductSpecificationGroup::create([
+            'name' => 'Physical',
+            'slug' => 'physical',
+            'is_active' => true
+        ]);
+
+        ProductSpecificationGroup::create([
+            'name' => 'Inactive',
+            'slug' => 'inactive',
+            'is_active' => false
+        ]);
+
+        $response = $this->getForSite('/api/specification-groups');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['groups']); // Only active groups
+    }
+
+    public function testProductIndexIncludesSpecificationGroups(): void
+    {
+        $group = ProductSpecificationGroup::create([
+            'name' => 'Color',
+            'slug' => 'color',
+            'is_active' => true
+        ]);
+
+        $product = $this->createProduct(['site_id' => $this->siteId]);
+
+        ProductSpecification::create([
+            'product_id' => $product->id,
+            'specification_group_id' => $group->id,
+            'key' => 'Color',
+            'value' => 'Red',
+            'is_active' => true,
+            'sort_order' => 1,
+            'category' => 'product'
+        ]);
+
+        $response = $this->getForSite('/api/products');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertStringContainsString('Color', $response->getContent());
     }
 }

@@ -31,11 +31,19 @@ class RewardsController extends Controller
         $rewards = $this->rewardsService->getMemberRewards($member, $siteId);
         $unclaimed = $this->rewardsService->getUnclaimedRewards($member, $siteId);
 
+        // Get top rewards (not yet available to member)
+        $topRewards = $this->rewardsService->getTopRewards($member, $siteId);
+
+        // Get reward stats for summary
+        $rewardStats = $this->rewardsService->getRewardStats($member, $siteId);
+
         return $this->view('member/rewards/index', [
             'member' => $member,
             'site' => SiteContext::get(),
             'rewards' => $rewards,
-            'unclaimedRewards' => $unclaimed
+            'unclaimedRewards' => $unclaimed,
+            'topRewards' => $topRewards,
+            'rewardStats' => $rewardStats
         ]);
     }
 

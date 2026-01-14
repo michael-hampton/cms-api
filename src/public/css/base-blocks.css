@@ -10527,6 +10527,124 @@ body.card-flipped {
     flex-direction: column;
 }
 
+/* Comment Badges **/
+.comment-badge-incentive {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border: 2px solid #dee2e6;
+}
+
+.badge-incentive-content {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.badge-icon-wrapper {
+    flex-shrink: 0;
+}
+
+.badge-progress-ring {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.badge-icon-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.badge-icon-emoji {
+    font-size: 2.5rem;
+}
+
+.badge-incentive-info {
+    flex: 1;
+}
+
+.badge-incentive-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 0.5rem;
+}
+
+.badge-incentive-description {
+    color: #6c757d;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.badge-progress-bar {
+    height: 12px;
+    background: #dee2e6;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.badge-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+.badge-progress-text {
+    color: #495057;
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+}
+
+.badge-progress-text strong {
+    color: #212529;
+    font-weight: 700;
+}
+
+.badge-progress-text .remaining {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.badge-points-reward {
+    display: inline-block;
+    background: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #495057;
+    border: 2px solid #dee2e6;
+}
+
+.badge-points-reward strong {
+    color: #667eea;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .badge-incentive-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .badge-incentive-title {
+        font-size: 1.25rem;
+    }
+}
+
 
 
 

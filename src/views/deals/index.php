@@ -29,146 +29,225 @@
 
                 <!-- Category Tabs (Dynamic) -->
                 <?php foreach (array_slice($categories ?? [], 0, 5) as $category): ?>
-                    <button class="tab-btn" data-tab="cat-<?= $category['id'] ?>" onclick="switchTab('cat-<?= $category['id'] ?>')">
-                        <?= htmlspecialchars($category['name']) ?>
+                    <button class="tab-btn" data-tab="cat-<?= $category->id ?>"
+                            onclick="switchTab('cat-<?= $category->id ?>')">
+                        <?= htmlspecialchars($category->name) ?>
                     </button>
                 <?php endforeach; ?>
             </div>
 
             <!-- Main Content Area -->
-            <div class="deals-layout">
-                <!-- Filters Sidebar -->
-                <aside class="deals-sidebar">
-                    <div class="sidebar-header">
-                        <h3>Filters</h3>
-                        <button class="reset-filters" onclick="resetDealsFilters()">Clear All</button>
-                    </div>
-
-                    <!-- Star Ratings Filter -->
-                    <div class="filter-section">
-                        <h4 class="filter-title">Customer Rating</h4>
-                        <div class="filter-options">
-                            <?php for ($i = 5; $i >= 1; $i--): ?>
-                                <label class="filter-option">
-                                    <input type="checkbox" name="rating[]" value="<?= $i ?>" onchange="applyDealsFilters()">
-                                    <span class="rating-stars" style="--rating: <?= $i ?>"></span>
-                                    <span class="rating-text">& Up</span>
-                                </label>
-                            <?php endfor; ?>
-                        </div>
-                    </div>
-
-                    <!-- Product Type Filter -->
-                    <div class="filter-section collapsible open">
-                        <button class="filter-toggle" onclick="toggleFilterSection(this)">
-                            <h4 class="filter-title">Categories</h4>
-                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <div class="shop-layout">
+                <!-- Sidebar -->
+                <aside class="shop-sidebar">
+                    <div class="sidebar-section collapsible" data-section="search">
+                        <button type="button" class="section-toggle" onclick="toggleSection('search')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.35-4.35"></path>
+                                </svg>
+                                Search
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </button>
-                        <div class="filter-options">
-                            <?php foreach (array_slice($categories ?? [], 0, 10) as $category): ?>
-                                <label class="filter-option">
-                                    <input type="checkbox" name="category[]" value="<?= $category['id'] ?>" onchange="applyDealsFilters()">
-                                    <span><?= htmlspecialchars($category['name']) ?></span>
-                                    <span class="count">(<?= $category['product_count'] ?? 0 ?>)</span>
-                                </label>
-                            <?php endforeach; ?>
-                            <?php if (count($categories ?? []) > 10): ?>
-                                <button class="show-more" onclick="showMoreFilters('category')">Show More</button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
 
-                    <!-- Brand Filter -->
-                    <div class="filter-section collapsible">
-                        <button class="filter-toggle" onclick="toggleFilterSection(this)">
-                            <h4 class="filter-title">Brand</h4>
-                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
-                        <div class="filter-options">
+                        <div class="section-content open">
                             <div class="search-box">
-                                <input type="text" id="brand-search" placeholder="Search brands..." onkeyup="filterBrands()">
+                                <input type="text" id="search-input" placeholder="Search products...">
+                                <button type="button" id="search-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <path d="m21 21-4.35-4.35"></path>
+                                    </svg>
+                                </button>
                             </div>
-                            <div id="brand-list">
-                                <?php foreach (array_slice($brands ?? [], 0, 10) as $brand): ?>
-                                    <label class="filter-option">
-                                        <input type="checkbox" name="brand[]" value="<?= $brand['id'] ?>" onchange="applyDealsFilters()">
-                                        <span><?= htmlspecialchars($brand['name']) ?></span>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section collapsible" data-section="categories">
+                        <button type="button" class="section-toggle" onclick="toggleSection('categories')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"></path>
+                                </svg>
+                                Categories
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="filter-list" id="category-list">
+                                <?php foreach (array_slice($categories, 0, 5) as $category): ?>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" class="filter-checkbox" name="category[]"
+                                               value="<?= $category->id ?>">
+                                        <span class="filter-name"><?= htmlspecialchars($category->name) ?></span>
+                                        <span class="filter-count"><?= $category->product_count ?? 0 ?></span>
                                     </label>
                                 <?php endforeach; ?>
                             </div>
-                            <?php if (count($brands ?? []) > 10): ?>
-                                <button class="show-more" onclick="showMoreFilters('brand')">Show More</button>
+                            <?php if (count($categories) > 5): ?>
+                                <button type="button" class="show-more-btn" data-filter="category">
+                                    Show More
+                                </button>
                             <?php endif; ?>
                         </div>
                     </div>
 
-                    <!-- Price Range Filter -->
-                    <div class="filter-section">
-                        <h4 class="filter-title">Price</h4>
-                        <div class="filter-options">
-                            <div class="price-inputs">
-                                <input type="number" id="min-price" placeholder="Min" min="0" onchange="applyDealsFilters()">
-                                <span class="separator">to</span>
-                                <input type="number" id="max-price" placeholder="Max" min="0" onchange="applyDealsFilters()">
+                    <div class="sidebar-section collapsible" data-section="brands">
+                        <button type="button" class="section-toggle" onclick="toggleSection('brands')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                                </svg>
+                                Brands
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="filter-list" id="brand-list">
+                                <?php foreach (array_slice($brands, 0, 5) as $brand): ?>
+                                    <label class="filter-checkbox-label">
+                                        <input type="checkbox" class="filter-checkbox" name="brand[]"
+                                               value="<?= $brand->id ?>">
+                                        <span class="filter-name"><?= htmlspecialchars($brand->name) ?></span>
+                                        <span class="filter-count"><?= $brand->product_count ?? 0 ?></span>
+                                    </label>
+                                <?php endforeach; ?>
                             </div>
-
-                            <div class="price-slider">
-                                <input type="range" id="price-range-min" min="0" max="1000" value="0" step="10" oninput="updatePriceRange()">
-                                <input type="range" id="price-range-max" min="0" max="1000" value="1000" step="10" oninput="updatePriceRange()">
-                            </div>
-
-                            <button class="btn-apply-price" onclick="applyDealsFilters()">Go</button>
+                            <?php if (count($brands) > 5): ?>
+                                <button type="button" class="show-more-btn" data-filter="brand">
+                                    Show More
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
-                    <!-- Discount Percentage Filter -->
-                    <div class="filter-section">
-                        <h4 class="filter-title">Discount</h4>
-                        <div class="filter-options">
-                            <label class="filter-option">
-                                <input type="radio" name="discount" value="10" onchange="applyDealsFilters()">
-                                <span>10% Off or More</span>
-                            </label>
-                            <label class="filter-option">
-                                <input type="radio" name="discount" value="25" onchange="applyDealsFilters()">
-                                <span>25% Off or More</span>
-                            </label>
-                            <label class="filter-option">
-                                <input type="radio" name="discount" value="50" onchange="applyDealsFilters()">
-                                <span>50% Off or More</span>
-                            </label>
-                            <label class="filter-option">
-                                <input type="radio" name="discount" value="75" onchange="applyDealsFilters()">
-                                <span>75% Off or More</span>
-                            </label>
+                    <!-- Specification Filters -->
+                    <?php if (!empty($specificationGroups)): ?>
+                        <?php foreach ($specificationGroups as $specGroup): ?>
+                            <div class="sidebar-section collapsible" data-section="spec-<?= $specGroup['slug'] ?>">
+                                <button type="button" class="section-toggle"
+                                        onclick="toggleSection('spec-<?= $specGroup['slug'] ?>')">
+                                    <h3 class="sidebar-title">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor" stroke-width="2">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                        </svg>
+                                        <?= htmlspecialchars($specGroup['name']) ?>
+                                    </h3>
+                                    <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="section-content">
+                                    <div class="filter-list" id="spec-<?= $specGroup['slug'] ?>-list">
+                                        <?php foreach (array_slice($specGroup['specifications'], 0, 5) as $spec): ?>
+                                            <?php foreach ($spec['values'] as $value): ?>
+                                                <label class="filter-checkbox-label">
+                                                    <input type="checkbox"
+                                                           class="filter-checkbox"
+                                                           name="spec_<?= $specGroup['id'] ?>[]"
+                                                           value="<?= htmlspecialchars($value) ?>"
+                                                           data-group="<?= $specGroup['id'] ?>"
+                                                           data-key="<?= htmlspecialchars($spec['key']) ?>">
+                                                    <span class="filter-name"><?= htmlspecialchars($spec['key']) ?>: <?= htmlspecialchars($value) ?></span>
+                                                    <span class="filter-count"><?= $spec['count'] ?></span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <?php if (count($specGroup['specifications']) > 5): ?>
+                                        <button type="button" class="show-more-btn"
+                                                data-filter="spec-<?= $specGroup['slug'] ?>">
+                                            Show More
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
 
-                            <div class="discount-custom">
-                                <input type="number" id="custom-discount" placeholder="Custom %" min="0" max="100" onchange="applyCustomDiscount()">
-                                <span>% or more</span>
+                    <div class="sidebar-section collapsible" data-section="price-range">
+                        <button type="button" class="section-toggle" onclick="toggleSection('price-range')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                                Price Range
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="price-range">
+                                <input type="number" id="min-price" placeholder="Min" class="price-input">
+                                <span class="price-separator">-</span>
+                                <input type="number" id="max-price" placeholder="Max" class="price-input">
                             </div>
                         </div>
                     </div>
+
+                    <div class="sidebar-section">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="on-sale-filter">
+                            <span>On Sale Only</span>
+                        </label>
+                    </div>
+
+                    <button class="btn btn-primary btn-block" id="apply-filters">Apply Filters</button>
+                    <button class="btn btn-secondary btn-block" id="reset-filters">Reset</button>
+
+                    <script id="all-categories" type="application/json">
+                        <?= json_encode($categories) ?>
+
+                    </script>
+                    <script id="all-brands" type="application/json">
+                        <?= json_encode($brands) ?>
+
+                    </script>
                 </aside>
 
                 <!-- Deals Grid -->
                 <div class="deals-content">
                     <!-- Toolbar -->
-                    <div class="deals-toolbar">
+                    <div class="shop-toolbar">
                         <div class="results-info">
-                            <span id="deals-count">0 deals</span>
+                            <span id="results-count">0 products</span>
                         </div>
                         <div class="toolbar-actions">
-                            <select id="deals-sort" class="sort-select" onchange="applyDealsFilters()">
-                                <option value="discount:desc">Discount: High to Low</option>
-                                <option value="discount:asc">Discount: Low to High</option>
+                            <select id="sort-select" class="sort-select">
+                                <option value="created_at:desc">Newest First</option>
+                                <option value="created_at:asc">Oldest First</option>
                                 <option value="price:asc">Price: Low to High</option>
                                 <option value="price:desc">Price: High to Low</option>
-                                <option value="rating:desc">Rating: High to Low</option>
-                                <option value="newest">Newest Deals</option>
+                                <option value="name:asc">Name: A to Z</option>
+                                <option value="name:desc">Name: Z to A</option>
+                            </select>
+                            <select id="per-page-select" class="per-page-select">
+                                <option value="12">12 per page</option>
+                                <option value="24">24 per page</option>
+                                <option value="48">48 per page</option>
                             </select>
                         </div>
                     </div>
@@ -179,25 +258,24 @@
                     </div>
 
                     <!-- Loading State -->
-                    <div id="deals-loading" class="loading-state" style="display: none;">
+                    <div id="loading-state" class="loading-state" style="display: none;">
                         <div class="spinner"></div>
-                        <p>Finding the best deals...</p>
+                        <p>Loading deals...</p>
                     </div>
 
                     <!-- Empty State -->
-                    <div id="deals-empty" class="empty-state" style="display: none;">
+                    <div id="empty-state" class="empty-state" style="display: none;">
                         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M16 16s-1.5-2-4-2-4 2-4 2"></path>
-                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
                         <h3>No deals found</h3>
-                        <p>Try adjusting your filters or check back later for new deals</p>
+                        <p>Try adjusting your filters or search terms</p>
                     </div>
 
                     <!-- Pagination -->
-                    <div id="deals-pagination" class="pagination">
+                    <div id="pagination" class="pagination">
                         <!-- Pagination will be loaded here -->
                     </div>
                 </div>
@@ -208,11 +286,14 @@
     @include('footer', ['footerMenu' => $footerMenu ?? null])
 </div>
 
+<div id="toast" class="toast"></div>
+
 <!-- Hidden data for JavaScript -->
 <script>
     site = '<?= \App\Framework\Support\SiteContext::slug() ?? '' ?>';
     categories = <?= json_encode($categories ?? []) ?>;
     brands = <?= json_encode($brands ?? []) ?>;
+    SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
 </script>
 
 @js('deals-carousel.js')

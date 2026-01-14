@@ -107,6 +107,7 @@ $router->get('/{site}/member/rewards/{id}', [RewardsController::class, 'show']);
 $router->post('/{site}/member/rewards/{rewardId}/claim', [RewardsController::class, 'claim']);
 
 $router->post('/{site}/member/rewards/{rewardId}/track/{action}', [RewardsController::class, 'trackClick']);
+$router->post('/{site}/member/badge-modal-shown', [MemberBadgeController::class, 'markAsShown']);
 
 $router->get('/{site}/member/gifted-articles', [GiftedArticlesController::class, 'index']);
 $router->get('/{site}/gift-article/{pageSlug}', [GiftedArticlesController::class, 'showGiftForm']);

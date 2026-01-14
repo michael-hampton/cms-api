@@ -138,13 +138,19 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($groups);
     }
 
-    public function sortBy(string $key, int $options = SORT_REGULAR, bool $descending = false): self
+    public function sortBy(string|callable $key, int $options = SORT_REGULAR, bool $descending = false): self
     {
         $items = $this->items;
 
         uasort($items, function ($a, $b) use ($key, $options, $descending) {
-            $valueA = is_array($a) ? $a[$key] : $a->{$key};
-            $valueB = is_array($b) ? $b[$key] : $b->{$key};
+
+            $valueA = is_callable($key)
+                ? $key($a)
+                : (is_array($a) ? ($a[$key] ?? null) : ($a->{$key} ?? null));
+
+            $valueB = is_callable($key)
+                ? $key($b)
+                : (is_array($b) ? ($b[$key] ?? null) : ($b->{$key} ?? null));
 
             $result = $valueA <=> $valueB;
 
@@ -312,6 +318,16 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
     public function contains($key, $operator = null, $value = null): bool
     {
+        if ($key instanceof \Closure) {
+            foreach ($this->items as $item) {
+                if ($key($item)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         if (func_num_args() === 1) {
             return in_array($key, $this->items, true);
         }
@@ -537,6 +553,17 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         });
 
         return new self(array_values($filtered));
+    }
+
+    public function reduce(callable $callback, $initial = null)
+    {
+        $carry = $initial;
+
+        foreach ($this->items as $key => $item) {
+            $carry = $callback($carry, $item, $key);
+        }
+
+        return $carry;
     }
 
 }

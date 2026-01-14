@@ -1141,6 +1141,9 @@ body {
     perspective: 1000px;
     transform-style: preserve-3d;
     min-height: 400px;
+    width: auto !important;
+    margin: 0 !important;
+    height: 514px !important;
 }
 
 .product-card-inner {

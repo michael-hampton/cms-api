@@ -2,8 +2,15 @@
 namespace App\Controllers;
 
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\Menu;
+use App\Models\Product;
 use App\Repositories\Cms\BrandRepository;
 use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Product\ProductSpecificationGroupRepository;
+use App\Services\Cms\MenuRenderer;
 use App\Services\Product\DealAlertService;
 use App\Services\Product\DealsService;
 use App\Services\Product\PriceAlertService;
@@ -20,17 +27,95 @@ class DealsController extends Controller
         parent::__construct();
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        // Get all categories
+        $categories = Category::orderBy('name')->get();
+
+        // Get product counts for each category using groupBy
+        $categoryProducts = Product::select('category_id')
+            ->groupBy('category_id')
+            ->get();
+
+        // Count products per category
+        $categoryCounts = [];
+        foreach ($categoryProducts as $product) {
+            $categoryId = $product->category_id;
+            if (!isset($categoryCounts[$categoryId])) {
+                $categoryCounts[$categoryId] = 0;
+            }
+            $categoryCounts[$categoryId]++;
+        }
+
+        // Alternative approach using raw SQL if the above doesn't work
+        // $db = Database::getInstance();
+        // $stmt = $db->query('SELECT category_id, COUNT(*) as count FROM products GROUP BY category_id', []);
+        // $results = $stmt->fetchAll();
+        // $categoryCounts = [];
+        // foreach ($results as $row) {
+        //     $categoryCounts[$row['category_id']] = $row['count'];
+        // }
+
+        // Add counts to categories
+        $categories = $categories->map(function ($category) use ($categoryCounts) {
+            return (object)[
+                'id' => $category->id,
+                'name' => $category->name,
+                'product_count' => $categoryCounts[$category->id] ?? 0
+            ];
+        });
+
+        // Get all brands
+        $brands = Brand::orderBy('name')->get();
+
+        // Get product counts for each brand
+        $brandProducts = Product::select('brand_id')
+            ->groupBy('brand_id')
+            ->get();
+
+        // Count products per brand
+        $brandCounts = [];
+        foreach ($brandProducts as $product) {
+            $brandId = $product->brand_id;
+            if (!isset($brandCounts[$brandId])) {
+                $brandCounts[$brandId] = 0;
+            }
+            $brandCounts[$brandId]++;
+        }
+
+        // Add counts to brands
+        $brands = $brands->map(function ($brand) use ($brandCounts) {
+            return (object)[
+                'id' => $brand->id,
+                'name' => $brand->name,
+                'product_count' => $brandCounts[$brand->id] ?? 0
+            ];
+        });
+
+        $menu = Menu::where('is_active', true)
+            ->where('site_id', SiteContext::getId())
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+
+        $siteId = SiteContext::getId();
+
         $deals = $this->dealsService->getTodaysDeals();
 
         $dealsService = new DealsService();
 
-        return $this->view('deals/index', [
+        // Get specification groups with counts
+        $specRepository = app(ProductSpecificationGroupRepository::class);
+        $specificationGroups = $specRepository->getAllWithCounts($siteId);
+
+        return $this->view('deals.index', [
+            'categories' => $categories->toArray(),
+            'brands' => $brands->toArray(),
+            'menu' => $menu,
+            'menuRenderer' => new MenuRenderer(),
+            'specificationGroups' => $specificationGroups->toArray(),
             'deals' => $deals,
             'todaysDeals' => $dealsService->getTodaysDeals(10),
-            'categories' => $this->categoryRepository->getActive()->toArray(),
-            'brands' => $this->brandRepository->getActiveBrands()->toArray()
         ]);
     }
 

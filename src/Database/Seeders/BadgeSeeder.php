@@ -2,15 +2,13 @@
 
 namespace App\Database\Seeders;
 
-use App\Framework\Support\SiteContext;
 use App\Models\Badge;
-use App\Models\Site;
 
 class BadgeSeeder
 {
     public function run()
     {
-        $siteId = SiteContext::getId();
+        $siteId = 52;
 
         $badges = [
             // Engagement Badges
@@ -232,13 +230,13 @@ class BadgeSeeder
             ],
         ];
 
-        $sites = Site::all();
+        //$sites = Site::all();
 
-        foreach ($sites as $site) {
+        //foreach ($sites as $site) {
             foreach ($badges as $badge) {
-                $badge['site_id'] = $site->id;
+                $badge['site_id'] = $siteId;
                 Badge::create($badge);
             }
-        }
+        //}
     }
 }

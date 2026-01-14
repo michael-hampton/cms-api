@@ -8,8 +8,11 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
+use App\Models\ProductSpecificationGroup;
 use App\Models\ProductVariant;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Requests\CreateProductRequest;
 use App\Requests\UpdateProductRequest;
 use App\Resources\ProductResource;
@@ -328,5 +331,32 @@ class ProductController extends Controller
             ->pluck('type')
             ->unique()
             ->toArray();
+    }
+
+    public function specificationGroups(string $siteName): JsonResponse
+    {
+        try {
+            $siteId = SiteContext::getId();
+            $repository = app(ProductSpecificationGroupRepository::class);
+
+            $groups = ProductSpecificationGroup::where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(function ($group) {
+                    return [
+                        'id' => $group->id,
+                        'name' => $group->name,
+                        'slug' => $group->slug,
+                    ];
+                });
+
+            return $this->resourceResponse([
+                'success' => true,
+                'groups' => $groups->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 }

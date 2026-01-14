@@ -309,6 +309,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         // Product merchants
         $router->get('/products/merchants', [ProductController::class, 'merchants']);
 
+        $router->get('/specification-groups', [ProductController::class, 'specificationGroups']);;
+
 
         $router->get('/users', UserController::class, 'index');
         $router->post('/users', UserController::class, 'store');
@@ -517,7 +519,7 @@ $router->delete('/api/{site}/wishlist/remove/{productId}', WishlistController::c
 
 
 // Product routes
-$router->get('/api/{site}/product-list/search', ProductListController::class, 'search');;
+$router->get('/api/{site}/product-list/search', [ProductListController::class, 'search']);
 
 //reviews
 $router->get('/api/{site}/products/{productId}/reviews', ReviewController::class, 'index');

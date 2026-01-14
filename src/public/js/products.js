@@ -11,12 +11,14 @@
             search: '',
             categoryIds: [],
             brandIds: [],
+            specificationIds: [],
             minPrice: '',
             maxPrice: '',
             onSale: false
         },
         cartCount: 0,
-        wishlistCount: 0
+        wishlistCount: 0,
+        debounceTimer: null
     };
 
     // DOM Elements
@@ -47,6 +49,80 @@
         updateCounts();
     }
 
+    // Load state from URL
+    function loadFromURL() {
+        const params = new URLSearchParams(window.location.search);
+
+        state.currentPage = parseInt(params.get('page')) || 1;
+        state.perPage = parseInt(params.get('per_page')) || 12;
+        state.sortBy = params.get('sort_by') || 'created_at';
+        state.sortOrder = params.get('sort_order') || 'desc';
+        state.filters.search = params.get('q') || '';
+        state.filters.categoryIds = params.get('category_ids') ? params.get('category_ids').split(',') : [];
+        state.filters.brandIds = params.get('brand_ids') ? params.get('brand_ids').split(',') : [];
+        state.filters.specificationIds = params.get('spec_ids') ? params.get('spec_ids').split(',') : [];
+        state.filters.minPrice = params.get('min_price') || '';
+        state.filters.maxPrice = params.get('max_price') || '';
+        state.filters.onSale = params.get('on_sale') === '1';
+
+        // Update UI to match state
+        elements.searchInput.value = state.filters.search;
+        elements.minPriceInput.value = state.filters.minPrice;
+        elements.maxPriceInput.value = state.filters.maxPrice;
+        elements.onSaleFilter.checked = state.filters.onSale;
+        elements.sortSelect.value = `${state.sortBy}:${state.sortOrder}`;
+        elements.perPageSelect.value = state.perPage.toString();
+
+        // Check appropriate checkboxes
+        state.filters.categoryIds.forEach(id => {
+            const checkbox = document.querySelector(`input[name="category[]"][value="${id}"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+
+        state.filters.brandIds.forEach(id => {
+            const checkbox = document.querySelector(`input[name="brand[]"][value="${id}"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+
+        state.filters.specificationIds.forEach(value => {
+            const checkbox = document.querySelector(`input[name^="spec_"][value="${value}"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+
+        loadProducts();
+    }
+
+    // Update URL with current state
+    function updateURL() {
+        const params = new URLSearchParams();
+
+        if (state.currentPage > 1) params.set('page', state.currentPage);
+        if (state.perPage !== 12) params.set('per_page', state.perPage);
+        if (state.sortBy !== 'created_at' || state.sortOrder !== 'desc') {
+            params.set('sort_by', state.sortBy);
+            params.set('sort_order', state.sortOrder);
+        }
+        if (state.filters.search) params.set('q', state.filters.search);
+        if (state.filters.categoryIds.length) params.set('category_ids', state.filters.categoryIds.join(','));
+        if (state.filters.brandIds.length) params.set('brand_ids', state.filters.brandIds.join(','));
+        if (state.filters.specificationIds.length) params.set('spec_ids', state.filters.specificationIds.join(','));
+        if (state.filters.minPrice) params.set('min_price', state.filters.minPrice);
+        if (state.filters.maxPrice) params.set('max_price', state.filters.maxPrice);
+        if (state.filters.onSale) params.set('on_sale', '1');
+
+        const newURL = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+        window.history.pushState({}, '', newURL);
+    }
+
+    // Debounced filter update
+    function debouncedFilterUpdate() {
+        clearTimeout(state.debounceTimer);
+        state.debounceTimer = setTimeout(() => {
+            updateFiltersAndLoad();
+        }, 300);
+    }
+
+
     // Event Listeners
     function attachEventListeners() {
         // Search
@@ -54,28 +130,67 @@
         elements.searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleSearch();
         });
+        elements.searchInput.addEventListener('input', debouncedFilterUpdate);
 
-        // Filters
-        elements.applyFiltersBtn.addEventListener('click', applyFilters);
+        // Auto-apply filters on change
+        document.querySelectorAll('input[name="category[]"]').forEach(cb => {
+            cb.addEventListener('change', debouncedFilterUpdate);
+        });
+
+        document.querySelectorAll('input[name="brand[]"]').forEach(cb => {
+            cb.addEventListener('change', debouncedFilterUpdate);
+        });
+
+        document.querySelectorAll('input[name^="spec_"]').forEach(cb => {
+            cb.addEventListener('change', debouncedFilterUpdate);
+        });
+
+        elements.minPriceInput.addEventListener('input', debouncedFilterUpdate);
+        elements.maxPriceInput.addEventListener('input', debouncedFilterUpdate);
+        elements.onSaleFilter.addEventListener('change', debouncedFilterUpdate);
+
+        // Keep apply/reset buttons for manual control
+        elements.applyFiltersBtn.addEventListener('click', updateFiltersAndLoad);
         elements.resetFiltersBtn.addEventListener('click', resetFilters);
 
         // Sorting and pagination
         elements.sortSelect.addEventListener('change', handleSortChange);
         elements.perPageSelect.addEventListener('change', handlePerPageChange);
 
-        // Enter key on price inputs
-        elements.minPriceInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') applyFilters();
-        });
-        elements.maxPriceInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') applyFilters();
-        });
+        // Browser back/forward
+        window.addEventListener('popstate', loadFromURL);
     }
 
     // Handle search
     function handleSearch() {
         state.filters.search = elements.searchInput.value.trim();
         state.currentPage = 1;
+        updateFiltersAndLoad();
+    }
+
+    // Update filters and load
+    function updateFiltersAndLoad() {
+        // Get all checked category checkboxes
+        state.filters.categoryIds = Array.from(
+            document.querySelectorAll('input[name="category[]"]:checked')
+        ).map(cb => cb.value);
+
+        // Get all checked brand checkboxes
+        state.filters.brandIds = Array.from(
+            document.querySelectorAll('input[name="brand[]"]:checked')
+        ).map(cb => cb.value);
+
+        // Get specification filters
+        const specCheckboxes = document.querySelectorAll('[name^="spec_"]:checked');
+        state.filters.specificationIds = Array.from(specCheckboxes).map(cb => cb.value);
+
+        state.filters.search = elements.searchInput.value.trim();
+        state.filters.minPrice = elements.minPriceInput.value;
+        state.filters.maxPrice = elements.maxPriceInput.value;
+        state.filters.onSale = elements.onSaleFilter.checked;
+        state.currentPage = 1;
+
+        updateURL();
         loadProducts();
     }
 
@@ -91,6 +206,12 @@
             document.querySelectorAll('input[name="brand[]"]:checked')
         ).map(cb => cb.value);
 
+        const specCheckboxes = document.querySelectorAll('[name^="spec_"]');
+
+        state.filters.specificationIds = Array.from(specCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
         state.filters.minPrice = elements.minPriceInput.value;
         state.filters.maxPrice = elements.maxPriceInput.value;
         state.filters.onSale = elements.onSaleFilter.checked;
@@ -104,6 +225,7 @@
             search: '',
             categoryIds: [],
             brandIds: [],
+            specificationIds: [],
             minPrice: '',
             maxPrice: '',
             onSale: false
@@ -113,10 +235,12 @@
         elements.searchInput.value = '';
         document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
         document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
         elements.minPriceInput.value = '';
         elements.maxPriceInput.value = '';
         elements.onSaleFilter.checked = false;
 
+        updateURL();
         loadProducts();
     }
 
@@ -126,6 +250,7 @@
         state.sortBy = sortBy;
         state.sortOrder = sortOrder;
         state.currentPage = 1;
+        updateURL();
         loadProducts();
     }
 
@@ -133,6 +258,7 @@
     function handlePerPageChange() {
         state.perPage = parseInt(elements.perPageSelect.value);
         state.currentPage = 1;
+        updateURL();
         loadProducts();
     }
 
@@ -148,6 +274,7 @@
             q: state.filters.search,
             category_ids: state.filters.categoryIds.join(','),
             brand_ids: state.filters.brandIds.join(','),
+            spec_ids: state.filters.specificationIds.join(','),
             min_price: state.filters.minPrice,
             max_price: state.filters.maxPrice,
             on_sale: state.filters.onSale ? '1' : ''
@@ -173,7 +300,6 @@
     }
 
     // Render products
-    // Replace the renderProducts function with this updated version
     function renderProducts(products) {
         if (!products || products.length === 0) {
             showEmptyState();
@@ -185,7 +311,6 @@
         elements.productsGrid.innerHTML = products.map(product => `
         <div class="product-card" data-product-id="${product.id}">
             <div class="product-card-inner">
-                <!-- FRONT OF CARD -->
                 <div class="product-card-front">
                     <button class="btn-flip" data-product-id="${product.id}" title="View details">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -226,7 +351,6 @@
                     </div>
                 </div>
                 
-                <!-- BACK OF CARD -->
                 <div class="product-card-back">
                     <div class="card-back-header">
                         <h3 class="card-back-title">${escapeHtml(product.name)}</h3>
@@ -239,9 +363,7 @@
                     </div>
                     
                     <div class="card-back-content">
-                        <div class="card-back-dynamic-content">
-                            <!-- Content will be loaded dynamically -->
-                        </div>
+                        <div class="card-back-dynamic-content"></div>
                     </div>
                     
                     <div class="card-back-actions">
@@ -257,7 +379,6 @@
         </div>
     `).join('');
 
-        // Attach event listeners to new buttons
         attachProductEventListeners();
         attachFlipEventListeners();
     }
@@ -313,7 +434,6 @@
         btn.textContent = 'Adding...';
 
         try {
-
             const response = await fetch(`/api/${SITE}/cart/add`, {
                 method: 'POST',
                 headers: {
@@ -392,7 +512,6 @@
         const { current_page, last_page } = pagination;
         let html = '';
 
-        // Previous button
         html += `
             <button ${current_page === 1 ? 'disabled' : ''} 
                     data-page="${current_page - 1}">
@@ -400,7 +519,6 @@
             </button>
         `;
 
-        // Page numbers
         const startPage = Math.max(1, current_page - 2);
         const endPage = Math.min(last_page, current_page + 2);
 
@@ -423,7 +541,6 @@
             html += `<button data-page="${last_page}">${last_page}</button>`;
         }
 
-        // Next button
         html += `
             <button ${current_page === last_page ? 'disabled' : ''} 
                     data-page="${current_page + 1}">
@@ -433,10 +550,10 @@
 
         elements.pagination.innerHTML = html;
 
-        // Attach click handlers
         elements.pagination.querySelectorAll('button').forEach(btn => {
             btn.addEventListener('click', () => {
                 state.currentPage = parseInt(btn.dataset.page);
+                updateURL();
                 loadProducts();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
@@ -451,13 +568,11 @@
     // Update counts
     async function updateCounts() {
         try {
-            // Get cart count
             const cartResponse = await fetch(`/api/${SITE}/cart`);
             const cartData = await cartResponse.json();
             state.cartCount = cartData.count || 0;
             updateCartCount();
 
-            // Get wishlist count
             const wishlistResponse = await fetch(`/api/${SITE}/wishlist`);
             const wishlistData = await wishlistResponse.json();
             state.wishlistCount = wishlistData.count || 0;
@@ -469,14 +584,18 @@
 
     // Update cart count display
     function updateCartCount() {
-        elements.cartCount.textContent = state.cartCount;
-        elements.cartCount.style.display = state.cartCount > 0 ? 'block' : 'none';
+        if (elements.cartCount) {
+            elements.cartCount.textContent = state.cartCount;
+            elements.cartCount.style.display = state.cartCount > 0 ? 'block' : 'none';
+        }
     }
 
     // Update wishlist count display
     function updateWishlistCount() {
-        elements.wishlistCount.textContent = state.wishlistCount;
-        elements.wishlistCount.style.display = state.wishlistCount > 0 ? 'block' : 'none';
+        if (elements.wishlistCount) {
+            elements.wishlistCount.textContent = state.wishlistCount;
+            elements.wishlistCount.style.display = state.wishlistCount > 0 ? 'block' : 'none';
+        }
     }
 
     // Show loading state
@@ -544,6 +663,11 @@
                 <span class="filter-count">${item.product_count || 0}</span>
             </label>
         `).join('');
+
+        // Re-attach event listeners
+        listElement.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', debouncedFilterUpdate);
+        });
     }
 
     function collapsFilterList(filterType) {
@@ -558,6 +682,11 @@
                 <span class="filter-count">${item.product_count || 0}</span>
             </label>
         `).join('');
+
+        // Re-attach event listeners
+        listElement.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', debouncedFilterUpdate);
+        });
     }
 
     // Show more/less button click handler
@@ -568,12 +697,10 @@
             const isExpanded = btn.classList.contains('expanded');
 
             if (isExpanded) {
-                // Collapse - show only first 5
                 collapsFilterList(filterType);
                 btn.classList.remove('expanded');
                 btn.textContent = 'Show More';
             } else {
-                // Expand - show all
                 expandFilterList(filterType);
                 btn.classList.add('expanded');
                 btn.textContent = 'Show Less';
