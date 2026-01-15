@@ -521,6 +521,7 @@ $router->delete('/api/{site}/wishlist/remove/{productId}', WishlistController::c
 // Product routes
 $router->get('/api/{site}/product-list/search', [ProductListController::class, 'search']);
 
+
 //reviews
 $router->get('/api/{site}/products/{productId}/reviews', ReviewController::class, 'index');
 $router->post('/api/{site}/products/{productId}/reviews', ReviewController::class, 'store');

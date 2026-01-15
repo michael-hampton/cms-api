@@ -36,6 +36,15 @@
                 <?php endforeach; ?>
             </div>
 
+            <div class="suggested-filters" id="suggested-filters" style="display: none;">
+                <div class="suggested-filters-header">
+                    <h3>Quick Filters:</h3>
+                </div>
+                <div class="suggested-filters-list" id="suggested-filters-list">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
             <!-- Main Content Area -->
             <div class="shop-layout">
                 <!-- Sidebar -->
@@ -287,6 +296,11 @@
 </div>
 
 <div id="toast" class="toast"></div>
+
+<div id="comparison-bar">
+    <div class="comparison-count">0 products selected</div>
+    <button onclick="compareProducts()" class="btn btn-primary">Compare Products</button>
+</div>
 
 <!-- Hidden data for JavaScript -->
 <script>

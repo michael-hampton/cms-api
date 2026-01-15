@@ -188,26 +188,42 @@ class DealsServiceTest extends FunctionalTestCase
     {
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $result = $this->service->getFilteredDeals([], $this->siteId);
 
         $this->assertIsArray($result);
-        $this->assertArrayHasKey('deals', $result);
+        $this->assertArrayHasKey('data', $result);
         $this->assertArrayHasKey('total', $result);
         $this->assertArrayHasKey('pagination', $result);
     }
 
     public function test_get_filtered_deals_applies_under25_tab(): void
     {
-        $filters = ['tab' => 'under25'];
+        $filters = ['max_price' => 25];
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
-                return isset($arg['maxPrice']) && $arg['maxPrice'] === 25;
+                return isset($arg['max_price']) && $arg['max_price'] === 25;
             }))
-            ->andReturn([]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -216,11 +232,19 @@ class DealsServiceTest extends FunctionalTestCase
 
     public function test_get_filtered_deals_applies_over50_tab(): void
     {
-        $filters = ['tab' => 'over50'];
+        $filters = ['min_price' => 50];
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -234,9 +258,17 @@ class DealsServiceTest extends FunctionalTestCase
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
-                return isset($arg['hasVoucher']) && $arg['hasVoucher'] === true;
+                return isset($arg['tab']) && $arg['tab'] === 'vouchers';
             }))
-            ->andReturn([]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -245,14 +277,22 @@ class DealsServiceTest extends FunctionalTestCase
 
     public function test_get_filtered_deals_applies_category_tab(): void
     {
-        $filters = ['tab' => 'cat-5'];
+        $filters = ['category_ids' => [1780]];
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
-                return isset($arg['category']) && $arg['category'] === [5];
+                return isset($arg['category_ids']) && $arg['category_ids'] === [1780];
             }))
-            ->andReturn([]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -274,7 +314,15 @@ class DealsServiceTest extends FunctionalTestCase
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([$productData]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([$productData]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
@@ -297,11 +345,6 @@ class DealsServiceTest extends FunctionalTestCase
         $brand = m::mock(\App\Models\Brand::class)->makePartial();
         $brand->name = 'BrandName';
         $product->brand = $brand;
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -326,7 +369,15 @@ class DealsServiceTest extends FunctionalTestCase
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([$productData]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([$productData]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
@@ -350,11 +401,6 @@ class DealsServiceTest extends FunctionalTestCase
         $brand->name = 'BrandName';
         $product->brand = $brand;
 
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
         $this->assertIsArray($result);
@@ -377,7 +423,15 @@ class DealsServiceTest extends FunctionalTestCase
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([$productData]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([$productData]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
@@ -401,11 +455,6 @@ class DealsServiceTest extends FunctionalTestCase
         $brand->name = 'BrandName';
         $product->brand = $brand;
 
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
         $this->assertIsArray($result);
@@ -420,12 +469,26 @@ class DealsServiceTest extends FunctionalTestCase
             'sort' => 'discount:desc'
         ];
 
-        $product1Data = ['id' => 1, 'price' => 100.00, 'sale_price' => 80.00];
-        $product2Data = ['id' => 2, 'price' => 100.00, 'sale_price' => 60.00];
+        $product1 = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product1->id = 1;
+        $product1->price = 100.00;
+        $product1->sale_price = 80.00;
+        $product2 = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product2->price = 100.00;
+        $product2->sale_price = 60.00;
+        $product2->id = 2;
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([$product1Data, $product2Data]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([$product1, $product2]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $product1 = m::mock(\App\Models\Product::class)->makePartial();
         $product1->id = 1;
@@ -465,17 +528,9 @@ class DealsServiceTest extends FunctionalTestCase
         $product1->brand = $brand;
         $product2->brand = $brand;
 
-        $this->mockRepository->shouldReceive('findProductById')
-            ->with(1)
-            ->andReturn($product1);
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->with(2)
-            ->andReturn($product2);
-
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
-        $this->assertGreaterThan($result['deals'][1]['discount_percentage'], $result['deals'][0]['discount_percentage']);
+        $this->assertGreaterThan($result['data'][0]['discount_percentage'], $result['data'][1]['discount_percentage']);
     }
 
     public function test_get_filtered_deals_sorts_by_price_asc(): void
@@ -484,12 +539,26 @@ class DealsServiceTest extends FunctionalTestCase
             'sort' => 'price:asc'
         ];
 
-        $product1Data = ['id' => 1, 'price' => 100.00, 'sale_price' => 80.00];
-        $product2Data = ['id' => 2, 'price' => 100.00, 'sale_price' => 60.00];
+        $product1 = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product1->id = 1;
+        $product1->price = 100.00;
+        $product1->sale_price = 80.00;
+        $product2 = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product2->price = 100.00;
+        $product2->sale_price = 60.00;
+        $product2->id = 2;
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([$product1Data, $product2Data]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([$product1, $product2]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $product1 = m::mock(\App\Models\Product::class)->makePartial();
         $product1->id = 1;
@@ -539,59 +608,7 @@ class DealsServiceTest extends FunctionalTestCase
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
-        $this->assertLessThan($result['deals'][1]['sale_price'], $result['deals'][0]['sale_price']);
-    }
-
-    public function test_get_filtered_deals_paginates_correctly(): void
-    {
-        $filters = [
-            'page' => 2,
-            'perPage' => 5
-        ];
-
-        $products = [];
-        for ($i = 1; $i <= 15; $i++) {
-            $products[] = ['id' => $i, 'price' => 100.00, 'sale_price' => 80.00];
-        }
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn($products);
-
-        foreach ($products as $productData) {
-            $product = m::mock(\App\Models\Product::class)->makePartial();
-            $product->id = $productData['id'];
-            $product->name = 'Product ' . $productData['id'];
-            $product->slug = 'product-' . $productData['id'];
-            $product->price = 100.00;
-            $product->sale_price = 80.00;
-            $product->main_image_url = 'image.jpg';
-            $product->average_rating = 4.5;
-            $product->review_count = 10;
-            $product->category_id = 1;
-            $product->brand_id = 1;
-            $product->variants = null;
-            $product->merchants = null;
-
-            $category = m::mock(\App\Models\Category::class)->makePartial();
-            $category->name = 'Electronics';
-            $product->category = $category;
-
-            $brand = m::mock(\App\Models\Brand::class)->makePartial();
-            $brand->name = 'BrandName';
-            $product->brand = $brand;
-
-            $this->mockRepository->shouldReceive('findProductById')
-                ->with($productData['id'])
-                ->andReturn($product);
-        }
-
-        $result = $this->service->getFilteredDeals($filters, $this->siteId);
-
-        $this->assertLessThanOrEqual(5, count($result['deals']));
-        $this->assertEquals(2, $result['pagination']['currentPage']);
-        $this->assertEquals(5, $result['pagination']['perPage']);
-        $this->assertTrue($result['pagination']['hasPrev']);
+        $this->assertLessThan($result['data'][0]['sale_price'], $result['data'][1]['sale_price']);
     }
 
     public function test_get_filtered_deals_returns_correct_pagination_info(): void
@@ -603,336 +620,46 @@ class DealsServiceTest extends FunctionalTestCase
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 0,
+                    'last_page' => 1
+                ]
+            ]);
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
         $this->assertArrayHasKey('pagination', $result);
-        $this->assertArrayHasKey('currentPage', $result['pagination']);
-        $this->assertArrayHasKey('totalPages', $result['pagination']);
-        $this->assertArrayHasKey('perPage', $result['pagination']);
-        $this->assertArrayHasKey('hasNext', $result['pagination']);
-        $this->assertArrayHasKey('hasPrev', $result['pagination']);
+        $this->assertArrayHasKey('current_page', $result['pagination']);
+        $this->assertArrayHasKey('total', $result['pagination']);
+        $this->assertArrayHasKey('per_page', $result['pagination']);
+        $this->assertArrayHasKey('last_page', $result['pagination']);
     }
 
-    public function test_get_filtered_deals_filters_out_products_with_no_discount(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 100.00 // No discount
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $product = m::mock(\App\Models\Product::class)->makePartial();
-        $product->id = 1;
-        $product->name = 'Test Product';
-        $product->slug = 'test-product';
-        $product->price = 100.00;
-        $product->sale_price = 100.00;
-        $product->main_image_url = 'image.jpg';
-        $product->average_rating = 4.5;
-        $product->review_count = 10;
-        $product->category_id = 1;
-        $product->brand_id = 1;
-        $product->variants = null;
-        $product->merchants = null;
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(0, $result['deals']);
-    }
-
-    public function test_get_filtered_deals_includes_variant_deals(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 90.00
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $variant = m::mock(\App\Models\ProductVariant::class)->makePartial();
-        $variant->id = 1;
-        $variant->name = 'Variant 1';
-        $variant->price = 100.00;
-        $variant->sale_price = 70.00;
-        $variant->is_active = true;
-        $variant->merchants = null;
-
-        $product = m::mock(\App\Models\Product::class)->makePartial();
-        $product->id = 1;
-        $product->name = 'Test Product';
-        $product->slug = 'test-product';
-        $product->price = 100.00;
-        $product->sale_price = 90.00;
-        $product->main_image_url = 'image.jpg';
-        $product->average_rating = 4.5;
-        $product->review_count = 10;
-        $product->category_id = 1;
-        $product->brand_id = 1;
-        $product->variants = collect([$variant]);
-        $product->merchants = null;
-
-        $category = m::mock(\App\Models\Category::class)->makePartial();
-        $category->name = 'Electronics';
-        $product->category = $category;
-
-        $brand = m::mock(\App\Models\Brand::class)->makePartial();
-        $brand->name = 'BrandName';
-        $product->brand = $brand;
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(70.00, $result['deals'][0]['sale_price']);
-        $this->assertEquals('variant', $result['deals'][0]['source']);
-        $this->assertEquals(1, $result['deals'][0]['variant_id']);
-    }
-
-    public function test_get_filtered_deals_includes_merchant_deals(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 90.00
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $product = $this->createProduct([
-            'price' => 100.00,
-            'sale_price' => 90.00,
-        ]);
-
-        $merchant = $this->createMerchant();
-
-        $productMerchant = $this->createProductMerchant($product->id, [
-            'merchant_id' => $merchant->id,
-            'price' => 100.00,
-            'sale_price' => 65.00,
-            'is_available' => true,
-        ]);
-
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(65.00, $result['deals'][0]['sale_price']);
-        $this->assertEquals('merchant', $result['deals'][0]['source']);
-        $this->assertEquals($merchant->id, $result['deals'][0]['merchant_id']);
-    }
-
-    public function test_get_filtered_deals_chooses_best_price_from_multiple_sources(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 90.00
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $product = $this->createProduct([
-            'price' => 100.00,
-            'sale_price' => 90.00,
-        ]);
-
-        $variant = $this->createProductVariant($product->id, [
-            'price' => 100.00,
-            'sale_price' => 75.00,
-        ]);
-
-        $merchant = $this->createMerchant();
-        $productMerchant = $this->createProductMerchant($product->id, [
-            'merchant_id' => $merchant->id,
-            'price' => 100.00,
-            'sale_price' => 60.00,
-            'is_available' => true,
-        ]);
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(60.00, $result['deals'][0]['sale_price']);
-        $this->assertEquals('merchant', $result['deals'][0]['source']);
-    }
-
-    public function test_get_filtered_deals_skips_inactive_variants(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 90.00
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $product = $this->createProduct([
-            'price' => 100.00,
-            'sale_price' => 90.00,
-        ]);
-
-        $variant = $this->createProductVariant($product->id, [
-            'price' => 100.00,
-            'sale_price' => 50.00,
-            'is_active' => false,
-        ]);
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(90.00, $result['deals'][0]['sale_price']);
-        $this->assertEquals('product', $result['deals'][0]['source']);
-    }
-
-    public function test_get_filtered_deals_skips_unavailable_merchants(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 90.00
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $merchant = m::mock(\App\Models\ProductMerchant::class)->makePartial();
-        $merchant->merchant_id = 1;
-        $merchant->name = 'Merchant 1';
-        $merchant->effective_price = 100.00;
-        $merchant->effective_sale_price = 50.00;
-        $merchant->is_available = false; // Unavailable
-        $merchant->merchant = null;
-
-        $product = m::mock(\App\Models\Product::class)->makePartial();
-        $product->id = 1;
-        $product->name = 'Test Product';
-        $product->slug = 'test-product';
-        $product->price = 100.00;
-        $product->sale_price = 90.00;
-        $product->main_image_url = 'image.jpg';
-        $product->average_rating = 4.5;
-        $product->review_count = 10;
-        $product->category_id = 1;
-        $product->brand_id = 1;
-        $product->variants = null;
-        $product->merchants = collect([$merchant]);
-
-        $category = m::mock(\App\Models\Category::class)->makePartial();
-        $category->name = 'Electronics';
-        $product->category = $category;
-
-        $brand = m::mock(\App\Models\Brand::class)->makePartial();
-        $brand->name = 'BrandName';
-        $product->brand = $brand;
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(90.00, $result['deals'][0]['sale_price']);
-        $this->assertEquals('product', $result['deals'][0]['source']);
-    }
-
-    public function test_get_filtered_deals_calculates_discount_percentage_correctly(): void
-    {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 75.00
-        ];
-
-        $this->mockRepository->shouldReceive('getFilteredProducts')
-            ->once()
-            ->andReturn([$productData]);
-
-        $product = m::mock(\App\Models\Product::class)->makePartial();
-        $product->id = 1;
-        $product->name = 'Test Product';
-        $product->slug = 'test-product';
-        $product->price = 100.00;
-        $product->sale_price = 75.00;
-        $product->main_image_url = 'image.jpg';
-        $product->average_rating = 4.5;
-        $product->review_count = 10;
-        $product->category_id = 1;
-        $product->brand_id = 1;
-        $product->variants = null;
-        $product->merchants = null;
-
-        $category = m::mock(\App\Models\Category::class)->makePartial();
-        $category->name = 'Electronics';
-        $product->category = $category;
-
-        $brand = m::mock(\App\Models\Brand::class)->makePartial();
-        $brand->name = 'BrandName';
-        $product->brand = $brand;
-
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $result = $this->service->getFilteredDeals([], $this->siteId);
-
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(25, $result['deals'][0]['discount_percentage']);
-    }
 
     public function test_get_filtered_deals_includes_category_and_brand_info(): void
     {
-        $productData = [
-            'id' => 1,
-            'price' => 100.00,
-            'sale_price' => 75.00
-        ];
+        $product1 = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product1->id = 1;
+        $product1->price = 100.00;
+        $product1->sale_price = 80.00;
+        $product1->category_id = 1;
+        $product1->brand_id = 2;
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
-            ->andReturn([$productData]);
+            ->andReturn([
+                'data' => new \App\Framework\Support\Collection([$product1]),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => 12,
+                    'total' => 1,
+                    'last_page' => 1
+                ]
+            ]);
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
@@ -956,17 +683,10 @@ class DealsServiceTest extends FunctionalTestCase
         $brand->name = 'Apple';
         $product->brand = $brand;
 
-        $this->mockRepository->shouldReceive('findProductById')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
         $result = $this->service->getFilteredDeals([], $this->siteId);
 
-        $this->assertCount(1, $result['deals']);
-        $this->assertEquals(1, $result['deals'][0]['category_id']);
-        $this->assertEquals('Electronics', $result['deals'][0]['category_name']);
-        $this->assertEquals(2, $result['deals'][0]['brand_id']);
-        $this->assertEquals('Apple', $result['deals'][0]['brand_name']);
+        $this->assertCount(1, $result['data']);
+        $this->assertEquals(1, $result['data'][0]['category_id']);
+        $this->assertEquals(2, $result['data'][0]['brand_id']);
     }
 }

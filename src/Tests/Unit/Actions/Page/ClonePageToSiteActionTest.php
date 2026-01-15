@@ -20,6 +20,7 @@ use App\Repositories\Cms\PageSocialRepository;
 use App\Repositories\Cms\PageTagRepository;
 use App\Repositories\Cms\PageTerritoryRepository;
 use App\Services\Cms\BlockParserService;
+use App\Services\Cms\ClonePermissionChecker;
 use App\Services\Cms\PageHistoryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -48,6 +49,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
     private $pageRegionSetRepository;
     private $pageTerritoryRepository;
     private $pageProductRepository;
+    private $clonePermissionChecker;
 
     protected function setUp(): void
     {
@@ -72,11 +74,13 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
         $this->pageAuthorRepository = Mockery::mock(PageAuthorRepository::class);
         $this->pageRegionSetRepository = Mockery::mock(PageRegionSetRepository::class);
         $this->pageTerritoryRepository = Mockery::mock(PageTerritoryRepository::class);
+        $this->clonePermissionChecker = Mockery::mock(ClonePermissionChecker::class);
 
         $this->service = new ClonePageToSite(
             $this->pageRepository,
            $this->databaseMock,
             $this->pageHistory,
+            $this->clonePermissionChecker
         );
     }
 

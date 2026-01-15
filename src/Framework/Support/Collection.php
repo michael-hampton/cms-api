@@ -566,4 +566,13 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return $carry;
     }
 
+    public function sort(): static
+    {
+        $items = $this->items;
+
+        sort($items);
+
+        return new static($items);
+    }
+
 }

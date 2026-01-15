@@ -195,94 +195,101 @@ class DealsService
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-        // Apply tab-specific filters
-        if (isset($filters['tab'])) {
-            switch ($filters['tab']) {
-                case 'under25':
-                    $filters['maxPrice'] = 25;
-                    break;
-                case 'over50':
-                    $filters['discount'] = 50;
-                    break;
-                case 'vouchers':
-                    $filters['hasVoucher'] = true;
-                    break;
-                default:
-                    if (strpos($filters['tab'], 'cat-') === 0) {
-                        $categoryId = (int) str_replace('cat-', '', $filters['tab']);
-                        $filters['category'] = [$categoryId];
-                    }
-            }
-        }
-
         $products = $this->repository->getFilteredProducts($siteId, $filters);
 
-        // Build deals array
-        $deals = [];
-        foreach ($products as $productData) {
-            $product = $this->repository->findProductById($productData['id']);
+        $formattedProducts = $products['data']->map(function ($product) {
+            return $this->formatProductForDeals($product);
+        })->toArray();
 
-            if ($product) {
+        return [
+            'data' => $formattedProducts,
+            'total' => $products['pagination']['total'],
+            'pagination' => $products['pagination']
+        ];
+    }
 
-                $bestDeal = $this->getBestDealForProduct($product);
+    /**
+     * Format product data for deals display
+     */
+    private function formatProductForDeals($product): array
+    {
+        // Calculate discount percentage
+        $discountPercentage = 0;
+        $finalPrice = $product->price;
 
-                if ($bestDeal) {
-                    // Apply rating filter
-                    if (!empty($filters['rating'])) {
-                        $minRating = min($filters['rating']);
-                        if ($bestDeal['rating'] < $minRating) {
-                            continue;
-                        }
-                    }
+        if ($product->sale_price && $product->sale_price > 0 && $product->sale_price < $product->price) {
+            $finalPrice = $product->sale_price;
+            $discountPercentage = round((($product->price - $product->sale_price) / $product->price) * 100);
+        }
 
-                    // Apply discount filter
-                    if (isset($filters['discount'])) {
-                        if ($bestDeal['discount_percentage'] < $filters['discount']) {
-                            continue;
-                        }
-                    }
+        // Get main image
+        $mainImage = null;
+        if ($product->main_image_url) {
+            $mainImage = $product->main_image_url;
+        } elseif ($product->images && count($product->images) > 0) {
+            $mainImage = $product->images[0]->url ?? $product->images[0]->path ?? null;
+        } elseif ($product->image) {
+            $mainImage = $product->image;
+        }
 
-                    $deals[] = $bestDeal;
+        // Calculate average rating
+        $averageRating = 0;
+        $reviewCount = 0;
+        if ($product->approvedReviews && count($product->approvedReviews) > 0) {
+            $totalRating = array_sum(array_column($product->approvedReviews, 'rating'));
+            $reviewCount = count($product->approvedReviews);
+            $averageRating = round($totalRating / $reviewCount, 1);
+        }
+
+        // Get lowest merchant price if available
+        $lowestMerchantPrice = null;
+        if ($product->merchants && count($product->merchants) > 0) {
+            $merchantPrices = array_map(function ($merchant) {
+                return $merchant->sale_price > 0 ? $merchant->sale_price : $merchant->price;
+            }, $product->merchants);
+            $lowestMerchantPrice = min($merchantPrices);
+        }
+
+        // Check for variants with better prices
+        $hasVariants = false;
+        $lowestVariantPrice = null;
+        if ($product->variants && count($product->variants) > 0) {
+            $hasVariants = true;
+            $variantPrices = [];
+            foreach ($product->variants as $variant) {
+                if ($variant->in_stock) {
+                    $variantPrice = $variant->sale_price > 0 ? $variant->sale_price : $variant->price;
+                    $variantPrices[] = $variantPrice;
                 }
+            }
+            if (count($variantPrices) > 0) {
+                $lowestVariantPrice = min($variantPrices);
             }
         }
 
-        // Sort deals
-        $sortBy = $filters['sort'] ?? 'discount:desc';
-        [$sortField, $sortDir] = explode(':', $sortBy);
-
-        usort($deals, function($a, $b) use ($sortField, $sortDir) {
-            // Map 'discount' to 'discount_percentage' field
-            if ($sortField === 'discount') {
-                $sortField = 'discount_percentage';
-            }
-
-            $aVal = $sortField === 'price' ? ($a['sale_price'] ?? 0) : ($a[$sortField] ?? 0);
-            $bVal = $sortField === 'price' ? ($b['sale_price'] ?? 0) : ($b[$sortField] ?? 0);
-
-            $result = $aVal <=> $bVal;
-            return $sortDir === 'desc' ? -$result : $result;
-        });
-
-        // Pagination
-        $page = $filters['page'] ?? 1;
-        $perPage = $filters['perPage'] ?? 24;
-        $total = count($deals);
-        $totalPages = (int) ceil($total / $perPage);
-        $offset = ($page - 1) * $perPage;
-
-        $paginatedDeals = array_slice($deals, $offset, $perPage);
-
         return [
-            'data' => $paginatedDeals,
-            'total' => $total,
-            'pagination' => [
-                'currentPage' => (int) $page,
-                'totalPages' => $totalPages,
-                'perPage' => (int) $perPage,
-                'hasNext' => $page < $totalPages,
-                'hasPrev' => $page > 1
-            ]
+            'product_id' => $product->id,
+            'title' => $product->title ?? $product->name,
+            'slug' => $product->slug,
+            'description' => $product->description,
+            'image' => $mainImage,
+            'original_price' => (float)$product->price,
+            'sale_price' => $product->sale_price > 0 ? (float)$product->sale_price : null,
+            'final_price' => (float)$finalPrice,
+            'discount_percentage' => $discountPercentage,
+            'brand' => $product->brand?->name ?? null,
+            'brand_id' => $product->brand_id,
+            'category' => $product->category?->name ?? null,
+            'category_id' => $product->category_id,
+            'stock_quantity' => $product->stock_quantity ?? 0,
+            'in_stock' => ($product->stock_quantity ?? 0) > 0,
+            'average_rating' => $averageRating,
+            'review_count' => $reviewCount,
+            'has_variants' => $hasVariants,
+            'lowest_variant_price' => $lowestVariantPrice,
+            'lowest_merchant_price' => $lowestMerchantPrice,
+            'created_at' => $product->created_at,
+            'updated_at' => $product->updated_at,
         ];
     }
 }

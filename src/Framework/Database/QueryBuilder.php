@@ -133,6 +133,17 @@ class QueryBuilder
 
     public function orWhere($column, $operator = null, $value = null): self
     {
+        if ($column instanceof Closure) {
+            $subQuery = new static($this->table, $this->relationManager, $this->database);
+            $column($subQuery); // let closure add its wheres
+            $this->wheres[] = [
+                'type' => 'Nested',
+                'query' => $subQuery,
+                'boolean' => 'OR',  // Note: OR instead of AND
+            ];
+            return $this;
+        }
+
         if ($value === null) {
             $value = $operator;
             $operator = '=';

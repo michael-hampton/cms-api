@@ -4,6 +4,7 @@ namespace App\Actions\Pages;
 
 use App\Framework\Database\Database;
 use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\ClonePermissionChecker;
 use App\Services\Cms\PageHistoryService;
 
 class ClonePage
@@ -11,7 +12,8 @@ class ClonePage
     public function __construct(
         private readonly PageRepository $pageRepository,
         private readonly Database $database,
-        private readonly PageHistoryService $historyService
+        private readonly PageHistoryService     $historyService,
+        private readonly ClonePermissionChecker $permissionChecker
     )
     {
     }
@@ -19,11 +21,17 @@ class ClonePage
     /**
      * Duplicate a page with all its relations
      */
-    public function handle(int $pageId, array $options = []): ?array
+    public function handle(int $pageId, array $options = [], ?int $userId = null): ?array
     {
         $originalPage = $this->pageRepository->getCompletePageData($pageId);
         if (!$originalPage) {
             return null;
+        }
+
+        // Check clone permissions
+        if ($userId !== null && !$this->permissionChecker->canClone($originalPage, $userId)) {
+            $reason = $this->permissionChecker->getCloneRestrictionReason($originalPage, $userId);
+            throw new \Exception($reason ?? 'Page cannot be cloned');
         }
 
         // Set default relations - all enabled by default

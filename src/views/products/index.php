@@ -274,6 +274,12 @@
 <!-- Toast Notification -->
 <div id="toast" class="toast"></div>
 
+<div id="comparison-bar"
+     style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #000; color: white; padding: 1rem; justify-content: space-between; align-items: center; z-index: 1000;">
+    <div class="comparison-count">0 products selected</div>
+    <button onclick="compareProducts()" class="btn btn-primary">Compare Products</button>
+</div>
+
 <script id="all-specification-groups" type="application/json">
     <?= json_encode($specificationGroups ?? []) ?>
 

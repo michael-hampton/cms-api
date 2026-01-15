@@ -42,11 +42,70 @@
         toast: document.getElementById('toast')
     };
 
+    const comparisonState = {
+        products: new Set(),
+        maxProducts: 4
+    };
+
     // Initialize
     function init() {
+        loadFromURL(); // Add this line first
         attachEventListeners();
-        loadProducts();
+        // Remove loadProducts() from here since loadFromURL calls it
         updateCounts();
+    }
+
+    function compareProducts() {
+        if (comparisonState.products.size < 2) {
+            showToast('Select at least 2 products to compare', 'error');
+            return;
+        }
+
+        const ids = Array.from(comparisonState.products).join(',');
+        window.location.href = `/${SITE}/compare?ids=${ids}`;
+    }
+
+    window.compareProducts = compareProducts;
+
+    function attachComparisonHandlers() {
+        document.querySelectorAll('.btn-compare').forEach(btn => {
+            btn.addEventListener('click', handleCompareToggle);
+        });
+    }
+
+    function handleCompareToggle(e) {
+        const btn = e.currentTarget;
+        const productId = parseInt(btn.dataset.productId);
+
+        if (comparisonState.products.has(productId)) {
+            comparisonState.products.delete(productId);
+            btn.classList.remove('active');
+        } else {
+            if (comparisonState.products.size >= comparisonState.maxProducts) {
+                showToast('Maximum 4 products can be compared', 'error');
+                return;
+            }
+            comparisonState.products.add(productId);
+            btn.classList.add('active');
+        }
+
+        updateComparisonBar();
+    }
+
+    function updateComparisonBar() {
+        const count = comparisonState.products.size;
+        const bar = document.getElementById('comparison-bar');
+
+        if (!bar) return;
+
+        alert(count)
+
+        if (count >= 2) {
+            bar.style.display = 'flex';
+            bar.querySelector('.comparison-count').textContent = `${count} products selected`;
+        } else {
+            bar.style.display = 'none';
+        }
     }
 
     // Load state from URL
@@ -109,6 +168,8 @@
         if (state.filters.minPrice) params.set('min_price', state.filters.minPrice);
         if (state.filters.maxPrice) params.set('max_price', state.filters.maxPrice);
         if (state.filters.onSale) params.set('on_sale', '1');
+
+        console.log('state', state.filters)
 
         const newURL = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
         window.history.pushState({}, '', newURL);
@@ -262,6 +323,187 @@
         loadProducts();
     }
 
+    function switchTab(tab) {
+        // Update active tab
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+
+        // Reset filters
+        state.filters = {
+            search: '',
+            categoryIds: [],
+            brandIds: [],
+            specificationIds: [],
+            minPrice: '',
+            maxPrice: '',
+            onSale: false
+        };
+
+        // Reset form inputs
+        elements.searchInput.value = '';
+        elements.minPriceInput.value = '';
+        elements.maxPriceInput.value = '';
+        elements.onSaleFilter.checked = false;
+        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
+
+        // Apply tab-specific filters
+        if (tab === 'under25') {
+            state.filters.maxPrice = '25';
+            elements.maxPriceInput.value = '25';
+        } else if (tab === 'under50') {
+            state.filters.maxPrice = '50';
+            elements.maxPriceInput.value = '50';
+        } else if (tab === 'under100') {
+            state.filters.maxPrice = '100';
+            elements.maxPriceInput.value = '100';
+        } else if (tab === 'over50') {
+            // 50% off or more
+            state.filters.onSale = true;
+            state.filters.minDiscountPercent = 50;
+            elements.onSaleFilter.checked = true;
+        } else if (tab === 'vouchers') {
+            state.filters.hasVoucher = true;
+        } else if (tab.startsWith('cat-')) {
+            const categoryId = tab.replace('cat-', '');
+            state.filters.categoryIds = [categoryId];
+            const checkbox = document.querySelector(`input[name="category[]"][value="${categoryId}"]`);
+            if (checkbox) checkbox.checked = true;
+        }
+
+        // Reset to first page
+        state.currentPage = 1;
+
+        // Update URL and load products
+        updateURL();
+        loadProducts();
+    }
+
+    window.switchTab = switchTab;
+
+    function generateSuggestedFilters(products) {
+        if (!products || products.length === 0) {
+            document.getElementById('suggested-filters').style.display = 'none';
+            return;
+        }
+
+        const suggestions = [];
+
+        // Price range suggestions based on data
+        const prices = products.map(p => p.sale_price || p.original_price).filter(p => p > 0);
+        if (prices.length > 0) {
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+
+            if (maxPrice > 100) {
+                suggestions.push({type: 'price', label: 'Under £25', maxPrice: 25});
+                suggestions.push({type: 'price', label: 'Under £50', maxPrice: 50});
+                suggestions.push({type: 'price', label: 'Under £100', maxPrice: 100});
+            } else if (maxPrice > 50) {
+                suggestions.push({type: 'price', label: 'Under £25', maxPrice: 25});
+                suggestions.push({type: 'price', label: 'Under £50', maxPrice: 50});
+            }
+        }
+
+        // Discount suggestions
+        const hasHighDiscounts = products.some(p => p.discount_percentage >= 50);
+        if (hasHighDiscounts) {
+            suggestions.push({type: 'discount', label: '50% Off or More', minDiscount: 50});
+        }
+
+        const hasModerateDiscounts = products.some(p => p.discount_percentage >= 30);
+        if (hasModerateDiscounts) {
+            suggestions.push({type: 'discount', label: '30% Off or More', minDiscount: 30});
+        }
+
+        // Top brands (brands with most products in results)
+        const brandCounts = {};
+        products.forEach(p => {
+            if (p.brand) {
+                brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1;
+            }
+        });
+
+        const topBrands = Object.entries(brandCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
+
+        topBrands.forEach(([brand, count]) => {
+            if (count >= 3) {
+                suggestions.push({type: 'brand', label: brand, brand: brand});
+            }
+        });
+
+        // Render suggestions
+        if (suggestions.length > 0) {
+            const html = suggestions.map(s => `
+            <button class="suggested-filter-chip" 
+                    data-type="${s.type}"
+                    data-value='${JSON.stringify(s)}'
+                    onclick="applySuggestedFilter(this)">
+                ${s.label}
+            </button>
+        `).join('');
+
+            document.getElementById('suggested-filters-list').innerHTML = html;
+            document.getElementById('suggested-filters').style.display = 'block';
+        } else {
+            document.getElementById('suggested-filters').style.display = 'none';
+        }
+    }
+
+    function applySuggestedFilter(btn) {
+        const filter = JSON.parse(btn.dataset.value);
+
+        console.log('fiter', filter)
+
+        // Toggle active state
+        btn.classList.toggle('active');
+
+        if (btn.classList.contains('active')) {
+            if (filter.type === 'price') {
+                state.filters.maxPrice = filter.maxPrice.toString();
+                elements.maxPriceInput.value = filter.maxPrice;
+            } else if (filter.type === 'discount') {
+                state.filters.minDiscountPercent = filter.minDiscount;
+                state.filters.onSale = true;
+                elements.onSaleFilter.checked = true;
+            } else if (filter.type === 'brand') {
+                // Find and check the brand checkbox
+                const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
+                    .find(cb => cb.nextElementSibling?.textContent?.trim() === filter.brand);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    state.filters.brandIds.push(checkbox.value);
+                }
+            }
+        } else {
+            if (filter.type === 'price') {
+                state.filters.maxPrice = '';
+                elements.maxPriceInput.value = '';
+            } else if (filter.type === 'discount') {
+                delete state.filters.minDiscountPercent;
+                state.filters.onSale = false;
+                elements.onSaleFilter.checked = false;
+            } else if (filter.type === 'brand') {
+                const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
+                    .find(cb => cb.nextElementSibling?.textContent?.trim() === filter.brand);
+                if (checkbox) {
+                    checkbox.checked = false;
+                    state.filters.brandIds = state.filters.brandIds.filter(id => id !== checkbox.value);
+                }
+            }
+        }
+
+        state.currentPage = 1;
+        updateURL();
+        loadProducts();
+    }
+
+    window.applySuggestedFilter = applySuggestedFilter;
+
     // Load products
     async function loadProducts() {
         showLoading();
@@ -303,12 +545,14 @@
 
     // Render products
     function renderProducts(products) {
+        hideEmptyState();
+
         if (!products || products.length === 0) {
             showEmptyState();
             return;
         }
 
-        hideEmptyState();
+        generateSuggestedFilters(products);
 
         elements.productsGrid.innerHTML = products.map(product => `
         <div class="product-card" data-product-id="${product.product_id}">
@@ -341,6 +585,12 @@
                             `}
                         </div>
                         <div class="product-actions">
+                         <button class="btn-compare" data-product-id="${product.product_id}" title="Add to comparison">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                            </svg>
+                        </button>
                             <button class="btn-add-to-cart" data-product-id="${product.product_id}">
                                 Add to Cart
                             </button>
@@ -369,6 +619,12 @@
                     </div>
                     
                     <div class="card-back-actions">
+                     <button class="btn-compare" data-product-id="${product.product_id}" title="Add to comparison">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                            </svg>
+                        </button>
                         <button class="btn-back-action btn-add-cart-back" data-product-id="${product.product_id}">
                             Add to Cart
                         </button>
@@ -383,6 +639,7 @@
 
         attachProductEventListeners();
         attachFlipEventListeners();
+        attachComparisonHandlers();
     }
 
     // Attach event listeners to product buttons
@@ -616,6 +873,7 @@
     // Show empty state
     function showEmptyState() {
         elements.productsGrid.style.display = 'none';
+        elements.productsGrid.innerHTML = ''; // Clear the grid
         elements.emptyState.style.display = 'block';
         elements.pagination.innerHTML = '';
     }

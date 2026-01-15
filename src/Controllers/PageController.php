@@ -16,6 +16,7 @@ use App\Actions\Pages\BulkUpdatePageRegions;
 use App\Actions\Pages\BulkUpdatePageStatus;
 use App\Actions\Pages\ClonePage;
 use App\Actions\Pages\ClonePageToSite;
+use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
@@ -349,9 +350,11 @@ class PageController extends Controller
     public function duplicate(int $id, string $siteName): JsonResponse
     {
         try {
+            /** @var ClonePage $handler */
             $handler = Container::getInstance()->make(ClonePage::class);
+            $userId = Auth::id();
 
-            $results = $handler->handle($id);
+            $results = $handler->handle($id, [], $userId);
 
             if (!$results) {
                 return $this->errorResponse('Page not found', 404);
@@ -367,6 +370,7 @@ class PageController extends Controller
     {
         try {
             $targetSiteId = $request->get('target_site_id');
+            $userId = Auth::id();
 
             if (!$targetSiteId) {
                 return $this->errorResponse('target_site_id is required', 422);
@@ -374,9 +378,10 @@ class PageController extends Controller
 
             $newTitle = $request->get('title', null);
 
+            /** @var ClonePageToSite $handler */
             $handler = Container::getInstance()->make(ClonePageToSite::class);
 
-            $results = $handler->handle($id, $targetSiteId, $newTitle);
+            $results = $handler->handle($id, $targetSiteId, $newTitle, [], $userId);
 
             if (!$results) {
                 return $this->errorResponse('Page not found', 404);

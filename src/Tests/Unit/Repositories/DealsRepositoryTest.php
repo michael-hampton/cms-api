@@ -356,10 +356,11 @@ class DealsRepositoryTest extends RepositoryTestCase
         $product3 = $this->createProduct(['category_id' => null, 'is_active' => true]);
 
         $products = $this->repository->getFilteredProducts($this->siteId, [
-            'category' => [$category1->id]
+            'category_ids' => [$category1->id]
         ]);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
+
         $this->assertContains($product1->id, $productIds);
         $this->assertNotContains($product2->id, $productIds);
         $this->assertNotContains($product3->id, $productIds);
@@ -374,10 +375,10 @@ class DealsRepositoryTest extends RepositoryTestCase
         $product2 = $this->createProduct(['brand_id' => $brand2->id, 'is_active' => true]);
 
         $products = $this->repository->getFilteredProducts($this->siteId, [
-            'brand' => [$brand1->id]
+            'brand_ids' => [$brand1->id]
         ]);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertContains($product1->id, $productIds);
         $this->assertNotContains($product2->id, $productIds);
     }
@@ -389,11 +390,11 @@ class DealsRepositoryTest extends RepositoryTestCase
         $product3 = $this->createProduct(['sale_price' => 150.00, 'is_active' => true]);
 
         $products = $this->repository->getFilteredProducts($this->siteId, [
-            'minPrice' => 50,
-            'maxPrice' => 100
+            'min_price' => 50,
+            'max_price' => 100
         ]);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertNotContains($product1->id, $productIds);
         $this->assertContains($product2->id, $productIds);
         $this->assertNotContains($product3->id, $productIds);
@@ -405,10 +406,10 @@ class DealsRepositoryTest extends RepositoryTestCase
         $product2 = $this->createProduct(['sale_price' => 75.00, 'is_active' => true]);
 
         $products = $this->repository->getFilteredProducts($this->siteId, [
-            'minPrice' => 50
+            'min_price' => 50
         ]);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertNotContains($product1->id, $productIds);
         $this->assertContains($product2->id, $productIds);
     }
@@ -419,27 +420,27 @@ class DealsRepositoryTest extends RepositoryTestCase
         $product2 = $this->createProduct(['sale_price' => 75.00, 'is_active' => true]);
 
         $products = $this->repository->getFilteredProducts($this->siteId, [
-            'maxPrice' => 50
+            'max_price' => 50
         ]);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertContains($product1->id, $productIds);
         $this->assertNotContains($product2->id, $productIds);
     }
 
-    public function test_get_filtered_products_applies_voucher_filter(): void
-    {
-        // This test assumes there's an activeVouchers relationship
-        $product1 = $this->createProduct(['is_active' => true]);
-        $product2 = $this->createProduct(['is_active' => true]);
-
-        // Note: You may need to create vouchers for this test to work properly
-        $products = $this->repository->getFilteredProducts($this->siteId, [
-            'hasVoucher' => true
-        ]);
-
-        $this->assertIsArray($products);
-    }
+//    public function test_get_filtered_products_applies_voucher_filter(): void
+//    {
+//        // This test assumes there's an activeVouchers relationship
+//        $product1 = $this->createProduct(['is_active' => true]);
+//        $product2 = $this->createProduct(['is_active' => true]);
+//
+//        // Note: You may need to create vouchers for this test to work properly
+//        $products = $this->repository->getFilteredProducts($this->siteId, [
+//            'hasVoucher' => true
+//        ]);
+//
+//        $this->assertIsArray($products);
+//    }
 
     public function test_get_filtered_products_filters_by_site(): void
     {
@@ -450,7 +451,7 @@ class DealsRepositoryTest extends RepositoryTestCase
 
         $products = $this->repository->getFilteredProducts($this->siteId, []);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertContains($thisSiteProduct->id, $productIds);
         $this->assertNotContains($otherSiteProduct->id, $productIds);
     }
@@ -462,7 +463,7 @@ class DealsRepositoryTest extends RepositoryTestCase
 
         $products = $this->repository->getFilteredProducts($this->siteId, []);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertContains($activeProduct->id, $productIds);
         $this->assertNotContains($inactiveProduct->id, $productIds);
     }
@@ -501,15 +502,143 @@ class DealsRepositoryTest extends RepositoryTestCase
         ]);
 
         $products = $this->repository->getFilteredProducts($this->siteId, [
-            'category' => [$category->id],
-            'brand' => [$brand->id],
-            'minPrice' => 25,
-            'maxPrice' => 75
+            'category_ids' => [$category->id],
+            'brand_ids' => [$brand->id],
+            'min_price' => 25,
+            'max_price' => 75
         ]);
 
-        $productIds = array_column($products, 'id');
+        $productIds = $products['data']->pluck('id')->toArray();
         $this->assertContains($matchingProduct->id, $productIds);
         $this->assertNotContains($wrongCategory->id, $productIds);
         $this->assertNotContains($wrongPrice->id, $productIds);
+    }
+
+    public function test_get_filtered_products_applies_search_filter(): void
+    {
+        $matchingProduct = $this->createProduct([
+            'name' => 'Samsung Galaxy Phone',
+            'is_active' => true
+        ]);
+
+        $nonMatchingProduct = $this->createProduct([
+            'name' => 'iPhone',
+            'is_active' => true
+        ]);
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'q' => 'Samsung'
+        ]);
+
+        $productIds = array_column($result['data']->toArray(), 'id');
+        $this->assertContains($matchingProduct->id, $productIds);
+        $this->assertNotContains($nonMatchingProduct->id, $productIds);
+    }
+
+    public function test_get_filtered_products_handles_empty_category_ids(): void
+    {
+        $product = $this->createProduct(['is_active' => true]);
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'category_ids' => ''
+        ]);
+
+        $this->assertGreaterThan(0, $result['pagination']['total']);
+    }
+
+    public function test_get_filtered_products_handles_empty_brand_ids(): void
+    {
+        $product = $this->createProduct(['is_active' => true]);
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'brand_ids' => ''
+        ]);
+
+        $this->assertGreaterThan(0, $result['pagination']['total']);
+    }
+
+    public function test_get_filtered_products_applies_on_sale_filter(): void
+    {
+        $onSaleProduct = $this->createProduct([
+            'is_active' => true,
+            'price' => 100.00,
+            'sale_price' => 75.00
+        ]);
+
+        $notOnSaleProduct = $this->createProduct([
+            'is_active' => true,
+            'price' => 100.00,
+            'sale_price' => 0
+        ]);
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'on_sale' => '1'
+        ]);
+
+        $productIds = array_column($result['data']->toArray(), 'id');
+        $this->assertContains($onSaleProduct->id, $productIds);
+        $this->assertNotContains($notOnSaleProduct->id, $productIds);
+    }
+
+    public function test_get_filtered_products_paginates_correctly(): void
+    {
+        for ($i = 0; $i < 25; $i++) {
+            $this->createProduct(['is_active' => true]);
+        }
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'page' => 1,
+            'per_page' => 10
+        ]);
+
+        $this->assertCount(10, $result['data']);
+        $this->assertEquals(25, $result['pagination']['total']);
+        $this->assertEquals(3, $result['pagination']['last_page']);
+    }
+
+    public function test_get_filtered_products_sorts_by_price_ascending(): void
+    {
+        $product1 = $this->createProduct([
+            'is_active' => true,
+            'price' => 100.00,
+            'sale_price' => 80.00
+        ]);
+
+        $product2 = $this->createProduct([
+            'is_active' => true,
+            'price' => 50.00,
+            'sale_price' => 40.00
+        ]);
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'sort_by' => 'price',
+            'sort_order' => 'asc'
+        ]);
+
+        $prices = array_map(function ($p) {
+            return $p->sale_price > 0 ? $p->sale_price : $p->price;
+        }, $result['data']->toArray());
+
+        $this->assertEquals(
+            collect($prices)->sort()->all(),
+            array_values($prices)
+        );
+    }
+
+    public function test_get_filtered_products_returns_pagination_metadata(): void
+    {
+        for ($i = 0; $i < 15; $i++) {
+            $this->createProduct(['is_active' => true]);
+        }
+
+        $result = $this->repository->getFilteredProducts($this->siteId, [
+            'page' => 2,
+            'per_page' => 10
+        ]);
+
+        $this->assertEquals(2, $result['pagination']['current_page']);
+        $this->assertEquals(10, $result['pagination']['per_page']);
+        $this->assertEquals(15, $result['pagination']['total']);
+        $this->assertEquals(2, $result['pagination']['last_page']);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Actions\Pages;
 use App\Framework\Database\Database;
 use App\Models\Page;
 use App\Repositories\Cms\PageRepository;
+use App\Services\Cms\ClonePermissionChecker;
 use App\Services\Cms\PageHistoryService;
 use Exception;
 
@@ -13,7 +14,8 @@ class ClonePageToSite
     public function __construct(
         private readonly PageRepository $pageRepository,
         private readonly Database $database,
-        private readonly PageHistoryService $historyService
+        private readonly PageHistoryService     $historyService,
+        private readonly ClonePermissionChecker $permissionChecker
     )
     {
     }
@@ -27,7 +29,7 @@ class ClonePageToSite
      * @return Page The cloned page in the target site
      * @throws Exception
      */
-    public function handle(int $pageId, int $targetSiteId, ?string $newTitle = null, array $options = []): array
+    public function handle(int $pageId, int $targetSiteId, ?string $newTitle = null, array $options = [], ?int $userId = null): array
     {
         $sourcePage = $this->pageRepository->getCompletePageData($pageId);
         if (!$sourcePage) {
@@ -36,6 +38,12 @@ class ClonePageToSite
 
         if ($sourcePage->site_id === $targetSiteId) {
             throw new \Exception("Source and target site cannot be the same");
+        }
+
+        // Check clone permissions
+        if ($userId !== null && !$this->permissionChecker->canClone($sourcePage, $userId)) {
+            $reason = $this->permissionChecker->getCloneRestrictionReason($sourcePage, $userId);
+            throw new \Exception($reason ?? 'Page cannot be cloned');
         }
 
         // Set default relations - all enabled by default

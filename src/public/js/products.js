@@ -1,6 +1,11 @@
 (function() {
     'use strict';
 
+    const comparisonState = {
+        products: new Set(),
+        maxProducts: 4
+    };
+
     // State management
     const state = {
         currentPage: 1,
@@ -44,10 +49,62 @@
 
     // Initialize
     function init() {
+        loadFromURL();
         attachEventListeners();
-        loadProducts();
         updateCounts();
     }
+
+    // Add comparison checkbox to product cards
+    function attachComparisonHandlers() {
+        document.querySelectorAll('.btn-compare').forEach(btn => {
+            btn.addEventListener('click', handleCompareToggle);
+        });
+    }
+
+    function handleCompareToggle(e) {
+        const btn = e.currentTarget;
+        const productId = parseInt(btn.dataset.productId);
+
+        if (comparisonState.products.has(productId)) {
+            comparisonState.products.delete(productId);
+            btn.classList.remove('active');
+        } else {
+            if (comparisonState.products.size >= comparisonState.maxProducts) {
+                showToast('Maximum 4 products can be compared', 'error');
+                return;
+            }
+            comparisonState.products.add(productId);
+            btn.classList.add('active');
+        }
+
+        updateComparisonBar();
+    }
+
+    function updateComparisonBar() {
+        const count = comparisonState.products.size;
+        const bar = document.getElementById('comparison-bar');
+
+        if (!bar) return;
+
+        if (count >= 2) {
+            bar.style.display = 'flex';
+            bar.querySelector('.comparison-count').textContent = `${count} products selected`;
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    function compareProducts() {
+        if (comparisonState.products.size < 2) {
+            showToast('Select at least 2 products to compare', 'error');
+            return;
+        }
+
+        const ids = Array.from(comparisonState.products).join(',');
+        window.location.href = `/${SITE}/compare?ids=${ids}`;
+    }
+
+    window.compareProducts = compareProducts;
 
     // Load state from URL
     function loadFromURL() {
@@ -301,12 +358,12 @@
 
     // Render products
     function renderProducts(products) {
+        hideEmptyState();
+
         if (!products || products.length === 0) {
             showEmptyState();
             return;
         }
-
-        hideEmptyState();
 
         elements.productsGrid.innerHTML = products.map(product => `
         <div class="product-card" data-product-id="${product.id}">
@@ -339,6 +396,12 @@
                             `}
                         </div>
                         <div class="product-actions">
+                         <button class="btn-compare" data-product-id="${product.id}" title="Add to comparison">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                            </svg>
+                        </button>
                             <button class="btn-add-to-cart" data-product-id="${product.id}">
                                 Add to Cart
                             </button>
@@ -367,6 +430,12 @@
                     </div>
                     
                     <div class="card-back-actions">
+                        <button class="btn-compare" data-product-id="${product.id}" title="Add to comparison">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                            </svg>
+                        </button>
                         <button class="btn-back-action btn-add-cart-back" data-product-id="${product.id}">
                             Add to Cart
                         </button>
@@ -381,6 +450,7 @@
 
         attachProductEventListeners();
         attachFlipEventListeners();
+        attachComparisonHandlers();
     }
 
     // Attach event listeners to product buttons
@@ -614,6 +684,7 @@
     // Show empty state
     function showEmptyState() {
         elements.productsGrid.style.display = 'none';
+        elements.productsGrid.innerHTML = ''; // Clear the grid
         elements.emptyState.style.display = 'block';
         elements.pagination.innerHTML = '';
     }

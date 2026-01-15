@@ -42,6 +42,7 @@ use App\Controllers\OneTimeSubscriptionsController;
 use App\Controllers\PageController;
 use App\Controllers\PageLikeController;
 use App\Controllers\PaymentController;
+use App\Controllers\ProductComparisonController;
 use App\Controllers\ProductDetailController;
 use App\Controllers\ProductListController;
 use App\Controllers\RegionContentController;
@@ -340,6 +341,9 @@ $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubsc
 $router->post('/api/{site}/subscriptions/onetime/checkout', [OneTimeSubscriptionsController::class, 'checkout']);
 $router->post('/api/{site}/subscriptions/onetime/confirm-payment', [OneTimeSubscriptionsController::class, 'confirmPayment']);
 $router->post('/api/{site}/checkout/confirm-payment', [PaymentController::class, 'confirmPayment']);
+
+$router->get('/api/{site}/compare', [ProductComparisonController::class, 'compare']);
+$router->get('/{site}/compare', [ProductComparisonController::class, 'index']);
 
 
 // Apply page member access check to content routes
