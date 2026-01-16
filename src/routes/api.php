@@ -69,6 +69,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
         $router->get('/pages/calendar', [PageController::class, 'getCalendarPages']);;
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
+        $router->put('/pages/{id}/schedule', [PageController::class, 'updateSchedule']);
 
         $router->get('/rewards', [RewardsAdminController::class, 'index']);
         $router->get('/rewards/search', [RewardsAdminController::class, 'search']);

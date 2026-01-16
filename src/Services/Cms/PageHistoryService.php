@@ -365,4 +365,15 @@ class PageHistoryService
             'created_at' => date('Y-m-d H:i:s')
         ]);
     }
+
+    public function logPageScheduleUpdated(int $pageId, string $scheduledDate)
+    {
+        return $this->logPageAction(
+            $pageId,
+            'schedule_updated',
+            'Schedule Updated',
+            ['status' => ['scheduled_date' => $scheduledDate]],
+            true
+        );
+    }
 }

@@ -566,6 +566,7 @@ class PageController extends Controller
             $types = $request->get('types');
             $sites = $request->get('sites');
             $tags = $request->get('tags');
+            $categories = $request->get('categories');
 
             if (!$startDate || !$endDate) {
                 return $this->errorResponse('start_date and end_date are required', 422);
@@ -613,6 +614,12 @@ class PageController extends Controller
                 $criteria->addFilter('tag_ids', $tagIds);
             }
 
+            // Category filter
+            if (!empty($categories)) {
+                $categoryIds = is_array($categories) ? $categories : explode(',', $categories);
+                $criteria->addFilter('category_ids', $categoryIds);
+            }
+
             // Get all results (no pagination for calendar)
             $criteria->setPerPage(1000);
 
@@ -620,6 +627,55 @@ class PageController extends Controller
 
             // Format results
             $formattedPages = array_map(function ($page) {
+                // Format categories
+                $categories = [];
+                if (isset($page['categories'])) {
+                    $categories = array_map(function ($cat) {
+                        return [
+                            'id' => $cat['id'],
+                            'name' => $cat['name'],
+                            'color' => $cat['color'] ?? null
+                        ];
+                    }, $page['categories']);
+                }
+
+                // Format tags
+                $tags = [];
+                if (isset($page['tags'])) {
+                    $tags = array_map(function ($tag) {
+                        return [
+                            'id' => $tag['id'],
+                            'name' => $tag['name'],
+                            'color' => $tag['color'] ?? null
+                        ];
+                    }, $page['tags']);
+                }
+
+                // Format authors
+                $authors = [];
+                if (isset($page['pageAuthors'])) {
+                    $authors = array_map(function ($pageAuthor) {
+                        return [
+                            'id' => $pageAuthor['author']['id'] ?? null,
+                            'name' => $pageAuthor['author']['name'] ?? null,
+                            'role' => $pageAuthor['role'] ?? null,
+                            'avatar' => $pageAuthor['author']['avatar'] ?? null
+                        ];
+                    }, $page['pageAuthors']);
+                }
+
+                // Format created by user
+                $createdBy = null;
+                if (!empty($page['created_by'])) {
+                    // You'll need to load the user relationship in the repository
+                    // For now, we'll use the creator relationship if it exists
+                    $createdBy = [
+                        'id' => $page['created_by'],
+                        'name' => $page['creator']['name'] ?? 'Unknown',
+                        'avatar' => $page['creator']['avatar'] ?? null
+                    ];
+                }
+
                 return [
                     'id' => $page['id'],
                     'title' => $page['title'],
@@ -627,17 +683,15 @@ class PageController extends Controller
                     'published_at' => $page['published_at']?->format('Y-m-d H:i:s'),
                     'scheduled_at' => $page['scheduled_at'] ?? null,
                     'page_type' => $page['page_type'],
-                    'author' => isset($page['author']) ? [
-                        'id' => $page['author']['id'] ?? null,
-                        'name' => $page['author']['name'] ?? null
-                    ] : null,
+                    'authors' => $authors,
+                    'categories' => $categories,
+                    'tags' => $tags,
+                    'created_by' => $createdBy,
                     'site' => [
                         'id' => $page['site_id'] ?? null,
-                        'name' => $page['site']['name'] ?? null
-                    ],
-                    'authors' => isset($page['pageAuthors']) ? array_map(function ($pageAuthor) {
-                        return $pageAuthor['author'];
-                    }, $page['pageAuthors']) : null,
+                        'name' => $page['site']['name'] ?? null,
+                        'slug' => $page['site']['slug'] ?? null
+                    ]
                 ];
             }, $result->getData());
 
@@ -815,5 +869,31 @@ class PageController extends Controller
 //            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
 //        ]);
 //    }
+
+    public function updateSchedule(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $scheduledDate = $request->get('scheduled_date');
+
+            if (!$scheduledDate) {
+                return $this->errorResponse('scheduled_date is required', 422);
+            }
+
+            $page = $this->pageRepository->find($id);
+
+            if (!$page) {
+                return $this->errorResponse('Page not found', 404);
+            }
+
+            // Update page with new scheduled date
+            $updatedPage = $this->pageService->updatePageSchedule($id, $scheduledDate);
+
+            return $this->jsonResponse([
+                'page' => $updatedPage->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
 
 }

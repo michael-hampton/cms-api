@@ -14,6 +14,7 @@ use App\Models\PageLike;
 use App\Models\PageView;
 use App\Models\Site;
 use App\Repositories\Cms\PageGridRepository;
+use App\Repositories\Cms\PageRepository;
 use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\Members\GiftedArticleRepository;
@@ -29,16 +30,18 @@ use App\Services\Url\UrlResolutionResult;
 class ContentController extends Controller
 {
     public function __construct(
-        private readonly BlockParserService $blockParserService,
-        private readonly CommentRepository  $commentRepository,
-        private readonly PageViewRepository $pageViewRepository,
-        private readonly PageGridRepository $pageGridRepository,
+        private readonly BlockParserService   $blockParserService,
+        private readonly CommentRepository    $commentRepository,
+        private readonly PageViewRepository   $pageViewRepository,
+        private readonly PageGridRepository   $pageGridRepository,
         private readonly ActivityTracking         $activityTracking,
         private readonly SubscriptionModalService $modalService,
-        private readonly PageRenderService $pageRenderService,
+        private readonly PageRenderService    $pageRenderService,
         private readonly ArticleAccessService $articleAccessService,
-        private readonly BadgeRepository $badgeRepository
-    ) {
+        private readonly BadgeRepository      $badgeRepository,
+        private readonly PageRepository       $pageRepository
+    )
+    {
         parent::__construct();
     }
 
@@ -179,15 +182,45 @@ class ContentController extends Controller
         $html = $this->pageRenderService->renderPage($page, $siteId);
         $data['html'] = $html;
 
+        if ($page->page_type === 'landing-page' && !empty($data['allCategories'])) {
+            $data['categoriesWithPages'] = $this->getCategoryPages($siteId, $data['allCategories']);
+        }
+
         return $this->view($viewPath, $data);
     }
 
-    public function sites() {
+    public function sites()
+    {
         $sites = Site::active()->get();
 
         return $this->view('estate/sites', [
             'sites' => $sites
         ]);
+    }
+
+    private function getCategoryPages(int $siteId, $categories)
+    {
+        $categoriesWithPages = [];
+
+        // Load pages for each category
+        foreach ($categories as $category) {
+
+            $categoryPages = $this->pageRepository->getPagesByCategory(
+                $category->id,
+                6, // Limit to 6 pages per category
+                $siteId
+            );
+
+            if (!$categoryPages->count() || $categoryPages->count() < 3) {
+                continue;
+            }
+
+            $categoriesWithPages[$category->id]['category'] = $category;
+
+            $categoriesWithPages[$category->id]['pages'] = $categoryPages;
+        }
+
+        return $categoriesWithPages;
     }
 
     private function showPaywall(Page $page, string $reason): Response

@@ -576,6 +576,11 @@ class Page extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
     /**
      * Get all valid statuses
      */

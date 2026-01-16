@@ -681,6 +681,208 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->assertGreaterThan(0, count($result['results']['success']));
     }
 
+    public function testClonePageWithPrivateStatusRequiresCreator()
+    {
+        $originalPage = $this->createMockPage(1, 'Private Page');
+        $originalPage->status = 'private';
+        $originalPage->created_by = 1;
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn(false);
+
+        $this->clonePermissionChecker->shouldReceive('getCloneRestrictionReason')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn('Only the creator can clone private pages');
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Only the creator can clone private pages');
+
+        $this->service->handle(1, [], 2); // Different user
+    }
+
+    public function testClonePageWithPrivateStatusSucceedsForCreator()
+    {
+        $originalPage = $this->createMockPage(1, 'Private Page');
+        $originalPage->status = 'private';
+        $originalPage->created_by = 1;
+        $newPage = $this->createMockPage(2, 'Private Page (Copy)');
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 1)
+            ->andReturn(true);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->setDuplicationExpectations();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
+
+        $result = $this->service->handle(1, [], 1); // Same user
+
+        $this->assertNotNull($result);
+    }
+
+    public function testClonePageWithOnHoldStatusFails()
+    {
+        $originalPage = $this->createMockPage(1, 'On Hold Page');
+        $originalPage->status = 'on_hold';
+        $originalPage->created_by = 1;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 1)
+            ->andReturn(false);
+
+        $this->clonePermissionChecker->shouldReceive('getCloneRestrictionReason')
+            ->once()
+            ->with($originalPage, 1)
+            ->andReturn('Pages on hold cannot be cloned');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Pages on hold cannot be cloned');
+
+        $this->service->handle(1, [], 1); // Even creator cannot clone
+    }
+
+    public function testClonePageWithOnHoldStatusFailsForAnyUser()
+    {
+        $originalPage = $this->createMockPage(1, 'On Hold Page');
+        $originalPage->status = 'on_hold';
+        $originalPage->created_by = 1;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn(false);
+
+        $this->clonePermissionChecker->shouldReceive('getCloneRestrictionReason')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn('Pages on hold cannot be cloned');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Pages on hold cannot be cloned');
+
+        $this->service->handle(1, [], 2); // Different user
+    }
+
+    public function testClonePageWithPublishedStatusSucceedsForAnyUser()
+    {
+        $originalPage = $this->createMockPage(1, 'Published Page');
+        $originalPage->status = 'published';
+        $originalPage->created_by = 1;
+        $newPage = $this->createMockPage(2, 'Published Page (Copy)');
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn(true);
+
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->setDuplicationExpectations();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
+
+        $result = $this->service->handle(1, [], 2); // Different user - should work
+
+        $this->assertNotNull($result);
+    }
+
+    public function testClonePageWithDraftStatusSucceedsForAnyUser()
+    {
+        $originalPage = $this->createMockPage(1, 'Draft Page');
+        $originalPage->status = 'draft';
+        $originalPage->created_by = 1;
+        $newPage = $this->createMockPage(2, 'Draft Page (Copy)');
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn(true);
+
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->setDuplicationExpectations();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
+
+        $result = $this->service->handle(1, [], 2); // Different user - should work
+
+        $this->assertNotNull($result);
+    }
+
+    public function testClonePageWithNullUserIdSkipsPermissionCheck()
+    {
+        $originalPage = $this->createMockPage(1, 'Private Page');
+        $originalPage->status = 'private';
+        $originalPage->created_by = 1;
+        $newPage = $this->createMockPage(2, 'Private Page (Copy)');
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('create')->once()->andReturn($newPage);
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once()->with(1, 2)->andReturn(new PageHistory(['id' => 1]));
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->setDuplicationExpectations();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
+
+        $result = $this->service->handle(1, [], null); // Null user - bypasses permission check
+
+        $this->assertNotNull($result);
+    }
+
+    public function testClonePageSetsCreatedByToNewUser()
+    {
+        $originalPage = $this->createMockPage(1, 'Original Page');
+        $originalPage->status = 'published';
+        $originalPage->created_by = 1;
+        $newPage = $this->createMockPage(2, 'Original Page (Copy)');
+        $newPage->created_by = 2;
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($originalPage);
+        $this->setupTransaction();
+
+        $this->pageRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['title'] === 'Original Page (Copy)';
+            }))
+            ->andReturn($newPage);
+
+        $this->clonePermissionChecker->shouldReceive('canClone')
+            ->once()
+            ->with($originalPage, 2)
+            ->andReturn(true);
+
+        $this->pageHistory->shouldReceive('logPageDuplicated')->once();
+        $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
+        $this->setDuplicationExpectations();
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(2)->once()->andReturn($newPage);
+
+        $result = $this->service->handle(1, [], 2);
+
+        $this->assertNotNull($result);
+    }
+
     private function createMockPage(int $id, string $title = 'Test'): Page
     {
         $page = Mockery::mock(Page::class)->makePartial();

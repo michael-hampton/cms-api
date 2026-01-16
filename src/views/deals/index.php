@@ -23,12 +23,9 @@
             <!-- Deals Tabs -->
             <div class="deals-tabs">
                 <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">All Deals</button>
-                <button class="tab-btn" data-tab="under25" onclick="switchTab('under25')">Under £25</button>
-                <button class="tab-btn" data-tab="vouchers" onclick="switchTab('vouchers')">Vouchers</button>
-                <button class="tab-btn" data-tab="over50" onclick="switchTab('over50')">Over 50% Off</button>
 
                 <!-- Category Tabs (Dynamic) -->
-                <?php foreach (array_slice($categories ?? [], 0, 5) as $category): ?>
+                <?php foreach (array_slice($categories ?? [], 0, 8) as $category): ?>
                     <button class="tab-btn" data-tab="cat-<?= $category->id ?>"
                             onclick="switchTab('cat-<?= $category->id ?>')">
                         <?= htmlspecialchars($category->name) ?>

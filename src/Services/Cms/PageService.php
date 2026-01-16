@@ -975,4 +975,29 @@ class PageService
             return $this->getCompletePageData($updatedPage->id);
         });
     }
+
+    public function updatePageSchedule(int $pageId, string $scheduledDate): Page
+    {
+        return $this->database->transaction(function () use ($pageId, $scheduledDate) {
+            $page = $this->pageRepository->find($pageId);
+
+            if (!$page) {
+                throw new \Exception("Page not found");
+            }
+
+            $currentStatus = $page->status;
+
+            $updateData = [
+                'scheduled_at' => $scheduledDate,
+                'published_at' => $scheduledDate,
+                'status' => $currentStatus === PageStatus::PUBLISHED->value ? PageStatus::PUBLISHED->value : 'scheduled'
+            ];
+
+            $updatedPage = $this->pageRepository->update($pageId, $updateData);
+
+            $this->historyService->logPageScheduleUpdated($pageId, $scheduledDate);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
 }

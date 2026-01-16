@@ -2663,7 +2663,7 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals('published', $foundPage['status']);
         $this->assertEquals('2025-01-15 10:00:00', $foundPage['published_at']);
         $this->assertEquals('blog', $foundPage['page_type']);
-        $this->assertArrayHasKey('author', $foundPage);
+        $this->assertArrayHasKey('authors', $foundPage);
         $this->assertArrayHasKey('site', $foundPage);
     }
 
@@ -2830,6 +2830,115 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertNotNull($page1Index);
         $this->assertLessThan($page2Index, $page3Index);
         $this->assertLessThan($page1Index, $page2Index);
+    }
+
+    public function testGetCalendarPagesIncludesCategoriesAndTags(): void
+    {
+        // Arrange
+        $category = $this->createCategory(['name' => 'Tech', 'color' => '#FF0000']);
+        $tag = $this->createTag(['name' => 'Featured', 'color' => '#00FF00']);
+
+        $page = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'title' => 'Test Page'
+        ]);
+
+        $this->attachCategoryToPage($page, $category);
+        $this->attachTagToPage($page, $tag);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $foundPage = null;
+        foreach ($data['items'] as $item) {
+            if ($item['id'] === $page->id) {
+                $foundPage = $item;
+                break;
+            }
+        }
+
+        $this->assertNotNull($foundPage);
+        $this->assertArrayHasKey('categories', $foundPage);
+        $this->assertArrayHasKey('tags', $foundPage);
+        $this->assertCount(1, $foundPage['categories']);
+        $this->assertCount(1, $foundPage['tags']);
+        $this->assertEquals('Tech', $foundPage['categories'][0]['name']);
+        $this->assertEquals('Featured', $foundPage['tags'][0]['name']);
+    }
+
+    public function testGetCalendarPagesIncludesCreator(): void
+    {
+        // Arrange
+        $user = $this->createUser(['name' => 'John Doe']);
+
+        $page = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00',
+            'created_by' => $user->id
+        ]);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $foundPage = null;
+        foreach ($data['items'] as $item) {
+            if ($item['id'] === $page->id) {
+                $foundPage = $item;
+                break;
+            }
+        }
+
+        $this->assertNotNull($foundPage);
+        $this->assertArrayHasKey('created_by', $foundPage);
+        $this->assertEquals($user->id, $foundPage['created_by']['id']);
+        $this->assertEquals('John Doe', $foundPage['created_by']['name']);
+    }
+
+    public function testGetCalendarPagesIncludesAuthorsWithRoles(): void
+    {
+        // Arrange
+        $author1 = $this->createAuthor(['name' => 'Author 1']);
+        $author2 = $this->createAuthor(['name' => 'Author 2']);
+
+        $page = $this->createPage([
+            'status' => 'published',
+            'published_at' => '2025-01-15 10:00:00'
+        ]);
+
+        $this->attachAuthorToPage($page, $author1, ['role' => 'primary']);
+        $this->attachAuthorToPage($page, $author2, ['role' => 'contributor']);
+
+        // Act
+        $response = $this->getForSite('/api/pages/calendar?start_date=2025-01-01&end_date=2025-01-31');
+
+        // Assert
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $foundPage = null;
+        foreach ($data['items'] as $item) {
+            if ($item['id'] === $page->id) {
+                $foundPage = $item;
+                break;
+            }
+        }
+
+        $this->assertNotNull($foundPage);
+        $this->assertArrayHasKey('authors', $foundPage);
+        $this->assertCount(2, $foundPage['authors']);
+        $this->assertEquals('Author 1', $foundPage['authors'][0]['name']);
+        $this->assertEquals('primary', $foundPage['authors'][0]['role']);
+        $this->assertEquals('Author 2', $foundPage['authors'][1]['name']);
+        $this->assertEquals('contributor', $foundPage['authors'][1]['role']);
     }
 
     public function testBulkSchedulePages()
@@ -3241,4 +3350,134 @@ class PageControllerTest extends FunctionalTestCase
 
     }
 
+    public function testDuplicatePrivatePageByCreatorSucceeds()
+    {
+        $page = $this->createPage(['status' => 'private', 'created_by' => 1]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function testDuplicatePrivatePageByNonCreatorFails()
+    {
+        $user = $this->createUser();
+
+        $page = $this->createPage(['status' => 'private', 'created_by' => $user->id]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('creator', strtolower($data['error']));
+    }
+
+    public function testDuplicatePageOnHoldFails()
+    {
+        $user = $this->createUser();
+
+        $page = $this->createPage(['status' => 'on_hold', 'created_by' => $user->id]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('on hold', strtolower($data['error']));
+    }
+
+    public function testCloneToSitePrivatePageByCreatorSucceeds()
+    {
+        $page = $this->createPage(['status' => 'private', 'created_by' => $this->authenticatedUser->id]);
+        $newSite = Site::create(['name' => 'New Site', 'slug' => 'new-site']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/clone-to-site", [
+            'target_site_id' => $newSite->id
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function testCloneToSitePrivatePageByNonCreatorFails()
+    {
+        $user = $this->createUser();
+        $page = $this->createPage(['status' => 'private', 'created_by' => $user->id]);
+        $newSite = $this->createSite();
+
+        $response = $this->postForSite("/api/pages/{$page->id}/clone-to-site", [
+            'target_site_id' => $newSite->id
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testUpdatePageWithInvalidStatusTransitionFails()
+    {
+        $page = $this->createPage(['status' => 'archived']);
+
+        $updateData = [
+            'id' => $page->id,
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'Test Page'],
+                'meta' => ['slug' => 'test-page', 'status' => 'published']
+            ],
+            'site_id' => $this->siteId
+        ];
+
+        $response = $this->putForSite("/api/pages/{$page->id}", $updateData);
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('Cannot change status from archived to published', $data['error']);
+    }
+
+    public function testUpdateScheduleSuccessfully()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->putForSite("/api/pages/{$page->id}/schedule", [
+            'scheduled_date' => '2025-01-25 10:00:00'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('scheduled', $data['data']['page']['status']);
+        $this->assertEquals('2025-01-25 10:00:00', $data['data']['page']['scheduled_at']);
+    }
+
+    public function testUpdateScheduleReturns422WithoutDate()
+    {
+        $page = $this->createPage();
+
+        $response = $this->putForSite("/api/pages/{$page->id}/schedule", []);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateScheduleReturns404ForNonexistentPage()
+    {
+        $response = $this->putForSite('/api/pages/999/schedule', [
+            'scheduled_date' => '2025-01-25 10:00:00'
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testUpdateScheduleCreatesHistoryEntry()
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->putForSite("/api/pages/{$page->id}/schedule", [
+            'scheduled_date' => '2025-01-25 10:00:00'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'schedule_updated')
+            ->first();
+
+        $this->assertNotNull($history);
+    }
 }

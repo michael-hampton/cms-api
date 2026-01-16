@@ -418,6 +418,12 @@
             suggestions.push({type: 'discount', label: '30% Off or More', minDiscount: 30});
         }
 
+        // Vouchers filter
+        const hasVouchers = products.some(p => p.has_voucher);
+        if (hasVouchers) {
+            suggestions.push({type: 'voucher', label: 'Has Voucher', hasVoucher: true});
+        }
+
         // Top brands (brands with most products in results)
         const brandCounts = {};
         products.forEach(p => {
@@ -457,8 +463,6 @@
     function applySuggestedFilter(btn) {
         const filter = JSON.parse(btn.dataset.value);
 
-        console.log('fiter', filter)
-
         // Toggle active state
         btn.classList.toggle('active');
 
@@ -470,6 +474,8 @@
                 state.filters.minDiscountPercent = filter.minDiscount;
                 state.filters.onSale = true;
                 elements.onSaleFilter.checked = true;
+            } else if (filter.type === 'voucher') {
+                state.filters.hasVoucher = true;
             } else if (filter.type === 'brand') {
                 // Find and check the brand checkbox
                 const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
@@ -487,6 +493,8 @@
                 delete state.filters.minDiscountPercent;
                 state.filters.onSale = false;
                 elements.onSaleFilter.checked = false;
+            } else if (filter.type === 'voucher') {
+                state.filters.hasVoucher = false;
             } else if (filter.type === 'brand') {
                 const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
                     .find(cb => cb.nextElementSibling?.textContent?.trim() === filter.brand);

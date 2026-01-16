@@ -680,7 +680,10 @@ class PageRepository extends Repository
             'author',
             'pageAuthors',
             'pageAuthors.author',
-            'site'
+            'site',
+            'categories',
+            'tags',
+            'creator'
         ]);
 
         // Handle date range filter - use whereRaw with named parameters

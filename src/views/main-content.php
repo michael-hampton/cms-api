@@ -92,6 +92,14 @@ $pageGridAdded = false;
     echo $footerRenderer->renderFooter($footerMenu);
 } ?>
 
+<?php if ($page->page_type === 'landing-page' && !empty($categoriesWithPages)): ?>
+    @include('components/category-pages', [
+    'categories' => $categoriesWithPages,
+    'site' => \App\Framework\Support\SiteContext::slug()
+    ])
+<?php endif; ?>
+
+
 @include('consent-banner', ['site' => $site])
 
 @js('base.js')
