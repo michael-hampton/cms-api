@@ -4,6 +4,7 @@ namespace App\Search;
 
 use App\Search\Configurations\AuthorSearchConfiguration;
 use App\Search\Configurations\BrandSearchConfiguration;
+use App\Search\Configurations\BriefSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\EmailThemeSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
@@ -37,6 +38,7 @@ class SearchConfigurationFactory
         'refund' => EmailThemeSearchConfiguration::class,
         'email-theme' => EmailThemeSearchConfiguration::class,
         'pipeline' => PipelineSearchConfiguration::class,
+        'brief' => BriefSearchConfiguration::class
     ];
 
     public static function create(string $type): SearchConfiguration

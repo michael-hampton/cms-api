@@ -21,21 +21,45 @@ class PageCategoryRepository extends Repository
         return PageCategory::class;
     }
 
-    public function syncCategories(int $pageId, array $categoryNames, $siteId): void
+    public function syncCategories(int $pageId, array $categoriesData, int $siteId): void
     {
-        // Delete existing page categories
-        $this->database->delete('page_categories', ['page_id' => $pageId]);;
+        // Delete existing page categories for this page and site
+        PageCategory::where('page_id', $pageId)
+            ->delete();
 
-        // Process new categories
-        foreach ($categoryNames as $categoryName) {
-            if (!empty(trim($categoryName))) {
-                // Find or create category
-                $category = $this->categoryRepository->findOrCreateByName(trim($categoryName), $siteId);
+        // Process categories (can be IDs or names)
+        foreach ($categoriesData as $categoryData) {
+            if (empty($categoryData)) {
+                continue;
+            }
 
-                // Create page-category relationship
+            // Skip whitespace-only strings
+            if (is_string($categoryData) && empty(trim($categoryData))) {
+                continue;
+            }
+
+            $category = null;
+
+            // Check if it's a numeric ID
+            if (is_numeric($categoryData)) {
+                $category = $this->categoryRepository->find($categoryData);
+
+                // Verify category belongs to the correct site
+                if ($category && $category->site_id != $siteId) {
+                    continue; // Skip categories from other sites
+                }
+            } else {
+                // It's a name, find or create
+                $category = $this->categoryRepository->findOrCreateByName(trim($categoryData), $siteId);
+            }
+
+            if ($category) {
                 $this->create([
                     'page_id' => $pageId,
-                    'category_id' => $category->id
+                    'category_id' => $category->id,
+                    'site_id' => $siteId,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
                 ]);
             }
         }

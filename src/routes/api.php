@@ -7,6 +7,7 @@ use App\Controllers\AuthController;
 use App\Controllers\AuthorController;
 use App\Controllers\BlockController;
 use App\Controllers\BrandController;
+use App\Controllers\BriefController;
 use App\Controllers\CampaignController;
 use App\Controllers\CartController;
 use App\Controllers\CategoryController;
@@ -52,6 +53,25 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
     // Pages API
     $router->group(['prefix' => '{siteName}'], function ($router) {
         $router->get('/contact-info', SiteController::class, 'getContactInfo');
+
+        // Briefs
+        $router->get('/briefs', [BriefController::class, 'index']);
+        $router->post('/briefs', [BriefController::class, 'store']);
+        $router->get('/briefs/{id}', [BriefController::class, 'show']);
+        $router->put('/briefs/{id}', [BriefController::class, 'update']);
+        $router->delete('/briefs/{id}', [BriefController::class, 'destroy']);
+
+        // Brief attachments
+        $router->post('/briefs/{id}/attachments', [BriefController::class, 'addAttachment']);
+        $router->delete('/briefs/{id}/attachments/{attachmentId}', [BriefController::class, 'deleteAttachment']);
+
+        // Brief comments
+        $router->post('/briefs/{id}/comments', [BriefController::class, 'addComment']);
+        $router->delete('/briefs/{id}/comments/{commentId}', [BriefController::class, 'deleteComment']);
+
+        // Brief conversion
+        $router->post('/briefs/{id}/convert', [BriefController::class, 'convertToPage']);
+        $router->post('/briefs/{id}/archive', [BriefController::class, 'archive']);
 
         $router->get('/members', MemberController::class, 'search');
 

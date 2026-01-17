@@ -4,6 +4,7 @@ namespace App\Repositories\Cms;
 
 use App\Framework\Support\Collection;
 use App\Models\Author;
+use App\Models\Model;
 use App\Models\Page;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
@@ -95,5 +96,44 @@ class AuthorRepository extends Repository
             return $category->pages_count > 0;
         })->toArray();
 
+    }
+
+    public function findOrCreateFromUser(object $user, int $siteId): Model
+    {
+        // Try to find existing author by email
+        $author = $this->findByEmail($user->email);
+
+        if ($author) {
+            return $author;
+        }
+
+        // Create new author from user data
+        return Author::create([
+            'name' => $user->name ?? $user->email,
+            'email' => $user->email,
+            'slug' => $this->generateUniqueSlug($user->name ?? $user->email),
+            'site_id' => $siteId,
+            'status' => 'active',
+            'bio' => '',
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+
+    private function generateUniqueSlug(string $name): string
+    {
+        $baseSlug = strtolower($name);
+        $baseSlug = preg_replace('/[^a-z0-9]+/', '-', $baseSlug);
+        $baseSlug = trim($baseSlug, '-');
+
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while ($this->where('slug', $slug)->first()) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
     }
 }

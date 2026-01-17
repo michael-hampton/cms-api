@@ -27,7 +27,8 @@ class SearchCriteriaParser
         'merchant',
         'brands',
         'is_featured',
-        'content_type'
+        'content_type',
+        'owner_id'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

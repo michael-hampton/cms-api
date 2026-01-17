@@ -9,6 +9,9 @@ use App\Models\Author;
 use App\Models\Badge;
 use App\Models\Block;
 use App\Models\Brand;
+use App\Models\Brief;
+use App\Models\BriefAttachment;
+use App\Models\BriefComment;
 use App\Models\Campaign;
 use App\Models\Category;
 use App\Models\Comment;
@@ -18,6 +21,7 @@ use App\Models\ConsentWithdrawalRequest;
 use App\Models\CustomFieldDefinition;
 use App\Models\EmailTheme;
 use App\Models\GiftedArticle;
+use App\Models\Image;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
@@ -697,5 +701,56 @@ trait CreatesTestData
             'slug' => 'test-reward',
             'criteria' => []
         ], $attributes));
+    }
+
+    protected function createBrief(array $attributes = []): Model
+    {
+        $defaults = [
+            'title' => 'Test Brief',
+            'description' => 'Test description',
+            'status' => 'active',
+            'site_id' => $this->siteId ?? 1
+        ];
+
+        return Brief::create(array_merge($defaults, $attributes));
+    }
+
+    protected function createBriefAttachment(int $briefId, array $attributes = []): Model
+    {
+        $defaults = [
+            'brief_id' => $briefId,
+            'type' => 'image',
+            'file_url' => 'http://example.com/image.jpg',
+            'file_name' => 'image.jpg',
+            'sort_order' => 0
+        ];
+
+        return BriefAttachment::create(array_merge($defaults, $attributes));
+    }
+
+    protected function createBriefComment(int $briefId, int $userId, array $attributes = []): Model
+    {
+        $defaults = [
+            'brief_id' => $briefId,
+            'user_id' => $userId,
+            'content' => 'Test comment'
+        ];
+
+        return BriefComment::create(array_merge($defaults, $attributes));
+    }
+
+    protected function createImage(array $attributes = []): Model
+    {
+        $defaults = [
+            'filename' => 'test.jpg',
+            'original_name' => 'test.jpg',
+            'url' => '/images/test.jpg',
+            'file_path' => '/images/test.jpg',
+            'file_size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'site_id' => $this->siteId ?? 1
+        ];
+
+        return Image::create(array_merge($defaults, $attributes));
     }
 }
