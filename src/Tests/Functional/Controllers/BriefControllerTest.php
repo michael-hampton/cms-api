@@ -173,8 +173,8 @@ class BriefControllerTest extends FunctionalTestCase
             'type' => 'product',
             'url' => 'http://example.com/product',
             'metadata' => [
-                'product_name' => 'Test Product',
-                'product_price' => '$99.99'
+                'productName' => 'Test Product',
+                'price' => '$99.99'
             ],
             'sort_order' => 0
         ];
@@ -367,8 +367,8 @@ class BriefControllerTest extends FunctionalTestCase
             'product_id' => $product->id,
             'url' => 'http://example.com/product',
             'metadata' => [
-                'product_name' => 'Test Product',
-                'product_price' => '$99.99'
+                'productName' => 'Test Product',
+                'price' => 99.99
             ]
         ]);
 
@@ -409,7 +409,7 @@ class BriefControllerTest extends FunctionalTestCase
         $attachment = $this->createBriefAttachment($brief->id, [
             'type' => 'product',
             'url' => 'http://example.com/product',
-            'metadata' => ['product_name' => 'Deal Product', 'product_price' => '$99.99']
+            'metadata' => ['productName' => 'Deal Product', 'price' => 99.99, 'currency' => 'USD']
         ]);
 
         $conversionData = [
@@ -597,5 +597,49 @@ class BriefControllerTest extends FunctionalTestCase
         $categoryIds = array_column($pageData['data']['categories'], 'id');
         $this->assertContains($category->id, $categoryIds,
             'The specified category should be assigned to the page');
+    }
+
+    public function testUpdateAttachmentSuccessfully()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+        $attachment = $this->createBriefAttachment($brief->id, [
+            'type' => 'product',
+            'url' => 'http://example.com/old'
+        ]);
+
+        $updateData = [
+            'url' => 'http://example.com/new',
+            'metadata' => ['productName' => 'Updated Product']
+        ];
+
+        $response = $this->putForSite(
+            "/api/briefs/{$brief->id}/attachments/{$attachment->id}",
+            $updateData
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('http://example.com/new', $data['data']['url']);
+    }
+
+    public function testUpdateCommentSuccessfully()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+        $comment = $this->createBriefComment($brief->id, $user->id, [
+            'content' => 'Original content'
+        ]);
+
+        $updateData = ['content' => 'Updated content'];
+
+        $response = $this->putForSite(
+            "/api/briefs/{$brief->id}/comments/{$comment->id}",
+            $updateData
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Updated content', $data['data']['content']);
     }
 }

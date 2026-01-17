@@ -12,7 +12,8 @@ class BriefComment extends Model
         'parent_comment_id',
         'content',
         'highlighted_text',
-        'highlighted_range'
+        'highlighted_range',
+        'created_at'
     ];
 
     protected $casts = [

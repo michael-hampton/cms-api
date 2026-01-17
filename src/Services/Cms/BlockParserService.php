@@ -95,9 +95,6 @@ class BlockParserService
             }
 
             if (!empty($errors)) {
-                echo '<pre>';
-                print_r($errors);
-                die('here');
                 throw new ValidationException('Block validation failed', $errors);
             }
 

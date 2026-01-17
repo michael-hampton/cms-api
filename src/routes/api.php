@@ -64,10 +64,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         // Brief attachments
         $router->post('/briefs/{id}/attachments', [BriefController::class, 'addAttachment']);
         $router->delete('/briefs/{id}/attachments/{attachmentId}', [BriefController::class, 'deleteAttachment']);
+        $router->put('/briefs/{id}/attachments/{attachmentId}', [BriefController::class, 'updateAttachment']);
 
         // Brief comments
         $router->post('/briefs/{id}/comments', [BriefController::class, 'addComment']);
         $router->delete('/briefs/{id}/comments/{commentId}', [BriefController::class, 'deleteComment']);
+        $router->put('/briefs/{id}/comments/{commentId}', [BriefController::class, 'updateComment']);
 
         // Brief conversion
         $router->post('/briefs/{id}/convert', [BriefController::class, 'convertToPage']);

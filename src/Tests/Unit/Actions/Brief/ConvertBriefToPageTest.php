@@ -179,7 +179,7 @@ class ConvertBriefToPageTest extends FunctionalTestCase
         $attachment->type = 'product';
         $attachment->url = 'http://example.com/product';
         $attachment->metadata = [
-            'product_name' => 'Test Product',
+            'productName' => 'Test Product',
             'product_price' => '$99.99'
         ];
 

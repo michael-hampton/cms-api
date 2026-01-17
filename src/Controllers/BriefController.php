@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Actions\Brief\ConvertBriefToPage;
 use App\Framework\Container;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Repositories\Cms\BriefRepository;
@@ -157,6 +158,12 @@ class BriefController extends Controller
             $result = $handler->handle($id, $data);
 
             return $this->resourceResponse(['data' => $result]);
+        } catch (ValidationException $e) {
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $e->getErrors()
+            );
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -172,6 +179,38 @@ class BriefController extends Controller
             }
 
             return $this->successResponse('Brief archived successfully');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateComment(int $id, int $commentId, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $comment = $this->briefRepository->updateComment($id, $commentId, $data['content']);
+
+            if (!$comment) {
+                return $this->errorResponse('Comment not found', 404);
+            }
+
+            return $this->resourceResponse(['data' => $comment->toArray()]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateAttachment(int $id, int $attachmentId, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $attachment = $this->briefRepository->updateAttachment($id, $attachmentId, $data);
+
+            if (!$attachment) {
+                return $this->errorResponse('Attachment not found', 404);
+            }
+
+            return $this->resourceResponse(['data' => $attachment->toArray()]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

@@ -74,63 +74,54 @@ class ConvertBriefToPage
             }
 
             // Add products as product/deal blocks
-            // Replace the products loop section with:
             foreach ($conversionData['products'] as $productData) {
                 $attachment = $this->briefRepository->getAttachment($productData['attachment_id']);
-                if (!$attachment || $attachment->type !== 'product') {
+                if (!$attachment) {
                     continue;
                 }
 
                 $blockType = $productData['conversion_type'] ?? 'product';
                 $metadata = $attachment->metadata ?? [];
 
+                // Common fields for both types
+                $commonFields = [
+                    'product_id' => $metadata['product_id'] ?? null,
+                    'variant_id' => $metadata['variant_id'] ?? null,
+                    'productName' => $metadata['productName'] ?? '',
+                    'brand' => $metadata['brand'] ?? '',
+                    'description' => $metadata['description'] ?? '',
+                    'price' => (float)($metadata['price'] ?? 0),
+                    'salePrice' => (float)($metadata['salePrice'] ?? 0),
+                    'currency' => $metadata['currency'] ?? '',
+                    'link' => $metadata['link'] ?? $attachment->url ?? '',
+                    'image' => isset($metadata['image']) ? $metadata['image'] : null,
+                    'noFollow' => (bool)($metadata['noFollow'] ?? false),
+                    'sponsored' => (bool)($metadata['sponsored'] ?? false),
+                    'openInNewTab' => (bool)($metadata['openInNewTab'] ?? true),
+                    'order' => $blockOrder++
+                ];
+
                 if ($blockType === 'deal') {
-                    $pageData['blocks'][] = [
+                    $pageData['blocks'][] = array_merge($commonFields, [
                         'type' => 'deal',
-                        'title' => $metadata['product_name'] ?? $conversionData['title'] ?? '',
-                        'productName' => $metadata['product_name'] ?? $conversionData['title'] ?? '',
-                        'brand' => $metadata['brand'] ?? '',
-                        'description' => $metadata['description'] ?? $conversionData['description'] ?? '',
-                        'price' => (float)str_replace(['$', '£', ','], '', $metadata['product_price'] ?? '0'),
-                        'salePrice' => (float)str_replace(['$', '£', ','], '', $metadata['sale_price'] ?? '0'),
-                        'currency' => $metadata['currency'] ?? '£',
-                        'link' => $attachment->url ?? $productData['url'] ?? '',
-                        'image' => $attachment->image_id ? ['src' => $attachment->image->file_path ?? ''] : null,
-                        'noFollow' => (bool)($metadata['no_follow'] ?? false),
-                        'sponsored' => (bool)($metadata['sponsored'] ?? false),
-                        'openInNewTab' => (bool)($metadata['open_in_new_tab'] ?? true),
-                        'showDealButton' => true,
-                        'starBlock' => false,
-                        'savingMode' => 'percent',
-                        'voucherId' => $metadata['voucher_id'] ?? '',
-                        'context' => 'default',
-                        'product_id' => $productData['product_id'] ?? null,
-                        'order' => $blockOrder++
-                    ];
+                        'title' => $metadata['title'] ?? $metadata['productName'] ?? '',
+                        'showDealButton' => (bool)($metadata['showDealButton'] ?? true),
+                        'starBlock' => (bool)($metadata['starBlock'] ?? false),
+                        'savingMode' => $metadata['savingMode'] ?? 'none',
+                        'voucherId' => $metadata['voucherId'] ?? '',
+                        'context' => $metadata['context'] ?? 'default',
+                    ]);
                 } else {
-                    $pageData['blocks'][] = [
+                    $pageData['blocks'][] = array_merge($commonFields, [
                         'type' => 'product',
-                        'name' => $metadata['product_name'] ?? '',
-                        'productName' => $metadata['product_name'] ?? '',
-                        'brand' => $metadata['brand'] ?? '',
-                        'description' => $metadata['description'] ?? '',
-                        'price' => (float)str_replace(['$', '£', ','], '', $metadata['product_price'] ?? '0'),
-                        'salePrice' => (float)str_replace(['$', '£', ','], '', $metadata['sale_price'] ?? '0'),
-                        'currency' => $metadata['currency'] ?? '$',
-                        'link' => $attachment->url ?? $productData['url'] ?? '',
-                        'image' => $attachment->image_id ? ['src' => $attachment->image->file_path ?? ''] : null,
-                        'noFollow' => (bool)($metadata['no_follow'] ?? false),
-                        'sponsored' => (bool)($metadata['sponsored'] ?? false),
-                        'openInNewTab' => (bool)($metadata['open_in_new_tab'] ?? true),
-                        'displayAs' => 'button',
-                        'linkText' => 'Buy Now',
-                        'layout' => 'standard',
+                        'name' => $conversionData['title'] ?? '',
+                        'displayAs' => $metadata['displayAs'] ?? 'button',
+                        'linkText' => $metadata['linkText'] ?? 'Buy Now',
+                        'layout' => $metadata['layout'] ?? 'standard',
                         'showReviewPanel' => false,
-                        'product_id' => $productData['product_id'] ?? null,
-                        'variant_id' => $productData['variant_id'] ?? null,
-                        'opted_out_product_match' => false,
-                        'order' => $blockOrder++
-                    ];
+                        'opted_out_product_match' => (bool)($metadata['opted_out_product_match'] ?? false),
+                        'review' => $metadata['review'] ?? null,
+                    ]);
                 }
             }
 
