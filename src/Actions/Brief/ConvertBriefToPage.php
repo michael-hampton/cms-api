@@ -49,7 +49,6 @@ class ConvertBriefToPage
             // Add images as image blocks
             $blockOrder = 0;
             foreach ($conversionData['images'] as $imageData) {
-
                 $attachment = $this->briefRepository->getAttachment($imageData['attachment_id']);
 
                 if (!$attachment || $attachment->type !== 'image') {
@@ -61,15 +60,24 @@ class ConvertBriefToPage
                     continue;
                 }
 
+                $metadata = $attachment->metadata ?? [];
+
                 $pageData['blocks'][] = [
                     'type' => 'image',
                     'src' => $image->file_path,
                     'url' => $image->file_path,
-                    'alt' => $imageData['alt_text'] ?? '',
-                    'credit' => $imageData['credit'] ?? '',
-                    'caption' => $imageData['caption'] ?? '',
-                    'order' => $blockOrder++,
-                    'image_id' => $image->id
+                    'image_id' => $image->id,
+                    'alt' => $metadata['alt_text'] ?? $imageData['alt_text'] ?? '',
+                    'credit' => $metadata['credit'] ?? $imageData['credit'] ?? '',
+                    'caption' => $metadata['caption'] ?? $imageData['caption'] ?? '',
+                    'linkUrl' => $metadata['linkUrl'] ?? '',
+                    'noFollow' => (bool)($metadata['noFollow'] ?? false),
+                    'sponsored' => (bool)($metadata['sponsored'] ?? false),
+                    'openInNewTab' => (bool)($metadata['openInNewTab'] ?? false),
+                    'layout' => $metadata['layout'] ?? 'full',
+                    'alignment' => $metadata['alignment'] ?? 'center',
+                    'context' => $metadata['context'] ?? 'default',
+                    'order' => $blockOrder++
                 ];
             }
 
