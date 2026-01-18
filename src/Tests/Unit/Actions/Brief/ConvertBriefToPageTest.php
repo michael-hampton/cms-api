@@ -11,7 +11,7 @@ use App\Models\Image;
 use App\Models\Page;
 use App\Models\User;
 use App\Repositories\Cms\AuthorRepository;
-use App\Repositories\Cms\BriefRepository;
+use App\Repositories\Cms\Briefs\BriefRepository;
 use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\UserRepository;
 use App\Services\Cms\PageService;

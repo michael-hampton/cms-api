@@ -75,6 +75,54 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/briefs/{id}/convert', [BriefController::class, 'convertToPage']);
         $router->post('/briefs/{id}/archive', [BriefController::class, 'archive']);
 
+        // Brief Templates
+        $router->get('/briefs/templates', [BriefController::class, 'getTemplates']);;
+        $router->post('/briefs/templates/{templateId}/create', [BriefController::class, 'createFromTemplate']);
+        $router->post('/briefs/{id}/save-template', [BriefController::class, 'saveAsTemplate']);;
+
+// Collaborators
+        $router->get('/briefs/{id}/collaborators', [BriefController::class, 'getCollaborators']);
+        $router->post('/briefs/{id}/collaborators', [BriefController::class, 'addCollaborator']);
+        $router->delete('/briefs/{id}/collaborators/{collaboratorId}', [BriefController::class, 'removeCollaborator']);
+
+// Tasks
+        $router->get('/briefs/{id}/tasks', [BriefController::class, 'getTasks']);
+        $router->post('/briefs/{id}/tasks', [BriefController::class, 'createTask']);;
+        $router->put('/briefs/{id}/tasks/{taskId}', [BriefController::class, 'updateTask']);
+        $router->delete('/briefs/{id}/tasks/{taskId}', [BriefController::class, 'deleteTask']);
+
+// Versions
+        $router->get('/briefs/{id}/versions', [BriefController::class, 'getVersions']);
+        $router->post('/briefs/{id}/versions/{versionId}/restore', [BriefController::class, 'restoreVersion']);
+        $router->get('/briefs/{id}/versions/compare', [BriefController::class, 'compareVersions']);
+
+// Status Management
+        $router->put('/briefs/{id}/status', [BriefController::class, 'updateStatus']);
+
+// Duplicate
+        $router->post('/briefs/{id}/duplicate', [BriefController::class, 'duplicate']);
+
+// Activity Log
+        $router->get('/briefs/{id}/activity', [BriefController::class, 'getActivityLog']);
+
+// Comment Resolution
+        $router->post('/briefs/{id}/comments/{commentId}/resolve', [BriefController::class, 'resolveComment']);
+        $router->post('/briefs/{id}/comments/{commentId}/unresolve', [BriefController::class, 'unresolveComment']);
+
+// Relationships
+        $router->get('/briefs/{id}/relationships', [BriefController::class, 'getRelationships']);
+        $router->post('/briefs/{id}/relationships', [BriefController::class, 'addRelationship']);
+        $router->delete('/briefs/{id}/relationships/{relationshipId}', [BriefController::class, 'removeRelationship']);
+
+// Bulk Operations
+        $router->post('/briefs/bulk/status', [BriefController::class, 'bulkUpdateStatus']);
+        $router->post('/briefs/bulk/assign', [BriefController::class, 'bulkAssign']);
+        $router->post('/briefs/bulk/delete', [BriefController::class, 'bulkDelete']);
+
+// Export
+        $router->get('/briefs/{id}/export/pdf', [BriefController::class, 'exportAsPdf']);
+        $router->get('/briefs/{id}/export/word', [BriefController::class, 'exportAsWord']);
+
         $router->get('/members', MemberController::class, 'search');
 
         $router->get('/pages', PageController::class, 'index');

@@ -4,7 +4,11 @@ namespace App\Tests\Functional\Controllers;
 
 use App\Models\Brief;
 use App\Models\BriefAttachment;
+use App\Models\BriefCollaborator;
 use App\Models\BriefComment;
+use App\Models\BriefTask;
+use App\Models\BriefTemplate;
+use App\Models\BriefVersion;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class BriefControllerTest extends FunctionalTestCase
@@ -28,16 +32,16 @@ class BriefControllerTest extends FunctionalTestCase
     public function testIndexWithSearchCriteria()
     {
         $user = $this->createUser();
-        $this->createBrief(['status' => 'active', 'owner_id' => $user->id]);
+        $this->createBrief(['status' => 'draft', 'owner_id' => $user->id]);
         $this->createBrief(['status' => 'converted', 'owner_id' => $user->id]);
 
-        $response = $this->getForSite('/api/briefs?status=active');
+        $response = $this->getForSite('/api/briefs?status=draft');
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
         $this->assertCount(1, $data['items']);
-        $this->assertEquals('active', $data['items'][0]['status']);
+        $this->assertEquals('draft', $data['items'][0]['status']);
     }
 
     public function testStoreCreatesNewBrief()
@@ -443,7 +447,7 @@ class BriefControllerTest extends FunctionalTestCase
     public function testConvertToPageMarksBriefAsConverted()
     {
         $user = $this->createUser();
-        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'active']);
+        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'ready']);
 
         $conversionData = [
             'title' => 'Brief to Convert',
@@ -473,7 +477,7 @@ class BriefControllerTest extends FunctionalTestCase
     public function testArchiveBriefSuccessfully()
     {
         $user = $this->createUser();
-        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'active']);
+        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'draft']);
 
         $response = $this->postForSite("/api/briefs/{$brief->id}/archive");
 
@@ -641,5 +645,533 @@ class BriefControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Updated content', $data['data']['content']);
+    }
+
+    public function testGetTemplatesReturnsSystemAndCustomTemplates()
+    {
+        $user = $this->createUser();
+
+        // Create system template
+        $systemTemplate = BriefTemplate::create([
+            'site_id' => $this->siteId,
+            'name' => 'Review Template',
+            'type' => 'review',
+            'is_system' => true,
+            'created_by' => 1
+        ]);
+
+        // Create custom template
+        $customTemplate = BriefTemplate::create([
+            'site_id' => $this->siteId,
+            'name' => 'Custom Template',
+            'type' => 'custom',
+            'is_system' => false,
+            'created_by' => $user->id
+        ]);
+
+        $response = $this->getForSite('/api/briefs/templates');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertGreaterThanOrEqual(2, count($data['items']));
+    }
+
+    public function testCreateFromTemplateAppliesDefaultFields()
+    {
+        $user = $this->createUser();
+
+        $template = BriefTemplate::create([
+            'site_id' => $this->siteId,
+            'name' => 'Review Template',
+            'type' => 'review',
+            'default_fields' => [
+                'target_word_count' => 1500,
+                'seo_keywords' => 'review, best',
+                'description' => 'Template content'
+            ],
+            'is_system' => true,
+            'created_by' => 1
+        ]);
+
+        $response = $this->postForSite("/api/briefs/templates/{$template->id}/create", [
+            'title' => 'New Brief from Template',
+            'owner_id' => $user->id
+        ]);
+
+//        echo '<pre>';
+//        print_r($response->getContent());
+//        die;
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(1500, $data['data']['target_word_count']);
+        $this->assertEquals('review, best', $data['data']['seo_keywords']);
+    }
+
+    public function testSaveAsTemplateCreatesCustomTemplate()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief([
+            'owner_id' => $user->id,
+            'title' => 'Source Brief',
+            'target_word_count' => 2000,
+            'seo_keywords' => 'keyword1, keyword2'
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/save-template", [
+            'name' => 'My Custom Template',
+            'description' => 'Custom template description',
+            'type' => 'custom',
+            'user_id' => $user->id
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('My Custom Template', $data['data']['name']);
+        $this->assertFalse($data['data']['is_system']);
+        $this->assertEquals(2000, $data['data']['default_fields']['target_word_count']);
+    }
+
+    // Collaborator Tests
+    public function testAddCollaboratorCreatesAssignment()
+    {
+        $owner = $this->createUser();
+        $collaborator = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $owner->id]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/collaborators", [
+            'user_id' => $collaborator->id,
+            'role' => 'editor'
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('editor', $data['data']['role']);
+        $this->assertEquals($collaborator->id, $data['data']['user_id']);
+    }
+
+    public function testGetCollaboratorsReturnsAllAssignedUsers()
+    {
+        $owner = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $owner->id]);
+
+        $user1 = $this->createUser();
+        $user2 = $this->createUser();
+
+        BriefCollaborator::create([
+            'brief_id' => $brief->id,
+            'user_id' => $user1->id,
+            'role' => 'writer'
+        ]);
+
+        BriefCollaborator::create([
+            'brief_id' => $brief->id,
+            'user_id' => $user2->id,
+            'role' => 'editor'
+        ]);
+
+        $response = $this->getForSite("/api/briefs/{$brief->id}/collaborators");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['items']);
+    }
+
+    public function testRemoveCollaboratorDeletesAssignment()
+    {
+        $owner = $this->createUser();
+        $collaborator = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $owner->id]);
+
+        $assignment = BriefCollaborator::create([
+            'brief_id' => $brief->id,
+            'user_id' => $collaborator->id,
+            'role' => 'writer'
+        ]);
+
+        $response = $this->deleteForSite("/api/briefs/{$brief->id}/collaborators/{$assignment->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertDatabaseMissing('brief_collaborators', ['id' => $assignment->id]);
+    }
+
+    // Task Tests
+    public function testCreateTaskSuccessfully()
+    {
+        $user = $this->createUser();
+        $assignee = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/tasks", [
+            'title' => 'Review draft',
+            'description' => 'Please review the draft content',
+            'assigned_to' => $assignee->id,
+            'created_by' => $user->id,
+            'due_date' => '2026-02-01'
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('Review draft', $data['data']['title']);
+        $this->assertEquals($assignee->id, $data['data']['assigned_to']);
+    }
+
+    public function testUpdateTaskStatus()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $task = BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Test task',
+            'created_by' => $user->id,
+            'status' => 'pending'
+        ]);
+
+        $response = $this->putForSite("/api/briefs/{$brief->id}/tasks/{$task->id}", [
+            'status' => 'completed'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('completed', $data['data']['status']);
+        $this->assertNotNull($data['data']['completed_at']);
+    }
+
+    public function testGetTasksReturnsAllBriefTasks()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Task 1',
+            'created_by' => $user->id
+        ]);
+
+        BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Task 2',
+            'created_by' => $user->id
+        ]);
+
+        $response = $this->getForSite("/api/briefs/{$brief->id}/tasks");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['items']);
+    }
+
+    // Version Tests
+    public function testGetVersionsReturnsVersionHistory()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id, 'title' => 'Original Title']);
+
+        // Create versions
+        BriefVersion::create([
+            'brief_id' => $brief->id,
+            'version_number' => 1,
+            'title' => 'Original Title',
+            'created_by' => $user->id
+        ]);
+
+        BriefVersion::create([
+            'brief_id' => $brief->id,
+            'version_number' => 2,
+            'title' => 'Updated Title',
+            'created_by' => $user->id,
+            'change_summary' => 'Updated title'
+        ]);
+
+        $response = $this->getForSite("/api/briefs/{$brief->id}/versions");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(2, $data['items']);
+        $this->assertEquals(2, $data['items'][0]['version_number']); // Latest first
+    }
+
+    public function testRestoreVersionRestoresBriefContent()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief([
+            'owner_id' => $user->id,
+            'title' => 'Current Title'
+        ]);
+
+        $version = BriefVersion::create([
+            'brief_id' => $brief->id,
+            'version_number' => 1,
+            'title' => 'Old Title',
+            'description' => 'Old description',
+            'created_by' => $user->id
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/versions/{$version->id}/restore", [
+            'user_id' => $user->id
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $brief = $brief->fresh();
+        $this->assertEquals('Old Title', $brief->title);
+    }
+
+    // Status Management Tests
+    public function testUpdateStatusChangesStatusAndLogsActivity()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief([
+            'owner_id' => $user->id,
+            'status' => 'draft'
+        ]);
+
+        $response = $this->putForSite("/api/briefs/{$brief->id}/status", [
+            'status' => 'in_review',
+            'user_id' => $user->id
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('in_review', $data['data']['status']);
+        $this->assertNotNull($data['data']['last_activity_at']);
+        $this->assertEquals($user->id, $data['data']['last_activity_user_id']);
+    }
+
+    // Duplicate Tests
+    public function testDuplicateBriefCreatesCompleteCopy()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief([
+            'owner_id' => $user->id,
+            'title' => 'Original Brief',
+            'target_word_count' => 1500
+        ]);
+
+        // Add attachment
+        $this->createBriefAttachment($brief->id, [
+            'type' => 'image',
+            'file_name' => 'test.jpg'
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/duplicate", [
+            'user_id' => $user->id
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsString('Copy', $data['data']['title']);
+        $this->assertEquals(1500, $data['data']['target_word_count']);
+        $this->assertCount(1, $data['data']['attachments']);
+    }
+
+    // Comment Resolution Tests
+    public function testResolveCommentMarksAsResolved()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+        $comment = $this->createBriefComment($brief->id, $user->id, [
+            'content' => 'Please fix this'
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/comments/{$comment->id}/resolve", [
+            'user_id' => $user->id
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['data']['is_resolved']);
+        $this->assertEquals($user->id, $data['data']['resolved_by']);
+        $this->assertNotNull($data['data']['resolved_at']);
+    }
+
+    public function testUnresolveCommentClearsResolution()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+        $comment = $this->createBriefComment($brief->id, $user->id, [
+            'content' => 'Fixed',
+            'is_resolved' => true,
+            'resolved_by' => $user->id,
+            'resolved_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/comments/{$comment->id}/unresolve");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['data']['is_resolved']);
+        $this->assertNull($data['data']['resolved_by']);
+    }
+
+    // Activity Log Tests
+    public function testGetActivityLogReturnsActions()
+    {
+        $user = $this->createUser();
+
+        // Create brief through the API (not directly) so activity log is created
+        $response = $this->postForSite('/api/briefs', [
+            'title' => 'Test Brief',
+            'owner_id' => $user->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $briefId = $data['data']['id'];
+
+        // Get activity log
+        $response = $this->getForSite("/api/briefs/{$briefId}/activity");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        // Should have at least the creation activity
+        $this->assertGreaterThan(0, count($data['items']));
+        $this->assertEquals('created', $data['items'][0]['action']);
+    }
+
+    public function testCompleteWorkflowFromDraftToConverted()
+    {
+        $user = $this->createUser();
+
+        // Create brief through API
+        $createResponse = $this->postForSite('/api/briefs', [
+            'title' => 'Test Brief',
+            'owner_id' => $user->id,
+            'status' => 'draft',
+            'site_id' => $this->siteId
+        ]);
+
+        $briefData = json_decode($createResponse->getContent(), true);
+        $briefId = $briefData['data']['id'];
+
+        // Add collaborator
+        $editor = $this->createUser();
+        $this->postForSite("/api/briefs/{$briefId}/collaborators", [
+            'user_id' => $editor->id,
+            'role' => 'editor'
+        ]);
+
+        // Create task
+        $this->postForSite("/api/briefs/{$briefId}/tasks", [
+            'title' => 'Review content',
+            'assigned_to' => $editor->id,
+            'created_by' => $user->id
+        ]);
+
+        // Update to in_review
+        $this->putForSite("/api/briefs/{$briefId}/status", [
+            'status' => 'in_review',
+            'user_id' => $user->id
+        ]);
+
+        // Update to ready
+        $this->putForSite("/api/briefs/{$briefId}/status", [
+            'status' => 'ready',
+            'user_id' => $user->id
+        ]);
+
+        // Convert to page
+        $this->postForSite("/api/briefs/{$briefId}/convert", [
+            'title' => 'Test Brief',
+            'owner_id' => $user->id,
+            'images' => [],
+            'products' => []
+        ]);
+
+        $brief = Brief::find($briefId);
+        $this->assertEquals('converted', $brief->status);
+        $this->assertNotNull($brief->converted_at);
+
+        // Check activity log has all actions
+        $activityResponse = $this->getForSite("/api/briefs/{$briefId}/activity");
+        $activityData = json_decode($activityResponse->getContent(), true);
+
+        $this->assertGreaterThanOrEqual(5, count($activityData['items'])); // created, collaborator_added, task_created, 2x status_changed
+    }
+
+    // Bulk Operation Tests
+    public function testBulkUpdateStatusUpdatesMultipleBriefs()
+    {
+        $user = $this->createUser();
+        $brief1 = $this->createBrief(['owner_id' => $user->id, 'status' => 'draft']);
+        $brief2 = $this->createBrief(['owner_id' => $user->id, 'status' => 'draft']);
+        $brief3 = $this->createBrief(['owner_id' => $user->id, 'status' => 'draft']);
+
+        $response = $this->postForSite('/api/briefs/bulk/status', [
+            'brief_ids' => [$brief1->id, $brief2->id],
+            'status' => 'in_review'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $brief1 = $brief1->fresh();
+        $brief2 = $brief2->fresh();
+        $brief3 = $brief3->fresh();
+
+        $this->assertEquals('in_review', $brief1->status);
+        $this->assertEquals('in_review', $brief2->status);
+        $this->assertEquals('draft', $brief3->status); // Not included
+    }
+
+    public function testBulkAssignAddsCollaboratorToMultipleBriefs()
+    {
+        $owner = $this->createUser();
+        $collaborator = $this->createUser();
+
+        $brief1 = $this->createBrief(['owner_id' => $owner->id]);
+        $brief2 = $this->createBrief(['owner_id' => $owner->id]);
+
+        $response = $this->postForSite('/api/briefs/bulk/assign', [
+            'brief_ids' => [$brief1->id, $brief2->id],
+            'user_id' => $collaborator->id,
+            'role' => 'editor'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $this->assertDatabaseHas('brief_collaborators', [
+            'brief_id' => $brief1->id,
+            'user_id' => $collaborator->id,
+            'role' => 'editor'
+        ]);
+
+        $this->assertDatabaseHas('brief_collaborators', [
+            'brief_id' => $brief2->id,
+            'user_id' => $collaborator->id,
+            'role' => 'editor'
+        ]);
+    }
+
+    public function testBulkDeleteRemovesMultipleBriefs()
+    {
+        $user = $this->createUser();
+        $brief1 = $this->createBrief(['owner_id' => $user->id]);
+        $brief2 = $this->createBrief(['owner_id' => $user->id]);
+        $brief3 = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite('/api/briefs/bulk/delete', [
+            'brief_ids' => [$brief1->id, $brief2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $this->assertNull(Brief::find($brief1->id));
+        $this->assertNull(Brief::find($brief2->id));
+        $this->assertNotNull(Brief::find($brief3->id));
     }
 }

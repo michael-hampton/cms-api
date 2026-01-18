@@ -1,10 +1,15 @@
 <?php
 
-namespace App\Repositories\Cms;
+namespace App\Repositories\Cms\Briefs;
 
 use App\Models\Brief;
+use App\Models\BriefActivityLog;
 use App\Models\BriefAttachment;
+use App\Models\BriefCollaborator;
 use App\Models\BriefComment;
+use App\Models\BriefRelationship;
+use App\Models\BriefTask;
+use App\Models\BriefVersion;
 use App\Models\Image;
 use App\Models\Model;
 use App\Repositories\Repository;
@@ -73,10 +78,15 @@ class BriefRepository extends Repository
 
     public function addComment(int $briefId, array $commentData): Model
     {
-        return BriefComment::create([
+        $comment = BriefComment::create([
             'brief_id' => $briefId,
             ...$commentData
         ]);
+
+        // Load the user relationship before returning
+        return BriefComment::with(['user'])
+            ->where('id', $comment->id)
+            ->first();
     }
 
     public function deleteComment(int $briefId, int $commentId): bool
@@ -115,7 +125,8 @@ class BriefRepository extends Repository
         return BriefAttachment::find($attachmentId);
     }
 
-    public function updateComment(int $briefId, int $commentId, string $content): ?Model
+    // Updated to be backwards compatible
+    public function updateComment(int $briefId, int $commentId, array $data): ?Model
     {
         $comment = BriefComment::where('brief_id', $briefId)
             ->where('id', $commentId)
@@ -125,8 +136,14 @@ class BriefRepository extends Repository
             return null;
         }
 
-        $comment->update(['content' => $content]);
-        return $comment->fresh();
+        // Remove relationships from update
+        $updateData = $data;
+        unset($updateData['user'], $updateData['resolvedBy'], $updateData['task'], $updateData['replies']);
+        $comment->update($updateData);
+
+        return BriefComment::with(['user', 'resolvedBy'])
+            ->where('id', $comment->id)
+            ->first();
     }
 
     // In BriefRepository.php
@@ -164,6 +181,59 @@ class BriefRepository extends Repository
 
         $attachment->update($data);
         return $attachment->fresh(['image', 'product']);
+    }
+
+    public function bulkUpdateStatus(array $briefIds, string $status): bool
+    {
+        return Brief::whereIn('id', $briefIds)
+                ->update(['status' => $status]) > 0;
+    }
+
+    public function bulkDelete(array $briefIds): bool
+    {
+        // Delete related data first
+        BriefAttachment::whereIn('brief_id', $briefIds)->delete();
+        BriefComment::whereIn('brief_id', $briefIds)->delete();
+        BriefCollaborator::whereIn('brief_id', $briefIds)->delete();
+        BriefTask::whereIn('brief_id', $briefIds)->delete();
+        BriefVersion::whereIn('brief_id', $briefIds)->delete();
+        BriefRelationship::whereIn('brief_id', $briefIds)->delete();
+        BriefActivityLog::whereIn('brief_id', $briefIds)->delete();
+
+        return Brief::whereIn('id', $briefIds)->delete() > 0;
+    }
+
+    public function getWithRelations(int $briefId): ?Brief
+    {
+        return Brief::with([
+            'attachments',
+            'attachments.image',
+            'attachments.product',
+            'comments',
+            'comments.user',
+            'comments.resolvedBy',
+            'comments.task',
+            'comments.replies',
+            'comments.replies.user',
+            'owner',
+            'category',
+            'template',
+            'collaborators',
+            'collaborators.user',
+            'tasks',
+            'tasks.assignee',
+            'tasks.creator',
+            'versions',
+            'versions.creator',
+            'relationships',
+            'relationships.relatedBrief',
+            'relationships.relatedPage',
+            'activityLog',
+            'activityLog.user',
+            'lastActivityUser',
+            'parentBrief',
+            'childBriefs'
+        ])->find($briefId);
     }
 
     protected function getModelClass(): string

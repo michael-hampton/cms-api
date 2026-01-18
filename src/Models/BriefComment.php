@@ -13,11 +13,18 @@ class BriefComment extends Model
         'content',
         'highlighted_text',
         'highlighted_range',
-        'created_at'
+        'created_at',
+        'is_resolved',
+        'resolved_by',
+        'resolved_at'
     ];
 
     protected $casts = [
-        'highlighted_range' => 'json'
+        'highlighted_range' => 'json',
+        'is_resolved' => 'boolean',
+        'is_task' => 'boolean',
+        'mentions' => 'array',
+        'resolved_at' => 'datetime'
     ];
 
     protected $alwaysInclude = [
@@ -44,5 +51,15 @@ class BriefComment extends Model
     {
         return $this->hasMany(BriefComment::class, 'parent_comment_id', 'id', $relation)
             ->orderBy('created_at', 'asc');
+    }
+
+    public function resolvedBy()
+    {
+        return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    public function task()
+    {
+        return $this->belongsTo(BriefTask::class, 'task_id');
     }
 }

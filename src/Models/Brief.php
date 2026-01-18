@@ -14,7 +14,14 @@ class Brief extends Model
         'site_id',
         'status',
         'converted_page_id',
-        'converted_at'
+        'converted_at',
+        'target_word_count',
+        'seo_keywords',
+        'template_id',
+        'last_activity_at',
+        'last_activity_user_id',
+        'parent_brief_id',
+        'target_audience'
     ];
 
     protected $casts = [
@@ -69,5 +76,50 @@ class Brief extends Model
     public function isArchived(): bool
     {
         return $this->status === 'archived';
+    }
+
+    public function template()
+    {
+        return $this->belongsTo(BriefTemplate::class, 'template_id');
+    }
+
+    public function collaborators()
+    {
+        return $this->hasMany(BriefCollaborator::class);
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(BriefTask::class);
+    }
+
+    public function versions()
+    {
+        return $this->hasMany(BriefVersion::class)->orderBy('version_number', 'desc');
+    }
+
+    public function relationships()
+    {
+        return $this->hasMany(BriefRelationship::class);
+    }
+
+    public function activityLog()
+    {
+        return $this->hasMany(BriefActivityLog::class)->orderBy('created_at', 'desc');
+    }
+
+    public function parentBrief()
+    {
+        return $this->belongsTo(Brief::class, 'parent_brief_id');
+    }
+
+    public function childBriefs()
+    {
+        return $this->hasMany(Brief::class, 'parent_brief_id');
+    }
+
+    public function lastActivityUser()
+    {
+        return $this->belongsTo(User::class, 'last_activity_user_id');
     }
 }

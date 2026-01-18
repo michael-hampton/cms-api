@@ -708,7 +708,7 @@ trait CreatesTestData
         $defaults = [
             'title' => 'Test Brief',
             'description' => 'Test description',
-            'status' => 'active',
+            'status' => 'ready',
             'site_id' => $this->siteId ?? 1
         ];
 

@@ -10,6 +10,8 @@ enum Layout: string
     case GRID = 'grid';
     case CAROUSEL = 'carousel';
     case MASONRY = 'masonry';
+    case HORIZONTAL = 'horizontal';
+    case VERSUS = 'versus';
     case SLIDER = 'slider';
     case HERO = 'hero';
 

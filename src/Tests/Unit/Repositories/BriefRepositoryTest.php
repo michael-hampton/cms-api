@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\Models\Brief;
-use App\Repositories\Cms\BriefRepository;
+use App\Repositories\Cms\Briefs\BriefRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

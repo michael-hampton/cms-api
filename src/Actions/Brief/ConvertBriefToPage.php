@@ -4,7 +4,7 @@ namespace App\Actions\Brief;
 
 use App\Framework\Database\Database;
 use App\Repositories\Cms\AuthorRepository;
-use App\Repositories\Cms\BriefRepository;
+use App\Repositories\Cms\Briefs\BriefRepository;
 use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\UserRepository;
 use App\Services\Cms\PageService;
@@ -84,6 +84,7 @@ class ConvertBriefToPage
             // Add products as product/deal blocks
             foreach ($conversionData['products'] as $productData) {
                 $attachment = $this->briefRepository->getAttachment($productData['attachment_id']);
+
                 if (!$attachment) {
                     continue;
                 }
