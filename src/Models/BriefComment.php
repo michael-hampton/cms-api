@@ -16,7 +16,8 @@ class BriefComment extends Model
         'created_at',
         'is_resolved',
         'resolved_by',
-        'resolved_at'
+        'resolved_at',
+        'mentions'
     ];
 
     protected $casts = [

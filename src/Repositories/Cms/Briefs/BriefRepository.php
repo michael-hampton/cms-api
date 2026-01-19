@@ -7,6 +7,7 @@ use App\Models\BriefActivityLog;
 use App\Models\BriefAttachment;
 use App\Models\BriefCollaborator;
 use App\Models\BriefComment;
+use App\Models\BriefDeadline;
 use App\Models\BriefRelationship;
 use App\Models\BriefTask;
 use App\Models\BriefVersion;
@@ -234,6 +235,13 @@ class BriefRepository extends Repository
             'parentBrief',
             'childBriefs'
         ])->find($briefId);
+    }
+
+    public function updateDeadline($id, array $deadlineData): Model
+    {
+        BriefDeadline::where('brief_id', $id)->update($deadlineData);
+
+        return BriefDeadline::where('brief_id', $id)->first();
     }
 
     protected function getModelClass(): string

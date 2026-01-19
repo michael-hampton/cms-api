@@ -98,9 +98,9 @@ class Brief extends Model
         return $this->hasMany(BriefVersion::class)->orderBy('version_number', 'desc');
     }
 
-    public function relationships()
+    public function relationships(bool $relation = false)
     {
-        return $this->hasMany(BriefRelationship::class);
+        return $this->hasMany(BriefRelationship::class, null, null, $relation);
     }
 
     public function activityLog()

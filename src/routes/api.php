@@ -84,6 +84,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/briefs/{id}/collaborators', [BriefController::class, 'getCollaborators']);
         $router->post('/briefs/{id}/collaborators', [BriefController::class, 'addCollaborator']);
         $router->delete('/briefs/{id}/collaborators/{collaboratorId}', [BriefController::class, 'removeCollaborator']);
+        $router->put('/briefs/{id}/collaborators/{collaboratorId}', [BriefController::class, 'updateCollaborator']);
 
 // Tasks
         $router->get('/briefs/{id}/tasks', [BriefController::class, 'getTasks']);
@@ -113,6 +114,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/briefs/{id}/relationships', [BriefController::class, 'getRelationships']);
         $router->post('/briefs/{id}/relationships', [BriefController::class, 'addRelationship']);
         $router->delete('/briefs/{id}/relationships/{relationshipId}', [BriefController::class, 'removeRelationship']);
+
+        //Workflow
+        $router->post('/briefs/{id}/workflow', [BriefController::class, 'addWorkflowChange']);
+        $router->get('/briefs/{id}/workflow', [BriefController::class, 'getWorkflowHistory']);
+
+        //Deadlines
+        $router->post('/briefs/{id}/deadline', [BriefController::class, 'setDeadline']);
+        $router->get('/briefs/{id}/deadline', [BriefController::class, 'getDeadline']);
+        $router->delete('/briefs/{id}/deadline', [BriefController::class, 'deleteDeadline']);
 
 // Bulk Operations
         $router->post('/briefs/bulk/status', [BriefController::class, 'bulkUpdateStatus']);

@@ -2,12 +2,13 @@
 
 namespace App\Repositories\Cms\Briefs;
 
+use App\Framework\Support\Collection;
 use App\Models\BriefTask;
 use App\Repositories\Repository;
 
 class BriefTaskRepository extends Repository
 {
-    public function getForBrief(int $briefId, bool $includeCompleted = true): array
+    public function getForBrief(int $briefId, bool $includeCompleted = true): Collection
     {
         $query = BriefTask::where('brief_id', $briefId)
             ->with(['assignee', 'creator']);
@@ -18,8 +19,7 @@ class BriefTaskRepository extends Repository
 
         return $query->orderBy('status')
             ->orderBy('due_date')
-            ->get()
-            ->toArray();
+            ->get();
     }
 
     public function getPending(int $userId): array

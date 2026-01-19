@@ -7,12 +7,19 @@ class BriefVersion extends Model
     protected $table = 'brief_versions';
 
     protected $fillable = [
-        'brief_id', 'version_number', 'title', 'description',
-        'data', 'created_by', 'change_summary'
+        'brief_id',
+        'version_number',
+        'title',
+        'description',
+        'data',
+        'created_by',
+        'change_summary',
+        'created_at'
     ];
 
     protected $casts = [
-        'data' => 'array'
+        'data' => 'array',
+        'created_at' => 'datetime'
     ];
 
     public function brief()

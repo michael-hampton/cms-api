@@ -12,6 +12,9 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\BriefDeadline;
+use App\Models\BriefRelationship;
+use App\Models\BriefWorkflowHistory;
 use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
 use App\Repositories\Cms\Briefs\BriefTaskRepository;
@@ -99,19 +102,23 @@ class BriefController extends Controller
             $shouldVersion = false;
             $changeSummary = [];
 
-            if (isset($data['title']) && $data['title'] !== $oldBrief->title) {
-                $shouldVersion = true;
-                $changeSummary[] = 'Title updated';
-            }
+            // Check all editable fields
+            $fieldsToCheck = [
+                'title' => 'Title',
+                'description' => 'Description',
+                'status' => 'Status',
+                'target_word_count' => 'Target word count',
+                'target_publish_date' => 'Target publish date',
+                'seo_keywords' => 'SEO keywords',
+                'target_audience' => 'Target audience',
+                'category_id' => 'Category'
+            ];
 
-            if (isset($data['description']) && $data['description'] !== $oldBrief->description) {
-                $shouldVersion = true;
-                $changeSummary[] = 'Description updated';
-            }
-
-            if (isset($data['status']) && $data['status'] !== $oldBrief->status) {
-                $shouldVersion = true;
-                $changeSummary[] = "Status changed to {$data['status']}";
+            foreach ($fieldsToCheck as $field => $label) {
+                if (isset($data[$field]) && $data[$field] != $oldBrief->$field) {
+                    $shouldVersion = true;
+                    $changeSummary[] = "{$label} updated";
+                }
             }
 
             if ($shouldVersion && $userId) {
@@ -394,6 +401,14 @@ class BriefController extends Controller
     {
         try {
             $tasks = $this->taskRepository->getForBrief($id);
+
+            $tasks = $tasks->map(function ($task) {
+                $data = $task->toArray();
+                $data['due_date'] = $task->due_date?->format('Y-m-d H:i:s') ?? '';
+
+                return $data;
+            });
+
             return $this->resourceResponse(['items' => $tasks]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -411,7 +426,10 @@ class BriefController extends Controller
             LogBriefActivity::execute($id, $data['created_by'], 'task_created',
                 "Created task: {$task->title}");
 
-            return $this->resourceResponse(['data' => $task->toArray()], 201);
+            $data = $task->toArray();
+            $data['due_date'] = $task->due_date?->format('Y-m-d') ?? '';
+
+            return $this->resourceResponse(['data' => $data], 201);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -434,11 +452,30 @@ class BriefController extends Controller
         }
     }
 
+    public function deleteTask(int $id, int $taskId, string $siteName): JsonResponse
+    {
+        try {
+            $result = $this->taskRepository->delete($taskId);
+            if (!$result) {
+                return $this->errorResponse('Task not found', 404);
+            }
+            return $this->successResponse('Task deleted successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
     // Versions
     public function getVersions(int $id, string $siteName): JsonResponse
     {
         try {
-            $versions = $this->versionRepository->getForBrief($id);
+
+            $versions = $this->versionRepository->getForBrief($id)->map(function ($task) {
+                $data = $task->toArray();
+                $data['created_at'] = $task->created_at?->format('Y-m-d H:i:s') ?? '';
+
+                return $data;
+            });
             return $this->resourceResponse(['items' => $versions]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -548,12 +585,40 @@ class BriefController extends Controller
     {
         try {
             $brief = $this->briefRepository->getCompleteBriefData($id);
-            $relationships = $brief->relationships()->with(['relatedBrief', 'relatedPage'])->get();
+            $relationships = $brief->relationships(true)->with(['relatedBrief', 'relatedPage', 'relationships'])->get();
 
             return $this->resourceResponse(['items' => $relationships]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
+    }
+
+    public function addRelationship(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $data['brief_id'] = $id;
+
+            $relationship = BriefRelationship::create($data);
+
+            return $this->resourceResponse(['data' => $relationship->toArray()], 201);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function removeRelationship(int $id, int $relationshipId, string $siteName): JsonResponse
+    {
+        try {
+            $result = BriefRelationship::where('id', $relationshipId)->delete();
+            if (!$result) {
+                return $this->errorResponse('Relationship not found', 404);
+            }
+            return $this->successResponse('Relationship removed');
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+
     }
 
     public function unresolveComment(int $id, int $commentId, Request $request, string $siteName): JsonResponse
@@ -638,6 +703,141 @@ class BriefController extends Controller
             $count = count($briefIds);
             return $this->successResponse("Deleted {$count} briefs");
         } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateCollaborator(int $id, int $collaboratorId, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $collaborator = $this->collaboratorRepository->find($collaboratorId);
+            if (!$collaborator || $collaborator->brief_id !== $id) {
+                return $this->errorResponse('Collaborator not found', 404);
+            }
+
+            $data = $request->all();
+            $updated = $this->collaboratorRepository->update($collaboratorId, $data);
+
+            return $this->resourceResponse(['data' => $updated->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function addWorkflowChange(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->all();
+
+            $workflowData = [
+                'brief_id' => $id,
+                'status' => $data['status'],
+                'changed_by' => $data['changed_by'],
+                'changed_at' => date('Y-m-d H:i:s'),
+                'notes' => $data['notes'] ?? null
+            ];
+
+            // Store in brief_workflow_history table
+            $workflow = BriefWorkflowHistory::create($workflowData);
+
+            // Also update the brief status
+            $this->briefRepository->update($id, [
+                'status' => $data['status'],
+                'last_activity_at' => date('Y-m-d H:i:s'),
+                'last_activity_user_id' => $data['changed_by']
+            ]);
+
+            LogBriefActivity::execute($id, $data['changed_by'], 'workflow_changed',
+                "Status changed to {$data['status']}");
+
+            return $this->resourceResponse(['data' => $workflow->toArray()], 201);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getWorkflowHistory(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $history = BriefWorkflowHistory::where('brief_id', $id)
+                ->orderBy('changed_at', 'desc')
+                ->get();
+
+            $history = $history->map(function ($item) {
+                $data = $item->toArray();
+                $data['changed_at'] = $item->changed_at?->format('Y-m-d H:i:s') ?? '';
+                return $data;
+            });
+
+            return $this->resourceResponse(['items' => $history->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function setDeadline(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $data = $request->all();
+
+            $deadlineData = [
+                'brief_id' => $id,
+                'due_date' => $data['due_date'],
+                'reminder_days' => json_encode($data['reminder_days'] ?? []),
+                'notify_collaborators' => $data['notify_collaborators'] ?? false,
+                'created_by' => $data['user_id']
+            ];
+
+            // Check if deadline exists
+            $existing = BriefDeadline::where('brief_id', $id)->first();
+
+            if ($existing) {
+                $deadline = $this->briefRepository->updateDeadline($existing->id, $deadlineData);
+            } else {
+                $deadline = BriefDeadline::create($deadlineData);
+            }
+
+            LogBriefActivity::execute($id, $data['user_id'], 'deadline_set',
+                "Deadline set to {$data['due_date']}");
+
+            $deadline = $deadline->toArray();
+            $deadline['due_date'] = $deadline['due_date']?->format('Y-m-d H:i:s') ?? '';
+
+            return $this->resourceResponse(['data' => $deadline]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getDeadline(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $deadline = BriefDeadline::where('brief_id', $id)->first();
+
+            if (!$deadline) {
+                return $this->resourceResponse(['data' => null]);
+            }
+
+            $deadline = $deadline->toArray();
+            $deadline['due_date'] = $deadline['due_date']?->format('Y-m-d H:i:s') ?? '';
+
+            return $this->resourceResponse(['data' => $deadline]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function deleteDeadline(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $result = BriefDeadline::where('brief_id', $id)->delete();
+
+            if (!$result) {
+                return $this->errorResponse('Deadline not found', 404);
+            }
+
+            return $this->successResponse('Deadline removed');
+        } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
