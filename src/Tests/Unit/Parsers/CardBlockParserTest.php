@@ -441,6 +441,56 @@ class CardBlockParserTest extends TestCase
         $this->assertEquals('featured', $result['context']);
     }
 
+    public function test_parse_default_layout_and_alignment()
+    {
+        $result = $this->parser->parse([]);
+
+        $this->assertEquals('full', $result['layout']);
+        $this->assertEquals('center', $result['alignment']);
+    }
+
+    public function test_parse_custom_layout()
+    {
+        $result = $this->parser->parse(['layout' => 'inline']);
+        $this->assertEquals('inline', $result['layout']);
+
+        $result = $this->parser->parse(['layout' => 'extended']);
+        $this->assertEquals('extended', $result['layout']);
+    }
+
+    public function test_parse_custom_alignment()
+    {
+        $alignments = ['left', 'center', 'right', 'fullscreen'];
+
+        foreach ($alignments as $alignment) {
+            $result = $this->parser->parse(['alignment' => $alignment]);
+            $this->assertEquals($alignment, $result['alignment']);
+        }
+    }
+
+    public function test_generate_html_includes_layout_class()
+    {
+        $data = $this->parser->parse([
+            'title' => 'Test',
+            'layout' => 'inline'
+        ]);
+
+        $html = $this->parser->generateHtml($data);
+        $this->assertStringContainsString('card-layout-inline', $html);
+    }
+
+    public function test_generate_html_includes_alignment_class()
+    {
+        $data = $this->parser->parse([
+            'title' => 'Test',
+            'alignment' => 'left'
+        ]);
+
+        $html = $this->parser->generateHtml($data);
+        $this->assertStringContainsString('card-align-left', $html);
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

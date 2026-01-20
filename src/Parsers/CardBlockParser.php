@@ -53,6 +53,8 @@ class CardBlockParser extends BaseBlockParser
             'openInNewTab' => (bool)($data['openInNewTab'] ?? false),
             'sponsorDeclaration' => $this->parseSponsorDeclaration($data['sponsorDeclaration'] ?? null),
             'context' => $this->sanitize($data['context'] ?? 'default'),
+            'layout' => $this->sanitize($data['layout'] ?? 'full'),
+            'alignment' => $this->sanitize($data['alignment'] ?? 'center'),
             'itemsPerRow' => $this->parseItemsPerRow($data['itemsPerRow'] ?? null)
         ];
     }
@@ -128,7 +130,9 @@ class CardBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $itemsPerRow = $parsedData['itemsPerRow'] ?? 3;
-        $containerClass = "card-block card-block-{$parsedData['context']} card-items-{$itemsPerRow}";
+        $layout = $parsedData['layout'] ?? 'full';
+        $alignment = $parsedData['alignment'] ?? 'center';
+        $containerClass = "card-block card-block-{$parsedData['context']} card-items-{$itemsPerRow} card-layout-{$layout} card-align-{$alignment}";
 
         $html = "<div class=\"{$containerClass}\">";
         $html .= "<div class=\"card-container\">";
