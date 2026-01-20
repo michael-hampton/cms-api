@@ -65,6 +65,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/briefs/{id}/attachments', [BriefController::class, 'addAttachment']);
         $router->delete('/briefs/{id}/attachments/{attachmentId}', [BriefController::class, 'deleteAttachment']);
         $router->put('/briefs/{id}/attachments/{attachmentId}', [BriefController::class, 'updateAttachment']);
+        $router->post('/briefs/{id}/upload', [BriefController::class, 'uploadAttachment']);
 
         // Brief comments
         $router->post('/briefs/{id}/comments', [BriefController::class, 'addComment']);

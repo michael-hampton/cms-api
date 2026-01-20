@@ -2,6 +2,7 @@
 
 namespace App\Framework\FileUpload;
 
+use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Logger;
 use Exception;
 
@@ -12,9 +13,15 @@ class FileUpload
     private $allowedExtensions;
     private $maxSize;
 
-    public function __construct(array $file, string $uploadPath = 'uploads')
+    public function __construct(array|UploadedFile $file, string $uploadPath = 'uploads')
     {
-        $this->file = $file;
+        // Convert UploadedFile to array format
+        if ($file instanceof UploadedFile) {
+            $this->file = $file->getFileInfo();
+        } else {
+            $this->file = $file;
+        }
+
         $this->uploadPath = rtrim($uploadPath, '/');
         $this->allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mpg'];
         $this->maxSize = 5 * 1024 * 1024; // 5MB
@@ -45,8 +52,7 @@ class FileUpload
         }
 
         $extension = strtolower(pathinfo($this->file['name'], PATHINFO_EXTENSION));
-        echo $extension;
-        die;
+
         if (!in_array($extension, $this->allowedExtensions)) {
             $errors[] = "File type not allowed. Allowed types: " . implode(', ', $this->allowedExtensions);
         }
@@ -71,12 +77,24 @@ class FileUpload
             $filename = uniqid() . '.' . $extension;
         }
 
-        $filepath = $uploadDir . '/' . $filename;
+        $filepath = rtrim($uploadDir, '/') . '/' . $filename;
 
-        if (move_uploaded_file($this->file['tmp_name'], $filepath)) {
+        if (is_uploaded_file($this->file['tmp_name'])) {
+            $success = move_uploaded_file($this->file['tmp_name'], $filepath);
+        } else {
+            // For tests or manually created temp files
+            $success = copy($this->file['tmp_name'], $filepath);
+        }
+
+        if ($success) {
             Logger::info('File uploaded successfully', ['file' => $filepath]);
             return $filepath;
+        } else {
+            throw new Exception("Failed to upload file to $filepath");
         }
+
+
+        die('b');
 
         throw new Exception("Failed to upload file");
     }

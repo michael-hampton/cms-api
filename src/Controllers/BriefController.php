@@ -841,4 +841,52 @@ class BriefController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    public function uploadAttachment(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $file = $request->file('file');
+
+            if (!$file) {
+                return $this->errorResponse('No file provided', 400);
+            }
+
+            // Use FileUpload class
+            $fileUpload = new \App\Framework\FileUpload\FileUpload(
+                $file,
+                'uploads/briefs/' . $id
+            );
+
+            // Set allowed extensions for documents
+            $fileUpload->setAllowedExtensions([
+                'pdf', 'doc', 'docx', 'xls', 'xlsx',
+                'ppt', 'pptx', 'txt', 'csv'
+            ]);
+
+            // Set max size to 10MB
+            $fileUpload->setMaxSize(10 * 1024 * 1024);
+
+            // Store the file
+            $filePath = $fileUpload->store();
+
+            // Create attachment record
+            $attachmentData = [
+                'type' => 'document',
+                'file_url' => $filePath,
+                'file_name' => $file->getClientOriginalName(),
+                'filesize' => $file->getSize(),
+                'metadata' => [
+                    'description' => $request->get('description', ''),
+                    'mime_type' => $file->getMimeType()
+                ],
+                'sort_order' => 0
+            ];
+
+            $attachment = $this->briefRepository->addAttachment($id, $attachmentData);
+
+            return $this->resourceResponse(['data' => $attachment->toArray()], 201);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
 }

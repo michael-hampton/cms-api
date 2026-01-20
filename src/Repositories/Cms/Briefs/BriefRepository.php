@@ -72,9 +72,23 @@ class BriefRepository extends Repository
 
     public function deleteAttachment(int $briefId, int $attachmentId): bool
     {
-        return BriefAttachment::where('brief_id', $briefId)
-                ->where('id', $attachmentId)
-                ->delete() > 0;
+        $attachment = BriefAttachment::where('brief_id', $briefId)
+            ->where('id', $attachmentId)
+            ->first();
+
+        if (!$attachment) {
+            return false;
+        }
+
+        // Delete physical file if it's a document
+        if ($attachment->type === 'document' && $attachment->file_url) {
+            $fileSystem = new \App\Framework\FileUpload\FileSystem();
+            if ($fileSystem->fileExists($attachment->file_url)) {
+                $fileSystem->deleteFile($attachment->file_url);
+            }
+        }
+
+        return $attachment->delete();
     }
 
     public function addComment(int $briefId, array $commentData): Model

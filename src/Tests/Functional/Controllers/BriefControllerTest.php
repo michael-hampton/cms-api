@@ -307,30 +307,222 @@ class BriefControllerTest extends FunctionalTestCase
         $this->assertEquals('url', $data['data']['type']);
     }
 
-//    public function testAddAttachmentCreatesDocumentAttachment()
-//    {
-//        $user = $this->createUser();
-//        $brief = $this->createBrief(['owner_id' => $user->id]);
-//
-//        $attachmentData = [
-//            'type' => 'document',
-//            'file_url' => 'http://example.com/doc.pdf',
-//            'file_name' => 'document.pdf',
-//            'file_size' => 1024000,
-//            'metadata' => [
-//                'description' => 'Reference document'
-//            ],
-//            'sort_order' => 0
-//        ];
-//
-//        $response = $this->postForSite("/api/briefs/{$brief->id}/attachments", $attachmentData);
-//
-//        $this->assertEquals(201, $response->getStatusCode());
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals('document', $data['data']['type']);
-//        $this->assertEquals(1024000, $data['data']['file_size']);
-//    }
+    public function testUploadDocumentAttachment()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        // Create a test PDF file
+        $pdfContent = '%PDF-1.4 test content';
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test_pdf_');
+        file_put_contents($tmpFile, $pdfContent);
+
+        $file = [
+            'name' => 'document.pdf',
+            'type' => 'application/pdf',
+            'tmp_name' => $tmpFile,
+            'error' => UPLOAD_ERR_OK,
+            'size' => strlen($pdfContent)
+        ];
+
+        $response = $this->postForSite(
+            "/api/briefs/{$brief->id}/upload",
+            [
+                'brief_id' => $brief->id,
+                'type' => 'document',
+                'description' => 'Reference document'
+            ],
+            ['file' => $file]
+        );
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('document', $data['data']['type']);
+        $this->assertEquals('document.pdf', $data['data']['file_name']);
+        $this->assertEquals(strlen($pdfContent), $data['data']['filesize']);
+        $this->assertEquals('Reference document', $data['data']['metadata']['description']);
+        $this->assertNotEmpty($data['data']['file_url']);
+
+        // Cleanup
+        if (file_exists($tmpFile)) {
+            unlink($tmpFile);
+        }
+    }
+
+    public function testUploadDocumentWithInvalidFileType()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test_exe_');
+        file_put_contents($tmpFile, 'fake executable');
+
+        $file = [
+            'name' => 'malware.exe',
+            'type' => 'application/x-msdownload',
+            'tmp_name' => $tmpFile,
+            'error' => UPLOAD_ERR_OK,
+            'size' => 100
+        ];
+
+        $response = $this->postForSite(
+            "/api/briefs/{$brief->id}/upload",
+            ['brief_id' => $brief->id, 'type' => 'document'],
+            ['file' => $file]
+        );
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsString('Upload validation failed: File type not allowed. Allowed types: pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv', $data['error']);
+
+        // Cleanup
+        if (file_exists($tmpFile)) {
+            unlink($tmpFile);
+        }
+    }
+
+    public function testUploadDocumentWithFileSizeExceeded()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test_large_');
+        file_put_contents($tmpFile, 'content');
+
+        $file = [
+            'name' => 'huge.pdf',
+            'type' => 'application/pdf',
+            'tmp_name' => $tmpFile,
+            'error' => UPLOAD_ERR_OK,
+            'size' => 11 * 1024 * 1024 // 11MB - exceeds 10MB limit
+        ];
+
+        $response = $this->postForSite(
+            "/api/briefs/{$brief->id}/upload",
+            ['brief_id' => $brief->id, 'type' => 'document'],
+            ['file' => $file]
+        );
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('exceeds maximum', $data['error']);
+
+        // Cleanup
+        if (file_exists($tmpFile)) {
+            unlink($tmpFile);
+        }
+    }
+
+    public function testUploadDocumentWithNoFile()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite(
+            "/api/briefs/{$brief->id}/upload",
+            ['brief_id' => $brief->id, 'type' => 'document']
+        );
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('No file provided', $data['error']);
+    }
+
+    public function testDeleteDocumentAttachmentRemovesFile()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        // Create temp file
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test_doc_');
+        file_put_contents($tmpFile, 'test content');
+
+        // Create attachment directly
+        $attachment = BriefAttachment::create([
+            'brief_id' => $brief->id,
+            'type' => 'document',
+            'file_url' => $tmpFile,
+            'file_name' => 'test.pdf',
+            'file_size' => 100,
+            'metadata' => ['description' => 'Test doc']
+        ]);
+
+        // Verify file exists
+        $this->assertTrue(file_exists($tmpFile));
+
+        // Delete attachment
+        $response = $this->deleteForSite("/api/briefs/{$brief->id}/attachments/{$attachment->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        // Verify database record is gone
+        $this->assertNull(BriefAttachment::find($attachment->id));
+
+        // Verify physical file is deleted
+        $this->assertFalse(file_exists($tmpFile));
+    }
+
+    public function testUploadMultipleDocuments()
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        // Upload first document
+        $tmpFile1 = tempnam(sys_get_temp_dir(), 'test_doc1_');
+        file_put_contents($tmpFile1, 'document 1');
+
+        $file1 = [
+            'name' => 'doc1.pdf',
+            'type' => 'application/pdf',
+            'tmp_name' => $tmpFile1,
+            'error' => UPLOAD_ERR_OK,
+            'size' => 10
+        ];
+
+        $response1 = $this->postForSite(
+            "/api/briefs/{$brief->id}/upload",
+            ['brief_id' => $brief->id, 'type' => 'document', 'description' => 'First doc'],
+            ['file' => $file1]
+        );
+
+        $this->assertEquals(201, $response1->getStatusCode());
+
+        // Upload second document
+        $tmpFile2 = tempnam(sys_get_temp_dir(), 'test_doc2_');
+        file_put_contents($tmpFile2, 'document 2');
+
+        $file2 = [
+            'name' => 'doc2.docx',
+            'type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'tmp_name' => $tmpFile2,
+            'error' => UPLOAD_ERR_OK,
+            'size' => 10
+        ];
+
+        $response2 = $this->postForSite(
+            "/api/briefs/{$brief->id}/upload",
+            ['brief_id' => $brief->id, 'type' => 'document', 'description' => 'Second doc'],
+            ['file' => $file2]
+        );
+
+        $this->assertEquals(201, $response2->getStatusCode());
+
+        // Verify both attachments exist
+        $attachments = BriefAttachment::where('brief_id', $brief->id)
+            ->where('type', 'document')
+            ->get();
+
+        $this->assertCount(2, $attachments);
+
+        // Cleanup
+        foreach ([$tmpFile1, $tmpFile2] as $file) {
+            if (file_exists($file)) {
+                unlink($file);
+            }
+        }
+    }
 
     public function testDeleteAttachmentRemovesAttachment()
     {
@@ -892,10 +1084,6 @@ class BriefControllerTest extends FunctionalTestCase
             'title' => 'New Brief from Template',
             'owner_id' => $user->id
         ]);
-
-//        echo '<pre>';
-//        print_r($response->getContent());
-//        die;
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);

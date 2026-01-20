@@ -15,7 +15,8 @@ class BriefAttachment extends Model
         'file_name',
         'url',
         'metadata',
-        'sort_order'
+        'sort_order',
+        'filesize'
     ];
 
     protected $casts = [
