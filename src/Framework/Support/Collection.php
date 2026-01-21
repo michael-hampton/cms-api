@@ -111,7 +111,21 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
     public function pluck(string $key): self
     {
         return $this->map(function ($item) use ($key) {
-            return is_array($item) ? $item[$key] : $item->{$key};
+
+            $segments = explode('.', $key);
+            $value = $item;
+
+            foreach ($segments as $segment) {
+                if (is_array($value) && array_key_exists($segment, $value)) {
+                    $value = $value[$segment];
+                } elseif (is_object($value) && isset($value->{$segment})) {
+                    $value = $value->{$segment};
+                } else {
+                    return null;
+                }
+            }
+
+            return $value;
         });
     }
 
@@ -346,6 +360,44 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
         return new static($keyed);
     }
+
+    public function whereNotNull(string $key): self
+    {
+        $filtered = array_filter($this->items, function ($item) use ($key) {
+            if (is_array($item)) {
+                return isset($item[$key]) && $item[$key] !== null;
+            } elseif (is_object($item)) {
+                // Use getAttribute if model implements it, fallback to property access
+                if (method_exists($item, 'getAttribute')) {
+                    return $item->getAttribute($key) !== null;
+                }
+                return isset($item->{$key}) && $item->{$key} !== null;
+            }
+            return false;
+        });
+
+        return new static($filtered);
+    }
+
+    public function whereNotEmpty(string $key): self
+    {
+        $filtered = array_filter($this->items, function ($item) use ($key) {
+            if (is_array($item)) {
+                return !empty($item[$key]);
+            } elseif (is_object($item)) {
+                // Use getAttribute if available, fallback to property
+                if (method_exists($item, 'getAttribute')) {
+                    return !empty($item->getAttribute($key));
+                }
+                return !empty($item->{$key});
+            }
+            return false;
+        });
+
+        return new static($filtered);
+    }
+
+
 
     public function flatten(int $depth = INF): self
     {

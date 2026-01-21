@@ -29,6 +29,10 @@ class MemberSupportController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
+        if (!$member) {
+            return $this->errorResponse('Member not found', 302);
+        }
+
         // Get member's active subscriptions for the dropdown
         $activeSubscriptions = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId);
 

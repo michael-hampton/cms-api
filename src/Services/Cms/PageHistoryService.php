@@ -153,13 +153,13 @@ class PageHistoryService
         );
     }
 
-    public function logPageUnpublished(int $pageId): PageHistory
+    public function logPageUnpublished(int $pageId, array $data = []): PageHistory
     {
         return $this->logPageAction(
             $pageId,
             'unpublished',
             'Page unpublished',
-            ['status' => ['old' => 'published', 'new' => 'draft']],
+            array_merge($data, ['old' => 'draft', 'new' => 'published']),
             false
         );
     }

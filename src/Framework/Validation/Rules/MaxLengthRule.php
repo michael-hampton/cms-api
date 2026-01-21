@@ -20,11 +20,6 @@ class MaxLengthRule extends BaseValidationRule
 
     public function validate($value, array $data = []): bool
     {
-        if(is_array($value)) {
-            print_r($value);
-            die('here7');
-        }
-
         if ($value === null) {
             return true;
         }

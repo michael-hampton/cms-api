@@ -38,7 +38,15 @@ class PageResource extends JsonResource
             'blocks' => $this->getAttribute('blocks', []),
             'categories' => $this->whenLoaded('categories'),
             'tags' => $this->whenLoaded('tags'),
-            'metadata' => $this->whenLoaded('metadata'),
+            'metadata' => $this->whenLoaded('metadata', function () {
+                return array_merge(
+                    $this->metadata,
+                    [
+                        'publish_date' => $this->metadata['publish_date']?->format('Y-m-d H:i:s'),
+                        'expiry_date' => $this->metadata['expiry_date']?->format('Y-m-d H:i:s'),
+                    ]
+                );
+            }),
             'seo' => $this->whenLoaded('seo'),
             'social' => $this->whenLoaded('social'),
             'settings' => $this->whenLoaded('settings'),

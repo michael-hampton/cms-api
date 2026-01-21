@@ -51,7 +51,9 @@ class PageController extends Controller
     public function index(Request $request, string $siteName): JsonResponse
     {
         try {
+            $userId = Auth::id();
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria->addFilter('exclude_private_internal', $userId); //hide private and internal from search
             $result = $this->pageRepository->search($criteria);
             // Format blocks in the paginated data
             $formattedData = $result->getData();
@@ -141,7 +143,7 @@ class PageController extends Controller
                 return $this->jsonResponse(['page' => $page->toArray()]);
             }
 
-            $page = $this->pageService->updatePageWithAllData($id, $requestData, $request->get('site_id'));
+            $page = $this->pageService->updatePageWithAllData($id, $requestData, $request->get('site_id'), $page);
 
             return $this->jsonResponse(['page' => $page->toArray()]);
 
@@ -893,6 +895,27 @@ class PageController extends Controller
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function unpublish(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id');
+            $redirectUrl = $request->get('redirect_url');
+            $skipRedirect = $request->get('skip_redirect', false);
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $finalRedirectUrl = $skipRedirect ? null : $redirectUrl;
+
+            $page = $this->pageService->unpublishPage($id, $userId, $finalRedirectUrl);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 400);
         }
     }
 

@@ -10,6 +10,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\Str;
 use App\Framework\Validation\Validator;
+use App\Models\Model;
 use App\Models\Page;
 use App\Repositories\Cms\AccessRoleRepository;
 use App\Repositories\Cms\BlockRepository;
@@ -247,9 +248,9 @@ class PageService
         return $page;
     }
 
-    public function updatePageWithAllData(int $pageId, array $requestData, int $siteId): Page
+    public function updatePageWithAllData(int $pageId, array $requestData, int $siteId, ?Model $page = null): Page
     {
-        $page = $this->pageRepository->find($pageId);
+        $page = $page ?? $this->pageRepository->find($pageId);
 
         if (!$page) {
             throw new \Exception("Page not found");
@@ -267,7 +268,7 @@ class PageService
             }
 
             // Handle publishing with approval workflow
-            if ($newStatus === PageStatus::PUBLISHED->value) {
+            if ($newStatus === strtolower(PageStatus::PUBLISHED->value)) {
                 $this->handlePublishAttempt($page, $requestData);
             }
         }
@@ -742,37 +743,67 @@ class PageService
             $this->pageProductRepository->syncProducts($pageId, $tagsForm['products'], $siteId);
         }
 
-        $customFieldsData = $tagsForm['customFields'] ?? $tagsForm['custom_fields'] ?? [];
 
-        if (!empty($customFieldsData) && is_array($customFieldsData)) {
+        $customFieldsData = $tagsForm['customFields']
+            ?? $tagsForm['custom_fields']
+            ?? [];
 
-            $customFieldsDefinitions = $this->customFieldRepository->getCustomFieldsByKeys(collect($customFieldsData)->pluck('key')->toArray());;
+        if (empty($customFieldsData)) {
+            return;
+        }
 
-            $customFields = array_map(function ($field) use ($customFieldsDefinitions) {
-                // Get the field definition to retrieve the ID
-                $fieldDef = $customFieldsDefinitions->where('key', $field['key'])->first();
+        $customFieldsCollection = collect($customFieldsData);
+
+        /**
+         * Get unique definition keys
+         */
+        $definitionKeys = $customFieldsCollection
+            ->pluck('customFieldDefinition.key')
+            ->filter()
+            ->unique()
+            ->toArray();
+
+        /**
+         * Fetch definitions indexed by key
+         */
+        $customFieldDefinitions = $this->customFieldRepository
+            ->getCustomFieldsByKeys($definitionKeys);
+
+        $keyedCollection = new Collection(
+            array_column($customFieldDefinitions->toArray(), null, 'key')
+        );
+
+        /**
+         * Build payload
+         */
+        $customFields = $customFieldsCollection
+            ->map(function ($field) use ($customFieldDefinitions, $keyedCollection) {
+                $definitionKey = $field['customFieldDefinition']['key'] ?? null;
+
+                $definition = $keyedCollection->get($definitionKey);
+
+                if (!$definition) {
+                    return null;
+                }
 
                 return [
-                    'custom_field_definition_id' => $fieldDef ? $fieldDef->id : null,
+                    'custom_field_definition_id' => $definition['id'],
                     'name' => $field['key'] ?? '',
                     'key' => $field['key'] ?? '',
                     'value' => $field['value'] ?? '',
                     'type' => $field['type'] ?? 'text',
-                    'options' => $field['options'] ?? null
+                    'options' => $field['options'] ?? null,
                 ];
-            }, $customFieldsData);
+            })
+            ->filter() // removes nulls
+            ->keyBy('custom_field_definition_id')
+            ->whereNotEmpty('value')
+            ->toArray();
 
-            // Filter out any fields without a valid definition ID
-            $customFields = array_filter($customFields, function ($field) {
-                return !empty($field['custom_field_definition_id']);
-            });
-
-            $customFields = collect($customFields)->keyBy('custom_field_definition_id')->toArray();
-
-            if (!empty($customFields)) {
-                $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
-            }
+        if (!empty($customFields)) {
+            $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
         }
+
     }
 
     // Utility methods
@@ -932,9 +963,9 @@ class PageService
         return $page;
     }
 
-    public function unpublishPage(int $pageId): Page
+    public function unpublishPage(int $id, int $userId, ?string $redirectUrl = null): Page
     {
-        $page = $this->pageRepository->find($pageId);
+        $page = $this->pageRepository->find($id);
 
         if (!$page) {
             throw new Exception("Page not found");
@@ -944,13 +975,31 @@ class PageService
             throw new Exception("Page is not published");
         }
 
-        $page = $this->pageRepository->update($pageId, [
-            'status' => 'draft'
-        ]);
+        $this->database->transaction(function () use ($page, $userId, $redirectUrl) {
+            // Update page status
+            $this->pageRepository->update($page->id, [
+                'status' => 'draft',
+                'published_at' => null,
+                'unpublished_at' => now(),
+                'unpublished_by' => $userId
+            ]);
 
-        $this->historyService->logPageUnpublished($pageId);
+            // Save redirect if provided
+            if ($redirectUrl) {
+                $this->pageRepository->update($page->id, [
+                    'unpublish_redirect_url' => $redirectUrl
+                ]);
+            }
 
-        return $page;
+            // Log history
+            $this->historyService->logPageUnpublished($page->id, [
+                'user_id' => $userId,
+                'redirect_url' => $redirectUrl,
+                'unpublished_at' => now()
+            ]);
+        });
+
+        return $this->pageRepository->getCompletePageData($id);
     }
 
     public function makePageInternal(int $pageId, int $userId): Page

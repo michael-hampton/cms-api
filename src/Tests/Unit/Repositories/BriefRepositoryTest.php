@@ -33,19 +33,19 @@ class BriefRepositoryTest extends RepositoryTestCase
     {
         // Arrange
         $user = $this->createUser();
-        $this->createBrief(['status' => 'active', 'owner_id' => $user->id]);
+        $this->createBrief(['status' => 'ready', 'owner_id' => $user->id]);
         $this->createBrief(['status' => 'converted', 'owner_id' => $user->id]);
         $this->createBrief(['status' => 'archived', 'owner_id' => $user->id]);
 
         // Act
         $criteria = new SearchCriteria();
-        $criteria->addFilter('status', 'active');
+        $criteria->addFilter('status', 'ready');
         $criteria->setPerPage(10);
         $result = $this->repository->search($criteria);
 
         // Assert
         $this->assertCount(1, $result->getData());
-        $this->assertEquals('active', $result->getData()[0]['status']);
+        $this->assertEquals('ready', $result->getData()[0]['status']);
     }
 
     public function test_search_filters_by_owner_id(): void
@@ -227,7 +227,7 @@ class BriefRepositoryTest extends RepositoryTestCase
     {
         // Arrange
         $user = $this->createUser();
-        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'active']);
+        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'ready']);
         $page = $this->createPage();
 
         // Act
@@ -261,7 +261,7 @@ class BriefRepositoryTest extends RepositoryTestCase
     {
         // Arrange
         $user = $this->createUser();
-        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'active']);
+        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'ready']);
 
         // Act
         $result = $this->repository->archive($brief->id);

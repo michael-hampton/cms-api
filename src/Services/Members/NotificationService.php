@@ -49,7 +49,7 @@ class NotificationService
 
         // Pending gifted articles
         $pendingGifts = $this->giftedArticleRepository->getPendingGiftsForMember($member->id, $member->email);
-        if ($pendingGifts->count() > 0) {
+        if ($pendingGifts && $pendingGifts->count() > 0) {
             $notifications[] = [
                 'type' => 'gift',
                 'icon' => '💝',

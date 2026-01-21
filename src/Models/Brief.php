@@ -21,7 +21,8 @@ class Brief extends Model
         'last_activity_at',
         'last_activity_user_id',
         'parent_brief_id',
-        'target_audience'
+        'target_audience',
+        'is_active'
     ];
 
     protected $casts = [
@@ -65,7 +66,7 @@ class Brief extends Model
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->is_active;
     }
 
     public function isConverted(): bool

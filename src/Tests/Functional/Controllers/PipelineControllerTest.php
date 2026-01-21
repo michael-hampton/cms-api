@@ -24,10 +24,6 @@ class PipelineControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        echo '<pre>';
-        print_r($data);
-        die;
-
         $this->assertTrue($data['data']['success']);
         $this->assertArrayHasKey('stages', $data['data']);
         $this->assertArrayHasKey('draft', $data['data']['stages']);

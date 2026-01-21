@@ -138,9 +138,10 @@ class Product extends Model
 
     public function specifications()
     {
-        return $this->hasMany(ProductSpecification::class)
+        return $this->hasMany(ProductSpecification::class, null, null, true)
             ->with(['specificationGroup'])
-            ->orderBy('sort_order');
+            ->orderBy('sort_order')
+            ->get();
     }
 
     public function inclusions()

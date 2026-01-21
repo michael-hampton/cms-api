@@ -3480,4 +3480,116 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertNotNull($history);
     }
+
+    public function testSearchExcludesPrivatePages(): void
+    {
+        $this->createPage(['status' => 'published', 'title' => 'Public Page']);
+        $this->createPage(['status' => 'private', 'title' => 'Private Page']);
+
+        $response = $this->getForSite('/api/pages?status=published');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('Public Page', $data['items'][0]['title']);
+    }
+
+    public function testSearchExcludesInternalPages(): void
+    {
+        $user = $this->createUser();
+        $this->createPage(['status' => 'published', 'title' => 'Public Page', 'created_by' => $user->id]);
+        $this->createPage(['status' => 'internal', 'title' => 'Internal Page', 'created_by' => $user->id]);
+
+        $response = $this->getForSite('/api/pages');
+        $data = json_decode($response->getContent(), true);
+
+        $titles = array_column($data['items'], 'title');
+        $this->assertContains('Public Page', $titles);
+        $this->assertNotContains('Internal Page', $titles);
+    }
+
+    public function testSearchWithMultipleStatusFilters(): void
+    {
+        $this->createPage(['status' => 'published']);
+        $this->createPage(['status' => 'draft']);
+        $this->createPage(['status' => 'private']);
+        $this->createPage(['status' => 'internal']);
+
+        $response = $this->getForSite('/api/pages?status=published,draft');
+        $data = json_decode($response->getContent(), true);
+
+        // Should only return published and draft, not private or internal
+        $this->assertCount(2, $data['items']);
+    }
+
+    public function testCreatorCanSeePrivatePages(): void
+    {
+        $this->createPage(['status' => 'published', 'title' => 'Public Page', 'created_by' => $this->authenticatedUser->id]);
+        $this->createPage(['status' => 'private', 'title' => 'Private Page', 'created_by' => $this->authenticatedUser->id]);
+        $this->createPage(['status' => 'internal', 'title' => 'Private Page', 'created_by' => $this->authenticatedUser->id]);
+
+        $response = $this->getForSite('/api/pages');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertCount(3, $data['items']);
+        $this->assertEquals('Public Page', $data['items'][0]['title']);
+        $this->assertEquals('Private Page', $data['items'][1]['title']);
+    }
+
+    public function testUnpublishPageSuccessfully(): void
+    {
+        $page = $this->createPage(['status' => 'published', 'published_at' => now()]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/unpublish", [
+            'user_id' => 1,
+            'redirect_url' => '/new-location'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('draft', $data['data']['page']['status']);
+        $this->assertNull($data['data']['page']['published_at']);
+    }
+
+    public function testUnpublishWithoutRedirect(): void
+    {
+        $page = $this->createPage(['status' => 'published']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/unpublish", [
+            'user_id' => 1,
+            'skip_redirect' => true
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $updatedPage = Page::find($page->id);
+        $this->assertNull($updatedPage->unpublish_redirect_url);
+    }
+
+    public function testCannotUnpublishDraftPage(): void
+    {
+        $page = $this->createPage(['status' => 'draft']);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/unpublish", [
+            'user_id' => 1
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testUnpublishCreatesHistoryEntry(): void
+    {
+        $page = $this->createPage(['status' => 'published']);
+
+        $this->postForSite("/api/pages/{$page->id}/unpublish", [
+            'user_id' => 1,
+            'redirect_url' => '/redirect'
+        ]);
+
+        $history = PageHistory::where('page_id', $page->id)
+            ->where('action', 'unpublished')
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertEquals('/redirect', $history->changes['redirect_url']);
+    }
 }

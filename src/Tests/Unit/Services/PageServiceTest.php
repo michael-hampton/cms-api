@@ -445,14 +445,42 @@ class PageServiceTest extends FunctionalTestCase
 
     public function testUnpublishPageSuccessfullyUnpublishesPublishedPage(): void
     {
-        $initialPage = new Page(['status' => 'published']);
+        $initialPage = Mockery::mock(Page::class)->makePartial();
+        $initialPage->id = 1;
+        $initialPage->status = 'published';
         $updatedPage = new Page(['status' => 'draft']);
 
-        $this->pageRepository->shouldReceive('find')->once()->with(1)->andReturn($initialPage);
-        $this->pageRepository->shouldReceive('update')->once()->with(1, ['status' => 'draft'])->andReturn($updatedPage);
-        $this->pageHistory->shouldReceive('logPageUnpublished')->once()->with(1)->andReturn(new PageHistory(['id' => 1]));
+        $this->setupTransaction();
 
-        $result = $this->service->unpublishPage(1);
+        $this->pageRepository->shouldReceive('find')->once()->with(1)->andReturn($initialPage);
+        $this->pageRepository->shouldReceive('update')
+            ->once()
+            ->with(
+                1,
+                Mockery::on(function ($data) {
+                    return $data['status'] === 'draft'
+                        && empty($data['published_at'])
+                        && $data['unpublished_by'] === 1
+                        && !empty($data['unpublished_at']);
+                })
+            )
+            ->andReturn($updatedPage);
+        $this->pageHistory->shouldReceive('logPageUnpublished')
+            ->once()
+            ->with(
+                1,
+                Mockery::on(function ($data) {
+                    return empty($data['redirect_url'])
+                        && $data['user_id'] === 1
+                        && !empty($data['unpublished_at']);
+                })
+            )
+            ->andReturn(new PageHistory(['id' => 1]));
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->andReturn($updatedPage);
+
+        $result = $this->service->unpublishPage(1, $this->authenticatedUser->id);
 
         $this->assertSame($updatedPage, $result);
         $this->assertEquals('draft', $result->status);
@@ -467,7 +495,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage("Page not found");
 
-        $this->service->unpublishPage(1);
+        $this->service->unpublishPage(1, $this->authenticatedUser->id);
     }
 
     public function testUnpublishPageThrowsExceptionIfNotPublished(): void
@@ -481,7 +509,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage("Page is not published");
 
-        $this->service->unpublishPage(1);
+        $this->service->unpublishPage(1, $this->authenticatedUser->id);
     }
 
     public function testProcessMetadataFormHandlesMultipleAuthors()

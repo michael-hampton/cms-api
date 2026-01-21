@@ -143,6 +143,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/pages/{id}', PageController::class, 'show');
         $router->put('/pages/{id}', PageController::class, 'update');
         $router->delete('/pages/{id}', PageController::class, 'destroy');
+        $router->post('/pages/{id}/unpublish', PageController::class, 'unpublish');
         $router->get('/block-types', PageController::class, 'getAvailableBlockTypes');
         $router->post('/pages/{id}/duplicate', PageController::class, 'duplicate');
         $router->post('/pages/bulk-delete', PageController::class, 'bulkDelete');

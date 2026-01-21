@@ -2,6 +2,7 @@
 
 namespace App\Search\Configurations;
 
+use App\Search\Filters\CustomFilter;
 use App\Search\Filters\InFilter;
 use App\Search\Filters\RelationshipExistsFilter;
 use App\Search\Filters\RelationshipFilter;
@@ -27,8 +28,15 @@ class PageSearchConfiguration extends SearchConfiguration implements SearchConfi
             ->addFilter(new RelationshipExistsFilter('visibility', 'metadata', 'visibility'))
             //->addFilter(new RelationshipFilter('category', 'categories', 'id'))
             ->addFilter(new RelationshipFilter('category_id', 'categories', 'id')) // Added for consistency
+            ->addFilter(new RelationshipFilter('category', 'categories', 'id')) // Added for consistency
             ->addFilter(new RelationshipFilter('tag', 'tags', 'id'))
-            ->addFilter(new RelationshipFilter('tag_id', 'tags', 'id')); // Added for consistency
+            ->addFilter(new RelationshipFilter('tag_id', 'tags', 'id'))
+            ->addFilter(new CustomFilter('exclude_private_internal', function ($query, $value) {
+                $query->where(function ($query) use ($value) {
+                    return $query->whereNotIn('status', ['private', 'internal'])->orWhere('created_by', $value);
+                });
+                return $query;
+            }));
 
         self::applySiteFilter();
 

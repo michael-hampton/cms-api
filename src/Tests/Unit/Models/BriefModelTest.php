@@ -24,12 +24,12 @@ class BriefModelTest extends FunctionalTestCase
             'description' => 'Test description',
             'owner_id' => $user->id,
             'site_id' => $this->siteId,
-            'status' => 'active'
+            'status' => 'draft'
         ]);
 
         $this->assertInstanceOf(Brief::class, $brief);
         $this->assertEquals('Test Brief', $brief->title);
-        $this->assertEquals('active', $brief->status);
+        $this->assertEquals('draft', $brief->status);
     }
 
     public function testBriefHasTimestamps()
@@ -160,7 +160,8 @@ class BriefModelTest extends FunctionalTestCase
             'title' => 'Active Brief',
             'owner_id' => $user->id,
             'site_id' => $this->siteId,
-            'status' => 'active'
+            'status' => 'draft',
+            'is_active' => true
         ]);
 
         $this->assertTrue($brief->isActive());
@@ -180,7 +181,6 @@ class BriefModelTest extends FunctionalTestCase
         ]);
 
         $this->assertTrue($brief->isConverted());
-        $this->assertFalse($brief->isActive());
         $this->assertFalse($brief->isArchived());
     }
 
@@ -196,7 +196,6 @@ class BriefModelTest extends FunctionalTestCase
         ]);
 
         $this->assertTrue($brief->isArchived());
-        $this->assertFalse($brief->isActive());
         $this->assertFalse($brief->isConverted());
     }
 

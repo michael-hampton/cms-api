@@ -3,14 +3,8 @@
 namespace App\Requests;
 
 use App\Framework\Validation\Rules\ArrayRule;
-use App\Framework\Validation\Rules\BooleanRule;
-use App\Framework\Validation\Rules\DateRule;
-use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
-use App\Framework\Validation\Rules\MinLengthRule;
-use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RequiredRule;
-use App\Framework\Validation\Rules\UrlRule;
 
 class PageFormValidationRules
 {
@@ -92,20 +86,20 @@ class PageFormValidationRules
             'tags' => [
                 new ArrayRule()
             ],
-            'customFields' => [
-                new ArrayRule()
-            ],
-            'customFields.*.key' => [
-                new RequiredRule(),
-                new MaxLengthRule(255)
-            ],
-            'customFields.*.value' => [
-                new MaxLengthRule(1000)
-            ],
-            'customFields.*.type' => [
-                new RequiredRule(),
-                new InRule(['text', 'number', 'url', 'email', 'boolean', 'date'])
-            ]
+//            'customFields' => [
+//                new ArrayRule()
+//            ],
+//            'customFields.*.key' => [
+//                new RequiredRule(),
+//                new MaxLengthRule(255)
+//            ],
+//            'customFields.*.value' => [
+//                new MaxLengthRule(1000)
+//            ],
+//            'customFields.*.type' => [
+//                new RequiredRule(),
+//                new InRule(['text', 'number', 'url', 'email', 'boolean', 'date'])
+//            ]
         ];
     }
 

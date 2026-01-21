@@ -284,7 +284,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertCollectionContains($pages, ['title' => 'Featured 2']);
     }
 
-    /** @test */
     public function test_get_featured_pages_filters_by_site_and_status(): void
     {
         // Arrange
@@ -316,7 +315,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals($publishedFeatured->id, $pages->first()->id);
     }
 
-    /** @test */
     public function test_get_featured_pages_respects_limit(): void
     {
         // Arrange
@@ -332,7 +330,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertCount(3, $result);
     }
 
-    /** @test */
     public function test_get_complete_page_data_loads_all_relationships(): void
     {
         // Arrange
@@ -367,7 +364,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertRelationLoaded($result, 'authors');
     }
 
-    /** @test */
     public function test_duplicate_blocks_creates_exact_copies(): void
     {
         // Arrange
@@ -411,7 +407,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals('image', $targetBlocks[1]['type']);
     }
 
-    /** @test */
     public function test_duplicate_metadata_copies_all_fields(): void
     {
         // Arrange
@@ -432,7 +427,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals(1, $metadata->featured);
     }
 
-    /** @test */
     public function test_duplicate_seo_copies_all_fields(): void
     {
         // Arrange
@@ -454,7 +448,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals('SEO Description', $seo->meta_description);
     }
 
-    /** @test */
     public function test_duplicate_settings_copies_all_fields(): void
     {
         // Arrange
@@ -471,7 +464,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($settings);
     }
 
-    /** @test */
     public function test_duplicate_social_copies_all_fields(): void
     {
         // Arrange
@@ -488,7 +480,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($social);
     }
 
-    /** @test */
     public function test_duplicate_categories_creates_associations(): void
     {
         // Arrange
@@ -518,7 +509,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals(2, $count);
     }
 
-    /** @test */
     public function test_duplicate_tags_creates_associations(): void
     {
         // Arrange
@@ -539,7 +529,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals(2, $count);
     }
 
-    /** @test */
     public function test_duplicate_custom_fields_copies_values(): void
     {
         // Arrange
@@ -560,7 +549,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertCount(2, $customFields);
     }
 
-    /** @test */
     public function test_duplicate_page_authors_maintains_order(): void
     {
         // Arrange
@@ -590,7 +578,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertEquals('contributor', $pageAuthors[1]['role']);
     }
 
-    /** @test */
     public function test_slug_exists_in_site_returns_true_when_exists(): void
     {
         // Arrange
@@ -603,7 +590,6 @@ class PageRepositoryTest extends RepositoryTestCase
         $this->assertTrue($exists);
     }
 
-    /** @test */
     public function test_slug_exists_in_site_returns_false_when_not_exists(): void
     {
         // Act
@@ -695,7 +681,6 @@ class PageRepositoryTest extends RepositoryTestCase
         ]);
     }
 
-    /** @test */
     public function test_duplicate_tags_to_site_creates_tag_if_not_exists(): void
     {
         // Arrange
@@ -1496,7 +1481,7 @@ class PageRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $results['draft']['cards']);
-        $draftPageIds = array_column($results['draft']['cards'], 'id');
+        $draftPageIds = $results['draft']['cards']->pluck('id')->toArray();
         $this->assertContains($page1->id, $draftPageIds);
         $this->assertNotContains($page2->id, $draftPageIds);
     }
@@ -1514,7 +1499,7 @@ class PageRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $results['draft']['cards']);
-        $this->assertStringContainsString('Angular', $results['draft']['cards'][0]['title']);
+        $this->assertStringContainsString('Angular', $results['draft']['cards']->first()['title']);
     }
 
     public function test_search_pipeline_filters_by_page_type(): void
@@ -1530,7 +1515,7 @@ class PageRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $results['draft']['cards']);
-        $this->assertEquals('blog', $results['draft']['cards'][0]['page_type']);
+        $this->assertEquals('blog', $results['draft']['cards']->first()['page_type']);
     }
 
     public function test_search_pipeline_filters_by_site(): void
@@ -1547,7 +1532,7 @@ class PageRepositoryTest extends RepositoryTestCase
         $results = $this->repository->searchPipeline($criteria);
 
         // Assert
-        $draftPageIds = array_column($results['draft']['cards'], 'id');
+        $draftPageIds = $results['draft']['cards']->pluck('id')->toArray();
         $this->assertContains($page1->id, $draftPageIds);
         $this->assertNotContains($page2->id, $draftPageIds);
     }
@@ -1568,8 +1553,9 @@ class PageRepositoryTest extends RepositoryTestCase
         $results = $this->repository->searchPipeline($criteria);
 
         // Assert
-        $draftCard = $results['draft']['cards'][0];
-        $this->assertNotEmpty($draftCard['page_authors']);
+        $draftCard = $results['draft']['cards']->first();
+
+        $this->assertNotEmpty($draftCard['pageAuthors']);
         $this->assertNotEmpty($draftCard['tags']);
         $this->assertNotEmpty($draftCard['metadata']);
     }
@@ -1799,7 +1785,7 @@ class PageRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $results['draft']['cards']);
-        $draftPageIds = array_column($results['draft']['cards'], 'id');
+        $draftPageIds = $results['draft']['cards']->pluck('id')->toArray();
         $this->assertContains($matchingPage->id, $draftPageIds);
     }
 }

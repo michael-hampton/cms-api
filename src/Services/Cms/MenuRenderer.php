@@ -121,8 +121,6 @@ class MenuRenderer
         foreach ($grouped as $columnGroup => $items) {
             $html .= "<div class='mega-column'>";
 
-            die('here');
-
             // First item in column is the header
             $header = $items->first();
             $html .= "<h3 class='mega-column-title'>{$header->label}</h3>";

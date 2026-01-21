@@ -44,7 +44,7 @@ class MemberAuthControllerTest extends FunctionalTestCase
         $response = $this->makeRequest('GET', '/member/register');
 
         $this->assertResponseStatus(200, $response);
-        $this->assertStringContainsString('Registration', $response->getContent());
+        $this->assertStringContainsString('>Create Your Account', $response->getContent());
     }
 
     public function testRegisterCreatesNewMember()

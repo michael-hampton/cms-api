@@ -19,6 +19,9 @@ class NotificationServiceTest extends TestCase
 
     public function testGetNotificationsWithUnclaimedRewards(): void
     {
+        $this->member->shouldReceive('isEmailVerified')
+            ->andReturn(true);
+
         $rewards = new Collection([
             (object)['id' => 1, 'status' => 'pending'],
             (object)['id' => 2, 'status' => 'pending']
@@ -41,6 +44,9 @@ class NotificationServiceTest extends TestCase
 
     public function testGetNotificationsWithPendingGifts(): void
     {
+        $this->member->shouldReceive('isEmailVerified')
+            ->andReturn(true);
+
         $gifts = new Collection([
             (object)['id' => 1, 'status' => 'pending']
         ]);
@@ -85,17 +91,16 @@ class NotificationServiceTest extends TestCase
             ->andReturn(new Collection());
 
         $notifications = $this->service->getNotifications($this->member, 1);
-
-        echo '<pre>';
-        print_r($notifications);
-        die;
-
         $verificationNotification = array_filter($notifications, fn($n) => $n['type'] === 'verification');
+
         $this->assertCount(1, $verificationNotification);
     }
 
     public function testGetNotificationCount(): void
     {
+        $this->member->shouldReceive('isEmailVerified')
+            ->andReturn(true);
+
         $rewards = new Collection([
             (object)['id' => 1], (object)['id' => 2]
         ]);
@@ -148,7 +153,7 @@ class NotificationServiceTest extends TestCase
         $this->member = Mockery::mock(Member::class)->makePartial();
         $this->member->id = 1;
         $this->member->email = 'test@example.com';
-        $this->member->shouldReceive('isEmailVerified')->andReturn(true);
+        //$this->member->shouldReceive('isEmailVerified')->andReturn(true);
     }
 
     protected function tearDown(): void
