@@ -95,14 +95,17 @@ class PageCustomFieldRepository extends Repository
         return $grouped;
     }
 
-    public function getCustomFieldsForPage(int $pageId): Collection
+    public function getCustomFieldsForPage(int $pageId, ?int $siteId = null): Collection
     {
-        return PageCustomField::where('page_id', $pageId)->get();
+        return PageCustomField::where('page_id', $pageId)
+            ->get();
     }
 
-    public function getCustomFieldsByKeys(array $keys): Collection
+    public function getCustomFieldsByKeys(array $keys, ?int $siteId = null): Collection
     {
-        return CustomFieldDefinition::whereIn('key', $keys)->get();
+        return CustomFieldDefinition::whereIn('key', $keys)
+            ->where('site_id', $siteId)
+            ->get();
     }
 
 }

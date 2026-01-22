@@ -767,7 +767,7 @@ class PageService
          * Fetch definitions indexed by key
          */
         $customFieldDefinitions = $this->customFieldRepository
-            ->getCustomFieldsByKeys($definitionKeys);
+            ->getCustomFieldsByKeys($definitionKeys, $siteId);
 
         $keyedCollection = new Collection(
             array_column($customFieldDefinitions->toArray(), null, 'key')
@@ -790,14 +790,14 @@ class PageService
                     'custom_field_definition_id' => $definition['id'],
                     'name' => $field['key'] ?? '',
                     'key' => $field['key'] ?? '',
-                    'value' => $field['value'] ?? '',
+                    'default_value' => $field['value'] ?? '',  // Changed from 'value' to 'default_value'
                     'type' => $field['type'] ?? 'text',
                     'options' => $field['options'] ?? null,
                 ];
             })
             ->filter() // removes nulls
             ->keyBy('custom_field_definition_id')
-            ->whereNotEmpty('value')
+            ->whereNotEmpty('default_value')  // Changed from 'value' to 'default_value'
             ->toArray();
 
         if (!empty($customFields)) {
