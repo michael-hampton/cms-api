@@ -108,6 +108,20 @@
         }
     }
 
+    // Toggle review visibility
+    function toggleReview(btn) {
+        const section = btn.nextElementSibling;
+        const isExpanded = section.classList.contains('show');
+
+        section.classList.toggle('show');
+        btn.classList.toggle('expanded');
+
+        const text = btn.querySelector('span');
+        text.textContent = isExpanded ? 'Top Review' : 'Hide Review';
+    }
+
+    window.toggleReview = toggleReview;
+
     // Load state from URL
     function loadFromURL() {
         const params = new URLSearchParams(window.location.search);
@@ -560,30 +574,58 @@
             return;
         }
 
-        generateSuggestedFilters(products);
+        // In renderProducts function, update the product card HTML:
 
         elements.productsGrid.innerHTML = products.map(product => `
-        <div class="product-card" data-product-id="${product.product_id}">
-            <div class="product-card-inner">
-                <div class="product-card-front">
-                    <button class="btn-flip" data-product-id="${product.product_id}" title="View details">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-                        </svg>
-                    </button>
+    <div class="product-card" data-product-id="${product.product_id}">
+        <div class="product-card-inner">
+            <div class="product-card-front">
+                <button class="btn-flip" data-product-id="${product.product_id}" title="View details">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                    </svg>
+                </button>
+                
+                <button class="btn-share" onclick='openShareModal(${JSON.stringify({
+            id: product.product_id,
+            name: product.name,
+            slug: product.slug,
+            price: product.original_price,
+            sale_price: product.sale_price,
+            image: product.image,
+            merchant_name: product.merchants && product.merchants.length > 0 ? product.merchants[0].name : null
+        })})' title="Share product">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                </button>
+                
+                <a href="/${SITE}/shop/details/${product.slug}" class="product-image">
+                    <img src="${product.image || '/images/placeholder.jpg'}" 
+                         alt="${escapeHtml(product.title || product.name)}">
+                    ${product.discount_percentage > 0 ? `
+                        <span class="badge-sale">-${product.discount_percentage}%</span>
+                    ` : ''}
+                </a>
+                
+                <div class="product-content">
+                    <h3 class="product-name">
+                        <a href="/${SITE}/shop/details/${product.slug}">${escapeHtml(product.title || product.name)}</a>
+                    </h3>
                     
-                    <a href="/${SITE}/shop/details/${product.slug}" class="product-image">
-                        <img src="${product.image || '/images/placeholder.jpg'}" 
-                             alt="${escapeHtml(product.title)}">
-                        ${product.discount_percentage > 0 ? `
-                            <span class="badge-sale">-${product.discount_percentage}%</span>
-                        ` : ''}
-                    </a>
-                    
-                    <div class="product-content">
-                        <h3 class="product-name">
-                            <a href="/${SITE}/shop/details/${product.slug}">${escapeHtml(product.title)}</a>
-                        </h3>
+                    ${product.average_rating > 0 ? `
+                        <div class="product-rating">
+                            <div class="stars-small">
+                                ${renderStars(product.average_rating)}
+                            </div>
+                            <span class="rating-count">(${product.review_count || 0})</span>
+                        </div>
+                    ` : ''}
+                    ${renderMerchants(product.availableMerchants || [])}
                         <div class="product-price">
                             ${product.sale_price && product.sale_price < product.original_price ? `
                                 <span class="price-sale">$${formatPrice(product.sale_price)}</span>
@@ -609,11 +651,13 @@
                             </button>
                         </div>
                     </div>
+                    
+                    ${product.top_review && Object.keys(product.top_review)?.length ? renderTopReview(product.top_review) : ''}
                 </div>
                 
                 <div class="product-card-back">
                     <div class="card-back-header">
-                        <h3 class="card-back-title">${escapeHtml(product.title)}</h3>
+                        <h3 class="card-back-title">${escapeHtml(product.name)}</h3>
                         <button class="btn-flip-back" data-product-id="${product.product_id}" title="Flip back">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -627,7 +671,7 @@
                     </div>
                     
                     <div class="card-back-actions">
-                     <button class="btn-compare" data-product-id="${product.product_id}" title="Add to comparison">
+                        <button class="btn-compare" data-product-id="${product.product_id}" title="Add to comparison">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M9 11l3 3L22 4"></path>
                                 <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
@@ -648,6 +692,81 @@
         attachProductEventListeners();
         attachFlipEventListeners();
         attachComparisonHandlers();
+    }
+
+    function renderStars(rating) {
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        let html = '<div class="rating-stars">';
+
+        for (let i = 0; i < 5; i++) {
+            if (i < fullStars) {
+                html += `<svg class="rating-star filled" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>`;
+            } else {
+                html += `<svg class="rating-star empty" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>`;
+            }
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    // Helper function to render merchants
+    function renderMerchants(merchants) {
+        if (!merchants || merchants.length === 0) return '';
+
+        if (merchants.length === 1) {
+            const merchant = merchants[0];
+            console.log('merchant', merchant)
+            return `<div class="product-merchants">
+            <span class="merchant-badge ${merchant.is_best_price ? 'best-price' : ''}">
+                ${escapeHtml(merchant.merchant?.name)}
+                ${merchant.discount_percentage > 0 ? ` ${merchant.discount_percentage}%` : ''}
+            </span>
+        </div>`;
+        }
+
+        // Multiple merchants - show best price + count
+        const bestMerchant = merchants.reduce((best, current) => {
+            const bestPrice = best.sale_price > 0 ? best.sale_price : best.price;
+            const currentPrice = current.sale_price > 0 ? current.sale_price : current.price;
+            return currentPrice < bestPrice ? current : best;
+        }, merchants[0]);
+
+        return `<div class="product-merchants">
+        <span class="merchant-badge best-price">
+            ${escapeHtml(bestMerchant.name)}
+        </span>
+        ${merchants.length > 1 ? `<span class="merchant-count">+${merchants.length - 1} more</span>` : ''}
+    </div>`;
+    }
+
+    function renderTopReview(review) {
+        if (!review) return '';
+
+        console.log('review', review)
+
+        return `
+        <button class="btn-show-review" onclick="toggleReview(this)">
+            <span>Top Review</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </button>
+        <div class="top-review-section">
+            <div class="review-header">
+                ${renderStars(review.rating)}
+                <span class="review-helpful">${review.helpful_count} helpful</span>
+            </div>
+            ${review.title ? `<div class="review-title">${escapeHtml(review.title)}</div>` : ''}
+            <div class="review-comment">${escapeHtml(review.comment)}</div>
+            <div class="review-author">by ${escapeHtml(review.author_name)}</div>
+        </div>
+    `;
     }
 
     // Attach event listeners to product buttons

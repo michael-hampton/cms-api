@@ -46,7 +46,7 @@ class CardBlockParser extends BaseBlockParser
             'endorsement' => $this->parseImage($data['endorsement'] ?? null),
             'description' => $this->sanitize($data['description'] ?? ''),
             'linkUrl' => $this->sanitizeUrl($data['linkUrl'] ?? ''),
-            'buttonType' => $this->sanitize($data['buttonType'] ?? 'primary'),
+            'buttonType' => $this->parseButtonType($data['buttonType'] ?? 'primary'),
             'buttonText' => $this->sanitize($data['buttonText'] ?? 'Learn More'),
             'noFollow' => (bool)($data['noFollow'] ?? false),
             'sponsored' => (bool)($data['sponsored'] ?? false),
@@ -67,6 +67,14 @@ class CardBlockParser extends BaseBlockParser
             return 3; // Default
         }
         return $value;
+    }
+
+    private function parseButtonType(string $value): string
+    {
+        $allowedTypes = ['primary', 'secondary', 'text'];
+        $value = strtolower(trim($value));
+
+        return in_array($value, $allowedTypes, true) ? $value : 'primary';
     }
 
     private function sanitize(string $value): string
@@ -225,6 +233,12 @@ class CardBlockParser extends BaseBlockParser
         if (!empty($rel)) {
             $relString = implode(' ', $rel);
             if ($parsedData['openInNewTab']) {
+                // Merge with existing noopener noreferrer
+                $existingRel = array_filter($attributes, fn($attr) => str_starts_with($attr, 'rel='));
+                if ($existingRel) {
+                    // Remove the old rel attribute
+                    $attributes = array_filter($attributes, fn($attr) => !str_starts_with($attr, 'rel='));
+                }
                 $attributes[] = 'rel="noopener noreferrer ' . $relString . '"';
             } else {
                 $attributes[] = 'rel="' . $relString . '"';

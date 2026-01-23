@@ -258,6 +258,23 @@ class BriefRepository extends Repository
         return BriefDeadline::where('brief_id', $id)->first();
     }
 
+    public function updateLastActivity(int $briefId, int $userId): Model
+    {
+        return $this->update($briefId, [
+            'last_activity_at' => now(),
+            'last_activity_user_id' => $userId
+        ]);
+    }
+
+    public function getAttachmentsByType(int $briefId, string $type): array
+    {
+        return BriefAttachment::where('brief_id', $briefId)
+            ->where('type', $type)
+            ->with(['image', 'product'])
+            ->get()
+            ->toArray();
+    }
+
     protected function getModelClass(): string
     {
         return Brief::class;

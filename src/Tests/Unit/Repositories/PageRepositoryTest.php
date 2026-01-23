@@ -1788,4 +1788,18 @@ class PageRepositoryTest extends RepositoryTestCase
         $draftPageIds = $results['draft']['cards']->pluck('id')->toArray();
         $this->assertContains($matchingPage->id, $draftPageIds);
     }
+
+    public function test_duplicate_owner_copies_owner_id(): void
+    {
+        $owner = $this->createUser(['name' => 'Test Owner']);
+        $sourcePage = $this->createPage(['owner_id' => $owner->id]);
+        $targetPage = $this->createPage();
+
+        $this->repository->duplicateOwner($sourcePage->id, $targetPage->id);
+
+        $this->assertDatabaseHas('pages', [
+            'id' => $targetPage->id,
+            'owner_id' => $owner->id
+        ]);
+    }
 }

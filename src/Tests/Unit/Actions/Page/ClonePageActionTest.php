@@ -360,6 +360,9 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $this->setCloneHistoryExpectations($originalPage, $newPage, 1, 2);
 
+        $this->pageHistory->shouldReceive('logPageDuplicated')->never();
+        $this->pageRepository->shouldReceive('getCompletePageData')->never();
+
         $this->pageRepository->shouldReceive('duplicateBlocks')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateMetadata')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateSeo')->andThrow(new \Exception('Failed'));
@@ -373,6 +376,7 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicateRegionSets')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateTerritories')->andThrow(new \Exception('Failed'));
         $this->pageRepository->shouldReceive('duplicateProducts')->andThrow(new \Exception('Failed'));
+        $this->pageRepository->shouldReceive('duplicateOwner')->andThrow(new \Exception('Failed'));
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Failed to duplicate any page relations');
@@ -620,7 +624,7 @@ class ClonePageActionTest extends FunctionalTestCase
                 'pageAuthors' => false,
                 'regionSets' => false,
                 'territories' => false,
-                'products' => false,
+                'products' => false
             ]
         ]);
 

@@ -3592,4 +3592,41 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertNotNull($history);
         $this->assertEquals('/redirect', $history->changes['redirect_url']);
     }
+
+    public function testStoreCreatesPageWithOwner()
+    {
+        $owner = $this->createAuthor(['name' => 'Page Owner']);
+
+        $pageData = [
+            'site_id' => $this->siteId,
+            'forms' => [
+                'main' => [
+                    'title' => 'Page with Owner',
+                    'owner' => $owner->id
+                ],
+                'meta' => ['slug' => 'page-with-owner', 'status' => 'draft']
+            ],
+            'blocks' => []
+        ];
+
+        $response = $this->postForSite('/api/pages', $pageData);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals($owner->id, $data['data']['page']['owner_id']);
+    }
+
+    public function testDuplicatePageClonesOwner()
+    {
+        $owner = $this->createAuthor(['name' => 'Original Owner']);
+        $page = $this->createPage(['owner_id' => $owner->id]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/duplicate");
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals($owner->id, $data['data']['page']['owner_id']);
+    }
 }

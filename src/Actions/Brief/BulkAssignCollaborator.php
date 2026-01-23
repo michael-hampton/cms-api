@@ -2,32 +2,41 @@
 
 namespace App\Actions\Brief;
 
-use App\Models\BriefCollaborator;
+use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 
 class BulkAssignCollaborator
 {
-    public static function execute(array $briefIds, int $userId, string $role): int
+    public function __construct(
+        private readonly BriefCollaboratorRepository $collaboratorRepository,
+        private readonly LogBriefActivity            $activityService
+    )
+    {
+    }
+
+    public function handle(array $briefIds, int $userId, string $role): int
     {
         $count = 0;
+
         foreach ($briefIds as $briefId) {
-            // Check if already assigned
-            $existing = BriefCollaborator::where('brief_id', $briefId)
-                ->where('user_id', $userId)
-                ->first();
+            $existing = $this->collaboratorRepository->findByBriefAndUser($briefId, $userId);
 
             if ($existing) {
-                $existing->update(['role' => $role]);
+                $this->collaboratorRepository->update($existing->id, ['role' => $role]);
             } else {
-                BriefCollaborator::create([
+                $this->collaboratorRepository->create([
                     'brief_id' => $briefId,
                     'user_id' => $userId,
                     'role' => $role,
-                    'assigned_at' => date('Y-m-d H:i:s')
+                    'assigned_at' => now()
                 ]);
             }
 
-            LogBriefActivity::execute($briefId, $userId, 'collaborator_added',
-                "Assigned as {$role}");
+            $this->activityService->handle(
+                $briefId,
+                $userId,
+                'collaborator_added',
+                "Assigned as {$role}"
+            );
 
             $count++;
         }

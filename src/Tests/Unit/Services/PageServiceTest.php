@@ -389,7 +389,7 @@ class PageServiceTest extends FunctionalTestCase
             'categories' => [1, 2],
             'tags' => [3, 4],
             'customFields' => [
-                ['key' => 'color', 'value' => 'red', 'type' => 'text']
+                ['customFieldDefinition' => ['key' => 'color', 'value' => 'red', 'type' => 'text', 'custom_field_definition_id' => 1], 'value' => 'red'],
             ]
         ];
 
@@ -399,7 +399,7 @@ class PageServiceTest extends FunctionalTestCase
 
         $this->categoryRepository->shouldReceive('syncCategories')->once()->with(1, [1, 2], $this->siteId);
         $this->tagRepository->shouldReceive('syncTags')->once()->with(1, [3, 4], $this->siteId);
-        $this->customFieldRepository->shouldReceive('getCustomFieldsByKeys')->with(['color'])->once()->andReturn(collect([$customField]));
+        $this->customFieldRepository->shouldReceive('getCustomFieldsByKeys')->with(['color'], 1)->once()->andReturn(collect([$customField]));
         $this->customFieldRepository->shouldReceive('syncCustomFields')->once();
 
         $this->invokePrivateMethod('processTagsForm', 1, $tagsForm, $this->siteId);
@@ -1089,5 +1089,40 @@ class PageServiceTest extends FunctionalTestCase
         $result = $this->service->createPageWithAllData($requestData, $this->siteId);
 
         $this->assertSame($newPage, $result);
+    }
+
+    public function testCreatePageWithOwner()
+    {
+        $requestData = [
+            'forms' => [
+                'main' => [
+                    'title' => 'Test Page',
+                    'owner' => 5
+                ],
+                'meta' => ['slug' => 'test-page', 'status' => 'draft']
+            ],
+            'blocks' => []
+        ];
+
+        $newPage = $this->createMockPage(1, 'Test Page');
+        $newPage->owner_id = 5;
+
+        $this->setupTransaction();
+        $this->pageHistory->shouldReceive('logPageCreated')->once()->with($newPage);
+
+        $this->pageRepository->shouldReceive('create')
+            ->with(Mockery::on(function ($data) {
+                return $data['title'] === 'Test Page'
+                    && isset($data['owner_id'])
+                    && $data['owner_id'] === 5;
+            }))
+            ->once()
+            ->andReturn($newPage);
+
+        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($newPage);
+
+        $result = $this->service->createPageWithAllData($requestData, $this->siteId);
+
+        $this->assertEquals(5, $result->owner_id);
     }
 }

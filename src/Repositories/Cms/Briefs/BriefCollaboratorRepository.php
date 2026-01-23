@@ -27,4 +27,11 @@ class BriefCollaboratorRepository extends Repository
     {
         return BriefCollaborator::class;
     }
+
+    public function findByBriefAndUser(int $briefId, int $userId): ?BriefCollaborator
+    {
+        return BriefCollaborator::where('brief_id', $briefId)
+            ->where('user_id', $userId)
+            ->first();
+    }
 }

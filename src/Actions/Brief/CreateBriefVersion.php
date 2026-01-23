@@ -2,23 +2,31 @@
 
 namespace App\Actions\Brief;
 
-use App\Models\Brief;
-use App\Models\BriefVersion;
 use App\Models\Model;
+use App\Repositories\Cms\Briefs\BriefRepository;
+use App\Repositories\Cms\Briefs\BriefVersionRepository;
 
 class CreateBriefVersion
 {
-    public static function execute(int $briefId, int $userId, ?string $changeSummary = null): Model
+    public function __construct(
+        private readonly BriefRepository        $briefRepository,
+        private readonly BriefVersionRepository $versionRepository
+    )
     {
-        $brief = Brief::with(['attachments', 'comments'])->find($briefId);
+    }
 
-        $latestVersion = BriefVersion::where('brief_id', $briefId)
-            ->orderBy('version_number', 'desc')
-            ->first();
+    public function handle(int $briefId, int $userId, ?string $changeSummary = null): Model
+    {
+        $brief = $this->briefRepository->getCompleteBriefData($briefId);
 
+        if (!$brief) {
+            throw new \Exception("Brief not found: {$briefId}");
+        }
+
+        $latestVersion = $this->versionRepository->getLatest($briefId);
         $versionNumber = $latestVersion ? $latestVersion->version_number + 1 : 1;
 
-        return BriefVersion::create([
+        return $this->versionRepository->create([
             'brief_id' => $briefId,
             'version_number' => $versionNumber,
             'title' => $brief->title,

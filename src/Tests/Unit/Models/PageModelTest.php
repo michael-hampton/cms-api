@@ -12,6 +12,7 @@ use App\Models\PageCustomField;
 use App\Models\PageProduct;
 use App\Models\Site;
 use App\Models\Tag;
+use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -624,5 +625,27 @@ class PageModelTest extends FunctionalTestCase
 
         $this->assertCount(1, $internal);
         $this->assertEquals('Internal', $internal->first()->title);
+    }
+
+    public function testPageBelongsToOwner()
+    {
+        $owner = User::create([
+            'name' => 'Page Owner',
+            'slug' => 'page-owner',
+            'email' => 'owner@example.com',
+            'status' => 'active',
+            'password' => 'password',
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'draft',
+            'owner_id' => $owner->id,
+        ]);
+
+        $pageOwner = $page->owner;
+        $this->assertInstanceOf(User::class, $pageOwner);
+        $this->assertEquals('Page Owner', $pageOwner->name);
     }
 }

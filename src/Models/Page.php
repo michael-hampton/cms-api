@@ -53,7 +53,8 @@ class Page extends Model
         'created_by',
         'updated_by',
         'zones',
-        'scheduled_at'
+        'scheduled_at',
+        'owner_id'
     ];
 
     protected $alwaysInclude = [
@@ -596,6 +597,11 @@ class Page extends Model
             PageStatus::ON_HOLD->value,
             PageStatus::INTERNAL->value,
         ];
+    }
+
+    public function owner($relation = false)
+    {
+        return $this->belongsTo(User::class, 'owner_id', 'id', $relation);
     }
 
     public function isInternal(): bool

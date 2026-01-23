@@ -58,6 +58,7 @@ class PageRepository extends Repository
             'tags',
             'metadata',
             'author',
+            'owner',
             'blocks',
             'seo',
             'settings',
@@ -183,7 +184,7 @@ class PageRepository extends Repository
             'blocks', 'categories', 'tags', 'metadata',
             'seo', 'settings', 'social', 'customFields',
             'customFields.customFieldDefinition',
-            'authors', 'pageAuthors', 'pageAuthors.author', 'regionSets', 'territories', 'products'
+            'authors', 'pageAuthors', 'pageAuthors.author', 'regionSets', 'territories', 'products', 'owner'
         ])->find($pageId);
     }
 
@@ -885,5 +886,16 @@ class PageRepository extends Repository
             'throughput' => $throughput,
             'bottlenecks' => $bottlenecks
         ];
+    }
+
+    public function duplicateOwner(int $sourcePageId, int $targetPageId): void
+    {
+        $sourcePage = $this->find($sourcePageId);
+
+        if ($sourcePage && $sourcePage->owner_id) {
+            $this->update($targetPageId, [
+                'owner_id' => $sourcePage->owner_id
+            ]);
+        }
     }
 }

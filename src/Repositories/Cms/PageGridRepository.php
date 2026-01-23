@@ -76,6 +76,8 @@ class PageGridRepository extends Repository
 
         $data['title'] = $data['title'] . ' (Copy)';
         $data['slug'] = $data['slug'] . '-copy';
+        $data['start_date'] = $data['start_date']->format('Y-m-d H:i:s');
+        $data['end_date'] = $data['end_date']->format('Y-m-d H:i:s');
 
         return $this->create($data);
     }

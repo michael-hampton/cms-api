@@ -119,4 +119,14 @@ class ReviewRepository extends Repository
             ->orderBy('created_at', 'desc')
             ->get();
     }
+
+    public function getTopReview(array $productIds): ?Collection
+    {
+        return $this->model->query()
+            ->whereIn('product_id', $productIds)
+            ->where('is_approved', true)
+            ->orderBy('helpful_count', 'desc')
+            ->orderBy('rating', 'desc')
+            ->get();
+    }
 }

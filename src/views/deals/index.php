@@ -299,6 +299,8 @@
     <button onclick="compareProducts()" class="btn btn-primary">Compare Products</button>
 </div>
 
+@include('components/share-modal')
+
 <!-- Hidden data for JavaScript -->
 <script>
     site = '<?= \App\Framework\Support\SiteContext::slug() ?? '' ?>';

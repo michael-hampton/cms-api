@@ -285,6 +285,8 @@
 
 </script>
 
+@include('components/share-modal')
+
 <script>
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
 </script>

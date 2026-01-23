@@ -49,6 +49,7 @@ class ClonePage
             'seo' => true,
             'settings' => true,
             'social' => true,
+            'owner' => true
         ];
 
         $options['relations'] = array_merge($defaultRelations, $options['relations'] ?? []);
@@ -121,6 +122,7 @@ class ClonePage
             'regionSets' => 'duplicateRegionSets',
             'territories' => 'duplicateTerritories',
             'products' => 'duplicateProducts',
+            'owner' => 'duplicateOwner',
         ];
 
         $results = [

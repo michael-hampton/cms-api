@@ -42,7 +42,8 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             'activeVariants.images',
             'availableMerchants.merchant',
             'brand',
-            'category'
+            'category',
+            'approvedReviews'
         ]);
         return $this->searchEngine->search($query, $criteria);
     }
@@ -525,6 +526,49 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return Page::whereIn('id', $pageIds)
             ->orderBy('updated_at', 'desc')
             ->get();
+    }
+
+    public function getProductCardData($productId): array
+    {
+        $product = $this->find($productId);
+
+        if (!$product) {
+            return [];
+        }
+
+        // Get top review
+        $topReview = \App\Models\Review::where('product_id', $productId)
+            ->where('is_approved', true)
+            ->orderBy('rating', 'desc')
+            ->orderBy('helpful_count', 'desc')
+            ->first();
+
+        // Get merchant summary
+        $merchants = \App\Models\ProductMerchant::where('product_id', $productId)
+            ->where('is_available', true)
+            ->with(['merchant'])
+            ->orderBy('price', 'asc')
+            ->get();
+
+        return [
+            'top_review' => $topReview ? [
+                'rating' => $topReview->rating,
+                'title' => $topReview->title,
+                'comment' => substr($topReview->comment, 0, 100) . '...',
+                'author' => $topReview->author_name,
+                'is_verified' => $topReview->is_verified_purchase
+            ] : null,
+            'merchants' => $merchants->map(fn($m) => [
+                'id' => $m->id,
+                'name' => $m->merchant->name,
+                'price' => $m->effective_price,
+                'sale_price' => $m->effective_sale_price,
+                'url' => $m->url,
+                'is_available' => $m->is_available
+            ])->toArray(),
+            'merchant_count' => $merchants->count(),
+            'lowest_price' => $merchants->min('effective_sale_price') ?? $merchants->min('effective_price')
+        ];
     }
 
 }

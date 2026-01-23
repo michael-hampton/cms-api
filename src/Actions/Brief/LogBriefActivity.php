@@ -2,14 +2,22 @@
 
 namespace App\Actions\Brief;
 
-use App\Models\Brief;
-use App\Models\BriefActivityLog;
+use App\Models\Model;
+use App\Repositories\Cms\Briefs\BriefActivityLogRepository;
+use App\Repositories\Cms\Briefs\BriefRepository;
 
 class LogBriefActivity
 {
-    public static function execute(int $briefId, int $userId, string $action, string $description, array $metadata = []): void
+    public function __construct(
+        private readonly BriefActivityLogRepository $activityLogRepository,
+        private readonly BriefRepository            $briefRepository
+    )
     {
-        BriefActivityLog::create([
+    }
+
+    public function handle(int $briefId, int $userId, string $action, string $description, array $metadata = []): Model
+    {
+        $this->activityLogRepository->create([
             'brief_id' => $briefId,
             'user_id' => $userId,
             'action' => $action,
@@ -17,10 +25,6 @@ class LogBriefActivity
             'metadata' => $metadata
         ]);
 
-        // Update last activity
-        Brief::where('id', $briefId)->update([
-            'last_activity_at' => date('Y-m-d H:i:s'),
-            'last_activity_user_id' => $userId
-        ]);
+        return $this->briefRepository->updateLastActivity($briefId, $userId);
     }
 }

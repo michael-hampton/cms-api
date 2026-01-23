@@ -354,7 +354,7 @@ class CardBlockParserTest extends TestCase
 
     public function test_generate_html_button_types()
     {
-        $types = ['primary', 'secondary', 'outline'];
+        $types = ['primary', 'secondary', 'text'];
 
         foreach ($types as $type) {
             $data = $this->parser->parse([

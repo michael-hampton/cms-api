@@ -70,7 +70,7 @@ class DealsRepository
 
         $query = Product::where('site_id', $siteId)
             ->where('is_active', true)
-            ->with(['variants.merchants', 'merchants', 'images', 'brand', 'category', 'approvedReviews']);
+            ->with(['variants.merchants', 'merchants', 'images', 'brand', 'category', 'approvedReviews', 'availableMerchants', 'availableMerchants.merchant']);
 
         // Search filter
         if (!empty($filters['q'])) {

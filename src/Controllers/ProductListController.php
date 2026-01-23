@@ -11,6 +11,7 @@ use App\Models\Menu;
 use App\Models\Product;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
+use App\Repositories\Product\ReviewRepository;
 use App\Search\SearchCriteria;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\BuildProductCardService;
@@ -19,8 +20,9 @@ use App\Services\Product\ProductService;
 class ProductListController extends Controller
 {
     public function __construct(
-        private readonly ProductService $productService,
+        private readonly ProductService   $productService,
         private readonly ProductRepository $productRepository,
+        private readonly ReviewRepository $reviewRepository,
     )
     {
         parent::__construct();
@@ -140,27 +142,55 @@ class ProductListController extends Controller
 
         $result = $this->productRepository->search($criteria);
 
-        // Filter by price range if provided
+        /**
+         * Price range filtering
+         */
         if (!empty($minPrice) || !empty($maxPrice)) {
-            $data = $result->getData();
+            $filtered = collect($result->getData())->filter(function ($product) use ($minPrice, $maxPrice) {
 
-            $data = array_filter($data, function ($product) use ($minPrice, $maxPrice) {
+                $price = $product['sale_price'] > 0
+                    ? $product['sale_price']
+                    : $product['price'];
 
-                $price = $product['sale_price'] > 0 ? $product['sale_price'] : $product['price'];
-
-                if ($minPrice !== null && $price < $minPrice) {
-                    return false;
-                }
-
-                if ($maxPrice !== null && $price > $maxPrice) {
-                    return false;
-                }
-
-                return true;
+                return ($minPrice === null || $price >= $minPrice)
+                    && ($maxPrice === null || $price <= $maxPrice);
             });
 
-            $result->setData(array_values($data));
+            $result->setData($filtered->all());
         }
+
+        $productIds = collect($result->getData())->pluck('id')->unique()->toArray();
+        $topReviews = $this->reviewRepository->getTopReview($productIds)->keyBy('product_id');
+
+        /**
+         * Enrich product data
+         */
+        $formattedProducts = collect($result->toArray()['data'])->map(function ($product) use ($topReviews) {
+
+            $reviews = $product['approvedReviews'] ?? [];
+            $merchants = $product['availableMerchants'] ?? [];
+
+            $averageRating = count($reviews)
+                ? array_sum(array_column($reviews, 'rating')) / count($reviews)
+                : 0;
+
+            $lowestMerchantPrice = count($merchants)
+                ? min(array_map(
+                    fn($m) => $m['effective_sale_price'] ?? $m['effective_price'],
+                    $merchants
+                ))
+                : 0;
+
+            return array_merge($product, [
+                'average_rating' => $averageRating,
+                'review_count' => count($reviews),
+                'merchant_count' => count($merchants),
+                'top_review' => $topReviews->get($product['id'])->toArray(),
+                'lowest_merchant_price' => $lowestMerchantPrice,
+            ]);
+        });
+
+        $result->setData($formattedProducts->toArray());
 
         return $this->resourceResponse($result->toArray());
     }

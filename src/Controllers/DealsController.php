@@ -102,8 +102,6 @@ class DealsController extends Controller
 
         $deals = $this->dealsService->getTodaysDeals();
 
-        $dealsService = new DealsService();
-
         // Get specification groups with counts
         $specRepository = app(ProductSpecificationGroupRepository::class);
         $specificationGroups = $specRepository->getAllWithCounts($siteId);
@@ -115,7 +113,7 @@ class DealsController extends Controller
             'menuRenderer' => new MenuRenderer(),
             'specificationGroups' => $specificationGroups->toArray(),
             'deals' => $deals,
-            'todaysDeals' => $dealsService->getTodaysDeals(10),
+            'todaysDeals' => $this->dealsService->getTodaysDeals(10),
         ]);
     }
 

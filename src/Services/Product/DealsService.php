@@ -4,12 +4,13 @@ namespace App\Services\Product;
 
 use App\Framework\Support\SiteContext;
 use App\Repositories\Product\DealsRepository;
+use App\Repositories\Product\ReviewRepository;
 
 class DealsService
 {
     private DealsRepository $repository;
 
-    public function __construct(?DealsRepository $repository = null)
+    public function __construct(private readonly ReviewRepository $reviewRepository, ?DealsRepository $repository = null)
     {
         $this->repository = $repository ?? new DealsRepository();
     }
@@ -197,8 +198,13 @@ class DealsService
 
         $products = $this->repository->getFilteredProducts($siteId, $filters);
 
-        $formattedProducts = $products['data']->map(function ($product) {
-            return $this->formatProductForDeals($product);
+        $productIds = array_unique(array_column($products['data']->toArray(), 'id'));
+        $topReviews = $this->reviewRepository->getTopReview($productIds)->keyBy('product_id');
+
+        $formattedProducts = $products['data']->map(function ($product) use ($topReviews) {
+            $data = $this->formatProductForDeals($product);
+            $data['top_review'] = $topReviews->get($data['product_id'])?->toArray() ?? [];
+            return $data;
         })->toArray();
 
         return [
@@ -236,24 +242,27 @@ class DealsService
         $averageRating = 0;
         $reviewCount = 0;
         if ($product->approvedReviews && count($product->approvedReviews) > 0) {
-            $totalRating = array_sum(array_column($product->approvedReviews, 'rating'));
-            $reviewCount = count($product->approvedReviews);
-            $averageRating = round($totalRating / $reviewCount, 1);
+            $reviews = $product->approvedReviews->toArray();
+            $reviewCount = count($reviews);
+            $averageRating = count($reviews)
+                ? array_sum(array_column($reviews, 'rating')) / count($reviews)
+                : 0;
         }
 
         // Get lowest merchant price if available
         $lowestMerchantPrice = null;
-        if ($product->merchants && count($product->merchants) > 0) {
-            $merchantPrices = array_map(function ($merchant) {
-                return $merchant->sale_price > 0 ? $merchant->sale_price : $merchant->price;
-            }, $product->merchants);
+        if ($product->availableMerchants && $product->availableMerchants->count() > 0) {
+            $merchantPrices = $product->availableMerchants->map(function ($merchant) {
+                return $merchant->sale_price && $merchant->sale_price > 0 ? $merchant->sale_price : $merchant->price;
+            })->toArray();
+
             $lowestMerchantPrice = min($merchantPrices);
         }
 
         // Check for variants with better prices
         $hasVariants = false;
         $lowestVariantPrice = null;
-        if ($product->variants && count($product->variants) > 0) {
+        if ($product->variants && $product->variants->count() > 0) {
             $hasVariants = true;
             $variantPrices = [];
             foreach ($product->variants as $variant) {
@@ -290,6 +299,8 @@ class DealsService
             'lowest_merchant_price' => $lowestMerchantPrice,
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
+            'merchant_count' => count($product->merchants ?? []),
+            'availableMerchants' => $product->availableMerchants?->toArray() ?? [],
         ];
     }
 }

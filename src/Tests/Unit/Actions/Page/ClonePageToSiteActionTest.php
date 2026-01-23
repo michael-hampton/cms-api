@@ -117,7 +117,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
 
         $this->assertNotEmpty($result['results']['success']);
         $this->assertEmpty($result['results']['failed']);
-        $this->assertCount(13, $result['results']['success']);
+        $this->assertCount(14, $result['results']['success']);
     }
 
     public function testClonePageToSiteThrowsExceptionWhenSameSite()
@@ -191,7 +191,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
 
         $this->assertNotEmpty($result['results']['success']);
         $this->assertEmpty($result['results']['failed']);
-        $this->assertCount(13, $result['results']['success']);
+        $this->assertCount(14, $result['results']['success']);
     }
 
     public function testClonePageToSiteClonesAllRelations()
@@ -294,6 +294,8 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicateTerritoriesToSite')
             ->with($sourcePageId, $targetPageId, $targetSiteId)->once();
         $this->pageRepository->shouldReceive('duplicateProductsToSite')
+            ->with($sourcePageId, $targetPageId, $targetSiteId)->once();
+        $this->pageRepository->shouldReceive('duplicateOwner')
             ->with($sourcePageId, $targetPageId, $targetSiteId)->once();
     }
 
@@ -512,6 +514,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicatePageAuthorsToSite')->once()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateRegionSetsToSite')->once()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateCustomFieldsToSite')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateOwner')->once()->andReturn(true);
         // tags, products, territories are disabled
 
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once();
