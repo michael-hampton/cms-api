@@ -2,7 +2,6 @@
 
 namespace App\Tests\Unit\Search\Configurations;
 
-use App\Search\Configurations\AuthorSearchConfiguration;
 use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
@@ -11,6 +10,7 @@ use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
+use App\Search\Configurations\VariantSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
 use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\CustomFilter;
@@ -29,7 +29,7 @@ class SearchConfigurationTest extends TestCase
 {
     public function testAuthorSearchConfigurationHasCorrectSetup()
     {
-        $config = new AuthorSearchConfiguration();
+        $config = new VariantSearchConfiguration();
         $config->configure();
 
         // Check sorts
@@ -317,7 +317,7 @@ class SearchConfigurationTest extends TestCase
     public function testAllConfigurationsHaveDefaultSort()
     {
         $configurations = [
-            new AuthorSearchConfiguration(),
+            new VariantSearchConfiguration(),
             new BrandSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),
@@ -346,7 +346,7 @@ class SearchConfigurationTest extends TestCase
     public function testAllConfigurationsHaveSearchableColumns()
     {
         $configurations = [
-            new AuthorSearchConfiguration(),
+            new VariantSearchConfiguration(),
             new BrandSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),

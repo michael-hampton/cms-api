@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services;
 
 use App\Repositories\Product\DealsRepository;
+use App\Repositories\Product\ReviewRepository;
 use App\Services\Product\DealsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -14,12 +15,14 @@ class DealsServiceTest extends FunctionalTestCase
 
     private DealsService $service;
     private $mockRepository;
+    private $reviewRepository;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->mockRepository = m::mock(DealsRepository::class);
-        $this->service = new DealsService($this->mockRepository);
+        $this->reviewRepository = m::mock(ReviewRepository::class);
+        $this->service = new DealsService($this->reviewRepository, $this->mockRepository);
     }
 
     protected function tearDown(): void
@@ -186,10 +189,13 @@ class DealsServiceTest extends FunctionalTestCase
 
     public function test_get_filtered_deals_returns_correct_structure(): void
     {
+        $product = m::mock(\App\Models\Product::class)->makePartial();
+        $product->id = 1;
+
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->andReturn([
-                'data' => new \App\Framework\Support\Collection([]),
+                'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
                     'current_page' => 1,
                     'per_page' => 12,
@@ -197,6 +203,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $result = $this->service->getFilteredDeals([], $this->siteId);
 
@@ -208,6 +221,9 @@ class DealsServiceTest extends FunctionalTestCase
 
     public function test_get_filtered_deals_applies_under25_tab(): void
     {
+        $product = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product->id = 1;
+
         $filters = ['max_price' => 25];
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
@@ -216,7 +232,7 @@ class DealsServiceTest extends FunctionalTestCase
                 return isset($arg['max_price']) && $arg['max_price'] === 25;
             }))
             ->andReturn([
-                'data' => new \App\Framework\Support\Collection([]),
+                'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
                     'current_page' => 1,
                     'per_page' => 12,
@@ -224,6 +240,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -232,12 +255,15 @@ class DealsServiceTest extends FunctionalTestCase
 
     public function test_get_filtered_deals_applies_over50_tab(): void
     {
+        $product = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product->id = 1;
+
         $filters = ['min_price' => 50];
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->andReturn([
-                'data' => new \App\Framework\Support\Collection([]),
+                'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
                     'current_page' => 1,
                     'per_page' => 12,
@@ -245,6 +271,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -253,6 +286,9 @@ class DealsServiceTest extends FunctionalTestCase
 
     public function test_get_filtered_deals_applies_vouchers_tab(): void
     {
+        $product = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product->id = 1;
+
         $filters = ['tab' => 'vouchers'];
 
         $this->mockRepository->shouldReceive('getFilteredProducts')
@@ -261,7 +297,7 @@ class DealsServiceTest extends FunctionalTestCase
                 return isset($arg['tab']) && $arg['tab'] === 'vouchers';
             }))
             ->andReturn([
-                'data' => new \App\Framework\Support\Collection([]),
+                'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
                     'current_page' => 1,
                     'per_page' => 12,
@@ -269,6 +305,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -279,13 +322,16 @@ class DealsServiceTest extends FunctionalTestCase
     {
         $filters = ['category_ids' => [1780]];
 
+        $product = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product->id = 1;
+
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
                 return isset($arg['category_ids']) && $arg['category_ids'] === [1780];
             }))
             ->andReturn([
-                'data' => new \App\Framework\Support\Collection([]),
+                'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
                     'current_page' => 1,
                     'per_page' => 12,
@@ -293,6 +339,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -323,6 +376,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
@@ -379,6 +439,13 @@ class DealsServiceTest extends FunctionalTestCase
                 ]
             ]);
 
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
+
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
         $product->name = 'Test Product';
@@ -432,6 +499,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
@@ -489,6 +563,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1, 2])
+            ->andReturn(collect([$review]));
 
         $product1 = m::mock(\App\Models\Product::class)->makePartial();
         $product1->id = 1;
@@ -560,6 +641,13 @@ class DealsServiceTest extends FunctionalTestCase
                 ]
             ]);
 
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1, 2])
+            ->andReturn(collect([$review]));
+
         $product1 = m::mock(\App\Models\Product::class)->makePartial();
         $product1->id = 1;
         $product1->name = 'Product 1';
@@ -618,10 +706,13 @@ class DealsServiceTest extends FunctionalTestCase
             'perPage' => 10
         ];
 
+        $product = \Mockery::mock(\App\Models\Product::class)->makePartial();
+        $product->id = 1;
+
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->andReturn([
-                'data' => new \App\Framework\Support\Collection([]),
+                'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
                     'current_page' => 1,
                     'per_page' => 12,
@@ -629,6 +720,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $result = $this->service->getFilteredDeals($filters, $this->siteId);
 
@@ -660,6 +758,13 @@ class DealsServiceTest extends FunctionalTestCase
                     'last_page' => 1
                 ]
             ]);
+
+        $review = m::mock(\App\Models\Review::class)->makePartial();
+
+        $this->reviewRepository->shouldReceive('getTopReview')
+            ->once()
+            ->with([1])
+            ->andReturn(collect([$review]));
 
         $product = m::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;

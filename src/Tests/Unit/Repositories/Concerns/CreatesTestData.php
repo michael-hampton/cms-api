@@ -29,6 +29,9 @@ use App\Models\MemberConsent;
 use App\Models\MemberGiftAllowance;
 use App\Models\MemberReward;
 use App\Models\Merchant;
+use App\Models\MerchantContact;
+use App\Models\MerchantProductFeed;
+use App\Models\MerchantUrl;
 use App\Models\Model;
 use App\Models\Newsletter;
 use App\Models\Order;
@@ -359,7 +362,7 @@ trait CreatesTestData
     }
 
     protected function createUser(array $overrides = []): User
-            {
+    {
         return $this->factory(User::class)
             ->forSite($this->siteId)
             ->create($overrides);
@@ -752,5 +755,46 @@ trait CreatesTestData
         ];
 
         return Image::create(array_merge($defaults, $attributes));
+    }
+
+    protected function createMerchantFeed(array $attributes = []): Model
+    {
+        if (empty($attributes['merchant_id'])) {
+            $attributes['merchant_id'] = $this->createMerchant()->id;
+        }
+
+        return MerchantProductFeed::create(array_merge([
+            'feed_url' => 'test',
+            'feed_type' => 'test',
+        ], $attributes));
+    }
+
+    protected function createMerchantUrl(array $attributes = []): Model
+    {
+        if (empty($attributes['merchant_id'])) {
+            $attributes['merchant_id'] = $this->createMerchant()->id;
+        }
+
+        return MerchantUrl::create(array_merge([
+            'url' => 'test',
+
+        ], $attributes));
+
+    }
+
+    protected function createMerchantContact(array $attributes = []): Model
+    {
+        if (empty($attributes['merchant_id'])) {
+            $attributes['merchant_id'] = $this->createMerchant()->id;
+        }
+
+        return MerchantContact::create(array_merge([
+            'merchant_id' => $attributes['merchant_id'],
+            'name' => 'Test Merchant',
+            'email' => 'test.merchant@example.com',
+            'phone' => '1234567890',
+            'role' => 'merchant'
+        ], $attributes));
+
     }
 }

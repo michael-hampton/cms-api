@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use http\Env\Request;
-
 class ProductVariant extends Model
 {
     protected $table = 'product_variants';
@@ -16,7 +14,9 @@ class ProductVariant extends Model
         'price',
         'sale_price',
         'price_modifier',
-        'is_active'
+        'is_active',
+        'created_at',
+        'updated_at',
     ];
 
 
@@ -26,6 +26,8 @@ class ProductVariant extends Model
         'sale_price' => 'float',
         'price_modifier' => 'float',
         'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     protected $appends = ['name', 'final_price', 'discount_percentage'];

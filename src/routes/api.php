@@ -21,6 +21,9 @@ use App\Controllers\MemberController;
 use App\Controllers\Members\Subscriptions\MemberAddressController;
 use App\Controllers\MenuController;
 use App\Controllers\MenuItemController;
+use App\Controllers\MerchantContactController;
+use App\Controllers\MerchantController;
+use App\Controllers\MerchantProductFeedController;
 use App\Controllers\NewsletterController;
 use App\Controllers\OrderController;
 use App\Controllers\PageController;
@@ -44,6 +47,7 @@ use App\Controllers\SubscriptionModalController;
 use App\Controllers\TagController;
 use App\Controllers\TerritoryController;
 use App\Controllers\UserController;
+use App\Controllers\VariantController;
 use App\Controllers\VideoController;
 use App\Controllers\VoucherController;
 use App\Controllers\WishlistController;
@@ -382,6 +386,50 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/products/{id}', ProductController::class, 'destroy');
         $router->post('/products/{id}/duplicate', ProductController::class, 'duplicate');
         $router->get('/products/{id}/price-history', ProductController::class, 'priceHistory');
+
+        //merchants
+        $router->get('/merchants', MerchantController::class, 'index');
+        $router->post('/merchants', MerchantController::class, 'store');
+        $router->get('/merchants/{id}', MerchantController::class, 'show');
+        $router->put('/merchants/{id}', MerchantController::class, 'update');
+        $router->delete('/merchants/{id}', MerchantController::class, 'destroy');
+        $router->post('/merchants/{id}/duplicate', MerchantController::class, 'duplicate');
+        $router->get('/merchants/{id}/price-history', MerchantController::class, 'priceHistory');
+        $router->post('/merchants/{id}/toggle-status', [MerchantController::class, 'toggleStatus']);
+        $router->post('/merchants/bulk-update-status', [MerchantController::class, 'bulkUpdateStatus']);
+        $router->post('/merchants/bulk-delete', [MerchantController::class, 'bulkDelete']);
+        $router->get('/merchants/active', [MerchantController::class, 'active']);
+
+        // merchant contacts
+        $router->get('/merchant-contacts', MerchantContactController::class, 'index');
+        $router->post('/merchant-contacts', MerchantContactController::class, 'store');
+        $router->get('/merchant-contacts/{id}', MerchantContactController::class, 'show');
+        $router->put('/merchant-contacts/{id}', MerchantContactController::class, 'update');
+        $router->delete('/merchant-contacts/{id}', MerchantContactController::class, 'destroy');
+        $router->get('/merchants/{merchantId}/contacts', [MerchantContactController::class, 'getByMerchant']);
+
+        //merchant feeds
+        $router->get('/merchants/{merchantId}/feeds', [MerchantProductFeedController::class, 'index']);
+        $router->post('/merchants/{merchantId}/feeds', [MerchantProductFeedController::class, 'store']);
+        $router->get('/merchants/{merchantId}/feeds/{feedId}', [MerchantProductFeedController::class, 'show']);
+        $router->put('/merchants/{merchantId}/feeds/{feedId}', [MerchantProductFeedController::class, 'update']);
+        $router->delete('/merchants/{merchantId}/feeds/{feedId}', [MerchantProductFeedController::class, 'destroy']);
+        $router->get('/merchants/{merchantId}/feeds/{feedId}/download', [MerchantProductFeedController::class, 'download']);
+        $router->post('/merchants/{merchantId}/feeds/{feedId}/fetch', [MerchantProductFeedController::class, 'fetch']);
+
+        //variants
+        // Variant listing and management
+        $router->get('/variants', [VariantController::class, 'index']);
+        $router->post('/variants', [VariantController::class, 'store']);
+        $router->get('/variants/{id}', [VariantController::class, 'show']);
+        $router->put('/variants/{id}', [VariantController::class, 'update']);
+        $router->delete('/variants/{id}', [VariantController::class, 'destroy']);
+
+        // Variant images
+        $router->put('/variants/{id}/images', [VariantController::class, 'updateImages']);
+
+        // Variant status toggle
+        $router->put('/variants/{id}/toggle-status', [VariantController::class, 'toggleStatus']);
 
         // Product variants
         $router->get('/products/{id}/variants', [ProductController::class, 'variants']);

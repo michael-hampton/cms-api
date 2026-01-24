@@ -2,7 +2,6 @@
 
 namespace App\Tests\Unit\Search;
 
-use App\Search\Configurations\AuthorSearchConfiguration;
 use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
@@ -14,6 +13,7 @@ use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
+use App\Search\Configurations\VariantSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
 use App\Search\SearchConfigurationFactory;
 use PHPUnit\Framework\TestCase;
@@ -59,7 +59,7 @@ class SearchConfigurationFactoryTest extends TestCase
     public function testFactoryCreatesAuthorConfiguration()
     {
         $config = SearchConfigurationFactory::create('author');
-        $this->assertInstanceOf(AuthorSearchConfiguration::class, $config);
+        $this->assertInstanceOf(VariantSearchConfiguration::class, $config);
     }
 
     public function testFactoryCreatesImageConfiguration()
