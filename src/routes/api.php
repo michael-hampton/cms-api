@@ -37,6 +37,7 @@ use App\Controllers\PreviewController;
 use App\Controllers\ProductController;
 use App\Controllers\ProductListController;
 use App\Controllers\ProductMatchingController;
+use App\Controllers\ProductOfferController;
 use App\Controllers\RefundController;
 use App\Controllers\RegionSetController;
 use App\Controllers\ReviewController;
@@ -386,6 +387,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/products/{id}', ProductController::class, 'destroy');
         $router->post('/products/{id}/duplicate', ProductController::class, 'duplicate');
         $router->get('/products/{id}/price-history', ProductController::class, 'priceHistory');
+
+        //product offers
+        $router->get('/offers/{id}', ProductOfferController::class, 'index');
+        $router->get('/products/{productId}/offers', ProductOfferController::class, 'index');
+        $router->get('/categories/{categoryId}/offers', [ProductOfferController::class, 'categoryOffers']);
+        $router->post('/products/{productId}/offers', ProductOfferController::class, 'store');
+        $router->put('/products/{productId}/offers/{offerId}', [ProductOfferController::class, 'update']);
+        $router->delete('/products/{productId}/offers/{offerId}', ProductOfferController::class, 'destroy');
+        $router->post('/products/{id}/duplicate', ProductOfferController::class, 'duplicate');
+        $router->get('/products/{id}/price-history', ProductOfferController::class, 'priceHistory');
 
         //merchants
         $router->get('/merchants', MerchantController::class, 'index');

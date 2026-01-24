@@ -55,6 +55,7 @@ use App\Models\PageView;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
+use App\Models\ProductOffer;
 use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
@@ -796,5 +797,16 @@ trait CreatesTestData
             'role' => 'merchant'
         ], $attributes));
 
+    }
+
+    protected function createProductOffer(int $productId, array $attributes = []): Model
+    {
+        return ProductOffer::create(array_merge([
+            'product_id' => $productId,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ], $attributes));
     }
 }

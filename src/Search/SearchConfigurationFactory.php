@@ -2,11 +2,13 @@
 
 namespace App\Search;
 
+use App\Search\Configurations\AuthorSearchConfiguration;
 use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\BriefSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\EmailThemeSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
+use App\Search\Configurations\MerchantSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
@@ -28,7 +30,7 @@ class SearchConfigurationFactory
         'voucher' => VoucherSearchConfiguration::class,
         'category' => CategorySearchConfiguration::class,
         'tag' => TagSearchConfiguration::class,
-        'author' => VariantSearchConfiguration::class,
+        'author' => AuthorSearchConfiguration::class,
         'image' => ImageSearchConfiguration::class,
         'user' => UserSearchConfiguration::class,
         'brand' => BrandSearchConfiguration::class,
@@ -39,7 +41,7 @@ class SearchConfigurationFactory
         'email-theme' => EmailThemeSearchConfiguration::class,
         'pipeline' => PipelineSearchConfiguration::class,
         'brief' => BriefSearchConfiguration::class,
-        'merchant' => VariantSearchConfiguration::class,
+        'merchant' => MerchantSearchConfiguration::class,
         'variant' => VariantSearchConfiguration::class,
     ];
 

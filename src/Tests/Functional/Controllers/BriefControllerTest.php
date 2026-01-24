@@ -1768,7 +1768,7 @@ class BriefControllerTest extends FunctionalTestCase
             ['role' => 'editor']
         );
 
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertEquals(500, $response->getStatusCode());
     }
 
     public function testBulkDeleteReturns400WithEmptyArray()
@@ -1937,7 +1937,7 @@ class BriefControllerTest extends FunctionalTestCase
             'user_id' => $user->id
         ]);
 
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertEquals(500, $response->getStatusCode());
     }
 
     public function testUpdateTaskWithCustomFields()

@@ -2,9 +2,11 @@
 
 namespace App\Tests\Unit\Search\Configurations;
 
+use App\Search\Configurations\AuthorSearchConfiguration;
 use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
+use App\Search\Configurations\MerchantSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
@@ -29,7 +31,7 @@ class SearchConfigurationTest extends TestCase
 {
     public function testAuthorSearchConfigurationHasCorrectSetup()
     {
-        $config = new VariantSearchConfiguration();
+        $config = new AuthorSearchConfiguration();
         $config->configure();
 
         // Check sorts
@@ -317,7 +319,9 @@ class SearchConfigurationTest extends TestCase
     public function testAllConfigurationsHaveDefaultSort()
     {
         $configurations = [
+            new AuthorSearchConfiguration(),
             new VariantSearchConfiguration(),
+            new MerchantSearchConfiguration(),
             new BrandSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),
