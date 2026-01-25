@@ -165,6 +165,24 @@ class QueryBuilder
         return $this->where($column, 'LIKE', $value);
     }
 
+    public function whereDate(string $column, $operator, $value = null): self
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Date',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
     public function orWhereLike(string $column, string $value): self
     {
         return $this->orWhere($column, 'LIKE', $value);
@@ -900,6 +918,12 @@ class QueryBuilder
         $bindings = [];
 
         switch ($where['type']) {
+            case 'Date':
+                $paramKey = 'param_' . $paramCounter++;
+                $quotedColumn = $this->quoteColumn($where['column']);
+                $bindings[$paramKey] = $where['value'];
+                // Wrap the column in the DATE() function
+                return ["DATE({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
             case 'Nested':
                 [$subSql, $subBindings] = $this->compileWheres($where['query']->wheres, $paramCounter);
                 return ['(' . $subSql . ')', $subBindings];

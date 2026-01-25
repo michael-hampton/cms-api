@@ -6,7 +6,11 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\MemberReward;
 use App\Repositories\Rewards\RewardsRepository;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteriaParser;
+use App\Search\SearchEngine;
 
 class RewardsAdminController extends Controller
 {
@@ -29,31 +33,26 @@ class RewardsAdminController extends Controller
         ]);
     }
 
-    public function search(Request $request)
+    public function search(Request $request, string $siteName)
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $siteId = SiteContext::getId();
-        $page = $request->input('page', 1);
-        $perPage = $request->input('per_page', 50);
 
-        $filters = [
-            'status' => $request->input('status'),
-            'member_id' => $request->input('member_id'),
-            'reward_definition_id' => $request->input('reward_definition_id'),
-            'date_from' => $request->input('date_from'),
-            'date_to' => $request->input('date_to'),
-            'search' => $request->input('search')
-        ];
+        $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+        $configuration = SearchConfigurationFactory::create('reward');
+        $engine = new SearchEngine($configuration);
 
-        $result = $this->rewardsRepository->searchRewards($siteId, $filters, $page, $perPage);
+        $queryBuilder = MemberReward::query();
+        $result = $engine->search($queryBuilder, $criteria);
+
         $stats = $this->rewardsRepository->getRewardStats($siteId);
 
         return $this->resourceResponse([
             'success' => true,
-            'rewards' => $result,
+            'rewards' => $result->toArray(),
             'stats' => $stats
         ]);
     }

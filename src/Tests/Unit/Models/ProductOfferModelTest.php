@@ -125,4 +125,180 @@ class ProductOfferModelTest extends FunctionalTestCase
         $this->assertCount(1, $offers);
         $this->assertEquals($product1->id, $offers->first()->product_id);
     }
+
+    public function testScopePublished(): void
+    {
+        $product = $this->createProduct();
+
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 69.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+        ]);
+
+        $published = ProductOffer::published()->get();
+
+        $this->assertCount(1, $published);
+        $this->assertEquals('published', $published->first()->status);
+    }
+
+    public function testScopePending(): void
+    {
+        $product = $this->createProduct();
+
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+        ]);
+
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 69.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        $pending = ProductOffer::pending()->get();
+
+        $this->assertCount(1, $pending);
+        $this->assertEquals('pending', $pending->first()->status);
+    }
+
+    public function testScopeRejected(): void
+    {
+        $product = $this->createProduct();
+
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'rejected',
+        ]);
+
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 69.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+        ]);
+
+        $rejected = ProductOffer::rejected()->get();
+
+        $this->assertCount(1, $rejected);
+        $this->assertEquals('rejected', $rejected->first()->status);
+    }
+
+    public function testVoucherRelationship(): void
+    {
+        $product = $this->createProduct();
+        $voucher = $this->createVoucher();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'voucher_id' => $voucher->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ]);
+
+        $offer = $offer->fresh(['voucher']);
+
+        $this->assertNotNull($offer->voucher);
+        $this->assertEquals($voucher->id, $offer->voucher->id);
+    }
+
+    public function testPublisherRelationship(): void
+    {
+        $user = $this->createUser();
+        $product = $this->createProduct();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+            'published_by' => $user->id,
+            'published_at' => now(),
+        ]);
+
+        $offer = $offer->fresh(['publisher']);
+
+        $this->assertNotNull($offer->publisher);
+        $this->assertEquals($user->id, $offer->publisher->id);
+    }
+
+    public function testRejectorRelationship(): void
+    {
+        $user = $this->createUser();
+        $product = $this->createProduct();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'rejected',
+            'rejected_by' => $user->id,
+            'rejected_at' => now(),
+            'rejection_reason' => 'Test reason',
+        ]);
+
+        $offer = $offer->fresh(['rejector']);
+
+        $this->assertNotNull($offer->rejector);
+        $this->assertEquals($user->id, $offer->rejector->id);
+    }
+
+    public function testCanBePublished(): void
+    {
+        $product = $this->createProduct();
+
+        $pendingOffer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+        ]);
+
+        $publishedOffer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 69.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        $this->assertTrue($pendingOffer->canBePublished());
+        $this->assertFalse($publishedOffer->canBePublished());
+    }
+
 }

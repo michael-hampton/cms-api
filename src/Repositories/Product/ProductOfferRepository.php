@@ -85,6 +85,74 @@ class ProductOfferRepository extends Repository
             ->exists();
     }
 
+    public function getByStatus(string $status): Collection
+    {
+        return ProductOffer::with(['product', 'merchant', 'voucher'])
+            ->where('status', $status)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    public function publish(int $id, int $userId): ?ProductOffer
+    {
+        $offer = $this->find($id);
+
+        if (!$offer || !$offer->canBePublished()) {
+            return null;
+        }
+
+        $offer->update([
+            'status' => 'published',
+            'published_at' => now(),
+            'published_by' => $userId,
+        ]);
+
+        return $offer->fresh(['product', 'merchant', 'voucher']);
+    }
+
+    public function reject(int $id, int $userId, string $reason): ?ProductOffer
+    {
+        $offer = $this->find($id);
+
+        if (!$offer || $offer->status !== 'pending') {
+            return null;
+        }
+
+        $offer->update([
+            'status' => 'rejected',
+            'rejected_at' => now(),
+            'rejected_by' => $userId,
+            'rejection_reason' => $reason,
+        ]);
+
+        return $offer->fresh(['product', 'merchant', 'voucher']);
+    }
+
+    public function search(array $filters): Collection
+    {
+        $query = ProductOffer::with(['product', 'merchant', 'voucher']);
+
+        if (!empty($filters['merchant_id'])) {
+            $query->where('merchant_id', $filters['merchant_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['voucher_id'])) {
+            $query->where('voucher_id', $filters['voucher_id']);
+        }
+
+        if (!empty($filters['search'])) {
+            $query->whereHas('product', function ($q) use ($filters) {
+                $q->where('name', 'like', "%{$filters['search']}%");
+            });
+        }
+
+        return $query->orderBy('created_at', 'desc')->get();
+    }
+
     protected function getModelClass(): string
     {
         return ProductOffer::class;

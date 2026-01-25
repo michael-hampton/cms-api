@@ -13,11 +13,24 @@ class ProductOffer extends Model
         'product_id',
         'merchant_id',
         'sale_price',
-        'start_date',
+        'start_date', 'status',
+        'rejection_reason',
+        'published_at',
+        'published_by',
+        'rejected_at',
+        'rejected_by',
+        'voucher_id',
         'end_date',
         'is_active',
         'created_by',
         'updated_by',
+        'status',
+        'rejection_reason',
+        'published_at',
+        'published_by',
+        'rejected_at',
+        'rejected_by',
+        'voucher_id',
     ];
 
     protected $casts = [
@@ -27,6 +40,8 @@ class ProductOffer extends Model
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'published_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     protected $table = 'product_offers';
@@ -78,5 +93,40 @@ class ProductOffer extends Model
         }
 
         return (int)round((($this->product->price - $this->sale_price) / $this->product->price) * 100);
+    }
+
+    public function scopePublished(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('status', 'published');
+    }
+
+    public function scopePending(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeRejected(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('status', 'rejected');
+    }
+
+    public function voucher()
+    {
+        return $this->belongsTo(Voucher::class);
+    }
+
+    public function publisher()
+    {
+        return $this->belongsTo(User::class, 'published_by');
+    }
+
+    public function rejector()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function canBePublished(): bool
+    {
+        return $this->status === 'pending' && $this->isCurrentlyActive();
     }
 }

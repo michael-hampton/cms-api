@@ -10,6 +10,7 @@ use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\HasModel;
 use App\Framework\Validation\Rules\AcceptedRule;
+use App\Framework\Validation\Rules\AfterRule;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\ConfirmedRule;
@@ -345,7 +346,8 @@ abstract class FormRequest extends Request
             'array' => ArrayRule::class,
             'numeric' => NumericRule::class,
             'confirmed' => ConfirmedRule::class,
-            'sometimes' => SometimesRule::class
+            'sometimes' => SometimesRule::class,
+            'after' => AfterRule::class,
             // Add other mappings as needed
         ];
 

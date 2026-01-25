@@ -7,10 +7,14 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Requests\CreateRewardRequest;
 use App\Requests\UpdateRewardRequest;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteriaParser;
+use App\Search\SearchEngine;
 
 class RewardDefinitionsAdminController extends Controller
 {
@@ -34,30 +38,26 @@ class RewardDefinitionsAdminController extends Controller
         ]);
     }
 
-    public function search(Request $request)
+    public function search(Request $request, string $siteName)
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $siteId = SiteContext::getId();
-        $page = $request->input('page', 1);
-        $perPage = $request->input('per_page', 50);
 
-        $filters = [
-            'search' => $request->input('search'),
-            'is_active' => $request->input('is_active'),
-            'reward_type' => $request->input('reward_type'),
-            'sort_by' => $request->input('sort_by'),
-            'sort_order' => $request->input('sort_order')
-        ];
+        $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+        $configuration = SearchConfigurationFactory::create('reward_definition');
+        $engine = new SearchEngine($configuration);
 
-        $result = $this->rewardDefinitionRepository->searchRewardDefinitions($siteId, $filters, $page, $perPage);
+        $queryBuilder = RewardDefinition::query();
+        $result = $engine->search($queryBuilder, $criteria);
+
         $stats = $this->rewardDefinitionRepository->getRewardDefinitionStats($siteId);
 
         return $this->resourceResponse([
             'success' => true,
-            'definitions' => $result,
+            'definitions' => $result->toArray(),
             'stats' => $stats
         ]);
     }

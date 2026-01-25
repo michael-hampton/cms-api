@@ -397,6 +397,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/products/{productId}/offers/{offerId}', ProductOfferController::class, 'destroy');
         $router->post('/products/{id}/duplicate', ProductOfferController::class, 'duplicate');
         $router->get('/products/{id}/price-history', ProductOfferController::class, 'priceHistory');
+        $router->get('/offers', [ProductOfferController::class, 'allOffers']);
+        $router->post('/products/{productId}/offers/{offerId}/publish', [ProductOfferController::class, 'publish']);
+        $router->post('/products/{productId}/offers/{offerId}/reject', [ProductOfferController::class, 'reject']);
 
         //merchants
         $router->get('/merchants', MerchantController::class, 'index');

@@ -13,8 +13,11 @@ use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
 use App\Search\Configurations\PipelineSearchConfiguration;
+use App\Search\Configurations\ProductOfferSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
+use App\Search\Configurations\RewardDefinitionSearchConfiguration;
+use App\Search\Configurations\RewardSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
@@ -43,6 +46,9 @@ class SearchConfigurationFactory
         'brief' => BriefSearchConfiguration::class,
         'merchant' => MerchantSearchConfiguration::class,
         'variant' => VariantSearchConfiguration::class,
+        'reward_definition' => RewardDefinitionSearchConfiguration::class,
+        'reward' => RewardSearchConfiguration::class,
+        'product_offer' => ProductOfferSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

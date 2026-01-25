@@ -78,6 +78,51 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         }
     }
 
+    public function testSearchSupportsSearchQuery(): void
+    {
+        $this->actingAs($this->user);
+
+        $this->createRewardDefinition(['name' => 'Welcome Bonus']);
+        $this->createRewardDefinition(['name' => 'Loyalty Points']);
+
+        $response = $this->getForSite('/api/reward-definitions/search?search=Welcome');
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['definitions']['data']);
+        $this->assertEquals('Welcome Bonus', $data['definitions']['data'][0]['name']);
+    }
+
+    public function testSearchSupportsSorting(): void
+    {
+        $this->actingAs($this->user);
+
+        $this->createRewardDefinition(['name' => 'Zebra Reward']);
+        $this->createRewardDefinition(['name' => 'Alpha Reward']);
+
+        $response = $this->getForSite('/api/reward-definitions/search?sort_by=name&sort_order=asc');
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEquals('Alpha Reward', $data['definitions']['data'][0]['name']);
+    }
+
+    public function testSearchSupportsPagination(): void
+    {
+        $this->actingAs($this->user);
+
+        for ($i = 1; $i <= 25; $i++) {
+            $this->createRewardDefinition(['name' => "Reward $i"]);
+        }
+
+        $response = $this->getForSite('/api/reward-definitions/search?page=1&per_page=10');
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertCount(10, $data['definitions']['data']);
+        $this->assertEquals(1, $data['definitions']['pagination']['current_page']);
+    }
+
     public function testShowReturnsDefinitionDetails(): void
     {
         $this->actingAs($this->user);
@@ -193,6 +238,25 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
 
         $this->assertFalse($data['success']);
         $this->assertStringContainsString('existing member rewards', $data['message']);
+    }
+
+    public function testSearchFiltersByMultipleRewardTypes(): void
+    {
+        $this->actingAs($this->user);
+
+        $this->createRewardDefinition(['reward_type' => 'voucher']);
+        $this->createRewardDefinition(['reward_type' => 'points']);
+        $this->createRewardDefinition(['reward_type' => 'discount']);
+
+        $response = $this->getForSite('/api/reward-definitions/search?reward_type=voucher,points');
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertGreaterThanOrEqual(2, count($data['definitions']['data']));
+
+        foreach ($data['definitions']['data'] as $definition) {
+            $this->assertContains($definition['reward_type'], ['voucher', 'points']);
+        }
     }
 
     protected function setUp(): void

@@ -5,8 +5,14 @@ namespace App\Controllers;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
+use App\Models\ProductOffer;
 use App\Requests\CreateProductOfferRequest;
 use App\Requests\UpdateProductOfferRequest;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteriaParser;
+use App\Search\SearchEngine;
 use App\Services\Product\ProductOfferService;
 use Exception;
 
@@ -19,18 +25,41 @@ class ProductOfferController extends Controller
         parent::__construct();
     }
 
-    public function index(int $productId, string $siteName): JsonResponse
+    public function index(Request $request, int $productId, string $siteName)
     {
-        try {
-            $offers = $this->offerService->getActiveOffersForProduct($productId);
+        $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+        $configuration = SearchConfigurationFactory::create('product_offer');
+        $engine = new SearchEngine($configuration);
 
-            return $this->resourceResponse([
-                'success' => true,
-                'items' => $offers->toArray()
-            ]);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
+        $queryBuilder = ProductOffer::where('product_id', $productId)->with(['merchant']);
+        $result = $engine->search($queryBuilder, $criteria);
+
+        $formattedData = $this->formatOffers($result);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'items' => $formattedData['data'] ?? [],
+            'pagination' => $formattedData['pagination'] ?? null
+        ]);
+    }
+
+    private function formatOffers(PaginatedResult $result): array
+    {
+        // Format dates in response
+        $formattedData = $result->toArray();
+        if (isset($formattedData['data'])) {
+            $formattedData['data'] = array_map(function ($offer) {
+                if (isset($offer['start_date'])) {
+                    $offer['start_date'] = $offer['start_date']->format('Y-m-d H:i:s');
+                }
+                if (isset($offer['end_date'])) {
+                    $offer['end_date'] = $offer['end_date']->format('Y-m-d H:i:s');
+                }
+                return $offer;
+            }, $formattedData['data']);
         }
+
+        return $formattedData;
     }
 
     public function categoryOffers(int $categoryId, string $siteName): JsonResponse
@@ -111,6 +140,79 @@ class ProductOfferController extends Controller
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Offer deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function publish(int $productId, int $offerId, string $siteName): JsonResponse
+    {
+        try {
+            $userId = auth()->id() ?? 1; // Get authenticated user
+
+            $offer = $this->offerService->publish($offerId, $userId);
+
+            if (!$offer) {
+                return $this->resourceResponse([
+                    'message' => 'Offer cannot be published'
+                ], 400);
+            }
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Offer published successfully',
+                'offer' => $offer->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function reject(int $productId, int $offerId, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $userId = auth()->id() ?? 1;
+            $reason = $request->input('reason');
+
+            if (!$reason) {
+                return $this->errorResponse('Rejection reason is required', 422);
+            }
+
+            $offer = $this->offerService->reject($offerId, $userId, $reason);
+
+            if (!$offer) {
+                return $this->resourceResponse([
+                    'message' => 'Offer cannot be rejected'
+                ], 400);
+            }
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Offer rejected successfully',
+                'offer' => $offer->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function allOffers(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $configuration = SearchConfigurationFactory::create('product_offer');
+            $engine = new SearchEngine($configuration);
+
+            $queryBuilder = ProductOffer::with(['merchant']);
+            $result = $engine->search($queryBuilder, $criteria);
+
+            $formattedData = $this->formatOffers($result);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'items' => $formattedData['data'] ?? [],
+                'pagination' => $formattedData['pagination'] ?? null
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

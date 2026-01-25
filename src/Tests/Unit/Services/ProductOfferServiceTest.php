@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services;
 
+use App\Framework\Authorization\AuthenticationService;
 use App\Models\ProductOffer;
 use App\Repositories\Product\ProductOfferRepository;
 use App\Services\Product\ProductOfferService;
@@ -15,6 +16,15 @@ class ProductOfferServiceTest extends FunctionalTestCase
 
     private $repository;
     private ProductOfferService $service;
+    private $authenticationService;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->authenticationService = Mockery::mock(AuthenticationService::class);
+        $this->repository = Mockery::mock(ProductOfferRepository::class);
+        $this->service = new ProductOfferService($this->repository, $this->authenticationService);
+    }
 
     public function testGetOffer(): void
     {
@@ -102,6 +112,11 @@ class ProductOfferServiceTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
         ];
 
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn(new ProductOffer(['id' => 1]));
+
         $offer = new ProductOffer($data);
 
         $this->repository->shouldReceive('update')
@@ -151,11 +166,76 @@ class ProductOfferServiceTest extends FunctionalTestCase
         $this->assertTrue($result);
     }
 
-    protected function setUp(): void
+
+    public function testCreateOfferWithPublishedStatus(): void
     {
-        parent::setUp();
-        $this->repository = Mockery::mock(ProductOfferRepository::class);
-        $this->service = new ProductOfferService($this->repository);
+        $user = $this->createUser();
+
+        $this->actingAs($user);
+
+        $this->authenticationService->shouldReceive('getUserId')
+            ->once()
+            ->andReturn($user->id);
+
+        $product = $this->createProduct();
+
+        $data = [
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'status' => 'published',
+        ];
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(\Mockery::on(function ($arg) {
+                return $arg['status'] === 'published'
+                    && isset($arg['published_by'])
+                    && isset($arg['published_at']);
+            }))
+            ->andReturn(new ProductOffer($data));
+
+        $offer = $this->service->createOffer($data);
+
+        $this->assertEquals('published', $offer->status);
+    }
+
+    public function testUpdateOfferToPublished(): void
+    {
+        $user = $this->createUser();
+        $this->actingAs($user);
+
+        $this->authenticationService->shouldReceive('getUserId')
+            ->once()
+            ->andReturn($user->id);
+
+        $product = $this->createProduct();
+        $existingOffer = new ProductOffer([
+            'id' => 1,
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'status' => 'pending',
+        ]);
+
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($existingOffer);
+
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->with(1, \Mockery::on(function ($arg) use ($user) {
+                return $arg['status'] === 'published'
+                    && $arg['published_by'] === $user->id
+                    && isset($arg['published_at']);
+            }))
+            ->andReturn($existingOffer);
+
+        $result = $this->service->updateOffer(1, ['status' => 'published']);
+        $this->assertInstanceOf(ProductOffer::class, $result);
     }
 
     protected function tearDown(): void

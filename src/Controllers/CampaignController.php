@@ -1,6 +1,4 @@
 <?php
-// src/Controllers/CampaignController.php
-
 namespace App\Controllers;
 
 use App\Framework\Exceptions\ValidationException;

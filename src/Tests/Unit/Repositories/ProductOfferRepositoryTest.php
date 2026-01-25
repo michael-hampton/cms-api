@@ -248,6 +248,85 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $this->assertFalse($this->repository->hasActiveOffer($product->id));
     }
 
+    public function testGetByStatus(): void
+    {
+        $product = $this->createProduct();
+
+        $publishedOffer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        $pendingOffer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 69.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
+            'is_active' => false,
+            'status' => 'pending',
+        ]);
+
+        $published = $this->repository->getByStatus('published');
+        $pending = $this->repository->getByStatus('pending');
+
+        $this->assertCount(1, $published);
+        $this->assertCount(1, $pending);
+        $this->assertEquals($publishedOffer->id, $published->first()->id);
+        $this->assertEquals($pendingOffer->id, $pending->first()->id);
+    }
+
+    public function testPublish(): void
+    {
+        $user = $this->createUser();
+        $product = $this->createProduct();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+        ]);
+
+        $result = $this->repository->publish($offer->id, $user->id);
+
+        $this->assertInstanceOf(ProductOffer::class, $result);
+        $updated = $offer->fresh();
+        $this->assertEquals('published', $updated->status);
+        $this->assertEquals($user->id, $updated->published_by);
+        $this->assertNotNull($updated->published_at);
+    }
+
+    public function testReject(): void
+    {
+        $user = $this->createUser();
+        $product = $this->createProduct();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+        ]);
+
+        $reason = 'Price too low';
+        $result = $this->repository->reject($offer->id, $user->id, $reason);
+
+        $this->assertInstanceOf(ProductOffer::class, $result);
+        $updated = $offer->fresh();
+        $this->assertEquals('rejected', $updated->status);
+        $this->assertEquals($user->id, $updated->rejected_by);
+        $this->assertEquals($reason, $updated->rejection_reason);
+        $this->assertNotNull($updated->rejected_at);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

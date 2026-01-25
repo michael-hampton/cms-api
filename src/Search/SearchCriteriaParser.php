@@ -29,7 +29,13 @@ class SearchCriteriaParser
         'is_featured',
         'content_type',
         'owner_id',
-        'product_ids'
+        'product_ids',
+        'reward_type',
+        'merchant_id',
+        'start_date',
+        'member_id',
+        'reward_definition_id',
+        'date_from'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

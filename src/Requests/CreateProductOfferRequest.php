@@ -12,8 +12,10 @@ class CreateProductOfferRequest extends FormRequest
             'merchant_id' => 'nullable|integer|exists:merchants,id',
             'sale_price' => 'required|numeric|min:0',
             'start_date' => 'required|date',
-            'end_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
             'is_active' => 'boolean',
+            'status' => 'in:pending,published,rejected',
+            'voucher_id' => 'nullable|integer|exists:vouchers,id',
         ];
     }
 
