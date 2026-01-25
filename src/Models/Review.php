@@ -16,7 +16,8 @@ class Review extends Model
         'is_approved',
         'helpful_count',
         'unhelpful_count',
-        'site_id'
+        'site_id',
+        'created_at',
     ];
 
     protected $casts = [
@@ -36,7 +37,7 @@ class Review extends Model
 
     public function user()
     {
-        return $this->belongsTo(Member::class);
+        return $this->belongsTo(Member::class, 'user_id', 'id');
     }
 
     public function scopeApproved($query)

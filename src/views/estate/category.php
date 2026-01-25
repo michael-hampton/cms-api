@@ -65,6 +65,8 @@
         </section>
     <?php endif; ?>
 
+    @include('components/category-stats', ['stats' => $stats, 'category' => $category])
+
     <?php if ($pages && count($pages) > 0): ?>
         <!-- Filters -->
         @include('partials.filters', ['pages' => $pages])
@@ -88,6 +90,19 @@
             <p>No articles in this category yet. Check back soon!</p>
         </div>
     <?php endif; ?>
+
+    @include('components/category-products', ['products' => $products, 'category' => $category])
+
+    @include('components/category-product-list', ['products' => $newProducts, 'title' => 'New Products', 'badgeText' =>
+    'new'])
+
+    @include('components/category-product-list', ['products' => $featuredProducts, 'title' => 'Featured Products',
+    'badgeText' => 'featured'])
+
+    @include('components/category-offers', ['offers' => $offers, 'category' => $category])
+
+    @include('components/category-reviews', ['reviews' => $reviews, 'category' => $category])
+
 </div>
 
 @include('components/newsletter-modal')

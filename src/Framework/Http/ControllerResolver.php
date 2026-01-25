@@ -12,15 +12,15 @@ class ControllerResolver implements ControllerResolverInterface
         // Default controller mappings
         $this->controllerMappings = array_merge([
             // Page type => Controller@method
-            'content' => 'App\Controllers\ContentController@show',
-            'landing-page' => 'App\Controllers\ContentController@show',
-            'buying-guide' => 'App\Controllers\ContentController@show',
-            'gallery' => 'App\Controllers\ContentController@show',
-            'review' => 'App\Controllers\ContentController@show',
-            'blog' => 'App\Controllers\ContentController@show',
+            'content' => 'App\Controllers\Front\ContentController@show',
+            'landing-page' => 'App\Controllers\Front\ContentController@show',
+            'buying-guide' => 'App\Controllers\Front\ContentController@show',
+            'gallery' => 'App\Controllers\Front\ContentController@show',
+            'review' => 'App\Controllers\Front\ContentController@show',
+            'blog' => 'App\Controllers\Front\ContentController@show',
             'product' => 'App\Controllers\ProductController@show',
             'category' => 'App\Controllers\CategoryController@show',
-            'event' => 'App\Controllers\ContentController@show',
+            'event' => 'App\Controllers\Front\ContentController@show',
             'documentation' => 'App\Controllers\DocsController@show',
         ], $this->controllerMappings);
     }
