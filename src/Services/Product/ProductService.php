@@ -354,7 +354,7 @@ class ProductService
             return new Collection([]);
         }
 
-        return $this->repository->getRecentlyViewed(array_slice($viewedIds, 0, $limit), $limit);
+        return $this->repository->getActiveProducts(array_slice($viewedIds, 0, $limit), $limit);
     }
 
     public function trackView(Product $product): void

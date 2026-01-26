@@ -22,6 +22,7 @@ class Newsletter extends Model
         'template',
         'created_at',
         'is_default',
+        'slug'
     ];
 
     protected $casts = [

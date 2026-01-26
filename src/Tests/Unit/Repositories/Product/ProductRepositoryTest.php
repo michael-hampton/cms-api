@@ -769,7 +769,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         $productIds = [$product1->id, $product2->id, $product3->id];
 
         // Act
-        $viewed = $this->repository->getRecentlyViewed($productIds, 10);
+        $viewed = $this->repository->getActiveProducts($productIds, 10);
 
         // Assert
         // Should only return active products
@@ -781,7 +781,7 @@ class ProductRepositoryTest extends RepositoryTestCase
     public function test_get_recently_viewed_returns_empty_collection_for_empty_array(): void
     {
         // Act
-        $viewed = $this->repository->getRecentlyViewed([], 10);
+        $viewed = $this->repository->getActiveProducts([], 10);
 
         // Assert
         $this->assertInstanceOf(\App\Framework\Support\Collection::class, $viewed);
@@ -798,7 +798,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         }
 
         // Act
-        $viewed = $this->repository->getRecentlyViewed($productIds, 3);
+        $viewed = $this->repository->getActiveProducts($productIds, 3);
 
         // Assert
         $this->assertLessThanOrEqual(3, $viewed->count());

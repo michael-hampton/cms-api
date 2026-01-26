@@ -305,6 +305,9 @@ $router->get('/{site}/newsletters', [NewsletterWebController::class, 'index']);
 $router->get('/{site}/newsletters/{id}', [NewsletterWebController::class, 'show']);
 $router->get('/{site}/newsletters/archive', [NewsletterWebController::class, 'archive']);
 $router->get('{site}/newsletters/{id}/download', [NewsletterWebController::class, 'downloadPdf']);
+$router->get('/{site}/newsletters/archive/search', [NewsletterWebController::class, 'searchArchive']);
+$router->get('/{site}/newsletters/search', [NewsletterWebController::class, 'search']);
+
 
 //faqs
 $router->get('{site}/faqs', [FaqController::class, 'subscriptions']);

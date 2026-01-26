@@ -76,6 +76,11 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static(array_filter($this->items, $callback, ARRAY_FILTER_USE_BOTH));
     }
 
+    public function values(): self
+    {
+        return new static(array_values($this->items));
+    }
+
     public function where(string $key, $operator, $value = null): self
     {
         if ($value === null) {
@@ -118,7 +123,7 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
             foreach ($segments as $segment) {
                 if (is_array($value) && array_key_exists($segment, $value)) {
                     $value = $value[$segment];
-                } elseif (is_object($value) && isset($value->{$segment})) {
+                } elseif (is_object($value)) {
                     $value = $value->{$segment};
                 } else {
                     return null;
@@ -379,6 +384,24 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($filtered);
     }
 
+    public function whereNull(string $key): self
+    {
+        $filtered = array_filter($this->items, function ($item) use ($key) {
+            if (is_array($item)) {
+                return isset($item[$key]) && $item[$key] === null;
+            } elseif (is_object($item)) {
+                // Use getAttribute if model implements it, fallback to property access
+                if (method_exists($item, 'getAttribute')) {
+                    return $item->getAttribute($key) === null;
+                }
+                return isset($item->{$key}) && $item->{$key} === null;
+            }
+            return false;
+        });
+
+        return new static($filtered);
+    }
+
     public function whereNotEmpty(string $key): self
     {
         $filtered = array_filter($this->items, function ($item) use ($key) {
@@ -495,12 +518,20 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         }
 
         foreach ($this->items as $item) {
-            if (is_array($item) && isset($item[$key]) && $item[$key] === $value) {
+            if (is_array($item) && array_key_exists($key, $item) && $item[$key] === $value) {
                 return $item;
-            } elseif (is_object($item) && isset($item->$key) && $item->$key === $value) {
-                return $item;
-            } elseif (is_object($item) && method_exists($item, $key) && $item->$key() === $value) {
-                return $item;
+            }
+
+            if (is_object($item)) {
+                // Use magic getter for Eloquent models / objects
+                if (isset($item->$key) && $item->$key === $value) {
+                    return $item;
+                }
+
+                // Optional: use getAttribute if Eloquent
+                if (method_exists($item, 'getAttribute') && $item->getAttribute($key) === $value) {
+                    return $item;
+                }
             }
         }
 

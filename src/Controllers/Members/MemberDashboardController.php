@@ -18,8 +18,10 @@ use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Members\BadgeService;
+use App\Services\Product\ProductRecommendationService;
 use App\Services\Recommendations\ContentRecommendationService;
 use App\Services\Rewards\RewardsService;
+use App\Services\Subscriptions\SubscriptionListingService;
 
 class MemberDashboardController extends Controller
 {
@@ -36,7 +38,9 @@ class MemberDashboardController extends Controller
         private readonly BadgeService             $badgeService,
         private readonly MemberActivityRepository     $activityRepository,
         private readonly ContentRecommendationService $contentRecommendationService,
-        private readonly RewardsService               $rewardService
+        private readonly RewardsService               $rewardService,
+        private readonly ProductRecommendationService $productRecommendationService,
+        private readonly SubscriptionListingService   $subscriptionListingService
     ) {
         parent::__construct();
     }
@@ -61,6 +65,7 @@ class MemberDashboardController extends Controller
         $recommendedPages = [];
         $trendingPages = [];
         $trendingConversations = [];
+        $recommendedProducts = [];
 
         if ($member->isEmailVerified()) {
             try {
@@ -72,6 +77,10 @@ class MemberDashboardController extends Controller
 
                 $trendingConversations = $this->contentRecommendationService
                     ->getTrendingConversations($siteId, 3);
+
+                // Get product recommendations
+                $recommendedProducts = $this->productRecommendationService
+                    ->getFormattedRecommendations($member, $siteId, 6);
             } catch (\Exception $e) {
                 // Log error but don't break dashboard
                 \App\Framework\Support\Logger::error('Failed to load recommendations', [
@@ -80,6 +89,7 @@ class MemberDashboardController extends Controller
                 ]);
             }
         }
+
 
         // Get counts for dashboard cards
         $stats = [
@@ -118,11 +128,27 @@ class MemberDashboardController extends Controller
             }
         }
 
+        $groupedSubscriptions = [];
+        if ($member->isEmailVerified()) {
+            try {
+                $groupedSubscriptions = $this->subscriptionListingService->getGroupedSubscriptions(
+                    $member->id,
+                    $siteId
+                );
+            } catch (\Exception $e) {
+                \App\Framework\Support\Logger::error('Failed to load subscriptions', [
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         return $this->view('member/dashboard', [
             'member' => $memberObj,
             'site' => SiteContext::get(),
             'stats' => $stats,
             'recommendedPages' => $recommendedPages,
+            'recommendedProducts' => $recommendedProducts,
             'progress' => $progress,
             'activity_trends' => $activityTrends,
             'recent_activities' => $recentActivities,
@@ -131,6 +157,7 @@ class MemberDashboardController extends Controller
             'trendingConversations' => $trendingConversations,
             'unclaimedRewards' => $unclaimedRewards,
             'giftedArticles' => $giftedArticles,
+            'groupedSubscriptions' => $groupedSubscriptions,
         ]);
     }
 

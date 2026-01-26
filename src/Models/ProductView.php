@@ -11,7 +11,9 @@ class ProductView extends Model
         'user_id',
         'session_id',
         'ip_address',
-        'site_id'
+        'site_id',
+        'created_at',
+        'viewed_at',
     ];
 
     protected $casts = [

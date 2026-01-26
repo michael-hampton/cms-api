@@ -893,6 +893,10 @@ use App\Framework\Support\SiteContext;
 
     @include('member/components/rewards-section')
 
+    @include('member/components/recommended-products-section', ['recommendedProducts' => $recommendedProducts])
+
+    @include('member/components/subscription-listing', ['groupedSubscriptions' => $groupedSubscriptions])
+
     @include('member/components/back-to-top')
 
     <div id="giftModal"

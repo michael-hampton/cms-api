@@ -36,7 +36,7 @@ class QueryBuilder
         'min', 'max', 'join', 'inner', 'left', 'right', 'on', 'as',
         'and', 'or', 'not', 'null', 'is', 'in', 'between', 'like',
         'exists', 'case', 'when', 'then', 'else', 'end', 'union',
-        'all', 'any', 'some', 'having', 'desc', 'asc', 'value', 'type'
+        'all', 'any', 'some', 'having', 'desc', 'asc', 'value', 'type', 'interval'
     ];
 
 
@@ -174,6 +174,42 @@ class QueryBuilder
 
         $this->wheres[] = [
             'type' => 'Date',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereMonth(string $column, $operator, $value = null): self
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Month',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereYear(string $column, $operator, $value = null): self
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Year',
             'column' => $column,
             'operator' => $operator,
             'value' => $value,
@@ -924,6 +960,17 @@ class QueryBuilder
                 $bindings[$paramKey] = $where['value'];
                 // Wrap the column in the DATE() function
                 return ["DATE({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
+            case 'Month':
+                $paramKey = 'param_' . $paramCounter++;
+                $quotedColumn = $this->quoteColumn($where['column']);
+                $bindings[$paramKey] = $where['value'];
+                return ["MONTH({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
+
+            case 'Year':
+                $paramKey = 'param_' . $paramCounter++;
+                $quotedColumn = $this->quoteColumn($where['column']);
+                $bindings[$paramKey] = $where['value'];
+                return ["YEAR({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
             case 'Nested':
                 [$subSql, $subBindings] = $this->compileWheres($where['query']->wheres, $paramCounter);
                 return ['(' . $subSql . ')', $subBindings];

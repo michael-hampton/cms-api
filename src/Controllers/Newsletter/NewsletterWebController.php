@@ -7,6 +7,7 @@ use App\Framework\Http\Request;
 use App\Framework\Http\StreamedResponse;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Services\Newsletter\NewsletterArchiveService;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -15,7 +16,8 @@ class NewsletterWebController extends Controller
 {
     public function __construct(
         private readonly NewsletterRepository         $newsletterRepository,
-        private readonly NewsletterPageBuilderService $pageBuilderService
+        private readonly NewsletterPageBuilderService $pageBuilderService,
+        private readonly NewsletterArchiveService     $archiveService
     )
     {
         parent::__construct();
@@ -271,5 +273,97 @@ HTML;
         $filename = trim($filename, '-');
         // Limit length
         return substr($filename, 0, 50);
+    }
+
+    /**
+     * Search newsletters (AJAX endpoint for index page)
+     */
+    public function search(Request $request)
+    {
+        $siteId = SiteContext::getId();
+
+        // Get filter parameters
+        $filters = [
+            'search' => $request->get('search', ''),
+            'interval' => $request->get('interval', ''),
+            'date_from' => $request->get('date_from', ''),
+            'date_to' => $request->get('date_to', ''),
+            'sort_by' => $request->get('sort_by', 'last_sent'),
+            'sort_order' => $request->get('sort_order', 'desc'),
+        ];
+
+        // Remove empty filters
+        $filters = array_filter($filters, fn($value) => $value !== '');
+
+        $page = (int)$request->get('page', 1);
+        $perPage = 12;
+
+        // Get filtered newsletters
+        $result = $this->archiveService->searchNewsletters($siteId, $filters, $page, $perPage);
+
+        // Format newsletters for JSON response
+        $formattedNewsletters = $result['newsletters']->map(function ($newsletter) {
+            return [
+                'id' => $newsletter->id,
+                'title' => $newsletter->title,
+                'content' => $newsletter->content,
+                'last_sent' => $newsletter->last_sent?->format('Y-m-d H:i:s'),
+                'interval' => $newsletter->interval,
+                'created_at' => $newsletter->created_at?->format('Y-m-d H:i:s'),
+            ];
+        })->toArray();
+
+        return $this->resourceResponse([
+            'success' => true,
+            'newsletters' => $formattedNewsletters,
+            'pagination' => $result['pagination'],
+            'filters_applied' => $result['filters_applied'],
+        ]);
+    }
+
+    /**
+     * Search and filter newsletters (AJAX endpoint)
+     */
+    public function searchArchive(Request $request)
+    {
+        $siteId = SiteContext::getId();
+
+        // Get filter parameters from request
+        $filters = [
+            'search' => $request->get('search', ''),
+            'interval' => $request->get('interval', ''),
+            'date_from' => $request->get('date_from', ''),
+            'date_to' => $request->get('date_to', ''),
+            'sort_by' => $request->get('sort_by', 'last_sent'),
+            'sort_order' => $request->get('sort_order', 'desc'),
+        ];
+
+        // Remove empty filters
+        $filters = array_filter($filters, fn($value) => $value !== '');
+
+        $page = (int)$request->get('page', 1);
+        $perPage = 20;
+
+        // Get filtered newsletters
+        $result = $this->archiveService->searchNewsletters($siteId, $filters, $page, $perPage);
+
+        // Format newsletters for JSON response
+        $formattedNewsletters = $result['newsletters']->map(function ($newsletter) {
+            return [
+                'id' => $newsletter->id,
+                'title' => $newsletter->title,
+                'content' => $newsletter->content,
+                'last_sent' => $newsletter->last_sent?->format('Y-m-d H:i:s'),
+                'interval' => $newsletter->interval,
+                'created_at' => $newsletter->created_at?->format('Y-m-d H:i:s'),
+            ];
+        })->toArray();
+
+        return $this->resourceResponse([
+            'success' => true,
+            'newsletters' => $formattedNewsletters,
+            'pagination' => $result['pagination'],
+            'filters_applied' => $result['filters_applied'],
+        ]);
     }
 }

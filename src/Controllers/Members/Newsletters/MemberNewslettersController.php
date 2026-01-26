@@ -29,7 +29,7 @@ class MemberNewslettersController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
         $subscriptions = $this->subscriberRepository->getNewslettersForMember($member->email, $siteId);

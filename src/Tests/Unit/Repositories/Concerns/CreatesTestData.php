@@ -59,6 +59,7 @@ use App\Models\ProductOffer;
 use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
+use App\Models\ProductView;
 use App\Models\ProductVoucher;
 use App\Models\RegionSet;
 use App\Models\RewardDefinition;
@@ -807,6 +808,18 @@ trait CreatesTestData
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+        ], $attributes));
+    }
+
+    protected function createProductView(array $attributes = []): Model
+    {
+        return ProductView::create(array_merge([
+            'product_id' => $this->createProduct()->id,
+            'site_id' => $this->siteId,
+            'user_id' => $this->createMember()->id,
+            'session_id' => 'test',
+            'ip_address' => '127.0.0.1',
+            'viewed_at' => date('Y-m-d H:i:s'),
         ], $attributes));
     }
 }

@@ -114,7 +114,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->get();
     }
 
-    public function getRecentlyViewed(array $productIds, int $limit = 6): Collection
+    public function getActiveProducts(array $productIds, int $limit = 6): Collection
     {
         if (empty($productIds)) {
             return new Collection([]);
@@ -571,4 +571,18 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         ];
     }
 
+    public function getRecommendationProducts(int $siteId, int $limit = 10, array $foundProductIds = []): Collection
+    {
+        $popularQuery = Product::where('site_id', $siteId)
+            ->where('is_active', true);
+
+        if (!empty($foundProductIds)) {
+            $popularQuery->whereNotIn('id', $foundProductIds);
+        }
+
+        $popularQuery->orderBy('created_at', 'desc')
+            ->limit($limit);
+
+        return $popularQuery->get();
+    }
 }
