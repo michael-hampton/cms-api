@@ -395,25 +395,34 @@
 
         if (newsletters.length === 0) {
             grid.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <h3>No Newsletters Found</h3>
-                        <p>Try adjusting your filters or search terms</p>
-                    </div>
-                `;
+            <div class="empty-state">
+                <div class="empty-state-icon">🔭</div>
+                <h3>No Newsletters Found</h3>
+                <p>Try adjusting your filters or search terms</p>
+            </div>
+        `;
             return;
         }
 
-        grid.innerHTML = newsletters.map(newsletter => `
-                <div class="newsletter-card" onclick="window.location.href='/newsletters/${newsletter.id}'">
-                    <div class="newsletter-date">${formatDate(newsletter.last_sent)}</div>
-                    <h3 class="newsletter-title">${escapeHtml(newsletter.title)}</h3>
-                    ${newsletter.content ? `<p class="newsletter-excerpt">${truncate(escapeHtml(newsletter.content), 150)}</p>` : ''}
-                    <a href="/newsletters/${newsletter.id}" class="newsletter-link" onclick="event.stopPropagation()">
-                        Read Newsletter →
-                    </a>
-                </div>
-            `).join('');
+        grid.innerHTML = newsletters.map(newsletter => {
+            // NEW: Check if there are multiple sends
+            const hasMultipleSends = newsletter.send_count && newsletter.send_count > 1;
+            const viewUrl = hasMultipleSends
+                ? `/newsletters/${newsletter.id}/editions`
+                : `/newsletters/${newsletter.id}`;
+
+            return `
+            <div class="newsletter-card" onclick="window.location.href='${viewUrl}'">
+                <div class="newsletter-date">${formatDate(newsletter.last_sent)}</div>
+                <h3 class="newsletter-title">${escapeHtml(newsletter.title)}</h3>
+                ${newsletter.content ? `<p class="newsletter-excerpt">${truncate(escapeHtml(newsletter.content), 150)}</p>` : ''}
+                ${hasMultipleSends ? `<p class="edition-count">${newsletter.send_count} editions available</p>` : ''}
+                <a href="${viewUrl}" class="newsletter-link" onclick="event.stopPropagation()">
+                    ${hasMultipleSends ? 'View Editions' : 'Read Newsletter'} →
+                </a>
+            </div>
+        `;
+        }).join('');
     }
 
     function displayPagination(pagination) {

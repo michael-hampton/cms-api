@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shop - All Products</title>
     @css('products.css')
+    @css('productModal.css')
 </head>
 <body>
 <div class="page-wrapper">
@@ -291,6 +292,7 @@
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
 </script>
 
+@js('productModal.js')
 @js('products.js')
 
 </body>

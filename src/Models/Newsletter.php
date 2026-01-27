@@ -22,7 +22,9 @@ class Newsletter extends Model
         'template',
         'created_at',
         'is_default',
-        'slug'
+        'slug',
+        'is_premium',
+        'allows_single_purchase'
     ];
 
     protected $casts = [

@@ -3,6 +3,7 @@
 namespace App\Services\Newsletter;
 
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Models\Newsletter;
 use App\Models\Page;
 use App\Repositories\Cms\PageRepository;
@@ -74,26 +75,54 @@ class NewsletterPageBuilderService
             $query->limit($newsletter->max_pages);
         }
 
+//        echo '<pre>';
+//        print_r($query->toSql());
+
         return $query->get();
+
     }
 
     /**
-     * Build newsletter HTML from pages
+     * Build newsletter HTML from pages with tracking
      */
-    public function buildNewsletterHtml(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken = null, bool $includeBlocks = false): string
+    public function buildNewsletterHtml(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken = null, bool $includeBlocks = false, ?int $sendId = null): string
     {
         $template = $newsletter->template ?? 'default';
 
         switch ($template) {
             case 'digest':
-                return $this->buildDigestTemplate($newsletter, $pages, $unsubscribeToken);
+                return $this->buildDigestTemplate($newsletter, $pages, $unsubscribeToken, $sendId);
             case 'featured':
-                return $this->buildFeaturedTemplate($newsletter, $pages, $unsubscribeToken);
+                return $this->buildFeaturedTemplate($newsletter, $pages, $unsubscribeToken, $sendId);
             case 'simple':
-                return $this->buildSimpleTemplate($newsletter, $pages, $unsubscribeToken);
+                return $this->buildSimpleTemplate($newsletter, $pages, $unsubscribeToken, $sendId);
             default:
-                return $this->buildDefaultTemplate($newsletter, $pages, $unsubscribeToken, $includeBlocks);
+                return $this->buildDefaultTemplate($newsletter, $pages, $unsubscribeToken, $includeBlocks, $sendId);
         }
+    }
+
+    /**
+     * Add tracking parameters to page URLs
+     */
+    /**
+     * Build tracking URL for a page
+     *
+     * @param int $pageId
+     * @param string $slug
+     * @param int|null $sendId
+     * @return string
+     */
+    private function buildTrackingUrl(int $pageId, string $slug, ?int $sendId = null): string
+    {
+        // Build tracking URL with placeholders that will be replaced per-recipient
+        $params = [
+            'send_id' => '{{SEND_ID}}',
+            'page_id' => $pageId,
+            'e' => '{{TRACKING_EMAIL}}',
+            'redirect' => $slug
+        ];
+
+        return url('/' . SiteContext::slug() . '/newsletters/track-view?' . http_build_query($params));
     }
 
     /**
@@ -851,7 +880,12 @@ class NewsletterPageBuilderService
     }
 
 
-    private function buildDigestTemplate(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken): string
+    private function buildDigestTemplate(
+        Newsletter $newsletter,
+        Collection $pages,
+        ?string    $unsubscribeToken = null,
+        ?int       $sendId = null
+    ): string
     {
         $html = [];
 
@@ -869,7 +903,7 @@ class NewsletterPageBuilderService
 
         // Compact page list
         foreach ($pages as $page) {
-            $html[] = $this->renderDigestItem($page);
+            $html[] = $this->renderDigestItem($page, $sendId);
         }
 
         $html[] = '</div>';
@@ -879,9 +913,15 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderDigestItem(Page $page): string
+    private function renderDigestItem($page, ?int $sendId = null): string
     {
-        $url = url($page->slug);
+        $isArray = is_array($page);
+        $pageId = $isArray ? $page['id'] : $page->id;
+        $title = $isArray ? $page['title'] : $page->title;
+        $subtitle = $isArray ? ($page['subtitle'] ?? '') : ($page->subtitle ?? '');
+        $slug = $isArray ? $page['slug'] : $page->slug;
+
+        $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
         $html = [];
 
         $html[] = '<div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">';
@@ -921,7 +961,12 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function buildFeaturedTemplate(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken): string
+    private function buildFeaturedTemplate(
+        Newsletter $newsletter,
+        Collection $pages,
+        ?string    $unsubscribeToken = null,
+        ?int       $sendId = null
+    ): string
     {
         $html = [];
 
@@ -930,7 +975,7 @@ class NewsletterPageBuilderService
         // First page as hero
         $featuredPage = $pages->first();
         if ($featuredPage) {
-            $html[] = $this->renderHeroPage($featuredPage);
+            $html[] = $this->renderHeroPage($featuredPage, $sendId);
             $pages = $pages->slice(1);
         }
 
@@ -939,7 +984,7 @@ class NewsletterPageBuilderService
         $html[] = '<h2 style="color: #333; margin-bottom: 20px;">More Articles</h2>';
 
         foreach ($pages as $page) {
-            $html[] = $this->renderCompactCard($page);
+            $html[] = $this->renderCompactCard($page, $sendId);
         }
 
         $html[] = '</div>';
@@ -949,9 +994,14 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderHeroPage(Page $page): string
+    private function renderHeroPage(Page $page, ?int $sendId = null): string
     {
-        $url = url($page->slug);
+        $isArray = is_array($page);
+        $pageId = $isArray ? $page['id'] : $page->id;
+        $title = $isArray ? $page['title'] : $page->title;
+        $slug = $isArray ? $page['slug'] : $page->slug;
+
+        $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
         $html = [];
 
         $html[] = '<div style="position: relative; margin-bottom: 40px;">';
@@ -981,9 +1031,14 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderCompactCard(Page $page): string
+    private function renderCompactCard(Page $page, ?int $sendId = null): string
     {
-        $url = url($page->slug);
+        $isArray = is_array($page);
+        $pageId = $isArray ? $page['id'] : $page->id;
+        $title = $isArray ? $page['title'] : $page->title;
+        $slug = $isArray ? $page['slug'] : $page->slug;
+
+        $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
         $html = [];
 
         $html[] = '<div style="margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 4px;">';
@@ -1003,7 +1058,12 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function buildSimpleTemplate(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken): string
+    private function buildSimpleTemplate(
+        Newsletter $newsletter,
+        Collection $pages,
+        ?string    $unsubscribeToken = null,
+        ?int       $sendId = null
+    ): string
     {
         $html = [];
 
@@ -1012,7 +1072,14 @@ class NewsletterPageBuilderService
         $html[] = '<ul style="list-style: none; padding: 0;">';
 
         foreach ($pages as $page) {
-            $url = url($page->slug);
+
+            $isArray = is_array($page);
+            $pageId = $isArray ? $page['id'] : $page->id;
+            $title = $isArray ? $page['title'] : $page->title;
+            $slug = $isArray ? $page['slug'] : $page->slug;
+
+            $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
             $html[] = '<li style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee;">';
             $html[] = '<a href="' . $url . '" style="color: #007bff; text-decoration: none; font-weight: bold;">';
             $html[] = htmlspecialchars($page->title);
@@ -1033,7 +1100,13 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function buildDefaultTemplate(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken, bool $includeBlocks = false): string
+    private function buildDefaultTemplate(
+        Newsletter $newsletter,
+        Collection $pages,
+        ?string    $unsubscribeToken = null,
+        bool       $includeBlocks = false,
+        ?int       $sendId = null
+    ): string
     {
         $html = [];
 
@@ -1044,7 +1117,7 @@ class NewsletterPageBuilderService
 
         // Pages
         foreach ($pages as $page) {
-            $html[] = $this->renderPageCard($page, $includeBlocks);
+            $html[] = $this->renderPageCard($page, $includeBlocks, $sendId);
         }
 
         // Footer
@@ -1054,9 +1127,16 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderPageCard(Page $page, bool $includeBlocks = true): string
+    private function renderPageCard(Page $page, bool $includeBlocks = true, ?int $sendId = null): string
     {
-        $url = url($page->slug);
+        $isArray = is_array($page);
+        $pageId = $isArray ? $page['id'] : $page->id;
+        $title = $isArray ? $page['title'] : $page->title;
+        $subtitle = $isArray ? ($page['subtitle'] ?? '') : ($page->subtitle ?? '');
+        $slug = $isArray ? $page['slug'] : $page->slug;
+
+        $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
         $html = [];
 
         $html[] = '<div style="margin-bottom: 30px; padding: 20px; border: 1px solid #eee; border-radius: 8px;">';

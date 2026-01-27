@@ -3,10 +3,18 @@
 namespace App\Controllers\Newsletter;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Http\StreamedResponse;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
+use App\Repositories\Cms\PageRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
+use App\Repositories\Newsletters\NewsletterSendRepository;
+use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Newsletter\NewsletterArchiveService;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use Dompdf\Dompdf;
@@ -17,7 +25,12 @@ class NewsletterWebController extends Controller
     public function __construct(
         private readonly NewsletterRepository         $newsletterRepository,
         private readonly NewsletterPageBuilderService $pageBuilderService,
-        private readonly NewsletterArchiveService     $archiveService
+        private readonly NewsletterArchiveService         $archiveService,
+        private readonly SubscriptionRepository           $subscriptionRepository,
+        private readonly SubscriberRepository             $subscriberRepository,
+        private readonly NewsletterSendRepository         $sendRepository,
+        private readonly NewsletterSendPageViewRepository $sendPageViewRepository,
+        private readonly PageRepository                   $pageRepository,
     )
     {
         parent::__construct();
@@ -37,6 +50,108 @@ class NewsletterWebController extends Controller
     public function show(int $id, Request $request)
     {
         $token = $request->query('token');
+        $sendId = $request->query('send_id');
+
+        $newsletter = $this->newsletterRepository->find($id);
+
+        if (!$newsletter) {
+            return $this->redirectResponse('', 404);
+        }
+
+        $newsletterSummary = $this->archiveService->getNewsletterArchive($newsletter->id, MemberAuth::id() ?? null);
+
+        if (!empty($newsletterSummary['requires_auth'])) {
+            return $this->view('newsletters/archive-access-required', [
+                'site' => SiteContext::get(),
+                'newsletter' => $newsletter,
+                'message' => $newsletterSummary['message'],
+                'access_type' => $newsletterSummary['access_type'],
+                'token' => $token,
+                'is_logged_in' => MemberAuth::check(),
+                'single_access_available' => $this->isSingleAccessAvailable($newsletter) ?? true
+            ]);
+        }
+
+        if ($newsletter->site_id !== SiteContext::getId()) {
+            return $this->redirectResponse('', 403);
+        }
+
+        // If viewing a specific edition, use cached content
+        if ($sendId) {
+            $send = $this->sendRepository->findByNewsletterAndSendId($newsletter->id, $sendId);
+
+            if ($send && $send->html_snapshot) {
+                // Use cached HTML - no tracking for archived views
+                $html = $send->html_snapshot;
+
+                // Remove tracking placeholders since this is an archive view
+                $html = str_replace('{{SEND_ID}}', '', $html);
+                $html = str_replace('{{TRACKING_EMAIL}}', '', $html);
+                // Convert tracking URLs back to direct URLs
+                $html = preg_replace(
+                    '/\/newsletters\/track-view\?send_id=&page_id=(\d+)&e=&redirect=([^"\']+)/',
+                    '$2',
+                    $html
+                );
+
+                $pages = $send->content_snapshot ?? [];
+
+                return $this->view('newsletters/show', [
+                    'site' => SiteContext::get(),
+                    'newsletter' => $newsletter,
+                    'html' => $html,
+                    'pages' => collect($pages),
+                    'token' => $token,
+                    'newsletter_summary' => $newsletterSummary,
+                    'latestNewsletter' => $newsletterSummary['latest_edition'],
+                    'newslettersByYear' => $newsletterSummary['grouped_editions'],
+                    'hasApp' => $this->archiveService->hasApp($newsletter->id),
+                    'send_id' => $sendId,
+                    'send_date' => $send->sent_at,
+                    'is_archive_view' => true,
+                    'years' => $newsletterSummary['years_available']
+                ]);
+            }
+        }
+
+        // Default behavior: generate current newsletter (no sendId for tracking)
+        $pages = collect([]);
+        if ($newsletter->isAutomated()) {
+            $pages = $this->pageBuilderService->getPagesForNewsletter(
+                $newsletter,
+                $newsletter->site_id
+            );
+        }
+
+        // Build HTML content without tracking (live view, not email)
+        $html = $this->pageBuilderService->buildNewsletterHtml(
+            $newsletter,
+            $pages,
+            $token,
+            true,
+            null // No sendId = no tracking
+        );
+
+        return $this->view('newsletters/show', [
+            'site' => SiteContext::get(),
+            'newsletter' => $newsletter,
+            'html' => $html,
+            'pages' => $pages,
+            'token' => $token,
+            'newsletter_summary' => $newsletterSummary,
+            'latestNewsletter' => $newsletterSummary['latest_edition'],
+            'newslettersByYear' => $newsletterSummary['grouped_editions'],
+            'hasApp' => $this->archiveService->hasApp($newsletter->id),
+            'is_archive_view' => false,
+            'years' => $newsletterSummary['years_available']
+        ]);
+    }
+
+    public function viewNewsletter(int $id, Request $request)
+    {
+        $token = $request->query('token');
+        $sendId = $request->query('send_id');
+
         $newsletter = $this->newsletterRepository->find($id);
 
         if (!$newsletter) {
@@ -47,29 +162,82 @@ class NewsletterWebController extends Controller
             return $this->redirectResponse('', 403);
         }
 
-        // Get pages for automated newsletter
+        // Try to get cached content first
+        if ($sendId) {
+            $send = $this->sendRepository->findByNewsletterAndSendId($newsletter->id, $sendId);
+
+            if ($send && $send->html_snapshot) {
+                $html = $send->html_snapshot;
+
+                // Remove tracking placeholders for archive view
+                $html = str_replace('{{SEND_ID}}', '', $html);
+                $html = str_replace('{{TRACKING_EMAIL}}', '', $html);
+                $html = preg_replace(
+                    '/\/newsletters\/track-view\?send_id=&page_id=(\d+)&e=&redirect=([^"\']+)/',
+                    '$2',
+                    $html
+                );
+
+                return $this->view('newsletters/view', [
+                    'site' => SiteContext::get(),
+                    'newsletter' => $newsletter,
+                    'html' => $html,
+                    'pages' => collect($send->content_snapshot ?? []),
+                    'token' => $token,
+                    'send_id' => $sendId,
+                    'send_date' => $send->sent_at,
+                    'is_archive_view' => true
+                ]);
+            }
+        }
+
+        // Fallback: Generate pages for newsletter
         $pages = collect([]);
+        $asOfDate = null;
+
+        if ($sendId) {
+            $send = $this->sendRepository->findByNewsletterAndSendId($newsletter->id, $sendId);
+            if ($send) {
+                $asOfDate = $send->sent_at;
+            }
+        }
+
         if ($newsletter->isAutomated()) {
             $pages = $this->pageBuilderService->getPagesForNewsletter(
                 $newsletter,
-                $newsletter->site_id
+                $newsletter->site_id,
+                $asOfDate
             );
         }
 
-        // Build HTML content
+        // Build HTML content without tracking
         $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
             $pages,
             $token,
-            true
+            true,
+            null // No tracking for archive/preview views
         );
 
-        return $this->view('newsletters/show', [
+        $html = urldecode($html);
+
+        $html = str_replace('{{SEND_ID}}', '', $html);
+        $html = str_replace('{{TRACKING_EMAIL}}', '', $html);
+        $html = preg_replace(
+            '/\/newsletters\/track-view\?send_id=&page_id=(\d+)&e=&redirect=([^"\']+)/',
+            '$2',
+            $html
+        );
+
+        return $this->view('newsletters/view', [
             'site' => SiteContext::get(),
             'newsletter' => $newsletter,
             'html' => $html,
             'pages' => $pages,
-            'token' => $token
+            'token' => $token,
+            'send_id' => $sendId,
+            'send_date' => $asOfDate,
+            'is_archive_view' => false
         ]);
     }
 
@@ -364,6 +532,326 @@ HTML;
             'newsletters' => $formattedNewsletters,
             'pagination' => $result['pagination'],
             'filters_applied' => $result['filters_applied'],
+        ]);
+    }
+
+    /**
+     * Toggle newsletter subscription (subscribe/unsubscribe)
+     */
+    public function toggle(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirectResponse('', 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
+
+        try {
+            $data = $request->all();
+
+            if (!isset($data['newsletter_id']) || !isset($data['subscribe'])) {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Missing required parameters'
+                ], 400);
+            }
+
+            $newsletterId = (int)$data['newsletter_id'];
+            $subscribe = (bool)$data['subscribe'];
+
+            // Get newsletter
+            $newsletter = $this->newsletterRepository->find($newsletterId);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Newsletter not found'
+                ], 404);
+            }
+
+            // Check if newsletter is premium and member has access
+            if ($newsletter->isPremium()) {
+                $hasAccess = $this->checkPremiumAccess($member, $newsletter);
+
+                if (!$hasAccess && $subscribe) {
+                    return $this->resourceResponse([
+                        'success' => false,
+                        'message' => 'You need an active subscription to access this premium newsletter',
+                        'requires_upgrade' => true
+                    ], 403);
+                }
+            }
+
+            // Find or create subscriber record
+            $subscriber = $this->subscriberRepository->findExisting(
+                $member->email,
+                $newsletterId,
+                $siteId
+            );
+
+            if ($subscribe) {
+                if ($subscriber) {
+                    // Resubscribe if previously unsubscribed
+                    if ($subscriber->unsubscribed_at) {
+                        $subscriber->resubscribe();
+                        $message = 'Successfully resubscribed to newsletter';
+                    } else {
+                        $message = 'Already subscribed to this newsletter';
+                    }
+                } else {
+                    // Create new subscription
+                    $subscriber = $this->subscriberRepository->create([
+                        'email' => $member->email,
+                        'newsletter_id' => $newsletterId,
+                        'site_id' => $siteId,
+                        'confirmed' => true, // Auto-confirm for logged-in members
+                        'confirmation_token' => bin2hex(random_bytes(32)),
+                        'unsubscribe_token' => bin2hex(random_bytes(32)),
+                        'subscribed_at' => now_datetime()->format('Y-m-d H:i:s')
+                    ]);
+                    $message = 'Successfully subscribed to newsletter';
+                }
+
+                Logger::info('Member subscribed to newsletter', [
+                    'member_id' => $member->id,
+                    'newsletter_id' => $newsletterId
+                ]);
+            } else {
+                if ($subscriber && !$subscriber->unsubscribed_at) {
+                    $subscriber->unsubscribe();
+                    $message = 'Successfully unsubscribed from newsletter';
+
+                    Logger::info('Member unsubscribed from newsletter', [
+                        'member_id' => $member->id,
+                        'newsletter_id' => $newsletterId
+                    ]);
+                } else {
+                    $message = 'Already unsubscribed from this newsletter';
+                }
+            }
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => $message,
+                'subscribed' => $subscribe
+            ]);
+
+        } catch (\Exception $e) {
+            Logger::error('Newsletter toggle failed', [
+                'member_id' => $member->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'An error occurred. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Check if member has premium access to newsletter
+     */
+    private function checkPremiumAccess(Member $member, $newsletter): bool
+    {
+        // Get member's active subscription
+        $subscription = $this->subscriptionRepository->getActiveSubscriptionForMember(
+            $member->id,
+            SiteContext::getId()
+        );
+
+        if (!$subscription) {
+            return false;
+        }
+
+        // Check if subscription grants access to this premium newsletter
+        return $subscription->hasPremiumAccess('newsletter', $newsletter->slug);
+    }
+
+    private function isSingleAccessAvailable($newsletter): bool
+    {
+        // Check multiple conditions for single access availability:
+
+        // 1. Check if newsletter explicitly allows single purchase
+        if (isset($newsletter->allows_single_purchase)) {
+            return (bool)$newsletter->allows_single_purchase;
+        }
+
+        // 2. Check if single content access feature is enabled for the site
+        $site = SiteContext::get();
+        if (isset($site->features['single_content_access'])) {
+            return (bool)$site->features['single_content_access'];
+        }
+
+        // 3. Check if there's a price set for single purchase
+        if (isset($newsletter->single_purchase_price) && $newsletter->single_purchase_price > 0) {
+            return true;
+        }
+
+        // 4. Default: enabled for premium newsletters, disabled for free ones
+        if (method_exists($newsletter, 'isPremium')) {
+            return $newsletter->isPremium();
+        }
+
+        // Default: disabled
+        return false;
+    }
+
+    /**
+     * Track when a user clicks on a page link from a newsletter
+     */
+    /**
+     * Track when a user clicks on a page link from a newsletter
+     */
+    public function trackPageView(Request $request)
+    {
+        try {
+            $sendId = $request->input('send_id');
+            $pageId = $request->input('page_id');
+            $emailHash = $request->input('e'); // Hashed email
+            $redirectUrl = $request->input('redirect');
+
+            if (!$sendId || !$pageId) {
+                // If missing params, just redirect to the page anyway
+                if ($redirectUrl) {
+                    return $this->redirectResponse($redirectUrl);
+                }
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Missing required parameters'
+                ], 400);
+            }
+
+            // Get IP and user agent
+            $ipAddress = $request->ip();
+            $userAgent = $request->userAgent();
+
+            // Track the view (we can't reverse the hash, so we just store the hash)
+            $pageViewRepo = app(NewsletterSendPageViewRepository::class);
+            $pageViewRepo->trackPageView($sendId, $pageId, $emailHash, $ipAddress, $userAgent);
+
+            // Redirect to the actual page
+            if ($redirectUrl) {
+                return $this->redirectResponse($redirectUrl);
+            }
+
+            $page = app(PageRepository::class)->find($pageId);
+            if ($page) {
+                return $this->redirectResponse('/' . $page->slug);
+            }
+
+            return $this->resourceResponse([
+                'success' => true
+            ]);
+
+        } catch (\Exception $e) {
+            Logger::error('Failed to track newsletter page view', [
+                'error' => $e->getMessage(),
+                'send_id' => $request->input('send_id'),
+                'page_id' => $request->input('page_id')
+            ]);
+
+            // Even if tracking fails, redirect the user
+            $redirectUrl = $request->input('redirect');
+            if ($redirectUrl) {
+                return $this->redirectResponse($redirectUrl);
+            }
+
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Failed to track view'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get analytics for a newsletter send
+     */
+    public function sendAnalytics(int $newsletterId, int $sendId, Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirectResponse('', 401);
+        }
+
+        // Check if user has permission to view analytics (admin/editor check)
+        // Implementation depends on your permission system
+
+        $send = $this->sendRepository->findByNewsletterAndSendId($newsletterId, $sendId);
+
+        if (!$send) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Newsletter send not found'
+            ], 404);
+        }
+
+        $statistics = $this->sendPageViewRepository->getViewStatistics($sendId);
+
+        // Calculate click-through rate
+        if ($send->recipient_count > 0) {
+            $statistics['click_through_rate'] =
+                round(($statistics['unique_recipients'] / $send->recipient_count) * 100, 2);
+        }
+
+        return $this->resourceResponse([
+            'success' => true,
+            'send' => [
+                'id' => $send->id,
+                'sent_at' => $send->sent_at->format('Y-m-d H:i:s'),
+                'recipient_count' => $send->recipient_count,
+                'recipients' => $send->recipients
+            ],
+            'statistics' => $statistics
+        ]);
+    }
+
+    /**
+     * Show list of all editions for a newsletter
+     */
+    public function editions(int $id, Request $request)
+    {
+        $newsletter = $this->newsletterRepository->find($id);
+
+        if (!$newsletter) {
+            return $this->redirectResponse('', 404);
+        }
+
+        if ($newsletter->site_id !== SiteContext::getId()) {
+            return $this->redirectResponse('', 403);
+        }
+
+        // Get all sends for this newsletter
+        $sends = $this->sendRepository->getSendsForNewsletter($newsletter->id);
+
+        // Group by year and month
+        $groupedSends = [];
+        foreach ($sends as $send) {
+            $date = new \DateTime($send['sent_at']);
+            $year = $date->format('Y');
+            $month = $date->format('F');
+
+            if (!isset($groupedSends[$year])) {
+                $groupedSends[$year] = [];
+            }
+            if (!isset($groupedSends[$year][$month])) {
+                $groupedSends[$year][$month] = [];
+            }
+
+            $groupedSends[$year][$month][] = [
+                'id' => $send['id'],
+                'sent_at' => $send['sent_at'],
+                'recipient_count' => $send['recipient_count'],
+                'page_count' => is_array($send['content_snapshot']) ? count($send['content_snapshot']) : 0,
+                'view_url' => url("/newsletters/{$newsletter->id}?send_id={$send['id']}")
+            ];
+        }
+
+        return $this->view('newsletters/editions', [
+            'site' => SiteContext::get(),
+            'newsletter' => $newsletter,
+            'grouped_sends' => $groupedSends,
+            'total_editions' => count($sends)
         ]);
     }
 }

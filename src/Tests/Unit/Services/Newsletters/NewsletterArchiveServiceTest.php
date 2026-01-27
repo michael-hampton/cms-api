@@ -3,7 +3,9 @@
 namespace App\Tests\Unit\Services\Newsletters;
 
 use App\Models\Newsletter;
+use App\Models\NewsletterSend;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Services\Newsletter\NewsletterArchiveService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
@@ -353,12 +355,104 @@ class NewsletterArchiveServiceTest extends FunctionalTestCase
         $this->assertEquals('Sent Newsletter', $result['newsletters']->first()->title);
     }
 
+    public function testGetNewsletterArchiveReturnsAllEditions(): void
+    {
+        // Create newsletter with multiple sends
+        $send1 = NewsletterSend::create([
+            'newsletter_id' => $this->newsletter->id,
+            'sent_at' => date('Y-m-d H:i:s', strtotime('2023-01-15')),
+            'recipient_count' => 100,
+            'content_snapshot' => [
+                ['id' => 1, 'title' => 'Page 1'],
+                ['id' => 2, 'title' => 'Page 2']
+            ]
+        ]);
+
+        $send2 = NewsletterSend::create([
+            'newsletter_id' => $this->newsletter->id,
+            'sent_at' => date('Y-m-d H:i:s', strtotime('2023-06-20')),
+            'recipient_count' => 150,
+            'content_snapshot' => [
+                ['id' => 3, 'title' => 'Page 3']
+            ]
+        ]);
+
+        $send3 = NewsletterSend::create([
+            'newsletter_id' => $this->newsletter->id,
+            'sent_at' => date('Y-m-d H:i:s', strtotime('2024-01-10')),
+            'recipient_count' => 200,
+            'content_snapshot' => []
+        ]);
+
+        $result = $this->service->getNewsletterArchive($this->newsletter->id);
+
+        $this->assertArrayHasKey('grouped_editions', $result);
+        $this->assertArrayHasKey('latest_edition', $result);
+        $this->assertArrayHasKey('total_editions', $result);
+
+        $this->assertEquals(3, $result['total_editions']);
+
+        $this->assertEquals($send3->id, $result['latest_edition']->id);
+
+        // Check grouping by year
+        $this->assertArrayHasKey('2023', $result['grouped_editions']);
+        $this->assertArrayHasKey('2024', $result['grouped_editions']);
+        $this->assertCount(2, $result['grouped_editions']['2023']);
+        $this->assertCount(1, $result['grouped_editions']['2024']);
+    }
+
+    public function testGetNewsletterArchiveIncludesPageCounts(): void
+    {
+        $send = NewsletterSend::create([
+            'newsletter_id' => $this->newsletter->id,
+            'sent_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'recipient_count' => 100,
+            'content_snapshot' => [
+                ['id' => 1, 'title' => 'Page 1'],
+                ['id' => 2, 'title' => 'Page 2'],
+                ['id' => 3, 'title' => 'Page 3']
+            ]
+        ]);
+
+        $result = $this->service->getNewsletterArchive($this->newsletter->id);
+
+        $year = date('Y');
+
+        $this->assertEquals(3, $result['grouped_editions'][$year][0]->page_count);
+    }
+
+    public function testGetNewsletterArchiveHandlesEmptySends(): void
+    {
+        $result = $this->service->getNewsletterArchive($this->newsletter->id);
+
+        $this->assertEquals(0, $result['total_editions']);
+        $this->assertNull($result['latest_edition']);
+        $this->assertEmpty($result['grouped_editions']);
+    }
+
+    public function testGetNewsletterArchiveReturnsErrorForInvalidNewsletter(): void
+    {
+        $result = $this->service->getNewsletterArchive(99999);
+
+        $this->assertArrayHasKey('error', $result);
+        $this->assertEquals('Newsletter not found', $result['error']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => '{}'
+        ]);
+
         $this->service = new NewsletterArchiveService(
-            new NewsletterRepository()
+            new NewsletterRepository(),
+            new NewsletterSendRepository()
         );
     }
 }

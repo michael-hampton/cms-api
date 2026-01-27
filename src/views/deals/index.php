@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today's Deals - Best Offers & Discounts</title>
     @css('deals.css')
+    @css('productModal.css')
     @css('deals-carousel.css')
 </head>
 <body>
@@ -311,6 +312,7 @@
 
 @js('deals-carousel.js')
 @js('deals.js')
+@js('productModal.js')
 @js('price-alert.js')
 
 </body>

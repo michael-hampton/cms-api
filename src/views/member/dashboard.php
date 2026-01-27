@@ -890,6 +890,7 @@ use App\Framework\Support\SiteContext;
     @include('member/components/recommended-section')
     @include('member/components/trending-section')
     @include('member/components/gifted-articles-section')
+    @include('member/components/newsletter-preferences')
 
     @include('member/components/rewards-section')
 

@@ -585,4 +585,17 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
         return $popularQuery->get();
     }
+
+    public function getRecentlyViewed(array $productIds, int $limit = 6): Collection
+    {
+        if (empty($productIds)) {
+            return new Collection([]);
+        }
+
+        return Product::whereIn('id', $productIds)
+            ->where('is_active', true)
+            ->with(['images', 'brand', 'approvedReviews'])
+            ->limit($limit)
+            ->get();
+    }
 }

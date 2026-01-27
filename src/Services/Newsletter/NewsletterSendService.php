@@ -1,6 +1,4 @@
 <?php
-// src/Services/NewsletterSendService.php
-
 namespace App\Services\Newsletter;
 
 use App\Framework\Support\SiteContext;
@@ -73,6 +71,9 @@ class NewsletterSendService
             ];
         }
 
+        $pages = [];
+        $baseHtml = '';
+
         // Build newsletter content
         if ($newsletter->isAutomated()) {
             $pages = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
@@ -85,7 +86,13 @@ class NewsletterSendService
                 ];
             }
 
-            $baseHtml = $this->pageBuilderService->buildNewsletterHtml($newsletter, $pages);
+            // Store page data for snapshot
+            $pages = $pages->map(fn($p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'subtitle' => $p->subtitle,
+                'slug' => $p->slug,
+            ])->toArray();
         } else {
             // Manual newsletter - use blocks
             $blocks = json_decode($newsletter->content, true);
@@ -98,6 +105,39 @@ class NewsletterSendService
         $sent = 0;
         $failed = [];
         $skipped = [];
+        $successfulRecipients = [];
+
+        // Log send with recipients and HTML snapshot - Create the send record BEFORE sending emails so we have a sendId
+        $sendRecord = $this->sendRepository->create([
+            'newsletter_id' => $newsletter->id,
+            'sent_at' => date('Y-m-d H:i:s'),
+            'recipient_count' => $sent,
+            'content_snapshot' => $pages,
+            'recipients' => $successfulRecipients,
+            'html_snapshot' => null
+        ]);
+
+        $sendId = $sendRecord->id;
+
+        // Now generate base HTML with tracking (for automated newsletters)
+        if ($newsletter->isAutomated()) {
+            // Rebuild pages collection from snapshot for rendering
+            $pagesCollection = collect($pages);
+            $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
+                $newsletter,
+                $pagesCollection,
+                null, // unsubscribe token - will be added per-recipient
+                false, // includeBlocks
+                $sendId // NEW: Pass sendId for tracking
+            );
+        } else {
+            // Manual newsletter - use blocks
+            $blocks = json_decode($newsletter->content, true);
+            if (!is_array($blocks)) {
+                $blocks = [];
+            }
+            $baseHtml = $this->renderBlocksToHtml($blocks);
+        }
 
         foreach ($allSubscribers as $email) {
             try {
@@ -147,11 +187,12 @@ class NewsletterSendService
 
                 // Add unsubscribe link to HTML
                 $html = $newsletter->isAutomated()
-                    ? $baseHtml // Already has footer with token placeholder
+                    ? $this->personalizeHtmlForRecipient($baseHtml, $email, $unsubscribeToken, $sendId)
                     : $this->addUnsubscribeLink($baseHtml, $unsubscribeToken);
 
                 $this->emailService->send($email, $newsletter->title, $html);
                 $sent++;
+                $successfulRecipients[] = $email;
             } catch (\Exception $e) {
                 $failed[] = [
                     'email' => $email,
@@ -164,11 +205,11 @@ class NewsletterSendService
         // Update newsletter
         $this->newsletterRepository->update($newsletter->id, ['last_sent' => date('Y-m-d H:i:s')]);
 
-        // Log send
-        $this->sendRepository->create([
-            'newsletter_id' => $newsletter->id,
-            'sent_at' => date('Y-m-d H:i:s'),
-            'recipient_count' => $sent
+        // Update send record with final data
+        $this->sendRepository->update($sendRecord->id, [
+            'recipient_count' => $sent,
+            'recipients' => $successfulRecipients,
+            'html_snapshot' => $baseHtml // Store the base HTML without personalization
         ]);
 
         return [
@@ -177,8 +218,35 @@ class NewsletterSendService
             'recipients' => $sent,
             'skipped' => $skipped,
             'failed' => $failed,
-            'pages_included' => $newsletter->isAutomated() ? $pages->count() : 0
+            'pages_included' => $newsletter->isAutomated() ? count($pages) : 0,
+            'send_id' => $sendId
         ];
+    }
+
+    /**
+     * Personalize HTML for a specific recipient with tracking links
+     */
+    private function personalizeHtmlForRecipient(string $html, string $email, ?string $unsubscribeToken, int $sendId): string
+    {
+        $html = urldecode($html);
+
+        // Replace tracking placeholders with recipient-specific values
+        $emailHash = md5($email);
+
+        // Replace {{TRACKING_EMAIL}} placeholder with hashed email
+        $html = str_replace('{{TRACKING_EMAIL}}', $emailHash, $html);
+
+        // Replace {{SEND_ID}} placeholder
+        $html = str_replace('{{SEND_ID}}', (string)$sendId, $html);
+
+        // Add unsubscribe footer
+        if ($unsubscribeToken) {
+            $unsubscribeUrl = url("/member/subscriptions/unsubscribe/{$unsubscribeToken}");
+            $unsubscribeFooter = "<hr><p style='font-size: 12px; color: #666;'>Don't want to receive these emails? <a href='{$unsubscribeUrl}'>Unsubscribe</a></p>";
+            $html .= $unsubscribeFooter;
+        }
+
+        return $html;
     }
 
     private function getUnsubscribeToken(string $email, int $siteId): ?string

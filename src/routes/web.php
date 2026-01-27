@@ -46,6 +46,7 @@ use App\Controllers\Members\Subscriptions\MemberSubscriptionPaymentsController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionPlansController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionsController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionUpgradeController;
+use App\Controllers\Members\Subscriptions\SingleContentAccessController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Newsletter\NewsletterWebController;
 use App\Controllers\Product\ProductComparisonController;
@@ -303,10 +304,23 @@ $router->post('/api/{site}/subscription-plans/{slug}/validate-voucher', [MemberS
 
 $router->get('/{site}/newsletters', [NewsletterWebController::class, 'index']);
 $router->get('/{site}/newsletters/{id}', [NewsletterWebController::class, 'show']);
+$router->get('/{site}/newsletters/{id}/view', [NewsletterWebController::class, 'viewNewsletter']);
 $router->get('/{site}/newsletters/archive', [NewsletterWebController::class, 'archive']);
 $router->get('{site}/newsletters/{id}/download', [NewsletterWebController::class, 'downloadPdf']);
 $router->get('/{site}/newsletters/archive/search', [NewsletterWebController::class, 'searchArchive']);
 $router->get('/{site}/newsletters/search', [NewsletterWebController::class, 'search']);
+$router->post('/{site}/member/newsletters/toggle', [NewsletterWebController::class, 'toggle']);
+$router->post('/{site}/newsletters/track-view', [NewsletterWebController::class, 'trackPageView']);
+$router->get('/{site}/newsletters/{newsletterId}/sends/{sendId}/analytics', [NewsletterWebController::class, 'sendAnalytics']);
+
+$router->get('/{site}/member/single-access', [SingleContentAccessController::class, 'index']);
+$router->get('/{site}/member/single-access/show', [SingleContentAccessController::class, 'show']);
+$router->get('/{site}/member/single-access/purchase', [SingleContentAccessController::class, 'purchase']);
+$router->post('/{site}/member/single-access/purchase', [SingleContentAccessController::class, 'purchase']);
+$router->post('/{site}/member/single-access/complete', [SingleContentAccessController::class, 'complete']);
+
+$router->get('/{site}/newsletters/track-view', [NewsletterWebController::class, 'trackPageView']);
+$router->get('/{site}/newsletters/{newsletterId}/sends/{sendId}/analytics', [NewsletterWebController::class, 'sendAnalytics']);
 
 
 //faqs
@@ -347,6 +361,11 @@ $router->post('/api/{site}/checkout/confirm-payment', [PaymentController::class,
 
 $router->get('/api/{site}/compare', [ProductComparisonController::class, 'compare']);
 $router->get('/{site}/compare', [ProductComparisonController::class, 'index']);
+
+$router->get('/{site}/products/{id}/modal', [ProductListController::class, 'getProductModal']);
+
+// For deals page
+$router->get('/{site}/deals/{id}/modal', [DealsController::class, 'getProductModal']);
 
 
 // Apply page member access check to content routes

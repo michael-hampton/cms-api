@@ -2063,6 +2063,125 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->assertStringNotContainsString('Use Code:', $html);
     }
 
+    public function testBuildNewsletterHtmlIncludesTrackingWithSendId(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'template' => 'default',
+            'content' => 'test'
+        ]);
+
+        $page = new Page([
+            'id' => 1,
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'site_id' => $this->siteId,
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'subtitle' => 'Test subtitle'
+        ]);
+
+        $pages = collect([$page]);
+
+        $sendId = 123;
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, $sendId);
+        $html = urldecode($html);
+
+        // Should contain tracking URL with placeholders
+        $this->assertStringContainsString('/newsletters/track-view', $html);
+        $this->assertStringContainsString('send_id={{SEND_ID}}', $html);
+        $this->assertStringContainsString('e={{TRACKING_EMAIL}}', $html);
+        $this->assertStringContainsString('page_id=1', $html);
+    }
+
+    public function testBuildNewsletterHtmlWithoutSendIdUsesDirectLinks(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'template' => 'default',
+            'content' => 'test'
+        ]);
+
+        $page = new Page([
+            'id' => 1,
+            'slug' => 'test-page',
+            'title' => 'Test Page',
+            'subtitle' => 'Test Subtitle'
+        ]);
+
+        $pages = collect([$page]);
+
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, null);
+
+        // Should contain direct URLs, not tracking URLs
+        $this->assertStringNotContainsString('/newsletters/track-view', $html);
+        $this->assertStringContainsString('/test-page', $html);
+    }
+
+    public function testDigestTemplateIncludesTracking(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Digest Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'template' => 'digest',
+            'content' => 'test'
+        ]);
+
+        $pages = collect([
+            (object)[
+                'id' => 5,
+                'title' => 'Digest Item',
+                'subtitle' => 'Subtitle',
+                'slug' => 'digest-item'
+            ]
+        ]);
+
+        $sendId = 456;
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, $sendId);
+        $html = urldecode($html);
+
+        $this->assertStringContainsString('/newsletters/track-view', $html);
+        $this->assertStringContainsString('page_id=5', $html);
+        $this->assertStringContainsString('{{SEND_ID}}', $html);
+        $this->assertStringContainsString('{{TRACKING_EMAIL}}', $html);
+    }
+
+    public function testFeaturedTemplateIncludesTracking(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Featured Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'template' => 'featured',
+            'content' => 'test'
+        ]);
+
+        $page = new Page([
+            'id' => 10,
+            'title' => 'Featured Page',
+            'slug' => 'featured-page',
+            'subtitle' => 'Test Subtitle'
+        ]);
+
+        $pages = collect([$page]);
+
+        $sendId = 789;
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, $sendId);
+        $html = urldecode($html);
+
+        $this->assertStringContainsString('/newsletters/track-view', $html);
+        $this->assertStringContainsString('page_id=10', $html);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

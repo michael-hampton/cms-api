@@ -18,7 +18,7 @@ class MemberNewslettersController extends Controller
     public function __construct(
         private readonly SubscriberRepository    $subscriberRepository,
         private readonly NewsletterRepository    $newsletterRepository,
-        private readonly NewsletterSignupService $newsletterSignupService,
+        private readonly NewsletterSignupService $newsletterSignupService
     ) {
         parent::__construct();
     }

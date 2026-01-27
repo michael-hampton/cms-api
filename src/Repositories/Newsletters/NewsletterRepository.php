@@ -3,13 +3,14 @@
 namespace App\Repositories\Newsletters;
 
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\Newsletter;
 use App\Repositories\Repository;
 
 class NewsletterRepository extends Repository
 {
-    public function find(int $id, array $relations = []): ?Newsletter
+    public function find(int $id, array $relations = []): ?Model
     {
         return Newsletter::find($id);
     }
@@ -65,6 +66,14 @@ class NewsletterRepository extends Repository
             ->where('active', true)
             ->where('is_default', true)
             ->first();
+    }
+
+    public function getNewslettersForMember(Member $member): Collection
+    {
+        $newsletterSubscriptions = $member->newsletters;
+        $newsletterIds = $newsletterSubscriptions->pluck('newsletter_id')->toArray();
+
+        return Newsletter::whereIn('id', $newsletterIds)->get();
     }
 
     protected function getModelClass(): string

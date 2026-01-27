@@ -50,6 +50,15 @@ class SubscriberRepository extends Repository
             ->get();
     }
 
+    public function getAllNewslettersForMember(string $email, ?int $siteId = null): Collection
+    {
+        $siteId = $siteId ?? $this->siteId;
+
+        return Subscriber::where('email', $email)
+            ->where('site_id', $siteId)
+            ->get();
+    }
+
 
     public function findByEmailAndNewsletter(string $email, int $newsletterId, int $siteId): ?Subscriber
     {

@@ -12,6 +12,7 @@ use App\Models\Menu;
 use App\Models\Product;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
+use App\Repositories\Product\ProductViewRepository;
 use App\Repositories\Product\ReviewRepository;
 use App\Search\SearchCriteria;
 use App\Services\Cms\MenuRenderer;
@@ -24,6 +25,7 @@ class ProductListController extends Controller
         private readonly ProductService   $productService,
         private readonly ProductRepository $productRepository,
         private readonly ReviewRepository $reviewRepository,
+        private readonly ProductViewRepository $productViewRepository,
     )
     {
         parent::__construct();
@@ -216,5 +218,165 @@ class ProductListController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getProductModal(Request $request, $id)
+    {
+        try {
+            $product = $this->productRepository->find($id);
+
+            if (!$product) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Product not found'
+                ], 404);
+            }
+
+            // Track the view
+            $userId = auth()->user()?->id ?? null;
+            $sessionId = session_id() ?: $request->session()->getId();
+            $ipAddress = $request->ip();
+
+            // Only track if not recently viewed (within last 60 minutes)
+            if (!$userId || !$this->productViewRepository->hasRecentView($id, $userId, 60)) {
+                $this->productViewRepository->trackView($product, $userId, $sessionId, $ipAddress);
+            }
+
+            // Load all necessary relationships
+            $product->load([
+                'images',
+                'activeVariants.images',
+                'activeVariants.merchants.merchant',
+                'availableMerchants.merchant',
+                'brand',
+                'category',
+                'approvedReviews',
+                'specifications.group'
+            ]);
+
+            // Get related products
+            $relatedProducts = $this->productRepository->findRelated($product, 6);
+
+            // Get similar items (from same category)
+            $similarItems = Product::where('category_id', $product->category_id)
+                ->where('id', '!=', $product->id)
+                ->where('is_active', true)
+                ->limit(6)
+                ->get();
+
+            // Format the response
+            $productData = [
+                'id' => $product->id,
+                'name' => $product->name,
+                'slug' => $product->slug,
+                'description' => $product->description,
+                'price' => $product->price,
+                'sale_price' => $product->sale_price,
+                'brand' => [
+                    'id' => $product->brand?->id,
+                    'name' => $product->brand?->name
+                ],
+                'category' => [
+                    'id' => $product->category?->id,
+                    'name' => $product->category?->name
+                ],
+                'images' => $product->images->map(fn($img) => [
+                    'url' => $img->url,
+                    'alt' => $img->alt,
+                    'is_primary' => $img->is_primary
+                ])->toArray(),
+                'variants' => $product->activeVariants->map(function ($variant) {
+                    return [
+                        'id' => $variant->id,
+                        'name' => $variant->name,
+                        'sku' => $variant->sku,
+                        'price' => $variant->price,
+                        'sale_price' => $variant->sale_price,
+                        'attributes' => $variant->attributes,
+                        'in_stock' => $variant->in_stock,
+                        'stock_quantity' => $variant->stock_quantity,
+                        'images' => $variant->images->map(fn($img) => [
+                            'url' => $img->url,
+                            'alt' => $img->alt
+                        ])->toArray(),
+                        'merchants' => $variant->merchants->map(function ($merchant) {
+                            return [
+                                'id' => $merchant->id,
+                                'merchant_id' => $merchant->merchant_id,
+                                'name' => $merchant->merchant?->name,
+                                'url' => $merchant->url,
+                                'price' => $merchant->effective_price,
+                                'sale_price' => $merchant->effective_sale_price,
+                                'is_available' => $merchant->is_available
+                            ];
+                        })->toArray()
+                    ];
+                })->toArray(),
+                'merchants' => $product->availableMerchants->map(function ($merchant) {
+                    return [
+                        'id' => $merchant->id,
+                        'merchant_id' => $merchant->merchant_id,
+                        'name' => $merchant->merchant?->name,
+                        'url' => $merchant->url,
+                        'price' => $merchant->effective_price,
+                        'sale_price' => $merchant->effective_sale_price,
+                        'is_available' => $merchant->is_available,
+                        'discount_percentage' => $merchant->discount_percentage,
+                        'has_discount' => $merchant->has_discount
+                    ];
+                })->toArray(),
+                'reviews' => $product->approvedReviews->map(fn($review) => [
+                    'id' => $review->id,
+                    'rating' => $review->rating,
+                    'title' => $review->title,
+                    'comment' => $review->comment,
+                    'author_name' => $review->author_name,
+                    'helpful_count' => $review->helpful_count,
+                    'is_verified_purchase' => $review->is_verified_purchase
+                ])->toArray(),
+                'specifications' => $product->specifications->groupBy('category')->map(function ($specs, $category) {
+                    return [
+                        'category' => $category,
+                        'items' => $specs->map(fn($spec) => [
+                            'key' => $spec->key,
+                            'value' => $spec->value
+                        ])->toArray()
+                    ];
+                })->values()->toArray(),
+                'average_rating' => $product->average_rating ?? 0,
+                'review_count' => $product->approvedReviews->count(),
+                'stock_quantity' => $product->stock_quantity,
+                'in_stock' => $product->in_stock
+            ];
+
+            return $this->resourceResponse([
+                'success' => true,
+                'product' => $productData,
+                'related_products' => $relatedProducts->map(fn($p) => $this->formatProductCard($p))->toArray(),
+                'similar_items' => $similarItems->map(fn($p) => $this->formatProductCard($p))->toArray()
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Error fetching product details',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function formatProductCard($product): array
+    {
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'price' => $product->price,
+            'sale_price' => $product->sale_price,
+            'image' => $product->main_image_url ?? $product->images->first()?->url ?? null,
+            'brand' => $product->brand?->name,
+            'average_rating' => $product->average_rating ?? 0,
+            'review_count' => $product->approvedReviews->count() ?? 0
+        ];
     }
 }

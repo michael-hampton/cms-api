@@ -1442,6 +1442,26 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleSection(section);
         }
     });
+
+    const dealsGrid = document.getElementById('deals-grid');
+
+    if (dealsGrid) {
+        dealsGrid.addEventListener('click', (e) => {
+            const dealCard = e.target.closest('[data-product-id]');
+
+            // Don't open modal if clicking action buttons
+            if (e.target.closest('.btn-compare, .btn-wishlist, .btn-cart, .shop-now-btn')) {
+                return;
+            }
+
+            if (dealCard) {
+                const productId = dealCard.dataset.productId;
+                if (window.productModal) {
+                    window.productModal.open(productId);
+                }
+            }
+        });
+    }
 });
 
 async function subscribeDealAlert() {

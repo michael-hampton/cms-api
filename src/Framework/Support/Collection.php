@@ -64,7 +64,13 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
     public function map(callable $callback): self
     {
-        return new static(array_map($callback, $this->items));
+        $items = [];
+
+        foreach ($this->items as $key => $item) {
+            $items[$key] = $callback($item, $key);
+        }
+
+        return new static($items);
     }
 
     public function filter(?callable $callback = null): self

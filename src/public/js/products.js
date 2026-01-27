@@ -305,6 +305,25 @@
 
         // Browser back/forward
         window.addEventListener('popstate', loadFromURL);
+
+        // Product card click to open modal
+        elements.productsGrid.addEventListener('click', (e) => {
+            e.preventDefault();
+            const productCard = e.target.closest('.product-card');
+            alert('here')
+
+            // Don't open modal if clicking action buttons
+            if (e.target.closest('.btn-compare, .btn-flip, .btn-wishlist, .btn-cart, .btn-show-review, .product-card-back')) {
+                return;
+            }
+
+            if (productCard) {
+                const productId = productCard.dataset.productId;
+                if (window.productModal) {
+                    window.productModal.open(productId);
+                }
+            }
+        });
     }
 
     // Handle search
