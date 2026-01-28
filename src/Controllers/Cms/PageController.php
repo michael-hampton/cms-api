@@ -570,12 +570,17 @@ class PageController extends Controller
             $sites = $request->get('sites');
             $tags = $request->get('tags');
             $categories = $request->get('categories');
+            $search = $request->get('search');
 
             if (!$startDate || !$endDate) {
                 return $this->errorResponse('start_date and end_date are required', 422);
             }
 
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+
+            if (!empty($search)) {
+                $criteria->setSearchQuery($search);
+            }
 
             // Date range filter for published_at or scheduled_at
             $criteria->addFilter('date_range', [

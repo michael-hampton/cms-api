@@ -687,6 +687,16 @@ class PageRepository extends Repository
             'creator'
         ]);
 
+        // Add search query if provided
+        $searchQuery = $criteria->getSearchQuery();
+        if (!empty($searchQuery)) {
+            $query->where(function ($q) use ($searchQuery) {
+                $q->where('title', 'LIKE', "%{$searchQuery}%")
+                    ->orWhere('subtitle', 'LIKE', "%{$searchQuery}%")
+                    ->orWhere('slug', 'LIKE', "%{$searchQuery}%");
+            });
+        }
+
         // Handle date range filter - use whereRaw with named parameters
         $dateRange = $criteria->getFilter('date_range');
         if ($dateRange) {

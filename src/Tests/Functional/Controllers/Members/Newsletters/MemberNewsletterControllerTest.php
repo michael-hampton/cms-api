@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\Model;
 use App\Models\Newsletter;
 use App\Models\NewsletterSend;
+use App\Models\NewsletterSendRecipient;
 use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -422,4 +423,205 @@ class MemberNewsletterControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('Active Newsletter', $response['body']);
         $this->assertStringContainsString('Inactive Newsletter', $response['body']);
     }*/
+
+    public function testPreviewSendsToSpecifiedEmails(): void
+    {
+        $page = \App\Models\Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'site_id' => $this->siteId,
+            'status' => 'published',
+            'published_at' => now_datetime()->format('Y-m-d H:i:s')
+        ]);
+
+        $response = $this->postForSiteUnauthenticated("/newsletters/{$this->testNewsletter->id}/preview", [
+            'preview_emails' => ['preview1@example.com', 'preview2@example.com']
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['data']['preview']);
+        $this->assertGreaterThan(0, $data['data']['send_id']);
+    }
+
+    public function testPreviewFailsWithNoEmails(): void
+    {
+        $response = $this->postForSite("/newsletters/{$this->testNewsletter->id}/preview", [
+            'preview_emails' => []
+        ]);
+
+        $this->assertResponseStatus(400, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+        $this->assertEquals('No preview email addresses provided', $data['error']);
+    }
+
+    public function testPreviewFailsWithInvalidEmail(): void
+    {
+        $response = $this->postForSite("/newsletters/{$this->testNewsletter->id}/preview", [
+            'preview_emails' => ['invalid-email']
+        ]);
+
+        $this->assertResponseStatus(400, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('Invalid email address', $data['error']);
+    }
+
+    public function testPreviewFailsWithTooManyEmails(): void
+    {
+        $emails = array_map(fn($i) => "test{$i}@example.com", range(1, 11));
+
+        $response = $this->postForSite("/newsletters/{$this->testNewsletter->id}/preview", [
+            'preview_emails' => $emails
+        ]);
+
+        $this->assertResponseStatus(400, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertEquals('Maximum 10 preview recipients allowed', $data['error']);
+    }
+
+    public function testGetSendStatisticsReturnsCorrectData(): void
+    {
+        // Create a send record
+        $send = NewsletterSend::create([
+            'newsletter_id' => $this->testNewsletter->id,
+            'sent_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'recipient_count' => 10,
+            'sent_count' => 8,
+            'failed_count' => 2,
+            'pending_count' => 0,
+            'content_snapshot' => [],
+            'html_snapshot' => '<html>Test</html>'
+        ]);
+
+        // Create some recipients
+        NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'user1@example.com',
+            'status' => 'sent',
+            'sent_at' => now_datetime()->format('Y-m-d H:i:s')
+        ]);
+
+        NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'user2@example.com',
+            'status' => 'failed',
+            'error_message' => 'SMTP error'
+        ]);
+
+        $response = $this->getForSite("/newsletters/{$this->testNewsletter->id}/sends/{$send->id}/statistics");
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('statistics', $data);
+        $this->assertGreaterThanOrEqual(0, $data['statistics']['sent']);
+        $this->assertGreaterThanOrEqual(0, $data['statistics']['failed']);
+    }
+
+    public function testGetSendStatisticsFailsForInvalidNewsletter(): void
+    {
+        $response = $this->getForSite("/newsletters/99999/sends/1/statistics");
+
+        $this->assertResponseStatus(404, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function testRetrySendRetriesFailedRecipients(): void
+    {
+        // Create a send record with failed recipients
+        $send = NewsletterSend::create([
+            'newsletter_id' => $this->testNewsletter->id,
+            'sent_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'recipient_count' => 3,
+            'sent_count' => 1,
+            'failed_count' => 2,
+            'pending_count' => 0,
+            'content_snapshot' => [],
+            'html_snapshot' => '<html>Test</html>'
+        ]);
+
+        // Create failed recipients
+        NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'failed1@example.com',
+            'status' => 'failed',
+            'attempts' => 1,
+            'error_message' => 'SMTP error'
+        ]);
+
+        NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'failed2@example.com',
+            'status' => 'failed',
+            'attempts' => 2,
+            'error_message' => 'Connection timeout'
+        ]);
+
+        $response = $this->postForSite("/newsletters/{$this->testNewsletter->id}/sends/{$send->id}/retry", [
+            'max_attempts' => 3
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEquals($send->id, $data['data']['send_id']);
+        $this->assertGreaterThan(0, $data['data']['retried']);
+    }
+
+    public function testRetrySendFailsWhenNoRetryableRecipients(): void
+    {
+        // Create a send record with all recipients successfully sent
+        $send = NewsletterSend::create([
+            'newsletter_id' => $this->testNewsletter->id,
+            'sent_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'recipient_count' => 2,
+            'sent_count' => 2,
+            'failed_count' => 0,
+            'pending_count' => 0,
+            'content_snapshot' => [],
+            'html_snapshot' => '<html>Test</html>'
+        ]);
+
+        NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'sent@example.com',
+            'status' => 'sent',
+            'sent_at' => now_datetime()->format('Y-m-d H:i:s')
+        ]);
+
+        $response = $this->postForSite("/newsletters/{$this->testNewsletter->id}/sends/{$send->id}/retry", [
+            'max_attempts' => 3
+        ]);
+
+        $this->assertResponseStatus(400, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertEquals('No recipients available for retry', $data['error']);
+    }
+
+    public function testRetrySendFailsForInvalidSendId(): void
+    {
+        $response = $this->postForSite("/newsletters/{$this->testNewsletter->id}/sends/99999/retry", [
+            'max_attempts' => 3
+        ]);
+
+        $this->assertResponseStatus(400, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
 }

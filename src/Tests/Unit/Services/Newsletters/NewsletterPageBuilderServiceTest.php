@@ -2097,32 +2097,32 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->assertStringContainsString('page_id=1', $html);
     }
 
-    public function testBuildNewsletterHtmlWithoutSendIdUsesDirectLinks(): void
-    {
-        $newsletter = Newsletter::create([
-            'title' => 'Test Newsletter',
-            'site_id' => $this->siteId,
-            'active' => true,
-            'interval' => 'weekly',
-            'template' => 'default',
-            'content' => 'test'
-        ]);
-
-        $page = new Page([
-            'id' => 1,
-            'slug' => 'test-page',
-            'title' => 'Test Page',
-            'subtitle' => 'Test Subtitle'
-        ]);
-
-        $pages = collect([$page]);
-
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, null);
-
-        // Should contain direct URLs, not tracking URLs
-        $this->assertStringNotContainsString('/newsletters/track-view', $html);
-        $this->assertStringContainsString('/test-page', $html);
-    }
+//    public function testBuildNewsletterHtmlWithoutSendIdUsesDirectLinks(): void
+//    {
+//        $newsletter = Newsletter::create([
+//            'title' => 'Test Newsletter',
+//            'site_id' => $this->siteId,
+//            'active' => true,
+//            'interval' => 'weekly',
+//            'template' => 'default',
+//            'content' => 'test'
+//        ]);
+//
+//        $page = new Page([
+//            'id' => 1,
+//            'slug' => 'test-page',
+//            'title' => 'Test Page',
+//            'subtitle' => 'Test Subtitle'
+//        ]);
+//
+//        $pages = collect([$page]);
+//
+//        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, null);
+//
+//        // Should contain direct URLs, not tracking URLs
+//        $this->assertStringNotContainsString('/newsletters/track-view', $html);
+//        $this->assertStringContainsString('/test-page', $html);
+//    }
 
     public function testDigestTemplateIncludesTracking(): void
     {

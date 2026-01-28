@@ -210,6 +210,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once()->with(1, 2, 2);
 
         $this->pageRepository->shouldReceive('duplicateBlocks')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateOwner')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateSeo')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateSettings')->with(1, 2, 2)->once();
@@ -246,6 +247,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
         $this->pageHistory->shouldReceive('logPageClonedToSite')->once();
 
         $this->pageRepository->shouldReceive('duplicateBlocks')->once();
+        $this->pageRepository->shouldReceive('duplicateOwner')->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->once();
         $this->pageRepository->shouldReceive('duplicateCategoriesToSite')->andThrow(new \Exception('Categories clone failed'));
 
@@ -337,6 +339,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
         $this->pageRepository->shouldReceive('duplicateBlocks')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->with(1, 2, 2)->once();
         $this->pageRepository->shouldReceive('duplicateCategoriesToSite')->with(1, 2, 2)->once();
+        $this->pageRepository->shouldReceive('duplicateOwner')->with(1, 2, 2)->once();
 
         // These should NOT be called
         $this->pageRepository->shouldReceive('duplicateProductsToSite')->never();
@@ -418,6 +421,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
 
         // No duplication methods should be called
         $this->pageRepository->shouldReceive('duplicateBlocks')->never();
+        $this->pageRepository->shouldReceive('duplicateOwner')->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->never();
         $this->pageRepository->shouldReceive('duplicateSeo')->never();
         $this->pageRepository->shouldReceive('duplicateSettings')->never();
@@ -452,7 +456,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
             ]
         ]);
 
-        $this->assertCount(0, $result['results']['success']);
+        $this->assertCount(1, $result['results']['success']);
         $this->assertEquals(13, count($result['results']['skipped']));
     }
 
@@ -474,7 +478,7 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
 
         $result = $this->service->handle(1, 2); // No options
 
-        $this->assertGreaterThanOrEqual(13, count($result['results']['success']));
+        $this->assertGreaterThanOrEqual(14, count($result['results']['success']));
         $this->assertCount(0, $result['results']['skipped']);
     }
 

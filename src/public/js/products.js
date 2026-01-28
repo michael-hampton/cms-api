@@ -107,26 +107,49 @@
 
         if (merchants.length === 1) {
             const merchant = merchants[0];
-            console.log('merchant', merchant)
+            const merchantName = merchant.merchant?.name || merchant.name || 'Unknown';
+            const merchantUrl = merchant.url || merchant.merchant?.url || '#';
+
             return `<div class="product-merchants">
-            <span class="merchant-badge ${merchant.is_best_price ? 'best-price' : ''}">
-                ${escapeHtml(merchant.merchant?.name)}
-                ${merchant.discount_percentage > 0 ? ` ${merchant.discount_percentage}%` : ''}
-            </span>
+            <a href="${escapeHtml(merchantUrl)}" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               class="merchant-badge ${merchant.is_best_price ? 'best-price' : ''}"
+               onclick="event.stopPropagation()">
+                ${escapeHtml(merchantName)}
+                ${merchant.discount_percentage > 0 ? ` -${merchant.discount_percentage}%` : ''}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px;">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+            </a>
         </div>`;
         }
 
-        // Multiple merchants - show best price + count
+        // Multiple merchants - find best price
         const bestMerchant = merchants.reduce((best, current) => {
             const bestPrice = best.sale_price > 0 ? best.sale_price : best.price;
             const currentPrice = current.sale_price > 0 ? current.sale_price : current.price;
             return currentPrice < bestPrice ? current : best;
         }, merchants[0]);
 
+        const merchantName = bestMerchant.merchant?.name || bestMerchant.name || 'Unknown';
+        const merchantUrl = bestMerchant.url || bestMerchant.merchant?.url || '#';
+
         return `<div class="product-merchants">
-        <span class="merchant-badge best-price">
-            ${escapeHtml(bestMerchant.name)}
-        </span>
+        <a href="${escapeHtml(merchantUrl)}" 
+           target="_blank" 
+           rel="noopener noreferrer"
+           class="merchant-badge best-price"
+           onclick="event.stopPropagation()">
+            ${escapeHtml(merchantName)}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px;">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+        </a>
         ${merchants.length > 1 ? `<span class="merchant-count">+${merchants.length - 1} more</span>` : ''}
     </div>`;
     }

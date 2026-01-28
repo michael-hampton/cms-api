@@ -80,6 +80,10 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function ensureSiteExists()
     {
+        if (!empty($this->siteId)) {
+            return;
+        }
+
         $sites = Site::all();
         $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
         $this->siteSlug = $site->slug;
@@ -109,6 +113,7 @@ abstract class FunctionalTestCase extends TestCase
             // Create or get a test user
             $user = User::where('email', 'test@example.com')->first();
             if (!$user) {
+                //$this->ensureSiteExists();
                 $user = User::create([
                     'name' => 'Test User',
                     'email' => 'test@example.com',
@@ -127,6 +132,11 @@ abstract class FunctionalTestCase extends TestCase
         $this->authToken = $this->generateTestToken($user);
 
         return $this;
+    }
+
+    private function createUser()
+    {
+
     }
 
     /**
@@ -263,6 +273,8 @@ abstract class FunctionalTestCase extends TestCase
 
             // Re-enable foreign key checks
             $this->database->query('SET FOREIGN_KEY_CHECKS = 1');
+
+            $this->ensureSiteExists();
 
         } catch (\Exception $e) {
             // Silently fail on cleanup - tests may have already cleaned up
@@ -704,14 +716,14 @@ abstract class FunctionalTestCase extends TestCase
         }
 
         $stmt = $this->database->query($sql, $bindings);
-        return (int) $stmt->fetch()['count'];
+        return (int)$stmt->fetch()['count'];
     }
 
     protected function createFile(string $filePath)
     {
         $filePath = getcwd() . '/' . $filePath;
 
-        if(!is_dir(dirname($filePath))){
+        if (!is_dir(dirname($filePath))) {
             mkdir(dirname($filePath), 0755, true);
         }
 

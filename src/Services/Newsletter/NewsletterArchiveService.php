@@ -197,7 +197,7 @@ class NewsletterArchiveService
                 $grouped[$year] = [];
             }
 
-            $edition->page_count = !empty($edition->content_snapshot) ? count($edition->content_snapshot) : 0;
+            $edition->page_count = is_array($edition->content_snapshot) ? count($edition->content_snapshot) : 0;
 
             $grouped[$year][] = $edition;
         }
@@ -256,13 +256,25 @@ class NewsletterArchiveService
             });
         }
 
-        // Apply date range filter
-        if (!empty($filters['date_from'])) {
-            $query->where('last_sent', '>=', $filters['date_from']);
-        }
+        // Only add whereHas if there are date/year filters
+        $hasDateFilters = !empty($filters['date_from']) || !empty($filters['date_to']) || !empty($filters['year']);
 
-        if (!empty($filters['date_to'])) {
-            $query->where('last_sent', '<=', $filters['date_to']);
+        if ($hasDateFilters) {
+            $query->whereHas('sends', function ($q) use ($filters) {
+
+                if (!empty($filters['date_from'])) {
+                    $q->where('sent_at', '>=', $filters['date_from']);
+                }
+
+                if (!empty($filters['date_to'])) {
+                    $q->where('sent_at', '<=', $filters['date_to']);
+                }
+
+                if (!empty($filters['year'])) {
+                    $q->whereYear('sent_at', $filters['year']);
+                }
+
+            });
         }
 
         // Apply interval filter

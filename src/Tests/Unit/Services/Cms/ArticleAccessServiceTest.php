@@ -19,6 +19,12 @@ class ArticleAccessServiceTest extends FunctionalTestCase
 
     private ArticleAccessService $service;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->service = new ArticleAccessService();
+    }
+
     public function testGuestCanViewFreeContent()
     {
         $page = $this->createPageWithAccess('free');
@@ -94,7 +100,7 @@ class ArticleAccessServiceTest extends FunctionalTestCase
 
     public function testMemberCanViewFreeContent()
     {
-        $member = $this->createMember();
+        $member = $this->createMember(['site_id' => $this->siteId]);
         $page = $this->createPageWithAccess('free');
 
         $result = $this->service->canView($page, $member);
@@ -449,11 +455,5 @@ class ArticleAccessServiceTest extends FunctionalTestCase
         $page3 = $this->createPageWithAccess('premium', '2025-02-01 00:00:00');
         $result3 = $this->service->canView($page3, $member);
         $this->assertFalse($result3['can_view']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->service = new ArticleAccessService();
     }
 }

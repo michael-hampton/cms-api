@@ -1649,6 +1649,55 @@ class QueryBuilder
                     $column = $this->quoteColumn($column);
                     $conditions[] = "{$column} IS NOT NULL";
                     break;
+
+                case 'Year':
+                    $table = $query->getTable();
+                    $column = $where['column'];
+
+                    if (strpos($column, '.') === false) {
+                        $column = "{$table}.{$column}";
+                    }
+
+                    $column = $this->quoteColumn($column);
+                    $value = $where['value'];
+
+                    if (is_numeric($value)) {
+                        $conditions[] = "YEAR({$column}) {$where['operator']} {$value}";
+                    }
+                    break;
+
+                case 'Month':
+                    $table = $query->getTable();
+                    $column = $where['column'];
+
+                    if (strpos($column, '.') === false) {
+                        $column = "{$table}.{$column}";
+                    }
+
+                    $column = $this->quoteColumn($column);
+                    $value = $where['value'];
+
+                    if (is_numeric($value)) {
+                        $conditions[] = "MONTH({$column}) {$where['operator']} {$value}";
+                    }
+                    break;
+
+                case 'Date':
+                    $table = $query->getTable();
+                    $column = $where['column'];
+
+                    if (strpos($column, '.') === false) {
+                        $column = "{$table}.{$column}";
+                    }
+
+                    $column = $this->quoteColumn($column);
+                    $value = $where['value'];
+
+                    if (is_string($value)) {
+                        $escapedValue = str_replace("'", "''", $value);
+                        $conditions[] = "DATE({$column}) {$where['operator']} '{$escapedValue}'";
+                    }
+                    break;
             }
         }
 
@@ -1691,6 +1740,11 @@ class QueryBuilder
 
     public function selectRaw(string $expression): self
     {
+        // 🔑 If default select is still '*', wipe it
+        if ($this->selects === ['*']) {
+            $this->selects = [];
+        }
+
         $this->selects[] = new RawExpression($expression);
         return $this;
     }

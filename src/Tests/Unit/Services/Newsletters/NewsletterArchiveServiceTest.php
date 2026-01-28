@@ -72,7 +72,8 @@ class NewsletterArchiveServiceTest extends FunctionalTestCase
 
     public function testFilterByDateRange(): void
     {
-        Newsletter::create([
+        // Create old newsletter with old send
+        $oldNewsletter = Newsletter::create([
             'title' => 'Old Newsletter',
             'site_id' => $this->siteId,
             'active' => true,
@@ -81,13 +82,32 @@ class NewsletterArchiveServiceTest extends FunctionalTestCase
             'content' => '{}'
         ]);
 
-        Newsletter::create([
+        // Create the send record for old newsletter
+        \App\Models\NewsletterSend::create([
+            'newsletter_id' => $oldNewsletter->id,
+            'sent_at' => date('Y-m-d H:i:s', strtotime('-3 months')),
+            'subject' => 'Old Newsletter Edition',
+            'content_snapshot' => [],
+            'recipient_count' => 100
+        ]);
+
+        // Create recent newsletter with recent send
+        $recentNewsletter = Newsletter::create([
             'title' => 'Recent Newsletter',
             'site_id' => $this->siteId,
             'active' => true,
             'last_sent' => date('Y-m-d H:i:s', strtotime('-1 week')),
             'interval' => 'weekly',
             'content' => '{}'
+        ]);
+
+        // Create the send record for recent newsletter
+        \App\Models\NewsletterSend::create([
+            'newsletter_id' => $recentNewsletter->id,
+            'sent_at' => date('Y-m-d H:i:s', strtotime('-1 week')),
+            'subject' => 'Recent Newsletter Edition',
+            'content_snapshot' => [],
+            'recipient_count' => 100
         ]);
 
         $result = $this->service->searchNewsletters($this->siteId, [

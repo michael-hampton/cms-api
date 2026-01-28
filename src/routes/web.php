@@ -312,6 +312,9 @@ $router->get('/{site}/newsletters/search', [NewsletterWebController::class, 'sea
 $router->post('/{site}/member/newsletters/toggle', [NewsletterWebController::class, 'toggle']);
 $router->post('/{site}/newsletters/track-view', [NewsletterWebController::class, 'trackPageView']);
 $router->get('/{site}/newsletters/{newsletterId}/sends/{sendId}/analytics', [NewsletterWebController::class, 'sendAnalytics']);
+$router->post('/{site}/newsletters/{id}/preview', [NewsletterController::class, 'preview']);
+$router->post('/{site}/newsletters/{id}/sends/{sendId}/retry', [NewsletterController::class, 'retrySend']);
+$router->get('/{site}/newsletters/{id}/sends/{sendId}/statistics', [NewsletterController::class, 'getSendStatistics']);
 
 $router->get('/{site}/member/single-access', [SingleContentAccessController::class, 'index']);
 $router->get('/{site}/member/single-access/show', [SingleContentAccessController::class, 'show']);

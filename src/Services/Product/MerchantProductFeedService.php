@@ -2,17 +2,24 @@
 
 namespace App\Services\Product;
 
+use App\Framework\HttpClient\HttpClient;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Repositories\Product\MerchantProductFeedRepository;
+use App\Repositories\Product\ProductRepository;
 use Exception;
 
 class MerchantProductFeedService
 {
     protected MerchantProductFeedRepository $repository;
 
-    public function __construct(MerchantProductFeedRepository $repository)
+    public function __construct(
+        MerchantProductFeedRepository      $repository,
+        private readonly ProductRepository $productRepository,
+        private readonly ProductService    $productService,
+        private readonly HttpClient        $httpClient
+    )
     {
         $this->repository = $repository;
     }
@@ -104,17 +111,29 @@ class MerchantProductFeedService
                 'last_error' => null
             ]);
 
-            // Here you would implement actual feed fetching logic
-            // For now, we'll simulate success
+            // Download feed data
+            $feedData = $this->downloadExternalFeedData($id);
+
+            // Parse feed based on type
+            $products = $this->parseFeedData($feedData, $feed->feed_type);
+
+            // Process products (create/update in database)
+            $processedCount = $this->processFeedProducts($products, $feed->merchant_id);
+
+            // Update feed status
             $updateData = [
                 'status' => 'success',
                 'last_fetched_at' => date('Y-m-d H:i:s'),
-                'next_fetch_at' => $this->calculateNextFetchTime($feed->fetch_frequency)
+                'next_fetch_at' => $this->calculateNextFetchTime($feed->fetch_frequency),
+                'products_processed' => $processedCount
             ];
 
             return $this->repository->update($id, $updateData);
         } catch (Exception $e) {
-            Logger::error('Feed fetch failed: ' . $e->getMessage());
+            Logger::error('Feed fetch failed: ' . $e->getMessage(), [
+                'feed_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
 
             $this->repository->update($id, [
                 'status' => 'failed',
@@ -125,7 +144,7 @@ class MerchantProductFeedService
         }
     }
 
-    public function downloadFeedData(int $id): string
+    public function downloadExternalFeedData(int $id): string
     {
         $feed = $this->repository->find($id);
 
@@ -133,18 +152,232 @@ class MerchantProductFeedService
             throw new Exception('Feed not found');
         }
 
-        // Here you would implement actual feed download logic
-        // For now, return sample data based on feed type
-        switch ($feed->feed_type) {
-            case 'xml':
-                return '<?xml version="1.0"?><products></products>';
-            case 'csv':
-                return 'id,name,price\n1,Product 1,10.00';
-            case 'json':
-                return json_encode(['products' => []]);
-            default:
-                return '';
+        if (!$feed->feed_url) {
+            throw new Exception('Feed URL is not configured');
         }
+
+        try {
+            $response = $this->httpClient->get($feed->feed_url, [
+                'timeout' => 60,
+                'headers' => [
+                    'User-Agent' => 'MerchantProductFeedBot/1.0'
+                ]
+            ]);
+
+            if ($response->getStatusCode() !== 200) {
+                throw new Exception('Failed to download feed: HTTP ' . $response->getStatusCode());
+            }
+
+            $content = $response->getBody();
+
+            // Validate content is not empty
+            if (empty($content)) {
+                throw new Exception('Feed returned empty content');
+            }
+
+            // Validate content type matches feed type
+            $this->validateFeedContent($content, $feed->feed_type);
+
+            return $content;
+        } catch (Exception $e) {
+            Logger::error('Failed to download feed', [
+                'feed_id' => $id,
+                'url' => $feed->feed_url,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception('Failed to download feed: ' . $e->getMessage());
+        }
+    }
+
+    protected function validateFeedContent(string $content, string $feedType): void
+    {
+        switch ($feedType) {
+            case 'xml':
+                libxml_use_internal_errors(true);
+                $xml = simplexml_load_string($content);
+                if ($xml === false) {
+                    $errors = libxml_get_errors();
+                    libxml_clear_errors();
+                    throw new Exception('Invalid XML: ' . ($errors[0]->message ?? 'Unknown error'));
+                }
+                break;
+            case 'json':
+                json_decode($content);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('Invalid JSON: ' . json_last_error_msg());
+                }
+                break;
+            case 'csv':
+                // Basic CSV validation - check if it has at least one line
+                $lines = str_getcsv($content, "\n");
+                if (count($lines) < 1) {
+                    throw new Exception('Invalid CSV: No data found');
+                }
+                break;
+        }
+    }
+
+    protected function parseFeedData(string $data, string $feedType): array
+    {
+        switch ($feedType) {
+            case 'xml':
+                return $this->parseXmlFeed($data);
+            case 'json':
+                return $this->parseJsonFeed($data);
+            case 'csv':
+                return $this->parseCsvFeed($data);
+            default:
+                throw new Exception('Unsupported feed type: ' . $feedType);
+        }
+    }
+
+    protected function parseXmlFeed(string $data): array
+    {
+        $xml = simplexml_load_string($data);
+        $products = [];
+
+        // Assuming standard product feed structure
+        foreach ($xml->product as $product) {
+            $products[] = [
+                'name' => (string)$product->name,
+                'description' => (string)$product->description,
+                'price' => (float)$product->price,
+                'sale_price' => isset($product->sale_price) ? (float)$product->sale_price : null,
+                'sku' => (string)$product->sku,
+                'url' => (string)$product->url,
+                'image' => (string)$product->image,
+                'category' => (string)$product->category,
+                'brand' => (string)$product->brand,
+                'in_stock' => isset($product->in_stock) ? (bool)$product->in_stock : true,
+            ];
+        }
+
+        return $products;
+    }
+
+    protected function parseJsonFeed(string $data): array
+    {
+        $json = json_decode($data, true);
+
+        if (!isset($json['products']) || !is_array($json['products'])) {
+            throw new Exception('Invalid JSON feed structure: missing products array');
+        }
+
+        return array_map(function ($product) {
+            return [
+                'name' => $product['name'] ?? '',
+                'description' => $product['description'] ?? '',
+                'price' => (float)($product['price'] ?? 0),
+                'sale_price' => isset($product['sale_price']) ? (float)$product['sale_price'] : null,
+                'sku' => $product['sku'] ?? '',
+                'url' => $product['url'] ?? '',
+                'image' => $product['image'] ?? '',
+                'category' => $product['category'] ?? '',
+                'brand' => $product['brand'] ?? '',
+                'in_stock' => $product['in_stock'] ?? true,
+            ];
+        }, $json['products']);
+    }
+
+    protected function parseCsvFeed(string $data): array
+    {
+        $lines = array_map('str_getcsv', explode("\n", $data));
+        $header = array_shift($lines);
+        $products = [];
+
+        foreach ($lines as $line) {
+            if (count($line) !== count($header)) {
+                continue; // Skip malformed lines
+            }
+
+            $product = array_combine($header, $line);
+            $products[] = [
+                'name' => $product['name'] ?? $product['title'] ?? '',
+                'description' => $product['description'] ?? '',
+                'price' => (float)($product['price'] ?? 0),
+                'sale_price' => isset($product['sale_price']) ? (float)$product['sale_price'] : null,
+                'sku' => $product['sku'] ?? $product['id'] ?? '',
+                'url' => $product['url'] ?? $product['link'] ?? '',
+                'image' => $product['image'] ?? $product['image_url'] ?? '',
+                'category' => $product['category'] ?? '',
+                'brand' => $product['brand'] ?? '',
+                'in_stock' => isset($product['in_stock']) ? (bool)$product['in_stock'] : true,
+            ];
+        }
+
+        return $products;
+    }
+
+    protected function processFeedProducts(array $products, int $merchantId): int
+    {
+        $processedCount = 0;
+
+        foreach ($products as $productData) {
+            try {
+                // Find or create product by SKU
+                $existingProduct = $this->productRepository->findBySku($productData['sku']);
+
+                if ($existingProduct) {
+                    // Update existing product merchant relationship
+                    $this->updateProductMerchant($existingProduct->id, $merchantId, $productData);
+                } else {
+                    // Create new product
+                    $this->createProductFromFeed($productData, $merchantId);
+                }
+
+                $processedCount++;
+            } catch (Exception $e) {
+                Logger::error('Failed to process feed product', [
+                    'sku' => $productData['sku'] ?? 'unknown',
+                    'error' => $e->getMessage()
+                ]);
+                // Continue processing other products
+            }
+        }
+
+        return $processedCount;
+    }
+
+    protected function updateProductMerchant(int $productId, int $merchantId, array $productData): void
+    {
+        $merchant = $this->productRepository->findProductMerchant($productId, $merchantId);
+
+        $merchantData = [
+            'url' => $productData['url'],
+            'price' => $productData['price'],
+            'sale_price' => $productData['sale_price'],
+            'is_available' => $productData['in_stock'],
+            'last_price_check' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($merchant) {
+            $this->productRepository->updateProductMerchant($merchant->id, $merchantData);
+        } else {
+            $this->productRepository->createProductMerchant($productId, array_merge($merchantData, [
+                'merchant_id' => $merchantId
+            ]));
+        }
+    }
+
+    protected function createProductFromFeed(array $productData, int $merchantId): void
+    {
+        // Create product with merchant data
+        $product = $this->productService->createProduct([
+            'name' => $productData['name'],
+            'description' => $productData['description'],
+            'price' => $productData['price'],
+            'sale_price' => $productData['sale_price'],
+            'sku' => $productData['sku'],
+            'image' => $productData['image'],
+            'is_active' => true,
+            'merchants' => [[
+                'id' => $merchantId,
+                'url' => $productData['url'],
+                'price' => $productData['price'],
+                'sale_price' => $productData['sale_price'],
+                'is_available' => $productData['in_stock'],
+            ]]
+        ]);
     }
 
     public function getActiveFeedsForMerchant(int $merchantId): Collection
@@ -155,5 +388,167 @@ class MerchantProductFeedService
     public function getFeedsDueForFetch(): Collection
     {
         return $this->repository->getDueForFetch();
+    }
+
+    public function downloadFeedData(int $id): string
+    {
+        $feed = $this->repository->find($id);
+
+        if (!$feed) {
+            throw new Exception('Feed not found');
+        }
+
+        // Get all products for this merchant
+        $products = $this->productRepository->getProductsByMerchant($feed->merchant_id);
+
+        if ($products->isEmpty()) {
+            throw new Exception('No products found for this merchant');
+        }
+
+        // Generate feed data based on type
+        switch ($feed->feed_type) {
+            case 'xml':
+                return $this->generateXmlFeed($products);
+            case 'csv':
+                return $this->generateCsvFeed($products);
+            case 'json':
+                return $this->generateJsonFeed($products);
+            default:
+                throw new Exception('Unsupported feed type: ' . $feed->feed_type);
+        }
+    }
+
+    protected function generateXmlFeed(Collection $products): string
+    {
+        $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><products/>');
+
+        foreach ($products as $product) {
+            $productNode = $xml->addChild('product');
+            $productNode->addChild('id', $product->id);
+            $productNode->addChild('name', htmlspecialchars($product->name));
+            $productNode->addChild('description', htmlspecialchars($product->description ?? ''));
+            $productNode->addChild('sku', htmlspecialchars($product->sku ?? ''));
+            $productNode->addChild('price', $product->price);
+
+            if ($product->sale_price) {
+                $productNode->addChild('sale_price', $product->sale_price);
+            }
+
+            $productNode->addChild('brand', htmlspecialchars($product->brand->name ?? ''));
+            $productNode->addChild('category', htmlspecialchars($product->category->name ?? ''));
+            $productNode->addChild('image', htmlspecialchars($product->main_image_url ?? ''));
+            $productNode->addChild('url', url('/products/' . $product->slug));
+            $productNode->addChild('in_stock', $product->stock_quantity > 0 ? 'true' : 'false');
+            $productNode->addChild('stock_quantity', $product->stock_quantity ?? 0);
+
+            // Add merchant-specific data if available
+            if ($product->merchant_data) {
+                $merchantNode = $productNode->addChild('merchant');
+                $merchantNode->addChild('merchant_url', htmlspecialchars($product->merchant_data->url ?? ''));
+                $merchantNode->addChild('merchant_price', $product->merchant_data->effective_price ?? $product->price);
+                $merchantNode->addChild('merchant_sale_price', $product->merchant_data->effective_sale_price ?? '');
+                $merchantNode->addChild('is_available', $product->merchant_data->is_available ? 'true' : 'false');
+            }
+        }
+
+        return $xml->asXML();
+    }
+
+    protected function generateCsvFeed(Collection $products): string
+    {
+        $csv = [];
+
+        // Header row
+        $csv[] = [
+            'id',
+            'name',
+            'description',
+            'sku',
+            'price',
+            'sale_price',
+            'brand',
+            'category',
+            'image',
+            'url',
+            'in_stock',
+            'stock_quantity',
+            'merchant_url',
+            'merchant_price',
+            'merchant_sale_price',
+            'is_available'
+        ];
+
+        // Data rows
+        foreach ($products as $product) {
+            $csv[] = [
+                $product->id,
+                $product->name,
+                $product->description ?? '',
+                $product->sku ?? '',
+                $product->price,
+                $product->sale_price ?? '',
+                $product->brand->name ?? '',
+                $product->category->name ?? '',
+                $product->main_image_url ?? '',
+                url('/products/' . $product->slug),
+                $product->stock_quantity > 0 ? 'true' : 'false',
+                $product->stock_quantity ?? 0,
+                $product->merchant_data->url ?? '',
+                $product->merchant_data->effective_price ?? $product->price,
+                $product->merchant_data->effective_sale_price ?? '',
+                isset($product->merchant_data) && $product->merchant_data->is_available ? 'true' : 'false'
+            ];
+        }
+
+        // Convert to CSV string
+        $output = fopen('php://temp', 'r+');
+        foreach ($csv as $row) {
+            fputcsv($output, $row);
+        }
+        rewind($output);
+        $csvString = stream_get_contents($output);
+        fclose($output);
+
+        return $csvString;
+    }
+
+    protected function generateJsonFeed(Collection $products): string
+    {
+        $productsArray = [];
+
+        foreach ($products as $product) {
+            $productData = [
+                'id' => $product->id,
+                'name' => $product->name,
+                'description' => $product->description ?? '',
+                'sku' => $product->sku ?? '',
+                'price' => (float)$product->price,
+                'sale_price' => $product->sale_price ? (float)$product->sale_price : null,
+                'brand' => $product->brand->name ?? '',
+                'category' => $product->category->name ?? '',
+                'image' => $product->main_image_url ?? '',
+                'url' => url('/products/' . $product->slug),
+                'in_stock' => $product->stock_quantity > 0,
+                'stock_quantity' => $product->stock_quantity ?? 0,
+            ];
+
+            // Add merchant-specific data if available
+            if ($product->merchant_data) {
+                $productData['merchant'] = [
+                    'url' => $product->merchant_data->url ?: '',
+                    'price' => (float)($product->merchant_data->effective_price ?: $product->price),
+                    'sale_price' => $product->merchant_data->effective_sale_price ? (float)$product->merchant_data->effective_sale_price : null,
+                    'is_available' => (bool)$product->merchant_data->is_available
+                ];
+            }
+
+            $productsArray[] = $productData;
+        }
+
+        return json_encode([
+            'products' => $productsArray,
+            'total' => count($productsArray),
+            'generated_at' => date('Y-m-d H:i:s')
+        ], JSON_PRETTY_PRINT);
     }
 }

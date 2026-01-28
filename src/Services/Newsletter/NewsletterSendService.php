@@ -1,9 +1,11 @@
 <?php
 namespace App\Services\Newsletter;
 
+use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
@@ -22,7 +24,8 @@ class NewsletterSendService
         private readonly MemberSubscriptionPreferenceRepository $preferenceRepository,
         private readonly NewsletterPageBuilderService $pageBuilderService,
         private readonly MemberRepository             $memberRepository,
-        private readonly MemberSubscriptionService    $subscriptionService
+        private readonly MemberSubscriptionService         $subscriptionService,
+        private readonly NewsletterSendRecipientRepository $recipientRepository
     )
     {
     }
@@ -44,23 +47,18 @@ class NewsletterSendService
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-        // Get all confirmed subscribers (legacy system)
+        // Get all confirmed subscribers
         $legacySubscribers = $this->subscriberRepository->getConfirmedEmails($siteId);
-
-        // Get member subscribers with preferences
         $memberPreferences = $this->preferenceRepository->getActiveSubscribersForSite($siteId);
 
-        // Filter member preferences by newsletter frequency
         $filteredMembers = $memberPreferences->filter(function ($pref) use ($newsletter) {
             return $pref->newsletter_frequency === $newsletter->interval;
         });
 
-        // Get member emails
         $memberEmails = $filteredMembers->map(function ($pref) {
             return $pref->member->email;
         })->toArray();
 
-        // Combine and deduplicate
         $allSubscribers = array_unique(array_merge($legacySubscribers, $memberEmails));
 
         if (empty($allSubscribers)) {
@@ -86,7 +84,6 @@ class NewsletterSendService
                 ];
             }
 
-            // Store page data for snapshot
             $pages = $pages->map(fn($p) => [
                 'id' => $p->id,
                 'title' => $p->title,
@@ -94,7 +91,6 @@ class NewsletterSendService
                 'slug' => $p->slug,
             ])->toArray();
         } else {
-            // Manual newsletter - use blocks
             $blocks = json_decode($newsletter->content, true);
             if (!is_array($blocks)) {
                 $blocks = [];
@@ -102,125 +98,318 @@ class NewsletterSendService
             $baseHtml = $this->renderBlocksToHtml($blocks);
         }
 
-        $sent = 0;
-        $failed = [];
-        $skipped = [];
-        $successfulRecipients = [];
-
-        // Log send with recipients and HTML snapshot - Create the send record BEFORE sending emails so we have a sendId
+        // Create send record
         $sendRecord = $this->sendRepository->create([
             'newsletter_id' => $newsletter->id,
             'sent_at' => date('Y-m-d H:i:s'),
-            'recipient_count' => $sent,
+            'recipient_count' => count($allSubscribers),
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'pending_count' => count($allSubscribers),
             'content_snapshot' => $pages,
-            'recipients' => $successfulRecipients,
             'html_snapshot' => null
         ]);
 
         $sendId = $sendRecord->id;
 
-        // Now generate base HTML with tracking (for automated newsletters)
+        // Generate base HTML
         if ($newsletter->isAutomated()) {
-            // Rebuild pages collection from snapshot for rendering
             $pagesCollection = collect($pages);
             $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
                 $newsletter,
                 $pagesCollection,
-                null, // unsubscribe token - will be added per-recipient
-                false, // includeBlocks
-                $sendId // NEW: Pass sendId for tracking
+                null,
+                false,
+                $sendId
             );
-        } else {
-            // Manual newsletter - use blocks
-            $blocks = json_decode($newsletter->content, true);
-            if (!is_array($blocks)) {
-                $blocks = [];
-            }
-            $baseHtml = $this->renderBlocksToHtml($blocks);
         }
 
+        // Store HTML snapshot
+        $this->sendRepository->update($sendId, [
+            'html_snapshot' => $baseHtml
+        ]);
+
+        // Filter and create recipient records
+        $validRecipients = $this->filterRecipients($allSubscribers, $newsletter, $siteId);
+
+        $skipped = [];
         foreach ($allSubscribers as $email) {
-            try {
-                $member = $this->memberRepository->findByEmail($email);
-
-                if ($member) {
-                    // NEW: Check global newsletter preference
-                    if (!$member->getCommunicationPreference('newsletter', true)) {
-                        $skipped[] = [
-                            'email' => $email,
-                            'reason' => 'Newsletter preference disabled in global settings'
-                        ];
-                        continue;
-                    }
-
-                    // NEW: Check global marketing preference
-                    if (!$member->wantsMarketingEmails()) {
-                        $skipped[] = [
-                            'email' => $email,
-                            'reason' => 'Marketing emails disabled in global settings'
-                        ];
-                        continue;
-                    }
-
-                    // Existing MemberSubscriptionPreference check
-                    /* $preference = $this->preferenceRepository->findByMemberEmail($email, $siteId);
-                     if ($preference && !$preference->is_active) {
-                         $skipped[] = [
-                             'email' => $email,
-                             'reason' => 'Subscription preference inactive'
-                         ];
-                         continue;
-                     }
-
-                     // Check if member's preference matches newsletter frequency
-                     if ($preference && $preference->newsletter_frequency !== $newsletter->interval) {
-                         $skipped[] = [
-                             'email' => $email,
-                             'reason' => "Frequency mismatch: wants {$preference->newsletter_frequency}, newsletter is {$newsletter->interval}"
-                         ];
-                         continue;
-                     }*/
-                }
-
-                // Get unsubscribe token for this email
-                $unsubscribeToken = $this->getUnsubscribeToken($email, $siteId);
-
-                // Add unsubscribe link to HTML
-                $html = $newsletter->isAutomated()
-                    ? $this->personalizeHtmlForRecipient($baseHtml, $email, $unsubscribeToken, $sendId)
-                    : $this->addUnsubscribeLink($baseHtml, $unsubscribeToken);
-
-                $this->emailService->send($email, $newsletter->title, $html);
-                $sent++;
-                $successfulRecipients[] = $email;
-            } catch (\Exception $e) {
-                $failed[] = [
+            if (!in_array($email, $validRecipients['valid'])) {
+                $reason = $validRecipients['skipped'][$email] ?? 'Unknown reason';
+                $skipped[] = [
                     'email' => $email,
-                    'error' => $e->getMessage()
+                    'reason' => $reason
                 ];
-                error_log("Failed to send to {$email}: " . $e->getMessage());
             }
         }
 
-        // Update newsletter
+        // Create recipient records
+        $recipients = $this->recipientRepository->createRecipients($sendId, $validRecipients['valid']);
+
+        // Send to all recipients
+        $this->processSendQueue($sendRecord, $recipients, $newsletter, $siteId, $baseHtml);
+
+        // Update newsletter last_sent
         $this->newsletterRepository->update($newsletter->id, ['last_sent' => date('Y-m-d H:i:s')]);
 
-        // Update send record with final data
-        $this->sendRepository->update($sendRecord->id, [
-            'recipient_count' => $sent,
-            'recipients' => $successfulRecipients,
-            'html_snapshot' => $baseHtml // Store the base HTML without personalization
-        ]);
+        // Get final statistics
+        $stats = $this->recipientRepository->getStatistics($sendId);
 
         return [
             'success' => true,
             'newsletter_id' => $newsletter->id,
-            'recipients' => $sent,
+            'recipients' => $stats['sent'],
             'skipped' => $skipped,
-            'failed' => $failed,
+            'failed' => $stats['failed'],
+            'pending' => $stats['pending'],
             'pages_included' => $newsletter->isAutomated() ? count($pages) : 0,
             'send_id' => $sendId
         ];
+    }
+
+    public function previewNewsletter($newsletter, array $previewEmails, ?int $siteId = null): array
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        if (empty($previewEmails)) {
+            return [
+                'success' => false,
+                'error' => 'No preview email addresses provided'
+            ];
+        }
+
+        // Validate all emails
+        foreach ($previewEmails as $email) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return [
+                    'success' => false,
+                    'error' => "Invalid email address: {$email}"
+                ];
+            }
+        }
+
+        // Limit to 10 preview recipients
+        if (count($previewEmails) > 10) {
+            return [
+                'success' => false,
+                'error' => 'Maximum 10 preview recipients allowed'
+            ];
+        }
+
+        $formattedPages = [];
+        $baseHtml = '';
+        $pages = null;
+
+        // Build newsletter content
+        if ($newsletter->isAutomated()) {
+            $pages = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
+
+            if ($pages->isEmpty()) {
+                return [
+                    'success' => false,
+                    'error' => 'No pages match newsletter criteria'
+                ];
+            }
+
+            $formattedPages = $pages->map(fn($p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'subtitle' => $p->subtitle,
+                'slug' => $p->slug,
+            ])->toArray();
+        } else {
+            $blocks = json_decode($newsletter->content, true);
+            $blocks = is_array($blocks) ? $blocks : [];
+            $baseHtml = $this->renderBlocksToHtml($blocks);
+        }
+
+        // Create preview send record
+        $sendRecord = $this->sendRepository->create([
+            'newsletter_id' => $newsletter->id,
+            'sent_at' => date('Y-m-d H:i:s'),
+            'recipient_count' => count($previewEmails),
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'pending_count' => count($previewEmails),
+            'content_snapshot' => $formattedPages,
+            'html_snapshot' => null
+        ]);
+
+        $sendId = $sendRecord->id;
+
+        // Generate base HTML
+        if ($newsletter->isAutomated() && $pages instanceof Collection) {
+            $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
+                $newsletter,
+                $pages,
+                null,
+                false,
+                $sendId
+            );
+        }
+
+        // Add preview notice
+        $previewNotice = '<div style="background: #fef3c7; border: 2px solid #f59e0b; padding: 15px; margin-bottom: 20px; border-radius: 4px; text-align: center;"><strong>⚠️ PREVIEW:</strong> This is a preview of the newsletter. Unsubscribe links will not work.</div>';
+        $baseHtml = preg_replace('/(<body[^>]*>)/i', '$1' . $previewNotice, $baseHtml);
+
+        // Store HTML
+        $this->sendRepository->update($sendId, [
+            'html_snapshot' => $baseHtml
+        ]);
+
+        // Create recipient records for preview
+        $recipients = $this->recipientRepository->createRecipients($sendId, $previewEmails);
+
+        // Send previews
+        $this->processSendQueue($sendRecord, $recipients, $newsletter, $siteId, $baseHtml, true);
+
+        // Get statistics
+        $stats = $this->recipientRepository->getStatistics($sendId);
+
+        return [
+            'success' => true,
+            'preview' => true,
+            'newsletter_id' => $newsletter->id,
+            'recipients' => $stats['sent'],
+            'failed' => $stats['failed'],
+            'pages_included' => $newsletter->isAutomated() ? count($pages) : 0,
+            'send_id' => $sendId,
+            'message' => "Preview sent to {$stats['sent']} recipient(s)"
+        ];
+    }
+
+    public function retrySend(int $sendId, ?int $maxAttempts = 3, ?int $siteId = null): array
+    {
+        $send = $this->sendRepository->find($sendId);
+        $siteId = $siteId ?? SiteContext::getId();
+
+        if (!$send) {
+            return [
+                'success' => false,
+                'error' => 'Send record not found'
+            ];
+        }
+
+        $newsletter = $this->newsletterRepository->find($send->newsletter_id);
+        $baseHtml = $send->html_snapshot;
+
+        // Get retryable recipients
+        $retryableRecipients = $this->recipientRepository->getRetryableRecipients($sendId, $maxAttempts);
+
+        if (empty($retryableRecipients)) {
+            return [
+                'success' => false,
+                'error' => 'No recipients available for retry'
+            ];
+        }
+
+        // Process retry queue
+        $this->processSendQueue($send, $retryableRecipients, $newsletter, $siteId, $baseHtml);
+
+        // Get updated statistics
+        $stats = $this->recipientRepository->getStatistics($sendId);
+
+        return [
+            'success' => true,
+            'send_id' => $sendId,
+            'retried' => count($retryableRecipients),
+            'sent' => $stats['sent'],
+            'failed' => $stats['failed'],
+            'pending' => $stats['pending']
+        ];
+    }
+
+    private function filterRecipients(array $emails, $newsletter, int $siteId): array
+    {
+        $valid = [];
+        $skipped = [];
+
+        foreach ($emails as $email) {
+            $member = $this->memberRepository->findByEmail($email);
+
+            if ($member) {
+                // Check global newsletter preference
+                if (!$member->getCommunicationPreference('newsletter', true)) {
+                    $skipped[$email] = 'Newsletter preference disabled in global settings';
+                    continue;
+                }
+
+                // Check global marketing preference
+                if (!$member->wantsMarketingEmails()) {
+                    $skipped[$email] = 'Marketing emails disabled in global settings';
+                    continue;
+                }
+            }
+
+            $valid[] = $email;
+        }
+
+        return [
+            'valid' => $valid,
+            'skipped' => $skipped
+        ];
+    }
+
+    private function processSendQueue(
+        $sendRecord,
+        array $recipients,
+        $newsletter,
+        int $siteId,
+        string $baseHtml,
+        bool $isPreview = false): void
+    {
+        foreach ($recipients as $recipient) {
+            try {
+
+                // Store token in recipient record
+                $recipientModel = is_array($recipient)
+                    ? $this->recipientRepository->find($recipient['id'])
+                    : $recipient;
+
+                // Get unsubscribe token
+                $unsubscribeToken = $isPreview
+                    ? 'preview-' . bin2hex(random_bytes(16))
+                    : $this->getUnsubscribeToken($recipientModel->email, $siteId);
+
+                $recipientModel->update(['unsubscribe_token' => $unsubscribeToken]);
+
+                // Personalize HTML
+                $html = $newsletter->isAutomated()
+                    ? $this->personalizeHtmlForRecipient($baseHtml, $recipientModel->email, $unsubscribeToken, $sendRecord->id)
+                    : $this->addUnsubscribeLink($baseHtml, $unsubscribeToken);
+
+                // Add preview prefix if preview
+                $subject = $isPreview ? '[PREVIEW] ' . $newsletter->title : $newsletter->title;
+
+                // Send email
+                $this->emailService->send($recipientModel->email, $subject, $html);
+
+                // Mark as sent
+                $recipientModel->markAsSent();
+
+            } catch (\Exception $e) {
+                // Mark as failed
+                $recipientModel->markAsFailed($e->getMessage());
+
+                error_log("Failed to send to {$recipientModel->email}: " . $e->getMessage());
+            }
+        }
+
+        // Update send counts
+        $this->recipientRepository->updateSendCounts($sendRecord->id);
+    }
+
+    private function getUnsubscribeToken(string $email, int $siteId): ?string
+    {
+        // First check if it's a member
+        $preference = $this->preferenceRepository->findByMemberEmail($email, $siteId);
+        if ($preference) {
+            return $preference->unsubscribe_token;
+        }
+
+        // Fall back to legacy subscriber
+        $subscriber = $this->subscriberRepository->findByEmail($email, $siteId);
+        return $subscriber?->unsubscribe_token;
     }
 
     /**
@@ -247,19 +436,6 @@ class NewsletterSendService
         }
 
         return $html;
-    }
-
-    private function getUnsubscribeToken(string $email, int $siteId): ?string
-    {
-        // First check if it's a member
-        $preference = $this->preferenceRepository->findByMemberEmail($email, $siteId);
-        if ($preference) {
-            return $preference->unsubscribe_token;
-        }
-
-        // Fall back to legacy subscriber
-        $subscriber = $this->subscriberRepository->findByEmail($email, $siteId);
-        return $subscriber?->unsubscribe_token;
     }
 
     private function addUnsubscribeLink(string $html, ?string $token): string

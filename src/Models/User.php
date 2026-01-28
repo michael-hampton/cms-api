@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Framework\AuthenticatedUser;
-
 class User extends Model
 {
     protected $fillable = [
@@ -12,7 +10,8 @@ class User extends Model
         'password',
         'role',
         'is_active',
-        'site_id'
+        'site_id',
+        'avatar'
     ];
 
     protected $hidden = [

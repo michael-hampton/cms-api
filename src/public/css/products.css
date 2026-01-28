@@ -1787,15 +1787,21 @@ body.card-flipped {
 .merchant-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    background: #f8f9fa;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-right: 0.25rem;
-    margin-bottom: 0.25rem;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #374151;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.merchant-badge:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+    transform: translateY(-1px);
 }
 
 .merchant-badge.best-price {
@@ -1803,6 +1809,15 @@ body.card-flipped {
     border-color: #86efac;
     color: #166534;
     font-weight: 500;
+}
+
+.merchant-badge.best-price:hover {
+    background: #bbf7d0;
+    color: #14532d;
+}
+
+.merchant-badge svg {
+    flex-shrink: 0;
 }
 
 .merchant-count {

@@ -598,4 +598,42 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->limit($limit)
             ->get();
     }
+
+    public function findProductMerchant(int $productId, int $merchantId): ?Model
+    {
+        return ProductMerchant::where('product_id', $productId)
+            ->where('merchant_id', $merchantId)
+            ->first();
+    }
+
+    public function updateProductMerchant(int $id, array $data): bool
+    {
+        return ProductMerchant::where('id', $id)->update($data);
+    }
+
+    public function createProductMerchant(int $productId, array $data): Model
+    {
+        return ProductMerchant::create(array_merge(['product_id' => $productId], $data));
+    }
+
+    public function findBySku(string $sku): ?Model
+    {
+        return Product::where('sku', $sku)->first();
+    }
+
+    public function getProductsByMerchant(int $merchantId): Collection
+    {
+        return Product::with(['brand', 'category', 'images'])
+            ->whereHas('merchants', function ($query) use ($merchantId) {
+                $query->where('merchant_id', $merchantId);
+            })
+            ->where('is_active', true)
+            ->get()
+            ->map(function ($product) use ($merchantId) {
+                // Attach merchant-specific data to each product
+                $merchantData = $product->merchants->firstWhere('merchant_id', $merchantId);
+                $product->merchant_data = $merchantData;
+                return $product;
+            });
+    }
 }

@@ -123,7 +123,7 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $this->assertNotEmpty($result['results']['success']);
         $this->assertEmpty($result['results']['failed']);
-        $this->assertCount(13, $result['results']['success']);;
+        $this->assertCount(14, $result['results']['success']);;
     }
 
     public function testDuplicatePageReturnsNullForNonexistent()
@@ -163,7 +163,7 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $this->assertNotEmpty($result['results']['success']);
         $this->assertEmpty($result['results']['failed']);
-        $this->assertCount(13, $result['results']['success']);;
+        $this->assertCount(14, $result['results']['success']);;
     }
 
     public function testDuplicatePageCreatesPageWithCopyInTitle()
@@ -423,7 +423,7 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $this->assertNotEmpty($result['results']['success']);
         $this->assertEmpty($result['results']['failed']);
-        $this->assertCount(13, $result['results']['success']);;
+        $this->assertCount(14, $result['results']['success']);;
     }
 
     #[DoesNotPerformAssertions]
@@ -476,12 +476,15 @@ class ClonePageActionTest extends FunctionalTestCase
             ->with(1, 2)->once()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateProducts')
             ->with(1, 2)->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateOwner')
+            ->with(1, 2)->once()->andReturn(true);
 
         $this->pageRepository->shouldReceive('duplicateBlocks')->byDefault()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateMetadata')->byDefault()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateSeo')->byDefault()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateSettings')->byDefault()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateSocial')->byDefault()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateOwner')->byDefault()->andReturn(true);
     }
 
     private function setupDuplicatePageExpectations(Page $originalPage, Page $newPage): void
@@ -508,7 +511,7 @@ class ClonePageActionTest extends FunctionalTestCase
 
         $this->assertNotEmpty($result['results']['success']);
         $this->assertEmpty($result['results']['failed']);
-        $this->assertCount(13, $result['results']['success']);
+        $this->assertCount(14, $result['results']['success']);
     }
 
     public function testClonePageWithSelectiveRelations()
@@ -523,6 +526,7 @@ class ClonePageActionTest extends FunctionalTestCase
 
         // Only these should be called
         $this->pageRepository->shouldReceive('duplicateBlocks')->once();
+        $this->pageRepository->shouldReceive('duplicateOwner')->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->once();
         $this->pageRepository->shouldReceive('duplicateCategories')->once();
 
@@ -594,6 +598,7 @@ class ClonePageActionTest extends FunctionalTestCase
 
         // No duplication methods should be called
         $this->pageRepository->shouldReceive('duplicateBlocks')->never();
+        $this->pageRepository->shouldReceive('duplicateOwner')->once();
         $this->pageRepository->shouldReceive('duplicateMetadata')->never();
         $this->pageRepository->shouldReceive('duplicateSeo')->never();
         $this->pageRepository->shouldReceive('duplicateSettings')->never();
@@ -628,7 +633,7 @@ class ClonePageActionTest extends FunctionalTestCase
             ]
         ]);
 
-        $this->assertCount(0, $result['results']['success']);
+        $this->assertCount(1, $result['results']['success']);
         $this->assertEquals(13, count($result['results']['skipped']));
     }
 
@@ -661,6 +666,7 @@ class ClonePageActionTest extends FunctionalTestCase
         // Multiple failures
         $this->pageRepository->shouldReceive('duplicateBlocks')->once()->andThrow(new \Exception('Blocks failed'));
         $this->pageRepository->shouldReceive('duplicateMetadata')->once()->andReturn(true);
+        $this->pageRepository->shouldReceive('duplicateOwner')->once()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateSeo')->once()->andThrow(new \Exception('SEO failed'));
         $this->pageRepository->shouldReceive('duplicateSettings')->once()->andReturn(true);
         $this->pageRepository->shouldReceive('duplicateSocial')->once()->andThrow(new \Exception('Social failed'));

@@ -161,7 +161,7 @@ class Database
             // Log slow queries (configurable threshold)
             $slowQueryThreshold = Config::get('database.slow_query_threshold', 1000); // 1 second
             if ($executionTime > $slowQueryThreshold) {
-                Logger::warn('Slow query detected', [
+                Logger::warning('Slow query detected', [
                     'sql' => $sql,
                     'params' => $params,
                     'execution_time' => $executionTime . 'ms'

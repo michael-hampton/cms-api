@@ -454,6 +454,7 @@ HTML;
         $filters = [
             'search' => $request->get('search', ''),
             'interval' => $request->get('interval', ''),
+            'year' => $request->get('year', ''),
             'date_from' => $request->get('date_from', ''),
             'date_to' => $request->get('date_to', ''),
             'sort_by' => $request->get('sort_by', 'last_sent'),
@@ -500,6 +501,7 @@ HTML;
         $filters = [
             'search' => $request->get('search', ''),
             'interval' => $request->get('interval', ''),
+            'year' => $request->get('year', ''),
             'date_from' => $request->get('date_from', ''),
             'date_to' => $request->get('date_to', ''),
             'sort_by' => $request->get('sort_by', 'last_sent'),

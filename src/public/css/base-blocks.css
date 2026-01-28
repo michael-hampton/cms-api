@@ -10755,6 +10755,373 @@ body.card-flipped {
     }
 }
 
+/* ========================================
+   SPOTLIGHT LAYOUT - PRODUCTION STYLES
+   Frontend rendering (not editor)
+   ======================================== */
+
+/* Base container for spotlight groups */
+.group-spotlight-container {
+    position: relative;
+    margin: 40px 0;
+    width: 100%;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+
+    /* Prevent ad injection */
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+/* Desktop Layout - Two Column with Sticky Image */
+@media (min-width: 768px) {
+    .spotlight-desktop {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        align-items: start;
+        padding: 0 20px;
+    }
+
+    /* Sticky image wrapper */
+    .spotlight-image-wrapper {
+        position: sticky;
+        top: 100px; /* Adjust based on your header height */
+        height: fit-content;
+        max-height: calc(100vh - 160px);
+        overflow: hidden;
+    }
+
+    .spotlight-image-wrapper .spotlight-image {
+        width: 100%;
+        margin: 0;
+        position: relative;
+    }
+
+    .spotlight-image-wrapper .spotlight-image img {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+        /* Support both square and portrait images */
+        max-height: calc(100vh - 180px);
+        object-position: center;
+    }
+
+    /* Square images (1:1 ratio) */
+    .spotlight-image-wrapper .spotlight-image.square img {
+        aspect-ratio: 1 / 1;
+    }
+
+    /* Portrait images (3:4 ratio) */
+    .spotlight-image-wrapper .spotlight-image.portrait img {
+        aspect-ratio: 3 / 4;
+    }
+
+    .spotlight-image-wrapper .spotlight-image figcaption {
+        margin-top: 16px;
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-style: italic;
+        line-height: 1.5;
+    }
+
+    /* Scrollable content area */
+    .spotlight-content-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        padding-bottom: 60px;
+        min-height: calc(100vh - 160px);
+    }
+
+    /* Prevent ad injection between product blocks */
+    .spotlight-content-wrapper > [data-block-type="product"] {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    /* Prevent ads between image and first product */
+    .spotlight-content-wrapper > [data-block-type="product"]:first-child::before {
+        content: '';
+        display: block;
+        height: 0;
+        width: 0;
+        visibility: hidden;
+    }
+
+    /* Hide mobile layout on desktop */
+    .spotlight-mobile {
+        display: none;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .spotlight-desktop {
+        grid-template-columns: 45% 55%;
+        gap: 32px;
+        padding: 0 16px;
+    }
+
+    .spotlight-image-wrapper {
+        top: 80px;
+        max-height: calc(100vh - 120px);
+    }
+
+    .spotlight-content-wrapper {
+        gap: 24px;
+    }
+}
+
+/* Large desktop */
+@media (min-width: 1400px) {
+    .spotlight-desktop {
+        grid-template-columns: 500px 1fr;
+        gap: 60px;
+    }
+
+    .spotlight-image-wrapper {
+        top: 120px;
+    }
+}
+
+/* Mobile Layout - Vertical Stack */
+@media (max-width: 767px) {
+    .spotlight-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        padding: 0 16px;
+    }
+
+    .spotlight-mobile-image {
+        width: 100%;
+    }
+
+    .spotlight-mobile-image .spotlight-image {
+        margin: 0;
+        position: relative;
+    }
+
+    .spotlight-mobile-image .spotlight-image img {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+        /* Support both square and portrait on mobile */
+        object-fit: cover;
+        max-height: 500px;
+        object-position: center;
+    }
+
+    /* Square images on mobile */
+    .spotlight-mobile-image .spotlight-image.square img {
+        aspect-ratio: 1 / 1;
+        max-height: 400px;
+    }
+
+    /* Portrait images on mobile */
+    .spotlight-mobile-image .spotlight-image.portrait img {
+        aspect-ratio: 3 / 4;
+        max-height: 500px;
+    }
+
+    .spotlight-mobile-image .spotlight-image figcaption {
+        margin-top: 12px;
+        font-size: 0.813rem;
+        color: #6c757d;
+        font-style: italic;
+        text-align: center;
+        line-height: 1.4;
+    }
+
+    .spotlight-mobile-content {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    /* Hide desktop layout on mobile */
+    .spotlight-desktop {
+        display: none;
+    }
+}
+
+/* Product Block Styling within Spotlight */
+.spotlight-content-wrapper [data-block-type="product"],
+.spotlight-mobile-content [data-block-type="product"] {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.spotlight-content-wrapper [data-block-type="product"]:hover,
+.spotlight-mobile-content [data-block-type="product"]:hover {
+    border-color: #dee2e6;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+/* Product images within spotlight */
+.spotlight-content-wrapper [data-block-type="product"] img,
+.spotlight-mobile-content [data-block-type="product"] img {
+    border-radius: 8px;
+    width: 100%;
+    height: auto;
+}
+
+/* Premium template specific styles */
+.premium-template .spotlight-image-wrapper {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.premium-template .spotlight-image-wrapper .spotlight-image img {
+    border-radius: 12px;
+}
+
+.premium-template .spotlight-content-wrapper [data-block-type="product"] {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Loading states */
+.spotlight-image-wrapper.loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    min-height: 400px;
+    border-radius: 12px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Ad injection prevention markers */
+.spotlight-content-wrapper[data-no-ads="true"],
+.spotlight-mobile-content[data-no-ads="true"] {
+    position: relative;
+}
+
+.spotlight-content-wrapper[data-no-ads="true"]::before,
+.spotlight-mobile-content[data-no-ads="true"]::before {
+    content: '';
+    display: block;
+    height: 0;
+    width: 0;
+    visibility: hidden;
+    /* Custom data attribute for ad scripts to detect */
+}
+
+/* Prevent ad injection between specific blocks */
+.spotlight-content-wrapper > * + *,
+.spotlight-mobile-content > * + * {
+    /* Marker class that ad injection scripts should respect */
+    position: relative;
+}
+
+/* Print styles */
+@media print {
+    .spotlight-desktop {
+        display: block;
+    }
+
+    .spotlight-image-wrapper {
+        position: relative;
+        top: 0;
+        max-height: none;
+        margin-bottom: 20px;
+    }
+
+    .spotlight-mobile {
+        display: none;
+    }
+
+    .spotlight-content-wrapper {
+        min-height: auto;
+    }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .spotlight-content-wrapper [data-block-type="product"],
+    .spotlight-mobile-content [data-block-type="product"] {
+        transition: none;
+    }
+
+    .spotlight-image-wrapper.loading {
+        animation: none;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .spotlight-content-wrapper [data-block-type="product"],
+    .spotlight-mobile-content [data-block-type="product"] {
+        border: 2px solid #000000;
+    }
+
+    .spotlight-image-wrapper .spotlight-image img {
+        border: 1px solid #000000;
+    }
+}
+
+/* Dark mode support (if applicable) */
+@media (prefers-color-scheme: dark) {
+    .spotlight-content-wrapper [data-block-type="product"],
+    .spotlight-mobile-content [data-block-type="product"] {
+        background: #1a1a1a;
+        border-color: #333333;
+    }
+
+    .spotlight-image-wrapper .spotlight-image figcaption,
+    .spotlight-mobile-image .spotlight-image figcaption {
+        color: #adb5bd;
+    }
+}
+
+/* Progressive enhancement: Intersection Observer support for lazy loading */
+.spotlight-image[data-lazy="true"] img {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.spotlight-image[data-lazy="true"].loaded img {
+    opacity: 1;
+}
+
+/* Responsive font sizing */
+.spotlight-content-wrapper h3,
+.spotlight-mobile-content h3 {
+    font-size: clamp(1.25rem, 2vw, 1.75rem);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+}
+
+.spotlight-content-wrapper p,
+.spotlight-mobile-content p {
+    font-size: clamp(0.875rem, 1.5vw, 1rem);
+    line-height: 1.6;
+}
+
 
 
 

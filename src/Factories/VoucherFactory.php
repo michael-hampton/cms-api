@@ -25,7 +25,6 @@ class VoucherFactory extends Factory
             'description' => 'Test description',
             'minimum_order_value' => 100,
             'type' => 'fixed',
-            'discount' => 0,
             'is_active' => true,
         ]);
     }

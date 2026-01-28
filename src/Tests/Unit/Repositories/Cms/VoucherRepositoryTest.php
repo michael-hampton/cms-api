@@ -24,23 +24,22 @@ class VoucherRepositoryTest extends RepositoryTestCase
     /**
      * Create a test voucher
      */
-    protected function createVoucher(array $overrides = []): Voucher
-    {
-        return Voucher::create(array_merge([
-            'site_id' => $this->siteId,
-            'code' => 'VOUCHER' . uniqid(),
-            'name' => 'Test Voucher',
-            'discount_type' => 'percentage',
-            'value' => 10.99,
-            'discount_value' => 10,
-            'status' => 'active',
-            'usage_count' => 0,
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
-        ], $overrides));
-    }
+//    protected function createVoucher(array $overrides = []): Voucher
+//    {
+//        return Voucher::create(array_merge([
+//            'site_id' => $this->siteId,
+//            'code' => 'VOUCHER' . uniqid(),
+//            'name' => 'Test Voucher',
+//            'type' => 'percentage',
+//            'value' => 10.99,
+//            'discount_value' => 10,
+//            'status' => 'active',
+//            'usage_count' => 0,
+//            'created_at' => date('Y-m-d H:i:s'),
+//            'updated_at' => date('Y-m-d H:i:s'),
+//        ], $overrides));
+//    }
 
-    /** @test */
     public function test_search_returns_vouchers_with_relationships(): void
     {
         // Arrange
@@ -61,7 +60,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertNotEmpty($foundVoucher['products']);
     }
 
-    /** @test */
     public function test_find_by_code_returns_correct_voucher(): void
     {
         // Arrange
@@ -76,7 +74,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertEquals('TESTCODE123', $found->code);
     }
 
-    /** @test */
     public function test_find_by_code_returns_null_when_not_found(): void
     {
         // Act
@@ -86,7 +83,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertNull($found);
     }
 
-    /** @test */
     public function test_find_by_code_filters_by_site(): void
     {
         $site = $this->createSite();
@@ -100,7 +96,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($found); // Should not find voucher from different site
     }
 
-    /** @test */
     public function test_get_active_vouchers_returns_only_active(): void
     {
         // Arrange
@@ -119,7 +114,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         }
     }
 
-    /** @test */
     public function test_get_active_vouchers_excludes_expired_by_date(): void
     {
         // Arrange
@@ -142,7 +136,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertNotContains($expiredVoucher->id, $voucherIds);
     }
 
-    /** @test */
     public function test_get_active_vouchers_includes_vouchers_with_null_expiry(): void
     {
         // Arrange
@@ -159,7 +152,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertContains($voucher->id, $voucherIds);
     }
 
-    /** @test */
     public function test_increment_usage_count_increases_counter(): void
     {
         // Arrange
@@ -174,7 +166,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertEquals(6, $freshVoucher->usage_count);
     }
 
-    /** @test */
     public function test_increment_usage_count_expires_when_limit_reached(): void
     {
         // Arrange
@@ -193,7 +184,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertEquals('expired', $freshVoucher->status);
     }
 
-    /** @test */
     public function test_increment_usage_count_does_not_expire_without_limit(): void
     {
         // Arrange
@@ -212,7 +202,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertEquals('active', $freshVoucher->status);
     }
 
-    /** @test */
     public function test_increment_usage_count_returns_false_when_not_found(): void
     {
         // Act
@@ -222,7 +211,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
     public function test_check_deletable_returns_true_when_no_usage(): void
     {
         // Arrange
@@ -237,7 +225,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result['requires_confirmation']);
     }
 
-    /** @test */
     public function test_check_deletable_returns_false_when_has_usage(): void
     {
         // Arrange
@@ -252,7 +239,6 @@ class VoucherRepositoryTest extends RepositoryTestCase
         $this->assertTrue($result['requires_confirmation']);
     }
 
-    /** @test */
     public function test_check_deletable_throws_exception_when_not_found(): void
     {
         // Expect

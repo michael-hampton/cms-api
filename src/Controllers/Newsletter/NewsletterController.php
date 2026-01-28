@@ -13,9 +13,11 @@ use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Models\Member;
 use App\Models\MemberRole;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Cms\CampaignService;
 use App\Services\EmailVerificationService;
+use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\NewsletterSignupService;
 
 class NewsletterController extends Controller
@@ -28,6 +30,8 @@ class NewsletterController extends Controller
         private readonly NewsletterRepository    $newsletterRepository,
         private readonly NewsletterSignupService $newsletterSignupService,
         private readonly CampaignService         $campaignService,
+        private readonly NewsletterSendService             $newsletterSendService,
+        private readonly NewsletterSendRecipientRepository $newsletterSendRecipientRepository
     )
     {
         parent::__construct();
@@ -497,5 +501,91 @@ class NewsletterController extends Controller
         ];
 
         return $labels[$interval] ?? strtoupper($interval);
+    }
+
+    public function preview(Request $request, int $id): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $newsletter = $this->newsletterRepository->find($id);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            $previewEmails = $request->input('preview_emails', []);
+
+            if (empty($previewEmails)) {
+                return $this->errorResponse('No preview email addresses provided', 400);
+            }
+
+            $result = $this->newsletterSendService->previewNewsletter(
+                $newsletter,
+                $previewEmails,
+                $siteId
+            );
+
+            if (!$result['success']) {
+                return $this->errorResponse($result['error'], 400);
+            }
+
+            return $this->successResponse('Preview sent successfully', $result);
+
+        } catch (\Exception $e) {
+            Logger::error('Failed to send newsletter preview', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            return $this->errorResponse('Failed to send preview: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function retrySend(Request $request, int $id, int $sendId): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $newsletter = $this->newsletterRepository->find($id);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            $maxAttempts = $request->input('max_attempts', 3);
+
+            $result = $this->newsletterSendService->retrySend($sendId, $maxAttempts);
+
+            if (!$result['success']) {
+                return $this->errorResponse($result['error'], 400);
+            }
+
+            return $this->successResponse('Retry completed', $result);
+
+        } catch (\Exception $e) {
+            Logger::error('Failed to retry newsletter send', [
+                'id' => $id,
+                'send_id' => $sendId,
+                'error' => $e->getMessage()
+            ]);
+            return $this->errorResponse('Failed to retry send: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function getSendStatistics(Request $request, int $id, int $sendId): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $newsletter = $this->newsletterRepository->find($id);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            $stats = $this->newsletterSendRecipientRepository->getStatistics($sendId);
+
+            return $this->resourceResponse(['statistics' => $stats]);
+
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 }
