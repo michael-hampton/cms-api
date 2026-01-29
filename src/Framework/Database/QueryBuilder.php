@@ -693,6 +693,9 @@ class QueryBuilder
             if ($value instanceof RawExpression) {
                 $setParts[] = $this->quoteColumn($col) . " = {$value->value}";
             } else {
+
+                if (is_bool($value)) $value = (int)($value == true);
+
                 $paramKey = 'param_' . $paramCounter++;
                 $setParts[] = $this->quoteColumn($col) . " = :{$paramKey}";
                 $bindings[$paramKey] = $value;

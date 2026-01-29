@@ -151,8 +151,8 @@ class ConsentServiceTest extends FunctionalTestCase
             'consent_type_id' => $consentType->id,
             'is_granted' => true,
             'channel' => 'web',
-            'granted_at' => now_datetime()->modify('-2 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-1 day')->format('Y-m-d H:i:s')
+            'granted_at' => now_datetime()->modify('-2 days'),
+            'expires_at' => now_datetime()->modify('-1 day')
         ]);
 
         $count = $this->service->processExpiredConsents();

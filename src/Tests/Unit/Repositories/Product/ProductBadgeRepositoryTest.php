@@ -58,8 +58,8 @@ class ProductBadgeRepositoryTest extends RepositoryTestCase
             'badge_type' => 'current',
             'label' => 'Current',
             'color' => '#ff0000',
-            'valid_from' => now_datetime()->subDays(5)->format('Y-m-d H:i:s'),
-            'valid_until' => now_datetime()->addDays(5)->format('Y-m-d H:i:s'),
+            'valid_from' => now_datetime()->subDays(5),
+            'valid_until' => now_datetime()->addDays(5),
             'is_active' => true
         ]);
 
@@ -68,7 +68,7 @@ class ProductBadgeRepositoryTest extends RepositoryTestCase
             'badge_type' => 'expired',
             'label' => 'Expired',
             'color' => '#00ff00',
-            'valid_until' => now_datetime()->subDays(5)->format('Y-m-d H:i:s'),
+            'valid_until' => now_datetime()->subDays(5),
             'is_active' => true
         ]);
 
@@ -77,7 +77,7 @@ class ProductBadgeRepositoryTest extends RepositoryTestCase
             'badge_type' => 'future',
             'label' => 'Future',
             'color' => '#0000ff',
-            'valid_from' => now_datetime()->addDays(5)->format('Y-m-d H:i:s'),
+            'valid_from' => now_datetime()->addDays(5),
             'is_active' => true
         ]);
 

@@ -336,7 +336,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'plan_name' => 'Premium',
             'status' => 'active',
             'start_date' => date('Y-m-d H:i:s'),
-            'next_billing_date' => $nextBillingDate->format('Y-m-d H:i:s'),
+            'next_billing_date' => $nextBillingDate,
             'price' => 29.99,
             'currency' => 'USD'
         ]);
@@ -901,7 +901,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
             'status' => 'active',
-            'start_date' => now_datetime()->format('Y-m-d H:i:s'),
+            'start_date' => now_datetime(),
             'price' => 29.99,
             'currency' => 'USD'
         ]);

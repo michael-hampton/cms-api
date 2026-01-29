@@ -38,11 +38,11 @@ class MerchantProductFeedModelTest extends FunctionalTestCase
     public function test_it_can_scope_feeds_due_for_fetch()
     {
 // Due now
-        $this->createMerchantFeed(['is_active' => true, 'next_fetch_at' => now_datetime()->subDays(1)->format('Y-m-d H:i:s')]);
+        $this->createMerchantFeed(['is_active' => true, 'next_fetch_at' => now_datetime()->subDays(1)]);
 // Due (null)
         $this->createMerchantFeed(['is_active' => true, 'next_fetch_at' => null]);
 // Not due
-        $this->createMerchantFeed(['is_active' => true, 'next_fetch_at' => now_datetime()->addDays(1)->format('Y-m-d H:i:s')]);
+        $this->createMerchantFeed(['is_active' => true, 'next_fetch_at' => now_datetime()->addDays(1)]);
 
         $this->assertCount(2, MerchantProductFeed::dueForFetch()->get());
     }

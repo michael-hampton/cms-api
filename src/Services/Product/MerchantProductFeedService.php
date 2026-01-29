@@ -8,20 +8,28 @@ use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Repositories\Product\MerchantProductFeedRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Services\Product\FeedMappers\AmazonFeedMapper;
+use App\Services\Product\FeedMappers\EbayFeedMapper;
+use App\Services\Product\FeedMappers\FeedMapperRegistry;
 use Exception;
 
 class MerchantProductFeedService
 {
-    protected MerchantProductFeedRepository $repository;
+    private FeedMapperRegistry $mapperRegistry;
+    private MerchantProductFeedRepository $repository;
+    private ?int $currentFeedId = null;
+
 
     public function __construct(
         MerchantProductFeedRepository      $repository,
         private readonly ProductRepository $productRepository,
         private readonly ProductService    $productService,
-        private readonly HttpClient        $httpClient
+        private readonly HttpClient $httpClient,
+        ?FeedMapperRegistry         $mapperRegistry = null
     )
     {
         $this->repository = $repository;
+        $this->mapperRegistry = $mapperRegistry ?? $this->createDefaultMapperRegistry();
     }
 
     public function getFeed(int $id): ?Model
@@ -104,6 +112,8 @@ class MerchantProductFeedService
             return null;
         }
 
+        $this->currentFeedId = $id;
+
         try {
             // Update status to processing
             $this->repository->update($id, [
@@ -130,6 +140,7 @@ class MerchantProductFeedService
 
             return $this->repository->update($id, $updateData);
         } catch (Exception $e) {
+            die('here5');
             Logger::error('Feed fetch failed: ' . $e->getMessage(), [
                 'feed_id' => $id,
                 'trace' => $e->getTraceAsString()
@@ -235,21 +246,12 @@ class MerchantProductFeedService
     {
         $xml = simplexml_load_string($data);
         $products = [];
+        $feed = $this->repository->find($this->currentFeedId ?? 0);
+        $mapper = $this->mapperRegistry->getMapper($feed->feed_url ?? '', $feed->merchant_id ?? 0);
 
-        // Assuming standard product feed structure
         foreach ($xml->product as $product) {
-            $products[] = [
-                'name' => (string)$product->name,
-                'description' => (string)$product->description,
-                'price' => (float)$product->price,
-                'sale_price' => isset($product->sale_price) ? (float)$product->sale_price : null,
-                'sku' => (string)$product->sku,
-                'url' => (string)$product->url,
-                'image' => (string)$product->image,
-                'category' => (string)$product->category,
-                'brand' => (string)$product->brand,
-                'in_stock' => isset($product->in_stock) ? (bool)$product->in_stock : true,
-            ];
+            $productArray = json_decode(json_encode($product), true);
+            $products[] = $mapper->map($productArray);
         }
 
         return $products;
@@ -263,19 +265,11 @@ class MerchantProductFeedService
             throw new Exception('Invalid JSON feed structure: missing products array');
         }
 
-        return array_map(function ($product) {
-            return [
-                'name' => $product['name'] ?? '',
-                'description' => $product['description'] ?? '',
-                'price' => (float)($product['price'] ?? 0),
-                'sale_price' => isset($product['sale_price']) ? (float)$product['sale_price'] : null,
-                'sku' => $product['sku'] ?? '',
-                'url' => $product['url'] ?? '',
-                'image' => $product['image'] ?? '',
-                'category' => $product['category'] ?? '',
-                'brand' => $product['brand'] ?? '',
-                'in_stock' => $product['in_stock'] ?? true,
-            ];
+        $feed = $this->repository->find($this->currentFeedId ?? 0);
+        $mapper = $this->mapperRegistry->getMapper($feed->feed_url ?? '', $feed->merchant_id ?? 0);
+
+        return array_map(function ($product) use ($mapper) {
+            return $mapper->map($product);
         }, $json['products']);
     }
 
@@ -285,24 +279,16 @@ class MerchantProductFeedService
         $header = array_shift($lines);
         $products = [];
 
+        $feed = $this->repository->find($this->currentFeedId ?? 0);
+        $mapper = $this->mapperRegistry->getMapper($feed->feed_url ?? '', $feed->merchant_id ?? 0);
+
         foreach ($lines as $line) {
             if (count($line) !== count($header)) {
-                continue; // Skip malformed lines
+                continue;
             }
 
             $product = array_combine($header, $line);
-            $products[] = [
-                'name' => $product['name'] ?? $product['title'] ?? '',
-                'description' => $product['description'] ?? '',
-                'price' => (float)($product['price'] ?? 0),
-                'sale_price' => isset($product['sale_price']) ? (float)$product['sale_price'] : null,
-                'sku' => $product['sku'] ?? $product['id'] ?? '',
-                'url' => $product['url'] ?? $product['link'] ?? '',
-                'image' => $product['image'] ?? $product['image_url'] ?? '',
-                'category' => $product['category'] ?? '',
-                'brand' => $product['brand'] ?? '',
-                'in_stock' => isset($product['in_stock']) ? (bool)$product['in_stock'] : true,
-            ];
+            $products[] = $mapper->map($product);
         }
 
         return $products;
@@ -370,13 +356,15 @@ class MerchantProductFeedService
             'sku' => $productData['sku'],
             'image' => $productData['image'],
             'is_active' => true,
+            'in_stock' => $productData['in_stock'],
             'merchants' => [[
                 'id' => $merchantId,
                 'url' => $productData['url'],
                 'price' => $productData['price'],
                 'sale_price' => $productData['sale_price'],
                 'is_available' => $productData['in_stock'],
-            ]]
+            ]],
+            'brand' => $productData['brand'] ?? ''
         ]);
     }
 
@@ -550,5 +538,22 @@ class MerchantProductFeedService
             'total' => count($productsArray),
             'generated_at' => date('Y-m-d H:i:s')
         ], JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Create default mapper registry with all mappers
+     *
+     * @return FeedMapperRegistry
+     */
+    protected function createDefaultMapperRegistry(): FeedMapperRegistry
+    {
+        $registry = new FeedMapperRegistry();
+
+        // Register specific mappers (order matters - more specific first)
+        $registry->register(new AmazonFeedMapper());
+        $registry->register(new EbayFeedMapper());
+        // Add more mappers here as needed
+
+        return $registry;
     }
 }

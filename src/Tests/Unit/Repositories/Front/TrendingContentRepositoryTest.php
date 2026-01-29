@@ -22,8 +22,8 @@ class TrendingContentRepositoryTest extends RepositoryTestCase
         $member = $this->createMember();
 
         // Create activity
-        PageView::create(['page_id' => $page->id, 'member_id' => $member->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->format('Y-m-d H:i:s')]);;
-        PageLike::create(['page_id' => $page->id, 'member_id' => $member->id, 'site_id' => $this->siteId, 'liked_at' => now_datetime()->format('Y-m-d H:i:s')]);;;
+        PageView::create(['page_id' => $page->id, 'member_id' => $member->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()]);;
+        PageLike::create(['page_id' => $page->id, 'member_id' => $member->id, 'site_id' => $this->siteId, 'liked_at' => now_datetime()]);;;
         Comment::create([
             'page_id' => $page->id,
             'member_id' => $member->id,

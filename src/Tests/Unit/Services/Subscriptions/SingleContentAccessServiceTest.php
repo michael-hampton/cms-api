@@ -364,7 +364,7 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
             'last_name' => 'User',
             'password' => password_hash('password', PASSWORD_DEFAULT),
             'site_id' => $this->siteId,
-            'email_verified_at' => now_datetime()->format('Y-m-d H:i:s')
+            'email_verified_at' => now_datetime()
         ]);
     }
 

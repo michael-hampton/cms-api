@@ -761,6 +761,10 @@ class PageRepository extends Repository
         // Order by date (published_at or scheduled_at)
         $query->orderByRaw('COALESCE(published_at, scheduled_at) ASC');
 
+//        echo '<pre>';
+//        print_r($query->toSql());
+//        die;
+
         return $this->searchEngine->search($query, $criteria);
     }
 

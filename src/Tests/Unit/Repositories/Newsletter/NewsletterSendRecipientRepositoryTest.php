@@ -168,7 +168,7 @@ class NewsletterSendRecipientRepositoryTest extends FunctionalTestCase
 
         $this->send = NewsletterSend::create([
             'newsletter_id' => $newsletter->id,
-            'sent_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'sent_at' => now_datetime(),
             'recipient_count' => 0,
             'sent_count' => 0,
             'failed_count' => 0,

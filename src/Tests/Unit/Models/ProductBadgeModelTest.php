@@ -83,7 +83,7 @@ class ProductBadgeModelTest extends FunctionalTestCase
             'badge_type' => 'trending',
             'label' => 'Trending',
             'color' => '#ffff00',
-            'valid_from' => now_datetime()->subDays(5)->format('Y-m-d H:i:s'),
+            'valid_from' => now_datetime()->subDays(5),
             'is_active' => true
         ]);
 
@@ -115,7 +115,7 @@ class ProductBadgeModelTest extends FunctionalTestCase
             'badge_type' => 'limited',
             'label' => 'Limited Time',
             'color' => '#ff6600',
-            'valid_until' => now_datetime()->addDays(5)->format('Y-m-d H:i:s'),
+            'valid_until' => now_datetime()->addDays(5),
             'is_active' => true
         ]);
 
@@ -150,8 +150,8 @@ class ProductBadgeModelTest extends FunctionalTestCase
             'badge_type' => 'seasonal',
             'label' => 'Seasonal',
             'color' => '#00cc00',
-            'valid_from' => $validFrom->format('Y-m-d H:i:s'),
-            'valid_until' => $validUntil->format('Y-m-d H:i:s'),
+            'valid_from' => $validFrom,
+            'valid_until' => $validUntil,
             'is_active' => true
         ]);
 

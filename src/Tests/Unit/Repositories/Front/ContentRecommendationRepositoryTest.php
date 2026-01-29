@@ -64,9 +64,9 @@ class ContentRecommendationRepositoryTest extends RepositoryTestCase
         $page3->categories(true)->attach($category2->id);
 
         // Create page views
-        PageView::create(['member_id' => $member->id, 'page_id' => $page1->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->format('Y-m-d H:i:s')]);
-        PageView::create(['member_id' => $member->id, 'page_id' => $page2->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->format('Y-m-d H:i:s')]);
-        PageView::create(['member_id' => $member->id, 'page_id' => $page3->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->format('Y-m-d H:i:s')]);
+        PageView::create(['member_id' => $member->id, 'page_id' => $page1->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()]);
+        PageView::create(['member_id' => $member->id, 'page_id' => $page2->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()]);
+        PageView::create(['member_id' => $member->id, 'page_id' => $page3->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()]);
 
         $this->repository->updatePreferencesFromActivity($member->id, $this->siteId);
 
@@ -82,10 +82,10 @@ class ContentRecommendationRepositoryTest extends RepositoryTestCase
         $page = $this->createPage();
 
         // Create activity
-        PageView::create(['member_id' => $member->id, 'page_id' => $page->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->format('Y-m-d H:i:s')]);
-        PageView::create(['member_id' => $member->id, 'page_id' => $page->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->subDays(1)->format('Y-m-d H:i:s')]);;
+        PageView::create(['member_id' => $member->id, 'page_id' => $page->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()]);
+        PageView::create(['member_id' => $member->id, 'page_id' => $page->id, 'site_id' => $this->siteId, 'viewed_at' => now_datetime()->subDays(1)]);;
 
-        PageLike::create(['member_id' => $member->id, 'page_id' => $page->id, 'site_id' => $this->siteId, 'liked_at' => now_datetime()->format('Y-m-d H:i:s')]);;
+        PageLike::create(['member_id' => $member->id, 'page_id' => $page->id, 'site_id' => $this->siteId, 'liked_at' => now_datetime()]);;
 
         Comment::create([
             'member_id' => $member->id,

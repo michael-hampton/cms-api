@@ -208,6 +208,28 @@ abstract class Model
             }
         }
 
+        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['date', 'datetime', 'timestamp'])) {
+
+            if ($value instanceof \DateTimeInterface) {
+                $this->attributes[$key] = $value->format($this->dateFormat);
+                return;
+            }
+
+            if (is_string($value)) {
+                $this->attributes[$key] = (new \DateTime($value))
+                    ->format($this->dateFormat);
+                return;
+            }
+        }
+
+        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['bool', 'boolean'])) {
+
+            if (is_bool($value)) {
+                $this->attributes[$key] = (int)$value;
+                return;
+            }
+        }
+
         $this->attributes[$key] = $value;
     }
 
@@ -298,18 +320,99 @@ abstract class Model
             return false;
         }
 
+        // Fire the "saving" event
+        if ($this->fireModelEvent('saving') === false) {
+            return false;
+        }
+
+        // Fire the "updating" event
+        if ($this->fireModelEvent('updating') === false) {
+            return false;
+        }
+
+        // Update timestamps if enabled
+        if ($this->timestamps) {
+            $this->setAttribute('updated_at', date($this->dateFormat));
+        }
+
+        // Determine dirty attributes (only changed values)
+        $dirty = array_diff_assoc(
+            $this->attributes,
+            $this->original ?? []
+        );
+
+        if (empty($dirty)) {
+            // No changes, but still fire events
+            $this->fireModelEvent('updated');
+            $this->fireModelEvent('saved');
+            return true;
+        }
+
+        // Cast dirty attributes for DB storage
+        foreach ($dirty as $key => $value) {
+            $dirty[$key] = $this->castAttributeForDb($key, $value);
+        }
+
+        // Perform database update
         $affectedRows = $this->database->update(
             $this->table,
-            $this->attributes,
+            $dirty,
             [$this->primaryKey => $primaryKeyValue]
         );
 
-        if ($affectedRows > 0) {
+        if ($affectedRows >= 0) {
+            // Update original snapshot
             $this->original = $this->attributes;
+
+            // Fire post-update events
+            $this->fireModelEvent('updated');
+            $this->fireModelEvent('saved');
+
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Cast an attribute before saving to database
+     */
+    protected function castAttributeForDb(string $key, $value)
+    {
+        if (isset($this->casts[$key])) {
+            switch ($this->casts[$key]) {
+                case 'date':
+                case 'datetime':
+                case 'timestamp':
+                    if ($value instanceof \DateTimeInterface) {
+                        return $value->format($this->dateFormat);
+                    } elseif (is_string($value)) {
+                        return (new \DateTime($value))->format($this->dateFormat);
+                    }
+                    break;
+
+                case 'array':
+                case 'json':
+                    if (is_array($value)) {
+                        return json_encode($value);
+                    }
+                    break;
+
+                case 'int':
+                case 'boolean':
+                case 'bool':
+                case 'integer':
+                    return (int)$value;
+                case 'float':
+                case 'double':
+                    return (float)$value;
+                case 'string':
+                    return (string)$value;
+            }
+        }
+
+        // No casting, return raw value
+        return $value;
     }
 
     public function delete(): bool

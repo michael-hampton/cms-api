@@ -14,8 +14,8 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
     {
         $subscription = $this->createPrintSubscription();
         $subscription->delivery_paused = true;
-        $subscription->delivery_pause_start = new \DateTime('-1 day')->format('Y-m-d H:i:s');
-        $subscription->delivery_pause_end = new \DateTime('+5 days')->format('Y-m-d H:i:s');
+        $subscription->delivery_pause_start = new \DateTime('-1 day');
+        $subscription->delivery_pause_end = new \DateTime('+5 days');
         $subscription->save();
 
         $this->assertTrue($subscription->isDeliveryPaused());
@@ -43,8 +43,8 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
     {
         $subscription = $this->createPrintSubscription();
         $subscription->delivery_paused = true;
-        $subscription->delivery_pause_start = new \DateTime('+5 days')->format('Y-m-d H:i:s');
-        $subscription->delivery_pause_end = new \DateTime('+10 days')->format('Y-m-d H:i:s');
+        $subscription->delivery_pause_start = new \DateTime('+5 days');
+        $subscription->delivery_pause_end = new \DateTime('+10 days');
         $subscription->save();
 
         $this->assertFalse($subscription->isDeliveryPaused());
@@ -54,8 +54,8 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
     {
         $subscription = $this->createPrintSubscription();
         $subscription->delivery_paused = true;
-        $subscription->delivery_pause_start = new \DateTime('-10 days')->format('Y-m-d H:i:s');
-        $subscription->delivery_pause_end = new \DateTime('-1 day')->format('Y-m-d H:i:s');
+        $subscription->delivery_pause_start = new \DateTime('-10 days');
+        $subscription->delivery_pause_end = new \DateTime('-1 day');
         $subscription->save();
 
         $this->assertFalse($subscription->isDeliveryPaused());
@@ -97,8 +97,8 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
     {
         $subscription = $this->createPrintSubscription();
         $subscription->delivery_paused = true;
-        $subscription->delivery_pause_start = new \DateTime('-1 day')->format('Y-m-d H:i:s');
-        $subscription->delivery_pause_end = new \DateTime('+5 days')->format('Y-m-d H:i:s');
+        $subscription->delivery_pause_start = new \DateTime('-1 day');
+        $subscription->delivery_pause_end = new \DateTime('+5 days');
         $subscription->save();
 
         $this->assertFalse($subscription->canPauseDelivery());
@@ -108,8 +108,8 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
     {
         $subscription = $this->createPrintSubscription();
         $subscription->delivery_paused = true;
-        $subscription->delivery_pause_start = new \DateTime('-1 day')->format('Y-m-d H:i:s');
-        $subscription->delivery_pause_end = new \DateTime('+5 days')->format('Y-m-d H:i:s');
+        $subscription->delivery_pause_start = new \DateTime('-1 day');
+        $subscription->delivery_pause_end = new \DateTime('+5 days');
         $subscription->save();
 
         $this->assertTrue($subscription->canResumeDelivery());
@@ -126,8 +126,8 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
     {
         $subscription = $this->createPrintSubscription();
         $subscription->delivery_paused = true;
-        $subscription->delivery_pause_start = new \DateTime('-1 day')->format('Y-m-d H:i:s');
-        $subscription->delivery_pause_end = new \DateTime('+5 days')->format('Y-m-d H:i:s');
+        $subscription->delivery_pause_start = new \DateTime('-1 day');
+        $subscription->delivery_pause_end = new \DateTime('+5 days');
         $subscription->save();
 
         $days = $subscription->getDaysUntilPauseEnds();

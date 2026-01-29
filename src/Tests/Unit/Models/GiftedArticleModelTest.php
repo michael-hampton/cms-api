@@ -36,7 +36,7 @@ class GiftedArticleModelTest extends FunctionalTestCase
     {
         $gift = $this->createGiftedArticle([
             'status' => 'pending',
-            'expires_at' => now_datetime()->modify('-1 day')->format('Y-m-d H:i:s')
+            'expires_at' => now_datetime()->modify('-1 day')
         ]);
 
         $this->assertTrue($gift->isExpired());
@@ -56,7 +56,7 @@ class GiftedArticleModelTest extends FunctionalTestCase
     {
         $gift = $this->createGiftedArticle([
             'status' => 'pending',
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s')
+            'expires_at' => now_datetime()->modify('+7 days')
         ]);
 
         $this->assertTrue($gift->isPending());
@@ -83,7 +83,7 @@ class GiftedArticleModelTest extends FunctionalTestCase
     {
         $gift = $this->createGiftedArticle([
             'status' => 'pending',
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s')
+            'expires_at' => now_datetime()->modify('+7 days')
         ]);
         $member = $this->createMember();
 

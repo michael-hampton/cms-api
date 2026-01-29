@@ -911,48 +911,54 @@ class NewsletterSendServiceTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
-//    public function test_send_newsletter_excludes_failed_recipients_from_list(): void //todo
-//    {
-//        $newsletter = $this->createMockNewsletter([
-//            'id' => 1,
-//            'title' => 'Test Newsletter',
-//            'content' => json_encode([['type' => 'heading', 'level' => 1, 'content' => 'Hello']]),
-//            'interval' => Newsletter::INTERVAL_WEEKLY,
-//        ]);
-//
-//        $subscriberEmails = ['success@example.com', 'fail@example.com'];
-//
-//        $this->setupBasicSendExpectations($subscriberEmails, [], [], 1);
-//
-//        foreach ($subscriberEmails as $email) {
-//            $this->memberRepository->shouldReceive('findByEmail')
-//                ->with($email)
-//                ->once()
-//                ->andReturn(null);
-//
-//            $this->setupUnsubscribeTokenMocks($email, 'unsub-token-' . $email);
-//        }
-//
-//        $this->emailService->shouldReceive('send')
-//            ->with('success@example.com', 'Test Newsletter', Mockery::type('string'))
-//            ->once()
-//            ->andReturn(true);
-//
-//        $this->emailService->shouldReceive('send')
-//            ->with('fail@example.com', 'Test Newsletter', Mockery::type('string'))
-//            ->andThrow(new \Exception('Email service error'))
-//            ->once();
-//
-//        $this->newsletterRepo->shouldReceive('update')
-//            ->with(1, Mockery::type('array'))
-//            ->once();
-//
-//        $result = $this->service->sendNewsletter($newsletter, $this->siteId);
-//
-//        $this->assertTrue($result['success']);
-//        $this->assertEquals(1, $result['recipients']);
-//        $this->assertEquals(1, $result['failed']);
-//    }
+    public function test_send_newsletter_excludes_failed_recipients_from_list(): void
+    {
+        $newsletter = $this->createMockNewsletter([
+            'id' => 1,
+            'title' => 'Test Newsletter',
+            'content' => json_encode([['type' => 'heading', 'level' => 1, 'content' => 'Hello']]),
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+        ]);
+
+        $subscriberEmails = ['success@example.com', 'fail@example.com'];
+
+        // Set up basic expectations - note we pass 1 as the forceSentCount
+        $this->setupBasicSendExpectations($subscriberEmails, [], null, 1);
+
+        // Set up member lookups
+        foreach ($subscriberEmails as $email) {
+            $this->memberRepository->shouldReceive('findByEmail')
+                ->with($email)
+                ->once()
+                ->andReturn(null);
+
+            $this->setupUnsubscribeTokenMocks($email, 'unsub-token-' . $email);
+        }
+
+        // Success email sends successfully
+        $this->emailService->shouldReceive('send')
+            ->with('success@example.com', 'Test Newsletter', Mockery::type('string'))
+            ->once()
+            ->andReturn(true);
+
+        // Fail email throws exception
+        $this->emailService->shouldReceive('send')
+            ->with('fail@example.com', 'Test Newsletter', Mockery::type('string'))
+            ->once()
+            ->andThrow(new \Exception('Email service error'));
+
+        $this->newsletterRepo->shouldReceive('update')
+            ->with(1, Mockery::type('array'))
+            ->once();
+
+        // Act
+        $result = $this->service->sendNewsletter($newsletter, $this->siteId);
+
+        // Assert
+        $this->assertTrue($result['success']);
+        $this->assertEquals(1, $result['recipients']); // Only successful sends
+        $this->assertEquals(1, $result['failed']); // One failed
+    }
 
     public function test_automated_newsletter_captures_page_snapshot(): void
     {

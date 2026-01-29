@@ -23,7 +23,7 @@ class MemberConsentModelTest extends FunctionalTestCase
             'is_granted' => true,
             'channel' => 'web',
             'ip_address' => '192.168.1.1',
-            'granted_at' => now_datetime()->format('Y-m-d H:i:s')
+            'granted_at' => now_datetime()
         ]);
 
         $this->assertInstanceOf(MemberConsent::class, $consent);
@@ -62,7 +62,7 @@ class MemberConsentModelTest extends FunctionalTestCase
             'consent_type_id' => $this->createConsentType(['code' => 'another'])->id,
             'is_granted' => false,
             'channel' => 'web',
-            'revoked_at' => now_datetime()->format('Y-m-d H:i:s')
+            'revoked_at' => now_datetime()
         ]);
 
         $this->assertTrue($active->isActive());
@@ -79,8 +79,8 @@ class MemberConsentModelTest extends FunctionalTestCase
             'consent_type_id' => $consentType->id,
             'is_granted' => true,
             'channel' => 'web',
-            'granted_at' => now_datetime()->modify('-2 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-1 day')->format('Y-m-d H:i:s')
+            'granted_at' => now_datetime()->modify('-2 days'),
+            'expires_at' => now_datetime()->modify('-1 day')
         ]);
 
         $notExpired = MemberConsent::create([
@@ -88,8 +88,8 @@ class MemberConsentModelTest extends FunctionalTestCase
             'consent_type_id' => $this->createConsentType(['code' => 'another'])->id,
             'is_granted' => true,
             'channel' => 'web',
-            'granted_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+30 days')->format('Y-m-d H:i:s')
+            'granted_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+30 days')
         ]);
 
         $this->assertTrue($expired->isExpired());
@@ -136,7 +136,7 @@ class MemberConsentModelTest extends FunctionalTestCase
             'consent_type_id' => $this->createConsentType(['code' => 'revoked'])->id,
             'is_granted' => false,
             'channel' => 'web',
-            'revoked_at' => now_datetime()->format('Y-m-d H:i:s')
+            'revoked_at' => now_datetime()
         ]);
 
         $active = MemberConsent::active()->get();
@@ -152,8 +152,8 @@ class MemberConsentModelTest extends FunctionalTestCase
             'consent_type_id' => $this->createConsentType(['code' => 'expired'])->id,
             'is_granted' => true,
             'channel' => 'web',
-            'granted_at' => now_datetime()->modify('-2 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-1 day')->format('Y-m-d H:i:s')
+            'granted_at' => now_datetime()->modify('-2 days'),
+            'expires_at' => now_datetime()->modify('-1 day')
         ]);
 
         MemberConsent::create([

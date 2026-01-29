@@ -1407,4 +1407,209 @@ class ProductRepositoryTest extends RepositoryTestCase
         $specs = ProductSpecification::where('product_id', $product->id)->get();
         $this->assertCount(2, $specs);
     }
+
+    public function test_find_product_merchant_returns_correct_merchant(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+        $productMerchant = $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'price' => 99.99
+        ]);
+
+        // Act
+        $found = $this->repository->findProductMerchant($product->id, $merchant->id);
+
+        // Assert
+        $this->assertNotNull($found);
+        $this->assertEquals($productMerchant->id, $found->id);
+        $this->assertEquals($product->id, $found->product_id);
+        $this->assertEquals($merchant->id, $found->merchant_id);
+    }
+
+    public function test_find_product_merchant_returns_null_when_not_found(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+
+        // Act
+        $found = $this->repository->findProductMerchant($product->id, 9999);
+
+        // Assert
+        $this->assertNull($found);
+    }
+
+    public function test_create_product_merchant_creates_new_merchant(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+
+        $data = [
+            'merchant_id' => $merchant->id,
+            'url' => 'https://amazon.com/product',
+            'price' => 99.99,
+            'sale_price' => 89.99,
+            'is_available' => true
+        ];
+
+        // Act
+        $productMerchant = $this->repository->createProductMerchant($product->id, $data);
+
+        // Assert
+        $this->assertNotNull($productMerchant);
+        $this->assertEquals($product->id, $productMerchant->product_id);
+        $this->assertEquals($merchant->id, $productMerchant->merchant_id);
+        $this->assertEquals(99.99, $productMerchant->price);
+        $this->assertEquals(89.99, $productMerchant->sale_price);
+        $this->assertTrue($productMerchant->is_available);
+
+        $this->assertDatabaseHas('product_merchants', [
+            'product_id' => $product->id,
+            'merchant_id' => $merchant->id,
+            'price' => 99.99
+        ]);
+    }
+
+    public function test_update_product_merchant_updates_fields(): void
+    {
+        // Arrange
+        $product = $this->createProduct();
+        $merchant = $this->createMerchant();
+        $productMerchant = $this->createProductMerchant($product->id, [
+            'merchant_id' => $merchant->id,
+            'price' => 99.99,
+            'is_available' => true
+        ]);
+
+        $updateData = [
+            'price' => 89.99,
+            'sale_price' => 79.99,
+            'is_available' => false,
+            'url' => 'https://updated-url.com'
+        ];
+
+        // Act
+        $updated = $this->repository->updateProductMerchant($productMerchant->id, $updateData);
+
+        // Assert
+        $this->assertTrue($updated);
+
+        $refreshed = ProductMerchant::find($productMerchant->id);
+        $this->assertEquals(89.99, $refreshed->price);
+        $this->assertEquals(79.99, $refreshed->sale_price);
+        $this->assertFalse($refreshed->is_available);
+        $this->assertEquals('https://updated-url.com', $refreshed->url);
+    }
+
+    public function test_update_product_merchant_returns_false_for_nonexistent(): void
+    {
+        // Act
+        $updated = $this->repository->updateProductMerchant(9999, ['price' => 100]);
+
+        // Assert
+        $this->assertFalse($updated);
+    }
+
+    public function test_get_products_by_merchant_returns_products_with_merchant_data(): void
+    {
+        // Arrange
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+        $brand = $this->createBrand(['name' => 'Test Brand']);
+        $category = $this->createCategory(['name' => 'Electronics']);
+
+        $product1 = $this->createProduct([
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'is_active' => true
+        ]);
+        $product2 = $this->createProduct([
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'is_active' => true
+        ]);
+        $product3 = $this->createProduct([
+            'brand_id' => $brand->id,
+            'category_id' => $category->id,
+            'is_active' => false  // Inactive product
+        ]);
+
+        $this->createProductImage($product1->id, ['is_primary' => true]);
+        $this->createProductImage($product2->id, ['is_primary' => true]);
+
+        // Create product merchants
+        $pm1 = $this->createProductMerchant($product1->id, [
+            'merchant_id' => $merchant->id,
+            'price' => 99.99,
+            'sale_price' => 89.99
+        ]);
+        $pm2 = $this->createProductMerchant($product2->id, [
+            'merchant_id' => $merchant->id,
+            'price' => 149.99
+        ]);
+        $this->createProductMerchant($product3->id, [
+            'merchant_id' => $merchant->id,
+            'price' => 199.99
+        ]);
+
+        // Act
+        $products = $this->repository->getProductsByMerchant($merchant->id);
+
+        // Assert
+        $this->assertCount(2, $products); // Only active products
+
+        $foundProduct1 = $products->firstWhere('id', $product1->id);
+        $foundProduct2 = $products->firstWhere('id', $product2->id);
+
+        $this->assertNotNull($foundProduct1);
+        $this->assertNotNull($foundProduct2);
+
+        // Check merchant data is attached
+        $this->assertNotNull($foundProduct1->merchant_data);
+        $this->assertEquals($pm1->id, $foundProduct1->merchant_data->id);
+        $this->assertEquals(99.99, $foundProduct1->merchant_data->price);
+        $this->assertEquals(89.99, $foundProduct1->merchant_data->sale_price);
+
+        $this->assertNotNull($foundProduct2->merchant_data);
+        $this->assertEquals($pm2->id, $foundProduct2->merchant_data->id);
+        $this->assertEquals(149.99, $foundProduct2->merchant_data->price);
+
+        // Check relationships are loaded
+        $this->assertNotNull($foundProduct1->brand);
+        $this->assertNotNull($foundProduct1->category);
+        $this->assertNotEmpty($foundProduct1->images);
+    }
+
+    public function test_get_products_by_merchant_returns_empty_collection_when_no_products(): void
+    {
+        // Arrange
+        $merchant = $this->createMerchant();
+
+        // Act
+        $products = $this->repository->getProductsByMerchant($merchant->id);
+
+        // Assert
+        $this->assertInstanceOf(\App\Framework\Support\Collection::class, $products);
+        $this->assertCount(0, $products);
+    }
+
+    public function test_get_products_by_merchant_filters_inactive_products(): void
+    {
+        // Arrange
+        $merchant = $this->createMerchant();
+        $activeProduct = $this->createProduct(['is_active' => true]);
+        $inactiveProduct = $this->createProduct(['is_active' => false]);
+
+        $this->createProductMerchant($activeProduct->id, ['merchant_id' => $merchant->id]);
+        $this->createProductMerchant($inactiveProduct->id, ['merchant_id' => $merchant->id]);
+
+        // Act
+        $products = $this->repository->getProductsByMerchant($merchant->id);
+
+        // Assert
+        $this->assertCount(1, $products);
+        $this->assertEquals($activeProduct->id, $products->first()->id);
+    }
+
 }

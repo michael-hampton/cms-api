@@ -99,7 +99,7 @@ class MemberGiftAllowanceModelTest extends FunctionalTestCase
         $allowance = $this->createMemberGiftAllowance([
             'annual_gift_limit' => 10,
             'gifts_used_this_year' => 8,
-            'year_start_date' => $oldDate->format('Y-m-d')
+            'year_start_date' => $oldDate
         ]);
 
         $allowance->resetIfNewYear();
@@ -115,7 +115,7 @@ class MemberGiftAllowanceModelTest extends FunctionalTestCase
         $allowance = $this->createMemberGiftAllowance([
             'annual_gift_limit' => 10,
             'gifts_used_this_year' => 5,
-            'year_start_date' => $recentDate->format('Y-m-d')
+            'year_start_date' => $recentDate
         ]);
 
         $allowance->resetIfNewYear();

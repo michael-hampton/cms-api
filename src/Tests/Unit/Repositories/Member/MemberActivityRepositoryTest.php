@@ -22,7 +22,7 @@ class MemberActivityRepositoryTest extends RepositoryTestCase
                 'member_id' => $member->id,
                 'site_id' => $this->siteId,
                 'activity_type' => 'comment',
-                'activity_date' => now_datetime()->subDays($i)->format('Y-m-d H:i:s')
+                'activity_date' => now_datetime()->subDays($i)
             ]);
         }
 
@@ -46,7 +46,7 @@ class MemberActivityRepositoryTest extends RepositoryTestCase
             'member_id' => $member->id,
             'site_id' => $this->siteId,
             'activity_type' => 'like',
-            'activity_date' => now_datetime()->subDays(1)->format('Y-m-d H:i:s')
+            'activity_date' => now_datetime()->subDays(1)
         ]);
 
         $activities = $this->repository->getMemberActivities($member->id);
@@ -72,7 +72,7 @@ class MemberActivityRepositoryTest extends RepositoryTestCase
                 'member_id' => $member->id,
                 'site_id' => $this->siteId,
                 'activity_type' => 'like',
-                'activity_date' => now_datetime()->subDays($i)->format('Y-m-d H:i:s')
+                'activity_date' => now_datetime()->subDays($i)
             ]);
         }
 
@@ -98,7 +98,7 @@ class MemberActivityRepositoryTest extends RepositoryTestCase
             'member_id' => $member->id,
             'site_id' => $this->siteId,
             'activity_type' => 'comment',
-            'activity_date' => now_datetime()->subDays(40)->format('Y-m-d H:i:s')
+            'activity_date' => now_datetime()->subDays(40)
         ]);
 
         $stats = $this->repository->getActivityStats($member->id, 30);

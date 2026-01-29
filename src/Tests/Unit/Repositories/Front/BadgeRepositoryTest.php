@@ -185,14 +185,14 @@ class BadgeRepositoryTest extends RepositoryTestCase
             'member_id' => $member->id,
             'site_id' => $this->siteId,
             'activity_type' => 'recent_activity',
-            'activity_date' => now_datetime()->modify("-5 day")->format('Y-m-d H:i:s')
+            'activity_date' => now_datetime()->modify("-5 day")
         ]);
 
         $oldActivity = $this->createMemberActivity([
             'member_id' => $member->id,
             'site_id' => $this->siteId,
             'activity_type' => 'old_activity',
-            'activity_date' => now_datetime()->modify("-40 day")->format('Y-m-d H:i:s')
+            'activity_date' => now_datetime()->modify("-40 day")
         ]);
 
         $startDate = now_datetime()->modify("-30 day")->format('Y-m-d H:i:s');

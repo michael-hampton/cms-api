@@ -52,9 +52,9 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(1)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(1)]);
         $this->createProductView(['user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(2)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(3)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(3)]);
         $this->createProductView(['user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(4)->format('Y-m-d H:i:s')]);
 
         $result = $this->repository->getViewedProductIdsByMember($member->id, 10, 30);
@@ -69,7 +69,7 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $member = $this->createMember();
 
         for ($i = 1; $i <= 10; $i++) {
-            $this->createProductView(['user_id' => $member->id, 'viewed_at' => now_datetime()->subDays($i)->format('Y-m-d H:i:s')]);
+            $this->createProductView(['user_id' => $member->id, 'viewed_at' => now_datetime()->subDays($i)]);
         }
 
         $result = $this->repository->getViewedProductIdsByMember($member->id, 5, 30);
@@ -84,8 +84,8 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['product_id' => $product->id, 'user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(5)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['product_id' => $product->id, 'user_id' => $member2->id, 'viewed_at' => now_datetime()->subDays(35)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['product_id' => $product->id, 'user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(5)]);
+        $this->createProductView(['product_id' => $product->id, 'user_id' => $member2->id, 'viewed_at' => now_datetime()->subDays(35)]);
 
         $result = $this->repository->getViewedProductIdsByMember($member->id, 10, 30);
 
@@ -100,8 +100,8 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product2 = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['product_id' => $product->id, 'user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(1)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['product_id' => $product2->id, 'user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(2)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['product_id' => $product->id, 'user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(1)]);
+        $this->createProductView(['product_id' => $product2->id, 'user_id' => $member->id, 'viewed_at' => now_datetime()->subDays(2)]);
 
         $result = $this->repository->getViewedProductsByMember($member->id, 10, 30);
 
@@ -125,9 +125,9 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(1)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(2)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(3)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(1)]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(2)]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(3)]);
 
         $result = $this->repository->getProductViewCount($product->id);
 
@@ -140,8 +140,8 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(5)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(60)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(5)]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(60)]);
 
 
         $result = $this->repository->getProductViewCount($product->id, 30);
@@ -213,7 +213,7 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subMinutes(30)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subMinutes(30)]);
 
         $result = $this->repository->hasRecentView($product->id, $member->id, 60);
 
@@ -254,8 +254,8 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(30)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(35)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(30)]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(35)]);
 
         $result = $this->repository->getMemberTotalViews($member->id, 30);
 
@@ -291,8 +291,8 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $product2 = $this->createProduct();
 
         // Create test data
-        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(400)->format('Y-m-d H:i:s')]);
-        $this->createProductView(['user_id' => $member2->id, 'product_id' => $product2->id, 'viewed_at' => now_datetime()->subDays(100)->format('Y-m-d H:i:s')]);
+        $this->createProductView(['user_id' => $member->id, 'product_id' => $product->id, 'viewed_at' => now_datetime()->subDays(400)]);
+        $this->createProductView(['user_id' => $member2->id, 'product_id' => $product2->id, 'viewed_at' => now_datetime()->subDays(100)]);
 
         $deleted = $this->repository->deleteOldViews(365);
 

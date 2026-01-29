@@ -50,7 +50,7 @@ class MemberRewardModelTest extends FunctionalTestCase
     {
         $reward = $this->createMemberReward([
             'status' => 'pending',
-            'expires_at' => now_datetime()->modify('-1 day')->format('Y-m-d H:i:s')
+            'expires_at' => now_datetime()->modify('-1 day')
         ]);
 
         $this->assertTrue($reward->isExpired());
@@ -70,7 +70,7 @@ class MemberRewardModelTest extends FunctionalTestCase
     {
         $reward = $this->createMemberReward([
             'status' => 'pending',
-            'expires_at' => now_datetime()->modify('+30 days')->format('Y-m-d H:i:s')
+            'expires_at' => now_datetime()->modify('+30 days')
         ]);
 
         $result = $reward->claim();

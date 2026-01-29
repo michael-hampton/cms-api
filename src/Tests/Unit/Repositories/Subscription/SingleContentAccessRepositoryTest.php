@@ -25,8 +25,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 
@@ -50,8 +50,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->modify('-14 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime()->modify('-14 days'),
+            'expires_at' => now_datetime()->modify('-7 days'),
             'is_active' => true
         ]);
 
@@ -75,8 +75,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => false
         ]);
 
@@ -100,8 +100,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 4.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+30 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+30 days'),
             'is_active' => true
         ]);
 
@@ -126,8 +126,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 19.99,
             'currency' => 'GBP',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+14 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+14 days'),
             'is_active' => true
         ];
 
@@ -151,8 +151,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 
@@ -164,8 +164,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 4.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 
@@ -178,8 +178,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->modify('-14 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime()->modify('-14 days'),
+            'expires_at' => now_datetime()->modify('-7 days'),
             'is_active' => true
         ]);
 
@@ -202,8 +202,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 
@@ -216,8 +216,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 4.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->modify('-14 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime()->modify('-14 days'),
+            'expires_at' => now_datetime()->modify('-7 days'),
             'is_active' => true
         ]);
 
@@ -238,8 +238,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->modify('-14 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime()->modify('-14 days'),
+            'expires_at' => now_datetime()->modify('-7 days'),
             'is_active' => true
         ]);
 
@@ -273,8 +273,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => $token,
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 
@@ -294,8 +294,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 
@@ -312,8 +312,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => false
         ]);
 
@@ -330,8 +330,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->modify('-14 days')->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime()->modify('-14 days'),
+            'expires_at' => now_datetime()->modify('-7 days'),
             'is_active' => true
         ]);
 
@@ -348,8 +348,8 @@ class SingleContentAccessRepositoryTest extends RepositoryTestCase
             'access_token' => SingleContentAccess::generateToken(),
             'price' => 9.99,
             'currency' => 'USD',
-            'purchased_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'expires_at' => now_datetime()->modify('+7 days')->format('Y-m-d H:i:s'),
+            'purchased_at' => now_datetime(),
+            'expires_at' => now_datetime()->modify('+7 days'),
             'is_active' => true
         ]);
 

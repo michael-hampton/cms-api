@@ -150,7 +150,7 @@ class ConsentAuditLogModelTest extends FunctionalTestCase
             'previous_state' => true,
             'new_state' => false,
             'source' => 'web',
-            'created_at' => now_datetime()->modify('-40 days')->format('Y-m-d H:i:s')
+            'created_at' => now_datetime()->modify('-40 days')
         ]);
 
         $recent = ConsentAuditLog::recent(30)->get();

@@ -69,7 +69,7 @@ class NewsletterSendPageViewRepositoryTest extends FunctionalTestCase
 
         $this->send = NewsletterSend::create([
             'newsletter_id' => $newsletter->id,
-            'sent_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'sent_at' => now_datetime(),
             'recipient_count' => 100,
             'content_snapshot' => []
         ]);
@@ -79,7 +79,7 @@ class NewsletterSendPageViewRepositoryTest extends FunctionalTestCase
             'slug' => 'test-page',
             'site_id' => $this->siteId,
             'status' => 'published',
-            'published_at' => now_datetime()->format('Y-m-d H:i:s')
+            'published_at' => now_datetime()
         ]);
     }
 }

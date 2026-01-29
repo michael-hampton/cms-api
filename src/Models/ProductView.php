@@ -18,6 +18,7 @@ class ProductView extends Model
 
     protected $casts = [
         'created_at' => 'datetime',
+        'viewed_at' => 'datetime',
     ];
 
     public function product()
