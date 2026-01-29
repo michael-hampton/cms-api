@@ -5,6 +5,7 @@ namespace App\Framework\Database;
 
 use App\Framework\Database\Relations\EagerLoader;
 use App\Framework\Database\Relations\RelationshipAnalyzer;
+use App\Framework\Macro\HasMacros;
 use App\Framework\ModelRegistry;
 use App\Framework\Support\Collection;
 use App\Models\Model;
@@ -15,6 +16,8 @@ use InvalidArgumentException;
 
 class QueryBuilder
 {
+    use HasMacros;
+
     protected $table;
     public $wheres = [];
     protected $orders = [];
@@ -1750,6 +1753,27 @@ class QueryBuilder
 
         $this->selects[] = new RawExpression($expression);
         return $this;
+    }
+
+    public function __call(string $method, array $arguments)
+    {
+        $modelClass = $this->getModelClassFromTable($this->table);
+
+        if ($modelClass) {
+            $model = new $modelClass();
+            $scopeMethod = 'scope' . ucfirst($method);
+
+            if (method_exists($model, $scopeMethod)) {
+                return $model->$scopeMethod($this, ...$arguments);
+            }
+        }
+
+        // macros
+        if ($this->hasMacro($method)) {
+            return $this->callMacro($method, $arguments);
+        }
+
+        throw new BadMethodCallException("Method {$method} does not exist.");
     }
 
 }

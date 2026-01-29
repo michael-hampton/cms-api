@@ -25,7 +25,7 @@ class SubscriptionPlanRepository extends Repository
         $siteId = $siteId ?? SiteContext::getId();
 
         return SubscriptionPlan::where('site_id', $siteId)
-            ->where('is_active', true)
+            ->active()
             ->where('is_featured', true)
             ->orderBy('sort_order', 'asc')
             ->get();
@@ -101,7 +101,7 @@ class SubscriptionPlanRepository extends Repository
     {
         return SubscriptionPlan::where('upgrade_from_plan_id', $planId)
             ->where('is_upgrade_option', true)
-            ->where('is_active', true)
+            ->active()
             ->orderBy('price', 'asc')
             ->get();
     }

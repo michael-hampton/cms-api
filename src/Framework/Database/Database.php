@@ -3,6 +3,8 @@
 namespace App\Framework\Database;
 
 use App\config\DatabaseConfig;
+use App\Framework\Container;
+use App\Framework\Database\Relations\EagerLoader;
 use App\Framework\Support\Config;
 use App\Framework\Support\Logger;
 use Exception;
@@ -107,6 +109,11 @@ class Database
             default:
                 throw new Exception("Unsupported database driver: {$driver}");
         }
+    }
+
+    public static function raw($value)
+    {
+        return new RawExpression($value);
     }
 
     public function getConnection(): PDO
@@ -509,5 +516,18 @@ class Database
             Logger::error('Transaction failed and rolled back', ['error' => $e->getMessage()]);
             throw $e;
         }
+    }
+
+    /**
+     * Begin a fluent query against a database table.
+     *
+     * @param string $table
+     * @return QueryBuilder
+     */
+    public static function table(string $table): QueryBuilder
+    {
+        $eagerLoader = Container::getInstance()->resolve(EagerLoader::class);
+
+        return new QueryBuilder($table, $eagerLoader, self::getInstance());
     }
 }

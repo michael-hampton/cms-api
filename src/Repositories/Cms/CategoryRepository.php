@@ -50,7 +50,7 @@ class CategoryRepository extends Repository
     public function getRootCategories(): Collection
     {
         return Category::roots()
-            ->where('is_active', true)
+            ->active()
             ->orderBy('sort_order', 'asc')
             ->orderBy('name', 'asc')
             ->get();
@@ -60,7 +60,7 @@ class CategoryRepository extends Repository
     public function getChildCategories(int $parentId): Collection
     {
         return $this->where('parent_id', $parentId)
-            ->where('is_active', 1)
+            ->active()
             ->orderBy('sort_order', 'asc')
             ->orderBy('name', 'asc')
             ->get();
@@ -108,7 +108,7 @@ class CategoryRepository extends Repository
     public function getPopularCategories(int $limit = 10): Collection
     {
         return Category::withCount('pages')
-            ->where('is_active', true)
+            ->active()
             ->orderBy('pages_count', 'desc')
             ->orderBy('name', 'asc')
             ->limit($limit)

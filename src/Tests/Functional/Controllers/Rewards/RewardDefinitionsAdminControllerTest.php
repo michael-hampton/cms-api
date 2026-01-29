@@ -56,7 +56,7 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['definitions']['data'] as $definition) {
+        foreach ($data['definitions']['items'] as $definition) {
             $this->assertTrue($definition['is_active']);
         }
     }
@@ -73,7 +73,7 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['definitions']['data'] as $definition) {
+        foreach ($data['definitions']['items'] as $definition) {
             $this->assertEquals('voucher', $definition['reward_type']);
         }
     }
@@ -89,8 +89,8 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertCount(1, $data['definitions']['data']);
-        $this->assertEquals('Welcome Bonus', $data['definitions']['data'][0]['name']);
+        $this->assertCount(1, $data['definitions']['items']);
+        $this->assertEquals('Welcome Bonus', $data['definitions']['items'][0]['name']);
     }
 
     public function testSearchSupportsSorting(): void
@@ -104,7 +104,7 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertEquals('Alpha Reward', $data['definitions']['data'][0]['name']);
+        $this->assertEquals('Alpha Reward', $data['definitions']['items'][0]['name']);
     }
 
     public function testSearchSupportsPagination(): void
@@ -119,7 +119,7 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertCount(10, $data['definitions']['data']);
+        $this->assertCount(10, $data['definitions']['items']);
         $this->assertEquals(1, $data['definitions']['pagination']['current_page']);
     }
 
@@ -251,10 +251,11 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         $response = $this->getForSite('/api/reward-definitions/search?reward_type=voucher,points');
 
         $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['success']);
-        $this->assertGreaterThanOrEqual(2, count($data['definitions']['data']));
 
-        foreach ($data['definitions']['data'] as $definition) {
+        $this->assertTrue($data['success']);
+        $this->assertGreaterThanOrEqual(2, count($data['definitions']['items']));
+
+        foreach ($data['definitions']['items'] as $definition) {
             $this->assertContains($definition['reward_type'], ['voucher', 'points']);
         }
     }

@@ -28,7 +28,7 @@ class CustomFieldDefinitionRepository extends Repository
 
     public function getRequired(): Collection
     {
-        return CustomFieldDefinition::ordered()->where('is_required', true)->where('is_active', 1)->get();
+        return CustomFieldDefinition::ordered()->where('is_required', true)->actve()->get();
     }
 
     public function getSearchableFields(): Collection

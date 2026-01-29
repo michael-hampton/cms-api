@@ -2,6 +2,8 @@
 
 namespace App\Repositories\Rewards;
 
+use App\Framework\Support\Collection;
+use App\Models\MemberReward;
 use App\Models\RewardDefinition;
 use App\Repositories\Repository;
 
@@ -56,19 +58,101 @@ class RewardDefinitionRepository extends Repository
 
     public function getRewardDefinitionStats(int $siteId): array
     {
-        $rewards = RewardDefinition::where('site_id', $siteId)->get();
+        $rewardDefinitions = RewardDefinition::where('site_id', $siteId)->get();
+        $rewards = MemberReward::whereIn('reward_definition_id', $rewardDefinitions->pluck('id')->toArray())->get();
 
-        $counts = $rewards
+        $counts = $rewardDefinitions
             ->groupBy('reward_type')
             ->map(fn($group) => $group->count())
             ->toArray();
+
+        $clickStats = $this->getClickStatistics($rewards->pluck('id')->toArray());
+
+        $clickThroughRate = $rewards->count() > 0
+            ? round(($clickStats['unique_clickers'] / $rewards->count()) * 100, 2)
+            : 0;
 
         return [
             'total' => RewardDefinition::where('site_id', $siteId)->count(),
             'active' => RewardDefinition::where('site_id', $siteId)->where('is_active', true)->count(),
             'inactive' => RewardDefinition::where('site_id', $siteId)->where('is_active', false)->count(),
-            'by_type' => $counts
+            'by_type' => $counts,
+            'total_clicks' => $clickStats['total_clicks'],
+            'unique_clickers' => $clickStats['unique_clickers'],
+            'click_through_rate' => $clickThroughRate,
+            'clicks_by_action' => $clickStats['clicks_by_action'],
+            'recent_clicks' => $clickStats['recent_clicks']
         ];
+    }
+
+    private function getClickStatistics(array $rewardIds): array
+    {
+        if (empty($rewardIds)) {
+            return [
+                'total_clicks' => 0,
+                'unique_clickers' => 0,
+                'clicks_by_action' => [],
+                'recent_clicks' => []
+            ];
+        }
+
+        $totalClicks = $this->database
+            ->table('reward_clicks')
+            ->whereIn('member_reward_id', $rewardIds)
+            ->count();
+
+        $uniqueClickers = $this->database
+            ->table('reward_clicks')
+            ->whereIn('member_reward_id', $rewardIds)
+            ->distinct('member_id')
+            ->count('member_id');
+
+        $clicksByAction = $this->database
+            ->table('reward_clicks')
+            ->whereIn('member_reward_id', $rewardIds)
+            ->select('action')
+            ->selectRaw('COUNT(*) as count')
+            ->groupBy('action')
+            ->get()
+            ->pluck('count', 'action')
+            ->toArray();
+
+        $recentClicks = $this->database
+            ->table('reward_clicks as rc')
+            ->join('member_rewards as mr', 'rc.member_reward_id', '=', 'mr.id')
+            ->join('members as m', 'rc.member_id', '=', 'm.id')
+            ->whereIn('rc.member_reward_id', $rewardIds)
+            ->select(
+                'rc.created_at',
+                'rc.action',
+                'm.first_name',
+                'm.last_name',
+                'm.email',
+                'mr.id as reward_id'
+            )
+            ->orderByDesc('rc.created_at')
+            ->limit(10)
+            ->get()
+            ->map(fn($click) => [
+                'clicked_at' => $click->created_at,
+                'action' => $click->action,
+                'member_name' => "{$click->first_name} {$click->last_name}",
+                'member_email' => $click->email,
+                'reward_id' => $click->reward_id
+            ])
+            ->toArray();
+
+        return [
+            'total_clicks' => $totalClicks,
+            'unique_clickers' => $uniqueClickers,
+            'clicks_by_action' => $clicksByAction,
+            'recent_clicks' => $recentClicks
+        ];
+    }
+
+    public function findBySite(int $siteId): Collection
+    {
+        return RewardDefinition::where('site_id', $siteId)->get();
     }
 
     protected function getModelClass(): string

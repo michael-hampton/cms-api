@@ -1168,7 +1168,7 @@ class NewsletterSendServiceTest extends FunctionalTestCase
     private function setupBasicSendExpectations(
         array $subscriberEmails,
         array $memberPreferences = [],
-        array $legacySubscribers = null,
+        array $legacySubscribers = [],
         ?int  $forceSentCount = null
     ): void
     {

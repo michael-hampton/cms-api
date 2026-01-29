@@ -6,12 +6,14 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Requests\CreateRewardRequest;
 use App\Requests\UpdateRewardRequest;
+use App\Resources\RewardDefinitionResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
@@ -53,11 +55,13 @@ class RewardDefinitionsAdminController extends Controller
         $queryBuilder = RewardDefinition::query();
         $result = $engine->search($queryBuilder, $criteria);
 
+        $collection = new PaginatedResourceCollection($result, RewardDefinitionResource::class);
+
         $stats = $this->rewardDefinitionRepository->getRewardDefinitionStats($siteId);
 
         return $this->resourceResponse([
             'success' => true,
-            'definitions' => $result->toArray(),
+            'definitions' => $collection->toArray(),
             'stats' => $stats
         ]);
     }

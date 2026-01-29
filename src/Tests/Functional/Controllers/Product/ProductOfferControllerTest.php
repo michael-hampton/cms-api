@@ -36,8 +36,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
-        $this->assertCount(1, $data['items']);
-        $this->assertEquals($activeOffer->id, $data['items'][0]['id']);
+        $this->assertCount(1, $data['offers']['items']);
+        $this->assertEquals($activeOffer->id, $data['offers']['items'][0]['id']);
     }
 
     public function testIndexSupportsSearch(): void
@@ -83,7 +83,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals(50.00, $data['items'][0]['sale_price']);
+        $this->assertEquals(50.00, $data['offers']['items'][0]['sale_price']);
     }
 
     public function testStoreValidatesEndDateAfterStartDate(): void
@@ -337,8 +337,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(1, $data['items']);
-        $this->assertEquals('published', $data['items'][0]['status']);
+        $this->assertCount(1, $data['offers']['items']);
+        $this->assertEquals('published', $data['offers']['items'][0]['status']);
     }
 
     public function testFilterOffersByMerchant(): void
@@ -354,8 +354,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(1, $data['items']);
-        $this->assertEquals($merchant->id, $data['items'][0]['merchant_id']);
+        $this->assertCount(1, $data['offers']['items']);
+        $this->assertEquals($merchant->id, $data['offers']['items'][0]['merchant_id']);
     }
 
     public function testCreateOfferWithVoucher(): void
@@ -405,8 +405,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(1, $data['items']);
-        $this->assertEquals($merchant1->id, $data['items'][0]['merchant_id']);
+        $this->assertCount(1, $data['offers']['items']);
+        $this->assertEquals($merchant1->id, $data['offers']['items'][0]['merchant_id']);
     }
 
     public function testIndexFiltersByStatus(): void
@@ -435,8 +435,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(1, $data['items']);
-        $this->assertEquals('published', $data['items'][0]['status']);
+        $this->assertCount(1, $data['offers']['items']);
+        $this->assertEquals('published', $data['offers']['items'][0]['status']);
     }
 
     public function testIndexFiltersByActiveStatus(): void
@@ -463,8 +463,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(1, $data['items']);
-        $this->assertTrue($data['items'][0]['is_active']);
+        $this->assertCount(1, $data['offers']['items']);
+        $this->assertTrue($data['offers']['items'][0]['is_active']);
     }
 
     public function testIndexFiltersByDateRange(): void
@@ -492,7 +492,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        foreach ($data['items'] as $item) {
+        foreach ($data['offers']['items'] as $item) {
             $this->assertGreaterThanOrEqual(strtotime($startDate), strtotime($item['start_date']));
         }
     }

@@ -7,6 +7,8 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
+use App\Framework\HttpClient\HttpClient;
+use App\Framework\HttpClient\HttpClientResponse;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
 use App\Models\Member;
@@ -17,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 abstract class FunctionalTestCase extends TestCase
 {
     protected Database $database;
+    protected static array $httpMocks = [];
     protected ApiApplication $app;
     protected $siteSlug = '';
     protected int $siteId;
@@ -736,6 +739,41 @@ abstract class FunctionalTestCase extends TestCase
     {
         $this->currentUserId = $userId;
         $_SESSION['user_id'] = $userId;
+    }
+
+    protected function createMockHttpClient(): HttpClient
+    {
+        return new class extends HttpClient {
+            protected function request(string $method, string $url, array $options = []): HttpClientResponse
+            {
+                $mock = FunctionalTestCase::getHttpMock($url);
+
+                if ($mock === null) {
+                    // No mock found, call parent (real request) or throw exception
+                    throw new \Exception("No mock configured for URL: {$url}");
+                }
+
+                return new HttpClientResponse(
+                    $mock['status'],
+                    $mock['headers'] ?? [],
+                    $mock['content']
+                );
+            }
+        };
+    }
+
+    protected function mockHttpResponse(string $url, string $content, int $statusCode = 200, array $headers = []): void
+    {
+        self::$httpMocks[$url] = [
+            'content' => $content,
+            'status' => $statusCode,
+            'headers' => $headers
+        ];
+    }
+
+    public static function getHttpMock(string $url): ?array
+    {
+        return self::$httpMocks[$url] ?? null;
     }
 
 }

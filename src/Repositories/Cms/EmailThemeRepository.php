@@ -27,7 +27,7 @@ class EmailThemeRepository extends Repository
     {
         return EmailTheme::default()
             ->where('site_id', $siteId)
-            ->where('is_active', true)
+            ->active()
             ->first();
     }
 

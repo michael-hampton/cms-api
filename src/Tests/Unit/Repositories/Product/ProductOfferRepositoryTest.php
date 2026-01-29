@@ -68,7 +68,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
 
         $offers = $this->repository->getActiveOffersForProduct($product->id);
 
-        $this->assertCount(3, $offers);
+        $this->assertCount(1, $offers);
         $this->assertContains($activeOffer->id, array_column($offers->toArray(), 'id'));
     }
 

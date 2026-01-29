@@ -4,18 +4,24 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Models\MemberReward;
 use App\Repositories\Rewards\RewardsRepository;
+use App\Resources\MemberRewardResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
+use App\Services\Rewards\RewardsService;
+use Exception;
 
 class RewardsAdminController extends Controller
 {
     public function __construct(
-        private RewardsRepository $rewardsRepository
+        private readonly RewardsRepository $rewardsRepository,
+        private readonly RewardsService    $rewardStatisticsService,
     )
     {
         parent::__construct();
@@ -48,11 +54,13 @@ class RewardsAdminController extends Controller
         $queryBuilder = MemberReward::query();
         $result = $engine->search($queryBuilder, $criteria);
 
-        $stats = $this->rewardsRepository->getRewardStats($siteId);
+        $collection = new PaginatedResourceCollection($result, MemberRewardResource::class);
+
+        $stats = $this->rewardsRepository->getRewardDefinitionStats($siteId);
 
         return $this->resourceResponse([
             'success' => true,
-            'rewards' => $result->toArray(),
+            'rewards' => $collection->toArray(),
             'stats' => $stats
         ]);
     }
@@ -136,5 +144,19 @@ class RewardsAdminController extends Controller
             'message' => 'Reward declined successfully',
             'reward' => $reward->fresh()->toArray()
         ]);
+    }
+
+    public function getRewardStatistics(int $definitionId): JsonResponse
+    {
+        try {
+            $stats = $this->rewardStatisticsService->getRewardDefinitionStatistics($definitionId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'statistics' => $stats
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 }

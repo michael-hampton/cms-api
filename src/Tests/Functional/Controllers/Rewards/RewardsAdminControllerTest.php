@@ -35,6 +35,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
+
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('rewards', $data);
         $this->assertArrayHasKey('stats', $data);
@@ -63,7 +64,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertGreaterThanOrEqual(1, count($data['rewards']['data']));
+        $this->assertGreaterThanOrEqual(1, count($data['rewards']['items']));
     }
 
     public function testSearchSupportsSorting(): void
@@ -91,7 +92,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
         // Most recent should be first
-        $this->assertEquals($reward2->id, $data['rewards']['data'][0]['id']);
+        $this->assertEquals($reward2->id, $data['rewards']['items'][0]['id']);
     }
 
     public function testSearchSupportsPagination(): void
@@ -111,7 +112,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertCount(10, $data['rewards']['data']);
+        $this->assertCount(10, $data['rewards']['items']);
     }
 
     public function testSearchFilterByStatus(): void
@@ -139,7 +140,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['rewards']['data'] as $reward) {
+        foreach ($data['rewards']['items'] as $reward) {
             $this->assertEquals('pending', $reward['status']);
         }
     }
@@ -303,7 +304,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['rewards']['data'] as $reward) {
+        foreach ($data['rewards']['items'] as $reward) {
             $this->assertContains($reward['status'], ['pending', 'claimed']);
         }
     }
@@ -330,7 +331,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['rewards']['data'] as $reward) {
+        foreach ($data['rewards']['items'] as $reward) {
             $this->assertEquals($this->member->id, $reward['member_id']);
         }
     }
@@ -357,7 +358,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['rewards']['data'] as $reward) {
+        foreach ($data['rewards']['items'] as $reward) {
             $this->assertEquals($rewardDef1->id, $reward['reward_definition_id']);
         }
     }
@@ -387,7 +388,7 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
 
-        foreach ($data['rewards']['data'] as $reward) {
+        foreach ($data['rewards']['items'] as $reward) {
             $this->assertGreaterThanOrEqual(strtotime($dateFrom), strtotime($reward['created_at']));
         }
     }

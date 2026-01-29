@@ -10,11 +10,6 @@ use App\Repositories\Repository;
 
 class NewsletterRepository extends Repository
 {
-    public function find(int $id, array $relations = []): ?Model
-    {
-        return Newsletter::find($id);
-    }
-
     public function getDueNewsletters(int $siteId): array
     {
         $newsletters = Newsletter::where('active', true)->where('site_id', $siteId)->get();
@@ -74,6 +69,16 @@ class NewsletterRepository extends Repository
         $newsletterIds = $newsletterSubscriptions->pluck('newsletter_id')->toArray();
 
         return Newsletter::whereIn('id', $newsletterIds)->get();
+    }
+
+    public function getNewslettersById(array $newsletterIds): Collection
+    {
+        return Newsletter::whereIn('id', $newsletterIds)->get();
+    }
+
+    public function findBySite(int $siteId): Collection
+    {
+        return Newsletter::where('site_id', $siteId)->get();
     }
 
     protected function getModelClass(): string

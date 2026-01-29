@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Newsletters;
 
+use App\Framework\Support\Collection;
 use App\Models\NewsletterSend;
 use App\Repositories\Repository;
 
@@ -35,12 +36,18 @@ class NewsletterSendRepository extends Repository
     /**
      * Get all sends for a newsletter ordered by date
      */
-    public function getSendsForNewsletter(int $newsletterId): array
+    public function getSendsForNewsletter(int $newsletterId): Collection
     {
         return NewsletterSend::where('newsletter_id', $newsletterId)
             ->orderBy('sent_at', 'desc')
-            ->get()
-            ->toArray();
+            ->get();
+    }
+
+    public function getSendsByNewsletterIds(array $newsletterIds)
+    {
+        return NewsletterSend::whereIn('newsletter_id', $newsletterIds)
+            ->orderByDesc('sent_at')
+            ->get();
     }
 
     protected function getModelClass(): string

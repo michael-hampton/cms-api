@@ -7,18 +7,26 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Mail\MailManager;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Models\Member;
 use App\Models\MemberRole;
+use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Resources\NewsletterResource;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteriaParser;
+use App\Search\SearchEngine;
 use App\Services\Cms\CampaignService;
 use App\Services\EmailVerificationService;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\NewsletterSignupService;
+use App\Services\Newsletter\NewsletterStatisticsService;
+use Exception;
 
 class NewsletterController extends Controller
 {
@@ -31,21 +39,48 @@ class NewsletterController extends Controller
         private readonly NewsletterSignupService $newsletterSignupService,
         private readonly CampaignService         $campaignService,
         private readonly NewsletterSendService             $newsletterSendService,
-        private readonly NewsletterSendRecipientRepository $newsletterSendRecipientRepository
+        private readonly NewsletterSendRecipientRepository $newsletterSendRecipientRepository,
+        private readonly NewsletterStatisticsService       $newsletterService
     )
     {
         parent::__construct();
     }
 
-    public function index()
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
-            $availableNewsletters = $this->newsletterRepository->where('site_id', $siteId)
-                ->where('active', true)
-                ->get();
-            return $this->resourceResponse(['newsletters' => $availableNewsletters->toArray()]);
+
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $configuration = SearchConfigurationFactory::create('newsletters');
+            $engine = new SearchEngine($configuration);
+
+            $queryBuilder = Newsletter::query();
+            $result = $engine->search($queryBuilder, $criteria);
+
+            $collection = new PaginatedResourceCollection($result, NewsletterResource::class);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'newsletters' => $collection->toArray(),
+                'stats' => $this->newsletterService->getAllNewsletterStatistics($siteId)
+            ]);
         } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function statistics(): JsonResponse
+    {
+        try {
+            $siteId = SiteContext::getId();
+            $stats = $this->newsletterService->getAllNewsletterStatistics($siteId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'statistics' => $stats
+            ]);
+        } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }

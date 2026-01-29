@@ -13,7 +13,7 @@ class ProductOfferRepository extends Repository
     {
         return ProductOffer::forProduct($productId)
             ->with(['merchant'])
-            ->where('is_active', true)
+            ->active()
             ->orderBy('start_date', 'desc')
             ->get();
     }
@@ -22,7 +22,7 @@ class ProductOfferRepository extends Repository
     {
         return ProductOffer::forCategory($categoryId)
             ->with(['product', 'merchant'])
-            ->where('is_active', true)
+            ->active()
             ->orderBy('start_date', 'desc')
             ->get();
     }
@@ -40,7 +40,7 @@ class ProductOfferRepository extends Repository
     public function deactivateOtherOffers(int $productId, ?int $excludeOfferId = null): void
     {
         $query = ProductOffer::where('product_id', $productId)
-            ->where('is_active', true);
+            ->active();
 
         if ($excludeOfferId) {
             $query->where('id', '!=', $excludeOfferId);
@@ -81,7 +81,7 @@ class ProductOfferRepository extends Repository
     public function hasActiveOffer(int $productId): bool
     {
         return ProductOffer::forProduct($productId)
-            ->where('is_active', true)
+            ->active()
             ->exists();
     }
 

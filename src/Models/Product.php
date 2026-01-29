@@ -84,6 +84,11 @@ class Product extends Model
         return $query->where('slug', $slug);
     }
 
+    public function scopeActive(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('is_active', true);
+    }
+
     public function reviews()
     {
         return $this->hasMany(Review::class);

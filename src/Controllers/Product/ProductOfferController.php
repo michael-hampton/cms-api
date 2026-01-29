@@ -7,10 +7,12 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Models\ProductOffer;
 use App\Requests\CreateProductOfferRequest;
 use App\Requests\UpdateProductOfferRequest;
-use App\Search\PaginatedResult;
+use App\Resources\OfferResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
@@ -28,6 +30,7 @@ class ProductOfferController extends Controller
 
     public function index(Request $request, int $productId, string $siteName)
     {
+        $siteId = SiteContext::getId();
         $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
         $configuration = SearchConfigurationFactory::create('product_offer');
         $engine = new SearchEngine($configuration);
@@ -35,32 +38,15 @@ class ProductOfferController extends Controller
         $queryBuilder = ProductOffer::where('product_id', $productId)->with(['merchant']);
         $result = $engine->search($queryBuilder, $criteria);
 
-        $formattedData = $this->formatOffers($result);
+        $collection = new PaginatedResourceCollection($result, OfferResource::class);
+
+        $stats = $this->offerService->getAllOfferStatistics($siteId);
 
         return $this->resourceResponse([
             'success' => true,
-            'items' => $formattedData['data'] ?? [],
-            'pagination' => $formattedData['pagination'] ?? null
+            'offers' => $collection->toArray(),
+            'stats' => $stats
         ]);
-    }
-
-    private function formatOffers(PaginatedResult $result): array
-    {
-        // Format dates in response
-        $formattedData = $result->toArray();
-        if (isset($formattedData['data'])) {
-            $formattedData['data'] = array_map(function ($offer) {
-                if (isset($offer['start_date'])) {
-                    $offer['start_date'] = $offer['start_date']->format('Y-m-d H:i:s');
-                }
-                if (isset($offer['end_date'])) {
-                    $offer['end_date'] = $offer['end_date']->format('Y-m-d H:i:s');
-                }
-                return $offer;
-            }, $formattedData['data']);
-        }
-
-        return $formattedData;
     }
 
     public function categoryOffers(int $categoryId, string $siteName): JsonResponse
@@ -201,19 +187,22 @@ class ProductOfferController extends Controller
     public function allOffers(Request $request, string $siteName): JsonResponse
     {
         try {
+            $siteId = SiteContext::getId();
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $configuration = SearchConfigurationFactory::create('product_offer');
             $engine = new SearchEngine($configuration);
 
-            $queryBuilder = ProductOffer::with(['merchant']);
+            $queryBuilder = ProductOffer::with(['merchant', 'product']);
             $result = $engine->search($queryBuilder, $criteria);
 
-            $formattedData = $this->formatOffers($result);
+            $collection = new PaginatedResourceCollection($result, OfferResource::class);
+
+            $stats = $this->offerService->getAllOfferStatistics($siteId);
 
             return $this->resourceResponse([
                 'success' => true,
-                'items' => $formattedData['data'] ?? [],
-                'pagination' => $formattedData['pagination'] ?? null
+                'offers' => $collection->toArray(),
+                'stats' => $stats
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

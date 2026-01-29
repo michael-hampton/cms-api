@@ -5,6 +5,7 @@ namespace App\Services\Product;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Support\Collection;
 use App\Models\Model;
+use App\Models\OfferClicks;
 use App\Models\ProductOffer;
 use App\Repositories\Product\ProductOfferRepository;
 use Exception;
@@ -149,5 +150,93 @@ class ProductOfferService
     public function getByStatus(string $status): Collection
     {
         return $this->repository->getByStatus($status);
+    }
+
+    public function getAllOfferStatistics(int $siteId): array
+    {
+        $offers = ProductOffer::with(['product'])->get();
+
+        $totalOffers = $offers->count();
+        $activeOffers = $offers->where('is_active', true)->count();
+        $publishedOffers = $offers->where('status', 'published')->count();
+        $pendingOffers = $offers->where('status', 'pending')->count();
+        $rejectedOffers = $offers->where('status', 'rejected')->count();
+
+        // Calculate currently running offers (published, active, and within date range)
+        $now = now_datetime();
+        $runningOffers = $offers->filter(function ($offer) use ($now) {
+            return $offer->is_active
+                && $offer->status === 'published'
+                && $offer->start_date <= $now
+                && $offer->end_date >= $now;
+        })->count();
+
+        // Get click statistics if you have an offer_clicks table
+        $offerIds = $offers->pluck('id')->toArray();
+        $clickStats = $this->getOfferClickStatistics($offerIds);
+
+        // Top performing offers
+        $topOffers = $offers
+            ->where('status', 'published')
+            ->sortByDesc('discount_percentage')
+            ->take(10)
+            ->map(fn($offer) => [
+                'id' => $offer->id,
+                'product_name' => $offer->product_name ?? 'Unknown',
+                'merchant_name' => $offer->merchant_name ?? 'N/A',
+                'discount_percentage' => $offer->discount_percentage,
+                'sale_price' => $offer->sale_price,
+                'clicks' => $clickStats['by_offer'][$offer->id] ?? 0
+            ])
+            ->values()
+            ->toArray();
+
+        return [
+            'total_offers' => $totalOffers,
+            'active_offers' => $activeOffers,
+            'running_offers' => $runningOffers,
+            'published_offers' => $publishedOffers,
+            'pending_offers' => $pendingOffers,
+            'rejected_offers' => $rejectedOffers,
+            'total_clicks' => $clickStats['total'] ?? 0,
+            'unique_clickers' => $clickStats['unique'] ?? 0,
+            'click_through_rate' => $totalOffers > 0 && isset($clickStats['unique']) ? round(($clickStats['unique'] / $totalOffers) * 100, 2) : 0,
+            'top_offers' => $topOffers
+        ];
+    }
+
+    private function getOfferClickStatistics(array $offerIds): array
+    {
+        return [];
+
+        // Assuming you have an offer_clicks table
+        if (empty($offerIds)) {
+            return [
+                'total' => 0,
+                'unique' => 0,
+                'by_offer' => []
+            ];
+        }
+
+        $totalClicks = OfferClicks::whereIn('offer_id', $offerIds)
+            ->count();
+
+        OfferClicks::whereIn('offer_id', $offerIds)
+            ->distinct('user_identifier')
+            ->count('user_identifier');
+
+        OfferClicks::whereIn('offer_id', $offerIds)
+            ->select('offer_id')
+            ->selectRaw('COUNT(*) as clicks')
+            ->groupBy('offer_id')
+            ->get()
+            ->pluck('clicks', 'offer_id')
+            ->toArray();
+
+        return [
+            'total' => $totalClicks,
+            'unique' => $uniqueClickers,
+            'by_offer' => $clicksByOffer
+        ];
     }
 }

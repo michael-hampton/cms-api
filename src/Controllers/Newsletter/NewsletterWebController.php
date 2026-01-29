@@ -824,7 +824,7 @@ HTML;
         }
 
         // Get all sends for this newsletter
-        $sends = $this->sendRepository->getSendsForNewsletter($newsletter->id);
+        $sends = $this->sendRepository->getSendsForNewsletter($newsletter->id)?->toArray();
 
         // Group by year and month
         $groupedSends = [];

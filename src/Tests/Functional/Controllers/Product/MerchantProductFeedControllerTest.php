@@ -148,11 +148,15 @@ class MerchantProductFeedControllerTest extends FunctionalTestCase
 
     public function testDownloadReturnsFeedData()
     {
+        $product = $this->createProduct();
+
         $merchant = $this->createMerchant();
         $feed = $this->createMerchantFeed([
             'merchant_id' => $merchant->id,
             'feed_type' => 'xml'
         ]);
+
+        $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
 
         $response = $this->getForSite("/api/merchants/{$merchant->id}/feeds/{$feed->id}/download");
         $data = json_decode($response->getContent(), true);

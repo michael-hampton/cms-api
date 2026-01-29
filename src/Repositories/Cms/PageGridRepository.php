@@ -58,7 +58,7 @@ class PageGridRepository extends Repository
     {
         return $this->model
             ->whereNull('deleted_at')
-            ->where('is_active', true)
+            ->active()
             ->with(['creator', 'updater'])
             ->get();
     }
@@ -149,7 +149,7 @@ class PageGridRepository extends Repository
     public function getActiveGridForTerritory(int $territoryId, ?string $startDate = null, ?string $endDate = null): ?PageGrid
     {
         $query = $this->model
-            ->where('is_active', true)
+            ->active()
             ->whereHas('territories', function ($q) use ($territoryId) {
                 $q->where('territories.id', $territoryId);
             });

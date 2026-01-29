@@ -18,7 +18,7 @@ class MerchantProductFeedRepository extends Repository
     public function getActiveFeedsByMerchant(int $merchantId): Collection
     {
         return MerchantProductFeed::where('merchant_id', $merchantId)
-            ->where('is_active', true)
+            ->active()
             ->orderBy('created_at', 'desc')
             ->get();
     }

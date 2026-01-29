@@ -9,6 +9,7 @@ use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\EmailThemeSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\MerchantSearchConfiguration;
+use App\Search\Configurations\NewsletterSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
@@ -49,6 +50,7 @@ class SearchConfigurationFactory
         'reward_definition' => RewardDefinitionSearchConfiguration::class,
         'reward' => RewardSearchConfiguration::class,
         'product_offer' => ProductOfferSearchConfiguration::class,
+        'newsletters' => NewsletterSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

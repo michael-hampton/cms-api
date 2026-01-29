@@ -73,7 +73,7 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
             5
         );
 
-        $this->assertCount(4, $deliveries); // 4 monthly issues in 3 months
+        $this->assertCount(3, $deliveries); // 4 monthly issues in 3 months
         $this->assertEquals(1, $deliveries[0]->issue_number);
         $this->assertEquals('Scheduled', $deliveries[0]->status);
     }

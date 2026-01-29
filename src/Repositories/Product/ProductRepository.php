@@ -104,7 +104,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     {
         return $this->model
             ->where('id', '!=', $product->id)
-            ->where('is_active', true)
+            ->active()
             ->where(function ($query) use ($product) {
                 $query->where('category_id', $product->category_id)
                     ->orWhere('brand_id', $product->brand_id);
@@ -122,7 +122,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
         return $this->model
             ->whereIn('id', $productIds)
-            ->where('is_active', true)
+            ->active()
             ->limit($limit)
             ->get();
     }
@@ -483,7 +483,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function searchByName(string $name, ?int $siteId, int $limit = 10): Collection
     {
-        return Product::where('is_active', true)
+        return Product::active()
             ->when($siteId, function ($query) use ($siteId) {
                 $query->where('site_id', $siteId);
             })
@@ -574,7 +574,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function getRecommendationProducts(int $siteId, int $limit = 10, array $foundProductIds = []): Collection
     {
         $popularQuery = Product::where('site_id', $siteId)
-            ->where('is_active', true);
+            ->active();
 
         if (!empty($foundProductIds)) {
             $popularQuery->whereNotIn('id', $foundProductIds);
@@ -593,7 +593,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         }
 
         return Product::whereIn('id', $productIds)
-            ->where('is_active', true)
+            ->active()
             ->with(['images', 'brand', 'approvedReviews'])
             ->limit($limit)
             ->get();
@@ -627,7 +627,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->whereHas('merchants', function ($query) use ($merchantId) {
                 $query->where('merchant_id', $merchantId);
             })
-            ->where('is_active', true)
+            ->active()
             ->get()
             ->map(function ($product) use ($merchantId) {
                 // Attach merchant-specific data to each product

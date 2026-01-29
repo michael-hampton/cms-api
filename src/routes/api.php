@@ -38,7 +38,7 @@ use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\ProductListController;
 use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberController;
-use App\Controllers\Members\Subscriptions\MemberAddressController;
+use App\Controllers\Members\MemberAddressController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Product\MerchantContactController;
@@ -595,6 +595,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/newsletters/{id}', [NewsletterController::class, 'delete']);;
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
+        $router->get('/newsletters/statistics', [NewsletterController::class, 'statistics']);
 
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
         $router->get('/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);

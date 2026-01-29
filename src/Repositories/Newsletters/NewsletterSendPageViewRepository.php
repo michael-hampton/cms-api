@@ -2,6 +2,9 @@
 
 namespace App\Repositories\Newsletters;
 
+use App\Framework\Database\Database;
+use App\Framework\Support\Collection;
+use App\Models\NewsletterSend;
 use App\Models\NewsletterSendPageView;
 use App\Repositories\Repository;
 
@@ -51,6 +54,51 @@ class NewsletterSendPageViewRepository extends Repository
             'unique_recipients' => $uniqueEmails,
             'page_clicks' => $pageClicks,
             'click_through_rate' => null // Will be calculated when we have recipient count
+        ];
+    }
+
+    /**
+     * Get the top clicked pages with their click counts.
+     */
+    public function getTopClickedPages(array $sendIds, int $limit = 10): Collection
+    {
+        return Database::table('newsletter_send_page_views as nspv')
+            ->join('pages as p', 'nspv.page_id', '=', 'p.id')
+            ->whereIn('nspv.newsletter_send_id', $sendIds)
+            ->select('p.id', 'p.title', 'p.slug', Database::raw('COUNT(*) as click_count'))
+            ->groupBy('p.id', 'p.title', 'p.slug')
+            ->orderByDesc('click_count')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getViewStatisticsByNewsletterIds(array $newsletterIds): array
+    {
+        $sendIds = NewsletterSend::whereIn('newsletter_id', $newsletterIds)
+            ->pluck('id');
+
+        return $this->getViewStatisticsBySendIds($sendIds);
+    }
+
+    private function getViewStatisticsBySendIds(array $sendIds): array
+    {
+        if (empty($sendIds)) {
+            return [
+                'total_clicks' => 0,
+                'unique_recipients' => 0
+            ];
+        }
+
+        $totalClicks = NewsletterSendPageView::whereIn('newsletter_send_id', $sendIds)
+            ->count();
+
+        $uniqueClickers = NewsletterSendPageView::whereIn('newsletter_send_id', $sendIds)
+            ->distinct('email')
+            ->count('email');
+
+        return [
+            'total_clicks' => $totalClicks,
+            'unique_recipients' => $uniqueClickers
         ];
     }
 

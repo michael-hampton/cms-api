@@ -11,8 +11,8 @@ class SubscriberRepository extends Repository
 {
     public function findByEmail(string $email, int $siteId): ?Subscriber
     {
-        return Subscriber::active()
-            ->where('email', $email)
+        return Subscriber::where('email', $email)
+            ->active()
             ->where('site_id', $siteId)
             ->first();
     }

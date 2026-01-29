@@ -350,6 +350,10 @@ abstract class Model
 
         // Cast dirty attributes for DB storage
         foreach ($dirty as $key => $value) {
+            if ($value === null || trim($value) === '') {
+                continue;
+            }
+
             $dirty[$key] = $this->castAttributeForDb($key, $value);
         }
 
@@ -915,8 +919,7 @@ abstract class Model
     protected function callScope(string $method, array $arguments)
     {
         $scopeMethod = 'scope' . ucfirst($method);
-        $query = $this->newQuery();
-        return $this->$scopeMethod($query, ...$arguments);
+        return $this->$scopeMethod($this->newQuery(), ...$arguments);
     }
 
     /**

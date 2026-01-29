@@ -90,10 +90,9 @@ abstract class Repository
             return null;
         }
 
-        if ($model) {
-            $model->fill($data);
-            $model->save();
-        }
+        $model->fill($data);
+        $model->save();
+
         return $model;
     }
 

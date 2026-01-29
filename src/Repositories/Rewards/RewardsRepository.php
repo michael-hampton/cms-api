@@ -11,6 +11,11 @@ use App\Repositories\Repository;
 
 class RewardsRepository extends Repository
 {
+    public function __construct(private readonly RewardDefinitionRepository $rewardDefinitionRepository)
+    {
+        parent::__construct();
+    }
+
     public function getActiveRewardDefinitions(int $siteId): Collection
     {
         return RewardDefinition::where('site_id', $siteId)
@@ -131,13 +136,15 @@ class RewardsRepository extends Repository
 
     public function getRewardStats(int $siteId): array
     {
-        return [
+        $topLevelStats = [
             'total' => MemberReward::where('site_id', $siteId)->count(),
             'pending' => MemberReward::where('site_id', $siteId)->where('status', 'pending')->count(),
             'claimed' => MemberReward::where('site_id', $siteId)->where('status', 'claimed')->count(),
             'expired' => MemberReward::where('site_id', $siteId)->where('status', 'expired')->count(),
             'declined' => MemberReward::where('site_id', $siteId)->where('status', 'declined')->count()
         ];
+
+        return array_merge($topLevelStats, $this->getRewardClickStats($siteId));
     }
 
     public function trackClick(int $memberRewardId, int $memberId, int $siteId, string $action, ?string $ipAddress = null, ?string $userAgent = null): void
@@ -152,7 +159,7 @@ class RewardsRepository extends Repository
         ]);
     }
 
-    public function getRewardClickStats(int $memberRewardId): array
+    private function getRewardClickStats(int $memberRewardId): array
     {
         $clicks = RewardClick::where('member_reward_id', $memberRewardId)->get();
 
@@ -162,6 +169,114 @@ class RewardsRepository extends Repository
             'claims' => $clicks->where('action', 'claim')->count(),
             'code_copies' => $clicks->where('action', 'copy_code')->count(),
             'unique_members' => $clicks->unique('member_id')->count()
+        ];
+    }
+
+    public function getRewardDefinitionStats(int $siteId): array
+    {
+        // Get all reward definitions for this site
+        $definitions = $this->rewardDefinitionRepository->findBySite($siteId);
+        $definitionIds = $definitions->pluck('id')->toArray();
+
+        // Get all member rewards
+        $memberRewards = $this->database
+            ->table('member_rewards')
+            ->whereIn('reward_definition_id', $definitionIds)
+            ->get();
+
+        $totalRewards = $memberRewards->count();
+        $claimedRewards = $memberRewards->where('status', 'claimed')->count();
+        $pendingRewards = $memberRewards->where('status', 'pending')->count();
+        $expiredRewards = $memberRewards->where('status', 'expired')->count();
+        $declinedRewards = $memberRewards->where('status', 'declined')->count();
+
+        // Get click statistics
+        $rewardIds = $memberRewards->pluck('id')->toArray();
+
+        $clickStats = $this->getClickStatistics($rewardIds);
+
+        $clickThroughRate = $totalRewards > 0
+            ? round(($clickStats['unique_clickers'] / $totalRewards) * 100, 2)
+            : 0;
+
+        return [
+            'total_definitions' => count($definitionIds),
+            'total' => $totalRewards,
+            'claimed' => $claimedRewards,
+            'pending' => $pendingRewards,
+            'expired' => $expiredRewards,
+            'declined' => $declinedRewards,
+            'claim_rate' => $totalRewards > 0 ? round(($claimedRewards / $totalRewards) * 100, 2) : 0,
+            'total_clicks' => $clickStats['total_clicks'],
+            'unique_clickers' => $clickStats['unique_clickers'],
+            'click_through_rate' => $clickThroughRate,
+            'clicks_by_action' => $clickStats['clicks_by_action'],
+            'recent_clicks' => $clickStats['recent_clicks']
+        ];
+    }
+
+    private function getClickStatistics(array $rewardIds): array
+    {
+        if (empty($rewardIds)) {
+            return [
+                'total_clicks' => 0,
+                'unique_clickers' => 0,
+                'clicks_by_action' => [],
+                'recent_clicks' => []
+            ];
+        }
+
+        $totalClicks = $this->database
+            ->table('reward_clicks')
+            ->whereIn('member_reward_id', $rewardIds)
+            ->count();
+
+        $uniqueClickers = $this->database
+            ->table('reward_clicks')
+            ->whereIn('member_reward_id', $rewardIds)
+            ->distinct('member_id')
+            ->count('member_id');
+
+        $clicksByAction = $this->database
+            ->table('reward_clicks')
+            ->whereIn('member_reward_id', $rewardIds)
+            ->select('action')
+            ->selectRaw('COUNT(*) as count')
+            ->groupBy('action')
+            ->get()
+            ->pluck('count', 'action')
+            ->toArray();
+
+        $recentClicks = $this->database
+            ->table('reward_clicks as rc')
+            ->join('member_rewards as mr', 'rc.member_reward_id', '=', 'mr.id')
+            ->join('members as m', 'rc.member_id', '=', 'm.id')
+            ->whereIn('rc.member_reward_id', $rewardIds)
+            ->select(
+                'rc.created_at',
+                'rc.action',
+                'm.first_name',
+                'm.last_name',
+                'm.email',
+                'mr.id as reward_id'
+            )
+            ->orderByDesc('rc.created_at')
+            ->limit(10)
+            ->get()
+            ->map(fn($click) => [
+                'clicked_at' => $click->created_at,
+                'action' => $click->action,
+                'member_name' => "{$click->first_name} {$click->last_name}",
+                'member_email' => $click->email,
+                'reward_id' => $click->reward_id
+            ])
+            ->toArray();
+
+        return [
+            'total_clicks' => $totalClicks,
+            'unique_clickers' => $uniqueClickers,
+            'clicks_by_action' => $clicksByAction,
+            'recent_clicks' => $recentClicks
         ];
     }
 
