@@ -31,7 +31,7 @@ class ProductOfferBundleController extends Controller
             $configuration = SearchConfigurationFactory::create('product_offer_bundle');
             $engine = new SearchEngine($configuration);
 
-            $queryBuilder = ProductOfferBundle::with(['items.productOffer.product', 'items.productOffer.merchant']);
+            $queryBuilder = ProductOfferBundle::with(['items', 'items.productOffer', 'items.productOffer.product']);
             $result = $engine->search($queryBuilder, $criteria);
 
             $collection = new PaginatedResourceCollection($result, ProductOfferBundleResource::class);

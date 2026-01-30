@@ -181,8 +181,6 @@ class SingleContentAccessController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
             return $this->jsonResponse([
                 'success' => false,
                 'message' => $e->getMessage()

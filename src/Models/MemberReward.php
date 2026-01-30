@@ -22,7 +22,8 @@ class MemberReward extends Model
         'admin_notes',
         'declined_by_admin_id',
         'declined_at',
-        'decline_reason'
+        'decline_reason',
+        'deleted_at'
     ];
 
     protected $casts = [
@@ -30,7 +31,8 @@ class MemberReward extends Model
         'claimed_at' => 'datetime',
         'expires_at' => 'datetime',
         'reward_data' => 'array',
-        'declined_at' => 'datetime'
+        'declined_at' => 'datetime',
+        'deleted_at' => 'datetime'
     ];
 
     public function member($relation = false)

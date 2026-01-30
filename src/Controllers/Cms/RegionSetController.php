@@ -191,8 +191,6 @@ class RegionSetController extends Controller
             $collection = new PaginatedResourceCollection($result, PageResource::class);
             return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die;
             return $this->errorResponse($e->getMessage(), 500);
         }
     }

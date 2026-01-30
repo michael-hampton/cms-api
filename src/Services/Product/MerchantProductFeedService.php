@@ -140,8 +140,6 @@ class MerchantProductFeedService
 
             return $this->repository->update($id, $updateData);
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die;
             Logger::error('Feed fetch failed: ' . $e->getMessage(), [
                 'feed_id' => $id,
                 'trace' => $e->getTraceAsString()

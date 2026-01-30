@@ -22,7 +22,7 @@ class RewardAuditLogRepository extends Repository
     ): Model
     {
         return RewardAuditLog::create([
-            'member_reward_id' => $memberRewardId,
+            'member_reward_id' => $memberRewardId ?: null,
             'reward_definition_id' => $rewardDefinitionId,
             'user_id' => $userId,
             'action' => $action,

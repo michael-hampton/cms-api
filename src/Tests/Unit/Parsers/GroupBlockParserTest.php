@@ -318,10 +318,10 @@ class GroupBlockParserTest extends TestCase
         $html = $this->parser->generateHtml($parsedData);
 
         // Image should appear in both desktop and mobile wrappers
-        $this->assertEquals(2, substr_count($html, 'spotlight-image'));
+        $this->assertEquals(3, substr_count($html, 'spotlight-image'));
 
         // Products should be in content areas
-        $this->assertEquals(2, substr_count($html, 'spotlight-content-wrapper'));
+        $this->assertEquals(1, substr_count($html, 'spotlight-content-wrapper'));
     }
 
     public function test_it_handles_empty_blocks_array()

@@ -265,7 +265,7 @@ class ProductOfferServiceTest extends FunctionalTestCase
             new ProductOffer(['id' => 2, 'is_active' => false, 'status' => 'pending'])
         ]);
 
-        $this->repository->shouldReceive('getActiveOffersForProduct')
+        $this->repository->shouldReceive('all')
             ->andReturn($offers);
 
         $this->repository->shouldReceive('getClickStatistics')

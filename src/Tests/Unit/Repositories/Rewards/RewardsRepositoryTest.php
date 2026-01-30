@@ -16,6 +16,14 @@ class RewardsRepositoryTest extends RepositoryTestCase
     private RewardsRepository $repository;
     private RewardAuditLogRepository $auditLogRepository;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $rewardDefinitionRepository = new RewardDefinitionRepository(new RewardAuditLogRepository());
+        $this->auditLogRepository = new RewardAuditLogRepository();
+        $this->repository = new RewardsRepository($rewardDefinitionRepository, $this->auditLogRepository);
+    }
+
     public function testGetActiveRewardDefinitions(): void
     {
         $site = $this->createSite();
@@ -344,13 +352,5 @@ class RewardsRepositoryTest extends RepositoryTestCase
         $this->assertEquals(2, $stats['total']);
         $this->assertEquals(1, $stats['claimed']);
         $this->assertEquals(1, $stats['pending']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $rewardDefinitionRepository = new RewardDefinitionRepository();
-        $this->auditLogRepository = new RewardAuditLogRepository();
-        $this->repository = new RewardsRepository($rewardDefinitionRepository, $this->auditLogRepository);
     }
 }

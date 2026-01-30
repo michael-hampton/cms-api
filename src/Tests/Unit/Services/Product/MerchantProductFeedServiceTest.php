@@ -12,6 +12,8 @@ use App\Models\Product;
 use App\Models\ProductMerchant;
 use App\Repositories\Product\MerchantProductFeedRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Services\Product\FeedMappers\FeedMapperInterface;
+use App\Services\Product\FeedMappers\FeedMapperRegistry;
 use App\Services\Product\MerchantProductFeedService;
 use App\Services\Product\ProductService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -158,6 +160,8 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
 
     public function testFetchFeedUpdatesStatus()
     {
+        $_ENV['APP_ENV'] = 'production';
+
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -209,6 +213,7 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertNotNull($result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testDownloadFeedDataReturnsCorrectFormat()
@@ -461,6 +466,7 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
 
     public function testFetchFeedUsesCorrectMapper()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -493,10 +499,12 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
 
         $result = $this->service->fetchFeed(1);
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testParseFeedUsesAmazonMapper()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -542,10 +550,12 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testParseFeedUsesEbayMapper()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -590,10 +600,12 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testParseXmlFeedWithMapper()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -637,10 +649,12 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testParseCsvFeedWithMapper()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -672,10 +686,12 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testMapperHandlesAlternativeFieldNames()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -725,10 +741,12 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testMapperHandlesMissingOptionalFields()
     {
+        $_ENV['APP_ENV'] = 'production';
         $feed = new MerchantProductFeed([
             'id' => 1,
             'merchant_id' => 1,
@@ -771,12 +789,14 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $this->service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testCustomMapperRegistryCanBeInjected()
     {
-        $customRegistry = new \App\Services\Product\FeedMappers\FeedMapperRegistry();
-        $customMapper = Mockery::mock(\App\Services\Product\FeedMappers\FeedMapperInterface::class);
+        $_ENV['APP_ENV'] = 'production';
+        $customRegistry = new FeedMapperRegistry();
+        $customMapper = Mockery::mock(FeedMapperInterface::class);
         $customMapper->shouldReceive('supports')->andReturn(true);
         $customMapper->shouldReceive('map')->andReturn([
             'name' => 'Custom Mapped',
@@ -829,6 +849,7 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
         $result = $service->fetchFeed(1);
 
         $this->assertInstanceOf(MerchantProductFeed::class, $result);
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     protected function createMockProduct(bool $withMerchantData = false): Product
@@ -866,7 +887,7 @@ class MerchantProductFeedServiceTest extends FunctionalTestCase
 
     public function testMapperRegistryCanBeInjected()
     {
-        $customRegistry = new \App\Services\Product\FeedMappers\FeedMapperRegistry();
+        $customRegistry = new FeedMapperRegistry();
 
         $service = new MerchantProductFeedService(
             $this->repository,

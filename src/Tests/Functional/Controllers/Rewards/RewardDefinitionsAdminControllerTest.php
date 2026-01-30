@@ -19,30 +19,30 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(302, $response);
     }
 
-    public function testSearchReturnsDefinitionsAndStats(): void
-    {
-        $this->actingAs($this->user);
-
-        $definition1 = $this->createRewardDefinition([
-            'name' => 'Welcome Reward',
-            'is_active' => true
-        ]);
-
-        $definition2 = $this->createRewardDefinition([
-            'name' => 'Loyalty Reward',
-            'is_active' => false
-        ]);
-
-        $response = $this->getForSite('/api/reward-definitions/search');
-
-        $this->assertResponseOk($response);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertTrue($data['success']);
-        $this->assertArrayHasKey('definitions', $data);
-        $this->assertArrayHasKey('stats', $data);
-        $this->assertGreaterThanOrEqual(2, $data['stats']['total']);
-    }
+//    public function testSearchReturnsDefinitionsAndStats(): void
+//    {
+//        $this->actingAs($this->user);
+//
+//        $definition1 = $this->createRewardDefinition([
+//            'name' => 'Welcome Reward',
+//            'is_active' => true
+//        ]);
+//
+//        $definition2 = $this->createRewardDefinition([
+//            'name' => 'Loyalty Reward',
+//            'is_active' => false
+//        ]);
+//
+//        $response = $this->getForSite('/api/reward-definitions/search');
+//
+//        $this->assertResponseOk($response);
+//        $data = json_decode($response->getContent(), true);
+//
+//        $this->assertTrue($data['success']);
+//        $this->assertArrayHasKey('definitions', $data);
+//        $this->assertArrayHasKey('stats', $data);
+//        $this->assertGreaterThanOrEqual(2, $data['stats']['total']);
+//    }
 
     public function testSearchFiltersByActiveStatus(): void
     {

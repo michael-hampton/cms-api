@@ -2,7 +2,9 @@
 
 namespace App\Tests\Unit\Repositories\Rewards;
 
+use App\Models\RewardAuditLog;
 use App\Models\RewardDefinition;
+use App\Repositories\Rewards\RewardAuditLogRepository;
 use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -12,6 +14,12 @@ class RewardDefinitionRepositoryTest extends RepositoryTestCase
     use CreatesTestData;
 
     private RewardDefinitionRepository $repository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repository = new RewardDefinitionRepository(new RewardAuditLogRepository());
+    }
 
     public function testFindRewardDefinitionById(): void
     {
@@ -299,12 +307,121 @@ class RewardDefinitionRepositoryTest extends RepositoryTestCase
         $deleted = $this->repository->delete($definition->id);
 
         $this->assertTrue($deleted);
-        $this->assertDatabaseMissing('reward_definitions', ['id' => $definition->id]);
+
+        $definition = RewardDefinition::find($definition->id);
+        $this->assertNull($definition);
     }
 
-    protected function setUp(): void
+    public function testCreateRewardDefinitionLogsAudit(): void
     {
-        parent::setUp();
-        $this->repository = new RewardDefinitionRepository();
+        $site = $this->createSite();
+        $user = $this->createUser();
+
+        $data = [
+            'site_id' => $site->id,
+            'name' => 'New Reward',
+            'slug' => 'new-reward',
+            'description' => 'Test description',
+            'reward_type' => 'points',
+            'criteria' => [
+                ['type' => 'signup', 'operator' => '>=', 'value' => 1]
+            ],
+            'reward_config' => [
+                'points' => 100
+            ],
+            'max_claims_per_member' => 1,
+            'is_active' => true,
+            'sort_order' => 1,
+        ];
+
+        $definition = $this->repository->create($data, $user->id);
+
+        $this->assertNotNull($definition);
+
+        // Check audit log was created
+        $this->assertDatabaseHas('reward_audit_logs', [
+            'reward_definition_id' => $definition->id,
+            'user_id' => $user->id,
+            'action' => 'definition_created',
+            'new_status' => 'active'
+        ]);
+    }
+
+    public function testUpdateRewardDefinitionLogsAudit(): void
+    {
+        $user = $this->createUser();
+        $definition = $this->createRewardDefinition([
+            'name' => 'Original Name',
+            'is_active' => true,
+        ]);
+
+        $updated = $this->repository->update($definition->id, [
+            'name' => 'Updated Name',
+            'is_active' => false,
+        ], $user->id);
+
+        $this->assertInstanceOf(RewardDefinition::class, $updated);
+
+        // Check audit log was created
+        $this->assertDatabaseHas('reward_audit_logs', [
+            'reward_definition_id' => $definition->id,
+            'user_id' => $user->id,
+            'action' => 'definition_updated',
+            'old_status' => 'active',
+            'new_status' => 'inactive'
+        ]);
+    }
+
+    public function testDeleteRewardDefinitionLogsAudit(): void
+    {
+        $user = $this->createUser();
+        $definition = $this->createRewardDefinition([
+            'is_active' => true
+        ]);
+
+        $deleted = $this->repository->delete($definition->id, $user->id);
+
+        $this->assertTrue($deleted);
+
+        // Check audit log was created
+        $this->assertDatabaseHas('reward_audit_logs', [
+            'reward_definition_id' => $definition->id,
+            'user_id' => $user->id,
+            'action' => 'definition_deleted',
+            'old_status' => 'active'
+        ]);
+    }
+
+    public function testGetAuditLogsForDefinition(): void
+    {
+        $user = $this->createUser();
+        $definition = $this->createRewardDefinition();
+        $member = $this->createMember();
+
+        // Create
+        $this->repository->create([
+            'site_id' => $definition->site_id,
+            'name' => 'Test',
+            'reward_type' => 'points',
+            'member_id' => $member->id,
+            'criteria' => [],
+            'reward_config' => [],
+            'reward_definition_id' => $definition->id,
+            'earned_at' => now_datetime(),
+            'slug' => 'test',
+            'is_active' => true
+        ], $user->id);
+
+        // Update
+        $this->repository->update($definition->id, [
+            'name' => 'Updated'
+        ], $user->id);
+
+        $logs = RewardAuditLog::where('reward_definition_id', $definition->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $this->assertGreaterThan(0, $logs->count());
+        $this->assertEquals('definition_updated', $logs->first()->action);
     }
 }

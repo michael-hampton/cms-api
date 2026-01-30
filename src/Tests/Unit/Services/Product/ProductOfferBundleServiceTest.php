@@ -335,6 +335,98 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
         $this->assertNotNull($result);
     }
 
+    public function testCreateBundleValidatesDates(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('End date must be after start date');
+
+        $data = [
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 100,
+            'bundle_price' => 80,
+            'start_date' => '2024-02-01 00:00:00',
+            'end_date' => '2024-01-01 00:00:00', // Before start date
+            'items' => [
+                ['product_offer_id' => 1, 'quantity' => 1],
+                ['product_offer_id' => 2, 'quantity' => 1],
+            ]
+        ];
+
+        $this->service->createBundle($data);
+    }
+
+    public function testCreateBundleRequiresMinimumTwoItems(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Bundle must contain at least two items');
+
+        $data = [
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 100,
+            'bundle_price' => 80,
+            'start_date' => '2024-01-01 00:00:00',
+            'end_date' => '2024-02-01 00:00:00',
+            'items' => [
+                ['product_offer_id' => 1, 'quantity' => 1],
+            ]
+        ];
+
+        $this->service->createBundle($data);
+    }
+
+    public function testCreateBundleCalculatesDiscount(): void
+    {
+        $data = [
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 90,
+            'bundle_price' => 70,
+            'start_date' => '2024-01-01 00:00:00',
+            'end_date' => '2024-02-01 00:00:00',
+            'items' => [
+                ['product_offer_id' => 1, 'quantity' => 1],
+                ['product_offer_id' => 1, 'quantity' => 1],
+            ],
+            'discount_percentage' => 22,
+        ];
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($arg) {
+                return $arg['discount_percentage'] === 22;
+            }))
+            ->andReturn(new ProductOfferBundle($data));
+
+        $bundle = $this->service->createBundle($data);
+
+        $this->assertEquals(22, $bundle->discount_percentage); // (90-70)/90 * 100 = 22%
+    }
+
+    public function testPublishBundleRequiresPendingStatus(): void
+    {
+        $userId = 1;
+
+        $this->repository->shouldReceive('publish')
+            ->once()
+            ->with(1, $userId)
+            ->andReturnNull();
+
+        $result = $this->service->publish(1, $userId);
+
+        $this->assertNull($result);
+    }
+
+    public function testRejectBundleRequiresReason(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Rejection reason is required');
+
+
+        $this->service->reject(1, 1, '');
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

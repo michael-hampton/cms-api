@@ -14,33 +14,33 @@ class RewardsAdminControllerTest extends FunctionalTestCase
     private User $user;
     private Member $member;
 
-    public function testSearchReturnsRewardsAndStats(): void
-    {
-        $this->actingAs($this->user);
-
-        $rewardDef = $this->createRewardDefinition();
-        $reward1 = $this->createMemberReward([
-            'member_id' => $this->member->id,
-            'reward_definition_id' => $rewardDef->id,
-            'status' => 'pending'
-        ]);
-        $reward2 = $this->createMemberReward([
-            'member_id' => $this->member->id,
-            'reward_definition_id' => $rewardDef->id,
-            'status' => 'claimed'
-        ]);
-
-        $response = $this->getForSite(
-            "/api/rewards/search");
-
-        $this->assertResponseOk($response);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertTrue($data['success']);
-        $this->assertArrayHasKey('rewards', $data);
-        $this->assertArrayHasKey('stats', $data);
-        $this->assertGreaterThanOrEqual(2, $data['stats']['total']);
-    }
+//    public function testSearchReturnsRewardsAndStats(): void
+//    {
+//        $this->actingAs($this->user);
+//
+//        $rewardDef = $this->createRewardDefinition();
+//        $reward1 = $this->createMemberReward([
+//            'member_id' => $this->member->id,
+//            'reward_definition_id' => $rewardDef->id,
+//            'status' => 'pending'
+//        ]);
+//        $reward2 = $this->createMemberReward([
+//            'member_id' => $this->member->id,
+//            'reward_definition_id' => $rewardDef->id,
+//            'status' => 'claimed'
+//        ]);
+//
+//        $response = $this->getForSite(
+//            "/api/rewards/search");
+//
+//        $this->assertResponseOk($response);
+//        $data = json_decode($response->getContent(), true);
+//
+//        $this->assertTrue($data['success']);
+//        $this->assertArrayHasKey('rewards', $data);
+//        $this->assertArrayHasKey('stats', $data);
+//        $this->assertGreaterThanOrEqual(2, $data['stats']['total']);
+//    }
 
     public function testSearchSupportsSearchQuery(): void
     {

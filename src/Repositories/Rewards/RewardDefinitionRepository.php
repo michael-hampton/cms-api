@@ -4,16 +4,97 @@ namespace App\Repositories\Rewards;
 
 use App\Framework\Support\Collection;
 use App\Models\MemberReward;
+use App\Models\Model;
 use App\Models\RewardClick;
 use App\Models\RewardDefinition;
 use App\Repositories\Repository;
 
 class RewardDefinitionRepository extends Repository
 {
+    public function __construct(
+        private readonly RewardAuditLogRepository $auditLogRepository
+    )
+    {
+        parent::__construct();
+    }
 
     public function findRewardDefinitionById(int $id): ?RewardDefinition
     {
         return RewardDefinition::with(['memberRewards'])->find($id);
+    }
+
+    public function update(int $id, array $data, ?int $userId = null): ?Model
+    {
+        $definition = $this->findRewardDefinitionById($id);
+
+        if (!$definition) {
+            return null;
+        }
+
+        $oldData = $definition->toArray();
+        $oldStatus = $definition->is_active;
+
+        $result = parent::update($id, $data);
+
+        if ($result) {
+            $definition = $definition->fresh();
+
+            // Log the update
+            $this->auditLogRepository->logAction(
+                memberRewardId: 0, // No specific member reward for definition changes
+                action: 'definition_updated',
+                userId: $userId,
+                oldStatus: $oldStatus ? 'active' : 'inactive',
+                newStatus: $definition->is_active ? 'active' : 'inactive',
+                oldData: $oldData,
+                newData: $definition->toArray(),
+                rewardDefinitionId: $definition->id
+            );
+        }
+
+        return $result;
+    }
+
+    public function create(array $data, ?int $userId = null): Model
+    {
+        $definition = parent::create($data);
+
+        // Log the creation
+        $this->auditLogRepository->logAction(
+            memberRewardId: 0,
+            action: 'definition_created',
+            userId: $userId,
+            newStatus: $definition->is_active ? 'active' : 'inactive',
+            newData: $definition->toArray(),
+            rewardDefinitionId: $definition->id
+        );
+
+        return $definition;
+    }
+
+    public function delete(int $id, ?int $userId = null): bool
+    {
+        $definition = $this->findRewardDefinitionById($id);
+
+        if (!$definition) {
+            return false;
+        }
+
+        $oldData = $definition->toArray();
+
+        // Log the deletion
+        $this->auditLogRepository->logAction(
+            memberRewardId: 0,
+            action: 'definition_deleted',
+            userId: $userId,
+            oldStatus: $definition->is_active ? 'active' : 'inactive',
+            oldData: $oldData,
+            rewardDefinitionId: $definition->id
+        );
+
+        $result = parent::delete($id);
+
+        return $result;
     }
 
     public function searchRewardDefinitions(int $siteId, array $filters = [], int $page = 1, int $perPage = 50): array

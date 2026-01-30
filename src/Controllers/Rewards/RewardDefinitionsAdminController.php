@@ -94,8 +94,9 @@ class RewardDefinitionsAdminController extends Controller
             $data = $request->validated();
 
             $data['site_id'] = SiteContext::getId();
+            $userId = Auth::id();
 
-            $definition = $this->rewardDefinitionRepository->create($data);
+            $definition = $this->rewardDefinitionRepository->create($data, $userId);
 
             return $this->resourceResponse([
                 'success' => true,
@@ -127,8 +128,10 @@ class RewardDefinitionsAdminController extends Controller
         }
 
         $data = $request->validated();
+        $userId = Auth::id();
 
-        $updated = $this->rewardDefinitionRepository->update($definitionId, $data);
+
+        $updated = $this->rewardDefinitionRepository->update($definitionId, $data, $userId);
 
         if (!$updated) {
             return $this->resourceResponse([
@@ -168,7 +171,8 @@ class RewardDefinitionsAdminController extends Controller
             ], 400);
         }
 
-        $deleted = $this->rewardDefinitionRepository->delete($definitionId);
+        $userId = Auth::id();
+        $deleted = $this->rewardDefinitionRepository->delete($definitionId, $userId);
 
         if (!$deleted) {
             return $this->resourceResponse([

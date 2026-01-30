@@ -16,7 +16,8 @@ class RewardDefinition extends Model
         'reward_config',
         'max_claims_per_member',
         'is_active',
-        'sort_order'
+        'sort_order',
+        'deleted_at'
     ];
 
     protected $casts = [
@@ -24,7 +25,8 @@ class RewardDefinition extends Model
         'reward_config' => 'array',
         'is_active' => 'boolean',
         'max_claims_per_member' => 'integer',
-        'sort_order' => 'integer'
+        'sort_order' => 'integer',
+        'deleted_at' => 'datetime'
     ];
 
     public function checkCriteria(Member $member): bool

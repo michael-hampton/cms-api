@@ -543,6 +543,10 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
     public function testTrackClickRecordsViewAction(): void
     {
+        $member = $this->createMember();
+
+        $this->actingAsMember($member);
+
         $product = $this->createProduct();
         $offer = $this->createProductOffer($product->id);
 
@@ -561,6 +565,10 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
     public function testTrackClickRecordsCopyCodeAction(): void
     {
+        $member = $this->createMember();
+
+        $this->actingAsMember($member);
+
         $product = $this->createProduct();
         $voucher = $this->createVoucher();
         $offer = $this->createProductOffer($product->id, ['voucher_id' => $voucher->id]);
