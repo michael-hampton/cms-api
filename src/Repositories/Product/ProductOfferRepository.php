@@ -4,6 +4,7 @@ namespace App\Repositories\Product;
 
 use App\Framework\Support\Collection;
 use App\Models\Model;
+use App\Models\OfferClicks;
 use App\Models\ProductOffer;
 use App\Repositories\Repository;
 
@@ -12,7 +13,7 @@ class ProductOfferRepository extends Repository
     public function getActiveOffersForProduct(int $productId): Collection
     {
         return ProductOffer::forProduct($productId)
-            ->with(['merchant'])
+            ->with(['merchant', 'product'])
             ->active()
             ->orderBy('start_date', 'desc')
             ->get();
@@ -151,6 +152,60 @@ class ProductOfferRepository extends Repository
         }
 
         return $query->orderBy('created_at', 'desc')->get();
+    }
+
+    public function trackClick(int $offerId, ?int $memberId, string $action, ?string $ipAddress = null, ?string $userAgent = null): Model
+    {
+        return OfferClicks::create([
+            'offer_id' => $offerId,
+            'member_id' => $memberId,
+            'ip_address' => $ipAddress,
+            'user_agent' => $userAgent,
+            'action' => $action
+        ]);
+    }
+
+    public function getClickStatistics(array $offerIds): array
+    {
+        if (empty($offerIds)) {
+            return [
+                'total' => 0,
+                'unique' => 0,
+                'by_offer' => [],
+                'by_action' => []
+            ];
+        }
+
+        $totalClicks = OfferClicks::whereIn('offer_id', $offerIds)->count();
+
+        $uniqueClickers = OfferClicks::whereIn('offer_id', $offerIds)
+            ->whereNotNull('member_id')
+            ->select('member_id')
+            ->distinct()
+            ->count();
+
+        $clicksByOffer = OfferClicks::whereIn('offer_id', $offerIds)
+            ->select('offer_id')
+            ->selectRaw('COUNT(*) as count')
+            ->groupBy('offer_id')
+            ->get()
+            ->pluck('count', 'offer_id')  // First param is value, second is key
+            ->toArray();
+
+        $clicksByAction = OfferClicks::whereIn('offer_id', $offerIds)
+            ->select('action')
+            ->selectRaw('COUNT(*) as count')
+            ->groupBy('action')
+            ->get()
+            ->pluck('count', 'action')
+            ->toArray();
+
+        return [
+            'total' => $totalClicks,
+            'unique' => $uniqueClickers,
+            'by_offer' => $clicksByOffer,
+            'by_action' => $clicksByAction
+        ];
     }
 
     protected function getModelClass(): string

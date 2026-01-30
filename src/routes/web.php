@@ -50,6 +50,7 @@ use App\Controllers\Members\Subscriptions\SingleContentAccessController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Newsletter\NewsletterWebController;
 use App\Controllers\Product\ProductComparisonController;
+use App\Controllers\Product\ProductOfferController;
 use App\Controllers\Subscription\OneTimeSubscriptionsController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Framework\Middleware\RequireMemberAuth;
@@ -230,6 +231,8 @@ $router->post('/{site}/member/profile/communication-preferences', [MemberControl
 $router->post('/{site}/member/subscriptions/{subscriptionId}/pause-delivery', [MemberSubscriptionsController::class, 'pauseDelivery']);
 $router->post('/{site}/member/subscriptions/{subscriptionId}/resume-delivery', [MemberSubscriptionsController::class, 'resumeDelivery']);
 $router->get('/{site}/member/subscriptions/{subscriptionId}/pause-status', [MemberSubscriptionsController::class, 'getPauseStatus']);
+
+$router->post('/{site}/products/{productId}/offers/{offerId}/track', [ProductOfferController::class, 'trackClick']);
 
 // API routes for Wishlist (JSON responses)
 $router->get('/api/{site}/wishlist', [WishlistController::class, 'index']);

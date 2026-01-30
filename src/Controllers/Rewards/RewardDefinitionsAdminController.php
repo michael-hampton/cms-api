@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Admin;
+namespace App\Controllers\Rewards;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
@@ -57,12 +57,12 @@ class RewardDefinitionsAdminController extends Controller
 
         $collection = new PaginatedResourceCollection($result, RewardDefinitionResource::class);
 
-        $stats = $this->rewardDefinitionRepository->getRewardDefinitionStats($siteId);
+        //$stats = $this->rewardDefinitionRepository->getRewardDefinitionStats($siteId);
 
         return $this->resourceResponse([
             'success' => true,
             'definitions' => $collection->toArray(),
-            'stats' => $stats
+            //'stats' => $stats
         ]);
     }
 
@@ -180,6 +180,21 @@ class RewardDefinitionsAdminController extends Controller
         return $this->resourceResponse([
             'success' => true,
             'message' => 'Reward definition deleted successfully'
+        ]);
+    }
+
+    public function getStatistics(Request $request)
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $siteId = SiteContext::getId();
+        $stats = $this->rewardDefinitionRepository->getRewardDefinitionStats($siteId);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'stats' => $stats
         ]);
     }
 }

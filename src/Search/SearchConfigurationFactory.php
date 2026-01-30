@@ -14,6 +14,7 @@ use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
 use App\Search\Configurations\PipelineSearchConfiguration;
+use App\Search\Configurations\ProductBundleSearchConfiguration;
 use App\Search\Configurations\ProductOfferSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
@@ -51,6 +52,7 @@ class SearchConfigurationFactory
         'reward' => RewardSearchConfiguration::class,
         'product_offer' => ProductOfferSearchConfiguration::class,
         'newsletters' => NewsletterSearchConfiguration::class,
+        'product_offer_bundle' => ProductBundleSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

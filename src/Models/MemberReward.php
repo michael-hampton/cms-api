@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Repositories\Rewards\RewardAuditLogRepository;
+
 class MemberReward extends Model
 {
     protected $table = 'member_rewards';
@@ -57,10 +59,30 @@ class MemberReward extends Model
             return false;
         }
 
-        return $this->update([
+        $oldStatus = $this->status;
+        $oldData = $this->toArray();
+
+        $result = $this->update([
             'status' => 'claimed',
             'claimed_at' => now_datetime()->toDateTimeString()
         ]);
+
+        if ($result) {
+            // Log the claim
+            $auditRepo = app(RewardAuditLogRepository::class);
+            $auditRepo->logAction(
+                memberRewardId: $this->id,
+                action: 'claimed',
+                userId: null,
+                oldStatus: $oldStatus,
+                newStatus: 'claimed',
+                oldData: $oldData,
+                newData: $this->fresh()->toArray(),
+                rewardDefinitionId: $this->reward_definition_id
+            );
+        }
+
+        return $result;
     }
 
     public function isPending(): bool
@@ -81,13 +103,34 @@ class MemberReward extends Model
 
     public function decline(int $adminId, string $reason, ?string $notes = null): bool
     {
-        return $this->update([
+        $oldStatus = $this->status;
+        $oldData = $this->toArray();
+
+        $result = $this->update([
             'status' => 'declined',
             'declined_by_admin_id' => $adminId,
             'declined_at' => now_datetime()->toDateTimeString(),
             'decline_reason' => $reason,
             'admin_notes' => $notes
         ]);
+
+        if ($result) {
+            // Log the decline
+            $auditRepo = app(RewardAuditLogRepository::class);
+            $auditRepo->logAction(
+                memberRewardId: $this->id,
+                action: 'declined',
+                userId: $adminId,
+                oldStatus: $oldStatus,
+                newStatus: 'declined',
+                oldData: $oldData,
+                newData: $this->fresh()->toArray(),
+                notes: "Reason: $reason" . ($notes ? " | Notes: $notes" : ""),
+                rewardDefinitionId: $this->reward_definition_id
+            );
+        }
+
+        return $result;
     }
 
     public function declinedBy($relation = false)

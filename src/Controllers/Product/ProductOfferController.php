@@ -4,6 +4,7 @@
 namespace App\Controllers\Product;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -40,12 +41,12 @@ class ProductOfferController extends Controller
 
         $collection = new PaginatedResourceCollection($result, OfferResource::class);
 
-        $stats = $this->offerService->getAllOfferStatistics($siteId);
+        //$stats = $this->offerService->getAllOfferStatistics($siteId);
 
         return $this->resourceResponse([
             'success' => true,
             'offers' => $collection->toArray(),
-            'stats' => $stats
+            //'stats' => $stats
         ]);
     }
 
@@ -197,12 +198,46 @@ class ProductOfferController extends Controller
 
             $collection = new PaginatedResourceCollection($result, OfferResource::class);
 
-            $stats = $this->offerService->getAllOfferStatistics($siteId);
+            //$stats = $this->offerService->getAllOfferStatistics($siteId);
 
             return $this->resourceResponse([
                 'success' => true,
                 'offers' => $collection->toArray(),
+                //'stats' => $stats
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getStatistics(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $siteId = SiteContext::getId();
+            $stats = $this->offerService->getAllOfferStatistics($siteId);
+
+            return $this->resourceResponse([
+                'success' => true,
                 'stats' => $stats
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function trackClick(int $productId, int $offerId, Request $request): JsonResponse
+    {
+        try {
+            $action = $request->input('action', 'view'); // view, click, copy_code
+            $memberId = MemberAuth::id();
+            $ipAddress = $request->ip();
+            $userAgent = $request->userAgent();
+
+            $this->offerService->trackClick($offerId, $memberId, $action, $ipAddress, $userAgent);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Click tracked successfully'
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

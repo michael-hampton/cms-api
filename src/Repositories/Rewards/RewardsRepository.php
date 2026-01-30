@@ -4,6 +4,7 @@ namespace App\Repositories\Rewards;
 
 use App\Framework\Support\Collection;
 use App\Models\MemberReward;
+use App\Models\Model;
 use App\Models\RewardClick;
 use App\Models\RewardDefinition;
 use App\Models\RewardVoucherCode;
@@ -11,7 +12,10 @@ use App\Repositories\Repository;
 
 class RewardsRepository extends Repository
 {
-    public function __construct(private readonly RewardDefinitionRepository $rewardDefinitionRepository)
+    public function __construct(
+        private readonly RewardDefinitionRepository $rewardDefinitionRepository,
+        private readonly RewardAuditLogRepository   $auditLogRepository
+    )
     {
         parent::__construct();
     }
@@ -51,12 +55,53 @@ class RewardsRepository extends Repository
             ->count();
     }
 
-    public function createMemberReward(array $data): MemberReward
+    public function createMemberReward(array $data): Model
     {
-        $data['earned_at'] = $data['earned_at'] ?? now_datetime()->format('Y-m-d H:i:s');
+        $data['earned_at'] = $data['earned_at'] ?? now_datetime();
         $data['status'] = $data['status'] ?? 'pending';
 
-        return MemberReward::create($data);
+        $reward = MemberReward::create($data);
+
+        // Log the creation
+        $this->auditLogRepository->logAction(
+            memberRewardId: $reward->id,
+            action: 'created',
+            userId: null,
+            newStatus: $reward->status,
+            newData: $reward->toArray(),
+            rewardDefinitionId: $reward->reward_definition_id
+        );
+
+        return $reward;
+    }
+
+    public function updateMemberReward(int $rewardId, array $data, ?int $userId = null): ?Model
+    {
+        $reward = $this->findMemberRewardById($rewardId);
+
+        if (!$reward) {
+            return null;
+        }
+
+        $oldData = $reward->toArray();
+        $oldStatus = $reward->status;
+
+        $reward->update($data);
+        $reward = $reward->fresh();
+
+        // Log the update
+        $this->auditLogRepository->logAction(
+            memberRewardId: $reward->id,
+            action: 'updated',
+            userId: $userId,
+            oldStatus: $oldStatus,
+            newStatus: $reward->status,
+            oldData: $oldData,
+            newData: $reward->toArray(),
+            rewardDefinitionId: $reward->reward_definition_id
+        );
+
+        return $reward;
     }
 
     public function getAvailableVoucher(int $rewardDefinitionId): ?RewardVoucherCode
@@ -71,7 +116,7 @@ class RewardsRepository extends Repository
     {
         return MemberReward::where('site_id', $siteId)
             ->where('status', 'pending')
-            ->where('expires_at', '<', now_datetime())
+            ->where('expires_at', '<', now_datetime()->format('Y-m-d H:i:s'))
             ->update(['status' => 'expired']);
     }
 

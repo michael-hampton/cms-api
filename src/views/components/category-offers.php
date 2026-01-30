@@ -170,16 +170,47 @@ $hasOffers = $offerCount > 0;
 </section>
 
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const offerCards = document.querySelectorAll('.category-offer-card');
+        offerCards.forEach(card => {
+            const offerId = card.dataset.offerId;
+            const productId = card.dataset.productId;
+
+            // Track view
+            fetch(`/api/${SITE}/products/${productId}/offers/${offerId}/track`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'view'
+                })
+            }).catch(err => console.error('Failed to track view:', err));
+        });
+    });
+
     // Add to Cart Handler for Offers
     async function handleCategoryOfferAddToCart(event, productId) {
         event.preventDefault();
         const btn = event.currentTarget;
         const originalText = btn.textContent;
+        const offerId = btn.closest('.category-offer-card').dataset.offerId;
 
         btn.disabled = true;
         btn.textContent = 'Adding...';
 
         try {
+            // Track the click
+            await fetch(`/api/${SITE}/products/${productId}/offers/${offerId}/track`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'click'
+                })
+            });
+
             const response = await fetch(`/api/${SITE}/cart/add`, {
                 method: 'POST',
                 headers: {
@@ -195,7 +226,6 @@ $hasOffers = $offerCount > 0;
 
             if (data.success) {
                 showCategoryOfferToast(data.message || 'Added to cart!', 'success');
-                // Update cart count if element exists
                 const cartCount = document.getElementById('cart-count');
                 if (cartCount && data.count) {
                     cartCount.textContent = data.count;

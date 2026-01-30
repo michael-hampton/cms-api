@@ -260,6 +260,25 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         }
     }
 
+    public function testGetStatisticsReturnsStats(): void
+    {
+        $this->actingAs($this->user);
+
+        $this->createRewardDefinition(['is_active' => true]);
+        $this->createRewardDefinition(['is_active' => false]);
+
+        $response = $this->getForSite('/api/reward-definitions/statistics');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('stats', $data);
+        $this->assertArrayHasKey('total', $data['stats']);
+        $this->assertArrayHasKey('active', $data['stats']);
+        $this->assertArrayHasKey('inactive', $data['stats']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

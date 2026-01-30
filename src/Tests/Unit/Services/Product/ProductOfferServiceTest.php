@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Product;
 
 use App\Framework\Authorization\AuthenticationService;
+use App\Models\Model;
 use App\Models\ProductOffer;
 use App\Repositories\Product\ProductOfferRepository;
 use App\Services\Product\ProductOfferService;
@@ -236,6 +237,50 @@ class ProductOfferServiceTest extends FunctionalTestCase
 
         $result = $this->service->updateOffer(1, ['status' => 'published']);
         $this->assertInstanceOf(ProductOffer::class, $result);
+    }
+
+    public function testTrackClick(): void
+    {
+        $this->repository->shouldReceive('trackClick')
+            ->once()
+            ->with(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0');
+
+        $result = $this->service->trackClick(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0');
+
+        $this->assertInstanceOf(Model::class, $result);
+    }
+
+    public function testTrackClickThrowsExceptionForInvalidAction(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid action type');
+
+        $this->service->trackClick(1, 2, 'invalid_action');
+    }
+
+    public function testGetAllOfferStatisticsIncludesClickData(): void
+    {
+        $offers = collect([
+            new ProductOffer(['id' => 1, 'is_active' => true, 'status' => 'published']),
+            new ProductOffer(['id' => 2, 'is_active' => false, 'status' => 'pending'])
+        ]);
+
+        $this->repository->shouldReceive('getActiveOffersForProduct')
+            ->andReturn($offers);
+
+        $this->repository->shouldReceive('getClickStatistics')
+            ->once()
+            ->with([1, 2])
+            ->andReturn([
+                'total' => 10,
+                'unique' => 5,
+                'by_offer' => [1 => 7, 2 => 3]
+            ]);
+
+        $stats = $this->service->getAllOfferStatistics(1);
+
+        $this->assertEquals(10, $stats['total_clicks']);
+        $this->assertEquals(5, $stats['unique_clickers']);
     }
 
     protected function tearDown(): void

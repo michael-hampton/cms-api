@@ -15,6 +15,11 @@ class RewardClick extends Model
         'user_agent'
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
     public function memberReward($relation = false)
     {
         return $this->belongsTo(MemberReward::class, 'member_reward_id', 'id', $relation);

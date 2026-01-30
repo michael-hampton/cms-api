@@ -393,6 +393,29 @@ class RewardsAdminControllerTest extends FunctionalTestCase
         }
     }
 
+    public function testGetStatisticsReturnsStats(): void
+    {
+        $this->actingAs($this->user);
+
+        $rewardDef = $this->createRewardDefinition();
+        $this->createMemberReward([
+            'member_id' => $this->member->id,
+            'reward_definition_id' => $rewardDef->id,
+            'status' => 'pending'
+        ]);
+
+        $response = $this->getForSite('/api/rewards/statistics');
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('stats', $data);
+        $this->assertArrayHasKey('total', $data['stats']);
+        $this->assertArrayHasKey('pending', $data['stats']);
+        $this->assertArrayHasKey('claimed', $data['stats']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

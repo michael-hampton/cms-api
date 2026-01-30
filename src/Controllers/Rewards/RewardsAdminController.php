@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Controllers\Admin;
+namespace App\Controllers\Rewards;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
-use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
@@ -15,7 +14,6 @@ use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
 use App\Services\Rewards\RewardsService;
-use Exception;
 
 class RewardsAdminController extends Controller
 {
@@ -56,12 +54,12 @@ class RewardsAdminController extends Controller
 
         $collection = new PaginatedResourceCollection($result, MemberRewardResource::class);
 
-        $stats = $this->rewardsRepository->getRewardDefinitionStats($siteId);
+        //$stats = $this->rewardsRepository->getRewardDefinitionStats($siteId);
 
         return $this->resourceResponse([
             'success' => true,
             'rewards' => $collection->toArray(),
-            'stats' => $stats
+            //'stats' => $stats
         ]);
     }
 
@@ -146,17 +144,18 @@ class RewardsAdminController extends Controller
         ]);
     }
 
-    public function getRewardStatistics(int $definitionId): JsonResponse
+    public function getStatistics(Request $request)
     {
-        try {
-            $stats = $this->rewardStatisticsService->getRewardDefinitionStatistics($definitionId);
-
-            return $this->resourceResponse([
-                'success' => true,
-                'statistics' => $stats
-            ]);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
+        if (!Auth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+
+        $siteId = SiteContext::getId();
+        $stats = $this->rewardsRepository->getRewardDefinitionStats($siteId);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'stats' => $stats
+        ]);
     }
 }

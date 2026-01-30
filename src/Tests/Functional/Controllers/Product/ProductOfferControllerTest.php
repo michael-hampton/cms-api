@@ -496,4 +496,85 @@ class ProductOfferControllerTest extends FunctionalTestCase
             $this->assertGreaterThanOrEqual(strtotime($startDate), strtotime($item['start_date']));
         }
     }
+
+    public function testGetStatisticsReturnsOfferStats(): void
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $this->createProductOffer($product1->id, ['status' => 'published', 'is_active' => true]);
+        $this->createProductOffer($product2->id, ['status' => 'pending', 'is_active' => false]);
+
+        $response = $this->getForSite('/api/offers/statistics');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('stats', $data);
+        $this->assertArrayHasKey('total_offers', $data['stats']);
+        $this->assertArrayHasKey('active_offers', $data['stats']);
+        $this->assertArrayHasKey('published_offers', $data['stats']);
+    }
+
+    public function testTrackClickRecordsClickSuccessfully(): void
+    {
+        $member = $this->createMember();
+
+        $this->actingAsMember($member);
+
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $response = $this->postForSite(
+            "/products/{$product->id}/offers/{$offer->id}/track",
+            ['action' => 'click']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $this->assertDatabaseHas('offer_clicks', [
+            'offer_id' => $offer->id,
+            'action' => 'click'
+        ]);
+    }
+
+    public function testTrackClickRecordsViewAction(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $response = $this->postForSite(
+            "/products/{$product->id}/offers/{$offer->id}/track",
+            ['action' => 'view']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $this->assertDatabaseHas('offer_clicks', [
+            'offer_id' => $offer->id,
+            'action' => 'view'
+        ]);
+    }
+
+    public function testTrackClickRecordsCopyCodeAction(): void
+    {
+        $product = $this->createProduct();
+        $voucher = $this->createVoucher();
+        $offer = $this->createProductOffer($product->id, ['voucher_id' => $voucher->id]);
+
+        $response = $this->postForSite(
+            "/products/{$product->id}/offers/{$offer->id}/track",
+            ['action' => 'copy_code']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $this->assertDatabaseHas('offer_clicks', [
+            'offer_id' => $offer->id,
+            'action' => 'copy_code'
+        ]);
+    }
 }

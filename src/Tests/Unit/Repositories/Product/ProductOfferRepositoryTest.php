@@ -328,6 +328,72 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($updated->rejected_at);
     }
 
+    public function testTrackClick(): void
+    {
+        $product = $this->createProduct();
+        $member = $this->createMember();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ]);
+
+        $this->repository->trackClick(
+            $offer->id,
+            $member->id,
+            'click',
+            '127.0.0.1',
+            'Mozilla/5.0'
+        );
+
+        $this->assertDatabaseHas('offer_clicks', [
+            'offer_id' => $offer->id,
+            'member_id' => $member->id,
+            'action' => 'click',
+            'ip_address' => '127.0.0.1'
+        ]);
+    }
+
+    public function testGetClickStatistics(): void
+    {
+        $product = $this->createProduct();
+        $member1 = $this->createMember();
+        $member2 = $this->createMember();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ]);
+
+        // Create clicks
+        $this->repository->trackClick($offer->id, $member1->id, 'view');
+        $this->repository->trackClick($offer->id, $member1->id, 'click');
+        $this->repository->trackClick($offer->id, $member2->id, 'view');
+
+        $stats = $this->repository->getClickStatistics([$offer->id]);
+
+        $this->assertEquals(3, $stats['total']);
+        $this->assertEquals(2, $stats['unique']);
+        $this->assertEquals(3, $stats['by_offer'][$offer->id]);
+        $this->assertEquals(2, $stats['by_action']['view']);
+        $this->assertEquals(1, $stats['by_action']['click']);
+    }
+
+    public function testGetClickStatisticsWithEmptyArray(): void
+    {
+        $stats = $this->repository->getClickStatistics([]);
+
+        $this->assertEquals(0, $stats['total']);
+        $this->assertEquals(0, $stats['unique']);
+        $this->assertEmpty($stats['by_offer']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

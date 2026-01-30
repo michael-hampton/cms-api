@@ -5,7 +5,6 @@ namespace App\Services\Product;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Support\Collection;
 use App\Models\Model;
-use App\Models\OfferClicks;
 use App\Models\ProductOffer;
 use App\Repositories\Product\ProductOfferRepository;
 use Exception;
@@ -154,7 +153,7 @@ class ProductOfferService
 
     public function getAllOfferStatistics(int $siteId): array
     {
-        $offers = ProductOffer::with(['product'])->get();
+        $offers = $this->repository->all();
 
         $totalOffers = $offers->count();
         $activeOffers = $offers->where('is_active', true)->count();
@@ -207,9 +206,6 @@ class ProductOfferService
 
     private function getOfferClickStatistics(array $offerIds): array
     {
-        return [];
-
-        // Assuming you have an offer_clicks table
         if (empty($offerIds)) {
             return [
                 'total' => 0,
@@ -218,25 +214,16 @@ class ProductOfferService
             ];
         }
 
-        $totalClicks = OfferClicks::whereIn('offer_id', $offerIds)
-            ->count();
+        return $this->repository->getClickStatistics($offerIds);
+    }
 
-        OfferClicks::whereIn('offer_id', $offerIds)
-            ->distinct('user_identifier')
-            ->count('user_identifier');
+    public function trackClick(int $offerId, ?int $memberId, string $action, ?string $ipAddress = null, ?string $userAgent = null): Model
+    {
+        // Validate action
+        if (!in_array($action, ['view', 'click', 'copy_code'])) {
+            throw new Exception('Invalid action type');
+        }
 
-        OfferClicks::whereIn('offer_id', $offerIds)
-            ->select('offer_id')
-            ->selectRaw('COUNT(*) as clicks')
-            ->groupBy('offer_id')
-            ->get()
-            ->pluck('clicks', 'offer_id')
-            ->toArray();
-
-        return [
-            'total' => $totalClicks,
-            'unique' => $uniqueClickers,
-            'by_offer' => $clicksByOffer
-        ];
+        return $this->repository->trackClick($offerId, $memberId, $action, $ipAddress, $userAgent);
     }
 }

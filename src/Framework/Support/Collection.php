@@ -119,25 +119,64 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         });
     }
 
-    public function pluck(string $key): self
+    public function pluck(string|array $key, ?string $keyBy = null): self
     {
-        return $this->map(function ($item) use ($key) {
+        // Handle multiple keys
+        if (is_array($key)) {
+            return $this->map(function ($item) use ($key) {
+                $result = [];
+                foreach ($key as $k) {
+                    $result[$k] = $this->getNestedValue($item, $k);
+                }
+                return $result;
+            });
+        }
 
-            $segments = explode('.', $key);
-            $value = $item;
+        // Handle single key with optional key-by
+        $results = $this->map(function ($item) use ($key) {
+            return $this->getNestedValue($item, $key);
+        });
 
-            foreach ($segments as $segment) {
-                if (is_array($value) && array_key_exists($segment, $value)) {
+        // If keyBy is provided, reindex the collection
+        if ($keyBy !== null) {
+            $keyed = [];
+            foreach ($results->items as $index => $value) {
+                $keyValue = $this->getNestedValue($this->items[$index], $keyBy);
+                $keyed[$keyValue] = $value;
+            }
+            return new self($keyed);
+        }
+
+        return $results;
+    }
+
+    protected function getNestedValue($item, string $key)
+    {
+        $segments = explode('.', $key);
+        $value = $item;
+
+        foreach ($segments as $segment) {
+            if (is_array($value) && array_key_exists($segment, $value)) {
+                $value = $value[$segment];
+            } elseif (is_object($value)) {
+                // Try to access as property first (handles magic __get methods)
+                if ($value->{$segment}) {
+                    $value = $value->{$segment};
+                } // Try as array access (for ArrayAccess objects)
+                elseif ($value instanceof \ArrayAccess && isset($value[$segment])) {
                     $value = $value[$segment];
-                } elseif (is_object($value)) {
+                } // Check if property actually exists
+                elseif (property_exists($value, $segment)) {
                     $value = $value->{$segment};
                 } else {
                     return null;
                 }
+            } else {
+                return null;
             }
+        }
 
-            return $value;
-        });
+        return $value;
     }
 
     public function groupBy($key): self

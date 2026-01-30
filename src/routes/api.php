@@ -1,7 +1,5 @@
 <?php
 // API routes (return arrays -> converted to JSON)
-use App\Controllers\Admin\RewardDefinitionsAdminController;
-use App\Controllers\Admin\RewardsAdminController;
 use App\Controllers\AuthController;
 use App\Controllers\Cms\AuthorController;
 use App\Controllers\Cms\BlockController;
@@ -46,9 +44,13 @@ use App\Controllers\Product\MerchantController;
 use App\Controllers\Product\MerchantProductFeedController;
 use App\Controllers\Product\ProductController;
 use App\Controllers\Product\ProductMatchingController;
+use App\Controllers\Product\ProductOfferBundleController;
 use App\Controllers\Product\ProductOfferController;
 use App\Controllers\Product\ReviewController;
 use App\Controllers\Product\VariantController;
+use App\Controllers\Rewards\RewardAuditLogController;
+use App\Controllers\Rewards\RewardDefinitionsAdminController;
+use App\Controllers\Rewards\RewardsAdminController;
 use App\Controllers\SiteController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
@@ -163,6 +165,14 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/rewards/{rewardId}', [RewardsAdminController::class, 'show']);
         $router->put('/rewards/{rewardId}', [RewardsAdminController::class, 'update']);
         $router->post('/rewards/{rewardId}/decline', [RewardsAdminController::class, 'decline']);
+        $router->get('/reward-audit-logs', [RewardAuditLogController::class, 'index']);
+        $router->get('/reward-audit-logs/reward/{rewardId}', [RewardAuditLogController::class, 'getForReward']);
+        $router->get('/reward-audit-logs/action/{action}', [RewardAuditLogController::class, 'getByAction']);
+        $router->get('/reward-audit-logs/date-range', [RewardAuditLogController::class, 'getByDateRange']);
+
+        $router->get('/reward-definitions/statistics', [RewardDefinitionsAdminController::class, 'getStatistics']);
+        $router->get('/rewards/statistics', [RewardsAdminController::class, 'getStatistics']);
+        $router->get('/offers/statistics', [ProductOfferController::class, 'getStatistics']);
 
         $router->get('/reward-definitions', [RewardDefinitionsAdminController::class, 'index']);
         $router->get('/reward-definitions/search', [RewardDefinitionsAdminController::class, 'search']);
@@ -400,6 +410,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/offers', [ProductOfferController::class, 'allOffers']);
         $router->post('/products/{productId}/offers/{offerId}/publish', [ProductOfferController::class, 'publish']);
         $router->post('/products/{productId}/offers/{offerId}/reject', [ProductOfferController::class, 'reject']);
+
+        //product bundles
+        $router->get('/bundles', ProductOfferBundleController::class, 'index');
+        $router->get('/bundles/{bundleId}', [ProductOfferBundleController::class, 'show']);
+        $router->post('/bundles', ProductOfferBundleController::class, 'store');
+        $router->put('/bundles/{bundleId}', [ProductOfferBundleController::class, 'update']);
+        $router->delete('/bundles/{bundleId}', ProductOfferBundleController::class, 'destroy');
+        $router->post('/bundles/{bundleId}/publish', [ProductOfferBundleController::class, 'publish']);
+        $router->post('/bundles/{bundleId}/reject', [ProductOfferBundleController::class, 'reject']);
 
         //merchants
         $router->get('/merchants', MerchantController::class, 'index');

@@ -4,6 +4,7 @@ namespace App\Repositories\Rewards;
 
 use App\Framework\Support\Collection;
 use App\Models\MemberReward;
+use App\Models\RewardClick;
 use App\Models\RewardDefinition;
 use App\Repositories\Repository;
 
@@ -101,11 +102,8 @@ class RewardDefinitionRepository extends Repository
             ->whereIn('member_reward_id', $rewardIds)
             ->count();
 
-        $uniqueClickers = $this->database
-            ->table('reward_clicks')
-            ->whereIn('member_reward_id', $rewardIds)
-            ->distinct('member_id')
-            ->count('member_id');
+        $uniqueClickers = RewardClick::whereIn('member_reward_id', $rewardIds)
+            ->countDistinct('member_id');
 
         $clicksByAction = $this->database
             ->table('reward_clicks')

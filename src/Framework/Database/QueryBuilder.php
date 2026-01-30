@@ -611,10 +611,24 @@ class QueryBuilder
         $originalSelects = $this->selects;
         $originalOrders = $this->orders;
 
-        $this->selects = ['COUNT(*) as count'];
+        // default
+        $countSql = 'COUNT(*) as count';
+
+        // if DISTINCT + specific column
+        if (
+            in_array('DISTINCT', $this->selects, true) &&
+            count($this->selects) === 2 &&
+            $this->selects[1] !== '*'
+        ) {
+            $column = $this->selects[1];
+            $countSql = "COUNT(DISTINCT {$column}) as count";
+        }
+
+        $this->selects = [$countSql];
         $this->orders = [];
 
         [$sql, $params] = $this->toSql();
+
         $stmt = $this->database->query($sql, $params);
         $result = $stmt->fetch();
 
@@ -740,7 +754,7 @@ class QueryBuilder
             $models[] = $model;
         }
 
-        return new Collection($models);;
+        return new Collection($models);
     }
 
     /**
