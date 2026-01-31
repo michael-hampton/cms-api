@@ -74,7 +74,7 @@ abstract class Model
     // Define which attributes should be visible in serialization (overrides hidden)
     protected $visible = [];
 
-    protected array $internalAttributes = ['exists', 'original'];
+    protected array $internalAttributes = ['exists', 'original', 'attributes'];
 
     private ?EagerLoader $relationManager = null;
 
@@ -193,14 +193,26 @@ abstract class Model
 
     public function setAttribute(string $key, $value): void
     {
-        // Check if there's an accessor
-        $accessorMethod = 'set' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
-        if (method_exists($this, $accessorMethod)) {
-            $this->$accessorMethod($value);
+        // Handle boolean casting FIRST - convert bools to int for storage
+        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['bool', 'boolean'])) {
+            $this->attributes[$key] = (int)$value;
             return;
         }
 
-        // Handle array/json casting - convert arrays to JSON strings for storage
+        // Handle datetime casting FIRST - convert to formatted string
+        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['date', 'datetime', 'timestamp'])) {
+            if ($value instanceof \DateTimeInterface) {
+                $this->attributes[$key] = $value->format($this->dateFormat);
+                return;
+            }
+
+            if (is_string($value)) {
+                $this->attributes[$key] = (new \DateTime($value))->format($this->dateFormat);
+                return;
+            }
+        }
+
+        // Handle array/json casting FIRST - convert arrays to JSON strings for storage
         if (isset($this->casts[$key]) && in_array($this->casts[$key], ['array', 'json'])) {
             if (is_array($value)) {
                 $this->attributes[$key] = json_encode($value);
@@ -208,26 +220,11 @@ abstract class Model
             }
         }
 
-        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['date', 'datetime', 'timestamp'])) {
-
-            if ($value instanceof \DateTimeInterface) {
-                $this->attributes[$key] = $value->format($this->dateFormat);
-                return;
-            }
-
-            if (is_string($value)) {
-                $this->attributes[$key] = (new \DateTime($value))
-                    ->format($this->dateFormat);
-                return;
-            }
-        }
-
-        if (isset($this->casts[$key]) && in_array($this->casts[$key], ['bool', 'boolean'])) {
-
-            if (is_bool($value)) {
-                $this->attributes[$key] = (int)$value;
-                return;
-            }
+        // Check if there's a set mutator
+        $mutatorMethod = 'set' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
+        if (method_exists($this, $mutatorMethod)) {
+            $this->$mutatorMethod($value);
+            return;
         }
 
         $this->attributes[$key] = $value;
@@ -240,17 +237,20 @@ abstract class Model
             return false;
         }
 
-        if ($this->timestamps) {
-            $now = date($this->dateFormat);
-            if (!$this->exists) {
-                $this->setAttribute('created_at', $now);
-            }
-            $this->setAttribute('updated_at', $now);
-        }
-
         if ($this->exists) {
             if ($this->fireModelEvent('updating') === false) {
                 return false;
+            }
+
+            // Check for dirty attributes BEFORE adding timestamp
+            $dirty = array_diff_assoc(
+                $this->attributes,
+                $this->original ?? []
+            );
+
+            // Only set updated_at if there are actual changes
+            if ($this->timestamps && !empty($dirty)) {
+                $this->setAttribute('updated_at', date($this->dateFormat));
             }
 
             $result = $this->performUpdate();
@@ -261,6 +261,13 @@ abstract class Model
             }
 
             return $result;
+        }
+
+        // For new models, set both timestamps
+        if ($this->timestamps) {
+            $now = date($this->dateFormat);
+            $this->setAttribute('created_at', $now);
+            $this->setAttribute('updated_at', $now);
         }
 
         // Fire creating event
@@ -320,21 +327,6 @@ abstract class Model
             return false;
         }
 
-        // Fire the "saving" event
-        if ($this->fireModelEvent('saving') === false) {
-            return false;
-        }
-
-        // Fire the "updating" event
-        if ($this->fireModelEvent('updating') === false) {
-            return false;
-        }
-
-        // Update timestamps if enabled
-        if ($this->timestamps) {
-            $this->setAttribute('updated_at', date($this->dateFormat));
-        }
-
         // Determine dirty attributes (only changed values)
         $dirty = array_diff_assoc(
             $this->attributes,
@@ -342,15 +334,13 @@ abstract class Model
         );
 
         if (empty($dirty)) {
-            // No changes, but still fire events
-            $this->fireModelEvent('updated');
-            $this->fireModelEvent('saved');
+            // No changes, return success without DB call
             return true;
         }
 
         // Cast dirty attributes for DB storage
         foreach ($dirty as $key => $value) {
-            if ($value === null || trim($value) === '') {
+            if ($value === null || (is_string($value) && trim($value) === '')) {
                 continue;
             }
 
@@ -367,11 +357,6 @@ abstract class Model
         if ($affectedRows >= 0) {
             // Update original snapshot
             $this->original = $this->attributes;
-
-            // Fire post-update events
-            $this->fireModelEvent('updated');
-            $this->fireModelEvent('saved');
-
             return true;
         }
 
@@ -1218,6 +1203,11 @@ abstract class Model
      */
     public function __get(string $key)
     {
+        // Allow access to internal properties for testing/debugging
+        if (in_array($key, ['attributes', 'exists', 'original'], true)) {
+            return $this->$key;
+        }
+
         // Check for eager loaded relation first for performance
         if ($this->relationLoaded($key)) {
             return $this->getRelation($key);

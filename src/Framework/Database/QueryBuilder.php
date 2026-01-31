@@ -52,7 +52,15 @@ class QueryBuilder
     // SELECT methods
     public function select($columns): self
     {
-        $this->selects = is_array($columns) ? $columns : func_get_args();
+        $columns = is_array($columns) ? $columns : func_get_args();
+
+        // Preserve DISTINCT if already set
+        if (in_array('DISTINCT', $this->selects)) {
+            $this->selects = array_merge(['DISTINCT'], $columns);
+        } else {
+            $this->selects = $columns;
+        }
+
         return $this;
     }
 
@@ -511,12 +519,15 @@ class QueryBuilder
 
     private function addJoin(string $type, string $table, $first, ?string $operator = null, ?string $second = null): self
     {
-        if ($operator === null) {
+        // Handle two-argument form: join('posts', 'posts.user_id')
+        if ($operator === null && $second === null) {
             $operator = '=';
-            if ($second === null) {
-                $second = $first;
-                $first = $this->table . '.id';
-            }
+            $second = $first;
+            $first = $this->table . '.id';
+        } // Handle three-argument form: join('posts', 'users.id', 'posts.user_id')
+        elseif ($second === null) {
+            $second = $operator;
+            $operator = '=';
         }
 
         $this->joins[] = [

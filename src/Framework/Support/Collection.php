@@ -433,13 +433,13 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
     {
         $filtered = array_filter($this->items, function ($item) use ($key) {
             if (is_array($item)) {
-                return isset($item[$key]) && $item[$key] === null;
+                return array_key_exists($key, $item) && $item[$key] === null;
             } elseif (is_object($item)) {
                 // Use getAttribute if model implements it, fallback to property access
                 if (method_exists($item, 'getAttribute')) {
                     return $item->getAttribute($key) === null;
                 }
-                return isset($item->{$key}) && $item->{$key} === null;
+                return property_exists($item, $key) && $item->{$key} === null;
             }
             return false;
         });
@@ -466,8 +466,7 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
     }
 
 
-
-    public function flatten(int $depth = INF): self
+    public function flatten($depth = INF): self
     {
         $flattened = [];
 
@@ -477,6 +476,8 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
                 if ($depth === 1) {
                     $flattened = array_merge($flattened, $values);
+                } elseif ($depth === INF || $depth === PHP_FLOAT_MAX) {
+                    $flattened = array_merge($flattened, (new static($values))->flatten($depth)->all());
                 } else {
                     $flattened = array_merge($flattened, (new static($values))->flatten($depth - 1)->all());
                 }
