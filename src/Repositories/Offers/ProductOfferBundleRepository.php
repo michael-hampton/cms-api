@@ -13,7 +13,12 @@ class ProductOfferBundleRepository extends Repository
     public function getActiveBundles(): Collection
     {
         return ProductOfferBundle::active()
-            ->with(['items.productOffer.product', 'items.productOffer.merchant'])
+            ->with([
+                'items.productOffer.product',
+                'items.productOffer.merchant',
+                'items.product',
+                'items.product.merchant'
+            ])
             ->published()
             ->orderBy('start_date', 'desc')
             ->get();
@@ -33,7 +38,7 @@ class ProductOfferBundleRepository extends Repository
             'published_by' => $userId,
         ]);
 
-        return ProductOfferBundle::with(['items.productOffer.product', 'items.productOffer.merchant'])->find($id);
+        return $this->findWithRelations($id);
     }
 
     public function update(int $id, array $data): ?ProductOfferBundle
@@ -69,13 +74,14 @@ class ProductOfferBundleRepository extends Repository
             foreach ($data['items'] as $item) {
                 ProductOfferBundleItem::create([
                     'bundle_id' => $bundle->id,
-                    'product_offer_id' => $item['product_offer_id'],
+                    'product_offer_id' => $item['product_offer_id'] ?? null,
+                    'product_id' => $item['product_id'] ?? null,
                     'quantity' => $item['quantity'] ?? 1,
                 ]);
             }
         }
 
-        return ProductOfferBundle::with(['items.productOffer.product', 'items.productOffer.merchant'])->find($id);
+        return $this->findWithRelations($id);
     }
 
     public function delete(int $id): bool
@@ -112,13 +118,14 @@ class ProductOfferBundleRepository extends Repository
             foreach ($data['items'] as $item) {
                 ProductOfferBundleItem::create([
                     'bundle_id' => $bundle->id,
-                    'product_offer_id' => $item['product_offer_id'],
+                    'product_offer_id' => $item['product_offer_id'] ?? null,
+                    'product_id' => $item['product_id'] ?? null,
                     'quantity' => $item['quantity'] ?? 1,
                 ]);
             }
         }
 
-        return $bundle->fresh(['items.productOffer.product', 'items.productOffer.merchant']);
+        return $this->findWithRelations($bundle->id);
     }
 
     public function reject(int $id, int $userId, string $reason): ?ProductOfferBundle
@@ -136,15 +143,33 @@ class ProductOfferBundleRepository extends Repository
             'rejection_reason' => $reason,
         ]);
 
-        return ProductOfferBundle::with(['items.productOffer.product', 'items.productOffer.merchant'])->find($id);
+        return $this->findWithRelations($id);
     }
 
     public function getByStatus(string $status): Collection
     {
-        return ProductOfferBundle::with(['items.productOffer.product', 'items.productOffer.merchant'])
+        return ProductOfferBundle::query()
+            ->with([
+                'items.productOffer.product',
+                'items.productOffer.merchant',
+                'items.product',
+                'items.product.merchant'
+            ])
             ->where('status', $status)
             ->orderBy('created_at', 'desc')
             ->get();
+    }
+
+    private function findWithRelations(int $id): ?ProductOfferBundle
+    {
+        return ProductOfferBundle::query()
+            ->with([
+                'items.productOffer.product',
+                'items.productOffer.merchant',
+                'items.product',
+                'items.product.merchant'
+            ])
+            ->find($id);
     }
 
     protected function getModelClass(): string

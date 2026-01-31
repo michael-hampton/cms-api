@@ -226,4 +226,102 @@ class ProductOfferService
 
         return $this->repository->trackClick($offerId, $memberId, $action, $ipAddress, $userAgent);
     }
+
+    /**
+     * Get offers with comprehensive search and filtering
+     */
+    public function getOffersForWeb(array $filters): array
+    {
+        $query = ProductOffer::with(['product', 'product.images', 'merchant']);
+
+        // Status filter
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        // Active filter
+        if (isset($filters['is_active'])) {
+            $isActive = filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN);
+            $query->where('is_active', $isActive);
+        }
+
+        // Search by product name or merchant name
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('product', function ($productQuery) use ($search) {
+                    $productQuery->where('name', 'LIKE', "%{$search}%");
+                })
+                    ->orWhereHas('merchant', function ($merchantQuery) use ($search) {
+                        $merchantQuery->where('name', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        // Category filter
+        if (!empty($filters['category'])) {
+            $query->whereHas('product', function ($productQuery) use ($filters) {
+                $productQuery->where('category', $filters['category']);
+            });
+        }
+
+        // Merchant filter
+        if (!empty($filters['merchant_id'])) {
+            $query->where('merchant_id', $filters['merchant_id']);
+        }
+
+        // Minimum discount filter
+        if (!empty($filters['min_discount'])) {
+            $query->where('discount_percentage', '>=', $filters['min_discount']);
+        }
+
+        // Price range filter
+        if (!empty($filters['min_price'])) {
+            $query->where('sale_price', '>=', $filters['min_price']);
+        }
+        if (!empty($filters['max_price'])) {
+            $query->where('sale_price', '<=', $filters['max_price']);
+        }
+
+        // Featured filter
+        if (!empty($filters['is_featured'])) {
+            $isFeatured = filter_var($filters['is_featured'], FILTER_VALIDATE_BOOLEAN);
+            $query->where('is_featured', $isFeatured);
+        }
+
+        // Sorting
+        $sortBy = $filters['sort_by'] ?? 'created_at';
+        $sortOrder = $filters['sort_order'] ?? 'desc';
+
+        $allowedSortFields = [
+            'created_at', 'sale_price', 'original_price',
+            'discount_percentage', 'start_date', 'end_date'
+        ];
+
+        if (in_array($sortBy, $allowedSortFields)) {
+            $query->orderBy($sortBy, $sortOrder);
+        }
+
+        // Pagination
+        $perPage = min($filters['per_page'] ?? 20, 100); // Max 100 per page
+        $page = $filters['page'] ?? 1;
+
+        $total = $query->count();
+        $offers = $query->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
+
+        return [
+            'items' => $offers->toArray(),
+            'pagination' => [
+                'current_page' => (int)$page,
+                'per_page' => (int)$perPage,
+                'total' => $total,
+                'total_pages' => ceil($total / $perPage),
+                'from' => (($page - 1) * $perPage) + 1,
+                'to' => min($page * $perPage, $total)
+            ]
+        ];
+    }
+
 }

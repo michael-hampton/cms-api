@@ -3,8 +3,10 @@
 namespace App\Tests\Unit\Services\Offers;
 
 use App\Framework\Authorization\AuthenticationService;
+use App\Models\ProductOffer;
 use App\Models\ProductOfferBundle;
 use App\Repositories\Offers\ProductOfferBundleRepository;
+use App\Repositories\Offers\ProductOfferRepository;
 use App\Services\Offers\ProductOfferBundleService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -18,6 +20,20 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
     private $repository;
     private ProductOfferBundleService $service;
     private $authenticationService;
+    private ProductOfferRepository $offerRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->authenticationService = Mockery::mock(AuthenticationService::class);
+        $this->repository = Mockery::mock(ProductOfferBundleRepository::class);
+        $this->offerRepository = Mockery::mock(ProductOfferRepository::class);
+        $this->service = new ProductOfferBundleService(
+            $this->repository,
+            $this->authenticationService,
+            $this->offerRepository
+        );
+    }
 
     public function testGetBundle(): void
     {
@@ -66,6 +82,16 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('create')
             ->once()
             ->andReturn($bundle);
+
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn(new ProductOffer(['sale_price' => 110]));
+
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->with(2)
+            ->andReturn(new ProductOffer(['sale_price' => 110]));
 
         $result = $this->service->createBundle($data);
 
@@ -261,6 +287,16 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
             ],
         ];
 
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn(new ProductOffer(['sale_price' => 110]));
+
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->with(2)
+            ->andReturn(new ProductOffer(['sale_price' => 110]));
+
         $this->repository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function ($arg) {
@@ -323,10 +359,22 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
             ],
         ];
 
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn(new ProductOffer(['sale_price' => 110]));
+
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->with(2)
+            ->andReturn(new ProductOffer(['sale_price' => 110]));
+
         $this->repository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function ($arg) {
-                return $arg['discount_percentage'] === 25;
+                return $arg['discount_percentage'] == 32
+                    && $arg['bundle_price'] == 150
+                    && $arg['total_price'] == 220;
             }))
             ->andReturn(new ProductOfferBundle($data));
 
@@ -392,10 +440,17 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
             'discount_percentage' => 22,
         ];
 
+        $this->offerRepository->shouldReceive('find')
+            ->twice()
+            ->with(1)
+            ->andReturn(new ProductOffer(['sale_price' => 45]));
+
         $this->repository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function ($arg) {
-                return $arg['discount_percentage'] === 22;
+                return $arg['discount_percentage'] == 22
+                    && $arg['bundle_price'] == 70
+                    && $arg['total_price'] == 90;
             }))
             ->andReturn(new ProductOfferBundle($data));
 
@@ -427,13 +482,120 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
         $this->service->reject(1, 1, '');
     }
 
-    protected function setUp(): void
+    public function testCreateBundleWithProductsFromSameMerchantAllowed(): void
     {
-        parent::setUp();
-        $this->authenticationService = Mockery::mock(AuthenticationService::class);
-        $this->repository = Mockery::mock(ProductOfferBundleRepository::class);
-        $this->service = new ProductOfferBundleService($this->repository, $this->authenticationService);
+        $merchant = $this->createMerchant();
+        $product1 = $this->createProduct(['merchant_id' => $merchant->id, 'price' => 100.00]);
+        $product2 = $this->createProduct(['merchant_id' => $merchant->id, 'price' => 100.00]);
+
+        $data = [
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'bundle_price' => 150.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'items' => [
+                ['product_id' => $product1->id, 'quantity' => 1],
+                ['product_id' => $product2->id, 'quantity' => 1],
+            ],
+        ];
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn(new ProductOfferBundle($data));
+
+        $bundle = $this->service->createBundle($data);
+
+        $this->assertEquals('Test Bundle', $bundle->name);
     }
+
+//    public function testCreateBundleWithProductsFromDifferentMerchantsDenied(): void
+//    {
+//        $this->service->allowMultiMerchant = false;
+//
+//        $merchant1 = $this->createMerchant();
+//        $merchant2 = $this->createMerchant();
+//        $product1 = $this->createProduct(['merchant_id' => $merchant1->id, 'price' => 100.00]);
+//        $product2 = $this->createProduct(['merchant_id' => $merchant2->id, 'price' => 100.00]);
+//
+//        $this->expectException(Exception::class);
+//        $this->expectExceptionMessage('Multi-merchant bundles are not allowed');
+//
+//        $data = [
+//            'name' => 'Test Bundle',
+//            'slug' => 'test-bundle',
+//            'bundle_price' => 150.00,
+//            'start_date' => date('Y-m-d H:i:s'),
+//            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+//            'items' => [
+//                ['product_id' => $product1->id, 'quantity' => 1],
+//                ['product_id' => $product2->id, 'quantity' => 1],
+//            ],
+//        ];
+//
+//        $this->service->createBundle($data);
+//
+//        $this->service->allowMultiMerchant = true;
+//    }
+
+    public function testCreateBundleWithProductsFromDifferentMerchantsAllowed(): void
+    {
+        $merchant1 = $this->createMerchant();
+        $merchant2 = $this->createMerchant();
+        $product1 = $this->createProduct(['merchant_id' => $merchant1->id, 'price' => 100.00]);
+        $product2 = $this->createProduct(['merchant_id' => $merchant2->id, 'price' => 100.00]);
+
+        $data = [
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'bundle_price' => 150.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'items' => [
+                ['product_id' => $product1->id, 'quantity' => 1],
+                ['product_id' => $product2->id, 'quantity' => 1],
+            ],
+        ];
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->andReturn(new ProductOfferBundle($data));
+
+        $bundle = $this->service->createBundle($data);
+
+        $this->assertEquals('Test Bundle', $bundle->name);
+    }
+
+    public function testCalculateBundlePricingWithProducts(): void
+    {
+        $product1 = $this->createProduct(['price' => 100.00]);
+        $product2 = $this->createProduct(['price' => 50.00]);
+
+        $data = [
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'bundle_price' => 120.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'items' => [
+                ['product_id' => $product1->id, 'quantity' => 1],
+                ['product_id' => $product2->id, 'quantity' => 1],
+            ],
+        ];
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($arg) {
+                return $arg['total_price'] === 150.00
+                    && $arg['discount_percentage'] === 20; // (150-120)/150 * 100
+            }))
+            ->andReturn(new ProductOfferBundle($data));
+
+        $bundle = $this->service->createBundle($data);
+
+        $this->assertNotNull($bundle);
+    }
+
 
     protected function tearDown(): void
     {

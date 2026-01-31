@@ -4,15 +4,19 @@ namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Product;
+use App\Models\ProductOffer;
+use App\Models\ProductOfferBundle;
 use App\Repositories\Product\ProductRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\ProductService;
 use App\Services\ReviewService;
 use App\Services\Shopping\WishlistService;
+use Exception;
 
 class ProductDetailController extends Controller
 {
@@ -120,6 +124,55 @@ class ProductDetailController extends Controller
             'member' => $user
         ]);
     }
+
+    public function getProductOffers(int $productId, string $siteName): JsonResponse
+    {
+        try {
+            $offers = ProductOffer::with(['merchant'])
+                ->where('product_id', $productId)
+                ->where('status', 'published')
+                ->where('is_active', true)
+                ->orderBy('sale_price', 'asc')
+                ->get();
+
+            return $this->jsonResponse([
+                'success' => true,
+                'offers' => $offers->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get bundles containing a specific product
+     */
+    public function getProductBundles(int $productId, string $siteName): JsonResponse
+    {
+        try {
+            $bundles = ProductOfferBundle::with([
+                'items.product',
+                'items.productOffer.product'
+            ])
+                ->whereHas('items', function ($query) use ($productId) {
+                    $query->where('product_id', $productId)
+                        ->orWhereHas('productOffer', function ($q) use ($productId) {
+                            $q->where('product_id', $productId);
+                        });
+                })
+                ->where('status', 'published')
+                ->where('is_active', true)
+                ->get();
+
+            return $this->jsonResponse([
+                'success' => true,
+                'bundles' => $bundles->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
 
     protected function getMenu(): array
     {

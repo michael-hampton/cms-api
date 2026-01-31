@@ -4,12 +4,14 @@ namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Services\Billing\OrderService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
+use Exception;
 
 class CartController extends Controller
 {
@@ -243,5 +245,51 @@ class CartController extends Controller
             'count' => $this->cartService->getCount(),
             'total' => $this->cartService->getTotal(),
         ]));
+    }
+
+    public function addOffer(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $offerId = $request->input('product_offer_id');
+            $quantity = $request->input('quantity', 1);
+
+            if (!$offerId) {
+                return $this->errorResponse('Offer ID is required', 422);
+            }
+
+            $cartItem = $this->cartService->addOfferToCart($offerId, $quantity);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Offer added to cart',
+                'cart_item' => $cartItem
+            ], 201);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Add bundle to cart
+     */
+    public function addBundle(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $bundleId = $request->input('bundle_id');
+
+            if (!$bundleId) {
+                return $this->errorResponse('Bundle ID is required', 422);
+            }
+
+            $cartItems = $this->cartService->addBundleToCart($bundleId);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Bundle added to cart',
+                'cart_items' => $cartItems
+            ], 201);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 }

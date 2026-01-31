@@ -32,11 +32,24 @@ class ProductOfferBundleResource extends JsonResource
             'created_by' => $this->getAttribute('created_by'),
             'updated_by' => $this->getAttribute('updated_by'),
             'items' => collect($this->getAttribute('items') ?? [])?->map(function ($item) {
-                $product = !empty($item['productOffer']['product_id']) ? Product::find($item['productOffer']['product_id']) : null;
-                $merchant = !empty($item['productOffer']['merchant_id']) ? Merchant::find($item['productOffer']['merchant_id']) : null;
+
+                $productId =
+                    $item['product_id']
+                    ?? $item['productOffer']['product_id']
+                    ?? null;
+
+                $merchantId = $item['productOffer']['merchant_id'] ?? null;
+
+                $product = $productId ? Product::find($productId) : null;
+
+                $merchant = $merchantId
+                    ? Merchant::find($merchantId)
+                    : ($product?->merchants->first() ?? null);
+
                 return [
                     'id' => $item['id'],
-                    'product_offer_id' => $item['product_offer_id'],
+                    'product_offer_id' => $item['product_offer_id'] ?? null,
+                    'product_id' => $productId ?? null,
                     'quantity' => $item['quantity'],
                     'product_offer' => $item['productOffer'] ? [
                         'id' => $item['productOffer']['id'],
@@ -50,6 +63,15 @@ class ProductOfferBundleResource extends JsonResource
                             'id' => $merchant->id,
                             'name' => $merchant->name,
                         ] : null,
+                    ] : null,
+                    'product' => $product ? [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'price' => $product->price,
+                    ] : null,
+                    'merchant' => $merchant ? [
+                        'id' => $merchant->id,
+                        'name' => $merchant->name,
                     ] : null,
                 ];
             })->toArray(),
