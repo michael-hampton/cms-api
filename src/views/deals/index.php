@@ -14,10 +14,14 @@
 
     <main class="deals-page">
         <div class="container">
+
             <!-- Hero Section with Carousel -->
             <section class="deals-hero">
                  @include ('components/deals-carousel')
             </section>
+
+            @include('components/offers-carousel', ['offers' => $offers ?? []])
+            @include('components/bundles-carousel', ['bundles' => $bundles ?? []])
 
             @include ('components/deal-alert-subscribe')
 

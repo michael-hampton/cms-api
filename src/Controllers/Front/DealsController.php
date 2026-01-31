@@ -18,6 +18,8 @@ use App\Services\Cms\MenuRenderer;
 use App\Services\Offers\DealAlertService;
 use App\Services\Offers\DealsService;
 use App\Services\Offers\PriceAlertService;
+use App\Services\Offers\ProductOfferBundleService;
+use App\Services\Offers\ProductOfferService;
 
 class DealsController extends Controller
 {
@@ -28,7 +30,9 @@ class DealsController extends Controller
         private readonly CategoryRepository $categoryRepository,
         private readonly BrandRepository $brandRepository,
         private readonly ProductRepository     $productRepository,
-        private readonly ProductViewRepository $productViewRepository
+        private readonly ProductViewRepository     $productViewRepository,
+        private readonly ProductOfferService       $offerService,
+        private readonly ProductOfferBundleService $bundleService
     ) {
         parent::__construct();
     }
@@ -52,6 +56,9 @@ class DealsController extends Controller
             }
             $categoryCounts[$categoryId]++;
         }
+
+        $offers = $this->offerService->getActiveOffers();
+        $bundles = $this->bundleService->getActiveBundles();
 
         // Alternative approach using raw SQL if the above doesn't work
         // $db = Database::getInstance();
@@ -120,6 +127,8 @@ class DealsController extends Controller
             'specificationGroups' => $specificationGroups->toArray(),
             'deals' => $deals,
             'todaysDeals' => $this->dealsService->getTodaysDeals(10),
+            'offers' => $offers,
+            'bundles' => $bundles
         ]);
     }
 

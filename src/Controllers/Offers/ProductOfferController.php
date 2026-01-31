@@ -243,38 +243,4 @@ class ProductOfferController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
-
-    /**
-     * Search product offers
-     * GET /api/product-offers/search
-     */
-    public function searchOffers(Request $request, string $siteName): JsonResponse
-    {
-        try {
-            $filters = [
-                'search' => $request->get('q') ?? $request->get('search'),
-                'status' => 'published',
-                'is_active' => true,
-                'category' => $request->get('category'),
-                'merchant_id' => $request->get('merchant_id'),
-                'min_discount' => $request->get('min_discount'),
-                'min_price' => $request->get('min_price'),
-                'max_price' => $request->get('max_price'),
-                'sort_by' => $request->get('sort_by', 'created_at'),
-                'sort_order' => $request->get('sort_order', 'desc'),
-                'per_page' => $request->get('per_page', 20),
-                'page' => $request->get('page', 1),
-            ];
-
-            $results = $this->offerService->getOffersForWeb($filters);
-
-            return $this->jsonResponse([
-                'success' => true,
-                'offers' => $results
-            ]);
-        } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
-        }
-    }
-
 }

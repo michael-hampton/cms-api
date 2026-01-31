@@ -249,9 +249,7 @@ class ProductOfferBundleService
     public function getBundlesForWeb(array $filters): array
     {
         $query = ProductOfferBundle::with([
-            'items.product',
-            'items.product.merchant',
-            'items.product.images',
+            'items',
             'items.productOffer.product',
             'items.productOffer.product.images',
             'items.productOffer.merchant'
@@ -360,11 +358,26 @@ class ProductOfferBundleService
             ->limit($perPage)
             ->get();
 
+
         // Calculate savings for each bundle
         $bundles = $bundles->map(function ($bundle) {
             $bundle->savings = $bundle->total_price - $bundle->bundle_price;
             return $bundle;
         });
+
+        foreach ($bundles as $bundle) {
+            $items = $bundle->items;
+
+            $products = Product::with(['category', 'merchants', 'merchants.merchant', 'images'])
+                ->whereIn('id', $items->pluck('product_id')->unique())
+                ->get()
+                ->keyBy('id');
+
+            $bundle->items = $items->map(function ($item) use ($products) {
+                $item->product = $products->get($item->product_id)->toArray();
+                return $item;
+            });
+        }
 
         return [
             'items' => $bundles->toArray(),
@@ -377,5 +390,55 @@ class ProductOfferBundleService
                 'to' => min($page * $perPage, $total)
             ]
         ];
+    }
+
+    public function getActiveBundlesForWeb(int $limit = 10): array
+    {
+        $bundles = $this->repository->getActiveBundles()->take($limit);
+
+        return $bundles->map(function ($bundle) {
+            $items = $bundle->items;
+
+            // Get merchant info from bundle items
+            $merchants = [];
+            foreach ($items as $item) {
+                $merchant = $item->getEffectiveMerchant();
+                if ($merchant && !isset($merchants[$merchant->id])) {
+                    $merchants[$merchant->id] = $merchant->name;
+                }
+            }
+
+            $isMultiMerchant = count($merchants) > 1;
+
+            // Get image from first product
+            $firstProduct = $items->first()?->getEffectiveProduct();
+
+            return [
+                'bundle_id' => $bundle->id,
+                'name' => $bundle->name,
+                'slug' => $bundle->slug,
+                'description' => $bundle->description,
+                'image' => $firstProduct?->main_image_url,
+                'total_price' => $bundle->total_price,
+                'bundle_price' => $bundle->bundle_price,
+                'savings' => $bundle->calculateSavings(),
+                'discount_percentage' => $bundle->discount_percentage,
+                'item_count' => $items->count(),
+                'is_multi_merchant' => $isMultiMerchant,
+                'merchants' => array_values($merchants),
+                'in_stock' => $this->checkBundleStock($items),
+            ];
+        })->toArray();
+    }
+
+    private function checkBundleStock($items): bool
+    {
+        foreach ($items as $item) {
+            $product = $item->getEffectiveProduct();
+            if (!$product || !($product->in_stock ?? true)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

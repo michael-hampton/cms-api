@@ -10,7 +10,9 @@ class Wishlist extends Model
         'session_id',
         'user_id',
         'product_id',
-        'site_id'
+        'site_id',
+        'item_type',
+        'item_id'
     ];
 
     protected $casts = [
@@ -26,5 +28,30 @@ class Wishlist extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getItemType(): string
+    {
+        return $this->item_type ?? 'product';
+    }
+
+    public function isOffer(): bool
+    {
+        return $this->item_type === 'offer';
+    }
+
+    public function isBundle(): bool
+    {
+        return $this->item_type === 'bundle';
+    }
+
+    public function offer()
+    {
+        return $this->belongsTo(ProductOffer::class, 'item_id');
+    }
+
+    public function bundle()
+    {
+        return $this->belongsTo(ProductOfferBundle::class, 'item_id');
     }
 }

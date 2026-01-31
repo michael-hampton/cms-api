@@ -21,7 +21,7 @@ class CartItem extends Model
     protected $casts = [
         'quantity' => 'integer',
         'price' => 'float',
-        'options' => 'json',
+        'options' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'subscription_plan_id' => 'integer',
@@ -50,5 +50,39 @@ class CartItem extends Model
     public function isSubscription(): bool
     {
         return $this->subscription_plan_id !== null;
+    }
+
+    public function getItemType(): string
+    {
+        $options = $this->options ?? [];
+        return $options['type'] ?? 'product';
+    }
+
+    public function isOffer(): bool
+    {
+        return $this->getItemType() === 'offer';
+    }
+
+    public function isBundle(): bool
+    {
+        return $this->getItemType() === 'bundle';
+    }
+
+    public function getBundleId(): ?int
+    {
+        $options = $this->options ?? [];
+        return $options['bundle_id'] ?? null;
+    }
+
+    public function getOfferId(): ?int
+    {
+        $options = $this->options ?? [];
+        return $options['offer_id'] ?? null;
+    }
+
+    public function getMerchantId(): ?int
+    {
+        $options = $this->options ?? [];
+        return $options['merchant_id'] ?? null;
     }
 }

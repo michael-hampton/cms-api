@@ -5,6 +5,8 @@ namespace App\Services\Shopping;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Session\Session;
 use App\Models\Product;
+use App\Repositories\Offers\ProductOfferBundleRepository;
+use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Shopping\WishlistRepository;
 
@@ -12,7 +14,9 @@ class WishlistService
 {
     public function __construct(
         private readonly WishlistRepository $wishlistRepository,
-        private readonly ProductRepository $productRepository
+        private readonly ProductRepository            $productRepository,
+        private readonly ProductOfferBundleRepository $productOfferBundleRepository,
+        private readonly ProductOfferRepository       $productOfferRepository
     ) {}
 
     protected function getSessionId(): string
@@ -108,5 +112,63 @@ class WishlistService
         $authId = MemberAuth::id();
         // Return null for guest users (don't use default value of 1)
         return $authId ?: null;
+    }
+
+    public function addOffer(int $offerId): array
+    {
+        $offer = $this->productOfferRepository->find($offerId);
+
+        if (!$offer || !$offer->isCurrentlyActive()) {
+            return ['success' => false, 'message' => 'Offer not available'];
+        }
+
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        $exists = $this->wishlistRepository->getOffers($offerId, $userId, $sessionId)->isNotEmpty();
+
+        if ($exists) {
+            return ['success' => false, 'message' => 'Offer already in wishlist'];
+        }
+
+        $this->wishlistRepository->create([
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'product_id' => $offer->product_id,
+            'item_type' => 'offer',
+            'item_id' => $offerId,
+            'site_id' => $offer->product->site_id,
+        ]);
+
+        return ['success' => true, 'message' => 'Offer added to wishlist'];
+    }
+
+    public function addBundle(int $bundleId): array
+    {
+        $bundle = $this->productOfferBundleRepository->find($bundleId);
+
+        if (!$bundle || !$bundle->isCurrentlyActive()) {
+            return ['success' => false, 'message' => 'Bundle not available'];
+        }
+
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        $exists = $this->wishlistRepository->getBundles($bundleId, $userId, $sessionId)->isNotEmpty();
+
+        if ($exists) {
+            return ['success' => false, 'message' => 'Bundle already in wishlist'];
+        }
+
+        $this->wishlistRepository->create([
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'product_id' => null,
+            'item_type' => 'bundle',
+            'item_id' => $bundleId,
+            'site_id' => $bundle->items->first()?->getEffectiveProduct()->site_id ?? 1,
+        ]);
+
+        return ['success' => true, 'message' => 'Bundle added to wishlist'];
     }
 }

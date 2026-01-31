@@ -1,8 +1,5 @@
 <?php
 // views/product-offers/index.php
-
-$pageTitle = 'Product Offers';
-require_once __DIR__ . '/../layouts/header.php';
 ?>
 
     <div class="offers-page">
@@ -489,10 +486,10 @@ require_once __DIR__ . '/../layouts/header.php';
                 showLoading();
 
                 try {
-                    const response = await fetch('/api/product-offers?status=published&is_active=true');
+                    const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/product-offers/search?status=published&is_active=true');
                     const data = await response.json();
 
-                    allOffers = data.offers.items;
+                    allOffers = data.data.offers.items;
 
                     // Extract categories
                     allOffers.forEach(offer => {
@@ -615,14 +612,14 @@ require_once __DIR__ . '/../layouts/header.php';
             <div class="offer-card" data-offer-id="${offer.id}">
                 <div style="position: relative;">
                     <img src="${imageUrl}" alt="${offer.product?.name || 'Product'}" class="offer-image">
-                    <div class="offer-badge">${offer.discount_percentage}% OFF</div>
+                    <div class="offer-badge">${offer.product.discount_percentage}% OFF</div>
                 </div>
                 <div class="offer-content">
-                    <div class="offer-merchant">${offer.merchant?.name || 'Unknown Merchant'}</div>
+                    <div class="offer-merchant">${offer.merchant?.name || offer.product?.merchant?.name || 'Unknown Merchant'}</div>
                     <h3 class="offer-name">${offer.product?.name || 'Unnamed Product'}</h3>
                     <div class="offer-pricing">
                         <span class="offer-price">$${offer.sale_price.toFixed(2)}</span>
-                        <span class="offer-original-price">$${offer.original_price.toFixed(2)}</span>
+                        <span class="offer-original-price">$${offer.product.price.toFixed(2)}</span>
                     </div>
                     <div class="offer-actions">
                         <button class="btn-add-to-cart" data-offer-id="${offer.id}">
@@ -831,5 +828,3 @@ require_once __DIR__ . '/../layouts/header.php';
             init();
         })();
     </script>
-
-<?php require_once __DIR__ . '/../layouts/footer.php'; ?>

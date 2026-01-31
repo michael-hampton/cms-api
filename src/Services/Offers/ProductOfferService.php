@@ -232,7 +232,7 @@ class ProductOfferService
      */
     public function getOffersForWeb(array $filters): array
     {
-        $query = ProductOffer::with(['product', 'product.images', 'merchant']);
+        $query = ProductOffer::with(['product', 'product.images', 'merchant', 'product.category']);
 
         // Status filter
         if (!empty($filters['status'])) {
@@ -322,6 +322,32 @@ class ProductOfferService
                 'to' => min($page * $perPage, $total)
             ]
         ];
+    }
+
+    public function getActiveOffers(int $limit = 10): array
+    {
+        $offers = $this->repository->all()
+            ->filter(fn($offer) => $offer->isCurrentlyActive())
+            ->take($limit);
+
+        return $offers->map(function ($offer) {
+            $product = $offer->product;
+
+            return [
+                'offer_id' => $offer->id,
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_slug' => $product->slug,
+                'product_image' => $product->main_image_url,
+                'original_price' => $product->price,
+                'offer_price' => $offer->sale_price,
+                'discount_percentage' => $offer->discount_percentage,
+                'start_date' => $offer->start_date,
+                'end_date' => $offer->end_date,
+                'in_stock' => $product->in_stock ?? true,
+                'merchant_name' => $offer->merchant?->name,
+            ];
+        })->toArray();
     }
 
 }

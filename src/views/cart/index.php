@@ -416,7 +416,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Toast */
@@ -561,137 +563,226 @@
             <div class="spinner"></div>
             <p>Loading your cart...</p>
         </div>
-            <div id="empty-container" class="empty-cart" style="display: <?php echo empty($items) ? 'block' : 'none'; ?>;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-                <h3>Your cart is empty</h3>
-                <p>Add some products to get started</p>
-                <button class="btn btn-primary" onclick="window.location.href='/shop'" style="max-width: 300px; margin: 0 auto;">
+        <div id="empty-container" class="empty-cart" style="display: <?php echo empty($items) ? 'block' : 'none'; ?>;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <h3>Your cart is empty</h3>
+            <p>Add some products to get started</p>
+            <button class="btn btn-primary" onclick="window.location.href='/shop'"
+                    style="max-width: 300px; margin: 0 auto;">
+                Continue Shopping
+            </button>
+        </div>
+
+        <div id="cart-container" class="cart-layout" style="display: <?php echo empty($items) ? 'none' : 'grid'; ?>;">
+            <div class="cart-items">
+                <div class="cart-header">
+                    <h2>Cart Items (<span id="items-count"><?= count($items) ?></span>)</h2>
+                    <button class="clear-cart-btn" onclick="clearCart()">Clear Cart</button>
+                </div>
+                <div id="cart-items-list">
+                    <?php
+                    // Group items by merchant
+                    $itemsByMerchant = [];
+                    foreach ($items as $item) {
+                        $merchantId = $item['options']['merchant_id'] ?? 0;
+                        $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
+
+                        if (!isset($itemsByMerchant[$merchantId])) {
+                            $itemsByMerchant[$merchantId] = [
+                                    'name' => $merchantName,
+                                    'items' => []
+                            ];
+                        }
+                        $itemsByMerchant[$merchantId]['items'][] = $item;
+                    }
+                    ?>
+
+
+                    <?php foreach ($itemsByMerchant as $merchantId => $merchantData): ?>
+                        <div class="merchant-group" style="margin-bottom: 2rem;">
+                            <div class="merchant-header"
+                                 style="padding: 1rem; background: #f8fafc; border-radius: 0.5rem; margin-bottom: 1rem;">
+                                <h3 style="font-size: 1.125rem; font-weight: 600; color: #1e293b;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         style="display: inline-block; vertical-align: middle; margin-right: 0.5rem;">
+                                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                    </svg>
+                                    <?= htmlspecialchars($merchantData['name']) ?>
+                                </h3>
+                                <p style="font-size: 0.875rem; color: #64748b; margin-top: 0.25rem;">
+                                    <?= count($merchantData['items']) ?> item(s)
+                                </p>
+                            </div>
+                            <?php foreach ($items as $item): ?>
+                                <div class="cart-item" data-item-id="<?= $item['id'] ?>">
+                                    <?php if (!empty($item['subscription_plan_id'])): ?>
+                                        <!-- Subscription item -->
+                                        <?php
+                                        $options = $item['options'];
+                                        $deliveryType = $options['delivery_type'] ?? 'digital';
+                                        $planName = $options['plan_name'] ?? 'Subscription';
+                                        ?>
+                                        <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
+                                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor">
+                                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="item-details">
+                                            <div class="item-name"><?= htmlspecialchars($planName) ?></div>
+                                            <div class="item-meta">
+                                                <?= ucfirst($deliveryType) ?> Delivery
+                                                <?php if (isset($options['billing_period'])): ?>
+                                                    • <?= htmlspecialchars($options['billing_period']) ?>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="item-price">
+                                                <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
+                                            </div>
+                                        </div>
+                                        <div class="item-actions">
+                                            <div class="item-subtotal">$<?= number_format($item['subtotal'], 2) ?></div>
+                                            <button class="remove-btn" onclick="removeItem(<?= $item['id'] ?>)">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor">
+                                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    <?php else: ?>
+                                        <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                             alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                             class="item-image">
+                                        <div class="item-details">
+                                            <a href="/shop/details/<?= htmlspecialchars($item['product_slug']) ?>"
+                                               class="item-name">
+                                                <?= htmlspecialchars($item['product_name']) ?>
+                                            </a>
+                                            <div class="item-price">
+                                                <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
+                                            </div>
+                                            <div class="quantity-controls">
+                                                <button class="qty-btn"
+                                                        onclick="updateQuantity(<?= $item['id'] ?>, <?= $item['quantity'] - 1 ?>)">
+                                                    -
+                                                </button>
+                                                <input type="number" class="qty-input"
+                                                       value="<?= $item['quantity'] ?>" min="1"
+                                                       onchange="updateQuantity(<?= $item['id'] ?>, this.value)"/>
+                                                <button class="qty-btn"
+                                                        onclick="updateQuantity(<?= $item['id'] ?>, <?= $item['quantity'] + 1 ?>)">
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="item-actions">
+                                            <div class="item-subtotal">
+                                                $<?= number_format($item['subtotal'], 2) ?></div>
+                                            <button class="remove-btn" onclick="removeItem(<?= $item['id'] ?>)">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor">
+                                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="cart-summary">
+                <h3>Order Summary</h3>
+                <?php
+                $subtotal = $total;
+                $tax = $subtotal * 0.1;
+                $finalTotal = $subtotal + $tax;
+
+                $merchantTotals = [];
+                foreach ($itemsByMerchant as $merchantId => $merchantData) {
+                    $total = array_sum(array_column($merchantData['items'], 'subtotal'));
+                    $merchantTotals[$merchantId] = [
+                            'name' => $merchantData['name'],
+                            'total' => $total
+                    ];
+                }
+                ?>
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
+                </div>
+                <div class="summary-row">
+                    <span>Shipping:</span>
+                    <span id="shipping">Free</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tax:</span>
+                    <span id="tax">$<?= number_format($tax, 2) ?></span>
+                </div>
+
+                <?php foreach ($merchantTotals as $merchantTotal): ?>
+                    <div class="summary-row" style="font-size: 0.875rem; color: #64748b;">
+                        <span><?= htmlspecialchars($merchantTotal['name']) ?>:</span>
+                        <span>$<?= number_format($merchantTotal['total'], 2) ?></span>
+                    </div>
+                <?php endforeach; ?>
+
+                <div class="summary-row total">
+                    <span>Total:</span>
+                    <span id="total">$<?= number_format($finalTotal, 2) ?></span>
+                </div>
+
+                <div class="voucher-section"
+                     style="margin: 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Have a voucher code?</h4>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="voucher-input" placeholder="Enter code"
+                               style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
+                        <button onclick="applyVoucher(<?= $total ?>)" class="btn btn-secondary"
+                                style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
+                        </button>
+                    </div>
+                    <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                    <div id="applied-voucher"
+                         style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong id="voucher-code-display" style="color: #065f46;"></strong>
+                                <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
+                                    Discount: <span id="voucher-discount-display"></span>
+                                </p>
+                            </div>
+                            <button onclick="removeVoucher()"
+                                    style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
+                    <span>Discount:</span>
+                    <span id="discount-amount">-$0.00</span>
+                </div>
+
+                <button class="btn btn-primary" onclick="proceedToCheckout()">
+                    Proceed to Checkout
+                </button>
+                <button class="btn btn-secondary" onclick="window.location.href='/shop'">
                     Continue Shopping
                 </button>
             </div>
-
-            <div id="cart-container" class="cart-layout" style="display: <?php echo empty($items) ? 'none' : 'grid'; ?>;">
-                <div class="cart-items">
-                    <div class="cart-header">
-                        <h2>Cart Items (<span id="items-count"><?= count($items) ?></span>)</h2>
-                        <button class="clear-cart-btn" onclick="clearCart()">Clear Cart</button>
-                    </div>
-                    <div id="cart-items-list">
-                        <?php foreach ($items as $item): ?>
-                            <div class="cart-item" data-item-id="<?= $item['id'] ?>">
-                                <?php if (!empty($item['subscription_plan_id'])): ?>
-                                    <!-- Subscription item -->
-                                    <?php
-                                    $options = $item['options'];
-                                    $deliveryType = $options['delivery_type'] ?? 'digital';
-                                    $planName = $options['plan_name'] ?? 'Subscription';
-                                    ?>
-                                    <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
-                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
-                                             stroke="currentColor">
-                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                        </svg>
-                                    </div>
-                                <div class="item-details">
-                                    <div class="item-name"><?= htmlspecialchars($planName) ?></div>
-                                    <div class="item-meta">
-                                        <?= ucfirst($deliveryType) ?> Delivery
-                                        <?php if (isset($options['billing_period'])): ?>
-                                            • <?= htmlspecialchars($options['billing_period']) ?>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="item-price">
-                                        <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
-                                    </div>
-                                </div>
-                                <div class="item-actions">
-                                    <div class="item-subtotal">$<?= number_format($item['subtotal'], 2) ?></div>
-                                    <button class="remove-btn" onclick="removeItem(<?= $item['id'] ?>)">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <?php else: ?>
-                                    <!-- Regular product item - existing code -->
-                                    <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
-                                         alt="<?= htmlspecialchars($item['product_name']) ?>"
-                                         class="item-image">
-                                    <!-- ... rest of existing product item code ... -->
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <div class="cart-summary">
-                    <h3>Order Summary</h3>
-                    <?php
-                    $subtotal = $total;
-                    $tax = $subtotal * 0.1;
-                    $finalTotal = $subtotal + $tax;
-                    ?>
-                    <div class="summary-row">
-                        <span>Subtotal:</span>
-                        <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Shipping:</span>
-                        <span id="shipping">Free</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tax:</span>
-                        <span id="tax">$<?= number_format($tax, 2) ?></span>
-                    </div>
-                    <div class="summary-row total">
-                        <span>Total:</span>
-                        <span id="total">$<?= number_format($finalTotal, 2) ?></span>
-                    </div>
-
-                    <div class="voucher-section" style="margin: 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-                        <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Have a voucher code?</h4>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" id="voucher-input" placeholder="Enter code"
-                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
-                            <button onclick="applyVoucher(<?= $total ?>)" class="btn btn-secondary"
-                                    style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply</button>
-                        </div>
-                        <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
-                        <div id="applied-voucher" style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <strong id="voucher-code-display" style="color: #065f46;"></strong>
-                                    <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
-                                        Discount: <span id="voucher-discount-display"></span>
-                                    </p>
-                                </div>
-                                <button onclick="removeVoucher()" style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
-                        <span>Discount:</span>
-                        <span id="discount-amount">-$0.00</span>
-                    </div>
-
-                    <button class="btn btn-primary" onclick="proceedToCheckout()">
-                        Proceed to Checkout
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/shop'">
-                        Continue Shopping
-                    </button>
-                </div>
-            </div>
+        </div>
     </div>
 </main>
 
@@ -815,7 +906,7 @@
         try {
             const response = await fetch(`${API_BASE}/vouchers/validate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     code: code,
                     order_value: cartData.total
@@ -866,8 +957,8 @@
         try {
             const response = await fetch(`${API_BASE}/cart/${itemId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ quantity })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({quantity})
             });
 
             const data = await response.json();
@@ -943,7 +1034,7 @@
         try {
             const response = await fetch(`${API_BASE}/wishlist`);
             const data = await response.json();
-            document.getElementById('wishlist-count').textContent = data.data.count || 0;
+            document.getElementById('wishlist-count').textContent = data.data?.count || 0;
         } catch (error) {
             console.error('Error loading wishlist count:', error);
         }

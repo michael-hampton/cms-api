@@ -8,6 +8,7 @@ use App\Controllers\EventController;
 use App\Controllers\FaqController;
 use App\Controllers\Front\AuthorViewController;
 use App\Controllers\Front\BrandPageController;
+use App\Controllers\Front\BundleListController;
 use App\Controllers\Front\BuyingGuideController;
 use App\Controllers\Front\CartController;
 use App\Controllers\Front\CategoryPageController;
@@ -15,6 +16,7 @@ use App\Controllers\Front\CommentController;
 use App\Controllers\Front\ContentController;
 use App\Controllers\Front\DealsController;
 use App\Controllers\Front\EstateWebsiteController;
+use App\Controllers\Front\OfferListController;
 use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\ProductDetailController;
 use App\Controllers\Front\ProductListController;
@@ -80,6 +82,17 @@ $router->get('/pages/{id}', WebPageController::class, 'show');
 $router->get('/pages/{id}/edit', WebPageController::class, 'edit');
 $router->put('/pages/{id}', WebPageController::class, 'update');
 $router->delete('/pages/{id}', WebPageController::class, 'destroy');
+
+$router->get('/{site}/offers', [OfferListController::class, 'index']);
+$router->get('/{site}/offers/{id}', [OfferListController::class, 'show']);
+$router->get('{site}/product-offers/search', [OfferListController::class, 'search']);
+
+
+// Bundles Routes
+$router->get('/{site}/bundles', [BundleListController::class, 'indexPage']);
+$router->get('/{site}/bundles/{id}', [BundleListController::class, 'showPage']);
+$router->get('/{site}/bundles/search', [BundleListController::class, 'searchBundles']);
+
 
 // Block routes
 $router->get('/blocks/{id}', BlockController::class, 'show');

@@ -64,4 +64,40 @@ class WishlistController extends Controller
         return $this->view('wishlist/index', $wishlistData);
     }
 
+    public function addOffer(Request $request, string $site)
+    {
+        $offerId = $request->input('offer_id');
+
+        if (!$offerId) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Offer ID required'
+            ], 400);
+        }
+
+        $result = $this->wishlistService->addOffer($offerId);
+
+        return $this->resourceResponse(array_merge($result, [
+            'count' => $this->wishlistService->getCount(),
+        ]));
+    }
+
+    public function addBundle(Request $request, string $site)
+    {
+        $bundleId = $request->input('bundle_id');
+
+        if (!$bundleId) {
+            return $this->resourceResponse([
+                'success' => false,
+                'message' => 'Bundle ID required'
+            ], 400);
+        }
+
+        $result = $this->wishlistService->addBundle($bundleId);
+
+        return $this->resourceResponse(array_merge($result, [
+            'count' => $this->wishlistService->getCount(),
+        ]));
+    }
+
 }

@@ -66,4 +66,20 @@ class WishlistRepository extends Repository
 
         return $query->count();
     }
+
+    public function getBundles(int $bundleId, ?int $userId = null, ?string $sessionId = null): Collection
+    {
+        return $this->model->where('item_type', 'bundle')
+            ->where('item_id', $bundleId)
+            ->where($userId ? 'user_id' : 'session_id', $userId ?? $sessionId)
+            ->get();
+    }
+
+    public function getOffers(int $offerId, ?int $userId = null, ?string $sessionId = null): Collection
+    {
+        return $this->model->where('item_type', 'offer')
+            ->where('item_id', $offerId)
+            ->where($userId ? 'user_id' : 'session_id', $userId ?? $sessionId)
+            ->get();
+    }
 }

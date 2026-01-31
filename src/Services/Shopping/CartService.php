@@ -3,6 +3,8 @@
 namespace App\Services\Shopping;
 
 use App\Framework\Session\Session;
+use App\Repositories\Offers\ProductOfferBundleRepository;
+use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -13,6 +15,8 @@ class CartService
         private readonly CartRepository $cartRepository,
         private readonly ProductRepository          $productRepository,
         private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
+        private readonly ProductOfferRepository       $offerRepository,
+        private readonly ProductOfferBundleRepository $bundleRepository
     ) {}
 
     protected function getSessionId(): string
@@ -32,7 +36,8 @@ class CartService
 
         return $items->map(function($item) {
             $product = $item->product;
-            return [
+
+            $itemData = [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'product_name' => $product->name ?? 'Unknown',
@@ -42,8 +47,21 @@ class CartService
                 'quantity' => $item->quantity,
                 'subtotal' => $item->subtotal,
                 'options' => $item->options,
-                'subscription_plan_id' => $item->subscription_plan_id,
+                'item_type' => $item->getItemType(),
+                'merchant_id' => $item->getMerchantId(),
             ];
+
+            if ($item->isOffer()) {
+                $itemData['offer_id'] = $item->getOfferId();
+                $itemData['badge'] = 'Limited-time offer';
+            }
+
+            if ($item->isBundle()) {
+                $itemData['bundle_id'] = $item->getBundleId();
+                $itemData['badge'] = 'Bundle deal';
+            }
+
+            return $itemData;
         })->toArray();
     }
 
@@ -55,12 +73,18 @@ class CartService
             return ['success' => false, 'message' => 'Product not found or inactive'];
         }
 
-        if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
-            return ['success' => false, 'message' => 'Insufficient stock'];
-        }
-
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
+
+        // Check for conflicting promotions
+        $existingItems = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+
+        foreach ($existingItems as $existingItem) {
+            if ($existingItem->product_id === $productId &&
+                ($existingItem->isOffer() || $existingItem->isBundle())) {
+                return ['success' => false, 'message' => 'Product already in cart with a promotion'];
+            }
+        }
 
         $price = $product->sale_price > 0 ? $product->sale_price : $product->price;
 
@@ -220,6 +244,99 @@ class CartService
         return [
             'success' => true,
             'message' => 'Subscription added to cart'
+        ];
+    }
+
+    public function addOfferToCart(int $offerId, int $quantity = 1): array
+    {
+        $offer = $this->offerRepository->find($offerId);
+
+        if (!$offer || !$offer->isCurrentlyActive()) {
+            return ['success' => false, 'message' => 'Offer not available'];
+        }
+
+        $product = $offer->product;
+
+        if (!$product || !$product->is_active) {
+            return ['success' => false, 'message' => 'Product not available'];
+        }
+
+        // Check if product already has an offer in cart
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        $existingItem = $this->cartRepository->findItemByProduct($product->id, $userId, $sessionId);
+
+        if ($existingItem) {
+            return ['success' => false, 'message' => 'Product already in cart'];
+        }
+
+        $cartItem = $this->cartRepository->create([
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+            'price' => $offer->sale_price,
+            'subtotal' => $offer->sale_price * $quantity,
+            'options' => json_encode([
+                'type' => 'offer',
+                'offer_id' => $offerId,
+                'merchant_id' => $offer->merchant_id,
+            ]),
+            'site_id' => $product->site_id,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Offer added to cart',
+            'cart_item' => $cartItem
+        ];
+    }
+
+    public function addBundleToCart(int $bundleId): array
+    {
+        $bundle = $this->bundleRepository->find($bundleId);
+
+        if (!$bundle || !$bundle->isCurrentlyActive()) {
+            return ['success' => false, 'message' => 'Bundle not available'];
+        }
+
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        $cartItems = [];
+
+        foreach ($bundle->items as $bundleItem) {
+            $product = $bundleItem->getEffectiveProduct();
+            $price = $bundleItem->getEffectivePrice();
+            $merchant = $bundleItem->getEffectiveMerchant();
+
+            if (!$product || !$product->is_active) {
+                continue;
+            }
+
+            $cartItem = $this->cartRepository->create([
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'product_id' => $product->id,
+                'quantity' => $bundleItem->quantity,
+                'price' => $price,
+                'subtotal' => $price * $bundleItem->quantity,
+                'options' => json_encode([
+                    'type' => 'bundle',
+                    'bundle_id' => $bundleId,
+                    'merchant_id' => $merchant?->id,
+                ]),
+                'site_id' => $product->site_id,
+            ]);
+
+            $cartItems[] = $cartItem;
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Bundle added to cart',
+            'cart_items' => $cartItems
         ];
     }
 }

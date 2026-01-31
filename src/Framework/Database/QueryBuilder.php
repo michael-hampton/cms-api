@@ -227,11 +227,15 @@ class QueryBuilder
         return $this->orWhere($column, 'LIKE', $value);
     }
 
-    public function whereIn(string $column, array $values): self
+    public function whereIn(string $column, array|Collection $values): self
     {
         if (empty($values)) {
             // If empty array, add impossible condition
             return $this->where('1', '=', '0');
+        }
+
+        if ($values instanceof Collection) {
+            $values = $values->toArray();
         }
 
         $this->wheres[] = [

@@ -1,8 +1,6 @@
 <?php
 // views/bundles/index.php
 
-$pageTitle = 'Product Bundles';
-require_once __DIR__ . '/../layouts/header.php';
 ?>
 
     <div class="bundles-page">
@@ -594,13 +592,14 @@ require_once __DIR__ . '/../layouts/header.php';
                 showLoading();
 
                 try {
-                    const response = await fetch('/api/bundles?status=published&is_active=true');
+                    const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/bundles/search?status=published&is_active=true');
                     const data = await response.json();
 
                     allBundles = data.bundles.items;
 
                     // Extract categories from bundle items
                     allBundles.forEach(bundle => {
+                        console.log('bundle', bundle)
                         bundle.items.forEach(item => {
                             const product = item.product || item.product_offer?.product;
                             if (product?.category) {
@@ -632,7 +631,7 @@ require_once __DIR__ . '/../layouts/header.php';
             function isMultiMerchant(bundle) {
                 const merchantIds = new Set();
                 bundle.items.forEach(item => {
-                    const merchantId = item.product?.merchant_id || item.product_offer?.merchant_id;
+                    const merchantId = item.product?.merchants?.[0]?.merchant?.id || item.product_offer?.merchant_id;
                     if (merchantId) merchantIds.add(merchantId);
                 });
                 return merchantIds.size > 1;
@@ -762,7 +761,7 @@ require_once __DIR__ . '/../layouts/header.php';
                         <div class="items-header">${bundle.items.length} Item(s) in Bundle</div>
                         ${displayItems.map(item => {
                     const product = item.product || item.product_offer?.product;
-                    const merchant = item.product?.merchant || item.product_offer?.merchant;
+                    const merchant = item.product?.merchants?.[0]?.merchant || item.product_offer?.merchant;
                     const imageUrl = product?.images?.[0]?.url || '/assets/images/placeholder.jpg';
 
                     return `
@@ -1008,5 +1007,3 @@ require_once __DIR__ . '/../layouts/header.php';
             init();
         })();
     </script>
-
-<?php require_once __DIR__ . '/../layouts/footer.php'; ?>
