@@ -1,6 +1,6 @@
 <?php
-        use App\Framework\Database\Schema;
-use App\Framework\Migration\Blueprint;
+
+use App\Framework\Database\Schema;
 use App\Framework\Migration\Migration;
 
 class CreateWishlistsTable extends Migration
@@ -11,7 +11,7 @@ class CreateWishlistsTable extends Migration
             $table->id();
             $table->string('session_id', 100)->nullable();
             $table->foreignId('user_id')->nullable();
-            $table->foreignId('product_id');
+            $table->foreignId('product_id')->nullable();
             $table->foreignId('site_id');
             $table->timestamps();
 

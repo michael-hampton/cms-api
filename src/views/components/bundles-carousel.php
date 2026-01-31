@@ -46,6 +46,7 @@
     }
 
     async function loadBundlesCarousel() {
+
         try {
             const response = await fetch(`/${SITE}/bundles/search?status=active`);
             const data = await response.json();
@@ -65,7 +66,10 @@
     }
 
     function createBundleCard(bundle) {
-        const isInStock = bundle.in_stock;
+        const isInStock = bundle.items.every(
+            item => item.product?.stock_quantity > 0
+        );
+
         const savings = bundle.savings;
 
         return `
@@ -129,13 +133,13 @@
                 ` : ''}
 
                 <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="addBundleToCart(${bundle.bundle_id})"
+                    <button onclick="addBundleToCart(${bundle.id})"
                             ${!isInStock ? 'disabled' : ''}
                             style="flex: 1; padding: 0.75rem; background: ${isInStock ? '#10b981' : '#94a3b8'}; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: ${isInStock ? 'pointer' : 'not-allowed'};">
                         ${isInStock ? 'Add Bundle' : 'Unavailable'}
                     </button>
 
-                    <button onclick="addBundleToWishlist(${bundle.bundle_id})"
+                    <button onclick="addBundleToWishlist(${bundle.id})"
                             ${!isInStock ? 'disabled' : ''}
                             style="padding: 0.75rem; background: white; color: #10b981; border: 2px solid #10b981; border-radius: 0.5rem; cursor: ${isInStock ? 'pointer' : 'not-allowed'};">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -150,6 +154,7 @@
 
     async function addBundleToCart(bundleId) {
         try {
+
             const response = await fetch(`/api/${SITE}/cart/bundle`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -158,9 +163,9 @@
 
             const data = await response.json();
 
-            if (data.success) {
+            if (data.data.success) {
                 showToast('Bundle added to cart!');
-                loadCartCount();
+                loadCartCountOnBundle();
             } else {
                 showToast(data.message || 'Failed to add bundle', 'error');
             }
@@ -172,7 +177,7 @@
 
     async function addBundleToWishlist(bundleId) {
         try {
-            const response = await fetch(`/api/${SITE}/wishlist/bundle`, {
+            const response = await fetch(`/${SITE}/wishlist/bundle`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({bundle_id: bundleId})
@@ -182,12 +187,36 @@
 
             if (data.success) {
                 showToast('Bundle added to wishlist!');
+                updateWishlistCountOnBundle(data.count);
             } else {
                 showToast(data.message || 'Failed to add to wishlist', 'error');
             }
         } catch (error) {
             console.error('Error adding bundle to wishlist:', error);
             showToast('Failed to add to wishlist', 'error');
+        }
+    }
+
+    // Update wishlist count
+    function updateWishlistCountOnBundle(count) {
+        document.getElementById('wishlist-count').textContent = count;
+        document.getElementById('wishlist-count').style.display = 'block';
+    }
+
+    // Update cart count
+    function updateCartCountOnBundle(count) {
+        document.getElementById('cart-count').textContent = count;
+        document.getElementById('cart-count').style.display = 'block';
+    }
+
+    // Load cart count
+    async function loadCartCountOnBundle() {
+        try {
+            const response = await fetch(`/api/${SITE}/cart`);
+            const data = await response.json();
+            updateCartCountOnBundle(data.count || 0);
+        } catch (error) {
+            console.error('Error loading cart count:', error);
         }
     }
 

@@ -576,6 +576,7 @@ abstract class FunctionalTestCase extends TestCase
     protected function assertResponseOk(Response $response): void
     {
         $statusCode = $response->getStatusCode();
+
         $this->assertTrue(
             $statusCode >= 200 && $statusCode < 300,
             "Expected successful response, got {$statusCode}"

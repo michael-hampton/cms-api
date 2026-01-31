@@ -248,115 +248,8 @@ class ProductOfferBundleService
      */
     public function getBundlesForWeb(array $filters): array
     {
-        $query = ProductOfferBundle::with([
-            'items',
-            'items.productOffer.product',
-            'items.productOffer.product.images',
-            'items.productOffer.merchant'
-        ]);
-
-        // Status filter
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        // Active filter
-        if (isset($filters['is_active'])) {
-            $isActive = filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN);
-            $query->where('is_active', $isActive);
-        }
-
-        // Search by bundle name or product names within bundle
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'LIKE', "%{$search}%")
-                    ->orWhere('description', 'LIKE', "%{$search}%")
-                    ->orWhereHas('items', function ($itemQuery) use ($search) {
-                        $itemQuery->whereHas('product', function ($prodQuery) use ($search) {
-                            $prodQuery->where('name', 'LIKE', "%{$search}%");
-                        })
-                            ->orWhereHas('productOffer.product', function ($prodQuery) use ($search) {
-                                $prodQuery->where('name', 'LIKE', "%{$search}%");
-                            });
-                    });
-            });
-        }
-
-        // Category filter (bundles containing products from category)
-        if (!empty($filters['category'])) {
-            $query->whereHas('items', function ($itemQuery) use ($filters) {
-                $itemQuery->whereHas('product', function ($prodQuery) use ($filters) {
-                    $prodQuery->where('category', $filters['category']);
-                })
-                    ->orWhereHas('productOffer.product', function ($prodQuery) use ($filters) {
-                        $prodQuery->where('category', $filters['category']);
-                    });
-            });
-        }
-
-        // Minimum savings filter
-        if (!empty($filters['min_savings'])) {
-            $query->whereRaw('(total_price - bundle_price) >= ?', [$filters['min_savings']]);
-        }
-
-        // Price range filter
-        if (!empty($filters['min_price'])) {
-            $query->where('bundle_price', '>=', $filters['min_price']);
-        }
-        if (!empty($filters['max_price'])) {
-            $query->where('bundle_price', '<=', $filters['max_price']);
-        }
-
-        // Discount percentage filter
-        if (!empty($filters['min_discount'])) {
-            $query->where('discount_percentage', '>=', $filters['min_discount']);
-        }
-
-        // Date range filter
-        if (!empty($filters['start_date'])) {
-            $query->where('start_date', '>=', $filters['start_date']);
-        }
-        if (!empty($filters['end_date'])) {
-            $query->where('end_date', '<=', $filters['end_date']);
-        }
-
-        // Multi-merchant filter
-        if (!empty($filters['merchant_type'])) {
-            if ($filters['merchant_type'] === 'single') {
-                $query->whereHas('items', function ($itemQuery) {
-                    // This would need a more complex query to ensure all items have same merchant
-                    // For now, simplified version
-                });
-            }
-        }
-
-        // Sorting
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
-
-        $allowedSortFields = [
-            'created_at', 'bundle_price', 'total_price',
-            'discount_percentage', 'start_date', 'end_date', 'name'
-        ];
-
-        if (in_array($sortBy, $allowedSortFields)) {
-            $query->orderBy($sortBy, $sortOrder);
-        }
-
-        // Special sorting for savings
-        if ($sortBy === 'savings') {
-            $query->orderByRaw('(total_price - bundle_price) ' . strtoupper($sortOrder));
-        }
-
-        // Pagination
-        $perPage = min($filters['per_page'] ?? 20, 100); // Max 100 per page
-        $page = $filters['page'] ?? 1;
-
-        $total = $query->count();
-        $bundles = $query->offset(($page - 1) * $perPage)
-            ->limit($perPage)
-            ->get();
+        $bundleData = $this->repository->searchBundles($filters);
+        $bundles = $bundleData['data'];
 
 
         // Calculate savings for each bundle
@@ -382,12 +275,12 @@ class ProductOfferBundleService
         return [
             'items' => $bundles->toArray(),
             'pagination' => [
-                'current_page' => (int)$page,
-                'per_page' => (int)$perPage,
-                'total' => $total,
-                'total_pages' => ceil($total / $perPage),
-                'from' => (($page - 1) * $perPage) + 1,
-                'to' => min($page * $perPage, $total)
+                'current_page' => (int)$bundleData['page'],
+                'per_page' => (int)$bundleData['per_page'],
+                'total' => $bundleData['total'],
+                'total_pages' => ceil($bundleData['total'] / $bundleData['per_page']),
+                'from' => (($bundleData['page'] - 1) * $bundleData['per_page']) + 1,
+                'to' => min($bundleData['page'] * $bundleData['per_page'], $bundleData['total'])
             ]
         ];
     }

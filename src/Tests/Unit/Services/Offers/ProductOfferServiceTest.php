@@ -283,6 +283,59 @@ class ProductOfferServiceTest extends FunctionalTestCase
         $this->assertEquals(5, $stats['unique_clickers']);
     }
 
+    public function testGetActiveOffers(): void
+    {
+        $product = $this->createProduct();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        $this->repository->shouldReceive('all')
+            ->once()
+            ->andReturn(collect([$offer->load(['product'])]));
+
+        $result = $this->service->getActiveOffers(10);
+
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertEquals($offer->id, $result[0]['offer_id']);
+        $this->assertEquals($product->id, $result[0]['product_id']);
+    }
+
+    public function testGetActiveOffersLimitsResults(): void
+    {
+        $offers = collect();
+
+        for ($i = 0; $i < 15; $i++) {
+            $product = $this->createProduct();
+
+            $offer = ProductOffer::create([
+                'product_id' => $product->id,
+                'sale_price' => 79.99,
+                'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+                'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+                'is_active' => true,
+                'status' => 'published',
+            ]);
+
+            $offers->push($offer->load(['product']));
+        }
+
+        $this->repository->shouldReceive('all')
+            ->once()
+            ->andReturn($offers);
+
+        $result = $this->service->getActiveOffers(5);
+
+        $this->assertCount(5, $result);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

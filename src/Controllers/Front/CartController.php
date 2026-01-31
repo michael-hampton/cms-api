@@ -247,7 +247,7 @@ class CartController extends Controller
         ]));
     }
 
-    public function addOffer(Request $request, string $siteName): JsonResponse
+    public function addOffer(Request $request): JsonResponse
     {
         try {
             $offerId = $request->input('product_offer_id');
@@ -272,7 +272,7 @@ class CartController extends Controller
     /**
      * Add bundle to cart
      */
-    public function addBundle(Request $request, string $siteName): JsonResponse
+    public function addBundle(Request $request): JsonResponse
     {
         try {
             $bundleId = $request->input('bundle_id');

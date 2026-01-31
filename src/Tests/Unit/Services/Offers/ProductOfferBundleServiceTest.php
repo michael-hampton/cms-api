@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Offers;
 use App\Framework\Authorization\AuthenticationService;
 use App\Models\ProductOffer;
 use App\Models\ProductOfferBundle;
+use App\Models\ProductOfferBundleItem;
 use App\Repositories\Offers\ProductOfferBundleRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Services\Offers\ProductOfferBundleService;
@@ -594,6 +595,90 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
         $bundle = $this->service->createBundle($data);
 
         $this->assertNotNull($bundle);
+    }
+
+    public function testGetActiveBundlesForWeb(): void
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+        $offer1 = $this->createProductOffer($product1->id);
+        $offer2 = $this->createProductOffer($product2->id);
+
+        $bundle = ProductOfferBundle::create([
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 200.00,
+            'bundle_price' => 150.00,
+            'discount_percentage' => 25,
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        ProductOfferBundleItem::create([
+            'bundle_id' => $bundle->id,
+            'product_offer_id' => $offer1->id,
+            'quantity' => 1,
+        ]);
+
+        ProductOfferBundleItem::create([
+            'bundle_id' => $bundle->id,
+            'product_offer_id' => $offer2->id,
+            'quantity' => 1,
+        ]);
+
+        $this->repository->shouldReceive('getActiveBundles')
+            ->once()
+            ->andReturn(collect([$bundle->load(['items.productOffer.product'])]));
+
+        $result = $this->service->getActiveBundlesForWeb(10);
+
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertEquals($bundle->id, $result[0]['bundle_id']);
+        $this->assertEquals($bundle->name, $result[0]['name']);
+        $this->assertEquals(150.00, $result[0]['bundle_price']);
+    }
+
+    public function testGetActiveBundlesForWebLimitsResults(): void
+    {
+        $bundles = collect();
+
+        for ($i = 0; $i < 15; $i++) {
+            $product1 = $this->createProduct();
+            $product2 = $this->createProduct();
+            $offer1 = $this->createProductOffer($product1->id);
+            $offer2 = $this->createProductOffer($product2->id);
+
+            $bundle = ProductOfferBundle::create([
+                'name' => "Bundle $i",
+                'slug' => "bundle-$i",
+                'total_price' => 200.00,
+                'bundle_price' => 150.00,
+                'discount_percentage' => 25,
+                'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+                'is_active' => true,
+                'status' => 'published',
+            ]);
+
+            ProductOfferBundleItem::create([
+                'bundle_id' => $bundle->id,
+                'product_offer_id' => $offer1->id,
+                'quantity' => 1,
+            ]);
+
+            $bundles->push($bundle->load(['items.productOffer.product']));
+        }
+
+        $this->repository->shouldReceive('getActiveBundles')
+            ->once()
+            ->andReturn($bundles);
+
+        $result = $this->service->getActiveBundlesForWeb(5);
+
+        $this->assertCount(5, $result);
     }
 
 

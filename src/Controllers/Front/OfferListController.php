@@ -27,7 +27,7 @@ class OfferListController extends Controller
     /**
      * Display single product offer detail page
      */
-    public function show(int $offerId, string $siteName): mixed
+    public function show(int $offerId): mixed
     {
         try {
             $offer = ProductOffer::with(['product', 'merchant'])
@@ -37,14 +37,14 @@ class OfferListController extends Controller
                 ->first();
 
             if (!$offer) {
-                return $this->view('errors/404');
+                return $this->errorResponse('Member ID is required', 404);
             }
 
             return $this->view('product-offers/detail', [
                 'offer' => $offer
             ]);
         } catch (Exception $e) {
-            return $this->view('errors/500');
+            return $this->errorResponse('does not exist', 500);
         }
     }
 

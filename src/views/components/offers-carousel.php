@@ -67,7 +67,7 @@
     }
 
     function createOfferCard(offer) {
-        const isInStock = offer.in_stock && offer.stock_quantity > 0;
+        const isInStock = offer.product?.stock_quantity > 0;
         const discount = offer.discount_percentage;
 
         console.log('offer', offer)
@@ -111,13 +111,13 @@
                 ` : ''}
 
                 <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="addOfferToCart(${offer.offer_id})"
+                    <button onclick="addOfferToCart(${offer.id})"
                             ${!isInStock ? 'disabled' : ''}
                             style="flex: 1; padding: 0.75rem; background: ${isInStock ? '#2563eb' : '#94a3b8'}; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: ${isInStock ? 'pointer' : 'not-allowed'};">
                         ${isInStock ? 'Add to Cart' : 'Out of Stock'}
                     </button>
 
-                    <button onclick="addOfferToWishlist(${offer.offer_id})"
+                    <button onclick="addOfferToWishlist(${offer.id})"
                             ${!isInStock ? 'disabled' : ''}
                             style="padding: 0.75rem; background: white; color: #2563eb; border: 2px solid #2563eb; border-radius: 0.5rem; cursor: ${isInStock ? 'pointer' : 'not-allowed'};">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -141,8 +141,9 @@
             const data = await response.json();
 
             if (data.success) {
+                alert('yes1')
                 showToast('Offer added to cart!');
-                loadCartCount();
+                await loadCartCountForOffer();
             } else {
                 showToast(data.message || 'Failed to add offer', 'error');
             }
@@ -152,9 +153,31 @@
         }
     }
 
+    // Update wishlist count
+    function updateWishlistCount(count) {
+        document.getElementById('wishlist-count').textContent = count;
+    }
+
+    // Update cart count
+    function updateCartCount(count) {
+        document.getElementById('cart-count').textContent = count;
+    }
+
+    // Load cart count
+    async function loadCartCountForOffer() {
+        try {
+            const response = await fetch(`/api/${SITE}/cart`);
+            const data = await response.json();
+            updateCartCount(data.count || 0);
+        } catch (error) {
+            alert('no')
+            console.error('Error loading cart count:', error);
+        }
+    }
+
     async function addOfferToWishlist(offerId) {
         try {
-            const response = await fetch(`/api/${SITE}/wishlist/offer`, {
+            const response = await fetch(`/${SITE}/wishlist/offer`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({offer_id: offerId})
@@ -164,6 +187,7 @@
 
             if (data.success) {
                 showToast('Offer added to wishlist!');
+                updateWishlistCount(data.count);
             } else {
                 showToast(data.message || 'Failed to add to wishlist', 'error');
             }

@@ -16,6 +16,8 @@ class ModelRegistry
 
     public static function getModelForTable(string $table): ?string
     {
+        $table = trim($table, '`'); // Clean the input string
+
         if(empty(self::$models)) {
             self::autoRegister();
         }

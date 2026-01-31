@@ -363,4 +363,241 @@ class CartItemModelTest extends FunctionalTestCase
         $this->assertEquals('digital', $cartItem->options['delivery_type']);
     }
 
+    public function testGetItemTypeReturnsProduct(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => []
+        ]);
+
+        $this->assertEquals('product', $cartItem->getItemType());
+    }
+
+    public function testGetItemTypeReturnsOffer(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['type' => 'offer', 'offer_id' => $offer->id]
+        ]);
+
+        $this->assertEquals('offer', $cartItem->getItemType());
+    }
+
+    public function testGetItemTypeReturnsBundle(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['type' => 'bundle', 'bundle_id' => 1]
+        ]);
+
+        $this->assertEquals('bundle', $cartItem->getItemType());
+    }
+
+    public function testIsOfferReturnsTrueForOfferItems(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['type' => 'offer', 'offer_id' => $offer->id]
+        ]);
+
+        $this->assertTrue($cartItem->isOffer());
+    }
+
+    public function testIsOfferReturnsFalseForNonOfferItems(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => []
+        ]);
+
+        $this->assertFalse($cartItem->isOffer());
+    }
+
+    public function testIsBundleReturnsTrueForBundleItems(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['type' => 'bundle', 'bundle_id' => 1]
+        ]);
+
+        $this->assertTrue($cartItem->isBundle());
+    }
+
+    public function testIsBundleReturnsFalseForNonBundleItems(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => []
+        ]);
+
+        $this->assertFalse($cartItem->isBundle());
+    }
+
+    public function testGetBundleIdReturnsNullForNonBundleItems(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => []
+        ]);
+
+        $this->assertNull($cartItem->getBundleId());
+    }
+
+    public function testGetBundleIdReturnsBundleIdForBundleItems(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['type' => 'bundle', 'bundle_id' => 123]
+        ]);
+
+        $this->assertEquals(123, $cartItem->getBundleId());
+    }
+
+    public function testGetOfferIdReturnsNullForNonOfferItems(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => []
+        ]);
+
+        $this->assertNull($cartItem->getOfferId());
+    }
+
+    public function testGetOfferIdReturnsOfferIdForOfferItems(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['type' => 'offer', 'offer_id' => $offer->id]
+        ]);
+
+        $this->assertEquals($offer->id, $cartItem->getOfferId());
+    }
+
+    public function testGetMerchantIdReturnsNullWhenNotSet(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => []
+        ]);
+
+        $this->assertNull($cartItem->getMerchantId());
+    }
+
+    public function testGetMerchantIdReturnsMerchantIdWhenSet(): void
+    {
+        $product = $this->createProduct();
+        $merchant = $this->createMerchant();
+
+        $cartItem = CartItem::create([
+            'session_id' => 'test-session',
+            'user_id' => null,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 20.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 20.00,
+            'options' => ['merchant_id' => $merchant->id]
+        ]);
+
+        $this->assertEquals($merchant->id, $cartItem->getMerchantId());
+    }
 }

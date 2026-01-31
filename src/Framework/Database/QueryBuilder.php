@@ -227,51 +227,75 @@ class QueryBuilder
         return $this->orWhere($column, 'LIKE', $value);
     }
 
-    public function whereIn(string $column, array|Collection $values): self
+    public function whereIn(string $column, array|Collection $values, string $boolean = 'and'): self
     {
-        if (empty($values)) {
-            // If empty array, add impossible condition
-            return $this->where('1', '=', '0');
-        }
-
         if ($values instanceof Collection) {
             $values = $values->toArray();
+        }
+
+        // 🔑 Fix: Handle empty arrays to prevent "IN ()" syntax error
+        if (empty($values)) {
+            // If we want to match nothing, we use a condition that is always false
+            return $this->whereRaw('1=0', [], $boolean);
+        }
+
+        $placeholders = [];
+        $localBindings = [];
+        foreach ($values as $value) {
+            $uniqueId = bin2hex(random_bytes(2));
+            // Ensure index is unique even within this specific In call
+            $paramName = "in_" . $uniqueId . "_" . count($this->bindings) . count($localBindings);
+
+            $placeholders[] = ":{$paramName}";
+            $localBindings[$paramName] = $value;
         }
 
         $this->wheres[] = [
             'type' => 'In',
             'column' => $column,
-            'values' => $values,
-            'boolean' => 'AND'
+            'sql_fragment' => implode(', ', $placeholders),
+            'bindings' => $localBindings,
+            'boolean' => $boolean
         ];
+
+        // Merge into master bindings
+        $this->bindings = array_merge($this->bindings, $localBindings);
 
         return $this;
     }
 
     public function orWhereIn(string $column, array $values): self
     {
+        return $this->whereIn($column, $values, 'or');
+    }
+
+    public function whereNotIn(string $column, array $values, string $boolean = 'and'): self
+    {
+        // 🔑 Fix: If we exclude "nothing", the condition is always true.
+        // We can just skip adding the where clause entirely.
         if (empty($values)) {
             return $this;
         }
 
-        $this->wheres[] = [
-            'type' => 'In',
-            'column' => $column,
-            'values' => $values,
-            'boolean' => 'OR'
-        ];
+        $placeholders = [];
+        $localBindings = [];
+        foreach ($values as $value) {
+            $uniqueId = bin2hex(random_bytes(2));
+            $paramName = "notin_" . $uniqueId . "_" . count($this->bindings) . count($localBindings);
 
-        return $this;
-    }
+            $placeholders[] = ":{$paramName}";
+            $localBindings[$paramName] = $value;
+        }
 
-    public function whereNotIn(string $column, array $values): self
-    {
         $this->wheres[] = [
             'type' => 'NotIn',
             'column' => $column,
-            'values' => $values,
-            'boolean' => 'AND'
+            'sql_fragment' => implode(', ', $placeholders),
+            'bindings' => $localBindings,
+            'boolean' => $boolean
         ];
+
+        $this->bindings = array_merge($this->bindings, $localBindings);
 
         return $this;
     }
@@ -1016,8 +1040,18 @@ class QueryBuilder
 
             case 'In':
                 $quotedColumn = $this->quoteColumn($where['column']);
+
+                // 🔑 Fix: Use the pre-compiled fragment and bindings from whereIn()
+                if (isset($where['sql_fragment'])) {
+                    foreach ($where['bindings'] as $key => $val) {
+                        $bindings[$key] = $val;
+                    }
+                    return ["{$quotedColumn} IN ({$where['sql_fragment']})", $bindings];
+                }
+
+                // Fallback for older code using 'values'
                 $placeholders = [];
-                foreach ($where['values'] as $value) {
+                foreach (($where['values'] ?? []) as $value) {
                     $paramKey = 'param_' . $paramCounter++;
                     $placeholders[] = ':' . $paramKey;
                     $bindings[$paramKey] = $value;
@@ -1026,8 +1060,17 @@ class QueryBuilder
 
             case 'NotIn':
                 $quotedColumn = $this->quoteColumn($where['column']);
+
+                // 🔑 Fix: Use the pre-compiled fragment and bindings from whereNotIn()
+                if (isset($where['sql_fragment'])) {
+                    foreach ($where['bindings'] as $key => $val) {
+                        $bindings[$key] = $val;
+                    }
+                    return ["{$quotedColumn} NOT IN ({$where['sql_fragment']})", $bindings];
+                }
+
                 $placeholders = [];
-                foreach ($where['values'] as $value) {
+                foreach (($where['values'] ?? []) as $value) {
                     $paramKey = 'param_' . $paramCounter++;
                     $placeholders[] = ':' . $paramKey;
                     $bindings[$paramKey] = $value;
@@ -1249,14 +1292,23 @@ class QueryBuilder
         return $result ? $result[$column] : null;
     }
 
-    public function whereRaw(string $sql, array $bindings = []): self
+    public function whereRaw(string $sql, array $bindings = [], string $boolean = 'and'): self
     {
         $this->wheres[] = [
             'type' => 'Raw',
             'sql' => $sql,
             'bindings' => $bindings,
-            'boolean' => 'AND'
+            'boolean' => $boolean
         ];
+
+        foreach ($bindings as $key => $value) {
+            if (is_string($key)) {
+                // Preserve named parameters exactly as they appear in SQL
+                $this->bindings[$key] = $value;
+            } else {
+                $this->bindings[] = $value;
+            }
+        }
 
         return $this;
     }
@@ -1330,10 +1382,27 @@ class QueryBuilder
     }
 
     /**
+     * Add an "or" constraint for existence of related models.
+     *
+     * @param string $relation
+     * @param callable|null $callback
+     * @return $this
+     */
+    public function orWhereHas(string $relation, ?callable $callback = null): self
+    {
+        return $this->has($relation, '>=', 1, 'or', $callback);
+    }
+
+    /**
      * Add constraints based on related model count
      */
     public function has(string $relation, string $operator = '>=', int $count = 1, string $boolean = 'and', ?callable $callback = null): self
     {
+        // 1. Handle Nested Relationships (e.g., 'productOffer.product')
+        if (str_contains($relation, '.')) {
+            return $this->hasNested($relation, $operator, $count, $boolean, $callback);
+        }
+
         $modelClass = $this->getModelClassFromTable($this->table);
         if (!$modelClass) {
             throw new \Exception("No model class found for table: {$this->table}");
@@ -1344,13 +1413,34 @@ class QueryBuilder
             throw new BadMethodCallException("Relationship {$relation} does not exist on {$modelClass}");
         }
 
-        // Get relation data by analyzing the method
         $analyzer = new RelationshipAnalyzer();
         $relationData = $analyzer->analyzeRelationshipMethod($tempModel, $relation);
 
         $this->addHasConstraintToMainQuery($relationData, $operator, $count, $boolean, $callback);
 
         return $this;
+    }
+
+    /**
+     * Resolve nested relationship existence checks
+     */
+    protected function hasNested(string $relations, string $operator, int $count, string $boolean, ?callable $callback): self
+    {
+        $relations = explode('.', $relations);
+        $firstRelation = array_shift($relations);
+
+        // We wrap the remaining relations in a closure to pass down the chain
+        return $this->has($firstRelation, '>=', 1, $boolean, function ($query) use ($relations, $operator, $count, $callback) {
+            $remainingPath = implode('.', $relations);
+
+            if (empty($remainingPath)) {
+                // We reached the end of the chain, apply the final user callback
+                if ($callback) $callback($query);
+            } else {
+                // Keep drilling down
+                $query->has($remainingPath, $operator, $count, 'and', $callback);
+            }
+        });
     }
 
     /**
@@ -1440,25 +1530,16 @@ class QueryBuilder
      */
     protected function addHasConstraintToMainQuery(array $relationData, string $operator, int $count, string $boolean, ?callable $callback): void
     {
-        $useExists = $count === 1 && in_array($operator, ['>=', '>', '<', '<=']);
+        $subqueryData = $this->buildSubqueryWithBindings($relationData, $callback);
 
-        $subqueryData = $this->buildSubqueryWithBindings($relationData, $callback, $useExists);
+        $sql = $subqueryData['sql'];
+        $subBindings = $subqueryData['bindings'];
 
-        if ($useExists) {
-            $constraint = in_array($operator, ['>=', '>'])
-                ? "EXISTS ({$subqueryData['sql']})"
-                : "NOT EXISTS ({$subqueryData['sql']})";
-        } else {
-            $countSql = str_replace('SELECT 1', 'SELECT COUNT(*)', $subqueryData['sql']);
-            $countSql = str_replace('LIMIT 1', '', $countSql);
-            $constraint = "({$countSql}) {$operator} {$count}";
-        }
+        // 🔑 If operator is '<' and count is 1, it's a "DoesntHave", use NOT EXISTS
+        $existsVerb = ($operator === '<' && $count === 1) ? 'NOT EXISTS' : 'EXISTS';
+        $constraint = "{$existsVerb} ({$sql})";
 
-        if ($boolean === 'and') {
-            $this->whereRaw($constraint, $subqueryData['bindings']);
-        } else {
-            $this->orWhereRaw($constraint, $subqueryData['bindings']);
-        }
+        $this->whereRaw($constraint, $subBindings, $boolean);
     }
 
 
@@ -1511,61 +1592,40 @@ class QueryBuilder
         $relatedInstance = new $relatedModel();
         $relatedTable = "`{$relatedInstance->getTable()}`";
 
-        $subquery = '';
         $bindings = [];
+        $selectClause = $isExists ? 'SELECT 1' : 'SELECT COUNT(*)';
 
+        // 1. Build the base relationship join
         switch ($relationData['type']) {
             case 'hasMany':
             case 'hasOne':
-                $foreignKey = $relationData['foreign_key'];
-                $localKey = $relationData['local_key'];
-
-                $selectClause = $isExists ? 'SELECT 1' : 'SELECT COUNT(*)';
-                $subquery = "{$selectClause} FROM {$relatedTable} WHERE {$relatedTable}.{$foreignKey} = {$this->table}.{$localKey}";
-
+            $subquery = "{$selectClause} FROM {$relatedTable} WHERE {$relatedTable}.{$relationData['foreign_key']} = {$this->table}.{$relationData['local_key']}";
                 break;
-
             case 'belongsTo':
-                $foreignKey = $relationData['foreign_key'];
-                $ownerKey = $relationData['owner_key'];
-
-                $selectClause = $isExists ? 'SELECT 1' : 'SELECT COUNT(*)';
-                $subquery = "{$selectClause} FROM {$relatedTable} WHERE {$relatedTable}.{$ownerKey} = {$this->table}.{$foreignKey}";
-
+                $subquery = "{$selectClause} FROM {$relatedTable} WHERE {$relatedTable}.{$relationData['owner_key']} = {$this->table}.{$relationData['foreign_key']}";
                 break;
-
             case 'belongsToMany':
-                $pivotTable = $relationData['pivot_table'];
-                $foreignKey = $relationData['foreign_key'];
-                $relatedKey = $relationData['related_key'];
-
-                $selectClause = $isExists ? 'SELECT 1' : 'SELECT COUNT(*)';
                 $subquery = "{$selectClause} FROM {$relatedTable} 
-                        INNER JOIN {$pivotTable} ON {$relatedTable}.id = {$pivotTable}.{$relatedKey} 
-                        WHERE {$pivotTable}.{$foreignKey} = {$this->table}.id";
-
-
+                    INNER JOIN {$relationData['pivot_table']} ON {$relatedTable}.id = {$relationData['pivot_table']}.{$relationData['related_key']} 
+                    WHERE {$relationData['pivot_table']}.{$relationData['foreign_key']} = {$this->table}.id";
                 break;
-
             default:
-                throw new BadMethodCallException("Unknown relation type: {$relationData['type']}");
+                throw new BadMethodCallException("Unknown relation: {$relationData['type']}");
         }
 
-        // Apply callback filters (if any)
+        // 2. Apply callback filters safely
         if ($callback) {
-            $relatedModel = $relationData['related']; // This is Block
-            $relatedInstance = new $relatedModel();   // Create Block instance
-            $relatedTable = "`{$relatedInstance->getTable()}`";
+            $tempQuery = new QueryBuilder($relatedInstance->getTable(), $this->relationManager, $this->database);
+            $callback($tempQuery);
 
-            $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
-            $callback($tempQuery); // Apply callback constraints to Block query
-
+            // 1. Get the conditions and local bindings from the closure
             $conditions = $this->buildConditionsFromQuery($tempQuery, $bindings);
             if (!empty($conditions)) {
-                $subquery .= " AND " . implode(' AND ', $conditions);
+                $subquery .= " AND (" . implode('', $conditions) . ")";
             }
         }
 
+        // 3. Append LIMIT at the very end
         if ($isExists) {
             $subquery .= " LIMIT 1";
         }
@@ -1574,7 +1634,7 @@ class QueryBuilder
     }
 
     /**
-     * Build conditions from query with proper binding
+     * Build conditions from query while preserving boolean (AND/OR) logic and bindings
      */
     protected function buildConditionsFromQuery(QueryBuilder $query, array &$bindings): array
     {
@@ -1584,144 +1644,77 @@ class QueryBuilder
 
         $conditions = [];
 
-        foreach ($query->wheres as $where) {
+        foreach ($query->wheres as $index => $where) {
+            $boolean = strtoupper($where['boolean']);
+            // First condition in the array doesn't need a prefix because
+            // the subquery caller handles the initial 'AND' join.
+            $prefix = ($index === 0) ? '' : " {$boolean} ";
+            $fragment = '';
+
             switch ($where['type']) {
-                case 'Basic':
-                    // Get the table name from the query
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    // Add table prefix if not already present
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
+                case 'Raw':
+                    $fragment = $where['sql'];
+                    if (!empty($where['bindings'])) {
+                        foreach ($where['bindings'] as $key => $bind) {
+                            if (is_string($key)) {
+                                $bindings[$key] = $bind;
+                            } else {
+                                $bindings[] = $bind;
+                            }
+                        }
                     }
+                    break;
 
+                case 'Basic':
+                    $table = $query->getTable();
+                    $column = (strpos($where['column'], '.') === false) ? "{$table}.{$where['column']}" : $where['column'];
                     $column = $this->quoteColumn($column);
                     $value = $where['value'];
 
-                    // Use literal values to avoid binding conflicts for now
-                    if (is_string($value)) {
-                        $escapedValue = str_replace("'", "''", $value); // Basic SQL escaping
-                        $conditions[] = "{$column} {$where['operator']} '{$escapedValue}'";
-                    } elseif (is_numeric($value)) {
-                        $conditions[] = "{$column} {$where['operator']} {$value}";
-                    } elseif (is_null($value)) {
-                        $conditions[] = "{$column} IS NULL";
-                    } elseif (is_bool($value)) {
-                        $conditions[] = "{$column} {$where['operator']} " . ($value ? '1' : '0');
+                    if (is_null($value)) {
+                        $fragment = "{$column} IS NULL";
                     } else {
-                        $conditions[] = "{$column} {$where['operator']} '{$value}'";
+                        // Create a unique key that will be preserved by whereRaw
+                        $uniqueId = bin2hex(random_bytes(2));
+                        $paramName = "sub_" . $uniqueId . "_" . count($bindings);
+
+                        $fragment = "{$column} {$where['operator']} :{$paramName}";
+                        $bindings[$paramName] = is_bool($value) ? ($value ? 1 : 0) : $value;
+                    }
+                    break;
+
+                case 'Nested':
+                    $subConditions = $this->buildConditionsFromQuery($where['query'], $bindings);
+                    if (!empty($subConditions)) {
+                        $fragment = '(' . implode('', $subConditions) . ')';
                     }
                     break;
 
                 case 'In':
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $values = array_map(function ($v) {
-                        if (is_string($v)) {
-                            return "'" . str_replace("'", "''", $v) . "'";
-                        }
-                        return $v;
-                    }, $where['values']);
-                    $conditions[] = "{$column} IN (" . implode(', ', $values) . ")";
-                    break;
-
                 case 'NotIn':
-                    $table = $query->getTable();
-                    $column = $where['column'];
+                    $column = $this->quoteColumn($where['column']);
+                    $operator = ($where['type'] === 'In') ? 'IN' : 'NOT IN';
+                    $fragment = "{$column} {$operator} ({$where['sql_fragment']})";
 
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $values = array_map(function ($v) {
-                        if (is_string($v)) {
-                            return "'" . str_replace("'", "''", $v) . "'";
+                    // 🔑 Collect the bindings from the 'In' clause and merge into the main pool
+                    if (!empty($where['bindings'])) {
+                        foreach ($where['bindings'] as $key => $bind) {
+                            $bindings[$key] = $bind;
                         }
-                        return $v;
-                    }, $where['values']);
-                    $conditions[] = "{$column} NOT IN (" . implode(', ', $values) . ")";
+                    }
                     break;
 
                 case 'Null':
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $conditions[] = "{$column} IS NULL";
+                    $fragment = $this->quoteColumn($where['column']) . " IS NULL";
                     break;
 
                 case 'NotNull':
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $conditions[] = "{$column} IS NOT NULL";
+                    $fragment = $this->quoteColumn($where['column']) . " IS NOT NULL";
                     break;
+            }
 
-                case 'Year':
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $value = $where['value'];
-
-                    if (is_numeric($value)) {
-                        $conditions[] = "YEAR({$column}) {$where['operator']} {$value}";
-                    }
-                    break;
-
-                case 'Month':
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $value = $where['value'];
-
-                    if (is_numeric($value)) {
-                        $conditions[] = "MONTH({$column}) {$where['operator']} {$value}";
-                    }
-                    break;
-
-                case 'Date':
-                    $table = $query->getTable();
-                    $column = $where['column'];
-
-                    if (strpos($column, '.') === false) {
-                        $column = "{$table}.{$column}";
-                    }
-
-                    $column = $this->quoteColumn($column);
-                    $value = $where['value'];
-
-                    if (is_string($value)) {
-                        $escapedValue = str_replace("'", "''", $value);
-                        $conditions[] = "DATE({$column}) {$where['operator']} '{$escapedValue}'";
-                    }
-                    break;
+            if (!empty($fragment)) {
+                $conditions[] = $prefix . $fragment;
             }
         }
 

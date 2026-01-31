@@ -368,6 +368,50 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
         $this->assertEquals($pendingBundle->id, $pending->first()->id);
     }
 
+    public function testSearchBundles(): void
+    {
+        $product1 = $this->createProduct(['name' => 'Gaming Mouse']);
+        $product2 = $this->createProduct(['name' => 'Gaming Keyboard']);
+        $offer1 = $this->createProductOffer($product1->id);
+        $offer2 = $this->createProductOffer($product2->id);
+
+        $bundle = ProductOfferBundle::create([
+            'name' => 'Gaming Bundle',
+            'slug' => 'gaming-bundle',
+            'total_price' => 200.00,
+            'bundle_price' => 150.00,
+            'discount_percentage' => 25,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        ProductOfferBundleItem::create([
+            'bundle_id' => $bundle->id,
+            'product_offer_id' => $offer1->id,
+            'quantity' => 1,
+        ]);
+
+        ProductOfferBundleItem::create([
+            'bundle_id' => $bundle->id,
+            'product_offer_id' => $offer2->id,
+            'quantity' => 1,
+        ]);
+
+        $filters = [
+            'search' => 'Gaming',
+            'status' => 'published',
+            'is_active' => true,
+        ];
+
+        $results = $this->repository->searchBundles($filters);
+
+        $this->assertCount(1, $results['data']);
+        $this->assertEquals(1, $results['total']);
+        $this->assertEquals($bundle->id, $results['data']->first()->id);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

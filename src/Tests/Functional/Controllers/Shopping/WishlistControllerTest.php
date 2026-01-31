@@ -3,10 +3,8 @@
 namespace App\Tests\Functional\Controllers\Shopping;
 
 use App\Framework\Authorization\Auth;
-use App\Framework\Authorization\MemberAuth;
 use App\Framework\Session\Session;
 use App\Models\Product;
-use App\Models\Wishlist;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class WishlistControllerTest extends FunctionalTestCase
@@ -14,15 +12,6 @@ class WishlistControllerTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->cleanupDatabase();
-        $this->ensureSiteExists();
-
-        // Clear session state between tests
-        Session::flush();
-        MemberAuth::$member = null;
-
-        // Clean wishlist table
-        Wishlist::query()->delete();
     }
 
     protected function tearDown(): void

@@ -612,7 +612,7 @@
             <div class="offer-card" data-offer-id="${offer.id}">
                 <div style="position: relative;">
                     <img src="${imageUrl}" alt="${offer.product?.name || 'Product'}" class="offer-image">
-                    <div class="offer-badge">${offer.product.discount_percentage}% OFF</div>
+                        <div class="offer-badge">${offer.discount_percentage}% OFF</div>
                 </div>
                 <div class="offer-content">
                     <div class="offer-merchant">${offer.merchant?.name || offer.product?.merchant?.name || 'Unknown Merchant'}</div>
@@ -665,7 +665,7 @@
                 document.querySelectorAll('.offer-card').forEach(card => {
                     card.addEventListener('click', () => {
                         const offerId = card.dataset.offerId;
-                        window.location.href = `/product-offers/${offerId}`;
+                        window.location.href = `/<?= \App\Framework\Support\SiteContext::slug() ?>/offers/${offerId}`;
                     });
                 });
             }
@@ -673,7 +673,7 @@
             // Add to cart
             async function addToCart(offerId) {
                 try {
-                    const response = await fetch('/api/cart/items', {
+                    const response = await fetch('/api/<?= \App\Framework\Support\SiteContext::slug() ?>/cart/offer', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({

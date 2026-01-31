@@ -394,6 +394,35 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $this->assertEmpty($stats['by_offer']);
     }
 
+    public function testSearchOffersWithFilters(): void
+    {
+        $product = $this->createProduct(['name' => 'Test Product']);
+        $merchant = $this->createMerchant();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'merchant_id' => $merchant->id,
+            'sale_price' => 79.99,
+            'original_price' => 99.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'published',
+        ]);
+
+        $filters = [
+            'merchant_id' => $merchant->id,
+            'status' => 'published',
+            'min_discount' => 15,
+        ];
+
+        $results = $this->repository->searchOffersWithFilters($filters);
+
+        $this->assertCount(1, $results['data']);
+        $this->assertEquals(1, $results['total']);
+        $this->assertEquals($offer->id, $results['data']->first()->id);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

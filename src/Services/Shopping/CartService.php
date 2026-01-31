@@ -339,4 +339,131 @@ class CartService
             'cart_items' => $cartItems
         ];
     }
+
+    public function getItemsGroupedByMerchant(): array
+    {
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+
+        $grouped = [];
+
+        foreach ($items as $item) {
+            $merchantId = $item->getMerchantId() ?? 0;
+            $merchantName = 'Direct';
+
+            if ($merchantId > 0) {
+                // Get merchant name from product or offer/bundle
+                $product = $item->product;
+                if ($item->isOffer()) {
+                    $offer = $this->offerRepository->find($item->getOfferId());
+                    $merchantName = $offer->merchant?->name ?? 'Merchant ' . $merchantId;
+                } elseif ($item->isBundle()) {
+                    // For bundles, we'll split items by their respective merchants
+                    // This is handled separately
+                    continue;
+                }
+            }
+
+            if (!isset($grouped[$merchantId])) {
+                $grouped[$merchantId] = [
+                    'merchant_id' => $merchantId,
+                    'merchant_name' => $merchantName,
+                    'items' => [],
+                    'subtotal' => 0,
+                ];
+            }
+
+            $itemData = [
+                'id' => $item->id,
+                'product_id' => $item->product_id,
+                'product_name' => $item->product->name ?? 'Unknown',
+                'product_slug' => $item->product->slug ?? '',
+                'product_image' => $item->product->image ?? '',
+                'price' => $item->price,
+                'quantity' => $item->quantity,
+                'subtotal' => $item->subtotal,
+                'item_type' => $item->getItemType(),
+            ];
+
+            $grouped[$merchantId]['items'][] = $itemData;
+            $grouped[$merchantId]['subtotal'] += $item->subtotal;
+        }
+
+        // Handle bundle items - they need special grouping
+        foreach ($items as $item) {
+            if ($item->isBundle()) {
+                $bundleId = $item->getBundleId();
+                $bundle = $this->bundleRepository->find($bundleId);
+
+                if ($bundle) {
+                    foreach ($bundle->items as $bundleItem) {
+                        $merchant = $bundleItem->getEffectiveMerchant();
+                        $merchantId = $merchant?->id ?? 0;
+                        $merchantName = $merchant?->name ?? 'Direct';
+
+                        if (!isset($grouped[$merchantId])) {
+                            $grouped[$merchantId] = [
+                                'merchant_id' => $merchantId,
+                                'merchant_name' => $merchantName,
+                                'items' => [],
+                                'subtotal' => 0,
+                            ];
+                        }
+
+                        $product = $bundleItem->getEffectiveProduct();
+                        $price = $bundleItem->getEffectivePrice();
+
+                        $itemData = [
+                            'product_id' => $product->id,
+                            'product_name' => $product->name,
+                            'product_slug' => $product->slug,
+                            'product_image' => $product->image,
+                            'price' => $price,
+                            'quantity' => $bundleItem->quantity,
+                            'subtotal' => $price * $bundleItem->quantity,
+                            'item_type' => 'bundle_item',
+                            'bundle_id' => $bundleId,
+                            'bundle_name' => $bundle->name,
+                        ];
+
+                        $grouped[$merchantId]['items'][] = $itemData;
+                        $grouped[$merchantId]['subtotal'] += $price * $bundleItem->quantity;
+                    }
+                }
+            }
+        }
+
+        return array_values($grouped);
+    }
+
+    public function getShipmentBreakdown(): array
+    {
+        $merchantGroups = $this->getItemsGroupedByMerchant();
+
+        $shipments = [];
+
+        foreach ($merchantGroups as $group) {
+            $shipments[] = [
+                'merchant_id' => $group['merchant_id'],
+                'merchant_name' => $group['merchant_name'],
+                'item_count' => count($group['items']),
+                'subtotal' => $group['subtotal'],
+                'shipping' => $this->calculateShippingForMerchant($group['merchant_id'], $group['subtotal']),
+                'items' => $group['items'],
+            ];
+        }
+
+        return $shipments;
+    }
+
+    private function calculateShippingForMerchant(int $merchantId, float $subtotal): float
+    {
+        // Simple shipping calculation - can be enhanced
+        if ($subtotal >= 100) {
+            return 0.00; // Free shipping over $100
+        }
+
+        return 10.00; // Flat rate per merchant
+    }
 }

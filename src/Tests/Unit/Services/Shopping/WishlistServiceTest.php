@@ -3,15 +3,20 @@
 namespace App\Tests\Unit\Services\Shopping;
 
 use App\Models\Product;
+use App\Models\ProductOfferBundle;
 use App\Models\Wishlist;
+use App\Repositories\Offers\ProductOfferBundleRepository;
+use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Shopping\WishlistRepository;
 use App\Services\Shopping\WishlistService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 
 class WishlistServiceTest extends FunctionalTestCase
 {
+    use CreatesTestData;
     protected $wishlistRepository;
     protected $productRepository;
     protected WishlistService $service;
@@ -22,8 +27,15 @@ class WishlistServiceTest extends FunctionalTestCase
 
         $this->wishlistRepository = Mockery::mock(WishlistRepository::class);
         $this->productRepository = Mockery::mock(ProductRepository::class);
+        $this->productOfferBundleRepository = Mockery::mock(ProductOfferBundleRepository::class);
+        $this->productOfferRepository = Mockery::mock(ProductOfferRepository::class);
 
-        $this->service = new WishlistService($this->wishlistRepository, $this->productRepository);
+        $this->service = new WishlistService(
+            $this->wishlistRepository,
+            $this->productRepository,
+            $this->productOfferBundleRepository,
+            $this->productOfferRepository
+        );
 
         $_SESSION['wishlist_session_id'] = 'test_wishlist_123';
     }
@@ -205,4 +217,166 @@ class WishlistServiceTest extends FunctionalTestCase
 
         $this->assertEquals(3, $count);
     }
+
+    public function testAddOfferSuccessfully()
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $this->productOfferRepository->shouldReceive('find')
+            ->with($offer->id)
+            ->once()
+            ->andReturn($offer);
+
+        $this->wishlistRepository->shouldReceive('getOffers')
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->wishlistRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(new Wishlist());
+
+        $result = $this->service->addOffer($offer->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Offer added to wishlist', $result['message']);
+    }
+
+    public function testAddOfferFailsWhenOfferNotAvailable()
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id, [
+            'is_active' => false
+        ]);
+
+        $this->productOfferRepository->shouldReceive('find')
+            ->with($offer->id)
+            ->once()
+            ->andReturn($offer);
+
+        $result = $this->service->addOffer($offer->id);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Offer not available', $result['message']);
+    }
+
+    public function testAddOfferFailsWhenAlreadyInWishlist()
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $existingWishlist = Mockery::mock(Wishlist::class);
+
+        $this->productOfferRepository->shouldReceive('find')
+            ->with($offer->id)
+            ->once()
+            ->andReturn($offer);
+
+        $this->wishlistRepository->shouldReceive('getOffers')
+            ->once()
+            ->andReturn(collect([$existingWishlist]));
+
+        $result = $this->service->addOffer($offer->id);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Offer already in wishlist', $result['message']);
+    }
+
+    public function testAddBundleSuccessfully()
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+        $offer1 = $this->createProductOffer($product1->id);
+        $offer2 = $this->createProductOffer($product2->id);
+
+        $bundle = ProductOfferBundle::create([
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 200.00,
+            'bundle_price' => 150.00,
+            'discount_percentage' => 25,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+        ]);
+
+        $this->productOfferBundleRepository->shouldReceive('find')
+            ->with($bundle->id)
+            ->once()
+            ->andReturn($bundle);
+
+        $this->wishlistRepository->shouldReceive('getBundles')
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->wishlistRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(new Wishlist());
+
+        $result = $this->service->addBundle($bundle->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Bundle added to wishlist', $result['message']);
+    }
+
+    public function testAddBundleFailsWhenBundleNotAvailable()
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $bundle = ProductOfferBundle::create([
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 200.00,
+            'bundle_price' => 150.00,
+            'discount_percentage' => 25,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => false,
+        ]);
+
+        $this->productOfferBundleRepository->shouldReceive('find')
+            ->with($bundle->id)
+            ->once()
+            ->andReturn($bundle);
+
+        $result = $this->service->addBundle($bundle->id);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Bundle not available', $result['message']);
+    }
+
+    public function testAddBundleFailsWhenAlreadyInWishlist()
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        $bundle = ProductOfferBundle::create([
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'total_price' => 200.00,
+            'bundle_price' => 150.00,
+            'discount_percentage' => 25,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+        ]);
+
+        $existingWishlist = Mockery::mock(Wishlist::class);
+
+        $this->productOfferBundleRepository->shouldReceive('find')
+            ->with($bundle->id)
+            ->once()
+            ->andReturn($bundle);
+
+        $this->wishlistRepository->shouldReceive('getBundles')
+            ->once()
+            ->andReturn(collect([$existingWishlist]));
+
+        $result = $this->service->addBundle($bundle->id);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Bundle already in wishlist', $result['message']);
+    }
+
 }

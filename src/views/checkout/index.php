@@ -909,17 +909,51 @@
                 <h3>Order Summary</h3>
 
                 <div id="order-items">
-                    <?php foreach ($items as $item): ?>
-                        <div class="summary-item">
-                            <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
-                                 alt="<?= htmlspecialchars($item['product_name']) ?>"
-                                 class="item-image">
-                            <div class="item-details">
-                                <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
-                                <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
-                            </div>
-                            <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
+                    <?php
+                    // Group items by merchant
+                    $itemsByMerchant = [];
+                    foreach ($items as $item) {
+                        $merchantId = $item['options']['merchant_id'] ?? 0;
+                        $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
+
+                        if (!isset($itemsByMerchant[$merchantId])) {
+                            $itemsByMerchant[$merchantId] = [
+                                    'name' => $merchantName,
+                                    'items' => [],
+                                    'subtotal' => 0
+                            ];
+                        }
+                        $itemsByMerchant[$merchantId]['items'][] = $item;
+                        $itemsByMerchant[$merchantId]['subtotal'] += $item['subtotal'];
+                    }
+                    ?>
+
+                    <?php foreach ($itemsByMerchant
+
+                                   as $merchantId => $merchantData): ?>
+                    <div class="merchant-group"
+                         style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
+                        <div class="merchant-header" style="margin-bottom: 1rem;">
+                            <strong style="font-size: 0.875rem; color: var(--text-primary);">
+                                <?= htmlspecialchars($merchantData['name']) ?>
+                            </strong>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">
+                    (<?= count($merchantData['items']) ?> items)
+                </span>
                         </div>
+
+                        <?php foreach ($items as $item): ?>
+                            <div class="summary-item">
+                                <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                     class="item-image">
+                                <div class="item-details">
+                                    <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+                                    <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
+                                </div>
+                                <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
+                            </div>
+                        <?php endforeach; ?>
                     <?php endforeach; ?>
                 </div>
 

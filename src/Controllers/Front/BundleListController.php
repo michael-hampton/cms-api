@@ -44,14 +44,14 @@ class BundleListController extends Controller
                 ->first();
 
             if (!$bundle) {
-                return $this->view('errors/404');
+                return $this->errorResponse('does not exist', 404);
             }
 
             return $this->view('bundles/detail', [
                 'bundle' => $bundle
             ]);
         } catch (Exception $e) {
-            return $this->view('errors/500');
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 

@@ -848,11 +848,12 @@
             // Add bundle to cart
             async function addBundleToCart(bundleId) {
                 try {
-                    const response = await fetch('/api/cart/bundles', {
+                    const response = await fetch('/api/<?= \App\Framework\Support\SiteContext::slug() ?>/cart/bundle', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
-                            bundle_id: bundleId
+                            bundle_id: bundleId,
+                            quantity: 1
                         })
                     });
 

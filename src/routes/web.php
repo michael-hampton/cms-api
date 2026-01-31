@@ -84,13 +84,13 @@ $router->put('/pages/{id}', WebPageController::class, 'update');
 $router->delete('/pages/{id}', WebPageController::class, 'destroy');
 
 $router->get('/{site}/offers', [OfferListController::class, 'index']);
-$router->get('/{site}/offers/{id}', [OfferListController::class, 'show']);
+$router->get('/{site}/offers/{offerId}', [OfferListController::class, 'show']);
 $router->get('{site}/product-offers/search', [OfferListController::class, 'search']);
 
 
 // Bundles Routes
 $router->get('/{site}/bundles', [BundleListController::class, 'indexPage']);
-$router->get('/{site}/bundles/{id}', [BundleListController::class, 'showPage']);
+$router->get('/{site}/bundles/{bundleId}', [BundleListController::class, 'showPage']);
 $router->get('/{site}/bundles/search', [BundleListController::class, 'searchBundles']);
 
 
@@ -213,11 +213,15 @@ $router->get('/api/{siteName}/consent/types/optional', 'App\Controllers\Members\
 
 $router->get('/cart', [CartController::class, 'page']);
 $router->get('/wishlist', [WishlistController::class, 'page']);
+$router->post('/{site}/wishlist/bundle', [WishlistController::class, 'addBundle']);
+$router->post('/{site}/wishlist/offer', [WishlistController::class, 'addOffer']);
 $router->get('/{site}/cart', [CartController::class, 'page']);
 
 // API routes for Cart (JSON responses)
 $router->get('/api/{site}/cart', [CartController::class, 'index']);
 $router->post('/api/{site}/cart', [CartController::class, 'add']);
+$router->post('/api/{site}/cart/bundle', [CartController::class, 'addBundle']);
+$router->post('/api/{site}/cart/offer', [CartController::class, 'addOffer']);
 $router->put('/api/{site}/cart/{id}', [CartController::class, 'update']);
 $router->delete('/api/{site}/cart/{id}', [CartController::class, 'remove']);
 $router->delete('/api/{site}/cart/clear', [CartController::class, 'clear']);
