@@ -6,9 +6,9 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Services\Members\OrderService;
-use App\Services\Shop\CartService;
-use App\Services\Shop\CheckoutService;
+use App\Services\Billing\OrderService;
+use App\Services\Shopping\CartService;
+use App\Services\Shopping\CheckoutService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
 
 class CartController extends Controller

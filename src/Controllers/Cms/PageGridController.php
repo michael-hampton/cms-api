@@ -14,7 +14,7 @@ use App\Resources\PageGridResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
-use App\Services\Cms\PageGridService;
+use App\Services\Cms\Pages\PageGridService;
 
 class PageGridController extends Controller
 {

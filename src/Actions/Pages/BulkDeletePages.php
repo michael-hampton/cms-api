@@ -2,7 +2,7 @@
 
 namespace App\Actions\Pages;
 
-use App\Services\Cms\PageService;
+use App\Services\Cms\Pages\PageService;
 use Exception;
 
 class BulkDeletePages

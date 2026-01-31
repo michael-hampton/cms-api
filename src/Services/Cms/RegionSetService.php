@@ -7,8 +7,8 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\RegionSet;
-use App\Repositories\Cms\PageRegionSetRepository;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRegionSetRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\RegionSetRepository;
 use App\Repositories\Cms\TerritoryRepository;
 

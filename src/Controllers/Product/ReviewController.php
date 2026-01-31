@@ -4,7 +4,7 @@ namespace App\Controllers\Product;
 
 use App\Controllers\Controller;
 use App\Framework\Http\Request;
-use App\Services\Product\ReviewService;
+use App\Services\ReviewService;
 
 class ReviewController extends Controller
 {

@@ -4,7 +4,7 @@ namespace App\Actions\Order;
 
 use App\Framework\Database\Database;
 use App\Models\Order;
-use App\Repositories\Members\OrderRepository;
+use App\Repositories\Billing\OrderRepository;
 use Exception;
 
 class BulkUpdateOrderStatus

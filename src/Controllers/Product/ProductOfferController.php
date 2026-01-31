@@ -17,7 +17,7 @@ use App\Resources\OfferResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
-use App\Services\Product\ProductOfferService;
+use App\Services\Offers\ProductOfferService;
 use Exception;
 
 class ProductOfferController extends Controller

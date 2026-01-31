@@ -6,7 +6,7 @@ use App\Framework\Database\Database;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Cms\CustomFieldDefinitionRepository;
 use App\Repositories\Cms\TagRepository;
-use App\Services\Cms\PageService;
+use App\Services\Cms\Pages\PageService;
 
 class EstateWebsiteService
 {

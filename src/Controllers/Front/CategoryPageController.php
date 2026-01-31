@@ -8,8 +8,8 @@ use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Models\Page;
 use App\Repositories\Cms\CategoryRepository;
-use App\Services\Cms\ArticleAccessService;
 use App\Services\Cms\MenuRenderer;
+use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Front\CategoryProductService;
 use App\Services\Subscriptions\SubscriptionModalService;
 

@@ -13,7 +13,7 @@ use App\Models\Product;
 use App\Models\Site;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\CategoryRepository;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 
 class ComprehensiveContentSeeder extends Seeder
@@ -37,7 +37,7 @@ class ComprehensiveContentSeeder extends Seeder
         $this->blockRepository = new BlockRepository();
         $this->tagRepository = new TagRepository();
         $this->categoryRepository = new CategoryRepository();
-        $this->blockParserService = (new Container())->resolve(\App\Services\Cms\BlockParserService::class);
+        $this->blockParserService = (new Container())->resolve(\App\Services\Cms\Pages\BlockParserService::class);
 
         parent::__construct();
     }

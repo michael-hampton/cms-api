@@ -5,7 +5,7 @@ namespace App\Services\Cms;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 
 class TagService

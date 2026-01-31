@@ -3,7 +3,7 @@
 namespace App\Actions\Voucher;
 
 use App\Framework\Database\Database;
-use App\Repositories\Cms\VoucherRepository;
+use App\Repositories\Vouchers\VoucherRepository;
 
 class CloneVoucher
 {

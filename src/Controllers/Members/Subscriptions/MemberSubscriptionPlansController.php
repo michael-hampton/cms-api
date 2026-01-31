@@ -8,9 +8,9 @@ use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Cms\VoucherService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionPlanService;
+use App\Services\Vouchers\VoucherService;
 
 class MemberSubscriptionPlansController extends Controller
 {

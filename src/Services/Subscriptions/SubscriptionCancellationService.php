@@ -5,9 +5,9 @@ namespace App\Services\Subscriptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
-use App\Repositories\Members\PaymentRepository;
+use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use Exception;
 
 class SubscriptionCancellationService

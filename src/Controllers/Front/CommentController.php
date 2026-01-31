@@ -9,7 +9,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Requests\CreateCommentRequest;
-use App\Services\CommentService;
+use App\Services\Members\CommentService;
 
 class CommentController extends Controller
 {

@@ -4,9 +4,9 @@ namespace App\Actions\Pages;
 
 use App\Framework\Database\Database;
 use App\Models\Page;
-use App\Repositories\Cms\PageRepository;
-use App\Services\Cms\ClonePermissionChecker;
-use App\Services\Cms\PageHistoryService;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Services\Cms\Pages\ClonePermissionChecker;
+use App\Services\Cms\Pages\PageHistoryService;
 use Exception;
 
 class ClonePageToSite

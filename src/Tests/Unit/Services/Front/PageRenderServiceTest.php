@@ -6,9 +6,9 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
-use App\Repositories\Cms\PageGridRepository;
-use App\Services\Cms\BlockParserService;
-use App\Services\Cms\PageRenderService;
+use App\Repositories\Cms\Pages\PageGridRepository;
+use App\Services\Cms\Pages\BlockParserService;
+use App\Services\Cms\Pages\PageRenderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

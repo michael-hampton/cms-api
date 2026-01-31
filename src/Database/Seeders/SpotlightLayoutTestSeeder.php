@@ -7,8 +7,8 @@ use App\Framework\Database\Seeder\Seeder;
 use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Cms\BlockRepository;
-use App\Repositories\Cms\PageRepository;
-use App\Services\Cms\BlockParserService;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Services\Cms\Pages\BlockParserService;
 
 class SpotlightLayoutTestSeeder extends Seeder
 {

@@ -12,7 +12,7 @@ use App\Models\Site;
 use App\Models\Tag;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\CategoryRepository;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 
 class TechWeeklySeeder extends Seeder

@@ -13,7 +13,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\RegionSetRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\CreateRegionSetRequest;

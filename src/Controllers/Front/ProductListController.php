@@ -13,7 +13,7 @@ use App\Models\Product;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
-use App\Repositories\Product\ReviewRepository;
+use App\Repositories\ReviewRepository;
 use App\Search\SearchCriteria;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\BuildProductCardService;

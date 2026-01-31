@@ -11,7 +11,7 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
-use App\Repositories\Members\OrderRepository;
+use App\Repositories\Billing\OrderRepository;
 use App\Requests\BulkUpdateOrderStatus;
 use App\Requests\CreateOrderRequest;
 use App\Requests\CreatePaymentRequest;
@@ -19,8 +19,8 @@ use App\Requests\UpdateOrderItemsRequest;
 use App\Requests\UpdateOrderRequest;
 use App\Resources\OrderResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\Members\OrderService;
-use App\Services\Members\PaymentService;
+use App\Services\Billing\OrderService;
+use App\Services\Billing\PaymentService;
 use Exception;
 
 class OrderController extends Controller
@@ -188,7 +188,7 @@ class OrderController extends Controller
             $refundData = $request->all();
             $refundData['order_id'] = $id;
 
-            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Members\RefundService::class);
+            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\RefundService::class);
             $refund = $refundService->createRefund($refundData, $request->user()->id ?? null);
 
             return $this->jsonResponse([
@@ -291,7 +291,7 @@ class OrderController extends Controller
     public function refunds(int $id): JsonResponse
     {
         try {
-            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Members\RefundService::class);
+            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\RefundService::class);
             $refunds = $refundService->getRefundsByOrder($id);
 
             return $this->jsonResponse([

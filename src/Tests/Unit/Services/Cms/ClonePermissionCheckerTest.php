@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Cms;
 
-use App\Services\Cms\ClonePermissionChecker;
+use App\Services\Cms\Pages\ClonePermissionChecker;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 

@@ -12,7 +12,7 @@ use App\Resources\ProductOfferBundleResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
-use App\Services\Product\ProductOfferBundleService;
+use App\Services\Offers\ProductOfferBundleService;
 use Exception;
 
 class ProductOfferBundleController extends Controller

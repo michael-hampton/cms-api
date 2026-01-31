@@ -11,7 +11,7 @@ use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
-use App\Services\Cms\BlockParserService;
+use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Members\EmailService;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Services\Newsletter\NewsletterSendService;

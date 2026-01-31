@@ -28,11 +28,11 @@ use App\Framework\Support\SiteContext;
 use App\Parsers\BlockRegistry;
 use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\CategoryRepository;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 use App\Resources\PageResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\Cms\PageService;
+use App\Services\Cms\Pages\PageService;
 use Exception;
 
 class PageController extends Controller
@@ -239,7 +239,7 @@ class PageController extends Controller
             $result = $this->pageRepository->search($criteria);
 
             // Get current member for access control
-            $accessService = Container::getInstance()->make(\App\Services\Cms\ArticleAccessService::class);
+            $accessService = Container::getInstance()->make(\App\Services\Cms\Pages\ArticleAccessService::class);
 
             // Enrich pages with access information
             $enrichedPages = $accessService->enrichPagesWithAccessInfo(

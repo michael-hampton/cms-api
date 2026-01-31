@@ -7,7 +7,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\MemberRepository;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\MemberSubscriptionService;
 
 class MemberController extends Controller

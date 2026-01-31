@@ -6,7 +6,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Newsletter;
 use App\Models\Page;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 
 class NewsletterPageBuilderService
 {

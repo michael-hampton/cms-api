@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Actions\Page;
 
 use App\Actions\Pages\BulkApprovePages;
 use App\Models\Page;
-use App\Services\Cms\PageService;
+use App\Services\Cms\Pages\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;

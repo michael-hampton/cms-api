@@ -14,7 +14,7 @@ use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
 use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\UserRepository;
-use App\Services\Cms\PageService;
+use App\Services\Cms\Pages\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

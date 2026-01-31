@@ -11,7 +11,7 @@ use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Models\Page;
 use App\Repositories\Cms\BlockRepository;
-use App\Services\Cms\BlockParserService;
+use App\Services\Cms\Pages\BlockParserService;
 
 class ZoneBlockParser extends BaseBlockParser
 {

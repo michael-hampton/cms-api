@@ -7,7 +7,7 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\PageTag;
 use App\Models\Tag;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 use App\Services\Cms\TagService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;

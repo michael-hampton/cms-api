@@ -2,8 +2,8 @@
 
 namespace App\Actions\Pages;
 
-use App\Repositories\Cms\PageRepository;
-use App\Repositories\Cms\PageTagRepository;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\Pages\PageTagRepository;
 use App\Repositories\Cms\TagRepository;
 
 class BulkRemoveTagsFromPages

@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Actions\Tag;
 use App\Actions\Tag\CloneTag;
 use App\Framework\Database\Database;
 use App\Models\Tag;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;

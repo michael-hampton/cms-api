@@ -10,8 +10,8 @@ use App\Models\PageSeo;
 use App\Models\PageSettings;
 use App\Models\PageSocial;
 use App\Repositories\Cms\BlockRepository;
-use App\Repositories\Cms\PageCustomFieldRepository;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageCustomFieldRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use Exception;
 
 class MergePages

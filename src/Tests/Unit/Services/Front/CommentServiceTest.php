@@ -7,7 +7,7 @@ use App\Models\Comment;
 use App\Models\Member;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\Members\MemberRepository;
-use App\Services\CommentService;
+use App\Services\Members\CommentService;
 use App\Services\NotificationService;
 use Mockery;
 use PHPUnit\Framework\TestCase;

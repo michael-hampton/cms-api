@@ -15,9 +15,9 @@ use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
 use App\Services\Cms\MenuRenderer;
-use App\Services\Product\DealAlertService;
-use App\Services\Product\DealsService;
-use App\Services\Product\PriceAlertService;
+use App\Services\Offers\DealAlertService;
+use App\Services\Offers\DealsService;
+use App\Services\Offers\PriceAlertService;
 
 class DealsController extends Controller
 {

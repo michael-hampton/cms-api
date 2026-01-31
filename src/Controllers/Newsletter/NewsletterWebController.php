@@ -9,7 +9,7 @@ use App\Framework\Http\StreamedResponse;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;

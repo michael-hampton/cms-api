@@ -12,7 +12,7 @@ use App\Models\PageCategory;
 use App\Models\PageMetadata;
 use App\Models\PageTag;
 use App\Models\Tag;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;

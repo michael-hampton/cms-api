@@ -8,9 +8,9 @@ use App\Models\Menu;
 use App\Models\Page;
 use App\Models\Territory;
 use App\Parsers\PageGridRenderer;
-use App\Repositories\Cms\PageGridRepository;
+use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Repositories\Members\CommentRepository;
-use App\Services\Cms\BlockParserService;
+use App\Services\Cms\Pages\BlockParserService;
 
 class RegionContentController extends Controller
 {

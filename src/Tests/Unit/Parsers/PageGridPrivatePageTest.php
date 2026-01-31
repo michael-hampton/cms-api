@@ -11,7 +11,7 @@ use App\Models\PageMetadata;
 use App\Models\Subscription;
 use App\Models\SubscriptionWindow;
 use App\Parsers\PageGridBlockParser;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;

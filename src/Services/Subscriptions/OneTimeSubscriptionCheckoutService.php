@@ -4,12 +4,12 @@ namespace App\Services\Subscriptions;
 
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
-use App\Services\Cms\VoucherService;
-use App\Services\Members\OrderCalculationService;
-use App\Services\Members\OrderService;
-use App\Services\Payment\StripePaymentProcessor;
-use App\Services\Shop\CartService;
-use App\Services\Shop\ShippingService;
+use App\Services\Billing\OrderCalculationService;
+use App\Services\Billing\OrderService;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Shopping\CartService;
+use App\Services\Shopping\ShippingService;
+use App\Services\Vouchers\VoucherService;
 
 class OneTimeSubscriptionCheckoutService
 {

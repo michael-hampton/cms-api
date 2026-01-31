@@ -5,7 +5,7 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
-use App\Services\Members\WishlistService;
+use App\Services\Shopping\WishlistService;
 
 class MemberWishlistController extends Controller
 {

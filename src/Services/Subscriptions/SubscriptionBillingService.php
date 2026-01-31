@@ -4,7 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Framework\Database\Database;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 
 class SubscriptionBillingService
 {

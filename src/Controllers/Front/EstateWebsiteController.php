@@ -8,7 +8,7 @@ use App\Framework\Http\Response;
 use App\Models\CustomFieldDefinition;
 use App\Models\Menu;
 use App\Models\Page;
-use App\Services\Cms\BlockParserService;
+use App\Services\Cms\Pages\BlockParserService;
 use App\Services\EstateWebsiteService;
 
 class EstateWebsiteController extends Controller

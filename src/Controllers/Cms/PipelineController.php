@@ -5,7 +5,7 @@ namespace App\Controllers\Cms;
 use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Search\SearchCriteriaParser;
 use Exception;
 

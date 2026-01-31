@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Actions\Voucher;
 use App\Actions\Voucher\CloneVoucher;
 use App\Framework\Database\Database;
 use App\Models\Voucher;
-use App\Repositories\Cms\VoucherRepository;
+use App\Repositories\Vouchers\VoucherRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;

@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Actions\Page;
 
 use App\Actions\Pages\BulkUpdatePageStatus;
 use App\Models\Page;
-use App\Repositories\Cms\PageRepository;
-use App\Services\Cms\PageService;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Services\Cms\Pages\PageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;

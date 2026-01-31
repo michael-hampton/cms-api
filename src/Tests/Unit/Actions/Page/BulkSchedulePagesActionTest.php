@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Actions\Page;
 
 use App\Actions\Pages\BulkSchedulePages;
 use App\Models\Page;
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

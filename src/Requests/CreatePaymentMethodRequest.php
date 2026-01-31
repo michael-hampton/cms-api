@@ -4,7 +4,7 @@ namespace App\Requests;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
-use App\Repositories\Members\PaymentMethodRepository;
+use App\Repositories\Billing\PaymentMethodRepository;
 
 class CreatePaymentMethodRequest extends FormRequest
 {

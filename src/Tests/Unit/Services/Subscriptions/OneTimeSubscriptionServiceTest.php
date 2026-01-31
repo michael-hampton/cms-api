@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\Members\OrderRepository;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\OneTimeSubscriptionService;

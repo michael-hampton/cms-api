@@ -6,7 +6,7 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
-use App\Services\Cms\BlockParserService;
+use App\Services\Cms\Pages\BlockParserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 

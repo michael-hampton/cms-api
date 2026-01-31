@@ -15,8 +15,8 @@ use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Models\Product;
 use App\Models\Wishlist;
-use App\Repositories\Cms\PageRepository;
-use App\Services\Cms\ArticleAccessService;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Product\BuildProductCardService;
 
 class PageGridBlockParser extends BaseBlockParser

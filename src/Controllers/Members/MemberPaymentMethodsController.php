@@ -6,8 +6,8 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\Members\PaymentRepository;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Repositories\Billing\PaymentRepository;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 
 class MemberPaymentMethodsController extends Controller
 {

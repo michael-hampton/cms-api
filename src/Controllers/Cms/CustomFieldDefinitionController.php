@@ -9,7 +9,7 @@ use App\Framework\Validation\Validator;
 use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Cms\CustomFieldDefinitionRepository;
-use App\Repositories\Cms\PageCustomFieldRepository;
+use App\Repositories\Cms\Pages\PageCustomFieldRepository;
 use App\Requests\CreateCustomFieldDefinitionRequest;
 use App\Requests\UpdateCustomFieldDefinitionRequest;
 use Exception;

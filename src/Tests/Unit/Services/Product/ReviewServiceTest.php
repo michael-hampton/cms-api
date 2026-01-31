@@ -8,9 +8,9 @@ use App\Models\Product;
 use App\Models\Review;
 use App\Models\ReviewHelpful;
 use App\Repositories\Product\ProductRepository;
-use App\Repositories\Product\ReviewRepository;
 use App\Repositories\ReviewHelpfulRepository;
-use App\Services\Product\ReviewService;
+use App\Repositories\ReviewRepository;
+use App\Services\ReviewService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

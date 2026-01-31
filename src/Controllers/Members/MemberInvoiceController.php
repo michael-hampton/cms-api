@@ -8,8 +8,8 @@ use App\Framework\Http\RedirectResponse;
 use App\Framework\Http\StreamedResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\Payment;
-use App\Repositories\Members\PaymentRepository;
-use App\Services\InvoicePdfService;
+use App\Repositories\Billing\PaymentRepository;
+use App\Services\Billing\InvoicePdfService;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 

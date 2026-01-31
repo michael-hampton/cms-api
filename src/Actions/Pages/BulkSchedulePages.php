@@ -2,7 +2,7 @@
 
 namespace App\Actions\Pages;
 
-use App\Repositories\Cms\PageRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 
 class BulkSchedulePages
 {

@@ -7,8 +7,8 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Territory;
-use App\Repositories\Cms\PageRepository;
-use App\Repositories\Cms\PageTerritoryRepository;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\Pages\PageTerritoryRepository;
 use App\Repositories\Cms\TerritoryRepository;
 
 class TerritoryService

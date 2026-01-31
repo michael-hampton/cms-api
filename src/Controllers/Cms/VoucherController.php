@@ -10,14 +10,14 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
-use App\Repositories\Cms\VoucherRepository;
+use App\Repositories\Vouchers\VoucherRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\BulkUpdateVoucherStatus;
 use App\Requests\CreateVoucherRequest;
 use App\Requests\UpdateVoucherRequest;
 use App\Resources\VoucherResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\Cms\VoucherService;
+use App\Services\Vouchers\VoucherService;
 use Exception;
 
 class VoucherController extends Controller

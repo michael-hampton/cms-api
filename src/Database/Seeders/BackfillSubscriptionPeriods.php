@@ -5,7 +5,7 @@ namespace App\Database\Seeders;
 use App\Framework\Container;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\Subscription;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use Exception;
 
 class BackfillSubscriptionPeriods extends Seeder

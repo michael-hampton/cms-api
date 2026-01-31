@@ -3,7 +3,7 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
-use App\Repositories\Members\PaymentMethodRepository;
+use App\Repositories\Billing\PaymentMethodRepository;
 
 class UpdatePaymentMethodRequest extends FormRequest
 {

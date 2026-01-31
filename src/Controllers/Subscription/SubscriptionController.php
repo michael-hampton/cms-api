@@ -7,7 +7,7 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
-use App\Repositories\Members\PaymentRepository;
+use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Resources\SubscriptionResource;

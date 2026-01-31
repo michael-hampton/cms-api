@@ -8,7 +8,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPremiumAccess;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionUpgradeService;
 use Mockery;
 use PHPUnit\Framework\TestCase;

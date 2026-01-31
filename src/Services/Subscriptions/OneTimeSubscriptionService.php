@@ -4,7 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Framework\Database\Database;
 use App\Models\Subscription;
-use App\Repositories\Members\OrderRepository;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use Exception;

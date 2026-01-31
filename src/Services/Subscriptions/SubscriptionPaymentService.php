@@ -5,9 +5,9 @@ namespace App\Services\Subscriptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Payment;
-use App\Repositories\Members\PaymentRepository;
+use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Members\PaymentService;
+use App\Services\Billing\PaymentService;
 use Exception;
 
 class SubscriptionPaymentService

@@ -10,9 +10,9 @@ use App\Models\Menu;
 use App\Models\Product;
 use App\Repositories\Product\ProductRepository;
 use App\Services\Cms\MenuRenderer;
-use App\Services\Members\WishlistService;
 use App\Services\Product\ProductService;
-use App\Services\Product\ReviewService;
+use App\Services\ReviewService;
+use App\Services\Shopping\WishlistService;
 
 class ProductDetailController extends Controller
 {

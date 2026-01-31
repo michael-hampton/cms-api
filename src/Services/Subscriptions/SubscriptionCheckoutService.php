@@ -7,12 +7,12 @@ use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\Members\PaymentMethodRepository;
+use App\Repositories\Billing\PaymentMethodRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Cms\VoucherService;
-use App\Services\Payment\PayPalPaymentProcessor;
-use App\Services\Payment\StripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Vouchers\VoucherService;
 use Exception;
 
 class SubscriptionCheckoutService

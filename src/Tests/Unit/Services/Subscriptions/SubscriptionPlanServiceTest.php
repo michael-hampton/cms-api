@@ -24,7 +24,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
 
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
-        $this->voucherServiceMock = Mockery::mock(\App\Services\Cms\VoucherService::class);
+        $this->voucherServiceMock = Mockery::mock(\App\Services\Vouchers\VoucherService::class);
 
         $this->service = new SubscriptionPlanService(
             $this->planRepository,

@@ -4,7 +4,7 @@ namespace App\Requests;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
-use App\Repositories\Cms\VoucherRepository;
+use App\Repositories\Vouchers\VoucherRepository;
 
 class CreateVoucherRequest extends FormRequest
 {
