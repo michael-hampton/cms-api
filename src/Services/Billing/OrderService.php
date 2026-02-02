@@ -399,8 +399,7 @@ class OrderService
     }
 
 
-
-    private function createOrderItem(int $orderId, array $itemData): OrderItem
+    private function createOrderItem(int $orderId, array $itemData): Model
     {
         $itemData['order_id'] = $orderId;
 
@@ -518,5 +517,117 @@ class OrderService
 
             return $payment;
         });
+    }
+
+    /**
+     * Create a single merchant order within a multi-merchant checkout.
+     *
+     * Differences from createOrder():
+     *   - Always generates a unique order number (no caller override).
+     *   - Does NOT send an order-confirmation email (the checkout orchestrator
+     *     handles the unified confirmation).
+     *   - Accepts an explicit merchant_id which is stored on the order.
+     *   - Totals are pre-calculated by PaymentAllocationService; no re-calculation.
+     *
+     * @param array $data Order-level data (subtotal, tax, shipping, discount, total, addresses, etc.)
+     * @param array $items Item arrays (product_id, product_name, quantity, unit_price, …)
+     * @param int $siteId
+     * @param int|null $merchantId
+     * @return Order
+     */
+    public function createMerchantOrder(array $data, array $items, int $siteId, ?int $merchantId = null): Order
+    {
+        return $this->database->transaction(function () use ($data, $items, $siteId, $merchantId) {
+            // Resolve member (same logic as createOrder)
+            $member = null;
+            if (empty($data['user_id']) && !empty($data['customer_email'])) {
+                $member = $this->createOrGetMember($data, $siteId);
+                $data['user_id'] = $member ? $member->id : null;
+            } elseif (!empty($data['user_id'])) {
+                $member = $this->memberRepository->find($data['user_id']);
+            }
+
+            // Address handling (reuse same logic)
+            $this->resolveAddresses($data, $member, $siteId);
+
+            // Strip customer fields
+            unset($data['customer_name'], $data['customer_email'], $data['customer_phone']);
+
+            // Always generate a fresh order number
+            $data['order_number'] = $this->generateOrderNumber();
+
+            // Merchant association
+            $data['merchant_id'] = $merchantId;
+
+            $data['site_id'] = $siteId;
+            $data['status'] = 'pending';
+            $data['payment_status'] = 'unpaid';
+
+            // Totals are already set by the caller — do NOT recalculate
+
+            $order = $this->orderRepository->create($data);
+
+            $this->historyService->logCreated($order->id, $data, $data['user_id'] ?? null);
+
+            foreach ($items as $item) {
+                $this->createOrderItem($order->id, $item);
+            }
+
+            return $this->getOrderById($order->id);
+        });
+    }
+
+    /**
+     * Extracted address-resolution logic shared by createOrder and createMerchantOrder.
+     * Mutates $data in place.
+     */
+    private function resolveAddresses(array &$data, ?object $member, int $siteId): void
+    {
+        // Shipping
+        if (isset($data['shipping_address_id'])) {
+            if ($member) {
+                $address = $this->addressRepository->find($data['shipping_address_id']);
+                if (!$address || $address->member_id !== $member->id) {
+                    throw new \Exception("Invalid shipping address");
+                }
+            }
+        } elseif (isset($data['shipping_address']) && is_array($data['shipping_address']) && !empty(array_filter($data['shipping_address']))) {
+            if ($member) {
+                $addressData = $data['shipping_address'];
+                $addressData['type'] = 'shipping';
+                $addressData['label'] = 'Order Address';
+                $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
+                $data['shipping_address_id'] = $newAddress->id;
+                unset($data['shipping_address']);
+            } else {
+                $data['shipping_address'] = json_encode($data['shipping_address']);
+            }
+        }
+
+        // Billing
+        if (isset($data['billing_address_id'])) {
+            if ($member) {
+                $address = $this->addressRepository->find($data['billing_address_id']);
+                if (!$address || $address->member_id !== $member->id) {
+                    throw new \Exception("Invalid billing address");
+                }
+            }
+        } elseif (isset($data['billing_address']) && is_array($data['billing_address']) && !empty(array_filter($data['billing_address']))) {
+            if ($member) {
+                $addressData = $data['billing_address'];
+                $addressData['type'] = 'billing';
+                $addressData['label'] = 'Order Billing Address';
+                $newAddress = $this->addressRepository->createAddressForMember($member->id, $addressData, $siteId);
+                $data['billing_address_id'] = $newAddress->id;
+                unset($data['billing_address']);
+            }
+        }
+
+        if (!empty($data['billing_address']) && is_array($data['billing_address'])) {
+            $data['billing_address'] = json_encode($data['billing_address']);
+        }
+        if (!empty($data['shipping_address']) && is_array($data['shipping_address'])) {
+            $data['shipping_address'] = json_encode($data['shipping_address']);
+        }
     }
 }

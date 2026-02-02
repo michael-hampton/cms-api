@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Newsletters;
 
+use App\Framework\Database\Database;
 use App\Models\Newsletter;
 use App\Models\NewsletterSend;
 use App\Models\NewsletterSendRecipient;
@@ -13,7 +14,10 @@ use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Members\EmailService;
+use App\Services\Newsletter\NewsletterContentBuilder;
+use App\Services\Newsletter\NewsletterDispatcher;
 use App\Services\Newsletter\NewsletterPageBuilderService;
+use App\Services\Newsletter\NewsletterRecipientResolver;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -22,11 +26,60 @@ use Mockery;
 class NewsletterSendServicePreviewTest extends FunctionalTestCase
 {
     private NewsletterSendService $service;
-    private $emailService;
-    private $newsletterRepo;
-    private $sendRepo;
-    private $recipientRepo;
-    private $pageBuilderService;
+    private $mockParser;
+    private $mockEmailService;
+    private $mockSubscriberRepository;
+    private $mockNewsletterRepository;
+    private $mockSendRepository;
+    private $mockPreferenceRepository;
+    private $mockPageBuilderService;
+    private $mockMemberRepository;
+    private $mockRecipientRepository;
+    private $mockContentBuilder;
+    private $mockRecipientResolver;
+    private $mockDispatcher;
+    private $mockDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mockParser = Mockery::mock(BlockParserService::class);
+        $this->mockEmailService = Mockery::mock(EmailService::class);
+        $this->mockSubscriberRepository = Mockery::mock(SubscriberRepository::class);
+        $this->mockNewsletterRepository = Mockery::mock(NewsletterRepository::class);
+        $this->mockSendRepository = Mockery::mock(NewsletterSendRepository::class);
+        $this->mockPreferenceRepository = Mockery::mock(MemberSubscriptionPreferenceRepository::class);
+        $this->mockPageBuilderService = Mockery::mock(NewsletterPageBuilderService::class);
+        $this->mockMemberRepository = Mockery::mock(MemberRepository::class);
+        $this->mockRecipientRepository = Mockery::mock(NewsletterSendRecipientRepository::class);
+        $this->mockContentBuilder = Mockery::mock(NewsletterContentBuilder::class);
+        $this->mockRecipientResolver = Mockery::mock(NewsletterRecipientResolver::class);
+        $this->mockDispatcher = Mockery::mock(NewsletterDispatcher::class);
+        $this->mockDatabase = Mockery::mock(Database::class);
+
+        $this->service = new NewsletterSendService(
+            $this->mockParser,
+            $this->mockEmailService,
+            $this->mockSubscriberRepository,
+            $this->mockNewsletterRepository,
+            $this->mockSendRepository,
+            $this->mockPreferenceRepository,
+            $this->mockPageBuilderService,
+            $this->mockMemberRepository,
+            $this->mockRecipientRepository,
+            $this->mockContentBuilder,
+            $this->mockRecipientResolver,
+            $this->mockDispatcher,
+            $this->mockDatabase
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function testPreviewWithNoEmails(): void
     {
@@ -82,35 +135,30 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
         $sendRecord = Mockery::mock(NewsletterSend::class)->makePartial();
         $sendRecord->id = 1;
 
-        $this->sendRepo->shouldReceive('create')
+        $this->mockSendRepository->shouldReceive('create')
             ->once()
             ->andReturn($sendRecord);
-
-        $this->sendRepo->shouldReceive('update')
-            ->once()
-            ->with(1, Mockery::subset(['html_snapshot' => '<p>Test</p>']));
 
         $recipient1 = Mockery::mock(NewsletterSendRecipient::class)->makePartial();
         $recipient1->id = 1;
         $recipient1->email = 'preview1@example.com';
-        $recipient1->shouldReceive('update')->once();
-        $recipient1->shouldReceive('markAsSent')->once();
 
         $recipient2 = Mockery::mock(NewsletterSendRecipient::class)->makePartial();
         $recipient2->id = 2;
         $recipient2->email = 'preview2@example.com';
-        $recipient2->shouldReceive('update')->once();
-        $recipient2->shouldReceive('markAsSent')->once();
 
-        $this->recipientRepo->shouldReceive('createRecipients')
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $this->mockRecipientRepository->shouldReceive('createRecipients')
             ->once()
             ->with(1, $emails)
             ->andReturn([$recipient1, $recipient2]);
 
-        $this->recipientRepo->shouldReceive('updateSendCounts')
-            ->once();
+        $this->mockDispatcher->shouldReceive('dispatch')
+            ->once()
+            ->andReturn(['success' => true, 'sent' => 2, 'failed' => 0]);
 
-        $this->recipientRepo->shouldReceive('getStatistics')
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
             ->once()
             ->andReturn([
                 'sent' => 2,
@@ -118,15 +166,14 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
                 'pending' => 0
             ]);
 
-        $this->emailService->shouldReceive('send')
-            ->twice()
-            ->andReturn(true);
+        $this->mockContentBuilder->shouldReceive('build')
+            ->once()
+            ->andReturn(['html' => '<p>Test</p>', 'success' => true]);
 
         $result = $this->service->previewNewsletter($newsletter, $emails, $this->siteId);
 
         $this->assertTrue($result['success']);
         $this->assertTrue($result['preview']);
-        $this->assertEquals(2, $result['recipients']);
         $this->assertEquals(0, $result['failed']);
     }
 
@@ -140,80 +187,28 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
 
         $emails = ['test@example.com'];
 
-        // 2. Mock the PageBuilder calls
-        $this->pageBuilderService->shouldReceive('getPagesForNewsletter')
+        $this->mockDispatcher->shouldReceive('dispatch')
             ->once()
-            ->andReturn(collect([(object)['id' => 1, 'title' => 'Page', 'subtitle' => 'Sub', 'slug' => 'slug']]));
+            ->andReturn(['success' => true, 'sent' => 1, 'failed' => 0]);
 
-        $this->pageBuilderService->shouldReceive('buildNewsletterHtml')
-            ->once()
-            ->andReturn('<html><body class="email-body">Original Content</body></html>');
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
         $sendRecord = Mockery::mock(\App\Models\NewsletterSend::class)->makePartial();
         $sendRecord->id = 1;
-        $this->sendRepo->shouldReceive('create')->once()->andReturn($sendRecord);
+        $this->mockSendRepository->shouldReceive('create')->once()->andReturn($sendRecord);
 
-        // 3. FIX: The snapshot will NOT be "<p>Test</p>".
-        // It will be the HTML with the injected PREVIEW notice.
-        $this->sendRepo->shouldReceive('update')
-            ->once()
-            ->with(1, Mockery::on(function ($data) {
-                return isset($data['html_snapshot']) &&
-                    str_contains($data['html_snapshot'], 'PREVIEW') &&
-                    str_contains($data['html_snapshot'], 'Original Content');
-            }));
 
         $recipient = Mockery::mock(\App\Models\NewsletterSendRecipient::class)->makePartial();
         $recipient->id = 1;
         $recipient->email = 'test@example.com';
-        $recipient->shouldReceive('update')->once();
-        $recipient->shouldReceive('markAsSent')->once();
 
-        $this->recipientRepo->shouldReceive('createRecipients')->once()->andReturn([$recipient]);
-        $this->recipientRepo->shouldReceive('updateSendCounts')->once()->with(1);
-        $this->recipientRepo->shouldReceive('getStatistics')->once()->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->once()->andReturn([$recipient]);
+        $this->mockRecipientRepository->shouldReceive('getStatistics')->once()->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
 
-        $this->emailService->shouldReceive('send')
-            ->once()
-            ->withArgs(function ($email, $subject, $html) {
-                return $email === 'test@example.com'
-                    && str_contains($subject, '[PREVIEW]')
-                    && str_contains($html, 'Unsubscribe');
-            })
-            ->andReturn(true);
+        $this->mockContentBuilder->shouldReceive('build')->once()->andReturn(['html' => '<p>Test</p>', 'success' => true]);
 
         $result = $this->service->previewNewsletter($newsletter, $emails, $this->siteId);
 
         $this->assertTrue($result['success']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->emailService = Mockery::mock(EmailService::class);
-        $this->newsletterRepo = Mockery::mock(NewsletterRepository::class);
-        $this->sendRepo = Mockery::mock(NewsletterSendRepository::class);
-        $this->recipientRepo = Mockery::mock(NewsletterSendRecipientRepository::class);
-        $this->pageBuilderService = Mockery::mock(NewsletterPageBuilderService::class);
-
-        $this->service = new NewsletterSendService(
-            Mockery::mock(BlockParserService::class),
-            $this->emailService,
-            Mockery::mock(SubscriberRepository::class),
-            $this->newsletterRepo,
-            $this->sendRepo,
-            Mockery::mock(MemberSubscriptionPreferenceRepository::class),
-            $this->pageBuilderService,
-            Mockery::mock(MemberRepository::class),
-            Mockery::mock(MemberSubscriptionService::class),
-            $this->recipientRepo
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 }

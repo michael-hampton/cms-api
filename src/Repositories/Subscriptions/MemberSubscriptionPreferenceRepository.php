@@ -155,4 +155,19 @@ class MemberSubscriptionPreferenceRepository extends Repository
 
         return $this->findByMember($member->id, $siteId);
     }
+
+    /**
+     * Find preferences by multiple email addresses
+     *
+     * @param array $emails
+     * @param int $siteId
+     * @return Collection
+     */
+    public function findByEmails(array $emails, int $siteId): Collection
+    {
+        return MemberSubscriptionPreference::whereHas('member', function ($query) use ($emails, $siteId) {
+            $query->whereIn('email', $emails)
+                ->where('site_id', $siteId);
+        })->with(['member'])->get();
+    }
 }

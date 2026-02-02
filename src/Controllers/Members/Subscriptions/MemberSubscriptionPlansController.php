@@ -260,21 +260,21 @@ class MemberSubscriptionPlansController extends Controller
             $member->id
         );
 
-        if ($validation['valid']) {
-            $finalPrice = $plan->price - $validation['discount'];
+        if ($validation->valid) {
+            $finalPrice = $plan->price - $validation->discount;
 
             return $this->resourceResponse([
                 'success' => true,
-                'message' => $validation['message'],
+                'message' => $validation->message,
                 'data' => [
-                    'discount' => $validation['discount'],
+                    'discount' => $validation->discount,
                     'original_price' => $plan->price,
                     'final_price' => $finalPrice,
                     'voucher' => [
-                        'id' => $validation['voucher_id'],
+                        'id' => $validation->voucherId,
                         'code' => $voucherCode,
-                        'type' => $validation['voucher']->type,
-                        'value' => $validation['voucher']->value
+                        'type' => $validation->voucher->type,
+                        'value' => $validation->voucher->value
                     ]
                 ]
             ]);
@@ -282,7 +282,7 @@ class MemberSubscriptionPlansController extends Controller
 
         return $this->resourceResponse([
             'success' => false,
-            'message' => $validation['message']
+            'message' => $validation->message
         ], 400);
     }
 }

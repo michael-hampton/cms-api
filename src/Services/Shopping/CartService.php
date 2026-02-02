@@ -49,6 +49,7 @@ class CartService
                 'options' => $item->options,
                 'item_type' => $item->getItemType(),
                 'merchant_id' => $item->getMerchantId(),
+                'subscription_plan_id' => $item->subscription_plan_id,
             ];
 
             if ($item->isOffer()) {
@@ -235,6 +236,7 @@ class CartService
                 'delivery_type' => $deliveryType,
                 'plan_name' => $plan->name,
                 'billing_period' => $plan->billing_period,
+                'subscription_plan_id' => $planId,
             ])),
             'site_id' => $plan->site_id,
         ];

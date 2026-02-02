@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\VoucherValidationResult;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -107,6 +108,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
+        $subscription->plan = $plan;
 
         $this->subscriptionRepository->shouldReceive('create')
             ->once()
@@ -123,7 +125,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
-            ->with(1, ['payment_intent_id' => 'pi_123', 'payment_subscription_id' => 1])
+            ->with(1, ['payment_intent_id' => 'pi_123', 'payment_subscription_id' => 1, 'status' => 'active'])
             ->andReturn($subscription);
 
 
@@ -154,6 +156,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->price = 29.99;
         $plan->currency = 'USD';
         $plan->billing_period = 'monthly';
+        $plan->shouldReceive('getPremiumAccessGrants')->andReturn([]);
+        $plan->shouldReceive('grantsPremiumAccess')->andReturn(false);
 
         $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
@@ -172,19 +176,33 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($paymentMethod);
 
+        // Update to expect VoucherValidationResult object
+        $voucherResult = new VoucherValidationResult(
+            valid: true,
+            message: 'Voucher applied successfully',
+            discount: 5.00,
+            voucherId: 1,
+            voucher: $voucher,
+            finalPrice: 24.99
+        );
+
+        $this->voucherService->shouldReceive('getVoucherById')
+            ->with(1)
+            ->once()
+            ->andReturn($voucher);
+
         $this->voucherService->shouldReceive('validateVoucherForSubscription')
             ->with('SAVE10', 1, 1)
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher' => $voucher,
-                'voucher_id' => 1,
-                'discount' => 5.00,
-                'final_price' => 24.99
-            ]);
+            ->andReturn($voucherResult);
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
+        $subscription->voucher_id = 1;
+        $subscription->plan = $plan;
+        $subscription->discount_amount = 5;
+        $subscription->shouldReceive('grantPremiumAccess')->andReturn(null);
+        $subscription->shouldReceive('update')->andReturn(true);
 
         $this->subscriptionRepository->shouldReceive('create')
             ->once()
@@ -200,7 +218,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
-            ->with(1, ['payment_intent_id' => 'pi_123', 'payment_subscription_id' => 'sub_123'])
+            ->with(1, ['payment_intent_id' => 'pi_123', 'payment_subscription_id' => 'sub_123', 'status' => 'active'])
             ->andReturn($subscription);
 
         $this->stripeProcessor->shouldReceive('processSubscriptionPaymentWithVoucher')
@@ -212,6 +230,11 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
                 'subscription_id' => 'sub_123',
                 'discount_applied' => true
             ]);
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->with(1, 1, 5.00)
+            ->andReturn(true);
 
         $data = [
             'subscription_plan_id' => 1,
@@ -244,13 +267,12 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($paymentMethod);
 
+        $voucherValidationResult = new VoucherValidationResult(valid: false, message: 'Invalid or expired voucher code');
+
         $this->voucherService->shouldReceive('validateVoucherForSubscription')
             ->with('INVALID', 1, 1)
             ->once()
-            ->andReturn([
-                'valid' => false,
-                'message' => 'Invalid or expired voucher code'
-            ]);
+            ->andReturn($voucherValidationResult);
 
         $data = [
             'subscription_plan_id' => 1,
@@ -268,6 +290,11 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
     {
         $this->planRepository->shouldReceive('find')
             ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $this->paymentMethodRepository->shouldReceive('findByCode')
+            ->with('stripe')
             ->once()
             ->andReturn(null);
 
@@ -291,6 +318,11 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             ->with(1)
             ->once()
             ->andReturn($plan);
+
+        $this->paymentMethodRepository->shouldReceive('findByCode')
+            ->with('stripe')
+            ->once()
+            ->andReturn(null);
 
         $data = [
             'subscription_plan_id' => 1,

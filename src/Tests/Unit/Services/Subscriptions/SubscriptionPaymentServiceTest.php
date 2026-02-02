@@ -143,6 +143,10 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
             }))
             ->andReturn($mockPayment);
 
+        $this->subscriptionRepository->shouldReceive('hasPendingPaymentForCycle')
+            ->once()
+            ->andReturn(false);
+
         $result = $this->service->createRecurringPayment($subscriptionId);
 
         $this->assertSame($mockPayment, $result);

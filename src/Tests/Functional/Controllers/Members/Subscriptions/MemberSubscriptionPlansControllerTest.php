@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -13,7 +14,7 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
     use CreatesTestData;
 
     private Member $member;
-    private SubscriptionPlan $plan;
+    private Model $plan;
 
     protected function setUp(): void
     {

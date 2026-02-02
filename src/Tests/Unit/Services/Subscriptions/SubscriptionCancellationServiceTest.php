@@ -10,6 +10,7 @@ use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionCancellationService;
+use App\Services\Subscriptions\SubscriptionRefundService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery as m;
@@ -23,6 +24,34 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
     private $stripeProcessor;
     private $databaseMock;
     private SubscriptionCancellationService $service;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
+        $this->paymentRepository = m::mock(PaymentRepository::class);
+        $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
+        $this->refundService = m::mock(SubscriptionRefundService::class);
+        $this->databaseMock = m::mock(Database::class);
+
+        $this->service = new SubscriptionCancellationService(
+            $this->subscriptionRepository,
+            $this->paymentRepository,
+            $this->stripeProcessor,
+            $this->refundService,
+            $this->databaseMock
+        );
+
+        $_ENV['APP_ENV'] = 'production';
+    }
+
+    protected function tearDown(): void
+    {
+        m::close();
+        parent::tearDown();
+        $_ENV['APP_ENV'] = 'testing';
+    }
 
     public function testCancelSubscriptionWithStripeAtPeriodEnd(): void
     {
@@ -144,7 +173,6 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
     public function testReactivateSubscription(): void
     {
         $subscriptionId = 1;
-        $_ENV['APP_ENV'] = 'production';
 
         $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
         $mockPlan->billing_period = 'monthly';
@@ -154,6 +182,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $mockSubscription->status = 'cancelled';
         $mockSubscription->payment_subscription_id = 'sub_stripe123';
         $mockSubscription->plan = $mockPlan;
+        $mockSubscription->end_date = now_datetime()->addMonths(1);
         $mockSubscription->shouldReceive('hasStripeSubscription')->andReturn(true);
         $mockSubscription->shouldReceive('getStripeSubscriptionId')->andReturn('sub_stripe123');
 
@@ -190,7 +219,6 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result['success']);
 
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testReactivateSubscriptionThrowsIfAlreadyActive(): void
@@ -385,18 +413,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $subscription->id = 1;
         $subscription->status = 'active';
         $subscription->type = 'paid';
-        $subscription->price = 100;
-        $subscription->currency = 'USD';
-        $subscription->site_id = 1;
-        $subscription->member_id = $member->id;
-        $subscription->start_date = (new \DateTime())->modify('-10 days');
-        $subscription->end_date = (new \DateTime())->modify('+20 days');
-        $subscription->last_payment_date = (new \DateTime())->modify('-10 days');
         $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
         $subscription->shouldReceive('closeWindow');
-
-        $lastPayment = m::mock(Payment::class)->makePartial();
-        $lastPayment->id = 1;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -417,19 +435,15 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->paymentRepository->shouldReceive('getLastSubscriptionPayment')
-            ->with(1)
+        // Expect refund service to be called
+        $this->refundService->shouldReceive('createProRatedRefund')
             ->once()
-            ->andReturn($lastPayment);
-
-        $this->paymentRepository->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) {
-                return $data['subscription_id'] === 1
-                    && $data['amount'] < 0  // Negative for refund
-                    && isset($data['metadata']['refund_type'])
-                    && $data['metadata']['refund_type'] === 'pro_rated_cancellation';
-            }));
+            ->with($subscription, 'immediate_cancellation')
+            ->andReturn([
+                'success' => true,
+                'amount' => 66.67,
+                'unused_days' => 20
+            ]);
 
         $result = $this->service->cancelSubscription(1, [
             'cancel_at_period_end' => false,
@@ -484,7 +498,6 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
     public function test_reactivate_subscription_successfully(): void
     {
         $subscriptionId = 1;
-        $_ENV['APP_ENV'] = 'production';
 
         $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
         $mockPlan->billing_period = 'monthly';
@@ -531,7 +544,6 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result['success']);
 
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function test_reactivate_subscription_without_stripe(): void
@@ -539,10 +551,12 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
         $mockPlan->billing_period = 'monthly';
 
+        $originalEndDate = new \DateTime('+5 days');
+
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
         $subscription->status = 'cancelled';
-        $subscription->end_date = new \DateTime('+5 days');
+        $subscription->end_date = $originalEndDate;
         $subscription->plan = $mockPlan;
         $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
 
@@ -559,6 +573,9 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
+            ->with(1, m::on(function ($data) use ($originalEndDate) {
+                return $data['end_date'] === $originalEndDate->format('Y-m-d H:i:s');
+            }))
             ->andReturn($subscription);
 
         $result = $this->service->reactivateSubscription(1);
@@ -568,8 +585,6 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
     public function test_reactivate_subscription_throws_exception_when_stripe_fails(): void
     {
-        $_ENV['APP_ENV'] = 'production';
-
         $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
         $mockPlan->billing_period = 'monthly';
 
@@ -604,19 +619,19 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('This subscription cannot be reactivated');
 
         $this->service->reactivateSubscription(1);
-
-        $_ENV['APP_ENV'] = 'testing';
     }
 
-    public function test_reactivate_subscription_calculates_correct_end_date_for_quarterly(): void
+    public function test_reactivate_subscription_preserves_end_date_for_quarterly(): void
     {
         $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
         $mockPlan->billing_period = 'quarterly';
 
+        $originalEndDate = new \DateTime('+5 days');
+
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
         $subscription->status = 'cancelled';
-        $subscription->end_date = new \DateTime('+5 days');
+        $subscription->end_date = $originalEndDate;
         $subscription->plan = $mockPlan;
         $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
 
@@ -633,12 +648,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
-            ->with(1, m::on(function ($data) {
-                // Verify end date is approximately 3 months from now
-                $endDate = new \DateTime($data['end_date']);
-                $expectedDate = (new \DateTime())->modify('+3 months');
-                $diff = abs($endDate->getTimestamp() - $expectedDate->getTimestamp());
-                return $diff < 86400; // Within 1 day
+            ->with(1, m::on(function ($data) use ($originalEndDate) {
+                return $data['end_date'] === $originalEndDate->format('Y-m-d H:i:s');
             }))
             ->andReturn($subscription);
 
@@ -646,15 +657,17 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
-    public function test_reactivate_subscription_calculates_correct_end_date_for_yearly(): void
+    public function test_reactivate_subscription_preserves_end_date_for_yearly(): void
     {
         $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
         $mockPlan->billing_period = 'yearly';
 
+        $originalEndDate = new \DateTime('+5 days');
+
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
         $subscription->status = 'cancelled';
-        $subscription->end_date = new \DateTime('+5 days');
+        $subscription->end_date = $originalEndDate;
         $subscription->plan = $mockPlan;
         $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
 
@@ -671,12 +684,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
-            ->with(1, m::on(function ($data) {
-                // Verify end date is approximately 1 year from now
-                $endDate = new \DateTime($data['end_date']);
-                $expectedDate = (new \DateTime())->modify('+1 year');
-                $diff = abs($endDate->getTimestamp() - $expectedDate->getTimestamp());
-                return $diff < 86400; // Within 1 day
+            ->with(1, m::on(function ($data) use ($originalEndDate) {
+                return $data['end_date'] === $originalEndDate->format('Y-m-d H:i:s');
             }))
             ->andReturn($subscription);
 
@@ -835,28 +844,5 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame($mockSubscription, $result['subscription']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
-        $this->paymentRepository = m::mock(PaymentRepository::class);
-        $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
-        $this->databaseMock = m::mock(Database::class);
-
-        $this->service = new SubscriptionCancellationService(
-            $this->subscriptionRepository,
-            $this->paymentRepository,
-            $this->stripeProcessor,
-            $this->databaseMock
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        m::close();
-        parent::tearDown();
     }
 }

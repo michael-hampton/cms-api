@@ -3,8 +3,11 @@
 namespace App\Services\Shopping;
 
 use App\Framework\Authorization\MemberAuthWrapper;
+use App\Repositories\Billing\ShipmentRepository;
+use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderService;
+use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Vouchers\VoucherService;
 use Exception;
@@ -18,7 +21,11 @@ class CheckoutService
         private readonly ShippingService $shippingService,
         private readonly MemberAuthWrapper $memberAuthWrapper,
         private readonly OrderCalculationService $calculationService,
-        private readonly StripePaymentProcessor  $stripeProcessor // ADD THIS
+        private readonly StripePaymentProcessor   $stripeProcessor,
+        private readonly CheckoutSplittingService $splittingService,
+        private readonly PaymentAllocationService $allocationService,
+        private readonly MerchantShippingService  $merchantShippingService,
+        private readonly ShipmentRepository       $shipmentRepository,
     ) {}
 
 
@@ -168,7 +175,7 @@ class CheckoutService
             'discount' => $totals['discount'],
             'total' => $totals['total'],
             'currency' => 'USD',
-            'voucher_code' => $totals['voucher_code'],
+            'voucher_code' => $totals['voucher_code'] ?? null,
         ];
 
         if (!empty($data['saved_address'])) {
@@ -238,6 +245,160 @@ class CheckoutService
             return [
                 'success' => false,
                 'message' => 'Payment confirmation error: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Multi-merchant checkout flow.
+     *
+     * 1. Validate & get cart
+     * 2. Split items by merchant
+     * 3. Calculate per-merchant shipping
+     * 4. Allocate payment across groups
+     * 5. Create one Stripe PaymentIntent per merchant order (logical; single capture)
+     * 6. Persist each merchant order + shipment
+     * 7. Return unified response with all order numbers
+     *
+     * Subscription items must be excluded before calling this method.
+     */
+    public function processMultiMerchantCheckout(array $data, int $siteId): array
+    {
+        // --- Validation ---
+        $validation = $this->validateCheckoutData($data);
+        if (!$validation['valid']) {
+            return ['success' => false, 'message' => $validation['message']];
+        }
+
+        $cartItems = $this->cartService->getItems();
+        if (empty($cartItems)) {
+            return ['success' => false, 'message' => 'Cart is empty'];
+        }
+
+        // --- Split ---
+        $groups = $this->splittingService->splitByMerchant($cartItems);
+
+        if (empty($groups)) {
+            return ['success' => false, 'message' => 'No items to process'];
+        }
+
+        // --- Shipping ---
+        $country = $data['country'] ?? 'US';
+        $shippingPerGroup = $this->merchantShippingService->calculatePerGroup($groups, $country);
+
+        // --- Totals at checkout level (for allocation math) ---
+        $subtotal = $this->cartService->getTotal();
+        $totalShipping = array_sum($shippingPerGroup);
+
+        $discount = 0.0;
+        $voucherCode = null;
+        $voucherId = null;
+        if (!empty($data['voucher_code']) && !empty($data['voucher_id']) && !empty($data['discount_amount'])) {
+            $discount = (float)$data['discount_amount'];
+            $voucherCode = $data['voucher_code'];
+            $voucherId = (int)$data['voucher_id'];
+        }
+
+        $checkoutTotals = $this->calculationService->calculateOrderTotals(
+            [],
+            ['subtotal' => $subtotal, 'shipping' => $totalShipping, 'discount' => $discount]
+        );
+
+        // --- Allocate ---
+        $allocations = $this->allocationService->allocate($groups, $checkoutTotals, $shippingPerGroup);
+
+        // --- Stripe: one PaymentIntent per merchant order ---
+        $stripeContexts = [];
+        foreach ($groups as $key => $group) {
+            // Zero-total groups (e.g. fully discounted, free system buckets) have no
+            // Stripe object. The order is still persisted internally.
+            if (!($allocations[$key]['stripe_eligible'] ?? true)) {
+                continue;
+            }
+
+            $piResult = $this->stripeProcessor->createPaymentIntent([
+                'amount' => $allocations[$key]['total'],
+                'currency' => strtolower($data['currency'] ?? 'usd'),
+                'site_id' => $siteId,
+                'metadata' => [
+                    'checkout_type' => 'multi_merchant',
+                    'merchant_id' => $group['merchant_id'],
+                    'stripe_group_key' => $group['stripe_group_key'],
+                ],
+            ]);
+
+            if (!$piResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => $piResult['message'] ?? 'Failed to create payment intent',
+                ];
+            }
+
+            $stripeContexts[$key] = $piResult;
+        }
+
+        // --- Persist orders + shipments ---
+        $checkoutId = 'chk-' . uniqid('', true);
+        $orderNumbers = [];
+
+        try {
+            foreach ($groups as $key => $group) {
+                $items = $this->prepareOrderItems($group['items']);
+
+                $orderData = $this->prepareOrderData($data, $allocations[$key], $siteId);
+                $orderData['voucher_code'] = $voucherCode;
+                $orderData['checkout_id'] = $checkoutId;
+                // Store Stripe context and checkout linkage in metadata-style fields
+                $orderData['metadata'] = [
+                    'checkout_id' => $checkoutId,
+                    'merchant_id' => $group['merchant_id'],
+                    'stripe_payment_intent_id' => $stripeContexts[$key]['payment_intent_id'],
+                    'stripe_client_secret' => $stripeContexts[$key]['client_secret'],
+                ];
+
+                $order = $this->orderService->createMerchantOrder($orderData, $items, $siteId, $group['merchant_id']);
+                $orderNumbers[] = $order->order_number;
+
+                // --- Shipment ---
+                $this->shipmentRepository->create([
+                    'order_id' => $order->id,
+                    'checkout_id' => $checkoutId,
+                    'merchant_id' => $group['merchant_id'],
+                    'shipping_cost' => $allocations[$key]['shipping'],
+                    'country' => $country,
+                    'status' => 'pending',
+                    'metadata' => [
+                        'consolidation_enabled' => $this->merchantShippingService->isConsolidationEnabled(),
+                    ],
+                    'site_id' => $siteId,
+                ]);
+            }
+
+            // Apply voucher once at checkout level if applicable
+            if (!empty($voucherId) && $discount > 0) {
+                $userId = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->member()->id : null;
+                // Use the first order's id as the anchor for the voucher usage record
+                $this->voucherService->applyVoucher($voucherId, $userId, $discount, null);
+            }
+
+            // Clear cart
+            //$this->cartService->clear();
+
+            return [
+                'success' => true,
+                'message' => 'Multi-merchant checkout completed',
+                'checkout_id' => $checkoutId,
+                'order_numbers' => $orderNumbers,
+                'total' => $checkoutTotals['total'],
+                'stripe_contexts' => array_map(fn($ctx) => [
+                    'payment_intent_id' => $ctx['payment_intent_id'],
+                    'client_secret' => $ctx['client_secret'],
+                ], $stripeContexts),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to create orders: ' . $e->getMessage(),
             ];
         }
     }

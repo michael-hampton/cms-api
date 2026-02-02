@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Cms;
+namespace App\Controllers\Billing;
 
 use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
@@ -8,6 +8,7 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Order;
 use App\Models\Subscription;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Requests\CreateSubscriptionPaymentRequest;
 use App\Requests\FailPaymentRequest;
@@ -19,9 +20,10 @@ use Exception;
 class PaymentController extends Controller
 {
     public function __construct(
-        private readonly PaymentService    $paymentService,
+        private readonly PaymentService  $paymentService,
         private readonly PaymentRepository      $paymentRepository,
         private readonly StripePaymentProcessor $stripePaymentProcessor,
+        private readonly OrderRepository $orderRepository
     )
     {
         parent::__construct();
@@ -246,13 +248,40 @@ class PaymentController extends Controller
     {
         $paymentIntentId = $request->input('payment_intent_id');
         $orderId = $request->input('order_id');
+        $checkoutId = $request->input('checkout_id');
         $siteId = SiteContext::getId();
 
-        if (!$paymentIntentId || !$orderId) {
+        if (!$paymentIntentId || (!$orderId && !$checkoutId)) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Missing required parameters'
             ], 400);
+        }
+
+        if (!empty($checkoutId)) {
+            $orders = $this->orderRepository->getOrdersByCheckoutId($checkoutId);
+
+            if ($orders->isEmpty()) {
+                return $this->errorResponse(
+                    'No order found with checkout ID: ' . $checkoutId,
+                );
+            }
+
+            $result = [];
+
+            foreach ($orders as $order) {
+                $result = $this->stripePaymentProcessor->handleOneTimeSubscriptionPayment(
+                    $paymentIntentId,
+                    $order->id,
+                    $siteId
+                );
+
+                $result['results'] = $result;
+            }
+
+            $result['checkout_id'] = $checkoutId;
+
+            return $this->resourceResponse($result, 200);
         }
 
         $result = $this->stripePaymentProcessor->handleOneTimeSubscriptionPayment(

@@ -119,4 +119,9 @@ class OrderRepository extends Repository
             'one_time_subscription_id' => $subscriptionId
         ]);
     }
+
+    public function getOrdersByCheckoutId(string $checkoutId): Collection
+    {
+        return Order::where('checkout_id', $checkoutId)->get();
+    }
 }

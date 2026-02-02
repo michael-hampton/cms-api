@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\BillingPeriod;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Payment;
@@ -103,8 +104,10 @@ class SubscriptionPaymentService
 
                 // Calculate and update next billing date
                 if ($subscription->auto_renew && $subscription->plan) {
+                    $baseDate = $subscription->end_date ?? new \DateTime();
                     $nextBillingDate = $this->calculateNextBillingDate(
-                        $subscription->plan->billing_period
+                        $subscription->plan->billing_period,
+                        $baseDate
                     );
 
                     $this->subscriptionRepository->updateNextBillingDate(
@@ -138,17 +141,18 @@ class SubscriptionPaymentService
     /**
      * Calculate next billing date based on billing period
      */
-    private function calculateNextBillingDate(string $billingPeriod): \DateTime
+    private function calculateNextBillingDate(string|BillingPeriod $billingPeriod, ?\DateTime $baseDate = null): \DateTime
     {
-        $nextDate = new \DateTime();
+        $nextDate = clone($baseDate ?? new \DateTime());
 
-        match ($billingPeriod) {
-            'monthly' => $nextDate->modify('+1 month'),
-            'quarterly' => $nextDate->modify('+3 months'),
-            'yearly' => $nextDate->modify('+1 year'),
-            default => throw new Exception("Invalid billing period: {$billingPeriod}")
-        };
+        $period = is_string($billingPeriod) ? BillingPeriod::from($billingPeriod) : $billingPeriod;
 
+        $modifier = $period->toDateModifier();
+        if ($modifier === null) {
+            throw new Exception("Cannot calculate next billing date for billing period: {$period->value}");
+        }
+
+        $nextDate->modify($modifier);
         return $nextDate;
     }
 
@@ -266,13 +270,19 @@ class SubscriptionPaymentService
                 throw new Exception('Subscription is not due for renewal');
             }
 
+            // NEW: Check for existing pending payment for this billing cycle
+            $billingDate = $subscription->next_billing_date ?? new \DateTime();
+            if ($this->subscriptionRepository->hasPendingPaymentForCycle($subscriptionId, $billingDate)) {
+                throw new Exception('Pending payment already exists for this billing cycle');
+            }
+
             // Create payment record for renewal
             $payment = $this->paymentRepository->create([
                 'subscription_id' => $subscriptionId,
                 'order_id' => null,
                 'site_id' => $subscription->site_id,
-                'payment_method' => 'stripe', // Default, should be fetched from subscription payment method
-                'payment_provider' => 'stripe',
+                'payment_method' => $subscription->payment_method ?? 'stripe',
+                'payment_provider' => $subscription->payment_method ?? 'stripe',
                 'amount' => $subscription->price,
                 'currency' => $subscription->currency,
                 'status' => 'pending',

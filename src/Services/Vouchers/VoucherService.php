@@ -2,6 +2,7 @@
 
 namespace App\Services\Vouchers;
 
+use App\DTO\VoucherValidationResult;
 use App\Exceptions\CannotDeleteException;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
@@ -188,41 +189,26 @@ class VoucherService
         string $code,
         int    $planId,
         ?int   $userId = null
-    ): array
+    ): VoucherValidationResult
     {
         $voucher = $this->repository->findByCode($code);
 
         if (!$voucher) {
-            return [
-                'valid' => false,
-                'message' => 'Voucher not found',
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid('Voucher not found');
+
         }
 
         if (!$voucher->isValid()) {
             $message = $this->getInvalidMessage($voucher);
-            return [
-                'valid' => false,
-                'message' => $message,
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid($message);
         }
 
         if (!$voucher->appliesToSubscriptions()) {
-            return [
-                'valid' => false,
-                'message' => 'This voucher cannot be used for subscriptions',
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid('This voucher cannot be used for subscriptions');
         }
 
         if (!$voucher->isApplicableToSubscriptionPlan($planId)) {
-            return [
-                'valid' => false,
-                'message' => 'Voucher not applicable to this subscription plan',
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid('Voucher not applicable to this subscription plan');
         }
 
         // Check per-user limit
@@ -230,33 +216,22 @@ class VoucherService
             $userUsageCount = $voucher->getUserUsageCount($userId);
 
             if ($userUsageCount >= $voucher->per_user_limit) {
-                return [
-                    'valid' => false,
-                    'message' => 'You have already used this voucher the maximum number of times',
-                    'discount' => 0
-                ];
+                return VoucherValidationResult::invalid(
+                    'You have already used this voucher the maximum number of times'
+                );
             }
         }
 
         $plan = $this->subscriptionPlanRepository->find($planId);
 
         if (!$plan) {
-            return [
-                'valid' => false,
-                'message' => 'Plan not found',
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid('Plan not found');
         }
 
         $discount = $voucher->calculateSubscriptionDiscount($plan->price);
+        $finalPrice = max(0, $plan->price - $discount);
 
-        return [
-            'valid' => true,
-            'message' => 'Voucher applied successfully',
-            'discount' => $discount,
-            'voucher_id' => $voucher->id,
-            'voucher' => $voucher
-        ];
+        return VoucherValidationResult::valid($voucher, $discount, $finalPrice);
     }
 
     private function getInvalidMessage($voucher): string
@@ -270,5 +245,10 @@ class VoucherService
         }
 
         return 'Voucher is not valid';
+    }
+
+    public function getVoucherById($voucher_id)
+    {
+        return $this->repository->find($voucher_id);
     }
 }

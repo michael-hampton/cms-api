@@ -1,3 +1,15 @@
+<?php
+$isCancelling =
+        $activeSubscription &&
+        $activeSubscription->status === 'active' &&
+        $activeSubscription->cancelled_at !== null &&
+        $activeSubscription->end_date > new \DateTime('today');
+
+if ($activeSubscription && $activeSubscription->status === 'cancelled') {
+    $isCancelling = true;
+}
+?>
+
 <?php if ($activeSubscription->hasStripeSubscription() && $activeSubscription->auto_renew): ?>
     <div class="btn-group">
         <!-- existing buttons -->

@@ -8,6 +8,7 @@ use App\Framework\Mail\PendingMail;
 use App\Mail\OrderConfirmation;
 use App\Models\Address;
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderHistory;
 use App\Models\OrderItem;
@@ -20,6 +21,7 @@ use App\Services\Billing\OrderHistoryService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery as m;
 
@@ -27,7 +29,7 @@ use Mockery as m;
 
 class OrderServiceTest extends FunctionalTestCase
 {
-    use HasSiteHistory;
+    use HasSiteHistory, CreatesTestData;
 
     private $orderRepository;
     private $orderItemRepository;
@@ -2172,6 +2174,408 @@ class OrderServiceTest extends FunctionalTestCase
         $pendingMail->shouldReceive('send')
             ->once()
             ->with(m::type(OrderConfirmation::class));
+    }
+
+    public function testCreateMerchantOrderSuccessfully()
+    {
+        $siteId = 1;
+        $merchantId = 5;
+        $orderData = [
+            'customer_name' => 'John Doe',
+            'customer_email' => 'john@example.com',
+            'customer_phone' => '1234567890',
+            'subtotal' => 100.00,
+            'tax' => 10.00,
+            'shipping' => 5.00,
+            'discount' => 0.00,
+            'total' => 115.00,
+            'currency' => 'USD',
+            'payment_method' => 'card',
+            'shipping_address' => [
+                'address_line_1' => '123 Main St',
+                'city' => 'New York',
+                'postcode' => '10001',
+                'country' => 'US'
+            ]
+        ];
+
+        $items = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Test Product',
+                'quantity' => 2,
+                'unit_price' => 50.00,
+                'subtotal' => 100.00,
+                'tax' => 10.00,
+                'total' => 110.00
+            ]
+        ];
+
+        $mockMember = m::mock(Member::class)->makePartial();
+        $mockMember->id = 10;
+        $mockMember->email = 'john@example.com';
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123456';
+        $mockOrder->merchant_id = $merchantId;
+        $mockOrder->user_id = 10;
+
+        // Mock transaction wrapper
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        // Mock member lookup
+        $this->memberRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('john@example.com')
+            ->andReturn($mockMember);
+
+        // Mock address creation
+        $mockAddress = m::mock(Address::class)->makePartial();
+        $mockAddress->id = 1;
+        $this->addressRepository->shouldReceive('createAddressForMember')
+            ->once()
+            ->andReturn($mockAddress);
+
+        // Mock order creation
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) use ($merchantId) {
+                return $data['merchant_id'] === $merchantId
+                    && $data['status'] === 'pending'
+                    && $data['payment_status'] === 'unpaid'
+                    && isset($data['order_number'])
+                    && !isset($data['customer_name']); // Should be removed
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once();
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(1)
+            ->andReturn($mockOrder);
+
+
+        // Mock history logging
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->with($mockOrder->id, m::any(), 10);
+
+        // Mock item creation
+        $this->orderItemRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(m::mock(OrderItem::class));
+
+        $result = $this->service->createMerchantOrder($orderData, $items, $siteId, $merchantId);
+
+        $this->assertInstanceOf(Order::class, $result);
+        $this->assertEquals($merchantId, $result->merchant_id);
+    }
+
+    public function testCreateMerchantOrderDoesNotRecalculateTotals()
+    {
+        $siteId = 1;
+        $merchantId = 5;
+        $orderData = [
+            'customer_email' => 'john@example.com',
+            'subtotal' => 80.00,
+            'tax' => 8.00,
+            'shipping' => 12.00,
+            'discount' => 5.00,
+            'total' => 95.00
+        ];
+
+        $items = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Test Product',
+                'quantity' => 1,
+                'unit_price' => 100.00,
+                'subtotal' => 100.00,
+                'total' => 100.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->subtotal = 80.00;
+        $mockOrder->tax = 8.00;
+        $mockOrder->shipping = 12.00;
+        $mockOrder->discount = 5.00;
+        $mockOrder->total = 95.00;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->memberRepository->shouldReceive('findByEmail')->andReturn(null);
+
+        // Should NOT call calculateTotals
+        $this->orderCalculationService->shouldNotReceive('calculateTotals');
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['subtotal'] === 80.00
+                    && $data['tax'] === 8.00
+                    && $data['shipping'] === 12.00
+                    && $data['discount'] === 5.00
+                    && $data['total'] === 95.00;
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once();
+
+        $this->historyService->shouldReceive('logCreated')->once();
+        $this->orderItemRepository->shouldReceive('create')->once();
+        $this->orderRepository->shouldReceive('getOrderById')->andReturn($mockOrder);
+
+        $result = $this->service->createMerchantOrder($orderData, $items, $siteId, $merchantId);
+
+        $this->assertEquals(80.00, $result->subtotal);
+        $this->assertEquals(95.00, $result->total);
+    }
+
+    public function testCreateMerchantOrderUsesTotalsFromData()
+    {
+        // Verify that createMerchantOrder doesn't recalculate totals
+
+        $merchant = $this->createMerchant();
+
+        $orderData = [
+            'customer_email' => 'john@example.com',
+            'subtotal' => 80.00,  // Pre-calculated by PaymentAllocationService
+            'tax' => 8.00,
+            'shipping' => 12.00,
+            'discount' => 5.00,
+            'total' => 95.00,
+            'shipping_address' => [
+                'address_line_1' => '123 Main St',
+                'city' => 'New York',
+                'postcode' => '10001',
+                'country' => 'US'
+            ]
+        ];
+
+        $items = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Test Product',
+                'quantity' => 1,
+                'unit_price' => 100.00,  // Different from subtotal - shouldn't be recalculated
+                'subtotal' => 100.00,
+                'tax' => 0.00,
+                'total' => 100.00
+            ]
+        ];
+
+        $this->setMerchantOrderExpectations($merchant);
+
+        $order = $this->service->createMerchantOrder($orderData, $items, $this->siteId, $merchant->id);
+
+        // Verify the order uses the provided totals, not recalculated ones
+        $this->assertEquals(80.00, $order->subtotal);
+        $this->assertEquals(8.00, $order->tax);
+        $this->assertEquals(12.00, $order->shipping);
+        $this->assertEquals(5.00, $order->discount);
+        $this->assertEquals(95.00, $order->total);
+    }
+
+    public function testCreateMerchantOrderDoesNotSendEmail()
+    {
+        $siteId = 1;
+        $merchantId = 5;
+        $orderData = [
+            'customer_email' => 'john@example.com',
+            'subtotal' => 100.00,
+            'total' => 100.00
+        ];
+
+        $items = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Test Product',
+                'quantity' => 1,
+                'unit_price' => 100.00,
+                'subtotal' => 100.00,
+                'total' => 100.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->memberRepository->shouldReceive('findByEmail')->andReturn(null);
+        $this->orderRepository->shouldReceive('create')->andReturn($mockOrder);
+        $this->historyService->shouldReceive('logCreated')->once();
+        $this->orderItemRepository->shouldReceive('create')->once();
+        $this->orderRepository->shouldReceive('getOrderById')->andReturn($mockOrder);
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once();
+
+        // Verify mail manager is NEVER called
+        $this->mailManager->shouldNotReceive('to');
+        $this->mailManager->shouldNotReceive('send');
+
+        $result = $this->service->createMerchantOrder($orderData, $items, $siteId, $merchantId);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testCreateMerchantOrderGeneratesUniqueOrderNumber()
+    {
+        $siteId = 1;
+        $merchantId = 5;
+        $orderData = [
+            'customer_email' => 'john@example.com',
+            'subtotal' => 100.00,
+            'total' => 100.00,
+            'order_number' => 'SHOULD_BE_IGNORED'
+        ];
+
+        $items = [
+            ['product_id' => 1, 'product_name' => 'Test', 'quantity' => 1, 'unit_price' => 100, 'subtotal' => 100, 'total' => 100]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-987654-3210';
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->memberRepository->shouldReceive('findByEmail')->andReturn(null);
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['order_number'] !== 'SHOULD_BE_IGNORED'
+                    && str_starts_with($data['order_number'], 'ORD-');
+            }))
+            ->andReturn($mockOrder);
+
+        // Mock order number uniqueness check
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->andReturn(null);
+
+        $this->historyService->shouldReceive('logCreated')->once();
+        $this->orderItemRepository->shouldReceive('create')->once();
+        $this->orderRepository->shouldReceive('getOrderById')->andReturn($mockOrder);
+
+        $result = $this->service->createMerchantOrder($orderData, $items, $siteId, $merchantId);
+
+        $this->assertNotEquals('SHOULD_BE_IGNORED', $result->order_number);
+    }
+
+    public function testCreateMerchantOrderUsesExistingMember()
+    {
+        $siteId = 1;
+        $merchantId = 5;
+        $orderData = [
+            'customer_name' => 'Jane Smith',
+            'customer_email' => 'existing@example.com',
+            'subtotal' => 100.00,
+            'total' => 100.00
+        ];
+
+        $items = [
+            ['product_id' => 1, 'product_name' => 'Test', 'quantity' => 1, 'unit_price' => 100, 'subtotal' => 100, 'total' => 100]
+        ];
+
+        $mockMember = m::mock(Member::class)->makePartial();
+        $mockMember->id = 99;
+        $mockMember->email = 'existing@example.com';
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->user_id = 99;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        // Should find existing member
+        $this->memberRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('existing@example.com')
+            ->andReturn($mockMember);
+
+        // Should NOT create new member
+        $this->memberRepository->shouldNotReceive('create');
+
+        $this->orderRepository->shouldReceive('create')
+            ->with(m::on(function ($data) {
+                return $data['user_id'] === 99;
+            }))
+            ->andReturn($mockOrder);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once();
+
+        $this->historyService->shouldReceive('logCreated')->once();
+        $this->orderItemRepository->shouldReceive('create')->once();
+        $this->orderRepository->shouldReceive('getOrderById')->andReturn($mockOrder);
+
+        $result = $this->service->createMerchantOrder($orderData, $items, $siteId, $merchantId);
+
+        $this->assertEquals(99, $result->user_id);
+    }
+
+    private function setMerchantOrderExpectations(?Model $merchant = null)
+    {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $this->memberRepository->shouldReceive('findByEmail')
+            ->once()
+            ->andReturn($member);
+
+        $address = m::mock(Address::class)->makePartial();
+        $address->id = 1;
+
+        $this->addressRepository->shouldReceive('createAddressForMember')
+            ->once()
+            ->andReturn($address);
+
+        $this->orderRepository->shouldReceive('findByOrderNumber')
+            ->once()
+            ->andReturn(null);
+
+        $this->historyService->shouldReceive('logCreated')
+            ->once()
+            ->andReturn(m::mock(OrderHistory::class));
+
+        $order = m::mock(Order::class)->makePartial();
+        $order->id = 1;
+        $order->merchant_id = $merchant ? $merchant->id : null;
+        $order->status = 'pending';
+        $order->payment_status = 'unpaid';
+        $order->order_number = 'ORD-12345';
+        $order->subtotal = 80.00;
+        $order->tax = 8.00;
+        $order->shipping = 12.00;
+        $order->discount = 5.00;
+        $order->total = 95.00;
+
+        $this->orderRepository->shouldReceive('create')
+            ->once()
+            ->andReturn($order);
+
+        $this->orderItemRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(m::mock(OrderItem::class));
+
+        $this->orderRepository->shouldReceive('getOrderById')
+            ->once()
+            ->with(1)
+            ->andReturn($order);
     }
 
 

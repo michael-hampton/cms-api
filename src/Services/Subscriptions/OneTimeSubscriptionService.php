@@ -70,7 +70,10 @@ class OneTimeSubscriptionService
                 throw new Exception('Print delivery not available for this plan');
             }
 
+            // ALWAYS use a consistent domain date as the base for all calculations
             $startDate = new \DateTime();
+            $startDate->setTime(0, 0, 0); // Normalize to midnight for consistency
+
             $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
 
             $subscriptionData = [

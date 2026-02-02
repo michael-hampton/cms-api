@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Cms;
+namespace App\Controllers\Vouchers;
 
 use App\Actions\Voucher\BulkDeleteVoucher;
 use App\Actions\Voucher\CloneVoucher;

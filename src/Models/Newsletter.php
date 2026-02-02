@@ -24,7 +24,8 @@ class Newsletter extends Model
         'is_default',
         'slug',
         'is_premium',
-        'allows_single_purchase'
+        'allows_single_purchase',
+        'is_preview'
     ];
 
     protected $casts = [
@@ -34,6 +35,7 @@ class Newsletter extends Model
         'max_pages' => 'integer',
         'created_at' => 'datetime',
         'is_default' => 'boolean',
+        'is_preview' => 'boolean'
     ];
 
     const INTERVAL_DAILY = 'daily';

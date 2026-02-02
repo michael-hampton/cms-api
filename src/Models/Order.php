@@ -37,7 +37,9 @@ class Order extends Model
         'site_id',
         'created_at',
         'voucher_code',
-        'clone_history'
+        'clone_history',
+        'metadata',
+        'checkout_id'
     ];
 
     protected $casts = [
@@ -53,6 +55,7 @@ class Order extends Model
         'clone_history' => 'array',
         'shipping_address' => 'array',
         'billing_address' => 'array',
+        'metadata' => 'array'
     ];
 
     protected $dates = ['deleted_at'];

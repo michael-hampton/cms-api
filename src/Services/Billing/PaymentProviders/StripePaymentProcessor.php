@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
@@ -17,6 +18,7 @@ class StripePaymentProcessor
 
     public function __construct(
         private readonly PaymentRepository $paymentRepository,
+        private readonly OrderRepository $orderRepository,
         ?StripeClient                      $stripeClient = null
     )
     {
@@ -556,6 +558,87 @@ class StripePaymentProcessor
             ]);
 
             return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Process a refund for a payment
+     *
+     * @param string $transactionId The Stripe charge or payment intent ID
+     * @param float $amount The amount to refund (in dollars)
+     * @param array $options Additional options (reason, metadata, etc.)
+     * @return array Result with success status, refund_id, and message
+     */
+    public function refund(string $transactionId, float $amount, array $options = []): array
+    {
+        try {
+            // Convert amount to cents for Stripe
+            $amountInCents = (int)round($amount * 100);
+
+            $refundParams = [
+                'amount' => $amountInCents,
+            ];
+
+            // Add reason if provided
+            if (!empty($options['reason'])) {
+                $refundParams['reason'] = $options['reason'];
+            }
+
+            // Add metadata if provided
+            if (!empty($options['metadata'])) {
+                $refundParams['metadata'] = $options['metadata'];
+            }
+
+            // Determine if this is a charge ID or payment intent ID
+            // Charge IDs start with 'ch_', payment intent IDs start with 'pi_'
+            if (str_starts_with($transactionId, 'pi_')) {
+                $refundParams['payment_intent'] = $transactionId;
+            } else {
+                $refundParams['charge'] = $transactionId;
+            }
+
+            $refund = $this->stripe->refunds->create($refundParams);
+
+            Logger::info('Stripe refund processed', [
+                'refund_id' => $refund->id,
+                'amount' => $amount,
+                'transaction_id' => $transactionId,
+                'status' => $refund->status
+            ]);
+
+            return [
+                'success' => true,
+                'refund_id' => $refund->id,
+                'amount' => $amount,
+                'status' => $refund->status,
+                'message' => 'Refund processed successfully'
+            ];
+
+        } catch (ApiErrorException $e) {
+            Logger::error('Stripe refund failed', [
+                'transaction_id' => $transactionId,
+                'amount' => $amount,
+                'error' => $e->getMessage(),
+                'code' => $e->getStripeCode()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $this->getUserFriendlyMessage($e),
+                'error_code' => $e->getStripeCode()
+            ];
+
+        } catch (\Exception $e) {
+            Logger::error('Refund processing error', [
+                'transaction_id' => $transactionId,
+                'amount' => $amount,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'An unexpected error occurred while processing the refund'
+            ];
         }
     }
 
@@ -1244,6 +1327,11 @@ class StripePaymentProcessor
                 ]
             ]);
 
+            $this->orderRepository->update($orderId, [
+                'status' => 'completed',
+                'payment_status' => 'paid'
+            ]);
+
             return [
                 'success' => true,
                 'payment_id' => $payment->id,
@@ -1550,6 +1638,43 @@ class StripePaymentProcessor
             return [
                 'success' => false,
                 'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    public function updateSubscriptionPlan(
+        string $stripeSubscriptionId,
+        string $newPriceId,
+        array  $metadata = []
+    ): array
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId);
+
+            $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'items' => [
+                    [
+                        'id' => $subscription->items->data[0]->id,
+                        'price' => $newPriceId,
+                    ]
+                ],
+                'proration_behavior' => 'always_invoice',
+                'metadata' => $metadata,
+            ]);
+
+            return [
+                'success' => true,
+                'stripe_subscription_id' => $stripeSubscriptionId,
+            ];
+        } catch (\Exception $e) {
+            Logger::error("Failed to update Stripe subscription", [
+                'stripe_subscription_id' => $stripeSubscriptionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
             ];
         }
     }

@@ -280,4 +280,27 @@ class SubscriptionRepository extends Repository
 
         $subscription->update(['includes_digital_access' => false]);
     }
+
+    /**
+     * Check if a pending payment already exists for the current billing cycle
+     */
+    public function hasPendingPaymentForCycle(int $subscriptionId, \DateTime $billingDate): bool
+    {
+        $startOfDay = (clone $billingDate)->setTime(0, 0, 0);
+        $endOfDay = (clone $billingDate)->setTime(23, 59, 59);
+
+        $query = "SELECT COUNT(*) as count 
+                  FROM payments 
+                  WHERE subscription_id = ? 
+                  AND status = 'pending' 
+                  AND created_at BETWEEN ? AND ?";
+
+        $result = $this->database->query($query, [
+            $subscriptionId,
+            $startOfDay->format('Y-m-d H:i:s'),
+            $endOfDay->format('Y-m-d H:i:s')
+        ]);
+
+        return ($result[0]['count'] ?? 0) > 0;
+    }
 }

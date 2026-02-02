@@ -763,10 +763,10 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription($code, $planId, $userId);
 
-        $this->assertTrue($result['valid']);
-        $this->assertEquals('Voucher applied successfully', $result['message']);
-        $this->assertEquals(2.99, $result['discount']);
-        $this->assertEquals(1, $result['voucher_id']);
+        $this->assertTrue($result->valid);
+        $this->assertEquals('Voucher applied successfully', $result->message);
+        $this->assertEquals(2.99, $result->discount);
+        $this->assertEquals(1, $result->voucherId);
     }
 
     public function testValidateVoucherForSubscriptionNotFound()
@@ -778,9 +778,9 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription('NOTFOUND', 1);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher not found', $result['message']);
-        $this->assertEquals(0, $result['discount']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Voucher not found', $result->message);
+        $this->assertEquals(0, $result->discount);
     }
 
     public function testValidateVoucherForSubscriptionNotApplicableToSubscriptions()
@@ -795,8 +795,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription('TEST', 1);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('This voucher cannot be used for subscriptions', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('This voucher cannot be used for subscriptions', $result->message);
     }
 
     public function testValidateVoucherForSubscriptionNotApplicableToPlan()
@@ -812,8 +812,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription('TEST', 1);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher not applicable to this subscription plan', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Voucher not applicable to this subscription plan', $result->message);
     }
 
     public function testValidateVoucherForSubscriptionExceedsPerUserLimit()
@@ -835,8 +835,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription('TEST', $planId, $userId);
 
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('already used', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('already used', $result->message);
     }
 
     public function testValidateVoucherForSubscriptionPlanNotFound()
@@ -854,8 +854,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription('TEST', 999);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Plan not found', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Plan not found', $result->message);
     }
 
     public function testValidateVoucherForSubscriptionInvalidVoucher()
@@ -870,7 +870,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForSubscription('EXPIRED', 1);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher has expired', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Voucher has expired', $result->message);
     }
 }

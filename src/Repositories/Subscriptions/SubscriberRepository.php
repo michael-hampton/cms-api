@@ -133,4 +133,18 @@ class SubscriberRepository extends Repository
 
         return $subscriber->resubscribe($campaignId);
     }
+
+    /**
+     * Find subscribers by multiple email addresses
+     *
+     * @param array $emails
+     * @param int $siteId
+     * @return Collection
+     */
+    public function findByEmails(array $emails, int $siteId): Collection
+    {
+        return Subscriber::whereIn('email', $emails)
+            ->where('site_id', $siteId)
+            ->get();
+    }
 }

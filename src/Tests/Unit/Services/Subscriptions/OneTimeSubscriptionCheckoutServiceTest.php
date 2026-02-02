@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\VoucherValidationResult;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\Member;
@@ -317,14 +318,17 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn($member);
 
+        $voucherResult = new VouchervalidationResult(
+            true,
+            'SAVE10',
+            5,
+            999
+        );
+
         $this->voucherService->shouldReceive('validateVoucherForSubscription')
             ->once()
             ->with('SAVE10', 1, 123)
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 999,
-                'discount' => 5.00
-            ]);
+            ->andReturn($voucherResult);
 
         $this->subscriptionService->shouldReceive('createOneTimeSubscription')
             ->once()

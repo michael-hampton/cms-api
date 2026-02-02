@@ -262,12 +262,12 @@ class SubscriptionPlanService
                 $memberId
             );
 
-            if (!$validation['valid']) {
-                throw new \Exception($validation['message']);
+            if (!$validation->valid) {
+                throw new \Exception($validation->message);
             }
 
-            $voucherId = $validation['voucher_id'];
-            $discountAmount = $validation['discount'];
+            $voucherId = $validation->voucherId;
+            $discountAmount = $validation->discount;
         }
 
         $subscriptionData = array_merge($paymentData, [

@@ -11,7 +11,10 @@ use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Members\NotificationService;
 
 $notificationService = new NotificationService(
-        new RewardsRepository(),
+        new RewardsRepository(
+                new \App\Repositories\Rewards\RewardDefinitionRepository(new \App\Repositories\Rewards\RewardAuditLogRepository()),
+                new \App\Repositories\Rewards\RewardAuditLogRepository()
+        ),
         new GiftedArticleRepository()
 );
 

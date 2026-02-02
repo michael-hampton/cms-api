@@ -3,9 +3,11 @@
 namespace App\Tests\Unit\Services\Billing\Payment;
 
 use App\Models\Member;
+use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -33,6 +35,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     private $invoiceServiceMock;
     private $paymentIntentServiceMock;
     private $couponServiceMock;
+    private OrderRepository $orderRepository;
 
     protected function setUp(): void
     {
@@ -50,6 +53,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->invoiceServiceMock = m::mock(InvoiceService::class);
         $this->paymentIntentServiceMock = m::mock(PaymentIntentService::class);
         $this->couponServiceMock = m::mock(CouponService::class);
+        $this->orderRepository = m::mock(OrderRepository::class);
 
         $this->stripeMock->customers = $this->customerServiceMock;
         $this->stripeMock->subscriptions = $this->subscriptionServiceMock;
@@ -63,6 +67,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         // Inject mocked Stripe client via constructor
         $this->processor = new StripePaymentProcessor(
             $this->paymentRepository,
+            $this->orderRepository,
             $this->stripeMock
         );
     }
@@ -743,6 +748,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ])
             ->andReturn($customer);
 
+        $this->setMockOrderExpectations();
+
         $payment = m::mock(Payment::class)->makePartial();
         $payment->id = 1;
 
@@ -777,6 +784,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->paymentIntentServiceMock->shouldReceive('retrieve')
             ->once()
             ->andReturn($paymentIntent);
+
+        $this->setMockOrderExpectations();
 
         // Payment method retrieval fails
         $this->paymentMethodServiceMock->shouldReceive('retrieve')
@@ -1466,6 +1475,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with('pi_test123')
             ->andReturn($paymentIntent);
 
+        $this->setMockOrderExpectations();
+
         $payment = m::mock(Payment::class)->makePartial();
         $payment->id = 1;
 
@@ -1681,5 +1692,141 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertTrue($result['has_warnings']);
         $this->assertCount(1, $result['warnings']);
         $this->assertEquals('expiring', $result['warnings'][0]['status']);
+    }
+
+    public function testRefundWithChargeId()
+    {
+        $chargeId = 'ch_' . uniqid();
+        $amount = 99.99;
+
+        $mockRefund = new \stdClass();
+        $mockRefund->id = 'refund_' . uniqid();
+        $mockRefund->status = 'succeeded';
+
+        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function ($params) use ($chargeId, $amount) {
+                return $params['charge'] === $chargeId
+                    && $params['amount'] === (int)($amount * 100);
+            }))
+            ->willReturn($mockRefund);
+
+        $result = $this->processor->refund($chargeId, $amount);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals($mockRefund->id, $result['refund_id']);
+        $this->assertEquals($amount, $result['amount']);
+        $this->assertEquals('succeeded', $result['status']);
+    }
+
+    public function testRefundWithPaymentIntentId()
+    {
+        $paymentIntentId = 'pi_' . uniqid();
+        $amount = 150.00;
+
+        $mockRefund = new \stdClass();
+        $mockRefund->id = 'refund_' . uniqid();
+        $mockRefund->status = 'succeeded';
+
+        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function ($params) use ($paymentIntentId, $amount) {
+                return $params['payment_intent'] === $paymentIntentId
+                    && $params['amount'] === (int)($amount * 100);
+            }))
+            ->willReturn($mockRefund);
+
+        $result = $this->processor->refund($paymentIntentId, $amount);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals($mockRefund->id, $result['refund_id']);
+    }
+
+    public function testRefundWithReasonAndMetadata()
+    {
+        $chargeId = 'ch_' . uniqid();
+        $amount = 50.00;
+        $reason = 'customer_request';
+        $metadata = ['order_id' => '12345', 'user_id' => '67890'];
+
+        $mockRefund = new \stdClass();
+        $mockRefund->id = 'refund_' . uniqid();
+        $mockRefund->status = 'succeeded';
+
+        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function ($params) use ($reason, $metadata) {
+                return $params['reason'] === $reason
+                    && $params['metadata'] === $metadata;
+            }))
+            ->willReturn($mockRefund);
+
+        $result = $this->processor->refund($chargeId, $amount, [
+            'reason' => $reason,
+            'metadata' => $metadata
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testRefundFailsWithApiError()
+    {
+        $chargeId = 'ch_invalid';
+        $amount = 100.00;
+
+        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds
+            ->expects($this->once())
+            ->method('create')
+            ->willThrowException(new \Stripe\Exception\InvalidRequestException(
+                'Charge not found',
+                null,
+                null,
+            ));
+
+        $result = $this->processor->refund($chargeId, $amount);
+
+        $this->assertFalse($result['success']);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertArrayHasKey('error_code', $result);
+    }
+
+    public function testRefundAmountConvertedToCents()
+    {
+        $chargeId = 'ch_' . uniqid();
+        $amount = 123.45;
+
+        $mockRefund = new \stdClass();
+        $mockRefund->id = 'refund_' . uniqid();
+        $mockRefund->status = 'succeeded';
+
+        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds
+            ->expects($this->once())
+            ->method('create')
+            ->with($this->callback(function ($params) {
+                return $params['amount'] === 12345; // 123.45 * 100
+            }))
+            ->willReturn($mockRefund);
+
+        $result = $this->processor->refund($chargeId, $amount);
+
+        $this->assertTrue($result['success']);
+    }
+
+    private function setMockOrderExpectations()
+    {
+        $order = m::mock(Order::class)->makePartial();
+
+        $this->orderRepository->shouldReceive('update')
+            ->once()
+            ->with(1, ['status' => 'completed', 'payment_status' => 'paid'])
+            ->andReturn($order);
     }
 }

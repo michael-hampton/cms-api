@@ -10,11 +10,13 @@ class NewsletterSend extends Model
         'sent_at',
         'recipient_count',
         'content_snapshot',
-        'html_snapshot'
+        'html_snapshot',
+        'is_preview'
     ];
     protected $casts = [
         'sent_at' => 'datetime',
         'content_snapshot' => 'array',
+        'is_preview' => 'boolean'
     ];
 
     protected $timestamps = false;

@@ -113,8 +113,6 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
 
     public function testCompleteAccessPurchaseSucceeds(): void
     {
-        $_ENV['APP_ENV'] = 'production';
-
         $mockAccess = m::mock(SingleContentAccess::class)->makePartial();
         $mockAccess->id = 1;
         $mockAccess->member_id = $this->testMember->id;
@@ -165,14 +163,10 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
         $result = $this->service->completeAccessPurchase('pi_test123');
 
         $this->assertTrue($result['success']);
-
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testCompleteAccessPurchaseFailsForInvalidToken(): void
     {
-        $_ENV['APP_ENV'] = 'production';
-
         $this->databaseMock
             ->shouldReceive('transaction')
             ->once()
@@ -199,7 +193,6 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Access record not found');
 
         $this->service->completeAccessPurchase('pi_test123');
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testCheckAccessReturnsTrueForValidAccess(): void

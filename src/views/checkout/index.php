@@ -1334,6 +1334,8 @@
             data.discount_amount = appliedVoucher.discount;
         }
 
+        data.multi_merchant = true;
+
         // Show loading
         document.getElementById('loading-overlay').classList.add('show');
         this.disabled = true;
@@ -1460,8 +1462,10 @@
                 return;
             }
 
-            const clientSecret = result.client_secret;
-            const orderId = result.order_internal_id;
+            console.log('result', result, result.stripe_contexts.__system__.client_secret, result.checkout_id)
+
+            const clientSecret = result.stripe_contexts.__system__.client_secret;
+            const orderId = result.checkout_id;
 
             // Confirm payment with Stripe
             const {error, paymentIntent} = await stripe.confirmCardPayment(clientSecret, {
@@ -1487,14 +1491,16 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         payment_intent_id: paymentIntent.id,
-                        order_id: orderId
+                        checkout_id: orderId
                     })
                 });
 
                 const confirmResult = await confirmResponse.json();
 
+                console.log('confirmResult', confirmResult)
+
                 if (confirmResult.success) {
-                    window.location.href = `/order-confirmation?order_id=${result.order_id}`;
+                    window.location.href = `/order-confirmation?checkout_id=${confirmResult.checkout_id}`;
                 } else {
                     showAlert(confirmResult.message || 'Payment confirmation failed', 'error');
                 }
@@ -1644,7 +1650,7 @@
 
     checkLoginStatus();
     checkForAppliedVoucher();
-    loadWishlistCount();
+    //loadWishlistCount();
     checkCartForSubscription();
     initStripe();
 </script>

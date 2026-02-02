@@ -105,13 +105,11 @@ class SingleContentAccessService
     public function completeAccessPurchase(string $paymentIntentId): array
     {
         return $this->database->transaction(function () use ($paymentIntentId) {
-            if ($_ENV['APP_ENV'] !== 'testing') {
-                // Confirm payment
-                $paymentResult = $this->stripeProcessor->confirmPaymentIntent($paymentIntentId);
+            // Confirm payment
+            $paymentResult = $this->stripeProcessor->confirmPaymentIntent($paymentIntentId);
 
-                if (!$paymentResult['success'] || $paymentResult['status'] !== 'succeeded') {
-                    throw new Exception('Payment was not successful');
-                }
+            if (!$paymentResult['success'] || $paymentResult['status'] !== 'succeeded') {
+                throw new Exception('Payment was not successful');
             }
 
             // Find access record by payment_intent_id in metadata

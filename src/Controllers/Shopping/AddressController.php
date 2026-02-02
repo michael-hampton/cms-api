@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Front;
+namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;

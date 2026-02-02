@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\VoucherValidationResult;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -208,14 +209,16 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($plan);
 
+        $voucherValidationResult = new VouchervalidationResult(
+            valid: true,
+            discount: 2.99,
+            voucherId: 1
+        );
+
         // Mock VoucherService validation
         $this->voucherServiceMock->shouldReceive('validateVoucherForSubscription')
             ->with($voucherCode, $planId, $memberId)
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 1,
-                'discount' => 2.99
-            ]);
+            ->andReturn($voucherValidationResult);
 
         $this->subscriptionRepository->shouldReceive('createSubscription')
             ->with($memberId, $planId, $siteId, Mockery::on(function ($data) {
@@ -245,11 +248,15 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($plan);
 
+        $voucherValidationResult = new VouchervalidationResult(
+            valid: false,
+            discount: 0,
+            voucherId: null,
+            message: 'Voucher not found'
+        );
+
         $this->voucherServiceMock->shouldReceive('validateVoucherForSubscription')
-            ->andReturn([
-                'valid' => false,
-                'message' => 'Voucher not found'
-            ]);
+            ->andReturn($voucherValidationResult);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Voucher not found');

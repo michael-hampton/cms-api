@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Controllers\Front;
+namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\OrderService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
@@ -19,7 +20,8 @@ class CartController extends Controller
         private readonly CartService     $cartService,
         private readonly OrderService    $orderService,
         private readonly CheckoutService             $checkoutService,
-        private readonly SubscriptionCheckoutService $subscriptionCheckoutService
+        private readonly SubscriptionCheckoutService $subscriptionCheckoutService,
+        private readonly OrderRepository             $orderRepository
     )
     {
         parent::__construct();
@@ -83,6 +85,13 @@ class CartController extends Controller
         // Check if this is a subscription checkout
         if (!empty($data['subscription_plan_id'])) {
             return $this->processSubscription($request);
+        }
+
+        // Check if this is a multi-merchant checkout
+        if (!empty($data['multi_merchant']) && $data['multi_merchant'] === true) {
+            $result = $this->checkoutService->processMultiMerchantCheckout($data, $siteId);
+            $statusCode = $result['success'] ? 200 : 400;
+            return $this->resourceResponse($result, $statusCode);
         }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
@@ -150,12 +159,14 @@ class CartController extends Controller
     public function orderConfirmation(Request $request)
     {
         $orderNumber = $request->query('order_id');
+        $checkoutId = $request->query('checkout_id');
 
-        if (!$orderNumber) {
+        if (!$orderNumber && !$checkoutId) {
             return $this->redirect('/');
         }
 
-        $order = $this->orderService->getOrderByNumber($orderNumber);
+        $order = !empty($checkoutId) ? $this->orderRepository->getOrdersByCheckoutId($checkoutId)?->first()
+            : $this->orderService->getOrderByNumber($orderNumber);
 
         if (!$order) {
             return $this->redirect('/');

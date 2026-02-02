@@ -43,7 +43,12 @@ class SubscriptionCheckoutService
     public function processSubscriptionCheckout(int $memberId, array $data, int $siteId): array
     {
         try {
-            return $this->database->transaction(function () use ($memberId, $data, $siteId) {
+
+            $paymentProvider = $this->paymentMethodRepository->findByCode($data['payment_method']);
+
+            // Step 1: Create subscription record (PENDING)
+            $subscription = $this->database->transaction(function () use ($memberId, $data, $siteId, $paymentProvider) {
+
                 // Validate plan
                 $plan = $this->planRepository->find($data['subscription_plan_id']);
                 if (!$plan || !$plan->is_active) {
@@ -51,16 +56,17 @@ class SubscriptionCheckoutService
                 }
 
                 // Validate payment method
-                $paymentMethod = $this->paymentMethodRepository->findByCode($data['payment_method']);
+                $paymentMethod = $paymentProvider;
                 if (!$paymentMethod || !$paymentMethod->is_active) {
                     throw new Exception('Invalid payment method');
                 }
 
-                // Handle voucher if provided
+                // Defaults
                 $voucherId = null;
                 $discountAmount = 0;
                 $finalPrice = $plan->price;
 
+                // Handle voucher
                 if (!empty($data['voucher_code'])) {
                     $voucherValidation = $this->voucherService->validateVoucherForSubscription(
                         $data['voucher_code'],
@@ -68,18 +74,17 @@ class SubscriptionCheckoutService
                         $memberId
                     );
 
-                    if (!$voucherValidation['valid']) {
-                        throw new Exception($voucherValidation['message']);
+                    if (!$voucherValidation->valid) {
+                        throw new Exception($voucherValidation->message);
                     }
 
-                    $voucher = $voucherValidation['voucher'];
-                    $voucherId = $voucherValidation['voucher_id'];
-                    $discountAmount = $voucherValidation['discount'];
-                    $finalPrice = $voucherValidation['final_price'] ?? null;
+                    $voucherId = $voucherValidation->voucherId;
+                    $discountAmount = $voucherValidation->discount;
+                    $finalPrice = $voucherValidation->finalPrice;
                 }
 
-                // Create subscription with voucher data
-                $subscription = $this->createSubscription(
+                // Create subscription (status: pending)
+                return $this->createSubscription(
                     $memberId,
                     $plan,
                     $siteId,
@@ -87,33 +92,65 @@ class SubscriptionCheckoutService
                     $discountAmount,
                     $finalPrice
                 );
+            });
 
-                // Process payment with voucher
-                $paymentResult = $this->processPayment(
-                    $subscription,
-                    $plan,
-                    $data,
-                    $paymentMethod,
-                    $voucher ?? null
-                );
+            // Step 2: Process payment OUTSIDE transaction
+            $plan = $subscription->plan;
+            $paymentMethod = $paymentProvider;
 
-                if (!$paymentResult['success']) {
-                    throw new Exception($paymentResult['message'] ?? 'Payment failed');
-                }
+            $voucher = null;
+            if ($subscription->voucher_id !== null) {
+                $voucher = $this->voucherService->getVoucherById($subscription->voucher_id);
+            }
 
-                // Update subscription with payment details
+            $paymentResult = $this->processPayment(
+                $subscription,
+                $plan,
+                $data,
+                $paymentMethod,
+                $voucher
+            );
+
+            if (!$paymentResult['success']) {
+                // Mark subscription as failed
+                $this->database->transaction(function () use ($subscription) {
+                    $this->subscriptionRepository->update($subscription->id, [
+                        'status' => 'failed'
+                    ]);
+                });
+
+                throw new Exception($paymentResult['message'] ?? 'Payment failed');
+            }
+
+            // Step 3: Activate subscription & apply voucher
+            $this->database->transaction(function () use ($subscription, $plan, $paymentResult, $memberId) {
+
                 $this->subscriptionRepository->update($subscription->id, [
                     'payment_intent_id' => $paymentResult['payment_intent_id'] ?? null,
-                    'payment_subscription_id' => $paymentResult['subscription_id'] ?? null
+                    'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
+                    'status' => 'active'
                 ]);
 
-                return [
-                    'success' => true,
-                    'message' => 'Subscription created successfully',
-                    'subscription_id' => $subscription->id,
-                    'redirect_url' => $paymentResult['redirect_url'] ?? null
-                ];
+                // Grant premium access
+                $this->grantPlanPremiumAccess($subscription, $plan);
+
+                // Apply voucher usage AFTER successful payment
+                if ($subscription->voucher_id !== null) {
+                    $this->voucherService->applyVoucher(
+                        $subscription->voucher_id,
+                        $memberId,
+                        $subscription->discount_amount
+                    );
+                }
             });
+
+            return [
+                'success' => true,
+                'message' => 'Subscription created successfully',
+                'subscription_id' => $subscription->id,
+                'redirect_url' => $paymentResult['redirect_url'] ?? null
+            ];
+
         } catch (Exception $e) {
             return [
                 'success' => false,
@@ -131,7 +168,10 @@ class SubscriptionCheckoutService
         ?float           $finalPrice = null
     ): Model
     {
+        // Use domain date (subscription start) as basis for all calculations
         $startDate = new \DateTime();
+        $startDate->setTime(0, 0, 0); // Normalize to midnight
+
         $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
 
         $subscription = $this->subscriptionRepository->create([
@@ -142,6 +182,7 @@ class SubscriptionCheckoutService
             'status' => 'pending',
             'start_date' => $startDate->format('Y-m-d H:i:s'),
             'end_date' => $endDate?->format('Y-m-d H:i:s'),
+            'next_billing_date' => $endDate?->format('Y-m-d H:i:s'),
             'price' => $finalPrice ?? $plan->price,
             'original_price' => $plan->price,
             'discount_amount' => $discountAmount,
@@ -149,9 +190,6 @@ class SubscriptionCheckoutService
             'currency' => $plan->currency,
             'auto_renew' => $plan->billing_period !== 'lifetime'
         ]);
-
-        // **GRANT PREMIUM ACCESS FROM PLAN**
-        $this->grantPlanPremiumAccess($subscription, $plan);
 
         return $subscription;
     }

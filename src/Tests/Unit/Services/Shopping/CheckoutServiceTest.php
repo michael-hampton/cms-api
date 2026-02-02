@@ -4,28 +4,40 @@ namespace App\Tests\Unit\Services\Shopping;
 
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Models\Member;
+use App\Models\Merchant;
 use App\Models\Order;
+use App\Models\Shipment;
+use App\Repositories\Billing\ShipmentRepository;
+use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderService;
+use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
+use App\Services\Shopping\MerchantShippingService;
 use App\Services\Shopping\ShippingService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery as m;
 
 class CheckoutServiceTest extends FunctionalTestCase
 {
-    private $cartService;
-    private $orderService;
-    private $voucherService;
-    private $shippingService;
-    private CheckoutService $service;
-    private $memberAuthWrapper;
-    private $orderCalculationService;
+    use CreatesTestData;
 
-    private $stripePaymentService;
+    private CartService $cartService;
+    private OrderService $orderService;
+    private VoucherService $voucherService;
+    private ShippingService $shippingService;
+    private CheckoutService $service;
+    private MemberAuthWrapper $memberAuthWrapper;
+    private OrderCalculationService $orderCalculationService;
+    private StripePaymentProcessor $stripePaymentService;
+    private CheckoutSplittingService $mockSplittingService;
+    private PaymentAllocationService $mockAllocationService;
+    private MerchantShippingService $mockMerchantShippingService;
+    private ShipmentRepository $mockShipmentRepository;
 
     protected function setUp(): void
     {
@@ -38,6 +50,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->voucherService = m::mock(VoucherService::class);
         $this->shippingService = m::mock(ShippingService::class);
         $this->stripePaymentService = m::mock(StripePaymentProcessor::class);
+        $this->mockSplittingService = m::mock(CheckoutSplittingService::class);
+        $this->mockAllocationService = m::mock(PaymentAllocationService::class);
+        $this->mockMerchantShippingService = m::mock(MerchantShippingService::class);
+        $this->mockShipmentRepository = m::mock(ShipmentRepository::class);
 
         $this->service = new CheckoutService(
             $this->cartService,
@@ -47,6 +63,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             $this->memberAuthWrapper,
             $this->orderCalculationService,
             $this->stripePaymentService,
+            $this->mockSplittingService,
+            $this->mockAllocationService,
+            $this->mockMerchantShippingService,
+            $this->mockShipmentRepository
         );
     }
 
@@ -1033,5 +1053,344 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Payment confirmation error', $result['message']);
+    }
+
+    public function testProcessMultiMerchantCheckoutSuccessfully()
+    {
+        $siteId = 1;
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'New York',
+            'postal_code' => '10001',
+            'country' => 'US',
+            'currency' => 'usd'
+        ];
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 50.00,
+                'quantity' => 1,
+                'subtotal' => 50.00,
+                'merchant_id' => 1
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2,
+                'product_name' => 'Product 2',
+                'price' => 75.00,
+                'quantity' => 1,
+                'subtotal' => 75.00,
+                'merchant_id' => 2
+            ]
+        ];
+
+        $groups = [
+            'merchant_1' => [
+                'merchant_id' => 1,
+                'stripe_group_key' => 'merchant_1',
+                'items' => [$cartItems[0]]
+            ],
+            'merchant_2' => [
+                'merchant_id' => 2,
+                'stripe_group_key' => 'merchant_2',
+                'items' => [$cartItems[1]]
+            ]
+        ];
+
+        $shippingPerGroup = [
+            'merchant_1' => 5.00,
+            'merchant_2' => 7.00
+        ];
+
+        $allocations = [
+            'merchant_1' => [
+                'subtotal' => 50.00,
+                'shipping' => 5.00,
+                'tax' => 5.00,
+                'discount' => 0.00,
+                'total' => 60.00,
+                'stripe_eligible' => true
+            ],
+            'merchant_2' => [
+                'subtotal' => 75.00,
+                'shipping' => 7.00,
+                'tax' => 7.50,
+                'discount' => 0.00,
+                'total' => 89.50,
+                'stripe_eligible' => true
+            ]
+        ];
+
+        $mockOrder1 = m::mock(Order::class)->makePartial();
+        $mockOrder1->id = 1;
+        $mockOrder1->order_number = 'ORD-1234';
+
+        $mockOrder2 = m::mock(Order::class)->makePartial();
+        $mockOrder2->id = 2;
+        $mockOrder2->order_number = 'ORD-5678';
+
+        // Mock cart service
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn($cartItems);
+
+        $this->cartService->shouldReceive('getTotal')
+            ->once()
+            ->andReturn(125.00);
+
+        // Mock splitting service
+        $this->mockSplittingService->shouldReceive('splitByMerchant')
+            ->once()
+            ->with($cartItems)
+            ->andReturn($groups);
+
+        // Mock merchant shipping
+        $this->mockMerchantShippingService->shouldReceive('calculatePerGroup')
+            ->once()
+            ->with($groups, 'US')
+            ->andReturn($shippingPerGroup);
+
+        // Mock calculation service
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->andReturn([
+                'subtotal' => 125.00,
+                'shipping' => 12.00,
+                'tax' => 12.50,
+                'discount' => 0.00,
+                'total' => 149.50
+            ]);
+
+        // Mock allocation service
+        $this->mockAllocationService->shouldReceive('allocate')
+            ->once()
+            ->andReturn($allocations);
+
+        // Mock Stripe payment intents
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->twice()
+            ->andReturn([
+                'success' => true,
+                'payment_intent_id' => 'pi_123',
+                'client_secret' => 'secret_123'
+            ], [
+                'success' => true,
+                'payment_intent_id' => 'pi_456',
+                'client_secret' => 'secret_456'
+            ]);
+
+        // Mock order service
+        $this->orderService->shouldReceive('createMerchantOrder')
+            ->twice()
+            ->andReturn($mockOrder1, $mockOrder2);
+
+        // Mock shipment repository
+        $this->mockShipmentRepository->shouldReceive('create')
+            ->twice()
+            ->andReturn(m::mock(Shipment::class));
+
+        // Mock member auth
+        $this->memberAuthWrapper->shouldReceive('check')
+            ->atLeast()->once()
+            ->andReturn(false);
+
+        $this->mockMerchantShippingService->shouldReceive('isConsolidationEnabled')
+            ->twice()
+            ->andReturn(true);
+
+        // Mock cart clear
+        $this->cartService->shouldReceive('clear')
+            ->once();
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('checkout_id', $result);
+        $this->assertArrayHasKey('order_numbers', $result);
+        $this->assertCount(2, $result['order_numbers']);
+        $this->assertEquals(['ORD-1234', 'ORD-5678'], $result['order_numbers']);
+    }
+
+    public function testProcessMultiMerchantCheckoutValidationFailure()
+    {
+        $siteId = 1;
+        $data = []; // Missing required fields
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertFalse($result['success']);
+        $this->assertArrayHasKey('message', $result);
+    }
+
+    public function testProcessMultiMerchantCheckoutStripeFailure()
+    {
+        $siteId = 1;
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'New York',
+            'postal_code' => '10001',
+            'country' => 'US',
+            'currency' => 'usd'
+        ];
+
+        $cartItems = [
+            ['id' => 1, 'product_id' => 1, 'merchant_id' => 1, 'price' => 50.00, 'quantity' => 1, 'subtotal' => 50.00]
+        ];
+
+        $groups = [
+            'merchant_1' => [
+                'merchant_id' => 1,
+                'stripe_group_key' => 'merchant_1',
+                'items' => $cartItems
+            ]
+        ];
+
+        $this->cartService->shouldReceive('getItems')->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->andReturn(50.00);
+        $this->mockSplittingService->shouldReceive('splitByMerchant')->andReturn($groups);
+        $this->mockMerchantShippingService->shouldReceive('calculatePerGroup')->andReturn(['merchant_1' => 5.00]);
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')->andReturn([
+            'subtotal' => 50.00,
+            'total' => 55.00
+        ]);
+        $this->mockAllocationService->shouldReceive('allocate')->andReturn([
+            'merchant_1' => ['total' => 55.00, 'stripe_eligible' => true]
+        ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => false,
+                'message' => 'Card declined'
+            ]);
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Card declined', $result['message']);
+    }
+
+    public function testProcessMultiMerchantCheckoutWithVoucher()
+    {
+        $siteId = 1;
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'New York',
+            'postal_code' => '10001',
+            'country' => 'US',
+            'currency' => 'usd',
+            'voucher_code' => 'SAVE10',
+            'voucher_id' => 1,
+            'discount_amount' => 10.00
+        ];
+
+        $cartItems = [
+            ['id' => 1, 'product_id' => 1, 'merchant_id' => 1, 'price' => 50.00, 'quantity' => 1, 'subtotal' => 50.00]
+        ];
+
+        $groups = [
+            'merchant_1' => [
+                'merchant_id' => 1,
+                'stripe_group_key' => 'merchant_1',
+                'items' => $cartItems
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-1234';
+
+        $this->cartService->shouldReceive('getItems')->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->andReturn(50.00);
+        $this->mockSplittingService->shouldReceive('splitByMerchant')->andReturn($groups);
+        $this->mockMerchantShippingService->shouldReceive('calculatePerGroup')->andReturn(['merchant_1' => 5.00]);
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')->andReturn([
+            'subtotal' => 50.00,
+            'discount' => 10.00,
+            'total' => 45.00
+        ]);
+        $this->mockAllocationService->shouldReceive('allocate')->andReturn([
+            'merchant_1' => ['total' => 45.00, 'stripe_eligible' => true, 'discount' => 10.00]
+        ]);
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')->andReturn([
+            'success' => true,
+            'payment_intent_id' => 'pi_123',
+            'client_secret' => 'secret_123'
+        ]);
+        $this->orderService->shouldReceive('createMerchantOrder')->andReturn($mockOrder);
+        $this->mockShipmentRepository->shouldReceive('create')->andReturn(m::mock(Shipment::class));
+        $this->memberAuthWrapper->shouldReceive('check')->andReturn(false);
+
+        // Mock voucher application
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->with(1, null, 10.00, null);
+
+        $this->cartService->shouldReceive('clear')->once();
+        $this->mockMerchantShippingService->shouldReceive('isConsolidationEnabled')->andReturn(true);
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessMultiMerchantCheckoutEmptyCart()
+    {
+        $siteId = 1;
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'New York',
+            'postal_code' => '10001',
+            'country' => 'US'
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn([]);
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Cart is empty', $result['message']);
+    }
+
+    public function testProcessMultiMerchantCheckoutWithEmptyCart()
+    {
+        $checkoutData = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'New York',
+            'postal_code' => '10001',
+            'country' => 'US'
+        ];
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([]);
+
+        $result = $this->service->processMultiMerchantCheckout($checkoutData, $this->siteId);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Cart is empty', $result['message']);
     }
 }

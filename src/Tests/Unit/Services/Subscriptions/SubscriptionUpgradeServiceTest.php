@@ -2,6 +2,13 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Exceptions\Subscriptions\InactiveSubscriptionException;
+use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
+use App\Exceptions\Subscriptions\MissingStripePriceException;
+use App\Exceptions\Subscriptions\PaymentFailedException;
+use App\Exceptions\Subscriptions\PlanMismatchException;
+use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
+use App\Exceptions\Subscriptions\UnauthorizedException;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -36,12 +43,15 @@ class SubscriptionUpgradeServiceTest extends TestCase
             $this->stripeProcessor,
             $this->database
         );
+
+        $_ENV['APP_ENV'] = 'production';
     }
 
     protected function tearDown(): void
     {
         Mockery::close();
         parent::tearDown();
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testGetUpgradeOptionsReturnsAvailableUpgrades(): void
@@ -51,6 +61,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->id = 1;
         $subscription->plan_name = 'Basic';
         $subscription->price = 19.99;
+        $subscription->currency = 'USD';
 
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
@@ -84,7 +95,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $this->assertTrue($result['can_upgrade']);
         $this->assertCount(1, $result['options']);
         $this->assertEquals('Premium', $result['options'][0]['plan_name']);
-        $this->assertEquals(20.00, round($result['options'][0]['price_difference'], 2));
+        $this->assertEquals(20.00, $result['options'][0]['price_difference']);
     }
 
     public function testGetUpgradeOptionsThrowsExceptionForNonExistentSubscription(): void
@@ -94,7 +105,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(999)
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(SubscriptionNotFoundException::class);
         $this->expectExceptionMessage('Subscription not found');
 
         $this->service->getUpgradeOptions(999);
@@ -156,6 +167,10 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->once()
             ->andReturn($access1);
 
+        $subscription->shouldReceive('grantLowerTierPlans')
+            ->once()
+            ->andReturn([]);
+
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
         $upgradePlan->name = 'Premium';
@@ -177,10 +192,6 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->shouldReceive('find')
             ->with(1)
             ->andReturn($subscription);
-
-        $subscription->shouldReceive('grantLowerTierPlans')
-            ->once()
-            ->andReturn([]);
 
         $this->planRepository
             ->shouldReceive('find')
@@ -224,10 +235,42 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(999)
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
+        $this->planRepository->shouldReceive('find')
+            ->once()
+            ->andReturnNull();
+
+        $this->expectException(SubscriptionNotFoundException::class);
         $this->expectExceptionMessage('Subscription not found');
 
         $this->service->upgradeSubscription(999, 2, []);
+    }
+
+    public function testUpgradeSubscriptionThrowsExceptionWhenNotActive(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('isActive')->andReturn(false);
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with(2)
+            ->andReturn(null);
+
+        $this->expectException(InactiveSubscriptionException::class);
+        $this->expectExceptionMessage('Subscription is not active');
+
+        $this->service->upgradeSubscription(1, 2, []);
     }
 
     public function testUpgradeSubscriptionThrowsExceptionWhenNotEligible(): void
@@ -246,6 +289,10 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->shouldReceive('find')
             ->with(1)
             ->andReturn($subscription);
+
+        $this->planRepository->shouldReceive('find')
+            ->once()
+            ->andReturnNull();
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Subscription is not active');
@@ -279,7 +326,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(2)
             ->andReturn($upgradePlan);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(InvalidUpgradePlanException::class);
         $this->expectExceptionMessage('Invalid upgrade plan');
 
         $this->service->upgradeSubscription(1, 2, []);
@@ -312,7 +359,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(2)
             ->andReturn($upgradePlan);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(PlanMismatchException::class);
         $this->expectExceptionMessage('Upgrade plan does not match current subscription');
 
         $this->service->upgradeSubscription(1, 2, []);
@@ -446,7 +493,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->once()
             ->andReturn(['success' => false, 'message' => 'Payment declined']);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(PaymentFailedException::class);
         $this->expectExceptionMessage('Payment declined');
 
         $this->service->upgradeSubscription(1, 2, []);
@@ -458,6 +505,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->plan_id = 1;
         $subscription->plan_name = 'Basic';
         $subscription->price = 19.99;
+        $subscription->currency = 'USD';
         $subscription->includes_digital_access = false;
         $subscription->plan = null;
 
@@ -467,6 +515,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->shouldReceive('getAttribute')->with('start_date')->andReturn(new \DateTime('-15 days'));
         $subscription->shouldReceive('__get')->with('plan')->andReturn(null);
         $subscription->shouldReceive('premiumAccess')->andReturn(collect([]));
+        $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
 
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
@@ -497,6 +546,8 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $this->assertTrue($result['upgrade_plan']['includes_digital']);
         $this->assertEquals(20.00, $result['pricing']['price_difference']);
         $this->assertArrayHasKey('benefits', $result);
+        $this->assertArrayHasKey('is_estimate', $result['pricing']);
+        $this->assertFalse($result['pricing']['is_estimate']); // Not Stripe
     }
 
     public function testPreviewUpgradeThrowsExceptionForInvalidSubscription(): void
@@ -506,7 +557,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(999)
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(SubscriptionNotFoundException::class);
         $this->expectExceptionMessage('Subscription not found');
 
         $this->service->previewUpgrade(999, 2);
@@ -526,7 +577,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(999)
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(InvalidUpgradePlanException::class);
         $this->expectExceptionMessage('Upgrade plan not found');
 
         $this->service->previewUpgrade(1, 999);
@@ -540,6 +591,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->plan_id = 1;
         $subscription->price = 30.00;
+        $subscription->currency = 'USD';
 
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
@@ -574,11 +626,11 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $result = $this->service->getUpgradeOptions(1);
 
         // Should prorate based on remaining time (10 days out of 30 total days)
-        // Price difference = 30.00
-        // Prorated = (30.00 / 30) * 10 = 10.00
+        // Price difference = 30.00, Prorated = (30.00 / 30) * 10 = 10.00
         $this->assertNotNull($result['options'][0]['price_difference']);
         $this->assertLessThan(15.00, $result['options'][0]['price_difference']);
         $this->assertGreaterThan(5.00, $result['options'][0]['price_difference']);
+        $this->assertTrue($result['options'][0]['is_estimate']); // Stripe subscriptions are estimates
     }
 
     public function testUpgradeGrantsImmediateDigitalAccess(): void
@@ -664,6 +716,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->id = 1;
         $subscription->plan_id = 1;
         $subscription->price = 39.99;
+        $subscription->currency = 'USD';
         $subscription->shouldReceive('isActive')->andReturn(true);
         $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
         $subscription->shouldReceive('getAttribute')->with('start_date')->andReturn(new \DateTime('-15 days'));
@@ -676,6 +729,10 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with('newsletter', 'insider', null)
             ->once()
             ->andReturn($access1);
+
+        $subscription->shouldReceive('grantLowerTierPlans')
+            ->once()
+            ->andReturn([]);
 
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
@@ -698,10 +755,6 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->shouldReceive('find')
             ->with(1)
             ->andReturn($subscription);
-
-        $subscription->shouldReceive('grantLowerTierPlans')
-            ->once()
-            ->andReturn([]);
 
         $this->planRepository
             ->shouldReceive('find')
@@ -738,6 +791,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->plan_id = 1;
         $subscription->plan_name = 'Basic';
         $subscription->price = 19.99;
+        $subscription->currency = 'USD';
 
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
@@ -780,6 +834,8 @@ class SubscriptionUpgradeServiceTest extends TestCase
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
+        $subscription->currency = 'USD';
+        $subscription->price = 19.99;
 
         $insiderPlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $insiderPlan->id = 2;
@@ -842,16 +898,11 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->shouldReceive('getAttribute')->with('start_date')->andReturn(new \DateTime('-15 days'));
         $subscription->shouldReceive('getAttribute')->with('next_billing_date')->andReturn(null);
 
-        // Mock grantPremiumAccess calls with proper return types
         $access1 = Mockery::mock(SubscriptionPremiumAccess::class)->makePartial();
         $access1->id = 1;
-        $access1->premium_type = 'newsletter';
-        $access1->premium_identifier = 'insider';
 
         $access2 = Mockery::mock(SubscriptionPremiumAccess::class)->makePartial();
         $access2->id = 2;
-        $access2->premium_type = 'newsletter';
-        $access2->premium_identifier = 'tech-weekly';
 
         $subscription->shouldReceive('grantPremiumAccess')
             ->with('newsletter', 'insider', null)
@@ -862,6 +913,10 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with('newsletter', 'tech-weekly', null)
             ->once()
             ->andReturn($access2);
+
+        $subscription->shouldReceive('grantLowerTierPlans')
+            ->once()
+            ->andReturn([]);
 
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->id = 2;
@@ -886,10 +941,6 @@ class SubscriptionUpgradeServiceTest extends TestCase
             ->with(1)
             ->times(2)
             ->andReturn($subscription);
-
-        $subscription->shouldReceive('grantLowerTierPlans')
-            ->once()
-            ->andReturn([]);
 
         $this->planRepository
             ->shouldReceive('find')
@@ -991,6 +1042,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $subscription->plan_name = 'Basic';
         $subscription->price = 19.99;
         $subscription->plan = null;
+        $subscription->currency = 'USD';
 
         $subscription->shouldReceive('isPrint')->andReturn(true);
         $subscription->shouldReceive('getAttribute')->with('plan')->andReturn(null);
@@ -1100,4 +1152,188 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $this->assertArrayHasKey('lower_tier_access_granted', $result);
         $this->assertCount(1, $result['lower_tier_access_granted']);
     }
+
+    public function testUpgradeQuoteMarksStripeSubscriptionsAsEstimate(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->price = 19.99;
+        $subscription->currency = 'USD';
+        $subscription->shouldReceive('hasStripeSubscription')->andReturn(true);
+        $subscription->shouldReceive('getAttribute')->with('next_billing_date')->andReturn(new \DateTime('+15 days'));
+        $subscription->shouldReceive('getAttribute')->with('start_date')->andReturn(new \DateTime('-15 days'));
+
+        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $upgradePlan->price = 39.99;
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with(2)
+            ->andReturn($upgradePlan);
+
+        $subscription->shouldReceive('isPrint')->andReturn(false);
+        $subscription->plan = null;
+        $subscription->includes_digital_access = true;
+        $subscription->plan_name = 'Basic';
+        $subscription->shouldReceive('premiumAccess')->andReturn(collect([]));
+        $upgradePlan->features = [];
+        $upgradePlan->name = 'Premium';
+        $upgradePlan->delivery_type = 'digital';
+        $upgradePlan->shouldReceive('getPremiumAccessGrants')->andReturn([]);
+
+        $result = $this->service->previewUpgrade(1, 2);
+
+        $this->assertTrue($result['pricing']['is_estimate']);
+        $this->assertNotNull($result['pricing']['estimate_note']);
+    }
+
+    public function testValidateUpgradeThrowsForUnauthorizedMember(): void
+    {
+        $member = new \stdClass();
+        $member->id = 999;
+
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->member_id = 1;
+        $subscription->shouldReceive('isActive')->andReturn(true);
+
+        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $upgradePlan->shouldReceive('isUpgradePlan')->andReturn(true);
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with(2)
+            ->andReturn($upgradePlan);
+
+        $this->expectException(UnauthorizedException::class);
+
+        $this->service->upgradeSubscription(1, 2, ['member' => $member]);
+    }
+
+    public function testMissingStripePriceIdThrowsException(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->plan_id = 1;
+        $subscription->price = 19.99;
+        $subscription->currency = 'USD';
+        $subscription->shouldReceive('isActive')->andReturn(true);
+        $subscription->shouldReceive('hasStripeSubscription')->andReturn(true);
+        $subscription->shouldReceive('getStripeSubscriptionId')->andReturn('sub_123');
+        $subscription->shouldReceive('getAttribute')->with('start_date')->andReturn(new \DateTime('-15 days'));
+        $subscription->shouldReceive('getAttribute')->with('next_billing_date')->andReturn(null);
+        $subscription->shouldReceive('grantPremiumAccess')->andReturn(Mockery::mock(SubscriptionPremiumAccess::class));
+        $subscription->shouldReceive('grantLowerTierPlans')->andReturn([]);
+
+        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $upgradePlan->id = 2;
+        $upgradePlan->name = 'Premium';
+        $upgradePlan->price = 39.99;
+        $upgradePlan->stripe_price_id = null; // Missing!
+        $upgradePlan->upgrade_from_plan_id = 1;
+        $upgradePlan->shouldReceive('isUpgradePlan')->andReturn(true);
+        $upgradePlan->shouldReceive('getPremiumAccessGrants')->andReturn([
+            ['type' => 'newsletter', 'identifier' => 'insider']
+        ]);
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with(2)
+            ->andReturn($upgradePlan);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->times(2)
+            ->andReturn($upgradePlan);
+
+        $this->stripeProcessor
+            ->shouldReceive('createPaymentIntent')
+            ->andReturn(['success' => true]);
+
+        $this->expectException(MissingStripePriceException::class);
+
+        $this->service->upgradeSubscription(1, 2, []);
+    }
+
+    public function testUpgradeWithBenefitConfiguration(): void
+    {
+        $benefitMap = [
+            'newsletter:insider' => [
+                'icon' => '🔓',
+                'title' => 'Test Benefit',
+                'description' => 'Test Description'
+            ]
+        ];
+
+        $service = new SubscriptionUpgradeService(
+            $this->subscriptionRepository,
+            $this->planRepository,
+            $this->stripeProcessor,
+            $this->database,
+            $benefitMap
+        );
+
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->price = 19.99;
+        $subscription->currency = 'USD';
+        $subscription->plan_name = 'Basic';
+        $subscription->includes_digital_access = false;
+        $subscription->plan = null;
+        $subscription->shouldReceive('isPrint')->andReturn(false);
+        $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
+        $subscription->shouldReceive('getAttribute')->with('next_billing_date')->andReturn(null);
+        $subscription->shouldReceive('getAttribute')->with('start_date')->andReturn(new \DateTime());
+        $subscription->shouldReceive('premiumAccess')->andReturn(collect([]));
+
+        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $upgradePlan->name = 'Premium';
+        $upgradePlan->price = 39.99;
+        $upgradePlan->features = [];
+        $upgradePlan->delivery_type = 'digital';
+        $upgradePlan->shouldReceive('getPremiumAccessGrants')->andReturn([
+            ['type' => 'newsletter', 'identifier' => 'insider']
+        ]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->andReturn($upgradePlan);
+
+        $result = $service->previewUpgrade(1, 2);
+
+        $this->assertArrayHasKey('benefits', $result);
+        $this->assertCount(1, $result['benefits']);
+        $this->assertEquals('Test Benefit', $result['benefits'][0]['title']);
+    }
+
 }

@@ -14,7 +14,8 @@ class MemberSubscriptionPreference extends Model
         'content_types',
         'category_preferences',
         'unsubscribe_token',
-        'is_active'
+        'is_active',
+        'newsletter_opt_out'
     ];
 
     protected $casts = [
@@ -22,6 +23,7 @@ class MemberSubscriptionPreference extends Model
         'content_types' => 'array',
         'category_preferences' => 'array',
         'is_active' => 'boolean',
+        'newsletter_opt_out' => 'boolean',
     ];
 
     public static function findByToken(string $token): ?self

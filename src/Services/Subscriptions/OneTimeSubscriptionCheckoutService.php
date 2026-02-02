@@ -32,6 +32,7 @@ class OneTimeSubscriptionCheckoutService
         return $this->database->transaction(function () use ($data, $siteId) {
             // Validate cart has subscription(s)
             $cartItems = $this->cartService->getItems();
+
             $subscriptionItems = [];
 
             foreach ($cartItems as $item) {
@@ -117,9 +118,9 @@ class OneTimeSubscriptionCheckoutService
                         $member->id
                     );
 
-                    if ($voucherValidation['valid']) {
-                        $voucherId = $voucherValidation['voucher_id'];
-                        $discountAmount = $voucherValidation['discount'];
+                    if ($voucherValidation->valid) {
+                        $voucherId = $voucherValidation->voucherId;
+                        $discountAmount = $voucherValidation->discount;
                         $totalDiscount += $discountAmount;
                     }
                 }

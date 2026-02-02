@@ -128,4 +128,22 @@ class MemberRepository extends Repository
 
         return $query->first() === null;
     }
+
+    /**
+     * Find multiple members by their email addresses
+     *
+     * @param array $emails Array of email addresses
+     * @param int|null $siteId Optional site ID filter
+     * @return Collection Collection of Member models
+     */
+    public function findByEmails(array $emails, ?int $siteId = null): Collection
+    {
+        $query = Member::whereIn('email', $emails);
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query->get();
+    }
 }

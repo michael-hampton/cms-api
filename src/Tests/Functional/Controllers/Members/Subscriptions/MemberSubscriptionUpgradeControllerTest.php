@@ -448,7 +448,8 @@ class MemberSubscriptionUpgradeControllerTest extends FunctionalTestCase
             'billing_period' => 'monthly',
             'is_active' => true,
             'is_upgrade_option' => true,
-            'upgrade_from_plan_id' => $this->currentPlan->id
+            'upgrade_from_plan_id' => $this->currentPlan->id,
+            'stripe_price_id' => 'price_test123'
         ]);
 
         $this->subscription = Subscription::create([

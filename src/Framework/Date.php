@@ -76,4 +76,14 @@ class Date extends \DateTime
     {
         return $this->add(new DateInterval("PT{$hours}H"));
     }
+
+    public function subWeeks(int $weeks): self
+    {
+        return $this->sub(new DateInterval("P{$weeks}W"));
+    }
+
+    public function addWeeks(int $weeks): self
+    {
+        return $this->add(new DateInterval("P{$weeks}W"));
+    }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Cms;
+namespace App\Controllers\Billing;
 
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;

@@ -18,6 +18,7 @@ class SubscriptionCancellationService
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly PaymentRepository      $paymentRepository,
         private readonly StripePaymentProcessor $stripeProcessor,
+        private readonly SubscriptionRefundService $refundService,
         ?Database                               $database = null
     )
     {
@@ -79,7 +80,7 @@ class SubscriptionCancellationService
 
             // Create a refund if immediate cancellation requested
             if (!$cancelAtPeriodEnd && ($options['create_refund'] ?? false)) {
-                $this->createProRatedRefund($subscription);
+                $this->refundService->createProRatedRefund($subscription, 'immediate_cancellation');
             }
 
             if (!$cancelAtPeriodEnd) {
@@ -101,63 +102,6 @@ class SubscriptionCancellationService
         });
     }
 
-    /**
-     * Reactivate a cancelled subscription
-     */
-
-    /**
-     * Create a pro-rated refund for immediate cancellation
-     */
-    private function createProRatedRefund(Subscription $subscription): void
-    {
-        if (!$subscription->end_date || !$subscription->last_payment_date) {
-            return;
-        }
-
-        $now = new \DateTime();
-        $endDate = $subscription->end_date;
-        $lastPayment = $subscription->last_payment_date;
-
-        // Calculate unused days
-        $totalDays = $lastPayment->diff($endDate)->days;
-        $usedDays = $lastPayment->diff($now)->days;
-        $unusedDays = max(0, $totalDays - $usedDays);
-
-        if ($unusedDays <= 0) {
-            return;
-        }
-
-        // Calculate refund amount
-        $refundAmount = ($subscription->price / $totalDays) * $unusedDays;
-
-        // Create payment record for refund
-        $lastCompletedPayment = $this->paymentRepository->getLastSubscriptionPayment($subscription->id);
-
-        if ($lastCompletedPayment) {
-            $this->paymentRepository->create([
-                'subscription_id' => $subscription->id,
-                'site_id' => $subscription->site_id,
-                'payment_method' => 'stripe',
-                'payment_provider' => 'stripe',
-                'amount' => -$refundAmount, // Negative for refund
-                'currency' => $subscription->currency,
-                'status' => 'completed',
-                'paid_at' => date('Y-m-d H:i:s'),
-                'metadata' => [
-                    'refund_type' => 'pro_rated_cancellation',
-                    'original_payment_id' => $lastCompletedPayment->id,
-                    'unused_days' => $unusedDays,
-                    'total_days' => $totalDays
-                ]
-            ]);
-
-            Logger::info("Pro-rated refund created", [
-                'subscription_id' => $subscription->id,
-                'refund_amount' => $refundAmount,
-                'unused_days' => $unusedDays
-            ]);
-        }
-    }
 
     /**
      * Reactivate a cancelled subscription (only if cancel_at_period_end is set)
@@ -209,17 +153,17 @@ class SubscriptionCancellationService
             }
 
             // Calculate new end date based on remaining time or billing period
-            $newEndDate = $subscription->plan?->billing_period === 'lifetime' ? null : $subscription->end_date; // Keep original end date
+            $newEndDate = $subscription->plan?->billing_period === 'lifetime' ? null : $subscription->end_date;
 
             // If they still have auto_renew enabled, calculate next billing
-            if ($subscription->plan && $subscription->plan->billing_period !== 'lifetime') {
+            /*if ($subscription->plan && $subscription->plan->billing_period !== 'lifetime') {
                 $newEndDate = clone $now;
                 match ($subscription->plan->billing_period) {
                     'monthly' => $newEndDate->modify('+1 month'),
                     'quarterly' => $newEndDate->modify('+3 months'),
                     'yearly' => $newEndDate->modify('+1 year'),
                 };
-            }
+            }*/
 
             // Update subscription
             $updated = $this->subscriptionRepository->update($subscriptionId, [

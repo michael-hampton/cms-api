@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Front;
+namespace App\Controllers\Offers;
 
 use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
