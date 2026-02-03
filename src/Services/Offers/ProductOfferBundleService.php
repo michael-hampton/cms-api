@@ -2,7 +2,10 @@
 
 namespace App\Services\Offers;
 
+use App\Enums\BundleStatus;
+use App\Exceptions\BundleValidationException;
 use App\Framework\Authorization\AuthenticationService;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\Product;
@@ -10,6 +13,7 @@ use App\Models\ProductOffer;
 use App\Models\ProductOfferBundle;
 use App\Repositories\Offers\ProductOfferBundleRepository;
 use App\Repositories\Offers\ProductOfferRepository;
+use App\Repositories\Product\ProductRepository;
 use Exception;
 
 class ProductOfferBundleService
@@ -19,7 +23,9 @@ class ProductOfferBundleService
     public function __construct(
         private readonly ProductOfferBundleRepository $repository,
         private readonly AuthenticationService  $authenticationService,
-        private readonly ProductOfferRepository $offerRepository
+        private readonly ProductOfferRepository $offerRepository,
+        private readonly ProductRepository      $productRepository,
+        private readonly Database               $database
     )
     {
         // Load from config
@@ -40,13 +46,19 @@ class ProductOfferBundleService
     {
         $this->validateBundleDates($data['start_date'], $data['end_date']);
         $this->validateBundleItems($data['items'] ?? []);
-        $this->validateMultiMerchant($data['items'] ?? []);
-        $this->calculateBundlePricing($data);
 
+        // Preload all entities to avoid N+1
+        $entities = $this->preloadEntitiesForValidation($data['items'] ?? []);
+        $this->validateMultiMerchant($data['items'] ?? [], $entities);
+
+        $this->calculateBundlePricing($data, $entities);
         $data = $this->fillStatusFields($data);
 
-        return $this->repository->create($data);
+        return $this->database->transaction(function () use ($data) {
+            return $this->repository->create($data);
+        });
     }
+
 
     private function validateBundleDates(string $startDate, string $endDate): void
     {
@@ -54,22 +66,22 @@ class ProductOfferBundleService
         $end = strtotime($endDate);
 
         if ($start === false || $end === false) {
-            throw new Exception('Invalid date format');
+            throw BundleValidationException::invalidDateFormat();
         }
 
         if ($end <= $start) {
-            throw new Exception('End date must be after start date');
+            throw BundleValidationException::endDateBeforeStart();
         }
     }
 
     private function validateBundleItems(array $items): void
     {
         if (empty($items)) {
-            throw new Exception('Bundle must contain at least one item');
+            throw BundleValidationException::emptyItems();
         }
 
         if (count($items) < 2) {
-            throw new Exception('Bundle must contain at least two items');
+            throw BundleValidationException::insufficientItems();
         }
 
         foreach ($items as $item) {
@@ -77,16 +89,52 @@ class ProductOfferBundleService
             $hasOffer = !empty($item['product_offer_id']);
 
             if ($hasProduct && $hasOffer) {
-                throw new Exception('Bundle item cannot have both product and product offer');
+                throw BundleValidationException::duplicateItemTypes();
             }
 
             if (!$hasProduct && !$hasOffer) {
-                throw new Exception('Bundle item must have either product or product offer');
+                throw BundleValidationException::missingItemType();
             }
         }
     }
 
-    private function validateMultiMerchant(array $items): void
+    /**
+     * Preload all products and offers in a single query to avoid N+1
+     */
+    private function preloadEntitiesForValidation(array $items): array
+    {
+        $productIds = [];
+        $offerIds = [];
+
+        foreach ($items as $item) {
+            if (!empty($item['product_id'])) {
+                $productIds[] = $item['product_id'];
+            }
+            if (!empty($item['product_offer_id'])) {
+                $offerIds[] = $item['product_offer_id'];
+            }
+        }
+
+        $products = [];
+        $offers = [];
+
+        if (!empty($productIds)) {
+            $products = $this->productRepository->findMany($productIds, ['merchants']);
+        }
+
+        if (!empty($offerIds)) {
+            $offers = ProductOffer::whereIn('id', array_unique($offerIds))
+                ->get()
+                ->keyBy('id');
+        }
+
+        return [
+            'products' => $products,
+            'offers' => $offers,
+        ];
+    }
+
+    private function validateMultiMerchant(array $items, array $entities): void
     {
         if ($this->allowMultiMerchant) {
             return;
@@ -95,27 +143,34 @@ class ProductOfferBundleService
         $merchantIds = [];
 
         foreach ($items as $item) {
-            $merchantId = null;
+            $merchantId = $this->extractMerchantId($item, $entities);
 
-            if (!empty($item['product_offer_id'])) {
-                $offer = ProductOffer::find($item['product_offer_id']);
-                $merchantId = $offer?->merchant_id;
-            } elseif (!empty($item['product_id'])) {
-                $product = Product::find($item['product_id']);
-                $merchantId = $product?->merchants->first()->id;
-            }
-
-            if ($merchantId && !in_array($merchantId, $merchantIds)) {
+            if ($merchantId && !in_array($merchantId, $merchantIds, true)) {
                 $merchantIds[] = $merchantId;
             }
         }
 
         if (count($merchantIds) > 1) {
-            throw new Exception('Multi-merchant bundles are not allowed. Please enable in configuration or select items from the same merchant.');
+            throw BundleValidationException::multiMerchantNotAllowed();
         }
     }
 
-    private function calculateBundlePricing(array &$data): void
+    private function extractMerchantId(array $item, array $entities): ?int
+    {
+        if (!empty($item['product_offer_id'])) {
+            $offer = $entities['offers']->get($item['product_offer_id']);
+            return $offer?->merchant_id;
+        }
+
+        if (!empty($item['product_id'])) {
+            $product = $entities['products']->get($item['product_id']);
+            return $product?->merchants?->first()?->id;
+        }
+
+        return null;
+    }
+
+    private function calculateBundlePricing(array &$data, array $entities): void
     {
         $totalPrice = 0.0;
 
@@ -124,21 +179,18 @@ class ProductOfferBundleService
             $quantity = $item['quantity'] ?? 1;
 
             if (!empty($item['product_offer_id'])) {
-                echo $item['product_offer_id'];
-                $offer = $this->offerRepository->find($item['product_offer_id']);
+                $offer = $entities['offers']->get($item['product_offer_id']);
                 $price = $offer?->sale_price ?? 0;
             } elseif (!empty($item['product_id'])) {
-                $product = Product::find($item['product_id']);
+                $product = $entities['products']->get($item['product_id']);
                 $price = $product?->price ?? 0;
             }
 
             $totalPrice += $price * $quantity;
         }
 
-        // Update total_price
         $data['total_price'] = $totalPrice;
 
-        // Calculate discount if bundle_price is provided
         if (isset($data['bundle_price'])) {
             $savings = $totalPrice - $data['bundle_price'];
             $data['discount_percentage'] = $totalPrice > 0
@@ -153,15 +205,17 @@ class ProductOfferBundleService
             return $data;
         }
 
+        $status = BundleStatus::from($data['status']);
         $userId = $this->authenticationService->getUserId();
+
         if (!$userId) {
             return $data;
         }
 
-        if ($data['status'] === 'published') {
+        if ($status === BundleStatus::PUBLISHED) {
             $data['published_by'] = $userId;
             $data['published_at'] = now_datetime();
-        } elseif ($data['status'] === 'rejected') {
+        } elseif ($status === BundleStatus::REJECTED) {
             $data['rejected_by'] = $userId;
             $data['rejected_at'] = now_datetime();
         }
@@ -175,21 +229,29 @@ class ProductOfferBundleService
             $this->validateBundleDates($data['start_date'], $data['end_date']);
         }
 
+        $entities = [];
         if (isset($data['items'])) {
             $this->validateBundleItems($data['items']);
-            $this->validateMultiMerchant($data['items']);
+            $entities = $this->preloadEntitiesForValidation($data['items']);
+            $this->validateMultiMerchant($data['items'], $entities);
         }
 
         if (isset($data['items']) || isset($data['bundle_price'])) {
-            $this->calculateBundlePricing($data);
+            if (empty($entities) && isset($data['items'])) {
+                $entities = $this->preloadEntitiesForValidation($data['items']);
+            }
+            $this->calculateBundlePricing($data, $entities);
         }
 
-        $currentBundle = $this->repository->find($id);
-        if ($currentBundle && isset($data['status'])) {
-            $data = $this->fillStatusFieldsOnUpdate($data, $currentBundle);
-        }
+        return $this->database->transaction(function () use ($id, $data) {
+            $currentBundle = $this->repository->find($id);
 
-        return $this->repository->update($id, $data);
+            if ($currentBundle && isset($data['status'])) {
+                $data = $this->fillStatusFieldsOnUpdate($data, $currentBundle);
+            }
+
+            return $this->repository->update($id, $data);
+        });
     }
 
     private function fillStatusFieldsOnUpdate(array $data, ProductOfferBundle $currentBundle): array
@@ -198,15 +260,17 @@ class ProductOfferBundleService
             return $data;
         }
 
+        $status = BundleStatus::from($data['status']);
         $userId = $this->authenticationService->getUserId();
+
         if (!$userId) {
             return $data;
         }
 
-        if ($data['status'] === 'published' && !$currentBundle->published_at) {
+        if ($status === BundleStatus::PUBLISHED && !$currentBundle->published_at) {
             $data['published_by'] = $userId;
             $data['published_at'] = now_datetime();
-        } elseif ($data['status'] === 'rejected' && !$currentBundle->rejected_at) {
+        } elseif ($status === BundleStatus::REJECTED && !$currentBundle->rejected_at) {
             $data['rejected_by'] = $userId;
             $data['rejected_at'] = now_datetime();
         }
@@ -227,7 +291,7 @@ class ProductOfferBundleService
     public function reject(int $id, int $userId, string $reason): ?ProductOfferBundle
     {
         if (empty($reason)) {
-            throw new Exception('Rejection reason is required');
+            throw BundleValidationException::rejectionReasonRequired();
         }
 
         return $this->repository->reject($id, $userId, $reason);

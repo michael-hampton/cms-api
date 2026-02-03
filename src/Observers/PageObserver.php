@@ -8,10 +8,9 @@ use App\Framework\Database\Relations\EagerLoader;
 use App\Framework\Database\Relations\RelationHandlerFactory;
 use App\Framework\Database\Relations\RelationshipAnalyzer;
 use App\Framework\Observers\Observer;
-use App\Framework\Support\Cache;
+use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Event;
 use App\Framework\Support\Logger;
-use App\Models\Block;
 use App\Models\Model;
 use App\Models\Page;
 

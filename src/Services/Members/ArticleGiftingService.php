@@ -2,15 +2,22 @@
 
 namespace App\Services\Members;
 
+use App\Events\ArticleGifting\GiftClaimedEvent;
+use App\Events\ArticleGifting\GiftCreatedEvent;
+use App\Framework\Database\Database;
 use App\Models\GiftedArticle;
 use App\Models\Member;
 use App\Models\Page;
 use App\Repositories\Members\GiftedArticleRepository;
+use App\Services\RateLimiting\RateLimiter;
+use App\Services\ValueObjects\Email;
 
 class ArticleGiftingService
 {
     public function __construct(
-        private GiftedArticleRepository $giftRepository
+        private readonly GiftedArticleRepository $giftRepository,
+        private readonly RateLimiter             $rateLimiter,
+        private readonly Database                $database
     )
     {
     }
@@ -35,6 +42,15 @@ class ArticleGiftingService
         ?string $personalMessage = null
     ): array
     {
+        // Rate limiting
+        $rateLimitKey = "gift_article:{$gifter->id}";
+        if ($this->rateLimiter->tooManyAttempts($rateLimitKey, 10)) {
+            return [
+                'success' => false,
+                'message' => 'Too many gift attempts. Please try again later.'
+            ];
+        }
+
         $allowance = $this->giftRepository->getOrCreateAllowance($gifter->id, $siteId);
 
         if (!$allowance->canGift()) {
@@ -44,8 +60,11 @@ class ArticleGiftingService
             ];
         }
 
+        $recipientEmailObj = new Email($recipientEmail);
+        $gifterEmailObj = new Email($gifter->email);
+
         // Prevent self-gifting
-        if (strtolower(trim($recipientEmail)) === strtolower(trim($gifter->email))) {
+        if ($recipientEmailObj->equals($gifterEmailObj)) {
             return [
                 'success' => false,
                 'message' => 'You cannot gift an article to yourself'
@@ -66,21 +85,29 @@ class ArticleGiftingService
             ];
         }
 
-        $gift = $this->giftRepository->createGift([
-            'page_id' => $page->id,
-            'gifted_by_member_id' => $gifter->id,
-            'site_id' => $siteId,
-            'recipient_email' => strtolower(trim($recipientEmail)),
-            'personal_message' => $personalMessage
-        ]);
+        return $this->database->transaction(function () use ($gifter, $page, $recipientEmailObj, $siteId, $personalMessage, $allowance, $rateLimitKey) {
+            $gift = $this->giftRepository->createGift([
+                'page_id' => $page->id,
+                'gifted_by_member_id' => $gifter->id,
+                'site_id' => $siteId,
+                'recipient_email' => $recipientEmailObj->getValue(),
+                'personal_message' => $personalMessage
+            ]);
 
-        $allowance->incrementUsage();
+            $allowance->incrementUsage();
 
-        return [
-            'success' => true,
-            'gift' => $gift,
-            'message' => 'Article gifted successfully'
-        ];
+            $this->rateLimiter->attempt($rateLimitKey, 10, 3600);
+
+            // Dispatch event instead of directly calling email service
+            event(new GiftCreatedEvent($gift));
+
+            return [
+                'success' => true,
+                'gift' => $gift,
+                'message' => 'Article gifted successfully'
+            ];
+
+        });
     }
 
     public function generateShareLink(GiftedArticle $gift): string
@@ -123,8 +150,10 @@ class ArticleGiftingService
             ];
         }
 
-        // Check email match
-        if (strtolower(trim($gift->recipient_email)) !== strtolower(trim($member->email))) {
+        $recipientEmailObj = new Email($gift->recipient_email);
+        $memberEmailObj = new Email($member->email);
+
+        if (!$recipientEmailObj->equals($memberEmailObj)) {
             return [
                 'success' => false,
                 'message' => 'This gift was sent to a different email address'
@@ -132,6 +161,8 @@ class ArticleGiftingService
         }
 
         $gift->claim($member->id);
+
+        event(new GiftClaimedEvent($gift, $member));
 
         return [
             'success' => true,
@@ -158,10 +189,15 @@ class ArticleGiftingService
 
     public function checkAndClaimGiftForPage(Member $member, Page $page): ?GiftedArticle
     {
-        $gift = $this->giftRepository->findPendingGiftForMemberAndPage($member->id, $member->email, $page->id);
+        $gift = $this->giftRepository->findPendingGiftForMemberAndPage(
+            $member->id,
+            $member->email,
+            $page->id
+        );
 
         if ($gift && !$gift->isClaimed()) {
             $gift->claim($member->id);
+            //event(new GiftClaimedEvent($gift, $member));
             return $gift;
         }
 

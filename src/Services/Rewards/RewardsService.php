@@ -2,6 +2,10 @@
 
 namespace App\Services\Rewards;
 
+use App\Enums\RewardClickAction;
+use App\Enums\RewardStatus;
+use App\Enums\RewardType;
+use App\Events\Rewards\RewardAwardedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
@@ -9,11 +13,14 @@ use App\Models\Member;
 use App\Models\MemberReward;
 use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardsRepository;
+use App\Services\Rewards\Handlers\RewardTypeHandlerFactory;
 
 class RewardsService
 {
     public function __construct(
-        private readonly RewardsRepository $rewardsRepository
+        private readonly RewardsRepository        $rewardsRepository,
+        private readonly RewardTypeHandlerFactory $handlerFactory,
+        private readonly Database                 $database
     )
     {
     }
@@ -36,6 +43,7 @@ class RewardsService
                         'reward_definition_id' => $definition->id,
                         'error' => $e->getMessage()
                     ]);
+                    throw $e; // Bubble up instead of silent failure
                 }
             }
         }
@@ -43,9 +51,8 @@ class RewardsService
         return $awarded;
     }
 
-    private function shouldAwardReward(Member $member, RewardDefinition $definition): bool
+    private function shouldAwardReward(Member $member, $definition): bool
     {
-        // Check if already earned max allowed times
         $earnedCount = $this->rewardsRepository->countMemberRewards(
             $member->id,
             $definition->id
@@ -55,75 +62,47 @@ class RewardsService
             return false;
         }
 
-        // Check if criteria is met
         return $definition->checkCriteria($member);
     }
 
-    private function awardReward(Member $member, RewardDefinition $definition, int $siteId): ?MemberReward
+    private function awardReward(Member $member, $definition, int $siteId): ?MemberReward
     {
-        $rewardData = [];
-        $expiresAt = null;
+        return $this->database->transaction(function () use ($member, $definition, $siteId) {
+            $rewardType = RewardType::from($definition->reward_type);
+            $handler = $this->handlerFactory->make($rewardType);
 
-        // Handle different reward types
-        switch ($definition->reward_type) {
-            case 'voucher':
-                $voucher = $this->rewardsRepository->getAvailableVoucher($definition->id);
+            $result = $handler->handle($member, $definition, $siteId);
 
-                if (!$voucher) {
-                    Logger::warning('No available vouchers for reward', [
-                        'reward_definition_id' => $definition->id
-                    ]);
-                    return null;
-                }
+            if (!$result) {
+                return null;
+            }
 
-                $rewardData = [
-                    'voucher_code' => $voucher->voucher_code,
-                    'provider' => $voucher->provider,
-                    'value' => $voucher->value,
-                    'currency' => $voucher->currency
-                ];
+            $reward = $this->rewardsRepository->createMemberReward([
+                'member_id' => $member->id,
+                'reward_definition_id' => $definition->id,
+                'site_id' => $siteId,
+                'reward_data' => $result['reward_data'],
+                'expires_at' => $result['expires_at'] ?? null
+            ]);
 
-                // Set expiration if configured
-                $expiryDays = $definition->reward_config['expiry_days'] ?? 90;
-                $expiresAt = now_datetime()->modify("+{$expiryDays} days");
-                break;
+            // Assign voucher if applicable
+            if ($rewardType === RewardType::VOUCHER && isset($result['reward_data']['voucher'])) {
+                $result['reward_data']['voucher']->assign($member->id, $reward->id);
+            }
 
-            case 'discount':
-                $rewardData = [
-                    'discount_type' => $definition->reward_config['discount_type'] ?? 'percentage',
-                    'discount_value' => $definition->reward_config['discount_value'] ?? 10
-                ];
+            event(new RewardAwardedEvent($member, $reward));
 
-                $expiryDays = $definition->reward_config['expiry_days'] ?? 30;
-                $expiresAt = now_datetime()->modify("+{$expiryDays} days");
-                break;
-
-            case 'points':
-                $rewardData = [
-                    'points' => $definition->reward_config['points'] ?? 100
-                ];
-                break;
-        }
-
-        $reward = $this->rewardsRepository->createMemberReward([
-            'member_id' => $member->id,
-            'reward_definition_id' => $definition->id,
-            'site_id' => $siteId,
-            'reward_data' => $rewardData,
-            'expires_at' => $expiresAt?->toDateTimeString() ?? null
-        ]);
-
-        // Assign voucher if applicable
-        if ($definition->reward_type === 'voucher' && isset($voucher)) {
-            $voucher->assign($member->id, $reward->id);
-        }
-
-        return $reward;
+            return $reward;
+        });
     }
 
     public function getUnclaimedRewards(Member $member, int $siteId): Collection
     {
-        return $this->rewardsRepository->getMemberRewards($member->id, $siteId, 'pending');
+        return $this->rewardsRepository->getMemberRewards(
+            $member->id,
+            $siteId,
+            RewardStatus::PENDING->value
+        );
     }
 
     public function getMemberRewards(Member $member, int $siteId): Collection
@@ -150,14 +129,10 @@ class RewardsService
         }
 
         if ($reward->isClaimed()) {
-            // Track view even if already claimed
-            $this->rewardsRepository->trackClick(
-                $reward->id,
-                $member->id,
-                $reward->site_id,
-                'view',
-                $_SERVER['REMOTE_ADDR'] ?? null,
-                $_SERVER['HTTP_USER_AGENT'] ?? null
+            $this->trackRewardClick(
+                $reward,
+                $member,
+                RewardClickAction::VIEW
             );
 
             return [
@@ -168,24 +143,39 @@ class RewardsService
             ];
         }
 
-        $reward->claim();
+        return $this->database->transaction(function () use ($reward, $member) {
+            $reward->claim();
 
-        // Track claim
+            $this->trackRewardClick(
+                $reward,
+                $member,
+                RewardClickAction::CLAIM
+            );
+
+            return [
+                'success' => true,
+                'reward' => $reward,
+                'message' => 'Reward claimed successfully!'
+            ];
+        });
+    }
+
+    private function trackRewardClick(
+        MemberReward      $reward,
+        Member            $member,
+        RewardClickAction $action
+    ): void
+    {
         $this->rewardsRepository->trackClick(
             $reward->id,
             $member->id,
             $reward->site_id,
-            'claim',
+            $action->value,
             $_SERVER['REMOTE_ADDR'] ?? null,
             $_SERVER['HTTP_USER_AGENT'] ?? null
         );
-
-        return [
-            'success' => true,
-            'reward' => $reward,
-            'message' => 'Reward claimed successfully!'
-        ];
     }
+
 
     public function getTopRewards(Member $member, int $siteId): Collection
     {
@@ -269,87 +259,5 @@ class RewardsService
         ];
 
         return $symbols[$currency] ?? $currency;
-    }
-
-    public function getRewardDefinitionStatistics(int $definitionId): array
-    {
-        $definition = RewardDefinition::find($definitionId);
-
-        if (!$definition) {
-            throw new Exception('Reward definition not found');
-        }
-
-        $memberRewards = MemberReward::where('reward_definition_id', $definitionId)->get();
-
-        $totalRewards = $memberRewards->count();
-        $claimedRewards = $memberRewards->where('status', 'claimed')->count();
-        $pendingRewards = $memberRewards->where('status', 'pending')->count();
-        $expiredRewards = $memberRewards->where('status', 'expired')->count();
-        $declinedRewards = $memberRewards->where('status', 'declined')->count();
-
-        // Get click statistics
-        $totalClicks = DB::table('reward_clicks')
-            ->whereIn('member_reward_id', $memberRewards->pluck('id'))
-            ->count();
-
-        $uniqueClickers = DB::table('reward_clicks')
-            ->whereIn('member_reward_id', $memberRewards->pluck('id'))
-            ->distinct('member_id')
-            ->count('member_id');
-
-        // Breakdown by action type
-        $clicksByAction = DB::table('reward_clicks')
-            ->whereIn('member_reward_id', $memberRewards->pluck('id'))
-            ->select('action', DB::raw('COUNT(*) as count'))
-            ->groupBy('action')
-            ->get()
-            ->pluck('count', 'action')
-            ->toArray();
-
-        // Click through rate
-        $clickThroughRate = $totalRewards > 0
-            ? round(($uniqueClickers / $totalRewards) * 100, 2)
-            : 0;
-
-        // Recent clicks
-        $recentClicks = Database::table('reward_clicks as rc')
-            ->join('member_rewards as mr', 'rc.member_reward_id', '=', 'mr.id')
-            ->join('members as m', 'rc.member_id', '=', 'm.id')
-            ->whereIn('rc.member_reward_id', $memberRewards->pluck('id')->toArray())
-            ->select(
-                'rc.created_at',
-                'rc.action',
-                'm.first_name',
-                'm.last_name',
-                'm.email',
-                'mr.id as reward_id'
-            )
-            ->orderByDesc('rc.created_at')
-            ->limit(10)
-            ->get();
-
-        return [
-            'definition_id' => $definitionId,
-            'definition_name' => $definition->name,
-            'total_rewards' => $totalRewards,
-            'claimed' => $claimedRewards,
-            'pending' => $pendingRewards,
-            'expired' => $expiredRewards,
-            'declined' => $declinedRewards,
-            'claim_rate' => $totalRewards > 0 ? round(($claimedRewards / $totalRewards) * 100, 2) : 0,
-
-            // Click statistics
-            'total_clicks' => $totalClicks,
-            'unique_clickers' => $uniqueClickers,
-            'click_through_rate' => $clickThroughRate,
-            'clicks_by_action' => $clicksByAction,
-            'recent_clicks' => $recentClicks->map(fn($click) => [
-                'clicked_at' => $click->created_at,
-                'action' => $click->action,
-                'member_name' => "{$click->first_name} {$click->last_name}",
-                'member_email' => $click->email,
-                'reward_id' => $click->reward_id
-            ])->toArray(),
-        ];
     }
 }

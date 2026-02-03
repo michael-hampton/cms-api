@@ -2,6 +2,7 @@
 
 use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\ModelRegistry;
 use App\Framework\ServiceProvider\ServiceProviderManager;
@@ -14,6 +15,8 @@ function bootstrapApplication(array $databaseConfig, ?Database $database = null)
     Logger::setLogPath('storage/logs');
 
     $container = Container::getInstance();
+
+    //$container->singleton(EventDispatcher::class, new EventDispatcher());
 
     if (!empty($databaseConfig)) {
         Config::set('DatabaseConfig', $databaseConfig);

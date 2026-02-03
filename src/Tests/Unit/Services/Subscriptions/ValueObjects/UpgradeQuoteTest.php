@@ -2,8 +2,8 @@
 
 namespace App\Tests\Unit\Services\Subscriptions\ValueObjects;
 
-use App\Services\Subscriptions\ValueObjects\Money;
 use App\Services\Subscriptions\ValueObjects\UpgradeQuote;
+use App\Services\ValueObjects\Money;
 use PHPUnit\Framework\TestCase;
 
 class UpgradeQuoteTest extends TestCase

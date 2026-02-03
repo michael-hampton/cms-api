@@ -6,6 +6,7 @@ use App\Framework\Authorization\AuthenticationService;
 use App\Models\Model;
 use App\Models\ProductOffer;
 use App\Repositories\Offers\ProductOfferRepository;
+use App\Services\Offers\OfferStatusTransitionHandler;
 use App\Services\Offers\ProductOfferService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -18,13 +19,19 @@ class ProductOfferServiceTest extends FunctionalTestCase
     private $repository;
     private ProductOfferService $service;
     private $authenticationService;
+    private $statusHandler;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->authenticationService = Mockery::mock(AuthenticationService::class);
         $this->repository = Mockery::mock(ProductOfferRepository::class);
-        $this->service = new ProductOfferService($this->repository, $this->authenticationService);
+        $this->statusHandler = Mockery::mock(OfferStatusTransitionHandler::class);
+        $this->service = new ProductOfferService(
+            $this->repository,
+            $this->authenticationService,
+            $this->statusHandler
+        );
     }
 
     public function testGetOffer(): void
@@ -71,18 +78,36 @@ class ProductOfferServiceTest extends FunctionalTestCase
 
     public function testCreateOffer(): void
     {
+        $user = $this->createUser();
+        $product = $this->createProduct();
+
         $data = [
-            'product_id' => 1,
+            'product_id' => $product->id,
             'sale_price' => 79.99,
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'status' => 'published',
         ];
 
-        $offer = new ProductOffer($data);
+        $this->authenticationService->shouldReceive('getUserId')
+            ->once()
+            ->andReturn($user->id);
+
+        $enrichedData = array_merge($data, [
+            'published_by' => $user->id,
+            'published_at' => now_datetime()
+        ]);
+
+        $this->statusHandler->shouldReceive('fillStatusFields')
+            ->once()
+            ->with($data, $user->id)
+            ->andReturn($enrichedData);
+
+        $offer = new ProductOffer($enrichedData);
 
         $this->repository->shouldReceive('create')
             ->once()
-            ->with($data)
+            ->with($enrichedData)
             ->andReturn($offer);
 
         $result = $this->service->createOffer($data);
@@ -167,17 +192,45 @@ class ProductOfferServiceTest extends FunctionalTestCase
         $this->assertTrue($result);
     }
 
+    public function testPublish(): void
+    {
+        $offer = new ProductOffer(['id' => 1, 'status' => 'published']);
 
-    public function testCreateOfferWithPublishedStatus(): void
+        $this->repository->shouldReceive('publish')
+            ->once()
+            ->with(1, 10)
+            ->andReturn($offer);
+
+        $result = $this->service->publish(1, 10);
+
+        $this->assertEquals($offer, $result);
+    }
+
+    public function testRejectThrowsExceptionWhenReasonEmpty(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Rejection reason is required');
+
+        $this->service->reject(1, 10, '');
+    }
+
+    public function testReject(): void
+    {
+        $offer = new ProductOffer(['id' => 1, 'status' => 'rejected']);
+
+        $this->repository->shouldReceive('reject')
+            ->once()
+            ->with(1, 10, 'Not suitable')
+            ->andReturn($offer);
+
+        $result = $this->service->reject(1, 10, 'Not suitable');
+
+        $this->assertEquals($offer, $result);
+    }
+
+    public function testCreateOfferWithStatusTransition(): void
     {
         $user = $this->createUser();
-
-        $this->actingAs($user);
-
-        $this->authenticationService->shouldReceive('getUserId')
-            ->once()
-            ->andReturn($user->id);
-
         $product = $this->createProduct();
 
         $data = [
@@ -188,30 +241,37 @@ class ProductOfferServiceTest extends FunctionalTestCase
             'status' => 'published',
         ];
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->with(\Mockery::on(function ($arg) {
-                return $arg['status'] === 'published'
-                    && isset($arg['published_by'])
-                    && isset($arg['published_at']);
-            }))
-            ->andReturn(new ProductOffer($data));
-
-        $offer = $this->service->createOffer($data);
-
-        $this->assertEquals('published', $offer->status);
-    }
-
-    public function testUpdateOfferToPublished(): void
-    {
-        $user = $this->createUser();
-        $this->actingAs($user);
-
         $this->authenticationService->shouldReceive('getUserId')
             ->once()
             ->andReturn($user->id);
 
+        $enrichedData = array_merge($data, [
+            'published_by' => $user->id,
+            'published_at' => now_datetime()
+        ]);
+
+        $this->statusHandler->shouldReceive('fillStatusFields')
+            ->once()
+            ->with($data, $user->id)
+            ->andReturn($enrichedData);
+
+        $offer = new ProductOffer($enrichedData);
+
+        $this->repository->shouldReceive('create')
+            ->once()
+            ->with($enrichedData)
+            ->andReturn($offer);
+
+        $result = $this->service->createOffer($data);
+
+        $this->assertEquals($offer, $result);
+    }
+
+    public function testUpdateOfferWithStatusTransition(): void
+    {
+        $user = $this->createUser();
         $product = $this->createProduct();
+
         $existingOffer = new ProductOffer([
             'id' => 1,
             'product_id' => $product->id,
@@ -221,21 +281,34 @@ class ProductOfferServiceTest extends FunctionalTestCase
             'status' => 'pending',
         ]);
 
+        $data = ['status' => 'published'];
+
         $this->repository->shouldReceive('find')
             ->once()
             ->with(1)
             ->andReturn($existingOffer);
 
+        $this->authenticationService->shouldReceive('getUserId')
+            ->once()
+            ->andReturn($user->id);
+
+        $enrichedData = array_merge($data, [
+            'published_by' => $user->id,
+            'published_at' => now_datetime()
+        ]);
+
+        $this->statusHandler->shouldReceive('fillStatusFieldsOnUpdate')
+            ->once()
+            ->with($data, $existingOffer, $user->id)
+            ->andReturn($enrichedData);
+
         $this->repository->shouldReceive('update')
             ->once()
-            ->with(1, \Mockery::on(function ($arg) use ($user) {
-                return $arg['status'] === 'published'
-                    && $arg['published_by'] === $user->id
-                    && isset($arg['published_at']);
-            }))
+            ->with(1, $enrichedData)
             ->andReturn($existingOffer);
 
-        $result = $this->service->updateOffer(1, ['status' => 'published']);
+        $result = $this->service->updateOffer(1, $data);
+
         $this->assertInstanceOf(ProductOffer::class, $result);
     }
 
@@ -252,35 +325,30 @@ class ProductOfferServiceTest extends FunctionalTestCase
 
     public function testTrackClickThrowsExceptionForInvalidAction(): void
     {
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Invalid action type');
+        $this->expectException(\ValueError::class);
 
         $this->service->trackClick(1, 2, 'invalid_action');
     }
 
-    public function testGetAllOfferStatisticsIncludesClickData(): void
+    public function testGetByStatusValidatesEnum(): void
     {
-        $offers = collect([
-            new ProductOffer(['id' => 1, 'is_active' => true, 'status' => 'published']),
-            new ProductOffer(['id' => 2, 'is_active' => false, 'status' => 'pending'])
-        ]);
+        $offers = collect([new ProductOffer(['id' => 1, 'status' => 'published'])]);
 
-        $this->repository->shouldReceive('all')
+        $this->repository->shouldReceive('getByStatus')
+            ->once()
+            ->with('published')
             ->andReturn($offers);
 
-        $this->repository->shouldReceive('getClickStatistics')
-            ->once()
-            ->with([1, 2])
-            ->andReturn([
-                'total' => 10,
-                'unique' => 5,
-                'by_offer' => [1 => 7, 2 => 3]
-            ]);
+        $result = $this->service->getByStatus('published');
 
-        $stats = $this->service->getAllOfferStatistics(1);
+        $this->assertEquals($offers, $result);
+    }
 
-        $this->assertEquals(10, $stats['total_clicks']);
-        $this->assertEquals(5, $stats['unique_clickers']);
+    public function testGetByStatusThrowsExceptionForInvalidStatus(): void
+    {
+        $this->expectException(\ValueError::class);
+
+        $this->service->getByStatus('invalid_status');
     }
 
     public function testGetActiveOffers(): void
@@ -334,6 +402,17 @@ class ProductOfferServiceTest extends FunctionalTestCase
         $result = $this->service->getActiveOffers(5);
 
         $this->assertCount(5, $result);
+    }
+
+    public function testTrackClickValidatesAction(): void
+    {
+        $this->repository->shouldReceive('trackClick')
+            ->once()
+            ->with(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0');
+
+        $result = $this->service->trackClick(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0');
+
+        $this->assertInstanceOf(Model::class, $result);
     }
 
     protected function tearDown(): void

@@ -17,6 +17,7 @@ use App\Repositories\Members\PageViewRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Members\ArticleGiftingService;
 use App\Services\Members\BadgeService;
 use App\Services\Recommendations\ContentRecommendationService;
 use App\Services\Recommendations\ProductRecommendationService;
@@ -40,7 +41,8 @@ class MemberDashboardController extends Controller
         private readonly ContentRecommendationService $contentRecommendationService,
         private readonly RewardsService               $rewardService,
         private readonly ProductRecommendationService $productRecommendationService,
-        private readonly SubscriptionListingService   $subscriptionListingService
+        private readonly SubscriptionListingService $subscriptionListingService,
+        private readonly ArticleGiftingService      $articleGiftingService
     ) {
         parent::__construct();
     }
@@ -109,11 +111,8 @@ class MemberDashboardController extends Controller
         $giftedArticles = [];
         if ($member->isEmailVerified()) {
             try {
-                $giftingService = new \App\Services\Members\ArticleGiftingService(
-                    new \App\Repositories\Members\GiftedArticleRepository()
-                );
 
-                $gifts = $giftingService->getGiftedArticlesForMember($member, $siteId);
+                $gifts = $this->articleGiftingService->getGiftedArticlesForMember($member, $siteId);
                 $giftedArticles = [
                     'received' => $gifts['received']->take(5), // Show latest 5
                     'given' => $gifts['given']->take(5),

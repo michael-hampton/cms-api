@@ -2,6 +2,8 @@
 
 namespace App\Services\Subscriptions\ValueObjects;
 
+use App\Services\ValueObjects\Money;
+
 /**
  * UpgradeQuote Value Object
  *

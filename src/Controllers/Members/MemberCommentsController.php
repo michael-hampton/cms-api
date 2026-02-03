@@ -3,6 +3,7 @@
 namespace App\Controllers\Members;
 
 use App\Controllers\Controller;
+use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -11,7 +12,7 @@ use App\Repositories\Members\CommentRepository;
 
 class MemberCommentsController extends Controller
 {
-    public function __construct(private CommentRepository $commentRepository)
+    public function __construct(private readonly CommentRepository $commentRepository, private readonly ActivityTracking $activityTracking)
     {
         parent::__construct();
     }
@@ -50,10 +51,7 @@ class MemberCommentsController extends Controller
 
         if ($this->commentRepository->deleteComment($commentId)) {
 
-            $activityTracking = new \App\Events\ActivityTracking(
-                new \App\Services\Members\BadgeService(new BadgeRepository())
-            );
-            $activityTracking->trackComment($comment);
+            $this->activityTracking->trackComment($comment);
 
             return $this->jsonResponse([
                 'success' => true,

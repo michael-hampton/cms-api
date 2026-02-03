@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Front;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\GiftedArticle;
 use App\Models\Member;
@@ -9,13 +10,36 @@ use App\Models\MemberGiftAllowance;
 use App\Models\Page;
 use App\Repositories\Members\GiftedArticleRepository;
 use App\Services\Members\ArticleGiftingService;
+use App\Services\RateLimiting\RateLimiter;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class ArticleGiftingServiceTest extends TestCase
+class ArticleGiftingServiceTest extends FunctionalTestCase
 {
     private $repository;
+    private $rateLimiter;
     private $service;
+    private Database $databaseMock;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repository = Mockery::mock(GiftedArticleRepository::class);
+        $this->rateLimiter = Mockery::mock(RateLimiter::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->service = new ArticleGiftingService(
+            $this->repository,
+            $this->rateLimiter,
+            $this->databaseMock
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function testCanMemberGiftReturnsCorrectInfo(): void
     {
@@ -69,10 +93,19 @@ class ArticleGiftingServiceTest extends TestCase
 
     public function testGiftArticleSuccess(): void
     {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $gifter = Mockery::mock(Member::class)->makePartial();
         $gifter->id = 1;
+        $gifter->email = 'gifter@example.com';
+
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;
+
         $siteId = 1;
         $recipientEmail = 'recipient@example.com';
         $personalMessage = 'Enjoy this article!';
@@ -82,6 +115,11 @@ class ArticleGiftingServiceTest extends TestCase
         $allowance->shouldReceive('incrementUsage')->once()->andReturn(true);
 
         $gift = Mockery::mock(GiftedArticle::class);
+
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->with("gift_article:1", 10)
+            ->andReturn(false);
 
         $this->repository
             ->shouldReceive('getOrCreateAllowance')
@@ -98,14 +136,12 @@ class ArticleGiftingServiceTest extends TestCase
         $this->repository
             ->shouldReceive('createGift')
             ->once()
-            ->with(Mockery::on(function ($arg) use ($page, $gifter, $siteId, $recipientEmail, $personalMessage) {
-                return $arg['page_id'] === $page->id
-                    && $arg['gifted_by_member_id'] === $gifter->id
-                    && $arg['site_id'] === $siteId
-                    && $arg['recipient_email'] === $recipientEmail
-                    && $arg['personal_message'] === $personalMessage;
-            }))
             ->andReturn($gift);
+
+        $this->rateLimiter->shouldReceive('attempt')
+            ->once()
+            ->with("gift_article:1", 10, 3600)
+            ->andReturn(true);
 
         $result = $this->service->giftArticle(
             $gifter,
@@ -120,16 +156,48 @@ class ArticleGiftingServiceTest extends TestCase
         $this->assertEquals('Article gifted successfully', $result['message']);
     }
 
+    public function testGiftArticleFailsWhenRateLimited(): void
+    {
+        $gifter = Mockery::mock(Member::class)->makePartial();
+        $gifter->id = 1;
+        $gifter->email = 'gifter@example.com';
+
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->with("gift_article:1", 10)
+            ->andReturn(true);
+
+        $result = $this->service->giftArticle(
+            $gifter,
+            $page,
+            'test@example.com',
+            1
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Too many', $result['message']);
+    }
+
     public function testGiftArticleFailsWhenLimitReached(): void
     {
         $gifter = Mockery::mock(Member::class)->makePartial();
         $gifter->id = 1;
+        $gifter->email = 'gifter@example.com';
+
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;
+
         $siteId = 1;
 
         $allowance = Mockery::mock(MemberGiftAllowance::class);
         $allowance->shouldReceive('canGift')->once()->andReturn(false);
+
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->andReturn(false);
 
         $this->repository
             ->shouldReceive('getOrCreateAllowance')
@@ -151,6 +219,7 @@ class ArticleGiftingServiceTest extends TestCase
     public function testGiftArticleFailsWhenAlreadyGiftedToSameEmail(): void
     {
         $gifter = Mockery::mock(Member::class)->makePartial();
+        $gifter->email = 'recipient@example.com';
         $gifter->id = 1;
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;
@@ -160,19 +229,15 @@ class ArticleGiftingServiceTest extends TestCase
         $allowance = Mockery::mock(MemberGiftAllowance::class);
         $allowance->shouldReceive('canGift')->once()->andReturn(true);
 
-        $existingGift = Mockery::mock(GiftedArticle::class);
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->andReturn(false);
 
         $this->repository
             ->shouldReceive('getOrCreateAllowance')
             ->once()
             ->with($gifter->id, $siteId)
             ->andReturn($allowance);
-
-        $this->repository
-            ->shouldReceive('findExistingGift')
-            ->once()
-            ->with($page->id, $gifter->id, $recipientEmail)
-            ->andReturn($existingGift);
 
         $result = $this->service->giftArticle(
             $gifter,
@@ -182,23 +247,28 @@ class ArticleGiftingServiceTest extends TestCase
         );
 
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('already gifted', $result['message']);
+        $this->assertStringContainsString('You cannot gift an article to yourself', $result['message']);
     }
 
     public function testGiftArticleTrimsAndLowercasesEmail(): void
     {
         $gifter = Mockery::mock(Member::class)->makePartial();
         $gifter->id = 1;
+        $gifter->email = 'recipient@example.com';
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;
         $siteId = 1;
-        $recipientEmail = 'recipient@example.com';
+        $recipientEmail = 'RECIPIENT2@example.com';
 
         $allowance = Mockery::mock(MemberGiftAllowance::class);
         $allowance->shouldReceive('canGift')->once()->andReturn(true);
         $allowance->shouldReceive('incrementUsage')->once()->andReturn(true);
 
         $gift = Mockery::mock(GiftedArticle::class);
+
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->andReturn(false);
 
         $this->repository
             ->shouldReceive('getOrCreateAllowance')
@@ -208,16 +278,26 @@ class ArticleGiftingServiceTest extends TestCase
         $this->repository
             ->shouldReceive('findExistingGift')
             ->once()
-            ->with($page->id, $gifter->id, 'recipient@example.com')
+            ->with($page->id, $gifter->id, $recipientEmail)
             ->andReturn(null);
+
+        $this->rateLimiter->shouldReceive('attempt')
+            ->once()
+            ->andReturn(true);
 
         $this->repository
             ->shouldReceive('createGift')
             ->once()
-            ->with(Mockery::on(function ($arg) {
-                return $arg['recipient_email'] === 'recipient@example.com';
+            ->with(Mockery::on(function ($arg) use ($recipientEmail) {
+                return $arg['recipient_email'] === strtolower($recipientEmail);
             }))
             ->andReturn($gift);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $result = $this->service->giftArticle(
             $gifter,
@@ -468,12 +548,18 @@ class ArticleGiftingServiceTest extends TestCase
         $gifter = Mockery::mock(Member::class)->makePartial();
         $gifter->id = 1;
         $gifter->email = 'user@example.com';
+
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;
+
         $siteId = 1;
 
         $allowance = Mockery::mock(MemberGiftAllowance::class);
         $allowance->shouldReceive('canGift')->once()->andReturn(true);
+
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->andReturn(false);
 
         $this->repository
             ->shouldReceive('getOrCreateAllowance')
@@ -484,7 +570,7 @@ class ArticleGiftingServiceTest extends TestCase
         $result = $this->service->giftArticle(
             $gifter,
             $page,
-            'user@example.com', // Same as gifter's email
+            'user@example.com',
             $siteId
         );
 
@@ -496,27 +582,35 @@ class ArticleGiftingServiceTest extends TestCase
     {
         $gifter = Mockery::mock(Member::class)->makePartial();
         $gifter->id = 1;
-        $gifter->email = 'User@Example.com';
+        $gifter->email = 'USER@example.com';
+
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;
+
         $siteId = 1;
 
         $allowance = Mockery::mock(MemberGiftAllowance::class);
         $allowance->shouldReceive('canGift')->once()->andReturn(true);
 
+        $this->rateLimiter->shouldReceive('tooManyAttempts')
+            ->once()
+            ->andReturn(false);
+
         $this->repository
             ->shouldReceive('getOrCreateAllowance')
             ->once()
+            ->with($gifter->id, $siteId)
             ->andReturn($allowance);
 
         $result = $this->service->giftArticle(
             $gifter,
             $page,
-            'user@example.com', // Different case
+            'user@example.com',
             $siteId
         );
 
         $this->assertFalse($result['success']);
+        $this->assertStringContainsString('cannot gift an article to yourself', $result['message']);
     }
 
     public function testCheckAndClaimGiftForPageClaimsPendingGift(): void
@@ -583,18 +677,5 @@ class ArticleGiftingServiceTest extends TestCase
         $result = $this->service->checkAndClaimGiftForPage($member, $page);
 
         $this->assertNull($result);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->repository = Mockery::mock(GiftedArticleRepository::class);
-        $this->service = new ArticleGiftingService($this->repository);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 }

@@ -4,10 +4,20 @@ namespace App\Repositories\Members;
 
 use App\Framework\Support\Collection;
 use App\Models\Address;
+use App\Models\Model;
 use App\Repositories\Repository;
 
 class AddressRepository extends Repository
 {
+    public function createGuestAddress(array $data, int $siteId): Model
+    {
+        $data['site_id'] = $siteId;
+        $data['member_id'] = null;
+        $data['is_guest'] = true;
+
+        return $this->create($data);
+    }
+
     protected function getModelClass(): string
     {
         return Address::class;

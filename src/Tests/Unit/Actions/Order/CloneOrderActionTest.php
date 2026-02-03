@@ -8,6 +8,7 @@ use App\Models\Address;
 use App\Models\Member;
 use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
+use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\OrderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -27,7 +28,7 @@ class CloneOrderActionTest extends FunctionalTestCase
         parent::setUp(); // Call parent setup if it exists
         $this->orderRepository = m::mock(OrderRepository::class);
         $this->databaseMock = m::mock(Database::class);
-        $this->orderService = m::mock(OrderService::class);
+        $this->orderService = m::mock(OrderCreationService::class);
 
         $this->service = new CloneOrder(
             $this->orderRepository,
@@ -95,7 +96,7 @@ class CloneOrderActionTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($originalOrder);
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($duplicatedOrder);
 
@@ -158,7 +159,7 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         // No address validation needed for billing (it's JSON)
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($duplicatedOrder);
 
@@ -215,7 +216,7 @@ class CloneOrderActionTest extends FunctionalTestCase
             ->with($orderId)
             ->andReturn($originalOrder);
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($duplicatedOrder);
 
@@ -266,7 +267,7 @@ class CloneOrderActionTest extends FunctionalTestCase
         $member = m::mock(Member::class)->makePartial();
         $member->id = 10;
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($duplicatedOrder);
 
@@ -326,7 +327,7 @@ class CloneOrderActionTest extends FunctionalTestCase
         $billingAddress->id = 21;
         $billingAddress->member_id = 10;
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($duplicatedOrder);
 
@@ -361,7 +362,7 @@ class CloneOrderActionTest extends FunctionalTestCase
 
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->orderRepository->shouldReceive('getOrderById')->with(1)->andReturn($originalOrder);
-        $this->orderService->shouldReceive('createOrder')->andReturn($newOrder);
+        $this->orderService->shouldReceive('create')->andReturn($newOrder);
         $this->setCloneHistoryExpectations($originalOrder, $newOrder, 1, 2);
 
         $result = $this->service->handle(1);

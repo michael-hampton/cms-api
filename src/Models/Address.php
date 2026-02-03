@@ -19,11 +19,13 @@ class Address extends Model
         'state',
         'postcode',
         'country',
-        'site_id'
+        'site_id',
+        'is_guest'
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'is_guest' => 'boolean'
     ];
 
     public function member($relation = false)

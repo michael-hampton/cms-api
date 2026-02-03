@@ -4,6 +4,7 @@ namespace App\Actions\Order;
 
 use App\Framework\Database\Database;
 use App\Repositories\Billing\OrderRepository;
+use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\OrderService;
 use Exception;
 
@@ -13,7 +14,7 @@ class CloneOrder
 
     public function __construct(
         private readonly OrderRepository         $orderRepository,
-        private readonly OrderService $orderService,
+        private readonly OrderCreationService $orderService,
         ?Database                                $database = null
     )
     {
@@ -80,7 +81,7 @@ class CloneOrder
                 $results['items_cloned']++;
             }
 
-            $newOrder = $this->orderService->createOrder($data, $items, $originalOrder->site_id);
+            $newOrder = $this->orderService->create($data, $items, $originalOrder->site_id);
             $results['success'][] = 'order_created';
 
             // Add clone history

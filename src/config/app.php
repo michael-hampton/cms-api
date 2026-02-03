@@ -13,6 +13,7 @@ return [
         \App\Framework\ServiceProvider\ServiceServiceProvider::class,
         \App\Framework\ServiceProvider\ControllerServiceProvider::class,
         \App\Framework\ServiceProvider\ScheduleServiceProvider::class,
+        \App\Framework\ServiceProvider\EventServiceProvider::class,
 
         // Add custom providers here
         // \App\Providers\CustomServiceProvider::class,

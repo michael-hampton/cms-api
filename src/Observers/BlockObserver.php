@@ -3,10 +3,9 @@
 namespace App\Observers;
 
 use App\Framework\Observers\Observer;
-use App\Framework\Support\Cache;
+use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Event;
 use App\Framework\Support\Logger;
-use App\Models\Block;
 use App\Models\Model;
 
 class BlockObserver extends Observer

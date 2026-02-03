@@ -8,6 +8,7 @@ use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\Subscription;
+use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
@@ -41,7 +42,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService = Mockery::mock(CartService::class);
         $this->subscriptionService = Mockery::mock(OneTimeSubscriptionService::class);
-        $this->orderService = Mockery::mock(OrderService::class);
+        $this->orderService = Mockery::mock(OrderCreationService::class);
         $this->voucherService = Mockery::mock(VoucherService::class);
         $this->shippingService = Mockery::mock(ShippingService::class);
         $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
@@ -175,7 +176,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'customer_id' => 'cus_test123'
             ]);
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($order);
 
@@ -267,7 +268,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'customer_id' => 'cus_test123'
             ]);
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($order);
 
@@ -355,7 +356,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 'customer_id' => 'cus_test123'
             ]);
 
-        $this->orderService->shouldReceive('createOrder')
+        $this->orderService->shouldReceive('create')
             ->once()
             ->andReturn($order);
 

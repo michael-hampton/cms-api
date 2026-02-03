@@ -18,7 +18,7 @@ class OrderFactory extends Factory
     protected function definition(): array
     {
         return $this->withSiteId([
-            'order_number' => 'ORD-001',
+            'order_number' => 'ORD-' . uniqid(),
             'status' => 'pending',
             'payment_status' => 'pending',
             'total' => 100.00,

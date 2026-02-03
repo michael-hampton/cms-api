@@ -6,7 +6,6 @@ enum PaymentStatus: string
 {
     case PAID = 'paid';
     case UNPAID = 'unpaid';
-
     case PENDING = 'pending';
     case PROCESSING = 'processing';
     case COMPLETED = 'completed';

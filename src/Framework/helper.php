@@ -3,6 +3,7 @@
 use App\Framework\Authorization\Auth;
 use App\Framework\Container;
 use App\Framework\Date;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Http\Router;
 use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
@@ -143,6 +144,7 @@ if (!function_exists('config')) {
                 'app' => 'config/app.php',
                 'database' => 'config/database.php',
                 'routing' => 'config/routing.php',
+                'recommendations' => 'config/recommendations.php',
             ];
 
             foreach ($configFiles as $name => $file) {
@@ -534,6 +536,14 @@ function diffForHumans(DateTimeInterface $time, ?DateTimeInterface $now = null, 
     }
 
     return $isFuture ? "in {$human}" : "{$human} ago";
+}
+
+if (!function_exists('event')) {
+    function event(object $event): object
+    {
+        $dispatcher = Container::getInstance()->resolve(EventDispatcher::class);
+        return $dispatcher?->dispatch($event) ?? $event;
+    }
 }
 
 

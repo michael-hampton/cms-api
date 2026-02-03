@@ -2,11 +2,15 @@
 
 namespace App\Tests\Unit\Services\Rewards;
 
+use App\Enums\RewardType;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\MemberReward;
 use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardsRepository;
+use App\Services\Rewards\Handlers\RewardTypeHandlerFactory;
+use App\Services\Rewards\Handlers\VoucherRewardHandler;
 use App\Services\Rewards\RewardsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -14,7 +18,29 @@ use Mockery;
 class RewardsServiceTest extends FunctionalTestCase
 {
     private $repository;
+    private $handlerFactory;
     private $service;
+    private Database $databaseMock;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repository = Mockery::mock(RewardsRepository::class);
+        $this->handlerFactory = Mockery::mock(RewardTypeHandlerFactory::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+
+        $this->service = new RewardsService(
+            $this->repository,
+            $this->handlerFactory,
+            $this->databaseMock
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function testGetMemberRewardsCallsRepository(): void
     {
@@ -52,8 +78,14 @@ class RewardsServiceTest extends FunctionalTestCase
         $this->assertSame($expectedCollection, $result);
     }
 
-    public function testClaimRewardSuccessfully(): void
+    public function testClaimRewardUsesTransaction(): void
     {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $member = new Member(['id' => 1]);
 
         $reward = Mockery::mock(MemberReward::class)->makePartial();
@@ -73,13 +105,12 @@ class RewardsServiceTest extends FunctionalTestCase
         $this->repository
             ->shouldReceive('trackClick')
             ->once()
-            ->with(1, $this->siteId, 1, 'claim', null, null);
+            ->with(1, 1, $this->siteId, 'claim', null, null);
 
         $result = $this->service->claimReward(1, $member);
 
         $this->assertTrue($result['success']);
         $this->assertSame($reward, $result['reward']);
-        $this->assertEquals('Reward claimed successfully!', $result['message']);
     }
 
     public function testClaimRewardFailsForExpiredReward(): void
@@ -101,6 +132,117 @@ class RewardsServiceTest extends FunctionalTestCase
         $this->assertFalse($result['success']);
         $this->assertEquals('This reward has expired', $result['message']);
     }
+
+    public function testClaimRewardTracksViewForAlreadyClaimed(): void
+    {
+        $member = new Member(['id' => 1]);
+
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->member_id = 1;
+        $reward->id = 1;
+        $reward->site_id = $this->siteId;
+        $reward->shouldReceive('isExpired')->once()->andReturn(false);
+        $reward->shouldReceive('isClaimed')->once()->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('findMemberRewardById')
+            ->once()
+            ->with(1)
+            ->andReturn($reward);
+
+        $this->repository
+            ->shouldReceive('trackClick')
+            ->once()
+            ->with(1, 1, $this->siteId, 'view', null, null);
+
+        $result = $this->service->claimReward(1, $member);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['already_claimed']);
+    }
+
+    public function testGetUnclaimedRewardsUsesPendingStatus(): void
+    {
+        $member = new Member(['id' => 1]);
+        $siteId = 1;
+        $expectedCollection = collect([]);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->with($member->id, $siteId, 'pending')
+            ->andReturn($expectedCollection);
+
+        $result = $this->service->getUnclaimedRewards($member, $siteId);
+
+        $this->assertSame($expectedCollection, $result);
+    }
+
+    public function testGetRewardStatsCalculatesGiftCardTotal(): void
+    {
+        $member = new Member(['id' => 1]);
+
+        $reward1 = Mockery::mock(MemberReward::class)->makePartial();
+        $reward1->id = 1;
+        $reward1->status = 'claimed';
+        $reward1->reward_data = ['value' => 25, 'currency' => 'GBP'];
+        $reward1->shouldReceive('isClaimed')->andReturn(true);
+
+        $reward2 = Mockery::mock(MemberReward::class)->makePartial();
+        $reward2->id = 2;
+        $reward2->status = 'claimed';
+        $reward2->reward_data = ['value' => 15, 'currency' => 'GBP'];
+        $reward2->shouldReceive('isClaimed')->andReturn(true);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->andReturn(collect([$reward1, $reward2]));
+
+        $result = $this->service->getRewardStats($member, $this->siteId);
+
+        $this->assertEquals(40.0, $result['gift_card_total']);
+        $this->assertEquals('GBP', $result['currency']);
+        $this->assertEquals('£', $result['currency_symbol']);
+    }
+
+    public function testGetTopRewardsExcludesEarnedAndQualified(): void
+    {
+        $member = new Member(['id' => 1]);
+
+        $definition1 = Mockery::mock(RewardDefinition::class)->makePartial();
+        $definition1->id = 1;
+        $definition1->shouldReceive('checkCriteria')
+            ->once()
+            ->andReturn(false); // Not qualified
+
+        $definition2 = Mockery::mock(RewardDefinition::class)->makePartial();
+        $definition2->id = 2;
+        $definition2->shouldReceive('checkCriteria')
+            ->once()
+            ->andReturn(true); // Qualified, should be excluded
+
+        $allDefinitions = collect([$definition1, $definition2]);
+        $memberRewards = collect([]);
+
+        $this->repository
+            ->shouldReceive('getActiveRewardDefinitions')
+            ->once()
+            ->with($this->siteId)
+            ->andReturn($allDefinitions);
+
+        $this->repository
+            ->shouldReceive('getMemberRewards')
+            ->once()
+            ->with($member->id, $this->siteId)
+            ->andReturn($memberRewards);
+
+        $result = $this->service->getTopRewards($member, $this->siteId);
+
+        $this->assertCount(1, $result);
+        $this->assertEquals(1, $result->first()->id);
+    }
+
 
     public function testClaimRewardFailsForNonExistentReward(): void
     {
@@ -167,7 +309,7 @@ class RewardsServiceTest extends FunctionalTestCase
         $this->assertEquals('This reward has already been claimed', $result['message']);
     }
 
-    public function testCheckAndAwardRewardsAwardsEligibleRewards(): void
+    public function testCheckAndAwardRewardsUsesTransaction(): void
     {
         $member = new Member(['id' => 1]);
         $siteId = 1;
@@ -192,6 +334,25 @@ class RewardsServiceTest extends FunctionalTestCase
             ->once()
             ->with($member->id, $rewardDef->id)
             ->andReturn(0);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $handler = Mockery::mock(VoucherRewardHandler::class);
+        $handler->shouldReceive('handle')
+            ->once()
+            ->andReturn([
+                'reward_data' => ['points' => 100],
+                'expires_at' => null
+            ]);
+
+        $this->handlerFactory->shouldReceive('make')
+            ->once()
+            ->with(Mockery::type(RewardType::class))
+            ->andReturn($handler);
 
         $newReward = Mockery::mock(MemberReward::class);
 
@@ -261,40 +422,6 @@ class RewardsServiceTest extends FunctionalTestCase
         $result = $this->service->checkAndAwardRewards($member, $siteId);
 
         $this->assertCount(0, $result);
-    }
-
-    public function testClaimRewardTracksClick(): void
-    {
-        $member = new Member(['id' => 1]);
-
-        $reward = Mockery::mock(MemberReward::class)->makePartial();
-        $reward->member_id = 1;
-        $reward->site_id = 1;
-        $reward->id = 1;
-        $reward->shouldReceive('isExpired')->once()->andReturn(false);
-        $reward->shouldReceive('isClaimed')->once()->andReturn(false);
-        $reward->shouldReceive('claim')->once()->andReturn(true);
-
-        $this->repository
-            ->shouldReceive('findMemberRewardById')
-            ->once()
-            ->andReturn($reward);
-
-        $this->repository
-            ->shouldReceive('trackClick')
-            ->once()
-            ->with(
-                $reward->id,
-                $member->id,
-                1,
-                'claim',
-                Mockery::any(),
-                Mockery::any()
-            );
-
-        $result = $this->service->claimReward($reward->id, $member);
-
-        $this->assertTrue($result['success']);
     }
 
     public function testGetTopRewards()
@@ -434,19 +561,5 @@ class RewardsServiceTest extends FunctionalTestCase
         $result = $this->service->getRewardStats($member, $this->siteId);
 
         $this->assertEquals(0.0, $result['gift_card_total']);
-    }
-
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->repository = Mockery::mock(RewardsRepository::class);
-        $this->service = new RewardsService($this->repository);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 }

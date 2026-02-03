@@ -209,7 +209,7 @@ if (empty($giftedArticles) || (empty($giftedArticles['received']) && empty($gift
 
                     <div class="gift-actions">
                         <?php if ($gift->status === 'pending'): ?>
-                            <a href="/gift/<?= htmlspecialchars($gift->gift_token) ?>"
+                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/gift/<?= htmlspecialchars($gift->gift_token) ?>"
                                class="gift-btn gift-btn-primary">
                                 Claim & Read
                             </a>

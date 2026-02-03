@@ -1,5 +1,4 @@
 <?php
-// src/Controllers/ProductOfferController.php
 
 namespace App\Controllers\Offers;
 
@@ -17,13 +16,15 @@ use App\Resources\OfferResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
+use App\Services\Analytics\OfferAnalyticsService;
 use App\Services\Offers\ProductOfferService;
 use Exception;
 
 class ProductOfferController extends Controller
 {
     public function __construct(
-        private readonly ProductOfferService $offerService
+        private readonly ProductOfferService   $offerService,
+        private readonly OfferAnalyticsService $analyticsService
     )
     {
         parent::__construct();
@@ -214,7 +215,7 @@ class ProductOfferController extends Controller
     {
         try {
             $siteId = SiteContext::getId();
-            $stats = $this->offerService->getAllOfferStatistics($siteId);
+            $stats = $this->analyticsService->getAllOfferStatistics($siteId);
 
             return $this->resourceResponse([
                 'success' => true,

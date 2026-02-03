@@ -2,6 +2,8 @@
 
 namespace App\Services\Offers;
 
+use App\Enums\OfferAction;
+use App\Enums\OfferStatus;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Support\Collection;
 use App\Models\Model;
@@ -13,7 +15,8 @@ class ProductOfferService
 {
     public function __construct(
         private readonly ProductOfferRepository $repository,
-        private readonly AuthenticationService  $authenticationService
+        private readonly AuthenticationService        $authenticationService,
+        private readonly OfferStatusTransitionHandler $statusHandler
     )
     {
     }
@@ -37,16 +40,18 @@ class ProductOfferService
     {
         $this->validateOfferDates($data['start_date'], $data['end_date']);
 
-        // Auto-fill status-related fields
-        $data = $this->fillStatusFields($data);
+        $userId = $this->authenticationService->getUserId();
+        if ($userId && isset($data['status'])) {
+            $data = $this->statusHandler->fillStatusFields($data, $userId);
+        }
 
         return $this->repository->create($data);
     }
 
     private function validateOfferDates(string $startDate, string $endDate): void
     {
-        $start = strtotime($startDate);
-        $end = strtotime($endDate);
+        $start = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $startDate);
+        $end = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $endDate);
 
         if ($start === false || $end === false) {
             throw new Exception('Invalid date format');
@@ -63,58 +68,15 @@ class ProductOfferService
             $this->validateOfferDates($data['start_date'], $data['end_date']);
         }
 
-        // Get current offer to check status changes
         $currentOffer = $this->repository->find($id);
         if ($currentOffer && isset($data['status'])) {
-            $data = $this->fillStatusFieldsOnUpdate($data, $currentOffer);
+            $userId = $this->authenticationService->getUserId();
+            if ($userId) {
+                $data = $this->statusHandler->fillStatusFieldsOnUpdate($data, $currentOffer, $userId);
+            }
         }
 
         return $this->repository->update($id, $data);
-    }
-
-    private function fillStatusFields(array $data): array
-    {
-        if (!isset($data['status'])) {
-            return $data;
-        }
-
-        $userId = $this->authenticationService->getUserId();
-        if (!$userId) {
-            return $data;
-        }
-
-        if ($data['status'] === 'published') {
-            $data['published_by'] = $userId;
-            $data['published_at'] = now_datetime();
-        } elseif ($data['status'] === 'rejected') {
-            $data['rejected_by'] = $userId;
-            $data['rejected_at'] = now_datetime();
-        }
-
-        return $data;
-    }
-
-    private function fillStatusFieldsOnUpdate(array $data, ProductOffer $currentOffer): array
-    {
-        // Only fill if status is changing
-        if ($data['status'] === $currentOffer->status) {
-            return $data;
-        }
-
-        $userId = $this->authenticationService->getUserId();
-        if (!$userId) {
-            return $data;
-        }
-
-        if ($data['status'] === 'published' && !$currentOffer->published_at) {
-            $data['published_by'] = $userId;
-            $data['published_at'] = now_datetime();
-        } elseif ($data['status'] === 'rejected' && !$currentOffer->rejected_at) {
-            $data['rejected_by'] = $userId;
-            $data['rejected_at'] = now_datetime();
-        }
-
-        return $data;
     }
 
     public function deleteOffer(int $id): bool
@@ -148,81 +110,19 @@ class ProductOfferService
 
     public function getByStatus(string $status): Collection
     {
+        OfferStatus::from($status); // Validate enum
         return $this->repository->getByStatus($status);
     }
 
-    public function getAllOfferStatistics(int $siteId): array
+    public function trackClick(
+        int     $offerId,
+        ?int    $memberId,
+        string  $action,
+        ?string $ipAddress = null,
+        ?string $userAgent = null
+    ): Model
     {
-        $offers = $this->repository->all();
-
-        $totalOffers = $offers->count();
-        $activeOffers = $offers->where('is_active', true)->count();
-        $publishedOffers = $offers->where('status', 'published')->count();
-        $pendingOffers = $offers->where('status', 'pending')->count();
-        $rejectedOffers = $offers->where('status', 'rejected')->count();
-
-        // Calculate currently running offers (published, active, and within date range)
-        $now = now_datetime();
-        $runningOffers = $offers->filter(function ($offer) use ($now) {
-            return $offer->is_active
-                && $offer->status === 'published'
-                && $offer->start_date <= $now
-                && $offer->end_date >= $now;
-        })->count();
-
-        // Get click statistics if you have an offer_clicks table
-        $offerIds = $offers->pluck('id')->toArray();
-        $clickStats = $this->getOfferClickStatistics($offerIds);
-
-        // Top performing offers
-        $topOffers = $offers
-            ->where('status', 'published')
-            ->sortByDesc('discount_percentage')
-            ->take(10)
-            ->map(fn($offer) => [
-                'id' => $offer->id,
-                'product_name' => $offer->product_name ?? 'Unknown',
-                'merchant_name' => $offer->merchant_name ?? 'N/A',
-                'discount_percentage' => $offer->discount_percentage,
-                'sale_price' => $offer->sale_price,
-                'clicks' => $clickStats['by_offer'][$offer->id] ?? 0
-            ])
-            ->values()
-            ->toArray();
-
-        return [
-            'total_offers' => $totalOffers,
-            'active_offers' => $activeOffers,
-            'running_offers' => $runningOffers,
-            'published_offers' => $publishedOffers,
-            'pending_offers' => $pendingOffers,
-            'rejected_offers' => $rejectedOffers,
-            'total_clicks' => $clickStats['total'] ?? 0,
-            'unique_clickers' => $clickStats['unique'] ?? 0,
-            'click_through_rate' => $totalOffers > 0 && isset($clickStats['unique']) ? round(($clickStats['unique'] / $totalOffers) * 100, 2) : 0,
-            'top_offers' => $topOffers
-        ];
-    }
-
-    private function getOfferClickStatistics(array $offerIds): array
-    {
-        if (empty($offerIds)) {
-            return [
-                'total' => 0,
-                'unique' => 0,
-                'by_offer' => []
-            ];
-        }
-
-        return $this->repository->getClickStatistics($offerIds);
-    }
-
-    public function trackClick(int $offerId, ?int $memberId, string $action, ?string $ipAddress = null, ?string $userAgent = null): Model
-    {
-        // Validate action
-        if (!in_array($action, ['view', 'click', 'copy_code'])) {
-            throw new Exception('Invalid action type');
-        }
+        OfferAction::from($action); // Validate enum
 
         return $this->repository->trackClick($offerId, $memberId, $action, $ipAddress, $userAgent);
     }

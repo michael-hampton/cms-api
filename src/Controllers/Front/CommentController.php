@@ -4,7 +4,7 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
-use App\Events\ActivityTracking;
+use App\Events\ArticleGifting\ActivityTracking;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;

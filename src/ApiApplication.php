@@ -2,7 +2,12 @@
 
 namespace App;
 
+use App\Events\ArticleGifting\GiftClaimedEvent;
+use App\Events\ArticleGifting\GiftCreatedEvent;
+use App\Events\Badges\BadgeEarnedEvent;
+use App\Events\Badges\PointsAwardedEvent;
 use App\Events\DatabaseEventSubscriber;
+use App\Events\Orders\OrderCreatedEvent;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -15,12 +20,18 @@ use App\Framework\Console\Commands\ScheduleRunCommand;
 use App\Framework\Console\Commands\SeedCommand;
 use App\Framework\Database\Database;
 use App\Framework\Date;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Routing\RouteLoader;
+use App\Listeners\BadgeEarnedListener;
+use App\Listeners\GiftClaimedListener;
+use App\Listeners\GiftCreatedListener;
+use App\Listeners\Orders\SendOrderConfirmationListener;
+use App\Listeners\PointsAwardedListener;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
@@ -47,6 +58,8 @@ class ApiApplication
 
         $this->container->instance(Router::class, $this->router);
         $this->container->bind(\DateTimeInterface::class, Date::class);
+
+        $this->registerEvents();
 
         // Create route loader using container
         $this->routeLoader = $this->container->resolve(RouteLoader::class);
@@ -171,5 +184,18 @@ class ApiApplication
     public function getRouter(): Router
     {
         return $this->router;
+    }
+
+    public function registerEvents()
+    {
+        $eventDispatcher = new EventDispatcher();
+        $this->container->instance(EventDispatcher::class, $eventDispatcher);
+
+        $eventDispatcher->listen(PointsAwardedEvent::class, [PointsAwardedListener::class, 'handle']);
+        $eventDispatcher->listen(GiftClaimedEvent::class, [GiftClaimedListener::class, 'handle']);
+        $eventDispatcher->listen(GiftCreatedEvent::class, [GiftCreatedListener::class, 'handle']);
+        $eventDispatcher->listen(BadgeEarnedEvent::class, [BadgeEarnedListener::class, 'handle']);
+        $eventDispatcher->listen(OrderCreatedEvent::class, [SendOrderConfirmationListener::class, 'handle']);
+
     }
 }

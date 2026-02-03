@@ -4,7 +4,7 @@ namespace App\Framework\Http;
 
 use App\Framework\Container;
 use App\Framework\Session\Session;
-use App\Framework\Support\Cache;
+use App\Framework\Support\Cache\Cache;
 use App\Services\Url\DynamicUrlResolver;
 use App\Services\Url\UrlResolutionResult;
 use Exception;

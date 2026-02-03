@@ -2,7 +2,7 @@
 
 namespace App\Services\Url;
 
-use App\Framework\Support\Cache;
+use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\SiteContext;
 use App\Models\Brand;
 use App\Models\Category;

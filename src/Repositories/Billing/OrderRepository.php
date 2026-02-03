@@ -48,14 +48,20 @@ class OrderRepository extends Repository
 
     public function getByUser(int $userId, ?int $limit = null): Collection
     {
-        $query = Order::where('user_id', $userId)
+        $query = Order::with([
+            'items.product',  // ✅ Eager load nested
+            'user',
+            'shippingAddress',
+            'billingAddress'
+        ])
+            ->where('user_id', $userId)
             ->orderBy('created_at', 'desc');
 
         if ($limit) {
             $query->limit($limit);
         }
 
-        return $this->applySiteFilter($query)->get();
+        return $query->get();
     }
 
     public function getRecentOrders(?int $limit = 10): Collection
@@ -123,5 +129,26 @@ class OrderRepository extends Repository
     public function getOrdersByCheckoutId(string $checkoutId): Collection
     {
         return Order::where('checkout_id', $checkoutId)->get();
+    }
+
+    public function getAll(int $page = 1, int $perPage = 50): array
+    {
+        $query = Order::with(['items', 'user'])
+            ->orderBy('created_at', 'desc');
+
+        $total = $query->count();
+        $orders = $query->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get();
+
+        return [
+            'data' => $orders,
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'total_pages' => ceil($total / $perPage)
+            ]
+        ];
     }
 }

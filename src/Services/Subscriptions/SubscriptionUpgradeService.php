@@ -19,8 +19,8 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
-use App\Services\Subscriptions\ValueObjects\Money;
 use App\Services\Subscriptions\ValueObjects\UpgradeQuote;
+use App\Services\ValueObjects\Money;
 
 class SubscriptionUpgradeService
 {

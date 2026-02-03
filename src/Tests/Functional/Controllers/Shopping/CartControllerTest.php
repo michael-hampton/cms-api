@@ -5,14 +5,15 @@ namespace App\Tests\Functional\Controllers\Shopping;
 use App\Framework\Authorization\Auth;
 use App\Models\Product;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class CartControllerTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     protected function setUp(): void
     {
         parent::setUp();
-        $this->cleanupDatabase();
-        $this->ensureSiteExists();
     }
 
     public function testIndexReturnsEmptyCart()
@@ -45,10 +46,14 @@ class CartControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId
         ]);
 
+        $member = $this->createMember();
+
         $response = $this->postForSite('/api/cart/add', [
             'product_id' => $product->id,
-            'quantity' => 2
+            'quantity' => 2,
+            'user_id' => $member->id
         ]);
+
 
         $this->assertResponseOk($response);
         $data = json_decode($response->getContent(), true);
@@ -104,10 +109,13 @@ class CartControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId
         ]);
 
+        $member = $this->createMember();
+
         // Add item first
         $addResponse = $this->postForSite('/api/cart/add', [
             'product_id' => $product->id,
-            'quantity' => 1
+            'quantity' => 1,
+            'user_id' => $member->id
         ]);
 
         // Verify item was added
@@ -160,9 +168,13 @@ class CartControllerTest extends FunctionalTestCase
             'stock_quantity' => 100
         ]);
 
+        $member = $this->createMember();
+
         // Add item
         $addResponse = $this->postForSite('/api/cart/add', [
-            'product_id' => $product->id
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'user_id' => $member->id
         ]);
         $this->assertResponseOk($addResponse);
 
@@ -231,14 +243,18 @@ class CartControllerTest extends FunctionalTestCase
             'stock_quantity' => 100
         ]);
 
+        $member = $this->createMember();
+
         $this->postForSite('/api/cart/add', [
             'product_id' => $product1->id,
-            'quantity' => 2
+            'quantity' => 2,
+            'user_id' => $member->id
         ]);
 
         $this->postForSite('/api/cart/add', [
             'product_id' => $product2->id,
-            'quantity' => 1
+            'quantity' => 1,
+            'user_id' => $member->id
         ]);
 
         $response = $this->getForSite('/api/cart');

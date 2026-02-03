@@ -19,6 +19,10 @@ use App\Requests\UpdateOrderItemsRequest;
 use App\Requests\UpdateOrderRequest;
 use App\Resources\OrderResource;
 use App\Search\SearchCriteriaParser;
+use App\Services\Billing\Order\OrderCreationService;
+use App\Services\Billing\Order\OrderManager;
+use App\Services\Billing\Order\OrderPaymentService;
+use App\Services\Billing\Order\OrderUpdateService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentService;
 use Exception;
@@ -28,7 +32,11 @@ class OrderController extends Controller
     public function __construct(
         private readonly OrderService    $orderService,
         private readonly OrderRepository $orderRepository,
-        private readonly PaymentService  $paymentService
+        private readonly PaymentService       $paymentService,
+        private readonly OrderCreationService $orderCreationService,
+        private readonly OrderUpdateService   $orderUpdateService,
+        private readonly OrderManager         $orderManager,
+        private readonly OrderPaymentService  $orderPaymentService
     )
     {
         parent::__construct();
@@ -69,7 +77,7 @@ class OrderController extends Controller
             $items = $data['items'];
             unset($data['items']);
 
-            $order = $this->orderService->createOrder($data, $items, $siteId);
+            $order = $this->orderCreationService->create($data, $items, $siteId);
 
             return $this->jsonResponse(['order' => $order->toArray()], 201);
 
@@ -107,7 +115,7 @@ class OrderController extends Controller
     {
         try {
             $data = $request->validated();
-            $order = $this->orderService->updateOrder($id, $data);
+            $order = $this->orderUpdateService->update($id, $data);
 
             return $this->jsonResponse(['order' => $order->toArray()]);
 
@@ -126,7 +134,13 @@ class OrderController extends Controller
     {
         try {
             $data = $request->validated();
-            $order = $this->orderService->updateOrderItems($id, $data['items']);
+            $result = $this->orderUpdateService->updateItems($id, $data['items']);
+
+            if (!$result) {
+                return $this->errorResponse('Order not found', 404);
+            }
+
+            $order = $this->orderService->getOrderById($id);
 
             return $this->jsonResponse(['order' => $order->toArray()]);
 
@@ -144,7 +158,7 @@ class OrderController extends Controller
     public function destroy(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $result = $this->orderService->deleteOrder($id);
+            $result = $this->orderManager->delete($id);
 
             if (!$result) {
                 return $this->errorResponse('Order not found', 404);
@@ -161,7 +175,7 @@ class OrderController extends Controller
     {
         try {
             $reason = $request->get('reason');
-            $order = $this->orderService->cancelOrder($id, $reason);
+            $order = $this->orderUpdateService->cancel($id, $reason);
 
             return $this->jsonResponse(['order' => $order->toArray()]);
 
@@ -173,7 +187,7 @@ class OrderController extends Controller
     public function complete(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $order = $this->orderService->completeOrder($id);
+            $order = $this->orderUpdateService->complete($id);
 
             return $this->jsonResponse(['order' => $order->toArray()]);
 
@@ -327,7 +341,7 @@ class OrderController extends Controller
         try {
             $data = $request->validated();
 
-            $payment = $this->orderService->processOrderPayment(
+            $payment = $this->orderPaymentService->processPayment(
                 $id,
                 $data,
                 SiteContext::getId()

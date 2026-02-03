@@ -118,7 +118,7 @@ class ProductResource extends JsonResource
                 return $activeVariants->map(fn($variant) => [
                     'id' => $variant['id'],
                     'product_id' => $variant['product_id'],
-                    'attributes' => $variant['attributes'],
+                    'attributes' => $variant['attributes'] ?? [],
                     'sku' => $variant['sku'],
                     'name' => $variant['name'],
                     'price' => $variant['price'],

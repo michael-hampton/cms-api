@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Subscriptions\ValueObjects;
+namespace App\Services\ValueObjects;
 
 use InvalidArgumentException;
 

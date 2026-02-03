@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
-use App\Events\ModelCreated;
-use App\Events\ModelCreating;
-use App\Events\ModelDeleted;
-use App\Events\ModelDeleting;
-use App\Events\ModelRetrieved;
-use App\Events\ModelSaved;
-use App\Events\ModelSaving;
-use App\Events\ModelUpdated;
-use App\Events\ModelUpdating;
+use App\Events\ArticleGifting\ModelCreated;
+use App\Events\ArticleGifting\ModelCreating;
+use App\Events\ArticleGifting\ModelDeleted;
+use App\Events\ArticleGifting\ModelDeleting;
+use App\Events\ArticleGifting\ModelRetrieved;
+use App\Events\ArticleGifting\ModelSaved;
+use App\Events\ArticleGifting\ModelSaving;
+use App\Events\ArticleGifting\ModelUpdated;
+use App\Events\ArticleGifting\ModelUpdating;
 use App\Framework\Database\Database;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Database\Relations\EagerLoader;

@@ -35,6 +35,9 @@ class OrderResource extends JsonResource
                 !empty($this->billingAddress),
                 AddressResource::make($this->billingAddress)->toArray()
             ),
+            'member' => $this->when(!empty($this->user), MemberResource::make($this->user)->toArray()),
+            'billing_address_id' => $this->getAttribute('billing_address_id'),
+            'shipping_address_id' => $this->getAttribute('shipping_address_id'),
         ];
     }
 }

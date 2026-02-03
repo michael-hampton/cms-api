@@ -2,7 +2,11 @@
 
 namespace App\Services\Members;
 
-use App\Framework\Support\Logger;
+use App\Enums\BadgeCriteriaOperator;
+use App\Enums\BadgeCriteriaType;
+use App\Events\Badges\BadgeEarnedEvent;
+use App\Events\Badges\PointsAwardedEvent;
+use App\Framework\Database\Database;
 use App\Framework\Support\SiteContext;
 use App\Models\Badge;
 use App\Models\Member;
@@ -10,13 +14,12 @@ use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberPoint;
 use App\Repositories\Members\BadgeRepository;
-use App\Services\Rewards\RewardsService;
 
 class BadgeService
 {
     public function __construct(
         private readonly BadgeRepository $badgeRepository,
-        private readonly RewardsService  $rewardsService
+        private readonly Database $database
     )
     {
     }
@@ -32,42 +35,59 @@ class BadgeService
     ): MemberActivity
     {
         $siteId = $siteId ?? SiteContext::getId();
-        $activity = $this->badgeRepository->createMemberActivity([
-            'member_id' => $member->id,
-            'site_id' => $siteId,
-            'activity_type' => $activityType,
-            'entity_type' => $entityType,
-            'entity_id' => $entityId,
-            'metadata' => $metadata,
-            'points' => $points,
-            'activity_date' => now()
-        ]);
 
-        if ($points > 0) {
-            $this->awardPoints($member, $points, "Activity: {$activityType}", $activityType, $activity->id);
-        }
+        return $this->database->transaction(function () use ($member, $activityType, $entityType, $entityId, $metadata, $points, $siteId) {
+            $activity = $this->badgeRepository->createMemberActivity([
+                'member_id' => $member->id,
+                'site_id' => $siteId,
+                'activity_type' => $activityType,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'metadata' => $metadata,
+                'points' => $points,
+                'activity_date' => now_datetime()
+            ]);
 
-        $this->checkAndAwardBadges($member);
+            if ($points > 0) {
+                $this->awardPoints(
+                    $member,
+                    $points,
+                    "Activity: {$activityType}",
+                    $activityType,
+                    $activity->id,
+                    now_datetime()
+                );
+            }
 
-        return $activity;
+            $this->checkAndAwardBadges($member);
+
+            return $activity;
+        });
     }
 
     public function awardPoints(
-        Member  $member,
-        int     $points,
-        string  $reason,
-        ?string $referenceType = null,
-        ?int    $referenceId = null
+        Member     $member,
+        int        $points,
+        string     $reason,
+        ?string    $referenceType = null,
+        ?int       $referenceId = null,
+        ?\DateTime $timestamp = null
     ): MemberPoint
     {
-        return $this->badgeRepository->createMemberPoint([
+        $timestamp = $timestamp ?? now_datetime();
+
+        $memberPoint = $this->badgeRepository->createMemberPoint([
             'member_id' => $member->id,
             'points' => $points,
             'reason' => $reason,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
-            'awarded_at' => now()
+            'awarded_at' => $timestamp
         ]);
+
+        event(new PointsAwardedEvent($member, $memberPoint));
+
+        return $memberPoint;
     }
 
     public function checkAndAwardBadges(Member $member): array
@@ -92,58 +112,37 @@ class BadgeService
 
     public function awardBadge(Member $member, Badge $badge): MemberBadge
     {
-        $memberBadge = $this->badgeRepository->createMemberBadge([
-            'member_id' => $member->id,
-            'badge_id' => $badge->id,
-            'earned_at' => now(),
-            'criteria_met' => $badge->criteria,
-            'is_visible' => true
-        ]);
+        $now = now_datetime();
 
-        if ($badge->points > 0) {
-            $this->awardPoints(
-                $member,
-                $badge->points,
-                "Badge earned: {$badge->name}",
-                'badge',
-                $badge->id
-            );
-        }
-
-        // Set session flag for modal display
-        if (!isset($_SESSION['badge_modal_shown_' . $badge->id])) {
-            $_SESSION['show_badge_modal'] = true;
-            $_SESSION['new_badge_data'] = [
-                'id' => $badge->id,
-                'name' => $badge->name,
-                'description' => $badge->description,
-                'icon' => $badge->icon ?? '🏆',
-                'points' => $badge->points,
-                'earned_at' => now_datetime()->format('Y-m-d H:i:s')
-            ];
-        }
-
-        try {
-            $newRewards = $this->rewardsService->checkAndAwardRewards($member, $member->site_id);
-
-            if (!empty($newRewards)) {
-                // Store in session to show notification
-                $_SESSION['new_rewards_earned'] = count($newRewards);
-            }
-        } catch (\Exception $e) {
-            Logger::error('Failed to check rewards after badge award', [
+        return $this->database->transaction(function () use ($member, $badge, $now) {
+            $memberBadge = $this->badgeRepository->createMemberBadge([
                 'member_id' => $member->id,
                 'badge_id' => $badge->id,
-                'error' => $e->getMessage()
+                'earned_at' => $now,
+                'criteria_met' => $badge->criteria,
+                'is_visible' => true
             ]);
-        }
 
-        return $memberBadge;
+            if ($badge->points > 0) {
+                $this->awardPoints(
+                    $member,
+                    $badge->points,
+                    "Badge earned: {$badge->name}",
+                    'badge',
+                    $badge->id,
+                    $now
+                );
+            }
+
+            event(new BadgeEarnedEvent($member, $badge, $memberBadge));
+
+            return $memberBadge;
+        });
     }
 
     public function getActivityTrends(Member $member, int $days = 30): array
     {
-        $startDate = now_datetime()->subDays($days);
+        $startDate = now_datetime()->modify("-{$days} days");
 
         $activities = $this->badgeRepository->getMemberActivitiesSince($member->id, $startDate)
             ->groupBy(function ($activity) {
@@ -152,7 +151,7 @@ class BadgeService
 
         $trends = [];
         for ($i = 0; $i < $days; $i++) {
-            $date = now_datetime()->subDays($days - $i - 1)->format('Y-m-d');
+            $date = now_datetime()->modify("-" . ($days - $i - 1) . " days")->format('Y-m-d');
             $trends[$date] = [
                 'date' => $date,
                 'count' => $activities->get($date)?->count() ?? 0,
@@ -177,7 +176,6 @@ class BadgeService
             }
 
             $progress = $this->calculateBadgeProgress($member, $badge);
-
 
             if ($progress['percentage'] > 0) {
                 $nextBadges[] = [
@@ -206,19 +204,19 @@ class BadgeService
         $details = [];
 
         foreach ($criteria as $rule) {
-            $type = $rule['type'] ?? '';
-            $operator = $rule['operator'] ?? '>=';
+            $type = BadgeCriteriaType::from($rule['type'] ?? '');
+            $operator = BadgeCriteriaOperator::from($rule['operator'] ?? '>=');
             $target = $rule['value'] ?? 0;
 
             $current = $this->getCurrentValue($member, $type);
-            $met = $this->compareForProgress($current, $operator, $target);
+            $met = $operator->compare($current, $target);
 
             if ($met) {
                 $metCriteria++;
             }
 
             $details[] = [
-                'type' => $type,
+                'type' => $type->value,
                 'current' => $current,
                 'target' => $target,
                 'met' => $met,
@@ -234,43 +232,15 @@ class BadgeService
         ];
     }
 
-    private function getCurrentValue(Member $member, string $type)
+    private function getCurrentValue(Member $member, BadgeCriteriaType $type)
     {
-        switch ($type) {
-            case 'comments_count':
-                return $this->badgeRepository->getCommentsCount($member);
-            case 'pages_read':
-                return $this->badgeRepository->getDistinctPagesRead($member);
-            case 'likes_given':
-                return $this->badgeRepository->getLikesGivenCount($member);
-            case 'member_days':
-                return now_datetime()->diffInDays($member->created_at);
-            case 'orders_count':
-                return $this->badgeRepository->getCompletedOrdersCount($member->id);
-            case 'total_spent':
-                return $this->badgeRepository->getTotalSpent($member->id);
-            default:
-                return 0;
-        }
-    }
-
-    private function compareForProgress($actual, $operator, $expected): bool
-    {
-        switch ($operator) {
-            case '>=':
-                return $actual >= $expected;
-            case '>':
-                return $actual > $expected;
-            case '<=':
-                return $actual <= $expected;
-            case '<':
-                return $actual < $expected;
-            case '==':
-                return $actual == $expected;
-            case '!=':
-                return $actual != $expected;
-            default:
-                return false;
-        }
+        return match ($type) {
+            BadgeCriteriaType::COMMENTS_COUNT => $this->badgeRepository->getCommentsCount($member),
+            BadgeCriteriaType::PAGES_READ => $this->badgeRepository->getDistinctPagesRead($member),
+            BadgeCriteriaType::LIKES_GIVEN => $this->badgeRepository->getLikesGivenCount($member),
+            BadgeCriteriaType::MEMBER_DAYS => now_datetime()->diff($member->created_at)->days,
+            BadgeCriteriaType::ORDERS_COUNT => $this->badgeRepository->getCompletedOrdersCount($member->id),
+            BadgeCriteriaType::TOTAL_SPENT => $this->badgeRepository->getTotalSpent($member->id),
+        };
     }
 }

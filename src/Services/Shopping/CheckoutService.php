@@ -2,13 +2,21 @@
 
 namespace App\Services\Shopping;
 
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
+use App\Events\Checkout\MultiMerchantCheckoutCompletedEvent;
+use App\Events\Orders\OrderCompletedEvent;
 use App\Framework\Authorization\MemberAuthWrapper;
+use App\Framework\Database\Database;
 use App\Repositories\Billing\ShipmentRepository;
 use App\Services\Billing\CheckoutSplittingService;
+use App\Services\Billing\Order\OrderCreationService;
+use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Currency\CurrencyResolver;
 use App\Services\Vouchers\VoucherService;
 use Exception;
 
@@ -16,7 +24,7 @@ class CheckoutService
 {
     public function __construct(
         private readonly CartService $cartService,
-        private readonly OrderService $orderService,
+        private readonly OrderCreationService $orderCreationService,
         private readonly VoucherService $voucherService,
         private readonly ShippingService $shippingService,
         private readonly MemberAuthWrapper $memberAuthWrapper,
@@ -26,6 +34,9 @@ class CheckoutService
         private readonly PaymentAllocationService $allocationService,
         private readonly MerchantShippingService  $merchantShippingService,
         private readonly ShipmentRepository       $shipmentRepository,
+        private readonly CurrencyResolver     $currencyResolver,
+        private readonly Database             $database,
+        private readonly OrderManager         $orderService
     ) {}
 
 
@@ -51,11 +62,12 @@ class CheckoutService
 
         // Calculate totals
         $totals = $this->calculateTotals($cartItems, $data);
+        $currency = $this->currencyResolver->resolve($siteId);
 
         // Create Stripe payment intent
         $paymentResult = $this->stripeProcessor->createPaymentIntent([
             'amount' => $totals['total'],
-            'currency' => 'usd',
+            'currency' => $currency,
             'site_id' => $siteId,
             'metadata' => [
                 'checkout_type' => 'regular'
@@ -69,25 +81,38 @@ class CheckoutService
             ];
         }
 
-        // Prepare order data
-        $orderData = $this->prepareOrderData($data, $totals, $siteId);
+        return $this->database->transaction(function () use ($data, $totals, $siteId, $paymentResult, $currency, $cartItems) {
+            // Prepare order data
+            $orderData = $this->prepareOrderData($data, $totals, $siteId);
+            $orderData['payment_intent_id'] = $paymentResult['payment_intent_id'];
+            $orderData['currency'] = strtoupper($currency);
+            $orderData['status'] = OrderStatus::PENDING->value;
 
-        try {
-            // Prepare order items
-            $items = $this->prepareOrderItems($cartItems);
+            try {
+                // Prepare order items
+                $items = $this->prepareOrderItems($cartItems);
 
-            // Create order
-            $order = $this->orderService->createOrder($orderData, $items, $siteId);
+                // Create order
+                $order = $this->orderCreationService->create($orderData, $items, $siteId);
 
-            // Apply voucher if provided
-            if (!empty($totals['voucher_id']) && $totals['discount'] > 0) {
-                $userId = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->member()->id : null;
-                $this->voucherService->applyVoucher(
-                    $totals['voucher_id'],
-                    $userId,
-                    $totals['discount'],
-                    $order->id
-                );
+                // Apply voucher if provided
+                if (!empty($totals['voucher_id']) && $totals['discount'] > 0) {
+                    $userId = $this->memberAuthWrapper->check()
+                        ? $this->memberAuthWrapper->member()->id
+                        : null;
+
+                    $this->voucherService->applyVoucher(
+                        $totals['voucher_id'],
+                        $userId,
+                        $totals['discount'],
+                        $order->id
+                    );
+                }
+            } catch (Exception $e) {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to create order: ' . $e->getMessage()
+                ];
             }
 
             // Return payment intent details for client confirmation
@@ -100,12 +125,7 @@ class CheckoutService
                 'order_internal_id' => $order->id,
                 'total' => $totals['total']
             ];
-        } catch (Exception $e) {
-            return [
-                'success' => false,
-                'message' => 'Failed to create order: ' . $e->getMessage()
-            ];
-        }
+        });
     }
 
     private function validateCheckoutData(array $data): array
@@ -138,10 +158,17 @@ class CheckoutService
         $voucherCode = null;
         $voucherId = null;
 
-        if (!empty($data['voucher_code']) && !empty($data['voucher_id']) && !empty($data['discount_amount'])) {
-            $discount = (float) $data['discount_amount'];
-            $voucherCode = $data['voucher_code'];
-            $voucherId = (int) $data['voucher_id'];
+        if (!empty($data['voucher_code']) && !empty($data['voucher_id'])) {
+            $voucherValidation = $this->voucherService->validateVoucher(
+                $data['voucher_id'],
+                $subtotal
+            );
+
+            if ($voucherValidation['valid']) {
+                $discount = $voucherValidation['discount'];
+                $voucherCode = $data['voucher_code'];
+                $voucherId = (int)$data['voucher_id'];
+            }
         }
 
         // Use shared calculation service
@@ -231,16 +258,23 @@ class CheckoutService
                 ];
             }
 
-            // Update order status
-            $this->orderService->updateOrderStatus($orderId, 'completed', 'paid');
+            return $this->database->transaction(function () use ($orderId) {
+                $this->orderService->updateOrderStatus(
+                    $orderId,
+                    OrderStatus::COMPLETED->value,
+                    PaymentStatus::PAID->value
+                );
 
-            // Clear cart after successful payment
-            $this->cartService->clear();
+                $this->cartService->clear();
 
-            return [
-                'success' => true,
-                'message' => 'Order completed successfully'
-            ];
+                $order = $this->orderService->find($orderId);
+                event(new OrderCompletedEvent($order));
+
+                return [
+                    'success' => true,
+                    'message' => 'Order completed successfully'
+                ];
+            });
         } catch (Exception $e) {
             return [
                 'success' => false,
@@ -293,10 +327,18 @@ class CheckoutService
         $discount = 0.0;
         $voucherCode = null;
         $voucherId = null;
-        if (!empty($data['voucher_code']) && !empty($data['voucher_id']) && !empty($data['discount_amount'])) {
-            $discount = (float)$data['discount_amount'];
-            $voucherCode = $data['voucher_code'];
-            $voucherId = (int)$data['voucher_id'];
+
+        if (!empty($data['voucher_code']) && !empty($data['voucher_id'])) {
+            $voucherValidation = $this->voucherService->validateVoucher(
+                $data['voucher_id'],
+                $subtotal
+            );
+
+            if ($voucherValidation['valid']) {
+                $discount = $voucherValidation['discount'];
+                $voucherCode = $data['voucher_code'];
+                $voucherId = (int)$data['voucher_id'];
+            }
         }
 
         $checkoutTotals = $this->calculationService->calculateOrderTotals(
@@ -306,6 +348,8 @@ class CheckoutService
 
         // --- Allocate ---
         $allocations = $this->allocationService->allocate($groups, $checkoutTotals, $shippingPerGroup);
+
+        $currency = $this->currencyResolver->resolve($siteId);
 
         // --- Stripe: one PaymentIntent per merchant order ---
         $stripeContexts = [];
@@ -337,69 +381,97 @@ class CheckoutService
             $stripeContexts[$key] = $piResult;
         }
 
-        // --- Persist orders + shipments ---
-        $checkoutId = 'chk-' . uniqid('', true);
-        $orderNumbers = [];
+        return $this->database->transaction(function () use (
+            $groups,
+            $allocations,
+            $data,
+            $siteId,
+            $country,
+            $stripeContexts,
+            $voucherCode,
+            $voucherId,
+            $discount,
+            $checkoutTotals,
+            $currency
+        ) {
+            // --- Persist orders + shipments ---
+            $checkoutId = 'chk-' . uniqid('', true);
+            $orderNumbers = [];
+            $createdOrders = [];
 
-        try {
-            foreach ($groups as $key => $group) {
-                $items = $this->prepareOrderItems($group['items']);
+            try {
+                foreach ($groups as $key => $group) {
+                    $items = $this->prepareOrderItems($group['items']);
 
-                $orderData = $this->prepareOrderData($data, $allocations[$key], $siteId);
-                $orderData['voucher_code'] = $voucherCode;
-                $orderData['checkout_id'] = $checkoutId;
-                // Store Stripe context and checkout linkage in metadata-style fields
-                $orderData['metadata'] = [
+                    $orderData = $this->prepareOrderData($data, $allocations[$key], $siteId);
+                    $orderData['voucher_code'] = $voucherCode;
+                    $orderData['checkout_id'] = $checkoutId;
+                    $orderData['currency'] = strtoupper($currency);
+                    $orderData['status'] = OrderStatus::PENDING->value;
+
+                    // Store Stripe context and checkout linkage in metadata-style fields
+                    $orderData['metadata'] = [
+                        'checkout_id' => $checkoutId,
+                        'merchant_id' => $group['merchant_id'],
+                        'stripe_payment_intent_id' => $stripeContexts[$key]['payment_intent_id'],
+                        'stripe_client_secret' => $stripeContexts[$key]['client_secret'],
+                    ];
+
+                    $order = $this->orderCreationService->createMerchantOrder(
+                        $orderData,
+                        $items,
+                        $siteId,
+                        $group['merchant_id']
+                    );
+
+                    $orderNumbers[] = $order->order_number;
+                    $createdOrders[] = $order;
+
+                    // --- Shipment ---
+                    $this->shipmentRepository->create([
+                        'order_id' => $order->id,
+                        'checkout_id' => $checkoutId,
+                        'merchant_id' => $group['merchant_id'],
+                        'shipping_cost' => $allocations[$key]['shipping'],
+                        'country' => $country,
+                        'status' => 'pending',
+                        'metadata' => [
+                            'consolidation_enabled' => $this->merchantShippingService->isConsolidationEnabled(),
+                        ],
+                        'site_id' => $siteId,
+                    ]);
+                }
+
+                // Apply voucher once at checkout level if applicable
+                if (!empty($voucherId) && $discount > 0) {
+                    $userId = $this->memberAuthWrapper->check()
+                        ? $this->memberAuthWrapper->member()->id
+                        : null;
+                    $this->voucherService->applyVoucher($voucherId, $userId, $discount, $createdOrders[0]->id);
+                }
+
+                // Clear cart
+                $this->cartService->clear();
+
+                event(new MultiMerchantCheckoutCompletedEvent($checkoutId, $createdOrders));
+
+                return [
+                    'success' => true,
+                    'message' => 'Multi-merchant checkout completed',
                     'checkout_id' => $checkoutId,
-                    'merchant_id' => $group['merchant_id'],
-                    'stripe_payment_intent_id' => $stripeContexts[$key]['payment_intent_id'],
-                    'stripe_client_secret' => $stripeContexts[$key]['client_secret'],
+                    'order_numbers' => $orderNumbers,
+                    'total' => $checkoutTotals['total'],
+                    'stripe_contexts' => array_map(fn($ctx) => [
+                        'payment_intent_id' => $ctx['payment_intent_id'],
+                        'client_secret' => $ctx['client_secret'],
+                    ], $stripeContexts),
                 ];
-
-                $order = $this->orderService->createMerchantOrder($orderData, $items, $siteId, $group['merchant_id']);
-                $orderNumbers[] = $order->order_number;
-
-                // --- Shipment ---
-                $this->shipmentRepository->create([
-                    'order_id' => $order->id,
-                    'checkout_id' => $checkoutId,
-                    'merchant_id' => $group['merchant_id'],
-                    'shipping_cost' => $allocations[$key]['shipping'],
-                    'country' => $country,
-                    'status' => 'pending',
-                    'metadata' => [
-                        'consolidation_enabled' => $this->merchantShippingService->isConsolidationEnabled(),
-                    ],
-                    'site_id' => $siteId,
-                ]);
+            } catch (\Exception $e) {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to create orders: ' . $e->getMessage(),
+                ];
             }
-
-            // Apply voucher once at checkout level if applicable
-            if (!empty($voucherId) && $discount > 0) {
-                $userId = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->member()->id : null;
-                // Use the first order's id as the anchor for the voucher usage record
-                $this->voucherService->applyVoucher($voucherId, $userId, $discount, null);
-            }
-
-            // Clear cart
-            //$this->cartService->clear();
-
-            return [
-                'success' => true,
-                'message' => 'Multi-merchant checkout completed',
-                'checkout_id' => $checkoutId,
-                'order_numbers' => $orderNumbers,
-                'total' => $checkoutTotals['total'],
-                'stripe_contexts' => array_map(fn($ctx) => [
-                    'payment_intent_id' => $ctx['payment_intent_id'],
-                    'client_secret' => $ctx['client_secret'],
-                ], $stripeContexts),
-            ];
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'message' => 'Failed to create orders: ' . $e->getMessage(),
-            ];
-        }
+        });
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
@@ -16,7 +17,7 @@ class OneTimeSubscriptionCheckoutService
     public function __construct(
         private readonly CartService                $cartService,
         private readonly OneTimeSubscriptionService $subscriptionService,
-        private readonly OrderService               $orderService,
+        private readonly OrderCreationService $orderCreationService,
         private readonly VoucherService             $voucherService,
         private readonly ShippingService            $shippingService,
         private readonly StripePaymentProcessor     $stripeProcessor,
@@ -236,7 +237,7 @@ class OneTimeSubscriptionCheckoutService
                 ];
             }
 
-            $order = $this->orderService->createOrder($orderData, $orderItems, $siteId);
+            $order = $this->orderCreationService->create($orderData, $orderItems, $siteId);
 
             // Return appropriate format based on single vs multiple subscriptions
             $result = [

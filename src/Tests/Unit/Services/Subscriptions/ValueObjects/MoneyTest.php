@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions\ValueObjects;
 
-use App\Services\Subscriptions\ValueObjects\Money;
+use App\Services\ValueObjects\Money;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 

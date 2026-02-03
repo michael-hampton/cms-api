@@ -43,6 +43,7 @@ class ContentController extends Controller
         private readonly BadgeRepository      $badgeRepository,
         private readonly PageRepository $pageRepository,
         private readonly DealsService   $dealsService,
+        private readonly ArticleGiftingService $articleGiftingService
     )
     {
         parent::__construct();
@@ -98,10 +99,8 @@ class ContentController extends Controller
         $claimedGift = null;
         if (MemberAuth::check()) {
             $member = MemberAuth::getMember();
-            $giftingService = new ArticleGiftingService(
-                new GiftedArticleRepository()
-            );
-            $claimedGift = $giftingService->checkAndClaimGiftForPage($member, $page);
+
+            $claimedGift = $this->articleGiftingService->checkAndClaimGiftForPage($member, $page);
         }
 
         $data = [

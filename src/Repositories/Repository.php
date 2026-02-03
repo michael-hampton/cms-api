@@ -28,6 +28,15 @@ abstract class Repository
 
     abstract protected function getModelClass(): string;
 
+    public function findMany(array $ids, array $relations = []): Collection
+    {
+        if (!empty($relations) && is_array($relations) && count($relations) > 0) {
+            return $this->model::with($relations)->whereIn('id', $ids)->get();
+        }
+
+        return $this->model::whereIn('id', $ids)->get();
+    }
+
     public function find(int $id, array $relations = []): ?Model
     {
         if (!empty($relations) && is_array($relations) && count($relations) > 0) {
