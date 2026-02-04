@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
@@ -39,7 +39,10 @@ class Order extends Model
         'voucher_code',
         'clone_history',
         'metadata',
-        'checkout_id'
+        'checkout_id',
+        'one_time_subscription_id',
+        'payment_intent_id',
+        'stripe_customer_id'
     ];
 
     protected $casts = [

@@ -151,7 +151,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         ];
 
         // Act
-        $this->repository->syncImages($product->id, $images);
+        $this->repository->syncVariantImages($product->id, $variant->id, $images);
 
         // Assert
         $this->assertDatabaseHas('product_images', [

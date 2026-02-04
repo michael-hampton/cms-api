@@ -2,19 +2,15 @@
 
 namespace App\Services\Billing\Order;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\Orders\OrderCreatedEvent;
 use App\Framework\Database\Database;
-use App\Models\Member;
-use App\Models\Model;
 use App\Models\Order;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Billing\OrderRepository;
-use App\Repositories\Members\MemberRepository;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderHistoryService;
-use App\Services\Shared\NameParser;
 
 class OrderCreationService
 {

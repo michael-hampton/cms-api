@@ -25,6 +25,7 @@ class ProductControllerTest extends FunctionalTestCase
         $this->createProduct();
 
         $response = $this->getForSite('/api/products');
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());

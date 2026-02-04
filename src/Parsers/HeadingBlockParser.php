@@ -3,7 +3,7 @@
 // HeadingBlockParser.php
 namespace App\Parsers;
 
-use App\Enums\HeadingLevel;
+use App\Enums\Blocks\HeadingLevel;
 use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;

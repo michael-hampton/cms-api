@@ -2,12 +2,11 @@
 
 namespace App\Tests\Unit\Parsers;
 
-use App\Enums\InfoType;
+use App\Enums\Blocks\InfoType;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
 use App\Parsers\InfoBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class InfoBlockParserTest extends FunctionalTestCase
 {

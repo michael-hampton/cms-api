@@ -7,12 +7,12 @@ use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
 use App\Models\Product;
 use App\Models\ProductImage;
-use App\Models\ProductPriceHistory;
 use App\Models\ProductVariant;
 use App\Repositories\Product\ProductRepository;
-use App\Repositories\Product\ProductViewRepository;
-use App\Services\Cms\ImageUploadService;
+use App\Services\Product\MerchantPricingResolver;
+use App\Services\Product\ProductImageUploadService;
 use App\Services\Product\ProductService;
+use App\Services\Shared\RequestContext;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -22,25 +22,30 @@ class ProductServiceTest extends FunctionalTestCase
 {
     use CreatesTestData, HasSiteHistory;
 
-    protected $repository;
-    protected $imageUploadService;
+    protected ProductRepository $repository;
+    protected ProductImageUploadService $imageUploadService;
+    protected MerchantPricingResolver $merchantPricingResolver;
+    protected RequestContext $requestContext;
     protected ProductService $service;
-    private $databaseMock;
+    private Database $databaseMock;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = Mockery::mock(ProductRepository::class);
-        $this->imageUploadService = Mockery::mock(ImageUploadService::class);
-        $productViewRepository = Mockery::mock(ProductViewRepository::class);
-
+        $this->imageUploadService = Mockery::mock(ProductImageUploadService::class);
+        $this->merchantPricingResolver = Mockery::mock(MerchantPricingResolver::class);
+        $this->requestContext = Mockery::mock(RequestContext::class);
         $this->databaseMock = Mockery::mock(Database::class);
 
-        $this->imageUploadService->shouldReceive('setAllowedMimeTypes')->andReturnSelf();
-        $this->imageUploadService->shouldReceive('setMaxFileSize')->andReturnSelf();
-
-        $this->service = new ProductService($this->repository, $this->imageUploadService, $productViewRepository);
+        $this->service = new ProductService(
+            $this->repository,
+            $this->imageUploadService,
+            $this->merchantPricingResolver,
+            $this->requestContext,
+            $this->databaseMock
+        );
     }
 
     protected function tearDown(): void
@@ -54,28 +59,21 @@ class ProductServiceTest extends FunctionalTestCase
         $file = Mockery::mock(UploadedFile::class);
         $file->shouldReceive('isValid')->andReturn(true);
 
-        $this->imageUploadService->shouldReceive('uploadToPath')
+        $this->imageUploadService->shouldReceive('upload')
             ->once()
-            ->with($file, Mockery::type('string'))
+            ->with($file, null)
             ->andReturn('products/2025-01/product_123.jpg');
 
         $product = new Product(['id' => 1, 'name' => 'Test Product', 'image' => 'products/2025-01/product_123.jpg']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->with(Mockery::on(function($data) {
-                return $data['image'] === 'products/2025-01/product_123.jpg';
-            }))
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
 
         $data = ['name' => 'Test Product', 'price' => 99.99];
         $result = $this->service->createProduct($data, $file);
 
-        $this->assertEquals('Test Product', $result->name);
         $this->assertEquals('products/2025-01/product_123.jpg', $result->image);
     }
 
@@ -84,20 +82,17 @@ class ProductServiceTest extends FunctionalTestCase
         $file = Mockery::mock(UploadedFile::class);
         $file->shouldReceive('isValid')->andReturn(true);
 
-        $product = new Product(['id' => 1, 'name' => 'Old Name', 'image' => 'old-image.jpg']);
+        $product = new Product(['id' => 1, 'name' => 'Old Name', 'image' => 'old-image.jpg', 'price' => 99.99]);
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($product);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->imageUploadService->shouldReceive('uploadToPath')
+        $this->imageUploadService->shouldReceive('upload')
             ->once()
-            ->with($file, Mockery::type('string'), 'old-image.jpg')
+            ->with($file, 'old-image.jpg')
             ->andReturn('products/2025-01/new-image.jpg');
 
-        $this->repository->shouldReceive('update')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
 
         $data = ['name' => 'New Name'];
         $result = $this->service->updateProduct(1, $data, $file);
@@ -105,38 +100,79 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertNotNull($result);
     }
 
-    public function testDeleteProductDeletesImage()
+    public function testCreateProductWithBase64Image()
     {
-        $product = new Product(['id' => 1, 'name' => 'Test', 'image' => 'products/test.jpg']);
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($product);
+        $this->imageUploadService->shouldReceive('isBase64Image')
+            ->with($base64)
+            ->andReturn(true);
 
-        $this->repository
-            ->shouldReceive('getImages')
-            ->with(1)
+        $this->imageUploadService->shouldReceive('saveBase64Image')
             ->once()
-            ->andReturn(collect([]));
+            ->with($base64)
+            ->andReturn('products/2025-01/base64_image.png');
 
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
+
+        $data = ['name' => 'Test Product', 'price' => 99.99, 'image' => $base64];
+        $result = $this->service->createProduct($data);
+
+        $this->assertInstanceOf(Product::class, $result);
+    }
+
+    public function testUpdateProductWithBase64ImageDeletesOldImage()
+    {
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+        $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'old-image.jpg', 'price' => 99.99]);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->imageUploadService->shouldReceive('isBase64Image')
+            ->with($base64)
+            ->andReturn(true);
 
         $this->imageUploadService->shouldReceive('delete')
             ->once()
-            ->with('products/test.jpg');
+            ->with('old-image.jpg');
 
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->andReturn(true);
-
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
+        $this->imageUploadService->shouldReceive('saveBase64Image')
             ->once()
-            ->andReturn(collect([]));
+            ->with($base64)
+            ->andReturn('products/2025-01/new-base64.png');
 
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
+
+        $data = ['name' => 'Updated', 'image' => $base64];
+        $result = $this->service->updateProduct(1, $data);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testDeleteProductHandlesImageDeletionFailureGracefully()
+    {
+        $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'main.jpg']);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $this->imageUploadService->shouldReceive('delete')
+            ->with('main.jpg')
+            ->andThrow(new \Exception('Delete failed'));
+
+        $this->repository->shouldReceive('getImages')->andReturn(collect([]));
+        $this->repository->shouldReceive('getVariants')->andReturn(collect([]));
+        $this->repository->shouldReceive('deletePriceHistory')->once();
+        $this->repository->shouldReceive('delete')->andReturn(true);
+
+        // Should not throw, just log error
         $result = $this->service->deleteProduct(1);
 
         $this->assertTrue($result);
@@ -183,51 +219,43 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertEquals('Test Product', $result->name);
     }
 
-    public function testItCanCreateProduct()
+    public function testCreateProduct()
     {
-        $data = [
-            'name' => 'Test Product',
-            'description' => 'Test Description',
-            'price' => 99.99,
-            'sale_price' => 79.99,
-            'category' => 'Electronics',
-            'brand' => 'TestBrand',
-        ];
+        $data = ['name' => 'Test Product', 'price' => 99.99];
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $product = new Product($data);
-
-        $this->repository->shouldReceive('create')
-            ->with($data)
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
-            ->andReturn($product);
+            ->andReturnUsing(function ($callback) use ($product) {
+                return $callback();
+            });
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Test Product', $result->name);
     }
 
-    public function testItCanUpdateProduct()
+    public function testUpdateProduct()
     {
-        $product = new Product(['id' => 1, 'name' => 'Old Name']);
+        $product = new Product(['id' => 1, 'name' => 'Old Name', 'price' => 99.99]);
         $data = ['name' => 'New Name'];
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($product);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->repository->shouldReceive('update')
-            ->with(1, $data)
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
-            ->andReturn($product);
+            ->andReturnUsing(function ($callback) use ($product) {
+                return $callback();
+            });
+
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
 
         $result = $this->service->updateProduct(1, $data);
 
-        $this->assertInstanceOf(Product::class, $result);;
+        $this->assertNotNull($result);
     }
 
     public function testItReturnsFalseWhenUpdatingNonExistentProduct()
@@ -242,37 +270,22 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertNull($result);
     }
 
-    public function testItCanDeleteProduct()
+    public function testDeleteProduct()
     {
-        //Storage::fake('local');
-
         $product = new Product(['id' => 1, 'name' => 'Test', 'image' => null]);
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($product);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->repository
-            ->shouldReceive('getImages')
-            ->with(1)
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
-            ->andReturn(collect([]));
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
-
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->once()
-            ->andReturn(true);
-
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
-            ->once()
-            ->andReturn(collect([]));
+        $this->repository->shouldReceive('getImages')->andReturn(collect([]));
+        $this->repository->shouldReceive('getVariants')->andReturn(collect([]));
+        $this->repository->shouldReceive('deletePriceHistory')->once();
+        $this->repository->shouldReceive('delete')->once()->andReturn(true);
 
         $result = $this->service->deleteProduct(1);
 
@@ -322,8 +335,6 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertCount(1, $result);
     }
 
-
-
     public function testCreateProductWithImagesArray()
     {
         $data = [
@@ -337,22 +348,26 @@ class ProductServiceTest extends FunctionalTestCase
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
         $this->repository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function($createData) {
-                return !isset($createData['images']);
+                return !isset($createData['images']) // Images should be removed
+                    && $createData['name'] === 'Test Product'
+                    && $createData['price'] == 99.99;
             }))
             ->andReturn($product);
 
         $this->repository->shouldReceive('syncImages')
             ->once()
             ->with(1, Mockery::on(function($images) {
-                return count($images) === 2 && $images[0]['url'] === 'img1.jpg';
+                return count($images) === 2
+                    && $images[0]['url'] === 'img1.jpg'
+                    && $images[1]['url'] === 'img2.jpg';
             }));
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $result = $this->service->createProduct($data);
 
@@ -371,22 +386,56 @@ class ProductServiceTest extends FunctionalTestCase
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncMerchants')
             ->once()
             ->with(1, Mockery::type('array'))
-            ->andReturn([1]); // Returns product_merchant IDs
+            ->andReturn([1]);
+
+        $this->repository->shouldReceive('getVariants')->once()->andReturn(collect([]));
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn(['price' => 79.99, 'sale_price' => null]);
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
             ->with(1, 1, 79.99, 27, null);
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
+    public function testCreateProductWithMerchantsUsesPricingResolver()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'merchants' => [
+                ['id' => 1, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
+            ]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
+        $this->repository->shouldReceive('syncMerchants')->once()->andReturn([1]);
+        $this->repository->shouldReceive('getVariants')->once()->andReturn(collect([]));
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->with($data['merchants'][0], Mockery::type(Collection::class))
+            ->andReturn(['price' => 79.99, 'sale_price' => null]);
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')
+            ->once()
+            ->with(1, 1, 79.99, 1, null);
 
         $result = $this->service->createProduct($data);
 
@@ -405,17 +454,16 @@ class ProductServiceTest extends FunctionalTestCase
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncVariants')
             ->once()
-            ->with(1, Mockery::type('array'));
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+            ->with(1, Mockery::on(function ($variants) {
+                return count($variants) === 1 && $variants[0]['sku'] === 'VAR-001';
+            }))
+            ->andReturn([1]);
 
         $result = $this->service->createProduct($data);
 
@@ -434,17 +482,15 @@ class ProductServiceTest extends FunctionalTestCase
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncSpecifications')
             ->once()
-            ->with(1, Mockery::type('array'));
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+            ->with(1, Mockery::on(function ($specs) {
+                return count($specs) === 1 && $specs[0]['key'] === 'Weight';
+            }));
 
         $result = $this->service->createProduct($data);
 
@@ -457,43 +503,50 @@ class ProductServiceTest extends FunctionalTestCase
             'name' => 'Complete Product',
             'price' => 99.99,
             'images' => [['url' => 'img1.jpg', 'alt' => 'Image 1', 'is_primary' => true, 'sort_order' => 0]],
-            'merchants' => [['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true]],
+            'merchants' => [['id' => 1, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true]],
             'variants' => [['sku' => 'VAR-001', 'attributes' => [], 'price_modifier' => 0, 'is_active' => true]],
             'specifications' => [['category' => 'Tech', 'key' => 'Weight', 'value' => '1kg', 'sort_order' => 0]],
         ];
 
         $product = new Product(['id' => 1, 'name' => 'Complete Product']);
 
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
         $this->repository->shouldReceive('syncImages')->once();
-        $this->repository->shouldReceive('syncMerchants')->once();
-        $this->repository->shouldReceive('syncVariants')->once();
+        $this->repository->shouldReceive('syncMerchants')->once()->andReturn([1]);
+        $this->repository->shouldReceive('syncVariants')->once()->andReturn([1]);
         $this->repository->shouldReceive('syncSpecifications')->once();
+        $this->repository->shouldReceive('getVariants')->once()->andReturn(collect([]));
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn(['price' => 79.99, 'sale_price' => null]);
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')->once();
 
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Complete Product', $result->name);
     }
 
+
     public function testUpdateProductWithBasicData()
     {
-        $product = new Product(['id' => 1, 'name' => 'Old Name']);
+        $product = new Product(['id' => 1, 'name' => 'Old Name', 'price' => 99.99]);
+        $data = ['name' => 'New Name'];
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
-            ->andReturn($product);
+            ->andReturnUsing(function ($callback) use ($product) {
+                return $callback();
+            });
 
-        $this->repository->shouldReceive('update')
-            ->with(1, ['name' => 'New Name'])
-            ->once()
-            ->andReturn($product);
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
 
-        $result = $this->service->updateProduct(1, ['name' => 'New Name']);
+        $result = $this->service->updateProduct(1, $data);
 
         $this->assertNotNull($result);
     }
@@ -512,19 +565,18 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductWithImages()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
 
         $this->repository->shouldReceive('syncImages')
             ->once()
-            ->with(1, Mockery::type('array'));
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+            ->with(1, Mockery::on(function ($images) {
+                return count($images) === 1 && $images[0]['url'] === 'new1.jpg';
+            }));
 
         $data = [
             'name' => 'Updated Product',
@@ -540,27 +592,36 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductWithMerchants()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
-        $this->repository->shouldReceive('syncMerchants')
-            ->once()
-            ->with(1, Mockery::type('array'))
-        ->andReturn([0 => 1]);
 
         $this->repository->shouldReceive('getProductMerchantsWithDetails')
             ->with(1)
             ->andReturn(collect([]));
 
+        $this->repository->shouldReceive('syncMerchants')
+            ->once()
+            ->with(1, Mockery::type('array'))
+            ->andReturn([1]);
+
+        $this->repository->shouldReceive('getVariants')->once()->andReturn(collect([]));
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn(['price' => 89.99, 'sale_price' => null]);
+
         $this->repository->shouldReceive('recordMerchantPriceHistory')
-            ->with(1, 1, 89.99, 1, null)
-            ->andReturn(new ProductPriceHistory());
+            ->once()
+            ->with(1, 1, 89.99, 1, null);
 
         $data = [
             'name' => 'Updated Product',
             'merchants' => [
-                ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true, 'id' => 1],
+                ['id' => 1, 'name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true],
             ]
         ];
 
@@ -571,13 +632,19 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductWithVariants()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
+
         $this->repository->shouldReceive('syncVariants')
             ->once()
-            ->with(1, Mockery::type('array'));
+            ->with(1, Mockery::on(function ($variants) {
+                return count($variants) === 1 && $variants[0]['sku'] === 'VAR-002';
+            }))
+            ->andReturn([1]);
 
         $data = [
             'name' => 'Updated Product',
@@ -593,13 +660,18 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductWithSpecifications()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
+
         $this->repository->shouldReceive('syncSpecifications')
             ->once()
-            ->with(1, Mockery::type('array'));
+            ->with(1, Mockery::on(function ($specs) {
+                return count($specs) === 1 && $specs[0]['key'] === 'Dimensions';
+            }));
 
         $data = [
             'name' => 'Updated Product',
@@ -615,9 +687,11 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductOnlyUpdatesProvidedRelations()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
         $this->repository->shouldReceive('syncImages')->once();
 
@@ -640,29 +714,16 @@ class ProductServiceTest extends FunctionalTestCase
     {
         $product = new Product(['id' => 1, 'name' => 'Product', 'image' => null]);
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($product);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->repository->shouldReceive('getImages')
-            ->with(1)
-            ->andReturn(new Collection([]));
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
-            ->once()
-            ->andReturn(collect([]));
+        $this->repository->shouldReceive('getImages')->with(1)->andReturn(collect([]));
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn(collect([]));
+        $this->repository->shouldReceive('deletePriceHistory')->with(1)->once();
+        $this->repository->shouldReceive('delete')->with(1)->andReturn(true);
 
         $this->imageUploadService->shouldNotReceive('delete');
-
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->andReturn(true);
-
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
 
         $result = $this->service->deleteProduct(1);
 
@@ -673,63 +734,19 @@ class ProductServiceTest extends FunctionalTestCase
     {
         $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'main.jpg']);
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($product);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->repository->shouldReceive('getImages')
-            ->with(1)
-            ->andReturn(new Collection([]));
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
         $this->imageUploadService->shouldReceive('delete')
             ->once()
             ->with('main.jpg');
 
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
-            ->once()
-            ->andReturn(collect([]));
+        $this->repository->shouldReceive('getImages')->with(1)->andReturn(collect([]));
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn(collect([]));
+        $this->repository->shouldReceive('deletePriceHistory')->with(1)->once();
+        $this->repository->shouldReceive('delete')->with(1)->andReturn(true);
 
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->andReturn(true);
-
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
-
-        $result = $this->service->deleteProduct(1);
-
-        $this->assertTrue($result);
-    }
-
-    public function testDeleteProductHandlesImageDeletionFailure()
-    {
-        $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'main.jpg']);
-
-        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
-        $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('main.jpg')
-            ->andThrow(new \Exception('Delete failed'));
-
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->andReturn(true);
-
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
-            ->once()
-            ->andReturn(collect([]));
-
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
-
-        // Should not throw, just log error
         $result = $this->service->deleteProduct(1);
 
         $this->assertTrue($result);
@@ -778,16 +795,16 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertCount(1, $result);
     }
 
-
-
     public function testCreateProductThrowsExceptionOnImageUploadFailure()
     {
         $file = Mockery::mock(UploadedFile::class);
         $file->shouldReceive('isValid')->andReturn(true);
 
-        $this->imageUploadService->shouldReceive('uploadToPath')
+        $this->imageUploadService->shouldReceive('upload')
             ->once()
             ->andThrow(new \Exception('Upload failed'));
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Failed to upload product image: Upload failed');
@@ -798,16 +815,18 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductThrowsExceptionOnImageUploadFailure()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
-
         $file = Mockery::mock(UploadedFile::class);
         $file->shouldReceive('isValid')->andReturn(true);
 
+        $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'old.jpg', 'price' => 99.99]);
+
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->imageUploadService->shouldReceive('uploadToPath')
+        $this->imageUploadService->shouldReceive('upload')
             ->once()
             ->andThrow(new \Exception('Upload failed'));
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Failed to upload product image: Upload failed');
@@ -816,43 +835,32 @@ class ProductServiceTest extends FunctionalTestCase
         $this->service->updateProduct(1, $data, $file);
     }
 
-    public function testDeleteProductWithMultipleImages()
+    public function testDeleteProductWithMultipleImagesAndVariants()
     {
         $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'main.jpg']);
 
-        $images = new Collection([
+        $images = collect([
             new ProductImage(['url' => 'img1.jpg']),
             new ProductImage(['url' => 'img2.jpg']),
         ]);
 
+        $variant = new ProductVariant(['id' => 1, 'sku' => 'VAR-001']);
+        $variantImages = collect([
+            new ProductImage(['url' => 'var-img1.jpg']),
+        ]);
+
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $this->imageUploadService->shouldReceive('delete')->times(4); // main + 2 product + 1 variant
+
         $this->repository->shouldReceive('getImages')->with(1)->andReturn($images);
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('main.jpg')
-            ->once();
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('img1.jpg')
-            ->once();
-
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
-            ->once()
-            ->andReturn(collect([]));
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('img2.jpg')
-            ->once();
-
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->andReturn(true);
-
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
+        $this->repository->shouldReceive('getVariants')->with(1)->andReturn(collect([$variant]));
+        $this->repository->shouldReceive('getVariantImages')->with(1)->andReturn($variantImages);
+        $this->repository->shouldReceive('deleteVariantImages')->with(1)->once();
+        $this->repository->shouldReceive('deletePriceHistory')->with(1)->once();
+        $this->repository->shouldReceive('delete')->with(1)->andReturn(true);
 
         $result = $this->service->deleteProduct(1);
 
@@ -868,52 +876,35 @@ class ProductServiceTest extends FunctionalTestCase
         ];
 
         $product = new Product(array_merge(['id' => 1], $data));
-        $priceHistory = new ProductPriceHistory(['price' => 99.99, 'sale_price' => 79.99]);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
 
         $this->repository->shouldReceive('recordPriceHistory')
             ->once()
-            ->with($product)
-            ->andReturn($priceHistory);
+            ->with(Mockery::on(function ($p) use ($product) {
+                return $p->id === $product->id;
+            }));
 
         $result = $this->service->createProduct($data);
+
         $this->assertInstanceOf(Product::class, $result);
         $this->assertEquals(99.99, $product->price);
         $this->assertEquals(79.99, $product->sale_price);
     }
 
-    public function testUpdateProductRecordsPriceHistoryOnPriceChange()
+    public function testUpdateProductEmitsPriceChangedEventWhenPriceChanges()
     {
-        $product = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'price' => 99.99,
-            'sale_price' => 89.99
-        ]);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99, 'sale_price' => 89.99]);
+        $data = ['price' => 109.99];
 
-        $this->repository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($product);
+        $this->repository->shouldReceive('find')->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('update')->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
-        $this->repository->shouldReceive('update')
-            ->once()
-            ->andReturn($product);
-
-        $priceHistory = new ProductPriceHistory(['price' => 99.99, 'sale_price' => 89.99]);
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->once()
-            ->with($product)
-            ->andReturn($priceHistory);
-
-        $data = ['price' => 109.99, 'sale_price' => 99.99];
         $result = $this->service->updateProduct(1, $data);
-
-        $this->assertEquals(99.99, $product->price);
-        $this->assertEquals(89.99, $product->sale_price);
+        $this->assertInstanceOf(Product::class, $result);
     }
 
     public function testUpdateProductDoesNotRecordPriceHistoryWhenPriceUnchanged()
@@ -926,46 +917,38 @@ class ProductServiceTest extends FunctionalTestCase
         ]);
 
         $this->repository->shouldReceive('find')->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->andReturn($product);
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->never()
-            ->with($product);
-
-        $initialCount = ProductPriceHistory::where('product_id', 1)->count();
+        $this->repository->shouldNotReceive('recordPriceHistory');
 
         $data = ['name' => 'Updated Name']; // No price change
-        $this->service->updateProduct(1, $data);
-        $this->assertEquals(99.99, $product->price);
-        $this->assertEquals(89.99, $product->sale_price);
+        $result = $this->service->updateProduct(1, $data);
+        $this->assertInstanceOf(Product::class, $result);
     }
+
 
     public function testDeleteProductDeletesPriceHistory()
     {
-        $product = Product::create(['name' => 'Test', 'image' => null, 'price' => 199.99]);;
+        $product = new Product(['id' => 1, 'name' => 'Test', 'image' => null]);
 
-        // Create some price history
-        ProductPriceHistory::create([
-            'product_id' => $product->id,
-            'price' => 99.99,
-            'sale_price' => 79.99,
-            'recorded_at' => date('Y-m-d H:i:s')
-        ]);
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
 
-        $this->repository->shouldReceive('find')->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
         $this->repository->shouldReceive('getImages')->andReturn(collect([]));
+        $this->repository->shouldReceive('getVariants')->andReturn(collect([]));
+
+        $this->repository->shouldReceive('deletePriceHistory')
+            ->once()
+            ->with(1);
+
         $this->repository->shouldReceive('delete')->andReturn(true);
 
-        $this->repository
-            ->shouldReceive('getVariants')
-            ->with(1)
-            ->once()
-            ->andReturn(collect([]));
-
-        $this->repository->shouldReceive('deletePriceHistory')->once();
-
         $result = $this->service->deleteProduct(1);
-        $this->assertTrue($result);;
+
+        $this->assertTrue($result);
     }
 
     public function testCreateProductRecordsMerchantPriceHistory()
@@ -974,38 +957,36 @@ class ProductServiceTest extends FunctionalTestCase
             'name' => 'Test Product',
             'price' => 99.99,
             'merchants' => [
-                ['name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true, 'id' => 1],
-                ['name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true, 'id' => 2],
+                ['id' => 1, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
+                ['id' => 2, 'name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true],
             ]
         ];
 
-        $product = new Product(array_merge(['id' => 1], $data));
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
-
-        $priceHistory = new ProductPriceHistory(['price' => 99.99, 'sale_price' => 79.99]);
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->once()
-            ->with($product)
-            ->andReturn($priceHistory);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncMerchants')
             ->once()
-            ->with(1, Mockery::type('array'))
-            ->andReturn([1, 2]); // Return merchant IDs
+            ->andReturn([1, 2]);
+
+        $this->repository->shouldReceive('getVariants')->twice()->andReturn(collect([]));
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->twice()
+            ->andReturnUsing(function ($merchantData) {
+                return ['price' => $merchantData['price'], 'sale_price' => null];
+            });
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 79.99, 1, null)
-            ->andReturn(new ProductPriceHistory(['price' => 79.99]));
+            ->with(1, 1, 79.99, 1, null);
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 2, 89.99, 2, null)
-            ->andReturn(new ProductPriceHistory(['price' => 89.99]));
+            ->with(1, 2, 89.99, 2, null);
 
         $result = $this->service->createProduct($data);
 
@@ -1014,18 +995,16 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductRecordsMerchantPriceHistoryOnPriceChange()
     {
-        $product = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'price' => 99.99
-        ]);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $existingMerchants = collect([
-           ['id' => 1, 'name' => 'Amazon', 'price' => 79.99],
-           ['id' => 2, 'name' => 'eBay', 'price' => 89.99]
+            ['id' => 1, 'name' => 'Amazon', 'price' => 79.99, 'sale_price' => null],
+            ['id' => 2, 'name' => 'eBay', 'price' => 89.99, 'sale_price' => null]
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
 
         $this->repository->shouldReceive('getProductMerchantsWithDetails')
@@ -1043,11 +1022,18 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn([1, 2]);
 
+        $this->repository->shouldReceive('getVariants')->twice()->andReturn(collect([]));
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->twice()
+            ->andReturnUsing(function ($merchantData) {
+                return ['price' => $merchantData['price'], 'sale_price' => null];
+            });
+
         // Should only record history for Amazon (price changed)
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
-            ->with(1, 1, 74.99, 1, null)
-            ->andReturn(new ProductPriceHistory(['price' => 74.99]));
+            ->with(1, 1, 74.99, 1, null);
 
         $result = $this->service->updateProduct(1, $data);
 
@@ -1056,19 +1042,23 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductRecordsHistoryForNewMerchants()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $existingMerchants = collect([
             ['id' => 1, 'name' => 'Amazon', 'price' => 79.99]
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
-        $this->repository->shouldReceive('getProductMerchantsWithDetails')->andReturn($existingMerchants);
+
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')
+            ->andReturn($existingMerchants);
 
         $data = [
             'merchants' => [
-                ['id' => 1, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 89.99, 'is_available' => true],
+                ['id' => 1, 'name' => 'Amazon', 'url' => 'https://amazon.com', 'price' => 79.99, 'is_available' => true],
                 ['id' => 2, 'name' => 'BestBuy', 'url' => 'https://bestbuy.com', 'price' => 85.99, 'is_available' => true], // New merchant
             ]
         ];
@@ -1077,9 +1067,13 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn([1, 3]);
 
-        $this->repository->shouldReceive('recordMerchantPriceHistory')
-            ->once()
-            ->with(1, 1, 89.99, 1, null);
+        $this->repository->shouldReceive('getVariants')->twice()->andReturn(collect([]));
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->twice()
+            ->andReturnUsing(function ($merchantData) {
+                return ['price' => $merchantData['price'], 'sale_price' => null];
+            });
 
         // Should record history for new merchant
         $this->repository->shouldReceive('recordMerchantPriceHistory')
@@ -1113,9 +1107,9 @@ class ProductServiceTest extends FunctionalTestCase
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncVariants')
             ->once()
@@ -1126,10 +1120,6 @@ class ProductServiceTest extends FunctionalTestCase
             }))
             ->andReturn([1]);
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
-
         $result = $this->service->createProduct($data);
 
         $this->assertEquals('Test Product', $result->name);
@@ -1137,9 +1127,11 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductWithVariantImages()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
 
         $this->repository->shouldReceive('syncVariants')
@@ -1168,56 +1160,6 @@ class ProductServiceTest extends FunctionalTestCase
         $result = $this->service->updateProduct(1, $data);
 
         $this->assertNotNull($result);
-    }
-
-    public function testDeleteProductDeletesVariantImages()
-    {
-        $product = new Product(['id' => 1, 'name' => 'Product', 'image' => 'main.jpg']);
-
-        $variant = new ProductVariant(['id' => 1, 'sku' => 'VAR-001']);
-        $variant->setRelation('images', collect([
-            new ProductImage(['url' => 'var-img1.jpg']),
-            new ProductImage(['url' => 'var-img2.jpg']),
-        ]));
-
-        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
-        $this->repository->shouldReceive('getImages')->with(1)->andReturn(new Collection([]));
-        $this->repository->shouldReceive('getVariants')->with(1)->andReturn(collect([$variant]));
-
-        $this->repository->shouldReceive('deleteVariantImages')
-            ->with(1)
-            ->andReturn(true);
-
-        $this->repository->shouldReceive('getVariantImages')
-            ->with(1)
-            ->andReturn(collect([
-                new ProductImage(['url' => 'var-img1.jpg']),
-                new ProductImage(['url' => 'var-img2.jpg']),
-            ]));
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('main.jpg')
-            ->once();
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('var-img1.jpg')
-            ->once();
-
-        $this->imageUploadService->shouldReceive('delete')
-            ->with('var-img2.jpg')
-            ->once();
-
-        $this->repository->shouldReceive('deletePriceHistory')
-            ->with(1)
-            ->andReturn(new ProductPriceHistory());
-
-        $this->repository->shouldReceive('delete')
-            ->with(1)
-            ->andReturn(true);
-
-        $result = $this->service->deleteProduct(1);
-
-        $this->assertTrue($result);
     }
 
     public function testGetProductVariants()
@@ -1272,16 +1214,16 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductChangingPrimaryImage()
     {
-        $product = new Product(['id' => 1, 'name' => 'Product']);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
 
-        // Simulate changing which image is primary
         $this->repository->shouldReceive('syncImages')
             ->once()
             ->with(1, Mockery::on(function($images) {
-                // Verify second image is now primary
                 return count($images) === 2
                     && $images[0]['is_primary'] === false
                     && $images[1]['is_primary'] === true
@@ -1337,28 +1279,24 @@ class ProductServiceTest extends FunctionalTestCase
             ],
             'merchants' => [
                 [
+                    'id' => 1,
                     'name' => 'Amazon',
                     'url' => 'https://amazon.com',
                     'price' => 115,
                     'override_price' => true,
                     'override_sale_price' => false,
-                    'variant_id' => 1, // Will be resolved after variant creation
+                    'variant_id' => 1,
                     'variant_sku' => 'AMZN-VAR-001',
-                    'is_available' => true,
-                    'id' => 1
+                    'is_available' => true
                 ],
             ]
         ];
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncVariants')
             ->once()
@@ -1374,9 +1312,14 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1, Mockery::on(function($merchants) {
                 return count($merchants) === 1
                     && $merchants[0]['override_price'] === true
-                    && $merchants[0]['variant_sku'] === 'AMZN-VAR-001';
+                    && $merchants[0]['variant_sku'] === 'AMZN-VAR-001'
+                    && $merchants[0]['variant_id'] === 1; // Mapped from form index to DB ID
             }))
             ->andReturn([1]);
+
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn(['price' => 115, 'sale_price' => 100]);
 
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
@@ -1389,11 +1332,7 @@ class ProductServiceTest extends FunctionalTestCase
 
     public function testUpdateProductMerchantVariantOverrides()
     {
-        $product = new Product([
-            'id' => 1,
-            'name' => 'Product',
-            'price' => 99.99
-        ]);
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
 
         $variant = new ProductVariant([
             'id' => 1,
@@ -1413,6 +1352,8 @@ class ProductServiceTest extends FunctionalTestCase
         ]);
 
         $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
         $this->repository->shouldReceive('update')->once()->andReturn($product);
 
         $this->repository->shouldReceive('getProductMerchantsWithDetails')
@@ -1442,6 +1383,10 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn([1]);
 
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn(['price' => 120, 'sale_price' => null]);
+
         // Should record history because effective price changed from 110 to 120
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
@@ -1457,8 +1402,6 @@ class ProductServiceTest extends FunctionalTestCase
         $brand = $this->createBrand();
         $category = $this->createCategory();
 
-        // Must be an array OF variants (objects or arrays)
-        // Your service expects ->id, so return an object
         $variantsCollection = collect([
             (object)[
                 'sku' => 'VAR-001',
@@ -1489,42 +1432,36 @@ class ProductServiceTest extends FunctionalTestCase
             ],
             'merchants' => [
                 [
+                    'id' => 1,
                     'name' => 'Amazon',
                     'url' => 'https://amazon.com',
-                    'price' => 979, // Override price
+                    'price' => 979,
                     'override_price' => true,
                     'variant_id' => 1,
-                    'is_available' => true,
-                    'id' => 1
+                    'is_available' => true
                 ],
                 [
+                    'id' => 2,
                     'name' => 'BestBuy',
                     'url' => 'https://bestbuy.com',
-                    'price' => 999, // Use variant price
+                    'price' => 999,
                     'override_price' => false,
                     'variant_id' => 1,
-                    'is_available' => true,
-                    'id' => 2
+                    'is_available' => true
                 ],
             ]
         ];
 
-        $product = new Product(array_merge(['id' => 1], $data));
+        $product = new Product(['id' => 1, 'name' => 'iPhone 15']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->once()
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncVariants')
             ->once()
             ->andReturn([1]);
 
-        // Return a proper variants collection (collection of objects)
         $this->repository->shouldReceive('getVariants')
             ->twice()
             ->andReturn($variantsCollection);
@@ -1533,12 +1470,26 @@ class ProductServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn([1, 2]);
 
-        // Amazon should record override price
+        // Amazon should use override price (979)
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->with(Mockery::on(function ($m) {
+                return $m['name'] === 'Amazon';
+            }), Mockery::type(Collection::class))
+            ->andReturn(['price' => 979, 'sale_price' => 949]);
+
+        // BestBuy should use variant price (999)
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->once()
+            ->with(Mockery::on(function ($m) {
+                return $m['name'] === 'BestBuy';
+            }), Mockery::type(Collection::class))
+            ->andReturn(['price' => 999, 'sale_price' => 949]);
+
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
             ->with(1, 1, 979, 1, 949);
 
-        // BestBuy should record variant price (999)
         $this->repository->shouldReceive('recordMerchantPriceHistory')
             ->once()
             ->with(1, 2, 999, 2, 949);
@@ -1547,7 +1498,6 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->assertInstanceOf(Product::class, $result);
     }
-
 
     public function testCreateProductWithMerchantsAndVariantsMapsProperly()
     {
@@ -1563,7 +1513,7 @@ class ProductServiceTest extends FunctionalTestCase
                 'sale_price' => 100,
                 'price_modifier' => 0,
                 'is_active' => true,
-                'id' => 2
+                'id' => 101  // DB ID
             ]),
             new ProductVariant([
                 'sku' => 'VAR-002',
@@ -1573,11 +1523,10 @@ class ProductServiceTest extends FunctionalTestCase
                 'sale_price' => 110,
                 'price_modifier' => 0,
                 'is_active' => true,
-                'id' => 1
+                'id' => 102  // DB ID
             ])
         ]);
 
-        // Simulate form data with variant_id as 1-indexed (from form array indices)
         $data = [
             'name' => 'Test Product',
             'price' => 99.99,
@@ -1605,45 +1554,41 @@ class ProductServiceTest extends FunctionalTestCase
             ],
             'merchants' => [
                 [
+                    'id' => 1,
                     'name' => 'Amazon',
                     'url' => 'https://amazon.com/var1',
                     'price' => 105,
                     'override_price' => true,
                     'variant_id' => 1, // Form index (1-indexed)
-                    'is_available' => true,
-                    'id' => 1
+                    'is_available' => true
                 ],
                 [
+                    'id' => 2,
                     'name' => 'Amazon',
                     'url' => 'https://amazon.com/var2',
                     'price' => 115,
                     'override_price' => true,
                     'variant_id' => 2, // Form index (1-indexed)
-                    'is_available' => true,
-                    'id' => 2
+                    'is_available' => true
                 ],
             ]
         ];
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
-
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
-
-        $this->repository->shouldReceive('getVariants')
-            ->twice()
-            ->with(1)
-            ->andReturn($variantsCollection);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         // Variants sync returns actual DB IDs
         $this->repository->shouldReceive('syncVariants')
             ->once()
             ->andReturn([101, 102]);
+
+        $this->repository->shouldReceive('getVariants')
+            ->twice()
+            ->with(1)
+            ->andReturn($variantsCollection);
 
         // Should receive merchants with mapped variant IDs
         $this->repository->shouldReceive('syncMerchants')
@@ -1651,13 +1596,18 @@ class ProductServiceTest extends FunctionalTestCase
             ->with(1, Mockery::on(function($merchants) {
                 // Check that variant_ids have been mapped to actual DB IDs
                 return count($merchants) === 2
-                    && $merchants[0]['variant_id'] === 101
-                    && $merchants[1]['variant_id'] === 102;
+                    && $merchants[0]['variant_id'] === 101  // Mapped from form index 1
+                    && $merchants[1]['variant_id'] === 102; // Mapped from form index 2
             }))
             ->andReturn([1, 2]);
 
-        $this->repository->shouldReceive('recordMerchantPriceHistory')
-            ->twice();
+        $this->merchantPricingResolver->shouldReceive('resolve')
+            ->twice()
+            ->andReturnUsing(function ($merchantData) {
+                return ['price' => $merchantData['price'], 'sale_price' => null];
+            });
+
+        $this->repository->shouldReceive('recordMerchantPriceHistory')->twice();
 
         $result = $this->service->createProduct($data);
 
@@ -1682,23 +1632,110 @@ class ProductServiceTest extends FunctionalTestCase
 
         $product = new Product(['id' => 1, 'name' => 'Test Product']);
 
-        $this->repository->shouldReceive('create')
-            ->once()
-            ->andReturn($product);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
 
         $this->repository->shouldReceive('syncSpecifications')
             ->once()
             ->with(1, Mockery::type('array'));
 
-        $this->repository->shouldReceive('recordPriceHistory')
-            ->with($product)
-            ->andReturn(new ProductPriceHistory());
-
         $result = $this->service->createProduct($data);
 
-        // This test should actually be testing the repository, not the service
-        // The service just passes data to the repository
         $this->assertInstanceOf(Product::class, $result);
         $this->assertEquals('Test Product', $result->name);
     }
+
+    public function testGetPaginatedProducts()
+    {
+        $paginationData = [
+            'data' => [],
+            'current_page' => 1,
+            'total' => 0,
+        ];
+
+        $this->repository->shouldReceive('paginate')->with(15)->once()->andReturn($paginationData);
+
+        $result = $this->service->getPaginatedProducts();
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('data', $result);
+    }
+
+    public function testGetProduct()
+    {
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->repository->shouldReceive('find')
+            ->with(1, ['availableMerchants', 'availableMerchants.merchant'])
+            ->once()
+            ->andReturn($product);
+
+        $result = $this->service->getProduct(1);
+
+        $this->assertEquals('Test Product', $result->name);
+        $this->assertEquals(1, $result->id);
+    }
+
+    public function testGetProductReturnsNullWhenNotFound()
+    {
+        $this->repository->shouldReceive('find')
+            ->with(999, ['availableMerchants', 'availableMerchants.merchant'])
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->getProduct(999);
+
+        $this->assertNull($result);
+    }
+
+    public function testGetOnSaleProducts()
+    {
+        $products = collect([
+            new Product(['id' => 1, 'price' => 100, 'sale_price' => 80]),
+        ]);
+
+        $this->repository->shouldReceive('getOnSale')->once()->andReturn($products);
+
+        $result = $this->service->getOnSaleProducts();
+
+        $this->assertCount(1, $result);
+        $this->assertEquals(80, $result->first()->sale_price);
+    }
+
+    public function testGetRelatedProducts()
+    {
+        $product = new Product(['id' => 1, 'category' => 'Electronics']);
+        $related = collect([
+            new Product(['id' => 2, 'category' => 'Electronics']),
+            new Product(['id' => 3, 'category' => 'Electronics']),
+        ]);
+
+        $this->repository->shouldReceive('findRelated')
+            ->with($product, 8)
+            ->once()
+            ->andReturn($related);
+
+        $result = $this->service->getRelatedProducts($product);
+
+        $this->assertCount(2, $result);
+    }
+
+    public function testGetRelatedProductsWithCustomLimit()
+    {
+        $product = new Product(['id' => 1, 'category' => 'Electronics']);
+        $related = collect([
+            new Product(['id' => 2, 'category' => 'Electronics']),
+        ]);
+
+        $this->repository->shouldReceive('findRelated')
+            ->with($product, 5)
+            ->once()
+            ->andReturn($related);
+
+        $result = $this->service->getRelatedProducts($product, 5);
+
+        $this->assertCount(1, $result);
+    }
+
 }

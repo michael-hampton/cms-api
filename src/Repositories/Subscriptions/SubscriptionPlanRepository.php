@@ -13,7 +13,7 @@ class SubscriptionPlanRepository extends Repository
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-        return SubscriptionPlan::where('site_id', $siteId)
+        return SubscriptionPlan::with(['pricingTiers'])->where('site_id', $siteId)
             ->where('is_active', true)
             ->orderBy('sort_order', 'asc')
             ->orderBy('price', 'asc')

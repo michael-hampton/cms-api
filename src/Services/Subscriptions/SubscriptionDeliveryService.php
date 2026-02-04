@@ -240,4 +240,31 @@ class SubscriptionDeliveryService
             'reason' => $subscription->delivery_pause_reason
         ];
     }
+
+    /**
+     * Set start issue for subscription
+     */
+    public function setStartIssue(
+        int $subscriptionId,
+        int $issueId
+    ): void
+    {
+        $this->database->transaction(function () use ($subscriptionId, $issueId) {
+            $issue = $this->issueDeliveryRepository->find($issueId);
+
+            if (!$issue) {
+                throw new \Exception('Issue not found');
+            }
+
+            // Validate issue is in the future or current
+            if (strtotime($issue->publication_date) < strtotime('today')) {
+                throw new \Exception('Cannot start subscription with past issue');
+            }
+
+            $this->subscriptionRepository->update($subscriptionId, [
+                'start_issue_id' => $issueId,
+                'start_date' => $issue->publication_date
+            ]);
+        });
+    }
 }

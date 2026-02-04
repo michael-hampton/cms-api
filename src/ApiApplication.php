@@ -8,6 +8,7 @@ use App\Events\Badges\BadgeEarnedEvent;
 use App\Events\Badges\PointsAwardedEvent;
 use App\Events\DatabaseEventSubscriber;
 use App\Events\Orders\OrderCreatedEvent;
+use App\Events\Products\ProductViewedEvent;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -32,10 +33,15 @@ use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
 use App\Listeners\PointsAwardedListener;
+use App\Listeners\Products\TrackProductViewListener;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
+use App\Services\Shared\NativeSessionStore;
+use App\Services\Shared\RequestContext;
+use App\Services\Shared\SessionStore;
+use App\Services\Shared\WebRequestContext;
 use Exception;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -58,6 +64,8 @@ class ApiApplication
 
         $this->container->instance(Router::class, $this->router);
         $this->container->bind(\DateTimeInterface::class, Date::class);
+        $this->container->bind(RequestContext::class, WebRequestContext::class);
+        $this->container->bind(SessionStore::class, NativeSessionStore::class);
 
         $this->registerEvents();
 
@@ -196,6 +204,7 @@ class ApiApplication
         $eventDispatcher->listen(GiftCreatedEvent::class, [GiftCreatedListener::class, 'handle']);
         $eventDispatcher->listen(BadgeEarnedEvent::class, [BadgeEarnedListener::class, 'handle']);
         $eventDispatcher->listen(OrderCreatedEvent::class, [SendOrderConfirmationListener::class, 'handle']);
+        $eventDispatcher->listen(ProductViewedEvent::class, [TrackProductViewListener::class, 'handle']);
 
     }
 }

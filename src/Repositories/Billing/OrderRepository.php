@@ -21,6 +21,11 @@ class OrderRepository extends Repository
         $this->searchEngine = new SearchEngine($config);
     }
 
+    public function findByPaymentIntent(string $paymentIntentId)
+    {
+        return Order::where('payment_intent_id', $paymentIntentId)->first();
+    }
+
     protected function getModelClass(): string
     {
         return Order::class;

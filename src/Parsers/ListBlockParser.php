@@ -2,8 +2,8 @@
 
 namespace App\Parsers;
 
-use App\Enums\ListType;
-use App\Enums\SchemaType;
+use App\Enums\Blocks\ListType;
+use App\Enums\Blocks\SchemaType;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\IntegerRule;

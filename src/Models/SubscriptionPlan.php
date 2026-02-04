@@ -260,4 +260,18 @@ class SubscriptionPlan extends Model
         $this->save();
     }
 
+    public function pricingTiers()
+    {
+        return $this->hasMany(SubscriptionPlanPricing::class, 'plan_id')
+            ->where('is_active', true)
+            ->orderBy('sort_order');
+    }
+
+    public function getDefaultPricing(): ?SubscriptionPlanPricing
+    {
+        return $this->pricingTiers()
+            ->where('is_default', true)
+            ->first();
+    }
+
 }

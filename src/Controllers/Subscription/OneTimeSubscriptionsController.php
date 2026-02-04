@@ -6,8 +6,8 @@ use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
-use App\Services\Subscriptions\OneTimeSubscriptionCheckoutService;
-use App\Services\Subscriptions\OneTimeSubscriptionService;
+use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
+use App\Services\Shopping\OneTimeSubscriptionService;
 
 class OneTimeSubscriptionsController extends Controller
 {

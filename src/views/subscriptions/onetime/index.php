@@ -345,54 +345,35 @@
                 </div>
 
                 <!-- Duration Options -->
+                <!-- Replace lines 347-396 with this: -->
                 <div class="duration-options">
-                    <div class="duration-option" data-plan="<?= $plan['id'] ?>">
-                        <input type="radio" name="duration_<?= $plan['id'] ?>" value="6"
-                               data-price="<?= $plan['price'] ?>" data-issues="6">
-                        <div class="duration-header">
-                            <span class="duration-label">6 month subscription</span>
-                            <div>
-                                <span class="duration-price">£<?= number_format($plan['price'], 2) ?></span>
+                    <?php foreach ($plan['pricing_tiers'] as $tier): ?>
+                        <div class="duration-option" data-plan="<?= $plan['id'] ?>">
+                            <input type="radio"
+                                   name="duration_<?= $plan['id'] ?>"
+                                   value="<?= $tier['duration_months'] ?>"
+                                   data-price="<?= $tier['price'] ?>"
+                                   data-digital="<?= $tier['digital_price'] ?>"
+                                   data-issues="<?= $tier['issue_count'] ?>"
+                                   data-pricing-id="<?= $tier['id'] ?>"
+                                    <?= $tier['is_default'] ? 'checked' : '' ?>>
+                            <div class="duration-header">
+                                <span class="duration-label"><?= htmlspecialchars($tier['label']) ?></span>
+                                <div>
+                                    <?php if ($tier['has_discount']): ?>
+                                        <span class="original-price">£<?= number_format($tier['original_price'], 2) ?></span>
+                                    <?php endif; ?>
+                                    <span class="duration-price">£<?= number_format($tier['price'], 2) ?></span>
+                                </div>
+                            </div>
+                            <div class="duration-details">
+                                <span class="duration-period"><?= htmlspecialchars($tier['period_description']) ?></span>
+                                <?php if ($tier['savings_text']): ?>
+                                    <span class="savings-badge"><?= htmlspecialchars($tier['savings_text']) ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <div class="duration-details">
-                            <span class="duration-period">for 6 issues</span>
-                        </div>
-                    </div>
-
-                    <div class="duration-option" data-plan="<?= $plan['id'] ?>">
-                        <input type="radio" name="duration_<?= $plan['id'] ?>" value="12"
-                               data-price="<?= number_format($plan['price'] * 2 * 0.63, 2) ?>"
-                               data-issues="12" checked>
-                        <div class="duration-header">
-                            <span class="duration-label">1 year subscription</span>
-                            <div>
-                                <span class="original-price">£<?= number_format($plan['price'] * 2, 2) ?></span>
-                                <span class="duration-price">£<?= number_format($plan['price'] * 2 * 0.63, 2) ?></span>
-                            </div>
-                        </div>
-                        <div class="duration-details">
-                            <span class="duration-period">for one year / 12 issues</span>
-                            <span class="savings-badge">SAVE 37%</span>
-                        </div>
-                    </div>
-
-                    <div class="duration-option" data-plan="<?= $plan['id'] ?>">
-                        <input type="radio" name="duration_<?= $plan['id'] ?>" value="24"
-                               data-price="<?= number_format($plan['price'] * 4 * 0.56, 2) ?>"
-                               data-issues="24">
-                        <div class="duration-header">
-                            <span class="duration-label">2 year subscription</span>
-                            <div>
-                                <span class="original-price">£<?= number_format($plan['price'] * 4, 2) ?></span>
-                                <span class="duration-price">£<?= number_format($plan['price'] * 4 * 0.56, 2) ?></span>
-                            </div>
-                        </div>
-                        <div class="duration-details">
-                            <span class="duration-period">for two years / 24 issues</span>
-                            <span class="savings-badge">SAVE 44%</span>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
 
                 <!-- Delivery Options -->
@@ -461,6 +442,25 @@
             const planId = this.dataset.plan;
             const radio = this.querySelector('input[type="radio"]');
 
+            if (radio.value === 'digital') {
+                document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
+                    .forEach(function (test) {
+                        const radio = test.querySelector('input[type="radio"]');
+                        const digitalPrice = radio.dataset.digital
+
+                        if (digitalPrice && digitalPrice > 0) {
+                            test.querySelector('.duration-price').textContent = digitalPrice;
+                        } else {
+                            test.querySelector('.duration-price').textContent = radio.dataset.price;
+                        }
+                    });
+            } else {
+                document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
+                    .forEach(function (test) {
+                        test.querySelector('.duration-price').textContent = test.querySelector('input[type="radio"]').dataset.price;
+                    });
+            }
+
             document.querySelectorAll(`.delivery-option[data-plan="${planId}"]`)
                 .forEach(opt => opt.classList.remove('selected'));
 
@@ -481,6 +481,7 @@
         const durationRadio = document.querySelector(`input[name="duration_${planId}"]:checked`);
         const deliveryRadio = document.querySelector(`input[name="delivery_${planId}"]:checked`);
 
+        const pricingId = durationRadio ? durationRadio.dataset.pricingId : null;
         const duration = durationRadio ? durationRadio.value : '12';
         const price = durationRadio ? durationRadio.dataset.price : null;
         const issues = durationRadio ? durationRadio.dataset.issues : '12';
@@ -492,6 +493,7 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     plan_id: planId,
+                    pricing_id: pricingId,
                     delivery_type: deliveryType,
                     duration_months: parseInt(duration),
                     price: parseFloat(price),

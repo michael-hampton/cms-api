@@ -400,7 +400,7 @@ class CartServiceTest extends FunctionalTestCase
 
         $this->productRepository->shouldReceive('find')->never();
 
-        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
         $this->cartRepository->shouldReceive('findBySubscriptionPlan')
             ->once()
@@ -422,7 +422,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan->shouldReceive('isOneTime')->andReturn(true);
         $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital']);
 
-        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
         $result = $this->service->addOneTimeSubscription(1, 'print');
 
@@ -436,7 +436,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan->shouldReceive('isOneTime')->andReturn(true);
         $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital']);
 
-        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
         $existingItem = Mockery::mock(CartItem::class);
         $this->cartRepository->shouldReceive('findBySubscriptionPlan')

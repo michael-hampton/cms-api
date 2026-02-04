@@ -2,11 +2,10 @@
 
 namespace App\Tests\Unit\Parsers;
 
-use App\Enums\DisplayType;
+use App\Enums\Blocks\DisplayType;
 use App\Framework\Validation\Validator;
 use App\Parsers\PersonBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class PersonBlockParserTest extends FunctionalTestCase
 {

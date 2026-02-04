@@ -18,22 +18,22 @@ use App\Requests\CreateProductRequest;
 use App\Requests\UpdateProductRequest;
 use App\Resources\ProductResource;
 use App\Search\SearchCriteriaParser;
+use App\Services\Product\ProductSchemaService;
 use App\Services\Product\ProductService;
+use App\Services\Product\RecentlyViewedService;
 use Exception;
 
 class ProductController extends Controller
 {
-    protected ProductService $productService;
-    private ProductRepository $productRepository;
-
     public function __construct(
-        ProductService $productService,
-        ProductRepository $productRepository
+        private readonly ProductService        $productService,
+        private readonly ProductRepository     $productRepository,
+        private readonly RecentlyViewedService $recentlyViewedService,
+        private readonly ProductSchemaService  $schemaService
     ) {
-        $this->productService = $productService;
-        $this->productRepository = $productRepository;
         parent::__construct();
     }
+
 
     public function index(Request $request, string $siteName): JsonResponse
     {

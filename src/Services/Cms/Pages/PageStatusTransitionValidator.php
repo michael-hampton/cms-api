@@ -2,7 +2,7 @@
 
 namespace App\Services\Cms\Pages;
 
-use App\Enums\PageStatus;
+use App\Enums\Pages\PageStatus;
 use App\Models\Page;
 
 class PageStatusTransitionValidator

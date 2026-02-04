@@ -5,7 +5,6 @@ namespace App\Tests\Unit\Services\Shopping;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\Member;
-use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Shipment;
 use App\Repositories\Billing\ShipmentRepository;
@@ -13,7 +12,6 @@ use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
-use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Currency\CurrencyResolver;
@@ -25,7 +23,6 @@ use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery as m;
-use function Amp\Socket\Internal\setupTls;
 
 class CheckoutServiceTest extends FunctionalTestCase
 {
@@ -125,6 +122,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
+        $this->setRequiresShippingExpectation();
+
         $this->cartService->shouldReceive('getItems')
             ->once()
             ->andReturn($cartItems);
@@ -193,6 +192,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'phone' => '1234567890'
         ];
 
+        $this->setRequiresShippingExpectation();
+
         $result = $this->service->processCheckout($data, 1);
 
         $this->assertFalse($result['success']);
@@ -206,6 +207,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'email' => 'john@example.com',
             'phone' => '1234567890'
         ];
+
+        $this->setRequiresShippingExpectation();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -221,6 +224,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'phone' => '1234567890'
         ];
 
+        $this->setRequiresShippingExpectation();
+
         $result = $this->service->processCheckout($data, 1);
 
         $this->assertFalse($result['success']);
@@ -234,6 +239,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'last_name' => 'Doe',
             'email' => 'john@example.com'
         ];
+
+        $this->setRequiresShippingExpectation();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -249,6 +256,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'email' => 'john@example.com',
             'phone' => '1234567890'
         ];
+
+        $this->setRequiresShippingExpectation();
 
         $result = $this->service->processCheckout($data, 1);
 
@@ -268,6 +277,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'postal_code' => '12345',
             'country' => 'US'
         ];
+
+        $this->setRequiresShippingExpectation();
 
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -303,6 +314,8 @@ class CheckoutServiceTest extends FunctionalTestCase
                 'subtotal' => 100.00
             ]
         ];
+
+        $this->setRequiresShippingExpectation();
 
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -376,6 +389,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
+
+        $this->setRequiresShippingExpectation();
 
         $this->setTransactionExpectations();
 
@@ -475,6 +490,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
+        $this->setRequiresShippingExpectation();
+
         $this->setTransactionExpectations();
 
         $this->cartService->shouldReceive('getItems')
@@ -494,7 +511,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 return $orderData['subtotal'] === 100.00
                     && $orderData['shipping'] === 10.00
                     && $orderData['tax'] === 11.00
@@ -562,6 +579,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
+        $this->setRequiresShippingExpectation();
+
         $this->setTransactionExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
@@ -605,7 +624,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 return $orderData['shipping'] === 15.00;
             }), m::any(), 1)
             ->andReturn($mockOrder);
@@ -642,6 +661,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
+        $this->setRequiresShippingExpectation();
+
         $this->setTransactionExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
@@ -675,7 +696,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 return $orderData['subtotal'] === 150.00
                     && $orderData['shipping'] === 0.00
                     && $orderData['tax'] === 15.00
@@ -728,6 +749,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
 
+        $this->setRequiresShippingExpectation();
+
         $this->setTransactionExpectations();
 
         $this->voucherService->shouldReceive('validateVoucher')
@@ -766,7 +789,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 return $orderData['subtotal'] == 100
                     && $orderData['discount'] == 10
                     && $orderData['shipping'] == 10
@@ -808,6 +831,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
+        $this->setRequiresShippingExpectation();
 
         $this->memberAuthWrapper->shouldReceive('member')
             ->once()
@@ -860,7 +884,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 return $orderData['user_id'] === 10
                     && $orderData['shipping_address_id'] === 5;
             }), m::any(), 1)
@@ -894,6 +918,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder = m::mock(Order::class)->makePartial();
         $mockOrder->id = 1;
         $mockOrder->order_number = 'ORD-123';
+
+        $this->setRequiresShippingExpectation();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
@@ -934,7 +960,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 return $orderData['shipping_address_id'] === 7
                     && !isset($orderData['shipping_address']);
             }), m::any(), 1)
@@ -975,6 +1001,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
+        $this->setRequiresShippingExpectation();
 
         $member = m::mock(Member::class)->makePartial();
 
@@ -1048,10 +1075,11 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
+        $this->setRequiresShippingExpectation();
 
         $this->orderService->shouldReceive('create')
             ->once()
-            ->with(m::on(function($orderData) {
+            ->with(m::on(function ($orderData) {
                 // Tax = (200 - 0 + 0) * 0.1 = 20.00
                 return $orderData['tax'] === 20.00;
             }), m::any(), 1)
@@ -1123,6 +1151,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
+        $this->setRequiresShippingExpectation();
 
         $this->memberAuthWrapper->shouldReceive('member')
             ->once()
@@ -1311,6 +1340,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder2->order_number = 'ORD-5678';
 
         $this->setCurrencyExpectations();
+        $this->setRequiresShippingExpectation();
 
         // Mock cart service
         $this->cartService->shouldReceive('getItems')
@@ -1401,6 +1431,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $siteId = 1;
         $data = []; // Missing required fields
 
+        $this->setRequiresShippingExpectation();
+
         $result = $this->service->processMultiMerchantCheckout($data, $siteId);
 
         $this->assertFalse($result['success']);
@@ -1447,6 +1479,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ]);
 
         $this->setCurrencyExpectations();
+        $this->setRequiresShippingExpectation();
 
         $this->stripePaymentService->shouldReceive('createPaymentIntent')
             ->once()
@@ -1496,6 +1529,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-1234';
 
         $this->setTransactionExpectations();
+        $this->setRequiresShippingExpectation();
 
         $this->voucherService->shouldReceive('validateVoucher')
             ->once()
@@ -1562,6 +1596,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn([]);
 
+        $this->setRequiresShippingExpectation();
+
         $result = $this->service->processMultiMerchantCheckout($data, $siteId);
 
         $this->assertFalse($result['success']);
@@ -1582,6 +1618,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([]);
+
+        $this->setRequiresShippingExpectation();
 
         $result = $this->service->processMultiMerchantCheckout($checkoutData, $this->siteId);
 
@@ -1604,5 +1642,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
+    }
+
+    private function setRequiresShippingExpectation()
+    {
+        $this->cartService->shouldReceive('requiresShipping')->atLeast()->once()->andReturn(true);
     }
 }

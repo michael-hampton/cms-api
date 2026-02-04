@@ -2,8 +2,8 @@
 
 namespace App\Tests\Unit\Parsers;
 
+use App\Enums\Blocks\DisplayAs;
 use App\Enums\Currency;
-use App\Enums\DisplayAs;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\UrlRule;

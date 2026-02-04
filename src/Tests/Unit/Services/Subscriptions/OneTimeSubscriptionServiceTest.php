@@ -8,7 +8,7 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Subscriptions\OneTimeSubscriptionService;
+use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 

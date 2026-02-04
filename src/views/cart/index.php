@@ -645,6 +645,7 @@
                                                 <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
                                             </div>
                                         </div>
+
                                         <div class="item-actions">
                                             <div class="item-subtotal">$<?= number_format($item['subtotal'], 2) ?></div>
                                             <button class="remove-btn" onclick="removeItem(<?= $item['id'] ?>)">
@@ -653,6 +654,15 @@
                                                     <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                                 </svg>
                                             </button>
+
+                                            <?php if (!empty($startOptions[$options['subscription_plan_id']])): ?>
+                                                <select id="start-date" name="start-date">
+                                                    <option value="">Select Start Date</option>
+                                                    <?php foreach ($startOptions[$options['subscription_plan_id']]['start_date_options'] as $startOption): ?>
+                                                        <option value="<?= $startOption['start_date'] ?>"><?= $startOption['start_date'] ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            <?php endif ?>
                                         </div>
                                     <?php else: ?>
                                         <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
@@ -702,7 +712,6 @@
                 <h3>Order Summary</h3>
                 <?php
                 $subtotal = $total;
-                $tax = $subtotal * 0.1;
                 $finalTotal = $subtotal + $tax;
 
                 $merchantTotals = [];
@@ -720,7 +729,7 @@
                 </div>
                 <div class="summary-row">
                     <span>Shipping:</span>
-                    <span id="shipping">Free</span>
+                    <span id="shipping">£<?= $shipping ?></span>
                 </div>
                 <div class="summary-row">
                     <span>Tax:</span>

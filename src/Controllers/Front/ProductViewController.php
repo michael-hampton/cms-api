@@ -5,7 +5,9 @@ namespace App\Controllers\Front;
 use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Models\Page;
+use App\Services\Product\ProductSchemaService;
 use App\Services\Product\ProductService;
+use App\Services\Product\RecentlyViewedService;
 use App\Services\ReviewService;
 use App\Services\Shopping\WishlistService;
 use App\Services\Url\UrlResolutionResult;
@@ -18,7 +20,9 @@ class ProductViewController extends Controller
     public function __construct(
         private readonly ProductService $productService,
         private readonly ReviewService $reviewService,
-        private readonly WishlistService $wishlistService
+        private readonly WishlistService       $wishlistService,
+        private readonly RecentlyViewedService $recentlyViewedService,
+        private readonly ProductSchemaService  $productSchemaService
     ) {}
 
     public function show(Page $page, UrlResolutionResult $result, Request $request)
@@ -36,7 +40,7 @@ class ProductViewController extends Controller
 
         $reviews = $this->reviewService->getProductReviews($product->id);
         $relatedProducts = $this->productService->getRelatedProducts($product, 8);
-        $recentlyViewed = $this->productService->getRecentlyViewedProducts();
+        $recentlyViewed = $this->recentlyViewedService->getProducts();
 
         // Track product view
         $this->productService->trackView($product);
@@ -55,7 +59,7 @@ class ProductViewController extends Controller
             'recentlyViewed' => $recentlyViewed,
             'inWishlist' => $inWishlist,
             'canonical_url' => $result->canonicalUrl,
-            'structuredData' => $this->productService->generateStructuredData($product),
+            'structuredData' => $this->productSchemaService->generateStructuredData($product),
             'meta_tags' => $this->buildProductMetaTags($product),
         ]);
     }

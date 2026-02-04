@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Billing\Orders;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Services\Billing\Order\OrderStatusTransitionHandler;

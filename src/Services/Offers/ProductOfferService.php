@@ -2,8 +2,8 @@
 
 namespace App\Services\Offers;
 
-use App\Enums\OfferAction;
-use App\Enums\OfferStatus;
+use App\Enums\Offers\OfferAction;
+use App\Enums\Offers\OfferStatus;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Support\Collection;
 use App\Models\Model;

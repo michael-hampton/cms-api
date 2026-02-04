@@ -2,7 +2,7 @@
 
 namespace App\Actions\Pages;
 
-use App\Enums\PageStatus;
+use App\Enums\Pages\PageStatus;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\Cms\Pages\PageService;

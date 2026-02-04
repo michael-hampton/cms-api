@@ -2,7 +2,7 @@
 
 namespace App\Services\Shopping;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\Checkout\MultiMerchantCheckoutCompletedEvent;
 use App\Events\Orders\OrderCompletedEvent;
@@ -13,7 +13,6 @@ use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
-use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Currency\CurrencyResolver;
@@ -130,9 +129,11 @@ class CheckoutService
 
     private function validateCheckoutData(array $data): array
     {
-        $required = ['first_name', 'last_name', 'email', 'phone'];
+        $requiresShipping = $this->cartService->requiresShipping();
 
-        if (empty($data['saved_address'])) {
+        $required = $requiresShipping ? ['first_name', 'last_name', 'email', 'phone'] : []; //todo needs test
+
+        if ($requiresShipping && empty($data['saved_address'])) {
             $required = array_merge($required, ['address', 'city', 'postal_code', 'country']);
         }
 
@@ -207,7 +208,7 @@ class CheckoutService
 
         if (!empty($data['saved_address'])) {
             $orderData['shipping_address_id'] = $data['saved_address'];
-        } else {
+        } else if ($this->cartService->requiresShipping()) { //todo needs test
             $shippingAddress = [
                 'address_line_1' => $data['address'],
                 'address_line_2' => $data['address2'] ?? '',

@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Offers;
 
-use App\Enums\OfferStatus;
+use App\Enums\Offers\OfferStatus;
 use App\Framework\Date;
 use App\Models\ProductOffer;
 use App\Services\Offers\OfferStatusTransitionHandler;

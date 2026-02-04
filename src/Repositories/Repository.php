@@ -30,7 +30,7 @@ abstract class Repository
 
     public function findMany(array $ids, array $relations = []): Collection
     {
-        if (!empty($relations) && is_array($relations) && count($relations) > 0) {
+        if (!empty($relations) && is_array($relations)) {
             return $this->model::with($relations)->whereIn('id', $ids)->get();
         }
 

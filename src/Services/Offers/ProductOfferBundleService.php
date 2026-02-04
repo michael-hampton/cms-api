@@ -2,7 +2,7 @@
 
 namespace App\Services\Offers;
 
-use App\Enums\BundleStatus;
+use App\Enums\Offers\BundleStatus;
 use App\Exceptions\BundleValidationException;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Database\Database;
@@ -14,7 +14,6 @@ use App\Models\ProductOfferBundle;
 use App\Repositories\Offers\ProductOfferBundleRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
-use Exception;
 
 class ProductOfferBundleService
 {
@@ -119,7 +118,8 @@ class ProductOfferBundleService
         $offers = [];
 
         if (!empty($productIds)) {
-            $products = $this->productRepository->findMany($productIds, ['merchants']);
+            $products = $this->productRepository->findMany($productIds, ['merchants'])
+                ->keyBy('id');
         }
 
         if (!empty($offerIds)) {
@@ -164,6 +164,7 @@ class ProductOfferBundleService
 
         if (!empty($item['product_id'])) {
             $product = $entities['products']->get($item['product_id']);
+
             return $product?->merchants?->first()?->id;
         }
 

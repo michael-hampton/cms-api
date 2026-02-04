@@ -2,13 +2,12 @@
 
 namespace App\Tests\Unit\Parsers;
 
-use App\Enums\HeadingLevel;
+use App\Enums\Blocks\HeadingLevel;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
 use App\Parsers\HeadingBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Validation\Custom\HeadingLevelRule;
-use PHPUnit\Framework\TestCase;
 
 class HeadingBlockParserTest extends FunctionalTestCase
 {

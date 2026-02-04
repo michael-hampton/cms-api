@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Rewards;
 
-use App\Enums\RewardType;
+use App\Enums\Rewards\RewardType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Member;

@@ -129,7 +129,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function syncImages(int $productId, array $images): void
     {
-        ProductImage::where('product_id', $productId)->delete();
+        ProductImage::where('product_id', $productId)->whereNull('variant_id')->delete();
 
         foreach ($images as $imageData) {
             ProductImage::create([
@@ -138,7 +138,8 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 'alt' => $imageData['alt'] ?? null,
                 'is_primary' => $imageData['is_primary'] ?? false,
                 'sort_order' => $imageData['sort_order'] ?? 0,
-                'variant_id' => $imageData['variant_id'] ?? null,
+                //'variant_id' => $imageData['variant_id'] ?? null,
+                'variant_id' => null
             ]);
         }
     }

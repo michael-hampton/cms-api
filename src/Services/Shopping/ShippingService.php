@@ -21,8 +21,13 @@ class ShippingService
         ];
     }
 
-    public function calculateShipping(float $subtotal, array $data): float
+    public function calculateShipping(float $subtotal, array $data, bool $requiresShipping = true): float
     {
+        // No shipping for digital items
+        if (!$requiresShipping) {
+            return 0.00;
+        }
+
         // Free shipping over threshold
         if ($subtotal >= $this->config['free_shipping_threshold']) {
             return 0.00;

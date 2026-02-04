@@ -2,12 +2,11 @@
 
 namespace App\Tests\Unit\Parsers;
 
-use App\Enums\ListType;
-use App\Enums\SchemaType;
+use App\Enums\Blocks\ListType;
+use App\Enums\Blocks\SchemaType;
 use App\Framework\Validation\Validator;
 use App\Parsers\ListBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class ListBlockParserTest extends FunctionalTestCase
 {

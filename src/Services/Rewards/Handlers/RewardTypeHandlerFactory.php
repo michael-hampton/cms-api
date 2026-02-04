@@ -3,7 +3,7 @@
 
 namespace App\Services\Rewards\Handlers;
 
-use App\Enums\RewardType;
+use App\Enums\Rewards\RewardType;
 
 class RewardTypeHandlerFactory
 {

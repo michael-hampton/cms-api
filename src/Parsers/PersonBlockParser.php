@@ -2,7 +2,7 @@
 
 namespace App\Parsers;
 
-use App\Enums\DisplayType;
+use App\Enums\Blocks\DisplayType;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\EnumRule;

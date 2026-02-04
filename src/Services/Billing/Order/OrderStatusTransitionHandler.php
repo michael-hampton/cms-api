@@ -2,7 +2,7 @@
 
 namespace App\Services\Billing\Order;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 

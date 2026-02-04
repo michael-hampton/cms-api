@@ -2,7 +2,7 @@
 
 namespace App\Parsers;
 
-use App\Enums\GalleryLayout;
+use App\Enums\Blocks\GalleryLayout;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EnumRule;

@@ -3,12 +3,11 @@
 namespace App\Tests\Unit\Parsers;
 
 use App\Enums\Alignment;
-use App\Enums\ImageLayout;
+use App\Enums\Blocks\ImageLayout;
 use App\Framework\Validation\Validator;
 use App\Models\Image;
 use App\Parsers\ImageBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class ImageBlockParserTest extends FunctionalTestCase
 {

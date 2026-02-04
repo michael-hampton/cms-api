@@ -2,7 +2,7 @@
 
 namespace App\Parsers;
 
-use App\Enums\InfoType;
+use App\Enums\Blocks\InfoType;
 use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;

@@ -3,7 +3,7 @@
 namespace App\Parsers;
 
 use App\Enums\Alignment;
-use App\Enums\ImageLayout;
+use App\Enums\Blocks\ImageLayout;
 use App\Enums\ImageRights;
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\EnumRule;

@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Cms\Pages;
 
-use App\Enums\PageStatus;
+use App\Enums\Pages\PageStatus;
 use App\Framework\Database\Database;
 use App\Models\CustomFieldDefinition;
 use App\Models\Page;

@@ -145,6 +145,7 @@ if (!function_exists('config')) {
                 'database' => 'config/database.php',
                 'routing' => 'config/routing.php',
                 'recommendations' => 'config/recommendations.php',
+                'bundles' => 'config/bundles.php',
             ];
 
             foreach ($configFiles as $name => $file) {

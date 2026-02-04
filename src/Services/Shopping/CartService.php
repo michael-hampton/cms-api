@@ -12,12 +12,14 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 class CartService
 {
     public function __construct(
-        private readonly CartRepository $cartRepository,
+        private readonly CartRepository             $cartRepository,
         private readonly ProductRepository          $productRepository,
         private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
         private readonly ProductOfferRepository       $offerRepository,
         private readonly ProductOfferBundleRepository $bundleRepository
-    ) {}
+    )
+    {
+    }
 
     protected function getSessionId(): string
     {
@@ -34,7 +36,7 @@ class CartService
 
         $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
 
-        return $items->map(function($item) {
+        return $items->map(function ($item) {
             $product = $item->product;
 
             $itemData = [
@@ -196,10 +198,11 @@ class CartService
     public function addOneTimeSubscription(
         int    $planId,
         string $deliveryType,
-        array  $options = []
+        array $options = [],
+        ?int  $pricingId = null
     ): array
     {
-        $plan = $this->subscriptionPlanRepository->find($planId);
+        $plan = $this->subscriptionPlanRepository->find($planId, ['pricingTiers']);
 
         if (!$plan || !$plan->isOneTime()) {
             return ['success' => false, 'message' => 'Invalid subscription plan'];
@@ -222,7 +225,11 @@ class CartService
             return ['success' => false, 'message' => 'Subscription plan already in cart'];
         }
 
-        $price = $plan->price;
+        // Get pricing tier
+
+        $pricing = $pricingId
+            ? $plan->pricingTiers->where('id', $pricingId)->first()
+            : $plan->getDefaultPricing();
 
         $cartData = [
             'session_id' => $sessionId,
@@ -230,8 +237,12 @@ class CartService
             'product_id' => null, // No product for subscriptions
             'subscription_plan_id' => $planId,
             'quantity' => 1,
-            'price' => $price,
-            'subtotal' => $price,
+            'price' => !empty($pricing) && $deliveryType === 'digital' && $pricing->digital_price !== null && $pricing->digital_price > 0
+                ? $pricing->digital_price
+                : ($pricing->price ?? $plan->price),
+            'subtotal' => !empty($pricing) && $deliveryType === 'digital' && $pricing->digital_price !== null && $pricing->digital_price > 0
+                ? $pricing->digital_price
+                : ($pricing->price ?? $plan->price),
             'options' => json_encode(array_merge($options, [
                 'delivery_type' => $deliveryType,
                 'plan_name' => $plan->name,
@@ -467,5 +478,58 @@ class CartService
         }
 
         return 10.00; // Flat rate per merchant
+    }
+
+    public function hasOnlyDigitalItems(): bool
+    {
+        $items = $this->getItems();
+
+        foreach ($items as $item) {
+
+            if (!empty($item['subscription_plan_id']) && ($item['options']['delivery_type'] ?? '') === 'digital') {
+                continue;
+            }
+
+            // Check if item is a digital subscription
+            if (isset($item['item_type']) && $item['item_type'] === 'subscription') {
+                continue; // Digital item, check next
+            }
+
+            // Check if item is a digital product
+            if (isset($item['product']) && isset($item['product']['is_digital']) && $item['product']['is_digital']) {
+                continue; // Digital item, check next
+            }
+
+            // Found a physical item
+            return false;
+        }
+
+        return true;
+    }
+
+    public function setSubscriptionStartIssue(string $itemId, int $issueId): array
+    {
+        $cart = $_SESSION['cart'] ?? [];
+        $found = false;
+
+        foreach ($cart as &$item) {
+            if ($item['id'] === $itemId && $item['type'] === 'subscription') {
+                $item['start_issue_id'] = $issueId;
+                $found = true;
+                break;
+            }
+        }
+
+        if ($found) {
+            $_SESSION['cart'] = $cart;
+            return ['success' => true, 'message' => 'Start issue set'];
+        }
+
+        return ['success' => false, 'message' => 'Item not found'];
+    }
+
+    public function requiresShipping(): bool
+    {
+        return !$this->hasOnlyDigitalItems();
     }
 }

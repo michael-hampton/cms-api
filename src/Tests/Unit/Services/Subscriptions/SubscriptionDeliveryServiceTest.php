@@ -572,6 +572,56 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->assertEquals('Holiday', $result['reason']);
     }
 
+    public function testSetStartIssue(): void
+    {
+        $issue = \Mockery::mock(IssueDelivery::class)->makePartial();
+        $issue->id = 1;
+        $issue->publication_date = date('Y-m-d', strtotime('+1 month'));
+
+        $this->issueDeliveryRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($issue);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->with(1, [
+                'start_issue_id' => 1,
+                'start_date' => $issue->publication_date
+            ])
+            ->once();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->service->setStartIssue(1, 1);
+        $this->assertTrue(true);
+    }
+
+    public function testSetStartIssueFailsWithPastIssue(): void
+    {
+        $issue = \Mockery::mock(IssueDelivery::class)->makePartial();
+        $issue->id = 1;
+        $issue->publication_date = date('Y-m-d', strtotime('-1 month'));
+
+        $this->issueDeliveryRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($issue);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot start subscription with past issue');
+
+        $this->service->setStartIssue(1, 1);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

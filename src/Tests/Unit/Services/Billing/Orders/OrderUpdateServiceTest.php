@@ -2,11 +2,8 @@
 
 namespace App\Tests\Unit\Services\Billing\Orders;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Events\Orders\OrderCancelledEvent;
-use App\Events\Orders\OrderRefundedEvent;
-use App\Events\Orders\OrderUpdatedEvent;
 use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Model;

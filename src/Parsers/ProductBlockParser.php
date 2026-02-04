@@ -2,9 +2,9 @@
 
 namespace App\Parsers;
 
+use App\Enums\Blocks\DisplayAs;
+use App\Enums\Blocks\Layout;
 use App\Enums\Currency;
-use App\Enums\DisplayAs;
-use App\Enums\Layout;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Framework\Validation\Rules\ArrayRule;

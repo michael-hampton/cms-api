@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\PageStatus;
+use App\Enums\Pages\PageStatus;
 use App\Framework\Authorization\AuthenticatedMember;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Database\Relations\HasManyHandler;

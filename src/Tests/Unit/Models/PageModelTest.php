@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
-use App\Enums\PageStatus;
+use App\Enums\Pages\PageStatus;
 use App\Models\Author;
 use App\Models\Block;
 use App\Models\Category;

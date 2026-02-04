@@ -2,12 +2,11 @@
 
 namespace App\Tests\Unit\Services\Offers;
 
-use App\Enums\BundleStatus;
+use App\Enums\Offers\BundleStatus;
 use App\Exceptions\BundleValidationException;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Database\Database;
 use App\Models\Product;
-use App\Models\ProductOffer;
 use App\Models\ProductOfferBundle;
 use App\Models\ProductOfferBundleItem;
 use App\Repositories\Offers\ProductOfferBundleRepository;

@@ -2,18 +2,16 @@
 
 namespace App\Services\Billing\Order;
 
-use App\Enums\OrderStatus;
+use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\Orders\OrderCancelledEvent;
 use App\Events\Orders\OrderRefundedEvent;
 use App\Events\Orders\OrderUpdatedEvent;
 use App\Framework\Database\Database;
-use App\Models\Member;
 use App\Models\Order;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\MemberRepository;
-use App\Services\Billing\Order\OrderAddressResolver;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderHistoryService;
 

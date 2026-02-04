@@ -754,78 +754,82 @@
                         </div>
                     </div>
 
-                    <div class="form-section" id="saved-addresses-section" style="display: none;">
-                        <h2 class="section-title">Saved Addresses</h2>
-                        <div id="saved-addresses-list"></div>
-                        <button type="button" onclick="showNewAddressForm()" class="btn btn-secondary">
-                            Use Different Address
-                        </button>
-                    </div>
+                    <?php if ($requiresShipping ?? true): ?>
 
-                    <!-- Shipping Address -->
-                    <div class="form-section" id="shipping-address-form">
-                        <div class="section-header"
-                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h2 class="section-title" style="margin-bottom: 0; padding-bottom: 0; border: none;">
-                                Shipping Address</h2>
-                            <button type="button" id="back-to-saved-btn" onclick="showSavedAddresses()"
-                                    class="btn btn-secondary" style="display: none; width: auto; padding: 0.5rem 1rem;">
-                                ← Back to Saved Addresses
+                        <div class="form-section" id="saved-addresses-section" style="display: none;">
+                            <h2 class="section-title">Saved Addresses</h2>
+                            <div id="saved-addresses-list"></div>
+                            <button type="button" onclick="showNewAddressForm()" class="btn btn-secondary">
+                                Use Different Address
                             </button>
                         </div>
-                        <div class="form-group full-width">
-                            <label class="form-label">
-                                Address <span class="required">*</span>
-                            </label>
-                            <input type="text" name="address" class="form-input" required>
-                            <span class="form-error" id="error-address"></span>
-                        </div>
-                        <div class="form-group full-width">
-                            <label class="form-label">
-                                Apartment, suite, etc. (optional)
-                            </label>
-                            <input type="text" name="address2" class="form-input">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    City <span class="required">*</span>
-                                </label>
-                                <input type="text" name="city" class="form-input" required>
-                                <span class="form-error" id="error-city"></span>
+
+                        <!-- Shipping Address -->
+                        <div class="form-section" id="shipping-address-form">
+                            <div class="section-header"
+                                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h2 class="section-title" style="margin-bottom: 0; padding-bottom: 0; border: none;">
+                                    Shipping Address</h2>
+                                <button type="button" id="back-to-saved-btn" onclick="showSavedAddresses()"
+                                        class="btn btn-secondary"
+                                        style="display: none; width: auto; padding: 0.5rem 1rem;">
+                                    ← Back to Saved Addresses
+                                </button>
                             </div>
-                            <div class="form-group">
+                            <div class="form-group full-width">
                                 <label class="form-label">
-                                    State / Province
+                                    Address <span class="required">*</span>
                                 </label>
-                                <input type="text" name="state" class="form-input">
+                                <input type="text" name="address" class="form-input" required>
+                                <span class="form-error" id="error-address"></span>
+                            </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">
+                                    Apartment, suite, etc. (optional)
+                                </label>
+                                <input type="text" name="address2" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        City <span class="required">*</span>
+                                    </label>
+                                    <input type="text" name="city" class="form-input" required>
+                                    <span class="form-error" id="error-city"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        State / Province
+                                    </label>
+                                    <input type="text" name="state" class="form-input">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Postal Code <span class="required">*</span>
+                                    </label>
+                                    <input type="text" name="postal_code" class="form-input" required>
+                                    <span class="form-error" id="error-postal_code"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Country <span class="required">*</span>
+                                    </label>
+                                    <select name="country" class="form-select" required>
+                                        <option value="">Select Country</option>
+                                        <option value="US">United States</option>
+                                        <option value="CA">Canada</option>
+                                        <option value="GB">United Kingdom</option>
+                                        <option value="AU">Australia</option>
+                                        <option value="DE">Germany</option>
+                                        <option value="FR">France</option>
+                                    </select>
+                                    <span class="form-error" id="error-country"></span>
+                                </div>
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Postal Code <span class="required">*</span>
-                                </label>
-                                <input type="text" name="postal_code" class="form-input" required>
-                                <span class="form-error" id="error-postal_code"></span>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Country <span class="required">*</span>
-                                </label>
-                                <select name="country" class="form-select" required>
-                                    <option value="">Select Country</option>
-                                    <option value="US">United States</option>
-                                    <option value="CA">Canada</option>
-                                    <option value="GB">United Kingdom</option>
-                                    <option value="AU">Australia</option>
-                                    <option value="DE">Germany</option>
-                                    <option value="FR">France</option>
-                                </select>
-                                <span class="form-error" id="error-country"></span>
-                            </div>
-                        </div>
-                    </div>
+                    <?php endif; ?>
 
                     <!-- Payment Method -->
                     <div class="form-section" id="payment-form-section">
@@ -954,85 +958,82 @@
                                 <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
                             </div>
                         <?php endforeach; ?>
-                    <?php endforeach; ?>
-                </div>
-
-                <div class="voucher-section"
-                     style="margin: 1.5rem 0; padding: 1.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
-                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Voucher Code</h4>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="voucher-input" placeholder="Enter code"
-                               style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
-                        <button onclick="applyVoucher()" class="btn btn-secondary"
-                                style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
-                        </button>
+                        <?php endforeach; ?>
                     </div>
-                    <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
-                    <div id="applied-voucher"
-                         style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong id="voucher-code-display" style="color: #065f46;"></strong>
-                                <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
-                                    Discount: <span id="voucher-discount-display"></span>
-                                </p>
-                            </div>
-                            <button onclick="removeVoucher()"
-                                    style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                </svg>
+
+                    <div class="voucher-section"
+                         style="margin: 1.5rem 0; padding: 1.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+                        <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Voucher Code</h4>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="voucher-input" placeholder="Enter code"
+                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
+                            <button onclick="applyVoucher()" class="btn btn-secondary"
+                                    style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
                             </button>
                         </div>
+                        <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                        <div id="applied-voucher"
+                             style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong id="voucher-code-display" style="color: #065f46;"></strong>
+                                    <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
+                                        Discount: <span id="voucher-discount-display"></span>
+                                    </p>
+                                </div>
+                                <button onclick="removeVoucher()"
+                                        style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
-                    <span>Discount:</span>
-                    <span id="discount-amount">-$0.00</span>
-                </div>
+                    <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
+                        <span>Discount:</span>
+                        <span id="discount-amount">-$0.00</span>
+                    </div>
 
-                <?php
-                $subtotal = $total;
-                $tax = $subtotal * 0.1;
-                $shipping = $subtotal >= 100 ? 0 : 10;
-                $finalTotal = $subtotal + $tax + $shipping;
-                ?>
+                    <?php
+                    $finalTotal = $subtotal + $tax + $shipping;
+                    ?>
 
-                <div class="summary-row">
-                    <span>Subtotal:</span>
-                    <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
-                </div>
-                <div class="summary-row">
-                    <span>Shipping:</span>
-                    <span id="shipping"><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 'Free' ?></span>
-                </div>
-                <div class="summary-row">
-                    <span>Tax (10%):</span>
-                    <span id="tax">$<?= number_format($tax, 2) ?></span>
-                </div>
-                <div class="summary-row total">
-                    <span>Total:</span>
-                    <span id="total">$<?= number_format($finalTotal, 2) ?></span>
-                </div>
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Shipping:</span>
+                        <span id="shipping"><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 'Free' ?></span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tax (10%):</span>
+                        <span id="tax">$<?= number_format($tax, 2) ?></span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total:</span>
+                        <span id="total">$<?= number_format($finalTotal, 2) ?></span>
+                    </div>
 
-                <button type="button" class="btn btn-primary" id="place-order-btn">
-                    Place Order
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="window.location.href='/cart'">
-                    Return to Cart
-                </button>
+                    <button type="button" class="btn btn-primary" id="place-order-btn">
+                        Place Order
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='/cart'">
+                        Return to Cart
+                    </button>
 
-                <div class="security-badge">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                    </svg>
-                    <span>Secure SSL encrypted checkout</span>
+                    <div class="security-badge">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        <span>Secure SSL encrypted checkout</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 </main>
 
 <!-- Footer -->
@@ -1056,6 +1057,7 @@
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
     const API_BASE = '/api/' + SITE;
     const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
+    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
 
     const INITIAL_SUBTOTAL = parseFloat(document.getElementById('subtotal').textContent.replace('$', ''));
     const INITIAL_SHIPPING = parseFloat(document.getElementById('shipping').textContent.replace('$', '') || '0');
@@ -1308,25 +1310,28 @@
             delete data.country;
         }
 
-        const required = selectedAddressId
-            ? ['first_name', 'last_name', 'email', 'phone']
-            : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
+        if (requiresShipping) {
+            const required = selectedAddressId
+                ? ['first_name', 'last_name', 'email', 'phone']
+                : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
 
-        let hasErrors = false;
+            let hasErrors = false;
 
-        for (const field of required) {
-            if (!data[field] || data[field].trim() === '') {
-                const errorEl = document.getElementById(`error-${field}`);
-                if (errorEl) {
-                    errorEl.textContent = 'This field is required';
+            for (const field of required) {
+                if (!data[field] || data[field].trim() === '') {
+                    const errorEl = document.getElementById(`error-${field}`);
+                    if (errorEl) {
+                        errorEl.textContent = 'This field is required';
+                    }
+                    hasErrors = true;
                 }
-                hasErrors = true;
+            }
+
+            if (hasErrors) {
+                return;
             }
         }
 
-        if (hasErrors) {
-            return;
-        }
 
         if (appliedVoucher) {
             data.voucher_code = appliedVoucher.code;
@@ -1648,7 +1653,9 @@
         data.discount_amount = appliedVoucher.discount;
     }
 
-    checkLoginStatus();
+    if (requiresShipping) {
+        checkLoginStatus();
+    }
     checkForAppliedVoucher();
     //loadWishlistCount();
     checkCartForSubscription();

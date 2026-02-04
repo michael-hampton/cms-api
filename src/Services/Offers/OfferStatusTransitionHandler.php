@@ -2,7 +2,7 @@
 
 namespace App\Services\Offers;
 
-use App\Enums\OfferStatus;
+use App\Enums\Offers\OfferStatus;
 use App\Models\ProductOffer;
 
 class OfferStatusTransitionHandler

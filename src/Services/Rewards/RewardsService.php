@@ -2,16 +2,15 @@
 
 namespace App\Services\Rewards;
 
-use App\Enums\RewardClickAction;
-use App\Enums\RewardStatus;
-use App\Enums\RewardType;
+use App\Enums\Rewards\RewardClickAction;
+use App\Enums\Rewards\RewardStatus;
+use App\Enums\Rewards\RewardType;
 use App\Events\Rewards\RewardAwardedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\MemberReward;
-use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Rewards\Handlers\RewardTypeHandlerFactory;
 
