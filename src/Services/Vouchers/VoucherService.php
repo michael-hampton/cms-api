@@ -158,7 +158,7 @@ class VoucherService
             ];
         }
 
-        $discount = $voucher->calculateDiscount($orderValue);
+        $discount = $voucher->calculateDiscount($orderValue); //todo this doesnt determine whether this is for a subscription
 
         return [
             'valid' => true,
@@ -229,6 +229,7 @@ class VoucherService
         }
 
         $discount = $voucher->calculateSubscriptionDiscount($plan->price);
+
         $finalPrice = max(0, $plan->price - $discount);
 
         return VoucherValidationResult::valid($voucher, $discount, $finalPrice);

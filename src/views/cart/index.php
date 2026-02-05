@@ -626,6 +626,7 @@
                                         $options = $item['options'];
                                         $deliveryType = $options['delivery_type'] ?? 'digital';
                                         $planName = $options['plan_name'] ?? 'Subscription';
+                                        $planId = $item['subscription_plan_id'];
                                         ?>
                                         <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
                                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
@@ -655,14 +656,27 @@
                                                 </svg>
                                             </button>
 
-                                            <?php if (!empty($startOptions[$options['subscription_plan_id']])): ?>
-                                                <select id="start-date" name="start-date">
-                                                    <option value="">Select Start Date</option>
-                                                    <?php foreach ($startOptions[$options['subscription_plan_id']]['start_date_options'] as $startOption): ?>
-                                                        <option value="<?= $startOption['start_date'] ?>"><?= $startOption['start_date'] ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            <?php endif ?>
+                                            <?php if (!empty($startOptions[$planId])): ?>
+                                                <div class="form-group" style="margin-top: 1rem;">
+                                                    <label class="form-label" style="font-size: 0.875rem;">Start
+                                                        Date:</label>
+                                                    <select id="start-date-<?= $item['id'] ?>"
+                                                            name="start_date"
+                                                            class="form-select"
+                                                            onchange="updateSubscriptionStartDate(<?= $item['id'] ?>, <?= $planId ?>, this.value)"
+                                                            style="padding: 0.5rem; font-size: 0.875rem;">
+                                                        <option value="">Select Start Date</option>
+                                                        <?php foreach ($startOptions[$planId]['start_date_options'] as $startOption): ?>
+                                                            <option value="<?= $startOption['start_date'] ?>">
+                                                                <?= date('M j, Y', strtotime($startOption['start_date'])) ?>
+                                                                (Next
+                                                                billing: <?= date('M j, Y', strtotime($startOption['next_billing_date'])) ?>
+                                                                )
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
                                     <?php else: ?>
                                         <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
@@ -811,6 +825,7 @@
     let cartData = null;
     let appliedVoucher = null;
     let isOneTimeSubscription = false
+    const subscriptionStartDates = {};
 
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toast');
@@ -823,6 +838,41 @@
 
     function formatCurrency(amount) {
         return '$' + parseFloat(amount).toFixed(2);
+    }
+
+    async function updateSubscriptionStartDate(cartItemId, planId, startDate) {
+        if (!startDate) {
+            delete subscriptionStartDates[cartItemId];
+            return;
+        }
+
+        subscriptionStartDates[cartItemId] = {
+            planId: planId,
+            startDate: startDate
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/cart/${cartItemId}/update-start-date`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    start_date: startDate,
+                    plan_id: planId,
+                    cart_item_id: cartItemId,
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('Start date updated');
+            } else {
+                showToast(data.message || 'Failed to update start date', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating start date:', error);
+            showToast('Failed to update start date', 'error');
+        }
     }
 
     async function loadCart() {
@@ -1036,6 +1086,11 @@
         if (appliedVoucher) {
             sessionStorage.setItem('appliedVoucher', JSON.stringify(appliedVoucher));
         }
+
+        if (Object.keys(subscriptionStartDates).length > 0) {
+            sessionStorage.setItem('subscriptionStartDates', JSON.stringify(subscriptionStartDates));
+        }
+
         window.location.href = isOneTimeSubscription ? '/checkout?type=subscription' : '/checkout';
     }
 

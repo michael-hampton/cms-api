@@ -14,6 +14,7 @@ use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\TaxCalculatorService;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
@@ -43,6 +44,7 @@ class CheckoutServiceTest extends FunctionalTestCase
     private CurrencyResolver $currencyResolver;
     private Database $databaseMock;
     private OrderManager $orderManager;
+    private TaxCalculatorService $taxCalculatorService;
 
     protected function setUp(): void
     {
@@ -62,6 +64,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->mockShipmentRepository = m::mock(ShipmentRepository::class);
         $this->currencyResolver = m::mock(CurrencyResolver::class);
         $this->databaseMock = m::mock(Database::class);
+        $this->taxCalculatorService = m::mock(TaxCalculatorService::class);
 
         $this->service = new CheckoutService(
             $this->cartService,
@@ -77,7 +80,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             $this->mockShipmentRepository,
             $this->currencyResolver,
             $this->databaseMock,
-            $this->orderManager
+            $this->orderManager,
+            $this->taxCalculatorService
         );
     }
 
@@ -123,6 +127,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->setRequiresShippingExpectation();
+        $this->setTaxCalculatorExpectations();
 
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -167,14 +172,14 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn($mockOrder);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
         $member->id = 10;
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $result = $this->service->processCheckout($data, 1);
@@ -316,6 +321,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $this->setRequiresShippingExpectation();
+        $this->setTaxCalculatorExpectations();
 
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -332,9 +338,17 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setCurrencyExpectations();
 
+        $this->memberAuthWrapper->shouldReceive('check')
+            ->once()
+            ->andReturn(true);
+
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->once()
+            ->andReturn(m::mock(Member::class)->makePartial());
+
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 100.00,
                 'shipping' => 10.00,
@@ -391,8 +405,9 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->setRequiresShippingExpectation();
-
+        $this->setMemberAuthExpectations();
         $this->setTransactionExpectations();
+        $this->setTaxCalculatorExpectations();
 
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -411,12 +426,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 100.00,
                 'shipping' => 10.00,
                 'discount' => 0,
-                'tax' => 11.00,
+                'tax' => 11,
                 'total' => 121.00
             ]);
 
@@ -431,11 +446,11 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->orderService->shouldReceive('create')
             ->once()
             ->with(m::on(function ($orderData) {
-                return $orderData['subtotal'] === 100.00
-                    && $orderData['shipping'] === 10.00
-                    && $orderData['tax'] === 11.00
-                    && $orderData['total'] === 121.00
-                    && $orderData['discount'] === 0;
+                return $orderData['subtotal'] == 100
+                    && $orderData['shipping'] == 10
+                    && $orderData['tax'] == 11
+                    && $orderData['total'] == 121
+                    && $orderData['discount'] == 0;
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
@@ -446,7 +461,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $member = m::mock(Member::class)->makePartial();
         $member->id = 10;
 
-        $this->memberAuthWrapper->shouldReceive('member')
+        $this->memberAuthWrapper->shouldReceive('getMember')
             ->once()
             ->andReturn($member);
 
@@ -491,8 +506,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->setRequiresShippingExpectation();
-
         $this->setTransactionExpectations();
+        $this->setTaxCalculatorExpectations();
 
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -521,18 +536,18 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn($mockOrder);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 0, 'tax' => 11.00])
             ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 11.00, 'total' => 121.00]);
 
         $this->stripePaymentService->shouldReceive('createPaymentIntent')
@@ -580,8 +595,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->setRequiresShippingExpectation();
-
         $this->setTransactionExpectations();
+        $this->setTaxCalculatorExpectations(5000, 1500, 'CA');
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
@@ -595,7 +610,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 15, 'discount' => 0])
+            ->with([], ['subtotal' => 50, 'shipping' => 15, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 50.00,
                 'shipping' => 15.00,
@@ -613,13 +628,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             ]);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $this->orderService->shouldReceive('create')
@@ -662,8 +677,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->setRequiresShippingExpectation();
-
         $this->setTransactionExpectations();
+        $this->setTaxCalculatorExpectations(15000, 0, 'US');
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(150.00);
@@ -677,7 +692,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 150, 'shipping' => 0, 'discount' => 0])
+            ->with([], ['subtotal' => 150, 'shipping' => 0, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 150.00,
                 'shipping' => 0.00,
@@ -705,13 +720,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn($mockOrder);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $result = $this->service->processCheckout($data, 1);
@@ -750,8 +765,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->setRequiresShippingExpectation();
-
         $this->setTransactionExpectations();
+        $this->setTaxCalculatorExpectations();
 
         $this->voucherService->shouldReceive('validateVoucher')
             ->once()
@@ -768,7 +783,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 10])
+            ->with([], ['subtotal' => 100, 'shipping' => 10, 'discount' => 10, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 100.00,
                 'shipping' => 10.00,
@@ -804,14 +819,14 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->with(5, m::any(), 10.00, 1);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->twice()
+            ->times(3)
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
         $member->id = 10;
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->twice()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->times(3)
             ->andReturn($member);
 
         $result = $this->service->processCheckout($data, 1);
@@ -826,15 +841,16 @@ class CheckoutServiceTest extends FunctionalTestCase
         $member->id = 10;
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
         $this->setRequiresShippingExpectation();
+        $this->setTaxCalculatorExpectations(5000, 1000, 'GB');
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $data = [
@@ -842,7 +858,8 @@ class CheckoutServiceTest extends FunctionalTestCase
             'last_name' => 'Doe',
             'email' => 'john@example.com',
             'phone' => '1234567890',
-            'saved_address' => 5
+            'saved_address' => 5,
+            'postal_code' => '12345',
         ];
 
         $cartItems = [
@@ -865,7 +882,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 50.00,
                 'shipping' => 10.00,
@@ -901,6 +918,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => 'john@example.com',
+            'postal_code' => '12345',
             'phone' => '1234567890',
             'saved_address' => 7
         ];
@@ -927,21 +945,22 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
+        $this->setTaxCalculatorExpectations(5000, 1000, 'GB');
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
         $member->id = 10;
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 50.00,
                 'shipping' => 10.00,
@@ -996,17 +1015,18 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
         $this->setRequiresShippingExpectation();
+        $this->setTaxCalculatorExpectations(5000, 1000);
 
         $member = m::mock(Member::class)->makePartial();
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
@@ -1015,7 +1035,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 50.00,
                 'shipping' => 10.00,
@@ -1076,6 +1096,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
         $this->setRequiresShippingExpectation();
+        $this->setTaxCalculatorExpectations(20000, 0, 'US');
 
         $this->orderService->shouldReceive('create')
             ->once()
@@ -1086,18 +1107,18 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn($mockOrder);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 200, 'shipping' => 0, 'discount' => 0])
+            ->with([], ['subtotal' => 200, 'shipping' => 0, 'discount' => 0, 'tax' => 11])
             ->andReturn(['subtotal' => 100.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 20.00, 'total' => 121.00]);
 
         $this->stripePaymentService->shouldReceive('createPaymentIntent')
@@ -1146,20 +1167,21 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder->order_number = 'ORD-123';
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $this->setCurrencyExpectations();
         $this->setTransactionExpectations();
         $this->setRequiresShippingExpectation();
+        $this->setTaxCalculatorExpectations(5000, 1000);
 
-        $this->memberAuthWrapper->shouldReceive('member')
-            ->once()
+        $this->memberAuthWrapper->shouldReceive('getMember')
+            ->twice()
             ->andReturn($member);
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
             ->once()
-            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0])
+            ->with([], ['subtotal' => 50, 'shipping' => 10, 'discount' => 0, 'tax' => 11])
             ->andReturn([
                 'subtotal' => 50.00,
                 'shipping' => 10.00,
@@ -1627,6 +1649,325 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->assertEquals('Cart is empty', $result['message']);
     }
 
+    public function testProcessCheckoutDoesNotRequireAddressWhenShippingNotRequired(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'payment_method' => 'card'
+            // NO ADDRESS FIELDS
+        ];
+
+        $cartItems = [
+            ['product_id' => 1, 'price' => 50.00, 'quantity' => 1, 'subtotal' => 50.00]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setTaxCalculatorExpectations(5000, 0, 'GB', null);
+
+        // requiresShipping returns FALSE
+        $this->cartService->shouldReceive('requiresShipping')
+            ->atLeast()->once()
+            ->andReturn(false);
+
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
+
+        // Shipping should be 0 when not required
+        $this->shippingService->shouldReceive('calculateShipping')
+            ->once()
+            ->andReturn(0.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50.00, 'shipping' => 0.00, 'discount' => 0, 'tax' => 11])
+            ->andReturn([
+                'subtotal' => 50.00,
+                'shipping' => 0.00,
+                'discount' => 0,
+                'tax' => 5.00,
+                'total' => 55.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'client_secret' => 'secret',
+                'payment_intent_id' => 'pi_123'
+            ]);
+
+        $this->orderService->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($orderData) {
+                // Verify NO shipping address fields in order data
+                return !isset($orderData['shipping_address'])
+                    && !isset($orderData['shipping_address_id'])
+                    && $orderData['shipping'] === 0.00;
+            }), m::any(), 1)
+            ->andReturn($mockOrder);
+
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(false);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessCheckoutSkipsAddressValidationWhenShippingNotRequired(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            // Intentionally missing address, city, postal_code, country
+        ];
+
+        $cartItems = [
+            ['product_id' => 1, 'price' => 50.00, 'quantity' => 1, 'subtotal' => 50.00]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setTaxCalculatorExpectations(5000, 0, 'GB', null);
+
+        $this->cartService->shouldReceive('requiresShipping')
+            ->atLeast()->once()
+            ->andReturn(false);
+
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->andReturn(['subtotal' => 50.00, 'shipping' => 0.00, 'discount' => 0, 'tax' => 5.00, 'total' => 55.00]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn(['success' => true, 'client_secret' => 'secret', 'payment_intent_id' => 'pi_123']);
+
+        $this->orderService->shouldReceive('create')->once()->andReturn($mockOrder);
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(false);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        // Should succeed even without address fields
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessCheckoutRequiresAddressWhenShippingRequired(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            // Missing address fields
+        ];
+
+        $this->cartService->shouldReceive('requiresShipping')
+            ->atLeast()->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Address is required', $result['message']);
+    }
+
+    public function testProcessCheckoutWithSavedAddressSkipsManualAddressValidation(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'saved_address' => 7,
+            'postal_code' => '12345'
+            // NO manual address fields - should be OK
+        ];
+
+        $cartItems = [
+            ['product_id' => 1, 'price' => 50.00, 'quantity' => 1, 'subtotal' => 50.00]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->cartService->shouldReceive('requiresShipping')
+            ->atLeast()->once()
+            ->andReturn(true);
+
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+        $this->setTaxCalculatorExpectations(5000, 1000, 'GB');
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->andReturn(['subtotal' => 50.00, 'shipping' => 10.00, 'discount' => 0, 'tax' => 6.00, 'total' => 66.00]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn(['success' => true, 'client_secret' => 'secret', 'payment_intent_id' => 'pi_123']);
+
+        $this->orderService->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($orderData) {
+                return $orderData['shipping_address_id'] === 7
+                    && !isset($orderData['address'])
+                    && !isset($orderData['city']);
+            }), m::any(), 1)
+            ->andReturn($mockOrder);
+
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
+
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(true);
+        $this->memberAuthWrapper->shouldReceive('getMember')->twice()->andReturn($member);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessCheckoutCalculatesShippingOnlyWhenRequired(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+        ];
+
+        $cartItems = [
+            ['product_id' => 1, 'price' => 50.00, 'quantity' => 1, 'subtotal' => 50.00]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setTaxCalculatorExpectations(5000, 0, 'GB', null);
+
+        // requiresShipping is false
+        $this->cartService->shouldReceive('requiresShipping')
+            ->atLeast()->once()
+            ->andReturn(false);
+
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->once()->andReturn(50.00);
+
+        // Shipping service should still be called but should return 0
+        $this->shippingService->shouldReceive('calculateShipping')
+            ->once()
+            ->with(50.00, $data)
+            ->andReturn(0.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->with([], ['subtotal' => 50.00, 'shipping' => 0.00, 'discount' => 0, 'tax' => 11])
+            ->andReturn(['subtotal' => 50.00, 'shipping' => 0.00, 'discount' => 0, 'tax' => 5.00, 'total' => 55.00]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true, 'client_secret' => 'secret', 'payment_intent_id' => 'pi_123'
+        ]);
+
+        $this->orderService->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($orderData) {
+                return $orderData['shipping'] === 0.00;
+            }), m::any(), 1)
+            ->andReturn($mockOrder);
+
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(false);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessCheckoutDigitalOnlyCartDoesNotRequireShipping(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            // No address fields
+        ];
+
+        $cartItems = [
+            [
+                'product_id' => 1,
+                'product_name' => 'Digital Magazine',
+                'price' => 9.99,
+                'quantity' => 1,
+                'subtotal' => 9.99,
+                'is_digital' => true
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setTaxCalculatorExpectations(999, 0, 'GB', null);
+
+        $this->cartService->shouldReceive('requiresShipping')
+            ->atLeast()->once()
+            ->andReturn(false);
+
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->once()->andReturn(9.99);
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->andReturn(['subtotal' => 9.99, 'shipping' => 0.00, 'discount' => 0, 'tax' => 1.00, 'total' => 10.99]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true, 'client_secret' => 'secret', 'payment_intent_id' => 'pi_123'
+        ]);
+
+        $this->orderService->shouldReceive('create')->once()->andReturn($mockOrder);
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(false);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    private function setMemberAuthExpectations()
+    {
+        $this->memberAuthWrapper->shouldReceive('check')->once()->andReturn(false);
+    }
+
     private function setCurrencyExpectations()
     {
         $this->currencyResolver->shouldReceive('resolve')
@@ -1647,5 +1988,19 @@ class CheckoutServiceTest extends FunctionalTestCase
     private function setRequiresShippingExpectation()
     {
         $this->cartService->shouldReceive('requiresShipping')->atLeast()->once()->andReturn(true);
+    }
+
+    private function setTaxCalculatorExpectations(float $subtotal = 10000, float $shipping = 1000, string $country = 'US', $postalCode = '12345')
+    {
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
+            ->once()
+            ->with(
+                $subtotal,
+                $shipping,
+                $country,
+                NULL,
+                $postalCode,
+                \Mockery::any())
+            ->andReturn(['tax_cents' => 1100]);
     }
 }

@@ -8,6 +8,7 @@ use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Services\Vouchers\VoucherService;
 
 class CartService
 {
@@ -16,7 +17,8 @@ class CartService
         private readonly ProductRepository          $productRepository,
         private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
         private readonly ProductOfferRepository       $offerRepository,
-        private readonly ProductOfferBundleRepository $bundleRepository
+        private readonly ProductOfferBundleRepository $bundleRepository,
+        private readonly VoucherService               $voucherService
     )
     {
     }
@@ -507,25 +509,31 @@ class CartService
         return true;
     }
 
-    public function setSubscriptionStartIssue(string $itemId, int $issueId): array
+    public function updateStartDate(int $cartItemId, string $startDate, ?int $userId = null, ?string $sessionId = null): array
     {
-        $cart = $_SESSION['cart'] ?? [];
-        $found = false;
+        $item = $this->cartRepository->find($cartItemId);
 
-        foreach ($cart as &$item) {
-            if ($item['id'] === $itemId && $item['type'] === 'subscription') {
-                $item['start_issue_id'] = $issueId;
-                $found = true;
-                break;
-            }
+        if (!$item) {
+            return ['success' => false, 'message' => 'Cart item not found'];
         }
 
-        if ($found) {
-            $_SESSION['cart'] = $cart;
-            return ['success' => true, 'message' => 'Start issue set'];
-        }
+        // Validate start date
+        $startDateTime = new \DateTime($startDate);
+        $now = new \DateTime();
 
-        return ['success' => false, 'message' => 'Item not found'];
+//        if ($startDateTime < $now) {
+//            return ['success' => false, 'message' => 'Start date cannot be in the past'];
+//        }
+
+        // Update options
+        $options = $item->options ?? [];
+        $options['start_date'] = $startDate;
+
+        $this->cartRepository->update($cartItemId, [
+            'options' => $options
+        ]);
+
+        return ['success' => true, 'message' => 'Start date updated'];
     }
 
     public function requiresShipping(): bool

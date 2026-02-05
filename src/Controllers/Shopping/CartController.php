@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\OrderRepository;
@@ -203,6 +204,7 @@ class CartController extends Controller
         }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
+        Session::forget('applied_voucher_code');
 
         $statusCode = $result['success'] ? 200 : 400;
         return $this->resourceResponse($result, $statusCode);
@@ -343,6 +345,8 @@ class CartController extends Controller
             $siteId
         );
 
+        Session::forget('applied_voucher_code');
+
         return $this->jsonResponse($result, $result['success'] ? 200 : 400);
     }
 
@@ -408,6 +412,24 @@ class CartController extends Controller
                 'message' => 'Bundle added to cart',
                 'cart_items' => $cartItems
             ], 201);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateStartDate(Request $request): JsonResponse
+    {
+        try {
+            $cartItemId = $request->input('cart_item_id');
+            $startDate = $request->input('start_date');
+            $result = $this->cartService->updateStartDate($cartItemId, $startDate, MemberAuth::member()->id);
+
+            if (!$result['success']) {
+                return $this->errorResponse($result['message'], 400);
+            }
+
+            return $this->jsonResponse(['success' => true]);
+
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

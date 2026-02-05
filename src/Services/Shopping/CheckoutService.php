@@ -15,6 +15,7 @@ use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\TaxCalculatorService;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Vouchers\VoucherService;
 use Exception;
@@ -35,7 +36,8 @@ class CheckoutService
         private readonly ShipmentRepository       $shipmentRepository,
         private readonly CurrencyResolver     $currencyResolver,
         private readonly Database             $database,
-        private readonly OrderManager         $orderService
+        private readonly OrderManager         $orderService,
+        private readonly TaxCalculatorService $taxCalculatorService
     ) {}
 
 
@@ -97,7 +99,7 @@ class CheckoutService
                 // Apply voucher if provided
                 if (!empty($totals['voucher_id']) && $totals['discount'] > 0) {
                     $userId = $this->memberAuthWrapper->check()
-                        ? $this->memberAuthWrapper->member()->id
+                        ? $this->memberAuthWrapper->getMember()->id
                         : null;
 
                     $this->voucherService->applyVoucher(
@@ -152,7 +154,6 @@ class CheckoutService
     private function calculateTotals(array $cartItems, array $data): array
     {
         $subtotal = $this->cartService->getTotal();
-
         $shipping = $this->shippingService->calculateShipping($subtotal, $data);
 
         $discount = 0;
@@ -172,13 +173,35 @@ class CheckoutService
             }
         }
 
+        $subtotalCents = (int)round($subtotal * 100);
+        $shippingCents = (int)round($shipping * 100);
+        $country = $data['country'] ?? 'GB';
+        $state = $data['state'] ?? null;
+        $postalCode = $data['postal_code'] ?? null;
+
+        $member = $this->memberAuthWrapper->check()
+            ? $this->memberAuthWrapper->getMember()
+            : null;
+
+        $taxResult = $this->taxCalculatorService->calculateOrderTax(
+            $subtotalCents,
+            $shippingCents,
+            $country,
+            $state,
+            $postalCode,
+            $member
+        );
+
+        $tax = $taxResult['tax_cents'] / 100;
+
         // Use shared calculation service
         $calculatedTotals = $this->calculationService->calculateOrderTotals(
             [], // No items needed, we have subtotal
             [
                 'subtotal' => $subtotal,
                 'shipping' => $shipping,
-                'discount' => $discount
+                'discount' => $discount,
+                'tax' => $tax
             ]
         );
 
@@ -223,7 +246,7 @@ class CheckoutService
         }
 
         if ($this->memberAuthWrapper->check()) {
-            $orderData['user_id'] = $this->memberAuthWrapper->member()->id;
+            $orderData['user_id'] = $this->memberAuthWrapper->getMember()->id;
         }
 
         return $orderData;
@@ -446,7 +469,7 @@ class CheckoutService
                 // Apply voucher once at checkout level if applicable
                 if (!empty($voucherId) && $discount > 0) {
                     $userId = $this->memberAuthWrapper->check()
-                        ? $this->memberAuthWrapper->member()->id
+                        ? $this->memberAuthWrapper->getMember()->id
                         : null;
                     $this->voucherService->applyVoucher($voucherId, $userId, $discount, $createdOrders[0]->id);
                 }

@@ -56,7 +56,8 @@ class SubscriptionBatchFactory
                 siteId: $siteId,
                 voucherId: $pricing->voucherId,
                 discountAmount: $pricing->getDiscount(),
-                status: SubscriptionStatus::PENDING->value
+                status: SubscriptionStatus::PENDING->value,
+                selectedStartDate: $item['options']['start_date'] ?? null
             );
 
             $subscriptions[] = [

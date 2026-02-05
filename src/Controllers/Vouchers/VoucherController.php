@@ -10,6 +10,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Session\Session;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Requests\BulkDeleteRequest;
 use App\Requests\BulkUpdateVoucherStatus;
@@ -17,18 +18,18 @@ use App\Requests\CreateVoucherRequest;
 use App\Requests\UpdateVoucherRequest;
 use App\Resources\VoucherResource;
 use App\Search\SearchCriteriaParser;
+use App\Services\Shopping\CartService;
 use App\Services\Vouchers\VoucherService;
 use Exception;
 
 class VoucherController extends Controller
 {
-    private VoucherService $voucherService;
-    private VoucherRepository $voucherRepository;
-
-    public function __construct(VoucherService $voucherService, VoucherRepository $voucherRepository)
+    public function __construct(
+        private readonly VoucherService    $voucherService,
+        private readonly VoucherRepository $voucherRepository,
+        private readonly CartService       $cartService
+    )
     {
-        $this->voucherService = $voucherService;
-        $this->voucherRepository = $voucherRepository;
         parent::__construct();
     }
 
@@ -164,17 +165,74 @@ class VoucherController extends Controller
             $orderValue = (float)$request->get('order_value', 0);
             $userId = $request->get('user_id', null);
             $productId = $request->get('product_id', null);
+            $planId = $request->get('plan_id', null); // ADD THIS
+            $isSubscription = $request->get('is_subscription', false); // ADD THIS
 
             if (!$code) {
                 return $this->errorResponse('Voucher code is required', 422);
             }
 
+            // Route to subscription validation if this is for a subscription
+            if ($isSubscription || $planId) {
+                if (!$planId) {
+                    return $this->errorResponse('Plan ID is required for subscription vouchers', 422);
+                }
+
+                $result = $this->voucherService->validateVoucherForSubscription(
+                    $code,
+                    $planId,
+                    $userId
+                );
+
+                if ($result->valid) {
+                    Session::put('applied_voucher_code', [
+                        'discount' => $result->discount,
+                        'voucher_id' => $result->voucher->id,
+                        'code' => $code,
+                        'type' => 'subscription'
+                    ]);
+
+                    return $this->jsonResponse([
+                        'valid' => true,
+                        'message' => 'Voucher applied successfully',
+                        'discount' => $result->discount,
+                        'final_price' => $result->finalPrice,
+                        'voucher_id' => $result->voucher->id,
+                        'voucher' => $result->voucher->toArray()
+                    ]);
+                }
+
+                return $this->jsonResponse([
+                    'valid' => false,
+                    'message' => $result->message,
+                    'discount' => 0
+                ]);
+            }
+
             $result = $this->voucherService->validateVoucher($code, $orderValue, $userId, $productId);
+
+            if ($result['valid'] === true) {
+                Session::put('applied_voucher_code', ['discount' => $result['discount'], 'voucher_id' => $result['voucher_id'], 'code' => $code]);
+
+//                $result = $this->voucherService->applyVoucher(
+//                    $result['voucher_id'],
+//                    $request->input('user_id') ?? null,
+//                    $request->input('discount_amount') ?? 0,
+//                    $request->input('order_id') ?? null
+//                );
+            }
 
             return $this->jsonResponse($result);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
+    }
+
+    public function removeVoucher()
+    {
+        Session::forget('applied_voucher_code');
+
+        return $this->jsonResponse(['success' => true]);
     }
 
     public function apply(int $id, Request $request): JsonResponse

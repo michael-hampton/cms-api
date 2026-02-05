@@ -630,6 +630,51 @@
             padding-bottom: 0;
             border: none;
         }
+
+        .saved-card {
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .saved-card:hover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .saved-card input[type="radio"] {
+            flex-shrink: 0;
+        }
+
+        .saved-card .card-details {
+            flex: 1;
+        }
+
+        .saved-card .card-brand {
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .saved-card .card-number {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .saved-card .card-expiry {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .saved-card.selected {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
     </style>
 </head>
 <body>
@@ -894,6 +939,32 @@
                         </div>
                     </div>
 
+                    <!-- Saved Payment Methods -->
+                    <div class="form-section" id="saved-cards-section" style="display: none;">
+                        <h2 class="section-title">Saved Payment Methods</h2>
+                        <div id="saved-cards-list"></div>
+                        <button type="button" onclick="showNewCardForm()" class="btn btn-secondary">
+                            Use Different Card
+                        </button>
+                    </div>
+
+                    <!-- Card Details Section (modify existing) -->
+                    <div class="form-section" id="new-card-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Card Details</h2>
+                            <button type="button" id="back-to-saved-cards-btn" onclick="showSavedCards()"
+                                    class="btn btn-secondary" style="display: none; width: auto; padding: 0.5rem 1rem;">
+                                ← Back to Saved Cards
+                            </button>
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Card Information <span class="required">*</span></label>
+                            <div id="card-element"
+                                 style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem;"></div>
+                            <div id="card-errors" class="form-error" role="alert"></div>
+                        </div>
+                    </div>
+
                     <!-- Order Notes -->
                     <div class="form-section">
                         <h2 class="section-title">Order Notes (Optional)</h2>
@@ -916,6 +987,7 @@
                     <?php
                     // Group items by merchant
                     $itemsByMerchant = [];
+
                     foreach ($items as $item) {
                         $merchantId = $item['options']['merchant_id'] ?? 0;
                         $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
@@ -956,6 +1028,11 @@
                                     <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
                                 </div>
                                 <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
+
+                                <?php if (!empty($item['options']['subscription_plan_id'])): ?>
+                                    <input type="hidden" name="plan_id"
+                                           value="<?= $item['options']['subscription_plan_id'] ?>">
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                         <?php endforeach; ?>
@@ -966,19 +1043,21 @@
                         <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Voucher Code</h4>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="voucher-input" placeholder="Enter code"
-                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
+                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;"
+                                   value="<?= htmlspecialchars($_SESSION['applied_voucher_code']['code'] ?? '') ?>">
                             <button onclick="applyVoucher()" class="btn btn-secondary"
                                     style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
                             </button>
                         </div>
                         <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
                         <div id="applied-voucher"
-                             style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
+                             style="<?= !empty($_SESSION['applied_voucher_code']) ? 'display: block;' : 'display: none;' ?> margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <strong id="voucher-code-display" style="color: #065f46;"></strong>
                                     <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
-                                        Discount: <span id="voucher-discount-display"></span>
+                                        Discount: <span
+                                                id="voucher-discount-display"><?= htmlspecialchars($_SESSION['applied_voucher_code']['discount'] ?? '') ?></span>
                                     </p>
                                 </div>
                                 <button onclick="removeVoucher()"
@@ -994,11 +1073,16 @@
 
                     <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
                         <span>Discount:</span>
-                        <span id="discount-amount">-$0.00</span>
+                        <span id="discount-amount"><?= htmlspecialchars($_SESSION['applied_voucher_code']['discount'] ?? '') ?></span>
                     </div>
 
                     <?php
                     $finalTotal = $subtotal + $tax + $shipping;
+
+                    if (!empty($_SESSION['applied_voucher_code'])) {
+                        $finalTotal -= $_SESSION['applied_voucher_code']['discount'];
+                    }
+
                     ?>
 
                     <div class="summary-row">
@@ -1007,7 +1091,7 @@
                     </div>
                     <div class="summary-row">
                         <span>Shipping:</span>
-                        <span id="shipping"><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 'Free' ?></span>
+                        <span id="shipping"><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 0 ?></span>
                     </div>
                     <div class="summary-row">
                         <span>Tax (10%):</span>
@@ -1066,7 +1150,7 @@
     let isLoggedIn = false;
     let currentMember = null;
     let selectedAddressId = null;
-    let appliedVoucher = null;
+    let appliedVoucher = <?= json_encode($_SESSION['applied_voucher_code'] ?? null) ?>;
 
     let stripe = null;
     let elements = null;
@@ -1077,10 +1161,105 @@
     let orderId = null;
     let isOneTimeSubscription = false;
 
+    let savedCards = [];
+    let selectedCardId = null;
+
     // Check if cart has one-time subscription
     function checkCartForSubscription() {
         const urlParams = new URLSearchParams(window.location.search);
         isOneTimeSubscription = urlParams.get('type') === 'subscription';
+    }
+
+    async function loadSavedCards() {
+        if (!isLoggedIn || !currentMember) return;
+
+        try {
+            const response = await fetch(`/api/${SITE}/member/payment-methods`);
+            const data = await response.json();
+
+            if (data.success && data.data.payment_methods && data.data.payment_methods.length > 0) {
+                savedCards = data.data.payment_methods;
+                displaySavedCards();
+            }
+        } catch (error) {
+            console.error('Failed to load saved cards:', error);
+        }
+    }
+
+    function displaySavedCards() {
+        const container = document.getElementById('saved-cards-list');
+        const section = document.getElementById('saved-cards-section');
+
+        container.innerHTML = savedCards.map(card => `
+        <label class="saved-card ${card.id === selectedCardId ? 'selected' : ''}"
+               for="card-${card.id}">
+            <input type="radio" name="saved_card" value="${card.id}"
+                   id="card-${card.id}" onchange="selectSavedCard('${card.id}')">
+            <div class="card-details">
+                <div class="card-brand">${card.card.brand}</div>
+                <div class="card-number">•••• •••• •••• ${card.card.last4}</div>
+                <div class="card-expiry">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
+            </div>
+        </label>
+    `).join('');
+
+        section.style.display = 'block';
+
+        // Hide new card form initially
+        const newCardSection = document.getElementById('new-card-section');
+        if (newCardSection) {
+            newCardSection.style.display = 'none';
+        }
+    }
+
+    function selectSavedCard(cardId) {
+        selectedCardId = cardId;
+
+        // Update UI
+        document.querySelectorAll('.saved-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.getElementById(`card-${cardId}`).closest('.saved-card').classList.add('selected');
+    }
+
+    function showNewCardForm() {
+        selectedCardId = null;
+
+        const savedCardsSection = document.getElementById('saved-cards-section');
+        if (savedCardsSection) {
+            savedCardsSection.style.display = 'none';
+        }
+
+        const newCardSection = document.getElementById('new-card-section');
+        if (newCardSection) {
+            newCardSection.style.display = 'block';
+        }
+
+        const backBtn = document.getElementById('back-to-saved-cards-btn');
+        if (backBtn) {
+            backBtn.style.display = 'block';
+        }
+
+        document.querySelectorAll('[name="saved_card"]').forEach(radio => radio.checked = false);
+    }
+
+    function showSavedCards() {
+        selectedCardId = null;
+
+        const savedCardsSection = document.getElementById('saved-cards-section');
+        if (savedCardsSection) {
+            savedCardsSection.style.display = 'block';
+        }
+
+        const newCardSection = document.getElementById('new-card-section');
+        if (newCardSection) {
+            newCardSection.style.display = 'none';
+        }
+
+        const backBtn = document.getElementById('back-to-saved-cards-btn');
+        if (backBtn) {
+            backBtn.style.display = 'none';
+        }
     }
 
     // Initialize Stripe
@@ -1144,7 +1323,12 @@
                 if (data.member) {
                     isLoggedIn = true;
                     currentMember = data.member;
-                    loadSavedAddresses();
+
+                    if (requiresShipping) {
+                        loadSavedAddresses();
+                    }
+
+                    loadSavedCards();
                 }
             }
         } catch (error) {
@@ -1373,23 +1557,31 @@
             }
 
             const responseData = result.data;
-
             clientSecret = responseData.client_secret;
             subscriptionId = responseData.subscription_ids || responseData.subscription_id; // Handle both
             orderId = responseData.order_id;
 
-            // Confirm payment with Stripe
-            const {error, paymentIntent} = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: {
-                    card: cardElement,
-                    billing_details: {
-                        name: `${data.first_name} ${data.last_name}`,
-                        email: data.email,
-                        phone: data.phone,
+            if (selectedCardId) {
+                // Use saved card
+                paymentResult = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: selectedCardId,
+                });
+            } else {
+                // Use new card
+                paymentResult = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: {
+                            name: `${data.first_name} ${data.last_name}`,
+                            email: data.email,
+                            phone: data.phone,
+                        },
                     },
-                },
-                setup_future_usage: 'off_session',
-            });
+                    setup_future_usage: 'off_session',
+                });
+            }
+
+            const {error, paymentIntent} = paymentResult;
 
             if (error) {
                 showAlert(error.message, 'error');
@@ -1472,17 +1664,28 @@
             const clientSecret = result.stripe_contexts.__system__.client_secret;
             const orderId = result.checkout_id;
 
-            // Confirm payment with Stripe
-            const {error, paymentIntent} = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: {
-                    card: cardElement,
-                    billing_details: {
-                        name: `${data.first_name} ${data.last_name}`,
-                        email: data.email,
-                        phone: data.phone,
+            let paymentResult;
+
+            if (selectedCardId) {
+                // Use saved card
+                paymentResult = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: selectedCardId,
+                });
+            } else {
+                // Use new card
+                paymentResult = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: {
+                            name: `${data.first_name} ${data.last_name}`,
+                            email: data.email,
+                            phone: data.phone,
+                        },
                     },
-                },
-            });
+                });
+            }
+
+            const {error, paymentIntent} = paymentResult;
 
             if (error) {
                 showAlert(error.message, 'error');
@@ -1580,32 +1783,53 @@
     }
 
     async function applyVoucher() {
-        const code = document.getElementById('voucher-input').value.trim();
-        const messageEl = document.getElementById('voucher-message');
-
-        if (!code) {
-            messageEl.textContent = 'Please enter a voucher code';
-            messageEl.style.color = 'var(--danger-color)';
+        const voucherCode = document.getElementById('voucher-input').value.trim();
+        if (!voucherCode) {
+            showVoucherMessage('Please enter a voucher code', 'error');
             return;
         }
+
+        // Detect if this is a subscription checkout
+        const isSubscription = window.location.search.includes('type=subscription') ||
+            document.querySelector('[name="plan_id"]');
+
+        const requestBody = {
+            code: voucherCode,
+            is_subscription: !!isSubscription
+        };
+
+        // Add plan_id if this is a subscription
+        if (isSubscription) {
+            const planIdInput = document.querySelector('[name="plan_id"]');
+            if (planIdInput) {
+                requestBody.plan_id = parseInt(planIdInput.value);
+            } else {
+                // Try to get from cart items
+                const cartItems = getCartItems(); // You'll need to implement this
+                if (cartItems.length > 0 && cartItems[0].subscription_plan_id) {
+                    requestBody.plan_id = cartItems[0].subscription_plan_id;
+                }
+            }
+        }
+
+        const messageEl = document.getElementById('voucher-message');
 
         try {
             const response = await fetch(`${API_BASE}/vouchers/validate`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    code: code,
-                    order_value: INITIAL_SUBTOTAL
-                })
+                body: JSON.stringify(requestBody)
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.data.valid) {
+            console.log('result', result.data)
+
+            if (result.data.valid) {
                 appliedVoucher = {
-                    code: code,
-                    discount: data.data.discount,
-                    voucher_id: data.data.voucher_id
+                    code: voucherCode,
+                    discount: result.data.discount,
+                    voucher_id: result.data.voucher_id
                 };
 
                 displayAppliedVoucher();
@@ -1617,18 +1841,29 @@
                 messageEl.style.color = 'var(--danger-color)';
             }
         } catch (error) {
-            console.error('Error applying voucher:', error);
-            messageEl.textContent = 'Failed to apply voucher';
-            messageEl.style.color = 'var(--danger-color)';
+            console.error('Error:', error);
+            showVoucherMessage('Error applying voucher', 'error');
         }
     }
 
-    function removeVoucher() {
-        appliedVoucher = null;
-        document.getElementById('applied-voucher').style.display = 'none';
-        document.getElementById('discount-row').style.display = 'none';
-        updateTotals();
-        showAlert('Voucher removed', 'success');
+    async function removeVoucher() {
+        try {
+            const response = await fetch(`${API_BASE}/vouchers/remove-voucher`, {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                appliedVoucher = null;
+                document.getElementById('applied-voucher').style.display = 'none';
+                document.getElementById('discount-row').style.display = 'none';
+                updateTotals();
+                showAlert('Voucher removed', 'success');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
     }
 
     function updateTotals() {
@@ -1648,14 +1883,13 @@
     // Update the place order button click handler to include voucher
     // Modify the existing place order handler to add:
     if (appliedVoucher) {
-        data.voucher_code = appliedVoucher.code;
-        data.voucher_id = appliedVoucher.voucher_id;
-        data.discount_amount = appliedVoucher.discount;
+        //data.voucher_code = appliedVoucher.code;
+        //data.voucher_id = appliedVoucher.voucher_id;
+        //data.discount_amount = appliedVoucher.discount;
     }
 
-    if (requiresShipping) {
-        checkLoginStatus();
-    }
+    checkLoginStatus();
+
     checkForAppliedVoucher();
     //loadWishlistCount();
     checkCartForSubscription();

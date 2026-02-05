@@ -68,7 +68,7 @@ class CartRepository extends Repository
         return $sum !== null ? (int)$sum : 0; // Handle null case
     }
 
-    public function findById(int $id, ?int $userId, string $sessionId): ?Model
+    public function findById(int $id, ?int $userId, ?string $sessionId = null): ?Model
     {
         $query = $this->model->query()
             ->where('id', $id);

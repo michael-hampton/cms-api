@@ -67,11 +67,12 @@ class OneTimeSubscriptionService
         int    $siteId,
         ?int   $voucherId = null,
         float   $discountAmount = 0,
-        ?string $status = null
+        ?string $status = null,
+        ?string $selectedStartDate = null
     ): Subscription
     {
         return $this->database->transaction(function () use (
-            $memberId, $planId, $deliveryType, $siteId, $voucherId, $discountAmount
+            $memberId, $planId, $deliveryType, $siteId, $voucherId, $discountAmount, $status, $selectedStartDate
         ) {
             $plan = $this->planRepository->find($planId);
 
@@ -89,7 +90,7 @@ class OneTimeSubscriptionService
             }
 
             // ALWAYS use a consistent domain date as the base for all calculations
-            $startDate = new \DateTime();
+            $startDate = $selectedStartDate ? new \DateTime($selectedStartDate) : new \DateTime();
             $startDate->setTime(0, 0, 0); // Normalize to midnight for consistency
 
             $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
@@ -127,6 +128,7 @@ class OneTimeSubscriptionService
         $endDate = clone $startDate;
 
         return match ($period) {
+            'monthly' => $endDate->modify('+1 month'),
             'yearly' => $endDate->modify('+1 year'),
             '2year' => $endDate->modify('+2 years'),
             default => $endDate->modify('+1 year')

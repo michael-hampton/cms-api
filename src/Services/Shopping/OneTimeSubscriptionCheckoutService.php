@@ -26,6 +26,7 @@ class OneTimeSubscriptionCheckoutService
     {
         // 1. Validate cart has subscriptions
         $subscriptionItems = $this->getSubscriptionItems();
+
         if (empty($subscriptionItems)) {
             return [
                 'success' => false,

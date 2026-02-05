@@ -107,13 +107,14 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->subscriptionService->shouldReceive('createOneTimeSubscription')
             ->once()
             ->with(
-                Mockery::any(),
-                Mockery::any(),
-                Mockery::any(),
-                Mockery::any(),
-                Mockery::any(),
-                Mockery::any(),
-                SubscriptionStatus::PENDING->value
+                123,
+                1,
+                'digital',
+                1,
+                null,
+                0,
+                SubscriptionStatus::PENDING->value,
+                null
             )
             ->andReturn($this->createMockSubscription());
 

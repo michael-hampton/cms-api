@@ -32,6 +32,7 @@ use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberController;
 use App\Controllers\Members\MemberAddressController;
+use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Offers\DealsController;
@@ -596,7 +597,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/vouchers/{id}/check-delete', VoucherController::class, 'checkDelete');
         $router->get('/vouchers/{id}/alternatives', VoucherController::class, 'alternatives');
         $router->post('/vouchers/{id}/duplicate', VoucherController::class, 'duplicate');
-        $router->post('/vouchers/validate', VoucherController::class, 'validate');
+        $router->post('/vouchers/validate', [VoucherController::class, 'validate']);
         $router->post('/vouchers/{id}/apply', VoucherController::class, 'apply');
         $router->get('/vouchers/{id}/redemptions', VoucherController::class, 'redemptions');
         $router->post('/vouchers/bulk-status', [VoucherController::class, 'bulkUpdateStatus']);
@@ -720,6 +721,10 @@ $router->post('/api/price-alerts', [DealsController::class, 'createPriceAlert'])
 $router->post('/api/deal-alerts/subscribe', [DealsController::class, 'subscribeDealAlert']);
 
 $router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalController::class, 'markShown']);
+
+$router->get('/api/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'getPaymentMethodsForMember']);
+$router->put('/api/{site}/cart/{id}/update-start-date', [CartController::class, 'updateStartDate']);
+$router->post('/api/{site}/vouchers/remove-voucher', VoucherController::class, 'removeVoucher');
 
 
 

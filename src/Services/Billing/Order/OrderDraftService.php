@@ -6,12 +6,14 @@ use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
+use App\Services\Billing\TaxCalculatorService;
 
 class OrderDraftService
 {
     public function __construct(
         private readonly OrderCreationService $orderCreationService,
         private readonly OrderRepository      $orderRepository,
+        private readonly TaxCalculatorService $taxCalculatorService,
         private readonly Database             $database
     )
     {
@@ -32,7 +34,6 @@ class OrderDraftService
         $totalSubtotalCents = 0;
         $totalShippingCents = 0;
         $totalDiscountCents = 0;
-        $totalTaxCents = 0;
 
         // Build order items and calculate totals
         foreach ($subscriptionsWithPricing as $subData) {
@@ -59,18 +60,34 @@ class OrderDraftService
             ];
         }
 
-        // Calculate order-level tax (FIXED: division by zero protection)
-        $taxBase = $totalSubtotalCents + $totalShippingCents;
-        $taxRatio = 0.10; // This should come from tax service
-        $totalTaxCents = $taxBase > 0 ? (int)round($taxBase * $taxRatio) : 0;
+        $country = $checkoutData['country'] ?? 'GB';
+        $state = $checkoutData['state'] ?? null;
+        $postalCode = $checkoutData['postal_code'] ?? null;
 
-        // Distribute tax proportionally to items
-        if ($totalTaxCents > 0 && $taxBase > 0) {
+        $taxResult = $this->taxCalculatorService->calculateOrderTax(
+            $totalSubtotalCents,
+            $totalShippingCents,
+            $country,
+            $state,
+            $postalCode,
+            $member
+        );
+
+        $totalTaxCents = $taxResult['tax_cents'];
+
+        // Distribute tax proportionally to items using TaxCalculatorService
+        if ($totalTaxCents > 0) {
+            $orderItems = $this->taxCalculatorService->distributeTaxToItems(
+                $orderItems,
+                $totalTaxCents
+            );
+
+            // Update item totals after tax distribution
             foreach ($orderItems as &$item) {
-                $itemBaseCents = (int)round(($item['subtotal'] + ($item['metadata']['delivery_type'] === 'print' ? $item['total'] - $item['subtotal'] : 0)) * 100);
-                $itemTaxCents = (int)round($itemBaseCents * ($totalTaxCents / $taxBase));
-                $item['tax'] = $itemTaxCents / 100;
-                $item['total'] = $item['subtotal'] + ($item['total'] - $item['subtotal']) + $item['tax'];
+                $item['total'] = $item['subtotal'] + $item['tax'] +
+                    ($item['metadata']['delivery_type'] === 'print'
+                        ? ($item['total'] - $item['subtotal'])
+                        : 0);
             }
         }
 

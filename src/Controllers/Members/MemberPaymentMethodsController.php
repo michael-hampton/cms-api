@@ -6,17 +6,13 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 
 class MemberPaymentMethodsController extends Controller
 {
-    private StripePaymentProcessor $stripeProcessor;
-
-    public function __construct(PaymentRepository $paymentRepository)
+    public function __construct(private readonly StripePaymentProcessor $stripePaymentProcessor)
     {
         parent::__construct();
-        $this->stripeProcessor = new StripePaymentProcessor($paymentRepository);
     }
 
     public function index()
@@ -28,10 +24,10 @@ class MemberPaymentMethodsController extends Controller
         $member = MemberAuth::getMember();
 
         // Get payment methods from Stripe via processor
-        $result = $this->stripeProcessor->getCustomerPaymentMethods($member);
+        $result = $this->stripePaymentProcessor->getCustomerPaymentMethods($member);
 
         // Get warnings for expiring/expired cards
-        $warningsResult = $this->stripeProcessor->getPaymentMethodsWithWarnings($member, $result);
+        $warningsResult = $this->stripePaymentProcessor->getPaymentMethodsWithWarnings($member, $result);
 
         return $this->view('member/subscriptions/payment-methods', [
             'member' => $member,
@@ -41,6 +37,13 @@ class MemberPaymentMethodsController extends Controller
             'warnings' => $warningsResult['warnings'] ?? [],
             'hasWarnings' => $warningsResult['has_warnings'] ?? false
         ]);
+    }
+
+    public function getPaymentMethodsForMember()
+    {
+        $result = $this->stripePaymentProcessor->getCustomerPaymentMethods(MemberAuth::getMember());
+
+        return $this->jsonResponse(['payment_methods' => $result['payment_methods'] ?? '']);
     }
 
     public function store(Request $request)
@@ -53,7 +56,7 @@ class MemberPaymentMethodsController extends Controller
         $paymentMethodId = $request->input('payment_method_id');
         $setDefault = $request->input('set_default', false);
 
-        $result = $this->stripeProcessor->addPaymentMethod($member, $paymentMethodId, $setDefault);
+        $result = $this->stripePaymentProcessor->addPaymentMethod($member, $paymentMethodId, $setDefault);
 
         if ($result['success']) {
             return $this->jsonResponse([
@@ -80,7 +83,7 @@ class MemberPaymentMethodsController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'No customer found'], 404);
         }
 
-        $result = $this->stripeProcessor->setDefaultPaymentMethod($member->stripe_customer_id, $paymentMethodId);
+        $result = $this->stripePaymentProcessor->setDefaultPaymentMethod($member->stripe_customer_id, $paymentMethodId);
 
         if ($result['success']) {
             return $this->jsonResponse([
@@ -103,7 +106,7 @@ class MemberPaymentMethodsController extends Controller
 
         $member = MemberAuth::getMember();
 
-        $result = $this->stripeProcessor->removePaymentMethod($member, $paymentMethodId);
+        $result = $this->stripePaymentProcessor->removePaymentMethod($member, $paymentMethodId);
 
         if ($result['success']) {
             return $this->jsonResponse([
@@ -138,7 +141,7 @@ class MemberPaymentMethodsController extends Controller
         }
 
         // First, remove the old payment method
-        $removeResult = $this->stripeProcessor->removePaymentMethod($member, $paymentMethodId);
+        $removeResult = $this->stripePaymentProcessor->removePaymentMethod($member, $paymentMethodId);
 
         if (!$removeResult['success']) {
             return $this->jsonResponse([
@@ -148,7 +151,7 @@ class MemberPaymentMethodsController extends Controller
         }
 
         // Then add the new payment method
-        $addResult = $this->stripeProcessor->addPaymentMethod($member, $newPaymentMethodId, $setDefault);
+        $addResult = $this->stripePaymentProcessor->addPaymentMethod($member, $newPaymentMethodId, $setDefault);
 
         if ($addResult['success']) {
             return $this->jsonResponse([
