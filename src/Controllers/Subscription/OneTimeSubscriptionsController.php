@@ -23,7 +23,7 @@ class OneTimeSubscriptionsController extends Controller
     public function index()
     {
         $siteId = SiteContext::getId();
-        $plans = $this->subscriptionService->getOneTimePlans($siteId);
+        $plans = $this->subscriptionService->getOneTimePlansCatalog($siteId);
 
         return $this->view('subscriptions/onetime/index', [
             'plans' => $plans,
@@ -103,7 +103,7 @@ class OneTimeSubscriptionsController extends Controller
 
         $subscriptions = [];
         foreach ($subscriptionIds as $id) {
-            $details = $this->subscriptionService->getSubscriptionWithDetails($id);
+            $details = $this->subscriptionService->getSubscriptionSummary($id);
             if ($details) {
                 $subscriptions[] = $details;
             }
@@ -120,7 +120,7 @@ class OneTimeSubscriptionsController extends Controller
 
     public function show(int $id)
     {
-        $details = $this->subscriptionService->getSubscriptionWithDetails($id);
+        $details = $this->subscriptionService->getSubscriptionSummary($id);
 
         if (!$details) {
             return $this->redirect('/');

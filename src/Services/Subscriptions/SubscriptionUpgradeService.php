@@ -4,10 +4,8 @@ namespace App\Services\Subscriptions;
 
 use App\Exceptions\Subscriptions\InactiveSubscriptionException;
 use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
-use App\Exceptions\Subscriptions\MissingStripePriceException;
 use App\Exceptions\Subscriptions\PaymentFailedException;
 use App\Exceptions\Subscriptions\PlanMismatchException;
-use App\Exceptions\Subscriptions\StripeUpdateFailedException;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Exceptions\Subscriptions\UnauthorizedException;
 use App\Exceptions\Subscriptions\UpgradeFailedException;
@@ -19,64 +17,22 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
-use App\Services\Subscriptions\ValueObjects\UpgradeQuote;
+use App\Services\Subscriptions\Calculators\UpgradeProrationCalculator;
 use App\Services\ValueObjects\Money;
 
 class SubscriptionUpgradeService
 {
-    private readonly array $benefitMap;
     public function __construct(
-        private readonly SubscriptionRepository     $subscriptionRepository,
+        private readonly SubscriptionRepository           $subscriptionRepository,
         private readonly SubscriptionPlanRepository $planRepository,
-        private readonly StripePaymentProcessor     $stripeProcessor,
+        private readonly StripePaymentProcessor           $stripeProcessor,
         private readonly Database $database,
-        array                     $benefitMap = []
+        private readonly UpgradeProrationCalculator       $prorationCalculator,
+        private readonly StripeSubscriptionUpgradeService $stripeUpgradeService,
+        private readonly PremiumAccessGrantService        $premiumAccessService,
+        private readonly UpgradeBenefitsService           $benefitsService,
     )
     {
-        $this->benefitMap = !empty($benefitMap) ? $benefitMap : $this->getDefaultBenefitMap();
-    }
-
-    /**
-     * Calculate upgrade quote with proration
-     * NOTE: For Stripe subscriptions, this is an ESTIMATE only.
-     * Actual charges may differ based on Stripe's proration calculation.
-     */
-    private function calculateUpgradeQuote(
-        Subscription     $subscription,
-        SubscriptionPlan $upgradePlan
-    ): UpgradeQuote
-    {
-        $currentPrice = Money::fromDecimal($subscription->price, $subscription->currency);
-        $upgradePrice = Money::fromDecimal($upgradePlan->price, $subscription->currency);
-        $priceDifference = $upgradePrice->subtract($currentPrice);
-
-        $remainingDays = null;
-        $isProrated = false;
-
-        // Calculate proration for recurring Stripe subscriptions
-        if ($subscription->hasStripeSubscription() && $subscription->next_billing_date) {
-            $now = new \DateTime();
-            $nextBilling = $subscription->next_billing_date;
-
-            $totalDays = $subscription->start_date->diff($nextBilling)->days;
-            $remainingDays = $now->diff($nextBilling)->days;
-
-            if ($totalDays > 0 && $remainingDays > 0) {
-                // Prorated difference based on remaining time
-                $prorationFactor = $remainingDays / $totalDays;
-                $priceDifference = $priceDifference->multiply($prorationFactor);
-                $isProrated = true;
-            }
-        }
-
-        $finalAmount = $priceDifference->isPositive()
-            ? $priceDifference
-            : Money::fromCents(0, $subscription->currency);
-
-        // Mark as estimate for Stripe subscriptions since Stripe calculates independently
-        $isEstimate = $subscription->hasStripeSubscription();
-
-        return new UpgradeQuote($finalAmount, $isProrated, $remainingDays, $isEstimate);
     }
 
     /**
@@ -89,9 +45,9 @@ class SubscriptionUpgradeService
      * @throws PlanMismatchException
      */
     private function validateUpgrade(
-        ?Subscription     $subscription,
+        ?Subscription $subscription,
         ?SubscriptionPlan $upgradePlan,
-        array             $paymentData
+        array         $paymentData
     ): void
     {
         if (!$subscription) {
@@ -120,6 +76,10 @@ class SubscriptionUpgradeService
                 'Upgrade plan does not match current subscription'
             );
         }
+
+        if ($upgradePlan->id === $subscription->plan_id) {
+            throw new InvalidUpgradePlanException('Cannot upgrade to the same plan');
+        }
     }
 
     /**
@@ -130,15 +90,14 @@ class SubscriptionUpgradeService
     private function chargeForUpgrade(
         Subscription $subscription,
         SubscriptionPlan $upgradePlan,
-        Money        $amount,
-        array        $paymentData
+        Money $amount,
+        array $paymentData
     ): ?array
     {
         if (!$amount->isPositive()) {
             return null;
         }
 
-        // Create payment intent for the upgrade difference
         $result = $this->stripeProcessor->createPaymentIntent([
             'amount' => $amount->toDecimal(),
             'currency' => $subscription->currency,
@@ -166,10 +125,10 @@ class SubscriptionUpgradeService
      * @throws UpgradeFailedException
      */
     private function applyPlanChange(
-        int              $subscriptionId,
-        Subscription     $subscription,
+        int          $subscriptionId,
+        Subscription $subscription,
         SubscriptionPlan $upgradePlan,
-        Money            $priceDifference
+        Money        $priceDifference
     ): Model
     {
         $updated = $this->subscriptionRepository->update($subscriptionId, [
@@ -189,98 +148,6 @@ class SubscriptionUpgradeService
     }
 
     /**
-     * Grant premium access for upgraded plan
-     */
-    private function grantPremiumAccess(
-        Subscription     $subscription,
-        SubscriptionPlan $upgradePlan,
-        int              $subscriptionId
-    ): array
-    {
-        $premiumGrants = $upgradePlan->getPremiumAccessGrants();
-        $grantedAccess = [];
-
-        foreach ($premiumGrants as $grant) {
-            $access = $subscription->grantPremiumAccess(
-                $grant['type'],
-                $grant['identifier'],
-                $grant['expires_at'] ?? null
-            );
-            $grantedAccess[] = $access;
-
-            // Backward compatibility: Set digital access flag for insider
-            if ($grant['type'] === 'newsletter' && $grant['identifier'] === 'insider') {
-                $this->subscriptionRepository->update($subscriptionId, [
-                    'includes_digital_access' => true
-                ]);
-            }
-        }
-
-        return $grantedAccess;
-    }
-
-    /**
-     * Update Stripe subscription to new plan
-     *
-     * @throws MissingStripePriceException
-     * @throws StripeUpdateFailedException
-     */
-    private function updateStripeSubscription(
-        Subscription     $subscription,
-        SubscriptionPlan $upgradePlan
-    ): void
-    {
-        $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
-
-        if (!$stripeSubscriptionId || $_ENV['APP_ENV'] === 'testing') {
-            return; // No Stripe subscription, nothing to update
-        }
-
-        // Fail fast if Stripe price ID is missing
-        $priceId = $upgradePlan->stripe_price_id;
-        if (!$priceId) {
-            throw new MissingStripePriceException(
-                "Cannot upgrade: Plan '{$upgradePlan->name}' is missing Stripe price ID. " .
-                "Please contact support."
-            );
-        }
-
-        // Delegate to payment processor for all Stripe operations
-        $result = $this->stripeProcessor->updateSubscriptionPlan(
-            $stripeSubscriptionId,
-            $priceId,
-            [
-                'upgraded_at' => now_datetime()->format('Y-m-d H:i:s'),
-                'original_plan_id' => $subscription->plan_id,
-            ]
-        );
-
-        if (!$result['success']) {
-            throw new StripeUpdateFailedException(
-                "Failed to update Stripe subscription: " . ($result['error'] ?? 'Unknown error')
-            );
-        }
-
-        Logger::info("Stripe subscription updated for upgrade", [
-            'subscription_id' => $subscription->id,
-            'stripe_subscription_id' => $stripeSubscriptionId
-        ]);
-    }
-
-    /**
-     * Sync changes to external payment providers
-     */
-    private function syncExternalProviders(
-        Subscription     $subscription,
-        SubscriptionPlan $upgradePlan
-    ): void
-    {
-        if ($subscription->hasStripeSubscription()) {
-            $this->updateStripeSubscription($subscription, $upgradePlan);
-        }
-    }
-
-    /**
      * Preview upgrade costs and benefits
      */
     public function previewUpgrade(int $subscriptionId, int $upgradePlanId): array
@@ -297,7 +164,7 @@ class SubscriptionUpgradeService
             throw new InvalidUpgradePlanException('Upgrade plan not found');
         }
 
-        $quote = $this->calculateUpgradeQuote($subscription, $upgradePlan);
+        $quote = $this->prorationCalculator->calculateUpgradeQuote($subscription, $upgradePlan);
 
         return [
             'current_plan' => [
@@ -327,7 +194,7 @@ class SubscriptionUpgradeService
                     ? 'Final charge may differ based on Stripe proration calculation'
                     : null,
             ],
-            'benefits' => $this->getUpgradeBenefits($subscription, $upgradePlan),
+            'benefits' => $this->benefitsService->getUpgradeBenefits($subscription, $upgradePlan),
         ];
     }
 
@@ -335,7 +202,7 @@ class SubscriptionUpgradeService
      * Get available upgrade options for a subscription
      */
     public function getUpgradeOptions(
-        int     $subscriptionId,
+        int $subscriptionId,
         ?string $premiumType = null,
         ?string $premiumIdentifier = null
     ): array
@@ -356,7 +223,6 @@ class SubscriptionUpgradeService
             ];
         }
 
-        // Filter by specific premium type if requested
         if ($premiumType && $premiumIdentifier) {
             $availableUpgrades = array_filter($availableUpgrades, function ($upgrade) use ($premiumType, $premiumIdentifier) {
                 foreach ($upgrade['new_access'] as $access) {
@@ -379,7 +245,7 @@ class SubscriptionUpgradeService
         $options = [];
         foreach ($availableUpgrades as $upgrade) {
             $plan = $upgrade['plan'];
-            $quote = $this->calculateUpgradeQuote($subscription, $plan);
+            $quote = $this->prorationCalculator->calculateUpgradeQuote($subscription, $plan);
 
             $options[] = [
                 'plan_id' => $plan->id,
@@ -416,8 +282,8 @@ class SubscriptionUpgradeService
      * Process subscription upgrade with flexible premium access
      */
     public function upgradeSubscription(
-        int   $subscriptionId,
-        int   $upgradePlanId,
+        int $subscriptionId,
+        int $upgradePlanId,
         array $paymentData = []
     ): array
     {
@@ -434,10 +300,11 @@ class SubscriptionUpgradeService
             $this->validateUpgrade($subscription, $upgradePlan, $paymentData);
 
             // 2. Calculate upgrade cost
-            $quote = $this->calculateUpgradeQuote($subscription, $upgradePlan);
+            $quote = $this->prorationCalculator->calculateUpgradeQuote($subscription, $upgradePlan);
 
             // 3. Charge for upgrade
-            $paymentResult = $_ENV['APP_ENV'] === 'testing' ? true : $this->chargeForUpgrade(
+            $isTestEnv = ($_ENV['APP_ENV'] ?? 'production') === 'testing';
+            $paymentResult = $isTestEnv ? true : $this->chargeForUpgrade(
                 $subscription,
                 $upgradePlan,
                 $quote->getAmount(),
@@ -453,13 +320,13 @@ class SubscriptionUpgradeService
             );
 
             // 5. Grant premium access
-            $grantedAccess = $this->grantPremiumAccess(
+            $grantedAccess = $this->premiumAccessService->grantPremiumAccess(
                 $subscription,
                 $upgradePlan,
                 $subscriptionId
             );
 
-            // 6. Grant lower-tier plan access (explicit method call)
+            // 6. Grant lower-tier plan access
             $lowerTierAccess = $subscription->grantLowerTierPlans();
 
             return [
@@ -474,15 +341,11 @@ class SubscriptionUpgradeService
 
         // Phase 2: External provider sync (outside transaction)
         try {
-            $this->syncExternalProviders(
+            $this->stripeUpgradeService->updateSubscriptionPlan(
                 $transactionResult['subscription'],
                 $transactionResult['upgradePlan']
             );
-        } catch (MissingStripePriceException|StripeUpdateFailedException $e) {
-            // Rethrow critical errors that should fail the upgrade
-            throw $e;
         } catch (\Exception $e) {
-            // Log non-critical sync errors but don't fail - local state is committed
             Logger::error("External sync failed after successful upgrade", [
                 'subscription_id' => $subscriptionId,
                 'error' => $e->getMessage()
@@ -506,133 +369,6 @@ class SubscriptionUpgradeService
             'price_charged' => $transactionResult['quote']->getAmount()->toDecimal(),
             'payment_result' => $transactionResult['paymentResult'],
             'message' => 'Successfully upgraded subscription'
-        ];
-    }
-
-    /**
-     * Get upgrade benefits comparing access levels
-     */
-    private function getUpgradeBenefits(Subscription $subscription, SubscriptionPlan $upgradePlan): array
-    {
-        $benefits = [];
-
-        $currentAccess = $subscription->premiumAccess();
-        $newAccess = $upgradePlan->getPremiumAccessGrants();
-
-        $currentAccessKeys = $currentAccess->map(
-            fn($a) => $a->premium_type . ':' . $a->premium_identifier
-        )->toArray();
-
-        foreach ($newAccess as $access) {
-            $key = $access['type'] . ':' . $access['identifier'];
-
-            if (!in_array($key, $currentAccessKeys)) {
-                $benefits[] = $this->getBenefitForAccess($access['type'], $access['identifier']);
-            }
-        }
-
-        // Compare features
-        $currentFeatures = $subscription->plan ? $subscription->plan->features : [];
-        $upgradeFeatures = $upgradePlan->features;
-
-        $newFeatures = array_diff($upgradeFeatures ?? [], $currentFeatures ?? []);
-
-        foreach (array_slice($newFeatures, 0, 3) as $feature) {
-            $benefits[] = [
-                'icon' => '✨',
-                'title' => 'New Feature',
-                'description' => $feature
-            ];
-        }
-
-        return $benefits;
-    }
-
-    /**
-     * Get benefit description for premium access type from configuration
-     */
-    private function getBenefitForAccess(string $type, string $identifier): array
-    {
-        $key = $type . ':' . $identifier;
-
-        // Use configured benefit map with fallback
-        $benefitMap = !empty($this->benefitMap) ? $this->benefitMap : config('subscription_benefits', []);
-
-        return $benefitMap[$key] ?? [
-            'icon' => '⭐',
-            'title' => ucfirst($identifier),
-            'description' => 'Premium ' . $type . ' access'
-        ];
-    }
-
-    private function getDefaultBenefitMap(): array
-    {
-        return [
-            'newsletter:insider' => [
-                'icon' => '🔓',
-                'title' => 'Unlock Insider Newsletter',
-                'description' => 'Immediate access to all premium Insider articles and features'
-            ],
-            'newsletter:tech-weekly' => [
-                'icon' => '💻',
-                'title' => 'Tech Weekly Newsletter',
-                'description' => 'Weekly technology insights and analysis'
-            ],
-            'newsletter:business-brief' => [
-                'icon' => '📊',
-                'title' => 'Business Brief Newsletter',
-                'description' => 'Daily business news and market updates'
-            ],
-            'newsletter:politics-daily' => [
-                'icon' => '🏛️',
-                'title' => 'Politics Daily Newsletter',
-                'description' => 'In-depth political coverage and analysis'
-            ],
-            'newsletter:sports-insider' => [
-                'icon' => '⚽',
-                'title' => 'Sports Insider Newsletter',
-                'description' => 'Exclusive sports news and behind-the-scenes content'
-            ],
-            'archive:full' => [
-                'icon' => '📚',
-                'title' => 'Full Archive Access',
-                'description' => 'Access our complete digital archive of past issues'
-            ],
-            'archive:recent' => [
-                'icon' => '📰',
-                'title' => 'Recent Archive Access',
-                'description' => 'Access to articles from the past 12 months'
-            ],
-            'video:premium' => [
-                'icon' => '🎥',
-                'title' => 'Premium Video Content',
-                'description' => 'Exclusive video interviews and documentaries'
-            ],
-            'video:live-events' => [
-                'icon' => '📺',
-                'title' => 'Live Event Streaming',
-                'description' => 'Watch live coverage of exclusive events'
-            ],
-            'podcast:premium' => [
-                'icon' => '🎙️',
-                'title' => 'Premium Podcasts',
-                'description' => 'Ad-free listening and exclusive bonus episodes'
-            ],
-            'community:forum' => [
-                'icon' => '💬',
-                'title' => 'Community Forum Access',
-                'description' => 'Join discussions with other subscribers'
-            ],
-            'events:in-person' => [
-                'icon' => '🎫',
-                'title' => 'In-Person Events',
-                'description' => 'Invitations to exclusive subscriber events'
-            ],
-            'events:virtual' => [
-                'icon' => '🖥️',
-                'title' => 'Virtual Events',
-                'description' => 'Access to virtual Q&A sessions and webinars'
-            ],
         ];
     }
 }

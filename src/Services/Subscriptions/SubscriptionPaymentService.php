@@ -2,7 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
-use App\Enums\BillingPeriod;
+use App\Enums\Subscriptions\BillingPeriod;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Payment;

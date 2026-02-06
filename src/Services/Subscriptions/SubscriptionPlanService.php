@@ -2,6 +2,10 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\BillingPeriod;
+use App\Exceptions\Subscriptions\AlreadySubscribedException;
+use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
+use App\Exceptions\Subscriptions\PlanNotFoundException;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Subscription;
@@ -12,15 +16,18 @@ use App\Services\Vouchers\VoucherService;
 
 class SubscriptionPlanService
 {
+    private const ALLOWED_CURRENCIES = ['USD', 'EUR', 'GBP', 'AUD', 'CAD'];
+
     public function __construct(
         private readonly SubscriptionPlanRepository $planRepository,
         private readonly SubscriptionRepository $subscriptionRepository,
-        private readonly VoucherService         $voucherService
+        private readonly VoucherService                 $voucherService,
+        private readonly SubscriptionEligibilityService $eligibilityService
     )
     {
     }
 
-    public function getAvailablePlans(int $siteId): Collection
+    public function getActivePlansForSite(int $siteId): Collection
     {
         return $this->planRepository->getActivePlans($siteId);
     }
@@ -52,7 +59,6 @@ class SubscriptionPlanService
         if (isset($data['name'])) {
             $prepared['name'] = $data['name'];
 
-            // Auto-generate slug if not provided
             if (empty($data['slug'])) {
                 $prepared['slug'] = $this->generateSlug($data['name']);
             }
@@ -67,19 +73,45 @@ class SubscriptionPlanService
         }
 
         if (isset($data['price'])) {
-            $prepared['price'] = (float)$data['price'];
+            $priceCents = is_float($data['price'])
+                ? (int)round($data['price'] * 100)
+                : (int)$data['price'];
+
+            if ($priceCents < 0) {
+                throw new \InvalidArgumentException('Price cannot be negative');
+            }
+
+            $prepared['price'] = $priceCents / 100;
         }
 
         if (isset($data['currency'])) {
-            $prepared['currency'] = strtoupper($data['currency']);
+            $currency = strtoupper($data['currency']);
+
+            if (!in_array($currency, self::ALLOWED_CURRENCIES)) {
+                throw new \InvalidArgumentException("Currency {$currency} is not supported");
+            }
+
+            $prepared['currency'] = $currency;
         }
 
         if (isset($data['billing_period'])) {
-            $prepared['billing_period'] = $data['billing_period'];
+            $billingPeriod = BillingPeriod::tryFrom($data['billing_period']);
+
+            if (!$billingPeriod) {
+                throw new \InvalidArgumentException("Invalid billing period: {$data['billing_period']}");
+            }
+
+            $prepared['billing_period'] = $billingPeriod->value;
         }
 
         if (isset($data['trial_days'])) {
-            $prepared['trial_days'] = (int)$data['trial_days'];
+            $trialDays = (int)$data['trial_days'];
+
+            if ($trialDays < 0) {
+                throw new \InvalidArgumentException('Trial days cannot be negative');
+            }
+
+            $prepared['trial_days'] = $trialDays;
         }
 
         if (isset($data['features'])) {
@@ -113,37 +145,59 @@ class SubscriptionPlanService
         return strtolower(trim(preg_replace('/[^a-z0-9-]+/', '-', $slug), '-'));
     }
 
-    public function updatePlan(int $planId, array $data): ?SubscriptionPlan
+    public function updatePlan(int $planId, array $data, int $siteId): ?SubscriptionPlan
     {
+        $existingPlan = $this->planRepository->find($planId);
+
+        if (!$existingPlan) {
+            throw new PlanNotFoundException("Plan with ID {$planId} not found");
+        }
+
+        if ($existingPlan->site_id !== $siteId) {
+            throw new \InvalidArgumentException('Cannot update plan from different site');
+        }
+
+        // Prevent slug changes if active subscriptions exist
+        if (isset($data['slug']) && $data['slug'] !== $existingPlan->slug) {
+            $activeCount = $this->planRepository->getSubscriberCount($planId);
+
+            if ($activeCount > 0) {
+                throw new PlanHasActiveSubscriptionsException(
+                    'Cannot change slug for plan with active subscriptions'
+                );
+            }
+        }
+
         $planData = $this->preparePlanData($data);
         return $this->planRepository->update($planId, $planData);
     }
 
     public function deletePlan(int $planId): bool
     {
-        // Check if plan has active subscriptions
         $activeCount = $this->planRepository->getSubscriberCount($planId);
 
         if ($activeCount > 0) {
-            throw new \Exception("Cannot delete plan with active subscriptions");
+            throw new PlanHasActiveSubscriptionsException(
+                "Cannot delete plan with {$activeCount} active subscriptions"
+            );
         }
 
         return $this->planRepository->delete($planId);
     }
 
     public function subscribeMemberToPlan(
-        int   $memberId,
-        int   $planId,
-        int   $siteId,
+        int $memberId,
+        int $planId,
+        int $siteId,
         array $paymentData = []
     ): Subscription
     {
-        // Check if member already has active subscription
-        if ($this->subscriptionRepository->hasActiveSubscriptionToPlan($memberId, $planId, $siteId, false)) {
-            throw new \Exception("Member already has an active subscription to this plan");
+        $eligibility = $this->eligibilityService->canMemberSubscribe($memberId, $planId, $siteId);
+
+        if (!$eligibility['can_subscribe']) {
+            throw new AlreadySubscribedException($eligibility['reason']);
         }
 
-        // Create subscription
         return $this->subscriptionRepository->createSubscription(
             $memberId,
             $planId,
@@ -154,37 +208,7 @@ class SubscriptionPlanService
 
     public function canMemberSubscribe(int $memberId, int $planId, int $siteId): array
     {
-        $plan = $this->planRepository->find($planId);
-
-        if (!$plan || !$plan->is_active) {
-            return [
-                'can_subscribe' => false,
-                'reason' => 'Plan not available'
-            ];
-        }
-
-        if ($this->subscriptionRepository->hasActiveSubscriptionToPlan($memberId, $planId, $siteId)) {
-            return [
-                'can_subscribe' => false,
-                'reason' => 'Already subscribed to this plan'
-            ];
-        }
-
-        // Check if member has any active subscription
-        $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($memberId, $siteId);
-
-        if ($activeSubscription) {
-            return [
-                'can_subscribe' => false,
-                'reason' => 'Already has an active subscription',
-                'current_plan' => $activeSubscription->plan_name
-            ];
-        }
-
-        return [
-            'can_subscribe' => true,
-            'plan' => $plan
-        ];
+        return $this->eligibilityService->canMemberSubscribe($memberId, $planId, $siteId);
     }
 
     public function getPlanWithStats(int $planId): array
@@ -192,7 +216,7 @@ class SubscriptionPlanService
         $plan = $this->planRepository->find($planId);
 
         if (!$plan) {
-            return [];
+            throw new PlanNotFoundException("Plan with ID {$planId} not found");
         }
 
         return [
@@ -237,24 +261,27 @@ class SubscriptionPlanService
     }
 
     public function subscribeMemberToPlanWithVoucher(
-        int     $memberId,
-        int     $planId,
-        int     $siteId,
+        int   $memberId,
+        int   $planId,
+        int   $siteId,
         ?string $voucherCode = null,
-        array   $paymentData = []
+        array $paymentData = []
     ): Subscription
     {
         $plan = $this->planRepository->find($planId);
 
         if (!$plan) {
-            throw new \Exception("Plan not found");
+            throw new PlanNotFoundException("Plan with ID {$planId} not found");
+        }
+
+        if (!$plan->is_active) {
+            throw new \InvalidArgumentException('Cannot subscribe to inactive plan');
         }
 
         $voucherId = null;
-        $discountAmount = 0;
-        $originalPrice = $plan->price;
+        $discountAmountCents = 0;
+        $originalPriceCents = (int)round($plan->price * 100);
 
-        // Validate and apply voucher
         if ($voucherCode) {
             $validation = $this->voucherService->validateVoucherForSubscription(
                 $voucherCode,
@@ -263,17 +290,22 @@ class SubscriptionPlanService
             );
 
             if (!$validation->valid) {
-                throw new \Exception($validation->message);
+                throw new \InvalidArgumentException($validation->message);
             }
 
             $voucherId = $validation->voucherId;
-            $discountAmount = $validation->discount;
+            $discountAmountCents = (int)round($validation->discount * 100);
+
+            // Ensure discount doesn't exceed price
+            if ($discountAmountCents > $originalPriceCents) {
+                $discountAmountCents = $originalPriceCents;
+            }
         }
 
         $subscriptionData = array_merge($paymentData, [
             'voucher_id' => $voucherId,
-            'discount_amount' => $discountAmount,
-            'original_price' => $originalPrice,
+            'discount_amount' => $discountAmountCents / 100,
+            'original_price' => $originalPriceCents / 100,
         ]);
 
         return $this->subscriptionRepository->createSubscription(

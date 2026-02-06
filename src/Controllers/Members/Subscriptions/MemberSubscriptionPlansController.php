@@ -28,7 +28,7 @@ class MemberSubscriptionPlansController extends Controller
     {
         $siteId = SiteContext::getId();
 
-        $plans = $this->planService->getAvailablePlans($siteId);
+        $plans = $this->planService->getActivePlansForSite($siteId);
 
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
         $currentSubscription = null;

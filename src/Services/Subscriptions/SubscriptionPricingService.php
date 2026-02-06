@@ -8,7 +8,7 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shopping\ShippingService;
 use App\Services\Vouchers\VoucherService;
 
-class SubscriptionPricingCalculator
+class SubscriptionPricingService
 {
     public function __construct(
         private readonly SubscriptionPlanRepository $planRepository,

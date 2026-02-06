@@ -12,7 +12,7 @@ class SubscriptionBatchFactory
 {
     public function __construct(
         private readonly OneTimeSubscriptionService    $subscriptionService,
-        private readonly SubscriptionPricingCalculator $pricingCalculator
+        private readonly SubscriptionPricingService $pricingCalculator
     )
     {
     }

@@ -3,12 +3,16 @@
 namespace App\Services\Shopping;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use Exception;
+use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
+use App\Services\Subscriptions\Calculators\SubscriptionPricingCalculator;
+use App\Services\Subscriptions\Validators\OneTimePlanValidator;
+use App\Services\ValueObjects\Money;
 
 class OneTimeSubscriptionService
 {
@@ -17,11 +21,14 @@ class OneTimeSubscriptionService
         private readonly SubscriptionPlanRepository $planRepository,
         private readonly Database                   $database,
         private readonly OrderRepository            $orderRepository,
+        private readonly OneTimePlanValidator          $validator,
+        private readonly SubscriptionDateCalculator    $dateCalculator,
+        private readonly SubscriptionPricingCalculator $pricingCalculator,
     )
     {
     }
 
-    public function getOneTimePlans(?int $siteId = null): array
+    public function getOneTimePlansCatalog(?int $siteId = null): array
     {
         $plans = $this->planRepository->getActivePlans($siteId)
             ->filter(fn($plan) => $plan->isOneTime());
@@ -61,51 +68,54 @@ class OneTimeSubscriptionService
     }
 
     public function createOneTimeSubscription(
-        int    $memberId,
-        int    $planId,
+        int                 $memberId,
+        int                 $planId,
         string $deliveryType,
-        int    $siteId,
-        ?int   $voucherId = null,
-        float   $discountAmount = 0,
-        ?string $status = null,
+        int                 $siteId,
+        ?int                $voucherId = null,
+        int                 $discountAmountCents = 0,
+        ?SubscriptionStatus $status = null,
         ?string $selectedStartDate = null
     ): Subscription
     {
         return $this->database->transaction(function () use (
-            $memberId, $planId, $deliveryType, $siteId, $voucherId, $discountAmount, $status, $selectedStartDate
+            $memberId,
+            $planId,
+            $deliveryType,
+            $siteId,
+            $voucherId,
+            $discountAmountCents,
+            $status,
+            $selectedStartDate
         ) {
             $plan = $this->planRepository->find($planId);
 
-            if (!$plan || !$plan->isOneTime()) {
-                throw new Exception('Invalid one-time subscription plan');
-            }
+            // Validate plan and delivery type
+            $this->validator->validatePlanForSubscription($plan, $deliveryType);
+            $billingPeriod = $this->validator->validateBillingPeriod($plan->billing_period);
 
-            // Validate delivery type
-            if ($deliveryType === 'digital' && !$plan->hasDigitalOption()) {
-                throw new Exception('Digital delivery not available for this plan');
-            }
+            // Calculate dates
+            $startDate = $this->dateCalculator->normalizeStartDate($selectedStartDate);
+            $endDate = $this->dateCalculator->calculateEndDate($startDate, $billingPeriod);
 
-            if ($deliveryType === 'print' && !$plan->hasPrintOption()) {
-                throw new Exception('Print delivery not available for this plan');
-            }
+            // Calculate pricing
+            $basePrice = Money::fromDecimal($plan->price, $plan->currency);
+            $discount = Money::fromCents($discountAmountCents, $plan->currency);
 
-            // ALWAYS use a consistent domain date as the base for all calculations
-            $startDate = $selectedStartDate ? new \DateTime($selectedStartDate) : new \DateTime();
-            $startDate->setTime(0, 0, 0); // Normalize to midnight for consistency
-
-            $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
+            $this->pricingCalculator->validateDiscount($basePrice, $discount);
+            $finalPrice = $this->pricingCalculator->calculateFinalPrice($basePrice, $discount);
 
             $subscriptionData = [
                 'member_id' => $memberId,
                 'site_id' => $siteId,
                 'plan_id' => $planId,
                 'plan_name' => $plan->name,
-                'status' => $status ?? SubscriptionStatus::PENDING->value,
+                'status' => ($status ?? SubscriptionStatus::PENDING)->value,
                 'start_date' => $startDate->format('Y-m-d H:i:s'),
                 'end_date' => $endDate->format('Y-m-d H:i:s'),
-                'price' => $plan->price - $discountAmount,
-                'original_price' => $plan->price,
-                'discount_amount' => $discountAmount,
+                'price' => $finalPrice->toDecimal(),
+                'original_price' => $basePrice->toDecimal(),
+                'discount_amount' => $discount->toDecimal(),
                 'voucher_id' => $voucherId,
                 'currency' => $plan->currency,
                 'auto_renew' => false,
@@ -123,29 +133,24 @@ class OneTimeSubscriptionService
         });
     }
 
-    private function calculateEndDate(\DateTime $startDate, string $period): \DateTime
-    {
-        $endDate = clone $startDate;
-
-        return match ($period) {
-            'monthly' => $endDate->modify('+1 month'),
-            'yearly' => $endDate->modify('+1 year'),
-            '2year' => $endDate->modify('+2 years'),
-            default => $endDate->modify('+1 year')
-        };
-    }
-
     public function activateSubscription(int $subscriptionId, int $orderId): void
     {
         $this->database->transaction(function () use ($subscriptionId, $orderId) {
             $subscription = $this->subscriptionRepository->find($subscriptionId);
 
             if (!$subscription) {
-                throw new Exception('Subscription not found');
+                throw new SubscriptionNotFoundException('Subscription not found');
+            }
+
+            // Enforce state transition: only PENDING can become ACTIVE
+            if ($subscription->status !== SubscriptionStatus::PENDING->value) {
+                throw new \InvalidArgumentException(
+                    "Cannot activate subscription with status: {$subscription->status}"
+                );
             }
 
             $this->subscriptionRepository->update($subscriptionId, [
-                'status' => 'active'
+                'status' => SubscriptionStatus::ACTIVE->value
             ]);
 
             // Link order to subscription
@@ -153,7 +158,7 @@ class OneTimeSubscriptionService
         });
     }
 
-    public function getSubscriptionWithDetails(int $subscriptionId): ?array
+    public function getSubscriptionSummary(int $subscriptionId): ?array
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
@@ -164,25 +169,56 @@ class OneTimeSubscriptionService
         $plan = $subscription->plan;
         $order = $subscription->order()->last();
 
-        // Calculate actual payment breakdown
-        $subtotal = $subscription->price;
-        $discount = $subscription->discount_amount ?? 0;
-        $shipping = 0;
-        $tax = 0;
-
+        // Use order data as source of truth for financials
         if ($order) {
-            $shipping = $order->shipping ?? 0;
-            $tax = $order->tax ?? 0;
-        } else {
-            // Fallback calculation if no order found
-            if ($subscription->delivery_type === 'print') {
-                $shipping = $subtotal >= 100 ? 0 : 10;
-            }
-            $taxableAmount = $subtotal - $discount + $shipping;
-            $tax = $taxableAmount * 0.1;
-        }
+            $subtotalCents = (int)round($subscription->price * 100);
+            $discountCents = (int)round(($subscription->discount_amount ?? 0) * 100);
+            $shippingCents = (int)round($order->shipping * 100);
+            $taxCents = (int)round($order->tax * 100);
+            $totalCents = $subtotalCents - $discountCents + $shippingCents + $taxCents;
 
-        $finalTotal = $subtotal - $discount + $shipping + $tax;
+            $breakdown = [
+                'subtotal_cents' => $subtotalCents,
+                'subtotal' => $subscription->price,
+                'discount_cents' => $discountCents,
+                'discount' => $subscription->discount_amount ?? 0,
+                'shipping_cents' => $shippingCents,
+                'shipping' => $order->shipping,
+                'tax_cents' => $taxCents,
+                'tax' => $order->tax,
+                'total_cents' => $totalCents,
+                'total' => $totalCents / 100,
+                'is_estimate' => false,
+            ];
+        } else {
+            // Estimated calculation when no order exists
+            $subtotalCents = (int)round($subscription->price * 100);
+            $discountCents = (int)round(($subscription->discount_amount ?? 0) * 100);
+
+            $shippingCents = 0;
+            if ($subscription->delivery_type === 'print') {
+                $shippingCents = $subscription->price >= 100 ? 0 : 1000; // $10.00
+            }
+
+            $taxableAmountCents = $subtotalCents - $discountCents + $shippingCents;
+            $taxCents = (int)round($taxableAmountCents * 0.1);
+
+            $totalCents = $subtotalCents - $discountCents + $shippingCents + $taxCents;
+
+            $breakdown = [
+                'subtotal_cents' => $subtotalCents,
+                'subtotal' => $subtotalCents / 100,
+                'discount_cents' => $discountCents,
+                'discount' => $discountCents / 100,
+                'shipping_cents' => $shippingCents,
+                'shipping' => $shippingCents / 100,
+                'tax_cents' => $taxCents,
+                'tax' => $taxCents / 100,
+                'total_cents' => $totalCents,
+                'total' => $totalCents / 100,
+                'is_estimate' => true,
+            ];
+        }
 
         return [
             'subscription' => $subscription->toArray(),
@@ -190,13 +226,7 @@ class OneTimeSubscriptionService
             'order' => $order ? $order->toArray() : null,
             'can_download' => $subscription->hasValidDownload(),
             'download_expires_at' => $subscription->download_expires_at?->format('Y-m-d H:i:s'),
-            'payment_breakdown' => [
-                'subtotal' => $subtotal,
-                'discount' => $discount,
-                'shipping' => $shipping,
-                'tax' => $tax,
-                'total' => $finalTotal
-            ]
+            'payment_breakdown' => $breakdown,
         ];
     }
 }

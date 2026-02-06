@@ -8,7 +8,7 @@ use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
-use App\Services\Subscriptions\SubscriptionPricingCalculator;
+use App\Services\Subscriptions\SubscriptionPricingService;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
@@ -128,7 +128,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         parent::setUp();
 
         $this->subscriptionService = Mockery::mock(OneTimeSubscriptionService::class);
-        $this->pricingCalculator = Mockery::mock(SubscriptionPricingCalculator::class);
+        $this->pricingCalculator = Mockery::mock(SubscriptionPricingService::class);
 
         $this->factory = new SubscriptionBatchFactory(
             $this->subscriptionService,

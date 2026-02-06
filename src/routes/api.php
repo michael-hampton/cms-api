@@ -52,8 +52,10 @@ use App\Controllers\Shopping\AddressController;
 use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\SiteController;
+use App\Controllers\Subscription\IssueDeliveryController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
+use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Vouchers\VoucherController;
 use App\Framework\Authorization\AuthenticateWithToken;
 
@@ -633,6 +635,24 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/addresses/{id}', [AddressController::class, 'destroy']);
         $router->post('/addresses/{id}/set-default', [AddressController::class, 'setDefault']);
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
+
+        // Issue Deliveries
+        $router->get('/issue-deliveries', [IssueDeliveryController::class, 'index']);
+        $router->post('/issue-deliveries', [IssueDeliveryController::class, 'store']);
+        $router->get('/issue-deliveries/search', [IssueDeliveryController::class, 'index']);
+        $router->get('/issue-deliveries/{id}', [IssueDeliveryController::class, 'show']);
+        $router->put('/issue-deliveries/{id}', [IssueDeliveryController::class, 'update']);
+        $router->delete('/issue-deliveries/{id}', [IssueDeliveryController::class, 'destroy']);
+        $router->put('/issue-deliveries/{id}/status', [IssueDeliveryController::class, 'updateStatus']);
+
+        // Subscription Plan Pricing
+        $router->get('/subscription-plans/{planId}/pricing', [SubscriptionPlanPricingController::class, 'index']);
+        $router->post('/subscription-plans/{planId}/pricing', [SubscriptionPlanPricingController::class, 'store']);
+        $router->put('/subscription-plans/{planId}/pricing/sort-order', [SubscriptionPlanPricingController::class, 'updateSortOrder']);
+        $router->put('/subscription-plans/{planId}/pricing/{pricingId}', [SubscriptionPlanPricingController::class, 'update']);
+        $router->delete('/subscription-plans/{planId}/pricing/{pricingId}', [SubscriptionPlanPricingController::class, 'destroy']);
+        $router->post('/subscription-plans/{planId}/pricing/{pricingId}/set-default', [SubscriptionPlanPricingController::class, 'setDefault']);
+        $router->post('/subscription-plans/{planId}/pricing/{pricingId}/toggle-active', [SubscriptionPlanPricingController::class, 'toggleActive']);
     });
 
     $router->post('/sites', [SiteController::class, 'create']);

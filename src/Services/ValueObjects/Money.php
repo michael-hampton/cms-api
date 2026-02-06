@@ -77,11 +77,7 @@ class Money
      */
     public function subtract(Money $other): Money
     {
-        if ($this->currency !== $other->currency) {
-            throw new InvalidArgumentException(
-                "Cannot subtract {$other->currency} from {$this->currency}"
-            );
-        }
+        $this->ensureSameCurrency($other);
         return new self($this->amountInCents - $other->amountInCents, $this->currency);
     }
 
@@ -92,11 +88,7 @@ class Money
      */
     public function add(Money $other): Money
     {
-        if ($this->currency !== $other->currency) {
-            throw new InvalidArgumentException(
-                "Cannot add {$other->currency} to {$this->currency}"
-            );
-        }
+        $this->ensureSameCurrency($other);
         return new self($this->amountInCents + $other->amountInCents, $this->currency);
     }
 
@@ -140,12 +132,29 @@ class Money
         return $this->amountInCents < 0;
     }
 
+    public function ensureNonNegative(): self
+    {
+        if ($this->isNegative()) {
+            return self::fromCents(0, $this->currency);
+        }
+        return $this;
+    }
+
     /**
      * Check if amount is zero
      */
     public function isZero(): bool
     {
         return $this->amountInCents === 0;
+    }
+
+    private function ensureSameCurrency(Money $other): void
+    {
+        if ($this->currency !== $other->currency) {
+            throw new \InvalidArgumentException(
+                "Cannot operate on different currencies: {$this->currency} vs {$other->currency}"
+            );
+        }
     }
 
     /**

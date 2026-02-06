@@ -274,4 +274,11 @@ class SubscriptionPlan extends Model
             ->first();
     }
 
+    public function issueSchedules()
+    {
+        return $this->hasMany(IssueDelivery::class, 'subscription_plan_id')
+            ->where('is_active', true)
+            ->orderBy('sort_order');
+    }
+
 }

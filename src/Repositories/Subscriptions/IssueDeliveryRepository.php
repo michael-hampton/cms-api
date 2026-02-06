@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
+use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
 use App\Repositories\Repository;
@@ -104,8 +105,131 @@ class IssueDeliveryRepository extends Repository
         return $this->update($deliveryId, $data);
     }
 
+    public function bulkCreateFromCsv(int $siteId, array $rows): array
+    {
+        $created = [];
+        $errors = [];
+
+        foreach ($rows as $index => $row) {
+            try {
+                $this->validateCsvRow($row);
+
+                $schedule = $this->create([
+                    'site_id' => $siteId,
+                    'product_id' => $row['product_id'] ?? null,
+                    'promotion_id' => $row['promotion_id'] ?? null,
+                    'title' => $row['title'],
+                    'issue_number' => $row['issue_number'],
+                    'issue_code' => $row['issue_code'] ?? null,
+                    'on_sale_date' => $row['on_sale_date'],
+                    'cut_off_date' => $row['cut_off_date'] ?? null,
+                    'fulfilment_date' => $row['fulfilment_date'] ?? null,
+                    'status' => $row['status'] ?? IssueScheduleStatus::DRAFT->value,
+                    'metadata' => $row['metadata'] ?? []
+                ]);
+
+                $created[] = $schedule;
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'row' => $index + 1,
+                    'error' => $e->getMessage(),
+                    'data' => $row
+                ];
+            }
+        }
+
+        return [
+            'created' => $created,
+            'errors' => $errors,
+            'total' => count($rows),
+            'success_count' => count($created),
+            'error_count' => count($errors)
+        ];
+    }
+
+    private function validateCsvRow(array $row): void
+    {
+        if (empty($row['title'])) {
+            throw new \InvalidArgumentException('Title is required');
+        }
+
+        if (empty($row['issue_number'])) {
+            throw new \InvalidArgumentException('Issue number is required');
+        }
+
+        if (empty($row['on_sale_date'])) {
+            throw new \InvalidArgumentException('On-sale date is required');
+        }
+
+        if (!empty($row['status']) && !IssueScheduleStatus::tryFrom($row['status'])) {
+            throw new \InvalidArgumentException('Invalid status value');
+        }
+    }
+
+    public function getAllForSite(int $siteId): Collection
+    {
+        return IssueDelivery::where('site_id', $siteId)
+            ->orderBy('on_sale_date', 'desc')
+            ->get();
+    }
+
+    public function delete(int $id): bool
+    {
+        $schedule = $this->find($id);
+
+        if (!$schedule) {
+            return false;
+        }
+
+        $hasDeliveries = IssueDelivery::where('subscription_id', $schedule->subscription_id)
+            ->where('id', '!=', $schedule->id)
+            ->exists();
+
+        if ($hasDeliveries) {
+            throw new \Exception('Cannot delete schedule with existing deliveries');
+        }
+
+        return parent::delete($id);
+    }
+
     protected function getModelClass(): string
     {
         return IssueDelivery::class;
     }
+
+    public function searchSchedules(int $siteId, array $filters): Collection
+    {
+        $query = IssueDelivery::where('site_id', $siteId);
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['product_id'])) {
+            $query->where('product_id', $filters['product_id']);
+        }
+
+        if (!empty($filters['promotion_id'])) {
+            $query->where('promotion_id', $filters['promotion_id']);
+        }
+
+        if (!empty($filters['from_date'])) {
+            $query->where('on_sale_date', '>=', $filters['from_date']);
+        }
+
+        if (!empty($filters['to_date'])) {
+            $query->where('on_sale_date', '<=', $filters['to_date']);
+        }
+
+        if (!empty($filters['search'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('issue_title', 'like', "%{$filters['search']}%")
+                    ->orWhere('issue_number', 'like', "%{$filters['search']}%")
+                    ->orWhere('issue_code', 'like', "%{$filters['search']}%");
+            });
+        }
+
+        return $query->orderBy('on_sale_date', 'desc')->get();
+    }
+
 }

@@ -2,19 +2,26 @@
 
 namespace App\Models;
 
+use App\Enums\Subscriptions\IssueScheduleStatus;
+
 class IssueDelivery extends Model
 {
     protected $table = 'issue_deliveries';
 
     protected $fillable = [
         'subscription_id',
+        'subscription_plan_id',
         'issue_number',
         'issue_title',
         'on_sale_date',
         'estimated_delivery_date',
         'status',
         'tracking_info',
-        'metadata'
+        'metadata',
+        'promotion_id',
+        'cut_off_date',
+        'fulfilment_date',
+        'site_id'
     ];
 
     protected $casts = [
@@ -23,11 +30,24 @@ class IssueDelivery extends Model
         'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'cut_off_date' => 'date',
+        'fulfilment_date' => 'date',
+        'status' => 'string',
     ];
 
     public function subscription($relation = false)
     {
         return $this->belongsTo(Subscription::class, 'subscription_id', 'id', $relation);
+    }
+
+    public function subscriptionPlans()
+    {
+        return $this->belongsToMany(
+            SubscriptionPlan::class,
+            'subscription_plan_issue_schedule',
+            'issue_schedule_id',
+            'subscription_plan_id'
+        )->withPivot('sort_order')->withTimestamps();
     }
 
     /**
@@ -96,5 +116,30 @@ class IssueDelivery extends Model
 
         return $status !== 'Delivered' &&
             $this->estimated_delivery_date < $now->modify('-7 days');
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === IssueScheduleStatus::ACTIVE->value;
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === IssueScheduleStatus::DRAFT->value;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === IssueScheduleStatus::CANCELLED->value;
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', IssueScheduleStatus::ACTIVE->value);
+    }
+
+    public function scopeForSite($query, int $siteId)
+    {
+        return $query->where('site_id', $siteId);
     }
 }

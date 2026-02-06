@@ -22,6 +22,7 @@ use App\Models\CustomFieldDefinition;
 use App\Models\EmailTheme;
 use App\Models\GiftedArticle;
 use App\Models\Image;
+use App\Models\IssueDelivery;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
@@ -821,5 +822,17 @@ trait CreatesTestData
             'ip_address' => '127.0.0.1',
             'viewed_at' => date('Y-m-d H:i:s'),
         ], $attributes));
+    }
+
+    public function createIssueSchedule()
+    {
+        return IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 1,
+            'issue_title' => 'Test Issue',
+            'on_sale_date' => now(),
+            'estimated_delivery_date' => now(),
+            'status' => 'active'
+        ]);
     }
 }

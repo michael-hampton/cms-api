@@ -7,7 +7,7 @@ use App\Models\Member;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shopping\ShippingService;
-use App\Services\Subscriptions\SubscriptionPricingCalculator;
+use App\Services\Subscriptions\SubscriptionPricingService;
 use App\Services\Vouchers\VoucherService;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -17,7 +17,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
-    private SubscriptionPricingCalculator $calculator;
+    private SubscriptionPricingService $calculator;
     private $planRepository;
     private $voucherService;
     private $shippingService;
@@ -262,7 +262,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $this->voucherService = Mockery::mock(VoucherService::class);
         $this->shippingService = Mockery::mock(ShippingService::class);
 
-        $this->calculator = new SubscriptionPricingCalculator(
+        $this->calculator = new SubscriptionPricingService(
             $this->planRepository,
             $this->voucherService,
             $this->shippingService

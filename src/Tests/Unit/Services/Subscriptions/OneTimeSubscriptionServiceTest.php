@@ -2,6 +2,11 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Enums\Subscriptions\BillingPeriod;
+use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Exceptions\Subscriptions\InvalidDeliveryTypeException;
+use App\Exceptions\Subscriptions\InvalidSubscriptionPlanException;
+use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -9,6 +14,10 @@ use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Shopping\OneTimeSubscriptionService;
+use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
+use App\Services\Subscriptions\Calculators\SubscriptionPricingCalculator;
+use App\Services\Subscriptions\Validators\OneTimePlanValidator;
+use App\Services\ValueObjects\Money;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
 
@@ -19,6 +28,38 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
     private $service;
     private $databaseMock;
     private $orderRepository;
+    private $validator;
+    private $dateCalculator;
+    private $pricingCalculator;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
+        $this->planRepository = m::mock(SubscriptionPlanRepository::class);
+        $this->databaseMock = m::mock(Database::class);
+        $this->orderRepository = m::mock(OrderRepository::class);
+        $this->validator = m::mock(OneTimePlanValidator::class);
+        $this->dateCalculator = m::mock(SubscriptionDateCalculator::class);
+        $this->pricingCalculator = m::mock(SubscriptionPricingCalculator::class);
+
+        $this->service = new OneTimeSubscriptionService(
+            $this->subscriptionRepository,
+            $this->planRepository,
+            $this->databaseMock,
+            $this->orderRepository,
+            $this->validator,
+            $this->dateCalculator,
+            $this->pricingCalculator
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        m::close();
+        parent::tearDown();
+    }
 
     public function testGetOneTimePlansReturnsOnlyOneTimePlans(): void
     {
@@ -46,7 +87,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($collection);
 
-        $result = $this->service->getOneTimePlans(1);
+        $result = $this->service->getOneTimePlansCatalog(1);
 
         $this->assertCount(1, $result);
 
@@ -63,13 +104,45 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $plan->price = 99.99;
         $plan->currency = 'USD';
         $plan->billing_period = 'yearly';
-        $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
 
         $this->planRepository->shouldReceive('find')
             ->with(1)
             ->once()
             ->andReturn($plan);
+
+        $this->validator->shouldReceive('validatePlanForSubscription')
+            ->with($plan, 'digital')
+            ->once();
+
+        $this->validator->shouldReceive('validateBillingPeriod')
+            ->with('yearly')
+            ->once()
+            ->andReturn(BillingPeriod::YEARLY);
+
+        $startDate = new \DateTimeImmutable('2024-01-01 00:00:00');
+        $endDate = new \DateTimeImmutable('2025-01-01 00:00:00');
+
+        $this->dateCalculator->shouldReceive('normalizeStartDate')
+            ->with(null)
+            ->once()
+            ->andReturn($startDate);
+
+        $this->dateCalculator->shouldReceive('calculateEndDate')
+            ->with($startDate, BillingPeriod::YEARLY)
+            ->once()
+            ->andReturn($endDate);
+
+        $basePrice = Money::fromDecimal(99.99, 'USD');
+        $discount = Money::fromCents(0, 'USD');
+
+        $this->pricingCalculator->shouldReceive('validateDiscount')
+            ->with(m::type(Money::class), m::type(Money::class))
+            ->once();
+
+        $this->pricingCalculator->shouldReceive('calculateFinalPrice')
+            ->with(m::type(Money::class), m::type(Money::class))
+            ->once()
+            ->andReturn($basePrice);
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
@@ -105,13 +178,16 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
+        $this->validator->shouldReceive('validatePlanForSubscription')
+            ->andThrow(new InvalidSubscriptionPlanException('Invalid one-time subscription plan'));
+
         $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->expectException(\Exception::class);
+        $this->expectException(InvalidSubscriptionPlanException::class);
         $this->expectExceptionMessage('Invalid one-time subscription plan');
 
         $this->service->createOneTimeSubscription(1, 999, 'digital', 1, null, 0);
@@ -120,13 +196,15 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
     public function testCreateOneTimeSubscriptionFailsWithInvalidDeliveryType(): void
     {
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
-        $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('hasDigitalOption')->andReturn(false);
 
         $this->planRepository->shouldReceive('find')
             ->with(1)
             ->once()
             ->andReturn($plan);
+
+        $this->validator->shouldReceive('validatePlanForSubscription')
+            ->with($plan, 'digital')
+            ->andThrow(new InvalidDeliveryTypeException('Digital delivery not available'));
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -134,16 +212,92 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->expectException(\Exception::class);
+        $this->expectException(InvalidDeliveryTypeException::class);
         $this->expectExceptionMessage('Digital delivery not available');
 
         $this->service->createOneTimeSubscription(1, 1, 'digital', 1, null, 0);
+    }
+
+    public function testCreateOneTimeSubscriptionWithDiscount(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->name = 'Annual Digital';
+        $plan->price = 99.99;
+        $plan->currency = 'USD';
+        $plan->billing_period = 'yearly';
+
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->validator->shouldReceive('validatePlanForSubscription')->once();
+        $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
+
+        $startDate = new \DateTimeImmutable();
+        $endDate = new \DateTimeImmutable('+1 year');
+
+        $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn($startDate);
+        $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn($endDate);
+
+        $basePrice = Money::fromDecimal(99.99, 'USD');
+        $discount = Money::fromCents(1000, 'USD'); // $10.00
+        $finalPrice = Money::fromDecimal(89.99, 'USD');
+
+        $this->pricingCalculator->shouldReceive('validateDiscount')->once();
+        $this->pricingCalculator->shouldReceive('calculateFinalPrice')
+            ->andReturn($finalPrice);
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $this->subscriptionRepository->shouldReceive('create')
+            ->with(m::on(function ($data) {
+                return abs($data['price'] - 89.99) < 0.01
+                    && abs($data['discount_amount'] - 10.00) < 0.01
+                    && abs($data['original_price'] - 99.99) < 0.01;
+            }))
+            ->andReturn($subscription);
+
+        $subscription->shouldReceive('generateDownloadUrl')->once();
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->createOneTimeSubscription(
+            1, 1, 'digital', 1, null, 1000 // 1000 cents = $10
+        );
+
+        $this->assertInstanceOf(Subscription::class, $result);
+    }
+
+    public function testCreateOneTimeSubscriptionValidatesNegativeDiscount(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 99.99;
+        $plan->currency = 'USD';
+        $plan->billing_period = 'yearly';
+
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->validator->shouldReceive('validatePlanForSubscription')->once();
+        $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
+
+        $this->dateCalculator->shouldReceive('normalizeStartDate')
+            ->andReturn(new \DateTimeImmutable());
+        $this->dateCalculator->shouldReceive('calculateEndDate')
+            ->andReturn(new \DateTimeImmutable('+1 year'));
+
+        $this->pricingCalculator->shouldReceive('validateDiscount')
+            ->andThrow(new \InvalidArgumentException('Discount amount cannot be negative'));
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Discount amount cannot be negative');
+
+        $this->service->createOneTimeSubscription(
+            1, 1, 'digital', 1, null, -1000
+        );
     }
 
     public function testActivateSubscriptionSuccess(): void
     {
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
+        $subscription->status = SubscriptionStatus::PENDING->value;
 
         $this->subscriptionRepository->shouldReceive('find')
             ->with(1)
@@ -151,7 +305,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->andReturn($subscription);
 
         $this->subscriptionRepository->shouldReceive('update')
-            ->with(1, ['status' => 'active'])
+            ->with(1, ['status' => SubscriptionStatus::ACTIVE->value])
             ->once();
 
         $this->databaseMock->shouldReceive('transaction')
@@ -166,29 +320,91 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
 
         $this->service->activateSubscription(1, 1);
 
-        $this->assertTrue(true); // If no exception, test passes
+        $this->assertTrue(true);
     }
 
-    protected function setUp(): void
+    public function testActivateSubscriptionThrowsWhenNotFound(): void
     {
-        parent::setUp();
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
 
-        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
-        $this->planRepository = m::mock(SubscriptionPlanRepository::class);
-        $this->databaseMock = m::mock(Database::class);
-        $this->orderRepository = m::mock(OrderRepository::class);
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
-        $this->service = new OneTimeSubscriptionService(
-            $this->subscriptionRepository,
-            $this->planRepository,
-            $this->databaseMock,
-            $this->orderRepository
-        );
+        $this->expectException(SubscriptionNotFoundException::class);
+        $this->expectExceptionMessage('Subscription not found');
+
+        $this->service->activateSubscription(999, 1);
     }
 
-    protected function tearDown(): void
+    public function testActivateSubscriptionEnforcesStateTransition(): void
     {
-        m::close();
-        parent::tearDown();
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->status = SubscriptionStatus::ACTIVE->value; // Already active
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($subscription);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot activate subscription with status: active');
+
+        $this->service->activateSubscription(1, 1);
     }
+
+    public function testGetSubscriptionSummaryWithoutOrder(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->price = 99.99;
+        $subscription->discount_amount = 10.00;
+        $subscription->delivery_type = 'print';
+        $subscription->plan = null;
+        $subscription->download_expires_at = null;
+
+        $orderRelation = m::mock();
+        $orderRelation->shouldReceive('last')->andReturn(null);
+        $subscription->shouldReceive('order')->andReturn($orderRelation);
+        $subscription->shouldReceive('hasValidDownload')->andReturn(false);
+        $subscription->shouldReceive('toArray')->andReturn(['id' => 1]);
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($subscription);
+
+        $result = $this->service->getSubscriptionSummary(1);
+
+        $this->assertNotNull($result);
+        $this->assertArrayHasKey('payment_breakdown', $result);
+        $this->assertTrue($result['payment_breakdown']['is_estimate']);
+        $this->assertEquals(1000, $result['payment_breakdown']['shipping_cents']); // $10 shipping
+    }
+
+    public function testGetSubscriptionSummaryReturnsNullForNonexistent(): void
+    {
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->getSubscriptionSummary(999);
+
+        $this->assertNull($result);
+    }
+
+
 }

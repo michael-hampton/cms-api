@@ -46,7 +46,7 @@ class MemberSubscriptionsController extends Controller
         // Get email subscription preferences
         $subscriptionSummary = $this->subscriptionService->getSubscriptionSummary($member->id, $siteId);
 
-        $plans = $this->subscriptionPlanService->getAvailablePlans($siteId);
+        $plans = $this->subscriptionPlanService->getActivePlansForSite($siteId);
 
         return $this->view('member/subscriptions/index', [
             'member' => $member,
