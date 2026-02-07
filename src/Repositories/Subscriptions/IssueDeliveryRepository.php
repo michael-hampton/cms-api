@@ -6,6 +6,7 @@ use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
 
 class IssueDeliveryRepository extends Repository
 {
@@ -197,7 +198,12 @@ class IssueDeliveryRepository extends Repository
         return IssueDelivery::class;
     }
 
-    public function searchSchedules(int $siteId, array $filters): Collection
+    public function searchSchedulesPaginated(
+        int   $siteId,
+        array $filters,
+        int   $page = 1,
+        int   $perPage = 20
+    ): PaginatedResult
     {
         $query = IssueDelivery::where('site_id', $siteId);
 
@@ -229,7 +235,21 @@ class IssueDeliveryRepository extends Repository
             });
         }
 
-        return $query->orderBy('on_sale_date', 'desc')->get();
+        $total = $query->count();
+        $lastPage = (int)ceil($total / $perPage);
+        $offset = ($page - 1) * $perPage;
+
+        $data = $query->orderBy('on_sale_date', 'desc')
+            ->limit($perPage)
+            ->offset($offset)
+            ->get();
+
+        return new PaginatedResult(
+            data: $data->toArray(),
+            total: $total,
+            page: $page,
+            perPage: $perPage
+        );
     }
 
 }

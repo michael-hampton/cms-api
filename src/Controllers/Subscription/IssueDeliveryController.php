@@ -32,15 +32,21 @@ class IssueDeliveryController extends Controller
             'search' => $request->input('search')
         ];
 
-        $schedules = $this->issueDeliveryRepository->searchSchedules($siteId, $filters);
+        $result = $this->issueDeliveryRepository->searchSchedulesPaginated($siteId, $filters);
 
         return $this->resourceResponse([
-            'success' => true,
-            'data' => $schedules->map(fn($schedule) => [
-                ...$schedule->toArray(),
-                'on_sale_date' => $schedule->on_sale_date?->format('Y-m-d'),
-                'estimated_delivery_date' => $schedule->estimated_delivery_date?->format('Y-m-d'),
-            ])
+            'data' => collect($result->getData())->map(fn($schedule) => [
+                ...$schedule,
+                'on_sale_date' => $schedule['on_sale_date']?->format('Y-m-d'),
+                'estimated_delivery_date' => $schedule['estimated_delivery_date']?->format('Y-m-d'),
+            ]),
+            'pagination' => [
+                'total' => $result->getTotal(),
+                'page' => $result->getPage(),
+                'per_page' => $result->getPerPage(),
+                'total_pages' => $result->getTotalPages(),
+                'has_more' => $result->hasMore()
+            ]
         ]);
     }
 

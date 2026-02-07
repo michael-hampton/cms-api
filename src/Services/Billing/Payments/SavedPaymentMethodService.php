@@ -55,8 +55,6 @@ class SavedPaymentMethodService
                 ];
             }, $paymentMethods->data);
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die('mike');
             // Log error but don't throw - just return empty array
             error_log("Failed to fetch payment methods for member {$member->id}: " . $e->getMessage());
             return [];
