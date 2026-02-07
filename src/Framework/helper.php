@@ -24,6 +24,21 @@ if (!function_exists('url')) {
     }
 }
 
+if (!function_exists('dispatch')) {
+    function dispatch(object $job): void
+    {
+        // If your jobs have a standard interface or method
+        if (method_exists($job, 'handle')) {
+            $job->handle();
+            return;
+        }
+
+        throw new InvalidArgumentException(
+            'Dispatched job must have a handle() method.'
+        );
+    }
+}
+
 if (!function_exists('message')) {
     function message(): ?string
     {

@@ -65,6 +65,7 @@ use App\Models\ProductVoucher;
 use App\Models\RegionSet;
 use App\Models\RewardDefinition;
 use App\Models\Subscriber;
+use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Tag;
 use App\Models\Territory;
@@ -606,6 +607,25 @@ trait CreatesTestData
             'active' => true,
             'site_id' => $this->siteId,
             'last_sent_at' => null
+        ], $attributes));
+    }
+
+    protected function createSubscription(array $attributes = [])
+    {
+        return Subscription::create(array_merge([
+            'site_id' => $this->siteId,
+            'plan_name' => 'Test Plan',
+            'member_id' => $this->createMember()->id,
+            'start_date' => now(),
+        ], $attributes));
+    }
+
+    protected function createIssueDelivery(array $attributes = [])
+    {
+        $plan = $attributes['subscription_plan'] ?? $this->createSubscriptionPlan();
+        return IssueDelivery::create(array_merge([
+            'subscription_plan_id' => $plan->id,
+            'on_sale_date' => now_datetime()->addDays(7),
         ], $attributes));
     }
 

@@ -5,6 +5,8 @@ $isCancelling =
         $activeSubscription->cancelled_at !== null &&
         $activeSubscription->end_date > new \DateTime('today');
 
+echo $activeSubscription->status;
+
 if ($activeSubscription && $activeSubscription->status === 'cancelled') {
     $isCancelling = true;
 }

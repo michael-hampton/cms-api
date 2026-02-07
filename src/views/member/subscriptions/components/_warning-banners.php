@@ -1,9 +1,7 @@
 <?php
 $defaultHasWarning = false;
 if ($member->stripe_customer_id) {
-    $stripeProcessor = new \App\Services\Billing\PaymentProviders\StripePaymentProcessor(
-            new \App\Repositories\Billing\PaymentRepository()
-    );
+    $stripeProcessor = app(\App\Services\Billing\PaymentProviders\StripePaymentProcessor::class);
     $warningsResult = $stripeProcessor->getPaymentMethodsWithWarnings($member);
 
     if (!empty($warningsResult['warnings'])) {
@@ -130,9 +128,7 @@ $isCancelling =
 $defaultHasWarning = false;
 // Check if default payment method is expiring/expired
 if ($member->stripe_customer_id) {
-    $stripeProcessor = new \App\Services\Billing\PaymentProviders\StripePaymentProcessor(
-            new \App\Repositories\Billing\PaymentRepository()
-    );
+    $stripeProcessor = app(\App\Services\Billing\PaymentProviders\StripePaymentProcessor::class);
     $warningsResult = $stripeProcessor->getPaymentMethodsWithWarnings($member);
 
     // Check if default payment method has warnings
