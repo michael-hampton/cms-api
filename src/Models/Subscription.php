@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\DTO\Newsletters\NewsletterAccessResult;
+use App\Enums\Newsletters\PremiumAccessType;
 use App\Framework\Database\QueryBuilder;
 
 class Subscription extends Model
@@ -60,7 +62,8 @@ class Subscription extends Model
         'upgraded_from_plan_id',
         'upgraded_at',
         'upgrade_price_difference',
-        'premium_access'
+        'premium_access',
+        'bundle_id',
     ];
 
     protected $casts = [
@@ -632,4 +635,159 @@ class Subscription extends Model
 
         return $grantedAccess;
     }
+
+    public function isEligibleForPaidNewsletter(): bool
+    {
+        // Must be a paid subscription
+        if ($this->type !== 'paid') {
+            return false;
+        }
+
+        // Allowed states for paid newsletter delivery
+        $allowedStates = ['active', 'grace_period', 'retrying'];
+
+        if (!in_array($this->status, $allowedStates)) {
+            return false;
+        }
+
+        // Check date boundaries
+        $now = new \DateTime();
+
+        // Must have started
+        if ($this->start_date && $this->start_date > $now) {
+            return false;
+        }
+
+        // If in grace period or retrying, check grace hasn't expired
+        if (in_array($this->status, ['grace_period', 'retrying'])) {
+            // If end_date exists and is in the past, grace period has ended
+            if ($this->end_date && $this->end_date < $now) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Comprehensive newsletter access check
+     * Encapsulates ALL newsletter-specific entitlement logic
+     *
+     * @param Newsletter $newsletter
+     * @param Member|null $member Optional for future geographic/time checks
+     * @return NewsletterAccessResult
+     */
+    public function canAccessNewsletter(Newsletter $newsletter, ?Member $member = null): NewsletterAccessResult
+    {
+        // Phase 1: Subscription eligibility (grace, retry, expiry)
+        if (!$this->isEligibleForPaidNewsletter()) {
+            return NewsletterAccessResult::denied(
+                'subscription_not_eligible',
+                "Subscription status '{$this->status}' is not eligible"
+            );
+        }
+
+        // Phase 2: Access level matching
+        if ($newsletter->slug) {
+            // Check direct premium access
+            $hasDirectAccess = $this->hasPremiumAccess(
+                PremiumAccessType::Newsletter->value,
+                $newsletter->slug
+            );
+
+            // Check bundle access
+            $hasBundleAccess = $this->hasBundleAccessToNewsletter($newsletter->slug);
+
+            if (!$hasDirectAccess && !$hasBundleAccess && !$newsletter->requiresBundle()) {
+                return NewsletterAccessResult::denied(
+                    'access_level_mismatch',
+                    "Subscription does not grant access to newsletter '{$newsletter->slug}'"
+                );
+            }
+        }
+
+        // Phase 3: Bundle access (if newsletter requires a specific bundle)
+        if ($newsletter->requiresBundle()) {
+            if (!$this->hasBundle($newsletter->bundle_id)) {
+                $bundle = $newsletter->bundle();
+                $bundleName = $bundle?->slug ?? $bundle?->name ?? 'Unknown Bundle';
+                return NewsletterAccessResult::denied(
+                    'bundle_required',
+                    "Newsletter requires '{$bundleName}' bundle which subscription does not include"
+                );
+            }
+        }
+
+        // Phase 4: Geographic restrictions
+        if ($newsletter->hasGeographicRestrictions()) {
+            if (!$member) {
+                return NewsletterAccessResult::denied(
+                    'member_required_for_geo_check',
+                    'Member information required to verify geographic eligibility'
+                );
+            }
+
+            $memberRegion = $member->getRegion();
+
+            if (!$newsletter->isRegionAllowed($memberRegion)) {
+                $region = $memberRegion ?? 'Unknown';
+                return NewsletterAccessResult::denied(
+                    'geographic_restriction',
+                    "Newsletter not available in region '{$region}'"
+                );
+            }
+        }
+
+        // Phase 5: Time-based access window
+        if ($newsletter->hasTimeWindow()) {
+            $now = new \DateTime();
+
+            if (!$newsletter->isWithinAccessWindow($now, $this)) {
+                $start = $newsletter->access_window_start?->format('Y-m-d H:i:s') ?? 'N/A';
+                $end = $newsletter->access_window_end?->format('Y-m-d H:i:s') ?? 'N/A';
+
+                return NewsletterAccessResult::denied(
+                    'outside_access_window',
+                    "Newsletter access window: {$start} to {$end}"
+                );
+            }
+        }
+
+        return NewsletterAccessResult::allowed();
+    }
+
+    /**
+     * Check if subscription grants access to a bundle
+     */
+    public function hasBundle(int $bundleId): bool
+    {
+        return $this->bundle_id === $bundleId;
+    }
+
+    /**
+     * Get the bundle granted by this subscription
+     */
+    public function bundle()
+    {
+        if (!$this->bundle_id) {
+            return null;
+        }
+
+        return SubscriptionBundle::find($this->bundle_id);
+    }
+
+    /**
+     * Check if subscription grants access to newsletter via bundle
+     */
+    public function hasBundleAccessToNewsletter(string $newsletterSlug): bool
+    {
+        $bundle = $this->bundle();
+
+        if (!$bundle) {
+            return false;
+        }
+
+        return $bundle->includesNewsletter($newsletterSlug);
+    }
+
 }

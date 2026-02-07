@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Repositories\Subscription;
 
+use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -183,36 +184,235 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
         $this->repository->delete($delivery1->id);
     }
 
-    public function testSearchSchedules(): void
+    public function testSearchSchedulesPaginatedWithNoFilters(): void
     {
         $subscription = $this->createSubscription();
+
         IssueDelivery::create([
             'site_id' => $this->siteId,
             'subscription_id' => $subscription->id,
-            'issue_number' => '101',
-            'issue_title' => 'Specific Issue',
+            'issue_number' => 1,
+            'issue_title' => 'Test Issue',
             'on_sale_date' => '2026-01-15',
-            'status' => 'Published'
+            'status' => IssueScheduleStatus::ACTIVE->value
         ]);
 
-        // Test status filter
-        $results = $this->repository->searchSchedules($this->siteId, ['status' => 'Published']);
-        $this->assertCount(1, $results);
+        $result = $this->repository->searchSchedulesPaginated(
+            $this->siteId,
+            [],
+            1,
+            20
+        );
 
-        // Test search filter (title)
-        $results = $this->repository->searchSchedules($this->siteId, ['search' => 'Specific']);
-        $this->assertCount(1, $results);
+        $this->assertEquals(1, $result->getTotal());
+        $this->assertEquals(1, $result->getPage());
+        $this->assertCount(1, $result->getData());
+    }
 
-        // Test search filter (issue_number)
-        $results = $this->repository->searchSchedules($this->siteId, ['search' => '101']);
-        $this->assertCount(1, $results);
+    public function testSearchSchedulesPaginatedWithPromotionFilter(): void
+    {
+        $subscription = $this->createSubscription();
 
-        // Test date range
-        $results = $this->repository->searchSchedules($this->siteId, [
-            'from_date' => '2026-01-01',
-            'to_date' => '2026-01-31'
+        IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_id' => $subscription->id,
+            'promotion_id' => 100,
+            'issue_number' => 1,
+            'issue_title' => 'Product Issue',
+            'on_sale_date' => '2026-01-15',
+            'status' => IssueScheduleStatus::ACTIVE->value
         ]);
-        $this->assertCount(1, $results);
+
+        IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_id' => $subscription->id,
+            'promotion_id' => 200,
+            'issue_number' => 2,
+            'issue_title' => 'Other Product',
+            'on_sale_date' => '2026-01-16',
+            'status' => IssueScheduleStatus::ACTIVE->value
+        ]);
+
+        $result = $this->repository->searchSchedulesPaginated(
+            $this->siteId,
+            ['promotion_id' => 100],
+            1,
+            20
+        );
+
+        $this->assertEquals(1, $result->getTotal());
+        $this->assertEquals(100, $result->getData()[0]['promotion_id']);
+    }
+
+    public function testSearchSchedulesPaginatedPagination(): void
+    {
+        $subscription = $this->createSubscription();
+
+        // Create 25 deliveries
+        for ($i = 1; $i <= 25; $i++) {
+            IssueDelivery::create([
+                'site_id' => $this->siteId,
+                'subscription_id' => $subscription->id,
+                'issue_number' => $i,
+                'issue_title' => "Issue $i",
+                'on_sale_date' => "2026-01-" . str_pad($i, 2, '0', STR_PAD_LEFT),
+                'status' => IssueScheduleStatus::ACTIVE->value
+            ]);
+        }
+
+        // Page 1
+        $page1 = $this->repository->searchSchedulesPaginated($this->siteId, [], 1, 20);
+        $this->assertEquals(25, $page1->getTotal());
+        $this->assertCount(20, $page1->getData());
+
+        // Page 2
+        $page2 = $this->repository->searchSchedulesPaginated($this->siteId, [], 2, 20);
+        $this->assertEquals(25, $page2->getTotal());
+        $this->assertCount(5, $page2->getData());
+    }
+
+    public function testSearchSchedulesPaginatedWithSearchByIssueCode(): void
+    {
+        $subscription = $this->createSubscription();
+
+        IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'issue_title' => 'Test',
+            'issue_code' => 'ABC-001',
+            'on_sale_date' => '2026-01-15',
+            'status' => IssueScheduleStatus::ACTIVE->value
+        ]);
+
+        $result = $this->repository->searchSchedulesPaginated(
+            $this->siteId,
+            ['search' => 'ABC'],
+            1,
+            20
+        );
+
+        $this->assertEquals(1, $result->getTotal());
+    }
+
+    public function testSearchSchedulesPaginatedWithDateRangeFilter(): void
+    {
+        $subscription = $this->createSubscription();
+
+        IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'issue_title' => 'Jan Issue',
+            'on_sale_date' => '2026-01-15',
+            'status' => IssueScheduleStatus::ACTIVE->value
+        ]);
+
+        IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_id' => $subscription->id,
+            'issue_number' => 2,
+            'issue_title' => 'Feb Issue',
+            'on_sale_date' => '2026-02-15',
+            'status' => IssueScheduleStatus::ACTIVE->value
+        ]);
+
+        $result = $this->repository->searchSchedulesPaginated(
+            $this->siteId,
+            [
+                'from_date' => '2026-02-01',
+                'to_date' => '2026-02-28'
+            ],
+            1,
+            20
+        );
+
+        $this->assertEquals(1, $result->getTotal());
+        $this->assertEquals('Feb Issue', $result->getData()[0]['issue_title']);
+    }
+
+    public function testUpdateDeliveryStatusWithTrackingInfo(): void
+    {
+        $subscription = $this->createSubscription();
+        $delivery = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'status' => IssueScheduleStatus::ACTIVE->value
+        ]);
+
+        $trackingInfo = [
+            'carrier' => 'UPS',
+            'tracking_number' => '1Z999AA10123456784'
+        ];
+
+        $updated = $this->repository->updateDeliveryStatus(
+            $delivery->id,
+            IssueScheduleStatus::ACTIVE->value,
+            $trackingInfo
+        );
+
+        $this->assertEquals(IssueScheduleStatus::ACTIVE->value, $updated->status);
+        $this->assertEquals($trackingInfo, $updated->tracking_info);
+    }
+
+    public function testValidateCsvRowWithInvalidStatus(): void
+    {
+        $result = $this->repository->bulkCreateFromCsv($this->siteId, [
+            [
+                'title' => 'Test',
+                'issue_number' => 1,
+                'on_sale_date' => '2026-01-01',
+                'status' => 'invalid_status'
+            ]
+        ]);
+
+        $this->assertNotEmpty($result['errors']);
+    }
+
+    public function testGetUpcomingDeliveriesRespectsLimit(): void
+    {
+        $subscription = $this->createSubscription();
+
+        // Create 20 upcoming deliveries
+        for ($i = 1; $i <= 20; $i++) {
+            IssueDelivery::create([
+                'subscription_id' => $subscription->id,
+                'issue_number' => $i,
+                'issue_title' => "Issue #$i",
+                'estimated_delivery_date' => date('Y-m-d', strtotime("+$i days")),
+                'status' => IssueScheduleStatus::ACTIVE->value
+            ]);
+        }
+
+        $deliveries = $this->repository->getUpcomingDeliveries($subscription->id, 5);
+
+        $this->assertCount(5, $deliveries);
+    }
+
+    public function testGetPastDeliveriesRespectsLimit(): void
+    {
+        $subscription = $this->createSubscription();
+
+        // Create 10 past deliveries
+        for ($i = 1; $i <= 10; $i++) {
+            IssueDelivery::create([
+                'subscription_id' => $subscription->id,
+                'issue_number' => $i,
+                'issue_title' => "Issue #$i",
+                'estimated_delivery_date' => date('Y-m-d', strtotime("-$i days")),
+                'status' => IssueScheduleStatus::ACTIVE->value
+            ]);
+        }
+
+        $deliveries = $this->repository->getPastDeliveries($subscription->id, 3);
+
+        $this->assertCount(3, $deliveries);
+    }
+
+    public function testDeleteReturnsFalseForNonExistentDelivery(): void
+    {
+        $result = $this->repository->delete(99999);
+        $this->assertFalse($result);
     }
 
     private function createSubscription(): \App\Models\Subscription

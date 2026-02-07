@@ -11,15 +11,22 @@ use App\Framework\Support\SiteContext;
 use App\Mail\NewsletterSignupConfirmationWithTracking;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Services\Newsletter\NewsletterAccessService;
 use App\Services\Newsletter\NewsletterSignupService;
+use App\Services\Subscriptions\SubscriptionCheckoutService;
+use App\Services\Subscriptions\SubscriptionPlanService;
 
 class MemberNewslettersController extends Controller
 {
     public function __construct(
         private readonly SubscriberRepository    $subscriberRepository,
         private readonly NewsletterRepository    $newsletterRepository,
-        private readonly NewsletterSignupService $newsletterSignupService
-    ) {
+        private readonly NewsletterSignupService     $newsletterSignupService,
+        private readonly NewsletterAccessService     $newsletterAccessService,
+        private readonly SubscriptionPlanService     $subscriptionPlanService,
+        private readonly SubscriptioncheckoutService $checkoutService
+    )
+    {
         parent::__construct();
     }
 
@@ -37,11 +44,34 @@ class MemberNewslettersController extends Controller
             ->where('active', true)
             ->get();
 
+        // Check access for each newsletter
+        // Check access for each newsletter
+        $newslettersWithAccess = $availableNewsletters->map(function ($newsletter) use ($member, $siteId) {
+            $accessCheck = $this->newsletterAccessService->checkAccess(
+                $newsletter->id,
+                $member->id,
+                $siteId
+            );
+
+            return [
+                'newsletter' => $newsletter,
+                'has_access' => $accessCheck['has_access'],
+                'access_reason' => $accessCheck['reason'],
+                'access_message' => $accessCheck['message'] ?? null,
+                'required_level' => $accessCheck['required_level'] ?? null
+            ];
+        });
+
+        // Get plans for upgrade CTAs
+        $plans = $this->subscriptionPlanService->getActivePlansForSite($siteId);
+
         return $this->view('member/newsletters/index', [
             'member' => $member,
             'site' => SiteContext::get(),
             'subscriptions' => $subscriptions,
-            'availableNewsletters' => $availableNewsletters
+            'availableNewsletters' => $availableNewsletters,
+            'newslettersWithAccess' => $newslettersWithAccess,
+            'plans' => $plans
         ]);
     }
 
@@ -239,6 +269,187 @@ class MemberNewslettersController extends Controller
                 'email' => $email,
                 'error' => $e->getMessage()
             ]);
+        }
+    }
+
+    public function getUpgradeOptions(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $data = $request->all();
+            $member = MemberAuth::member();
+            $siteId = (int)$data['site_id'];
+            $newsletterId = $request->input('newsletter_id');
+
+            if (!$newsletterId) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Newsletter ID required'
+                ], 400);
+            }
+
+            $newsletter = $this->newsletterRepository->find($newsletterId);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Newsletter not found'
+                ], 404);
+            }
+
+            // Get all active plans that grant access to this newsletter
+            $plans = $this->subscriptionPlanService->getActivePlansForSite($siteId);
+
+            /**
+             * $eligiblePlans = $plans->filter(function($plan) use ($newsletter) {
+             * return $plan->grantsPremiumAccess('newsletter', $newsletter->slug ?? 'insider');
+             * })->map(function($plan) {
+             */
+
+            $eligiblePlans = $plans->map(function ($plan) {
+                return [
+                    'id' => $plan->id,
+                    'name' => $plan->name,
+                    'description' => $plan->description,
+                    'price' => $plan->price,
+                    'currency' => $plan->currency,
+                    'billing_period' => $plan->billing_period,
+                    'features' => $plan->features,
+                    'is_featured' => $plan->is_featured
+                ];
+            })->values();
+
+            return $this->jsonResponse([
+                'success' => true,
+                'newsletter' => [
+                    'id' => $newsletter->id,
+                    'title' => $newsletter->title,
+                ],
+                'plans' => $eligiblePlans
+            ]);
+
+        } catch (\Exception $e) {
+            Logger::error('Failed to get upgrade options', [
+                'error' => $e->getMessage(),
+                'member_id' => $member->id ?? null
+            ]);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Failed to load upgrade options'
+            ], 500);
+        }
+    }
+
+    public function processUpgrade(Request $request)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $member = MemberAuth::member();
+            $siteId = SiteContext::getId();
+
+            $planId = $request->input('plan_id');
+            $newsletterId = $request->input('newsletter_id');
+            $paymentMethod = $request->input('payment_method');
+            $voucherCode = $request->input('voucher_code');
+
+            if (!$planId || !$newsletterId || !$paymentMethod) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Missing required fields'
+                ], 400);
+            }
+
+            // Verify the plan grants access to this newsletter
+            $plan = $this->subscriptionPlanService->getPlanBySlug($planId, $siteId);
+            if (!$plan) {
+                $plan = $this->subscriptionPlanService->getActivePlansForSite($siteId)
+                    ->firstWhere('id', $planId);
+            }
+
+            if (!$plan) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Invalid plan selected'
+                ], 400);
+            }
+
+            $newsletter = $this->newsletterRepository->find($newsletterId);
+            if (!$newsletter) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Newsletter not found'
+                ], 404);
+            }
+
+            // Check eligibility
+            $eligibility = $this->subscriptionPlanService->canMemberSubscribe(
+                $member->id,
+                $plan->id,
+                $siteId
+            );
+
+            if (!$eligibility['can_subscribe']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $eligibility['reason']
+                ], 400);
+            }
+
+            // Process the subscription checkout
+            $checkoutData = [
+                'subscription_plan_id' => $plan->id,
+                'payment_method' => $paymentMethod,
+            ];
+
+            if ($voucherCode) {
+                $checkoutData['voucher_code'] = $voucherCode;
+            }
+
+            // You'll need to inject SubscriptionCheckoutService
+            $result = $this->checkoutService->processSubscriptionCheckout(
+                $member->id,
+                $checkoutData,
+                $siteId
+            );
+
+            if (!$result['success']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
+            }
+
+            // Auto-subscribe to the newsletter after successful upgrade
+            $newsletterSignup = $this->newsletterSignupService->signup(
+                $member->email,
+                true,
+                $newsletterId,
+                $siteId
+            );
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Subscription successful! You now have access to this newsletter.',
+                'subscription_id' => $result['subscription_id'],
+                'newsletter_subscribed' => $newsletterSignup['success'],
+                'redirect_url' => $result['redirect_url'] ?? null
+            ]);
+
+        } catch (\Exception $e) {
+            Logger::error('Newsletter upgrade failed', [
+                'error' => $e->getMessage(),
+                'member_id' => $member->id ?? null
+            ]);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Upgrade failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

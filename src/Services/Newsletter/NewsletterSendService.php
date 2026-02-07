@@ -68,59 +68,41 @@ class NewsletterSendService
             ];
         }
 
-        // Resolve all recipients (both legacy and member-based)
-        $allSubscribers = $this->recipientResolver->resolveForNewsletter($newsletter, $siteId);
-
-        if (empty($allSubscribers)) {
-            Logger::warning('No confirmed subscribers for newsletter', [
-                'newsletter_id' => $newsletter->id
-            ]);
-            return [
-                'success' => false,
-                'newsletter_id' => $newsletter->id,
-                'error' => 'No confirmed subscribers'
-            ];
-        }
-
         // Build newsletter content
         $contentResult = $this->contentBuilder->build($newsletter, $siteId, false);
         if (!$contentResult['success']) {
             return $contentResult;
         }
 
-        return $this->database->transaction(function () use ($newsletter, $allSubscribers, $contentResult, $siteId) {
+        // Resolve recipients with eligibility + preferences
+        $resolutionResult = $this->recipientResolver->resolveForNewsletter($newsletter, $siteId);
+        $validRecipients = $resolutionResult['valid'];
+        $skipped = $resolutionResult['skipped'];
+
+        if (empty($validRecipients)) {
+            Logger::warning('No eligible recipients after filtering', [
+                'newsletter_id' => $newsletter->id,
+                'skipped_count' => count($skipped)
+            ]);
+            return [
+                'success' => false,
+                'newsletter_id' => $newsletter->id,
+                'error' => 'No eligible recipients',
+                'skipped' => $this->formatSkippedList($skipped)
+            ];
+        }
+
+        return $this->database->transaction(function () use ($newsletter, $validRecipients, $contentResult, $siteId, $skipped) {
             // Create send record
-            $sendRecord = $this->createSendRecord($newsletter, $allSubscribers, $contentResult);
-
-            // Filter recipients (applies all opt-out logic)
-            $filteredResult = $this->recipientResolver->filterRecipients(
-                $allSubscribers,
-                $newsletter,
-                $siteId
-            );
-
-            $skipped = $this->buildSkippedList($allSubscribers, $filteredResult['valid'], $filteredResult['skipped']);
-
-            if (empty($filteredResult['valid'])) {
-                Logger::warning('All recipients filtered out', [
-                    'newsletter_id' => $newsletter->id,
-                    'total_subscribers' => count($allSubscribers)
-                ]);
-                return [
-                    'success' => false,
-                    'newsletter_id' => $newsletter->id,
-                    'error' => 'All recipients filtered out',
-                    'skipped' => $skipped
-                ];
-            }
+            $sendRecord = $this->createSendRecord($newsletter, $validRecipients, $contentResult);
 
             // Create recipient records
             $recipients = $this->recipientRepository->createRecipients(
                 $sendRecord->id,
-                $filteredResult['valid']
+                $validRecipients
             );
 
-            // Dispatch send (handles batching internally)
+            // Dispatch send
             $sendResult = $this->dispatcher->dispatch(
                 $sendRecord,
                 $recipients,
@@ -131,7 +113,7 @@ class NewsletterSendService
             );
 
             // Update newsletter last_sent
-            $timestamp = new DateTimeImmutable();
+            $timestamp = new \DateTimeImmutable();
             $this->newsletterRepository->update($newsletter->id, [
                 'last_sent' => $timestamp->format('Y-m-d H:i:s')
             ]);
@@ -145,7 +127,7 @@ class NewsletterSendService
                 'success' => $success,
                 'newsletter_id' => $newsletter->id,
                 'recipients' => $stats['sent'],
-                'skipped' => $skipped,
+                'skipped' => $this->formatSkippedList($skipped),
                 'failed' => $stats['failed'],
                 'pending' => $stats['pending'],
                 'pages_included' => $newsletter->isAutomated() ? count($contentResult['pages']) : 0,
@@ -153,6 +135,21 @@ class NewsletterSendService
                 'partial_failure' => !$success && $stats['sent'] > 0
             ];
         });
+    }
+
+    /**
+     * Format skipped list from associative array
+     */
+    private function formatSkippedList(array $skippedAssoc): array
+    {
+        $formatted = [];
+        foreach ($skippedAssoc as $email => $reason) {
+            $formatted[] = [
+                'email' => $email,
+                'reason' => $reason
+            ];
+        }
+        return $formatted;
     }
 
     public function previewNewsletter(Newsletter $newsletter, array $previewEmails, ?int $siteId = null): array

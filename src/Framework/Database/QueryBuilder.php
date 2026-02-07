@@ -599,7 +599,9 @@ class QueryBuilder
                 'total' => (int)$total,
                 'last_page' => (int)ceil($total / $perPage),
                 'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total)
+                'to' => min($offset + $perPage, $total),
+                'total_pages' => (int)ceil($total / $perPage),
+                'has_more' => $page < (int)ceil($total / $perPage)
             ]
         ];
     }

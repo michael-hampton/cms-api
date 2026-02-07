@@ -24,7 +24,9 @@ class SubscriptionCheckoutService
         private readonly StripePaymentProcessor     $stripeProcessor,
         private readonly PayPalPaymentProcessor     $paypalProcessor,
         private readonly VoucherService $voucherService,
-        private readonly Database                   $database
+        private readonly SubscriptionEligibilityService $eligibilityService,
+        private readonly Database                       $database,
+
     )
     {
     }
@@ -60,6 +62,14 @@ class SubscriptionCheckoutService
                 if (!$paymentMethod || !$paymentMethod->is_active) {
                     throw new Exception('Invalid payment method');
                 }
+
+                // Check eligibility using injected service
+                $eligibility = $this->eligibilityService->canMemberSubscribe($memberId, $plan->id, $siteId, true);
+
+                if (!$eligibility['can_subscribe']) {
+                    throw new Exception($eligibility['reason']);
+                }
+
 
                 // Defaults
                 $voucherId = null;

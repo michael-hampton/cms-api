@@ -15,7 +15,7 @@ class SubscriptionEligibilityService
     {
     }
 
-    public function canMemberSubscribe(int $memberId, int $planId, int $siteId): array
+    public function canMemberSubscribe(int $memberId, int $planId, int $siteId, bool $allowMultiplePlans = false): array
     {
         $plan = $this->planRepository->find($planId);
 
@@ -33,15 +33,18 @@ class SubscriptionEligibilityService
             ];
         }
 
-        $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($memberId, $siteId);
+        if (!$allowMultiplePlans) {
+            $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($memberId, $siteId);
 
-        if ($activeSubscription) {
-            return [
-                'can_subscribe' => false,
-                'reason' => 'Already has an active subscription',
-                'current_plan' => $activeSubscription->plan_name
-            ];
+            if ($activeSubscription) {
+                return [
+                    'can_subscribe' => false,
+                    'reason' => 'Already has an active subscription',
+                    'current_plan' => $activeSubscription->plan_name
+                ];
+            }
         }
+
 
         return [
             'can_subscribe' => true,

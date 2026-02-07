@@ -21,7 +21,8 @@ class IssueDelivery extends Model
         'promotion_id',
         'cut_off_date',
         'fulfilment_date',
-        'site_id'
+        'site_id',
+        'issue_code'
     ];
 
     protected $casts = [
@@ -33,6 +34,7 @@ class IssueDelivery extends Model
         'cut_off_date' => 'date',
         'fulfilment_date' => 'date',
         'status' => 'string',
+        'tracking_info' => 'array'
     ];
 
     public function subscription($relation = false)

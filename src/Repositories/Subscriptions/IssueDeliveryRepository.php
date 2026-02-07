@@ -7,6 +7,7 @@ use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
+use InvalidArgumentException;
 
 class IssueDeliveryRepository extends Repository
 {
@@ -151,19 +152,19 @@ class IssueDeliveryRepository extends Repository
     private function validateCsvRow(array $row): void
     {
         if (empty($row['title'])) {
-            throw new \InvalidArgumentException('Title is required');
+            throw new InvalidArgumentException('Title is required');
         }
 
         if (empty($row['issue_number'])) {
-            throw new \InvalidArgumentException('Issue number is required');
+            throw new InvalidArgumentException('Issue number is required');
         }
 
         if (empty($row['on_sale_date'])) {
-            throw new \InvalidArgumentException('On-sale date is required');
+            throw new InvalidArgumentException('On-sale date is required');
         }
 
         if (!empty($row['status']) && !IssueScheduleStatus::tryFrom($row['status'])) {
-            throw new \InvalidArgumentException('Invalid status value');
+            throw new InvalidArgumentException('Invalid status value');
         }
     }
 
@@ -236,7 +237,6 @@ class IssueDeliveryRepository extends Repository
         }
 
         $total = $query->count();
-        $lastPage = (int)ceil($total / $perPage);
         $offset = ($page - 1) * $perPage;
 
         $data = $query->orderBy('on_sale_date', 'desc')
@@ -248,7 +248,7 @@ class IssueDeliveryRepository extends Repository
             data: $data->toArray(),
             total: $total,
             page: $page,
-            perPage: $perPage
+            perPage: $perPage,
         );
     }
 

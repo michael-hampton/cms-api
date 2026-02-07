@@ -6,6 +6,7 @@ use App\Models\Member;
 use App\Models\Model;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\SubscriptionBundle;
 use App\Models\SubscriptionPremiumAccess;
 use App\Models\SubscriptionWindow;
 use App\Models\Voucher;
@@ -1352,5 +1353,175 @@ class SubscriptionModelTest extends FunctionalTestCase
         }, $grantedAccess);
 
         $this->assertNotContains('basic-newsletter', $identifiers);
+    }
+
+
+    public function test_is_eligible_for_paid_newsletter_returns_true_for_active(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertTrue($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_true_for_grace_period(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'grace_period',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertTrue($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_true_for_retrying(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'retrying',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+3 days')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertTrue($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_false_for_expired(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'expired',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_false_for_cancelled(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'cancelled',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_false_for_paused(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'paused',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_false_for_grace_period_ended(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'grace_period',
+            'type' => 'paid',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')), // Grace ended
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_is_eligible_for_paid_newsletter_returns_false_for_free_subscription(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Free',
+            'status' => 'active',
+            'type' => 'free',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 0,
+            'currency' => 'USD'
+        ]);
+
+        $this->assertFalse($subscription->isEligibleForPaidNewsletter());
+    }
+
+    public function test_has_bundle(): void
+    {
+        $subscription = new Subscription(['bundle_id' => 123]);
+        $this->assertTrue($subscription->hasBundle(123));
+        $this->assertFalse($subscription->hasBundle(456));
+    }
+
+    public function test_has_bundle_access_to_newsletter(): void
+    {
+        $bundle = SubscriptionBundle::create([
+            'site_id' => $this->siteId,
+            'name' => 'Test Bundle',
+            'slug' => 'test-bundle',
+            'newsletter_slugs' => ['news1', 'news2'],
+            'is_active' => true
+        ]);
+
+        $subscription = new Subscription(['bundle_id' => $bundle->id]);
+        $this->assertTrue($subscription->hasBundleAccessToNewsletter('news1'));
+        $this->assertTrue($subscription->hasBundleAccessToNewsletter('news2'));
+        $this->assertFalse($subscription->hasBundleAccessToNewsletter('news3'));
+    }
+
+    public function test_has_bundle_access_to_newsletter_inactive_bundle(): void
+    {
+        $bundle = SubscriptionBundle::create([
+            'site_id' => $this->siteId,
+            'name' => 'Inactive Bundle',
+            'slug' => 'inactive',
+            'newsletter_slugs' => ['news1'],
+            'is_active' => false
+        ]);
+
+        $subscription = new Subscription(['bundle_id' => $bundle->id]);
+        $this->assertFalse($subscription->hasBundleAccessToNewsletter('news1'));
     }
 }

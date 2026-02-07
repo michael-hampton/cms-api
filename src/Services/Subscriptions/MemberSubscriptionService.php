@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Newsletters\CommunicationChannel;
 use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
@@ -192,8 +193,8 @@ class MemberSubscriptionService
         return match ($emailType) {
             'special_offer' => $member->wantsSpecialOffers(),
             'third_party' => $member->wantsThirdPartyCommunications(),
-            'product_update' => $member->getCommunicationPreference('product_updates', true),
-            'newsletter' => $member->getCommunicationPreference('newsletter', true),
+            'product_update' => $member->getCommunicationPreference(CommunicationChannel::ProductUpdates->value, true),
+            'newsletter' => $member->getCommunicationPreference(CommunicationChannel::Newsletter->value, true),
             default => $member->wantsMarketingEmails(),
         };
     }

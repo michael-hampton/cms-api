@@ -25,7 +25,15 @@ class Newsletter extends Model
         'slug',
         'is_premium',
         'allows_single_purchase',
-        'is_preview'
+        'is_preview',
+        'allowed_regions',
+        'blocked_regions',
+        'has_geographic_restrictions',
+        'access_window_start',
+        'access_window_end',
+        'has_time_window',
+        'bundle_id',
+        'requires_bundle',
     ];
 
     protected $casts = [
@@ -35,7 +43,14 @@ class Newsletter extends Model
         'max_pages' => 'integer',
         'created_at' => 'datetime',
         'is_default' => 'boolean',
-        'is_preview' => 'boolean'
+        'is_preview' => 'boolean',
+        'allowed_regions' => 'array',
+        'blocked_regions' => 'array',
+        'has_geographic_restrictions' => 'boolean',
+        'access_window_start' => 'datetime',
+        'access_window_end' => 'datetime',
+        'has_time_window' => 'boolean',
+        'requires_bundle' => 'boolean',
     ];
 
     const INTERVAL_DAILY = 'daily';
@@ -125,5 +140,90 @@ class Newsletter extends Model
     public function campaigns($relation = false)
     {
         return $this->hasMany(Campaign::class, 'newsletter_id', 'id', $relation);
+    }
+
+    /**
+     * Check if newsletter has geographic restrictions
+     */
+    public function hasGeographicRestrictions(): bool
+    {
+        return $this->has_geographic_restrictions ?? false;
+    }
+
+    /**
+     * Check if a region is allowed to access this newsletter
+     */
+    public function isRegionAllowed(?string $region): bool
+    {
+        if (!$this->hasGeographicRestrictions()) {
+            return true; // No restrictions = everyone allowed
+        }
+
+        if (!$region) {
+            return false; // Region required but not provided
+        }
+
+        // Check blocked regions first (blocklist takes precedence)
+        if ($this->blocked_regions && in_array($region, $this->blocked_regions)) {
+            return false;
+        }
+
+        // If allowed_regions is set, region must be in it
+        if ($this->allowed_regions) {
+            return in_array($region, $this->allowed_regions);
+        }
+
+        // No specific allowed regions but has restrictions = use blocklist only
+        return true;
+    }
+
+    /**
+     * Check if newsletter has a time-based access window
+     */
+    public function hasTimeWindow(): bool
+    {
+        return $this->has_time_window ?? false;
+    }
+
+    /**
+     * Check if current time is within access window
+     */
+    public function isWithinAccessWindow(\DateTime $currentTime, ?Subscription $subscription = null): bool
+    {
+        if (!$this->hasTimeWindow()) {
+            return true; // No time window = always accessible
+        }
+
+        // Check start window
+        if ($this->access_window_start && $currentTime < $this->access_window_start) {
+            return false; // Too early
+        }
+
+        // Check end window
+        if ($this->access_window_end && $currentTime > $this->access_window_end) {
+            return false; // Too late
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if newsletter requires a bundle
+     */
+    public function requiresBundle(): bool
+    {
+        return $this->requires_bundle ?? false;
+    }
+
+    /**
+     * Get the required bundle
+     */
+    public function bundle()
+    {
+        if (!$this->bundle_id) {
+            return null;
+        }
+
+        return SubscriptionBundle::find($this->bundle_id);
     }
 }

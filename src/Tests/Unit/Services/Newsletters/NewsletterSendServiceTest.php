@@ -97,17 +97,20 @@ class NewsletterSendServiceTest extends TestCase
             (object)['id' => 2, 'email' => 'user2@example.com']
         ];
 
-        // Mock recipient resolution
-        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
-            ->once()
-            ->with($newsletter, $siteId)
-            ->andReturn($subscribers);
-
         // Mock content building
         $this->mockContentBuilder->shouldReceive('build')
             ->once()
             ->with($newsletter, $siteId, false)
             ->andReturn($contentResult);
+
+        // Mock recipient resolution - NEW STRUCTURE
+        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
+            ->once()
+            ->with($newsletter, $siteId)
+            ->andReturn([
+                'valid' => $subscribers,
+                'skipped' => []
+            ]);
 
         // Mock transaction
         $this->mockDatabase->shouldReceive('transaction')
@@ -120,14 +123,6 @@ class NewsletterSendServiceTest extends TestCase
         $this->mockSendRepository->shouldReceive('create')
             ->once()
             ->andReturn($mockSendRecord);
-
-        // Mock recipient filtering
-        $this->mockRecipientResolver->shouldReceive('filterRecipients')
-            ->once()
-            ->andReturn([
-                'valid' => $subscribers,
-                'skipped' => []
-            ]);
 
         // Mock recipient record creation
         $this->mockRecipientRepository->shouldReceive('createRecipients')
@@ -163,6 +158,7 @@ class NewsletterSendServiceTest extends TestCase
         $this->assertEquals(0, $result['failed']);
     }
 
+
     public function testSendNewsletterPreventsDuplicateSend()
     {
         $siteId = 1;
@@ -180,25 +176,31 @@ class NewsletterSendServiceTest extends TestCase
         $siteId = 1;
         $newsletter = $this->createMockNewsletter();
 
+        $this->mockContentBuilder->shouldReceive('build')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'html' => 'content',
+                'pages' => []
+            ]);
+
         $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
             ->once()
-            ->andReturn([]);
+            ->andReturn([
+                'valid' => [],
+                'skipped' => []
+            ]);
 
         $result = $this->service->sendNewsletter($newsletter, $siteId);
 
         $this->assertFalse($result['success']);
-        $this->assertEquals('No confirmed subscribers', $result['error']);
+        $this->assertEquals('No eligible recipients', $result['error']);
     }
 
     public function testSendNewsletterFailsWhenContentBuildingFails()
     {
         $siteId = 1;
         $newsletter = $this->createMockNewsletter();
-        $subscribers = ['user@example.com'];
-
-        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
-            ->once()
-            ->andReturn($subscribers);
 
         $this->mockContentBuilder->shouldReceive('build')
             ->once()
@@ -219,19 +221,19 @@ class NewsletterSendServiceTest extends TestCase
         $newsletter = $this->createMockNewsletter();
         $subscribers = ['user1@example.com', 'user2@example.com'];
 
-        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')->andReturn($subscribers);
         $this->mockContentBuilder->shouldReceive('build')->andReturn([
             'success' => true,
             'html' => 'content',
             'pages' => []
         ]);
 
-        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
-        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
-        $this->mockRecipientResolver->shouldReceive('filterRecipients')->andReturn([
+        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')->andReturn([
             'valid' => $subscribers,
             'skipped' => []
         ]);
+
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
         $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
 
         $this->mockDispatcher->shouldReceive('dispatch')
@@ -398,30 +400,26 @@ class NewsletterSendServiceTest extends TestCase
         $siteId = 1;
         $newsletter = $this->createMockNewsletter();
 
-        $allSubscribers = ['valid@example.com', 'skipped@example.com'];
         $contentResult = [
             'success' => true,
             'html' => '<p>Content</p>{{UNSUBSCRIBE_LINK}}',
             'pages' => []
         ];
 
-        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
-            ->andReturn($allSubscribers);
-
         $this->mockContentBuilder->shouldReceive('build')
             ->andReturn($contentResult);
+
+        $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
+            ->andReturn([
+                'valid' => ['valid@example.com'],
+                'skipped' => ['skipped@example.com' => 'Marketing emails disabled in global settings']
+            ]);
 
         $this->mockDatabase->shouldReceive('transaction')
             ->andReturnUsing(fn($cb) => $cb());
 
         $this->mockSendRepository->shouldReceive('create')
             ->andReturn($this->createMockSendRecord());
-
-        $this->mockRecipientResolver->shouldReceive('filterRecipients')
-            ->andReturn([
-                'valid' => ['valid@example.com'],
-                'skipped' => ['skipped@example.com' => 'Marketing emails disabled in global settings']
-            ]);
 
         $this->mockRecipientRepository->shouldReceive('createRecipients')
             ->andReturn([]);

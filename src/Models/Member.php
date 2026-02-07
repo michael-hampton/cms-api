@@ -25,7 +25,9 @@ class Member extends Model
         'total_points',
         'activity_stats',
         'stripe_customer_id',
-        'communication_preferences'
+        'communication_preferences',
+        'region',
+        'timezone',
     ];
 
     protected $hidden = [
@@ -375,4 +377,30 @@ class Member extends Model
         );
         return $this->save();
     }
+
+    /**
+     * Get member's region (ISO country code)
+     */
+    public function getRegion(): ?string
+    {
+        return $this->region;
+    }
+
+    /**
+     * Set member's region
+     */
+    public function setRegion(?string $region): void
+    {
+        $this->region = $region ? strtoupper($region) : null;
+        $this->save();
+    }
+
+    /**
+     * Get member's timezone
+     */
+    public function getTimezone(): string
+    {
+        return $this->timezone ?? 'UTC';
+    }
+
 }

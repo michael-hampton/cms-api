@@ -66,6 +66,39 @@ class SubscriptionPlanPricingRepository extends Repository
         return true;
     }
 
+    public function searchPricingTiersPaginated(array $filters): array
+    {
+        $query = SubscriptionPlanPricing::query();
+
+        // Filter by plan_id
+        if (!empty($filters['plan_id'])) {
+            $query->where('plan_id', $filters['plan_id']);
+        }
+
+        // Filter by status (active/inactive)
+        if (!empty($filters['status'])) {
+            $isActive = $filters['status'] === 'active';
+            $query->where('is_active', $isActive);
+        }
+
+        // Search in label and period_description
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('label', 'LIKE', "%{$search}%")
+                    ->orWhere('period_description', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // Default ordering
+        $query->orderBy('sort_order', 'asc');
+
+        return $query->paginate(
+            perPage: $filters['per_page'] ?? 15,
+            page: $filters['page'] ?? 1
+        );
+    }
+
     protected function getModelClass(): string
     {
         return SubscriptionPlanPricing::class;

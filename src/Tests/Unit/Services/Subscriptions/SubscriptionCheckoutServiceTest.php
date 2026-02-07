@@ -13,6 +13,7 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
+use App\Services\Subscriptions\SubscriptionEligibilityService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
@@ -26,6 +27,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
     private $paypalProcessor;
     private $voucherService;
     private $service;
+    private $eligibilityService;
 
     protected function setUp(): void
     {
@@ -37,6 +39,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
         $this->paypalProcessor = m::mock(PayPalPaymentProcessor::class);
         $this->voucherService = m::mock(VoucherService::class);
+        $this->eligibilityService = m::mock(SubscriptionEligibilityService::class);
 
         $this->service = new SubscriptionCheckoutService(
             $this->planRepository,
@@ -45,6 +48,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             $this->stripeProcessor,
             $this->paypalProcessor,
             $this->voucherService,
+            $this->eligibilityService,
             Database::getInstance()
         );
     }
@@ -95,6 +99,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();;
         $paymentMethod->is_active = true;
+
+        $this->setEligibilityServiceMock(true);
 
         $this->planRepository->shouldReceive('find')
             ->with(1)
@@ -158,6 +164,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->billing_period = 'monthly';
         $plan->shouldReceive('getPremiumAccessGrants')->andReturn([]);
         $plan->shouldReceive('grantsPremiumAccess')->andReturn(false);
+
+        $this->setEligibilityServiceMock(true);
 
         $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
@@ -256,6 +264,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
+
+        $this->setEligibilityServiceMock(true);
 
         $this->planRepository->shouldReceive('find')
             ->with(1)
@@ -359,5 +369,12 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Invalid payment method', $result['message']);
+    }
+
+    private function setEligibilityServiceMock(bool $canSubscribe): void
+    {
+        $this->eligibilityService->shouldReceive('canMemberSubscribe')
+            ->with(1, 1, 1, true)
+            ->andReturn(['can_subscribe' => $canSubscribe]);
     }
 }

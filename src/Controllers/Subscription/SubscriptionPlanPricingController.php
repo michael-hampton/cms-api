@@ -6,24 +6,38 @@ use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Models\SubscriptionPlanPricing;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
 
 class SubscriptionPlanPricingController extends Controller
 {
     public function __construct(
-        private readonly SubscriptionPlanPricingService $pricingService
+        private readonly SubscriptionPlanPricingService    $pricingService,
+        private readonly SubscriptionPlanPricingRepository $pricingRepository
     )
     {
         parent::__construct();
     }
 
-    public function index(int $planId)
+    public function index(Request $request, int $planId)
     {
-        $tiers = $this->pricingService->getPricingTiersForPlan($planId);
+        $filters = [
+            'plan_id' => $planId,
+            'status' => $request->input('status'),
+            'search' => $request->input('search')
+        ];
+
+        $result = $this->pricingRepository->searchPricingTiersPaginated($filters);
 
         return $this->resourceResponse([
             'success' => true,
-            'data' => $tiers
+            'data' => $result['data']->toArray(),
+            'pagination' => [
+                'total' => $result['pagination']['total'],
+                'page' => $result['pagination']['current_page'],
+                'per_page' => $result['pagination']['per_page'],
+                'total_pages' => $result['pagination']['total_pages'],
+            ]
         ]);
     }
 

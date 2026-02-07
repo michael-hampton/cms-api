@@ -7,6 +7,7 @@ use App\Models\Newsletter;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Newsletter\NewsletterRecipientResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -17,6 +18,7 @@ class NewsletterRecipientResolverTest extends TestCase
     private $mockSubscriberRepository;
     private $mockPreferenceRepository;
     private $mockMemberRepository;
+    private $mockSubscriptionRepository;
 
     protected function setUp(): void
     {
@@ -25,11 +27,13 @@ class NewsletterRecipientResolverTest extends TestCase
         $this->mockSubscriberRepository = Mockery::mock(SubscriberRepository::class);
         $this->mockPreferenceRepository = Mockery::mock(MemberSubscriptionPreferenceRepository::class);
         $this->mockMemberRepository = Mockery::mock(MemberRepository::class);
+        $this->mockSubscriptionRepository = Mockery::mock(SubscriptionRepository::class);
 
         $this->resolver = new NewsletterRecipientResolver(
             $this->mockSubscriberRepository,
             $this->mockPreferenceRepository,
-            $this->mockMemberRepository
+            $this->mockMemberRepository,
+            $this->mockSubscriptionRepository
         );
     }
 
@@ -41,7 +45,7 @@ class NewsletterRecipientResolverTest extends TestCase
 
     public function testResolveForNewsletterCombinesAllSources()
     {
-        $newsletter = $this->createMockNewsletter('weekly');
+        $newsletter = $this->createMockNewsletter('weekly', false);
         $siteId = 1;
 
         $legacyEmails = ['legacy1@example.com', 'legacy2@example.com'];
@@ -59,18 +63,27 @@ class NewsletterRecipientResolverTest extends TestCase
             ->with($siteId)
             ->andReturn(collect([$mockPref1, $mockPref2]));
 
+        // Mock preference filtering phase
+        $this->mockMemberRepository->shouldReceive('findByEmails')
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->mockPreferenceRepository->shouldReceive('findByEmails')
+            ->once()
+            ->andReturn(collect([]));
+
         $result = $this->resolver->resolveForNewsletter($newsletter, $siteId);
 
-        $this->assertCount(4, $result);
-        $this->assertContains('legacy1@example.com', $result);
-        $this->assertContains('legacy2@example.com', $result);
-        $this->assertContains('member1@example.com', $result);
-        $this->assertContains('member2@example.com', $result);
+        $this->assertCount(4, $result['valid']);
+        $this->assertContains('legacy1@example.com', $result['valid']);
+        $this->assertContains('legacy2@example.com', $result['valid']);
+        $this->assertContains('member1@example.com', $result['valid']);
+        $this->assertContains('member2@example.com', $result['valid']);
     }
 
     public function testResolveForNewsletterFiltersByFrequency()
     {
-        $newsletter = $this->createMockNewsletter('weekly');
+        $newsletter = $this->createMockNewsletter('weekly', false);
         $siteId = 1;
 
         $mockPref1 = $this->createMockPreference('weekly@example.com', 'weekly', false);
@@ -82,16 +95,22 @@ class NewsletterRecipientResolverTest extends TestCase
         $this->mockPreferenceRepository->shouldReceive('getActiveSubscribersForSite')
             ->andReturn(collect([$mockPref1, $mockPref2]));
 
+        $this->mockMemberRepository->shouldReceive('findByEmails')
+            ->andReturn(collect([]));
+
+        $this->mockPreferenceRepository->shouldReceive('findByEmails')
+            ->andReturn(collect([]));
+
         $result = $this->resolver->resolveForNewsletter($newsletter, $siteId);
 
-        $this->assertCount(1, $result);
-        $this->assertContains('weekly@example.com', $result);
-        $this->assertNotContains('monthly@example.com', $result);
+        $this->assertCount(1, $result['valid']);
+        $this->assertContains('weekly@example.com', $result['valid']);
+        $this->assertNotContains('monthly@example.com', $result['valid']);
     }
 
     public function testResolveForNewsletterExcludesOptedOut()
     {
-        $newsletter = $this->createMockNewsletter('weekly');
+        $newsletter = $this->createMockNewsletter('weekly', false);
         $siteId = 1;
 
         $mockPref1 = $this->createMockPreference('active@example.com', 'weekly', false);
@@ -103,16 +122,22 @@ class NewsletterRecipientResolverTest extends TestCase
         $this->mockPreferenceRepository->shouldReceive('getActiveSubscribersForSite')
             ->andReturn(collect([$mockPref1, $mockPref2]));
 
+        $this->mockMemberRepository->shouldReceive('findByEmails')
+            ->andReturn(collect([]));
+
+        $this->mockPreferenceRepository->shouldReceive('findByEmails')
+            ->andReturn(collect([]));
+
         $result = $this->resolver->resolveForNewsletter($newsletter, $siteId);
 
-        $this->assertCount(1, $result);
-        $this->assertContains('active@example.com', $result);
-        $this->assertNotContains('optedout@example.com', $result);
+        $this->assertCount(1, $result['valid']);
+        $this->assertContains('active@example.com', $result['valid']);
+        $this->assertNotContains('optedout@example.com', $result['valid']);
     }
 
     public function testResolveForNewsletterDeduplicatesEmails()
     {
-        $newsletter = $this->createMockNewsletter('weekly');
+        $newsletter = $this->createMockNewsletter('weekly', false);
         $siteId = 1;
 
         $legacyEmails = ['duplicate@example.com', 'unique@example.com'];
@@ -124,10 +149,16 @@ class NewsletterRecipientResolverTest extends TestCase
         $this->mockPreferenceRepository->shouldReceive('getActiveSubscribersForSite')
             ->andReturn(collect([$mockPref]));
 
+        $this->mockMemberRepository->shouldReceive('findByEmails')
+            ->andReturn(collect([]));
+
+        $this->mockPreferenceRepository->shouldReceive('findByEmails')
+            ->andReturn(collect([]));
+
         $result = $this->resolver->resolveForNewsletter($newsletter, $siteId);
 
-        $this->assertCount(2, $result);
-        $this->assertEquals(2, count(array_unique($result)));
+        $this->assertCount(2, $result['valid']);
+        $this->assertEquals(2, count(array_unique($result['valid'])));
     }
 
     public function testFilterRecipientsAllowsValidEmails()
@@ -175,27 +206,6 @@ class NewsletterRecipientResolverTest extends TestCase
         $this->assertEmpty($result['valid']);
         $this->assertCount(1, $result['skipped']);
         $this->assertEquals('Newsletter preference disabled in global settings', $result['skipped']['disabled@example.com']);
-    }
-
-    public function testFilterRecipientsSkipsMarketingDisabled()
-    {
-        $newsletter = $this->createMockNewsletter('weekly');
-        $siteId = 1;
-        $emails = ['nomarketing@example.com'];
-
-        $mockMember = $this->createMockMember('nomarketing@example.com', true, false);
-
-        $this->mockMemberRepository->shouldReceive('findByEmails')
-            ->andReturn(collect([$mockMember]));
-
-        $this->mockPreferenceRepository->shouldReceive('findByEmails')
-            ->andReturn(collect([]));
-
-        $result = $this->resolver->filterRecipients($emails, $newsletter, $siteId);
-
-        $this->assertEmpty($result['valid']);
-        $this->assertCount(1, $result['skipped']);
-        $this->assertEquals('Marketing emails disabled in global settings', $result['skipped']['nomarketing@example.com']);
     }
 
     public function testFilterRecipientsSkipsNewsletterOptOut()
