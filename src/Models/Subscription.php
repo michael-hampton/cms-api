@@ -696,7 +696,7 @@ class Subscription extends Model
                 $newsletter->slug
             );
 
-            $hasAccessThroughPlan = $this->plan->grantsPremiumAccess(
+            $hasAccessThroughPlan = $this->plan?->grantsPremiumAccess(
                 PremiumAccessType::Newsletter->value, $newsletter->slug
             );
 

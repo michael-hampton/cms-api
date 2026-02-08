@@ -461,7 +461,14 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'site_id' => $this->siteId,
         ]);
 
-        // NO BLOCKS CREATED - testing dynamic injection
+        // must have at least one block to display
+        Block::create([
+            'type' => 'test',
+            'page_id' => $page->id,
+            'data' => json_encode([
+                'paragraphs' => ['Test content'],
+            ]),
+        ]);
 
         $newsletter = Newsletter::create([
             'title' => 'Test Newsletter',
@@ -472,7 +479,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'content' => 'test',
         ]);
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([$page]), null, null, true, null, $this->siteId);
 
         // Offer should be dynamically injected
         $this->assertStringContainsString('Partner Offer', $html);
@@ -495,6 +502,14 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'site_id' => $this->siteId,
         ]);
 
+        Block::create([
+            'type' => 'test',
+            'page_id' => $page->id,
+            'data' => json_encode([
+                'paragraphs' => ['Test content'],
+            ]),
+        ]);
+
         $newsletter = Newsletter::create([
             'title' => 'Test Newsletter',
             'site_id' => $this->siteId,
@@ -504,7 +519,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'content' => 'test',
         ]);
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, $member, $this->siteId);
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([$page]), $member, null, true, null, $this->siteId);
 
         // Reward should be dynamically injected
         $this->assertStringContainsString('Member Reward', $html);
@@ -526,7 +541,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         Block::create([
             'type' => 'text',
             'page_id' => $page->id,
-            'data' => json_encode(['paragraphs' => ['Static content']]),
+            'data' => ['paragraphs' => ['Static content']],
         ]);
 
         // Dynamic offer
@@ -548,7 +563,9 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'content' => 'test',
         ]);
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+        $page = $page->with(['blocks'])->first();
+
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([$page]), null, null, true, null, $this->siteId);
 
         // Both static and dynamic content should appear
         $this->assertStringContainsString('Static content', $html);
@@ -601,7 +618,9 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'content' => 'test',
         ]);
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, $member, $this->siteId);
+        $page = $page->with(['blocks'])->first();
+
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([$page]), $member, null, true, null, $this->siteId);
 
         // Both static and dynamic should be present
         $this->assertStringContainsString('Static paragraph 1', $html);
@@ -662,7 +681,9 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'content' => 'test',
         ]);
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+        $page = $page->with(['blocks'])->first();
+
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([$page]), null, null, true, null, $this->siteId);
 
         // Dynamic blocks should be distributed throughout, not clumped at end
         $offerCount = substr_count($html, 'Partner Offer');

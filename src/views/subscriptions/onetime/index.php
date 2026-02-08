@@ -469,8 +469,18 @@
 </head>
 <body>
 <header class="header">
-    <div class="container">
+    <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
         <h2>YourStore</h2>
+        <button onclick="openMiniCart()"
+                style="position: relative; background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            Cart
+            <span id="header-cart-count" class="cart-badge" style="display: none;">0</span>
+        </button>
     </div>
 </header>
 <main class="container">
@@ -679,8 +689,18 @@
     }
 
     function updateCartDisplay() {
-        document.getElementById('cart-count').textContent = cartData.count || 0;
+        const count = cartData.count || 0;
+        document.getElementById('cart-count').textContent = count;
         document.getElementById('cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
+
+        // Update header badge
+        const headerBadge = document.getElementById('header-cart-count');
+        if (count > 0) {
+            headerBadge.textContent = count;
+            headerBadge.style.display = 'flex';
+        } else {
+            headerBadge.style.display = 'none';
+        }
 
         const cartItemsContainer = document.getElementById('cart-items');
         if (!cartData.items || cartData.items.length === 0) {
@@ -689,14 +709,14 @@
         }
 
         cartItemsContainer.innerHTML = cartData.items.map(item => `
-            <div class="cart-item">
-                <div class="cart-item-name">${item.name || 'Subscription'}</div>
-                <div class="cart-item-details">
-                    ${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months
-                </div>
-                <div class="cart-item-price">£${(item.price || 0).toFixed(2)}</div>
+        <div class="cart-item">
+            <div class="cart-item-name">${item.name || 'Subscription'}</div>
+            <div class="cart-item-details">
+                ${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months
             </div>
-        `).join('');
+            <div class="cart-item-price">£${(item.price || 0).toFixed(2)}</div>
+        </div>
+    `).join('');
     }
 
 
@@ -783,6 +803,9 @@
 
             if (result.success) {
                 cartData = result;
+
+                console.log('cartData: ', cartData)
+
                 updateCartDisplay();
                 openMiniCart();
                 showToast('Added to cart!', 'success');

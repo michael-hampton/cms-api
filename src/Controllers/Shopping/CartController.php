@@ -368,6 +368,7 @@ class CartController extends Controller
         return $this->resourceResponse(array_merge($result, [
             'count' => $this->cartService->getCount(),
             'total' => $this->cartService->getTotal(),
+            'items' => $this->cartService->getItems(),
         ]));
     }
 

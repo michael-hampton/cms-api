@@ -2,6 +2,7 @@
 
 namespace App\Services\Newsletter;
 
+use App\Enums\Newsletters\CommunicationChannel;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
@@ -48,7 +49,7 @@ class NewsletterPageBuilderService
         $filters = $newsletter->page_filters ?? [];
 
         // Build query for published pages
-        $query = Page::with(['categories', 'tags', 'authors', 'metadata'])
+        $query = Page::with(['categories', 'tags', 'authors', 'metadata', 'blocks'])
             ->where('site_id', $siteId)
             ->where('status', 'published');
 
@@ -167,7 +168,6 @@ class NewsletterPageBuilderService
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-
         // Create render context
         $context = RenderContext::forNewsletter($newsletter->id, $member);
 
@@ -198,16 +198,8 @@ class NewsletterPageBuilderService
 
         $blocks = collect(!is_array($blocks) ? $blocks->toArray() : $blocks);
 
-        // DYNAMIC INJECTION: Get and merge dynamic blocks
-        $dynamicBlocks = $this->injector->getBlocksForSurface(
-            'newsletter_issue',
-            $newsletter->id,
-            $member,
-            $siteId,
-            'newsletter'
-        );
-
-        return !empty($dynamicBlocks) ? $blocks->concat($dynamicBlocks) : $blocks;
+        // NO MORE PROMOTION INJECTION HERE
+        return $blocks;
     }
 
     /**
@@ -1076,21 +1068,40 @@ class NewsletterPageBuilderService
     {
         $html = [];
 
-        $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px;">';
-        $html[] = '<div style="background: white; padding: 30px; border-radius: 8px;">';
+        $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #f5f5f5;">';
 
-        // Header with date
-        $html[] = '<h1 style="color: #333; margin-bottom: 10px;">' . htmlspecialchars($newsletter->title) . '</h1>';
-        $html[] = '<p style="color: #666; font-size: 14px; margin-bottom: 30px;">' . date('F j, Y') . '</p>';
+        // Compact header
+        $html[] = '<div style="background: #ffffff; padding: 30px 20px; border-bottom: 3px solid #007bff;">';
+        $html[] = '<h1 style="color: #333; margin: 0 0 5px 0; font-size: 24px;">' . htmlspecialchars($newsletter->title) . '</h1>';
+        $html[] = '<p style="color: #666; font-size: 13px; margin: 0;">' . date('l, F j, Y') . ' • ' . $pages->count() . ' articles</p>';
+        $html[] = '</div>';
 
-        // Summary
-        $html[] = '<p style="color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">';
-        $html[] = 'Here are the ' . $pages->count() . ' latest articles from our site:';
-        $html[] = '</p>';
+        $html[] = '<div style="background: #ffffff; padding: 20px;">';
 
-        // Compact page list
-        foreach ($pages as $page) {
-            $html[] = $this->renderDigestItem($newsletter, $page, $context, $member, $includeBlocks, $sendId, $siteId);
+        // GET PROMOTIONS ONCE at the newsletter level
+        $promotionBlocks = $this->injector->getBlocksForSurface(
+            'newsletter_issue',
+            $newsletter->id,
+            $member,
+            $siteId,
+            'newsletter'
+        );
+
+        // Merge pages and promotions
+        $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks, $newsletter, $context, $member, $includeBlocks, $sendId, $siteId);
+
+        foreach ($allContent as $index => $item) {
+            if ($index > 0) {
+                $html[] = '<div style="border-top: 1px solid #eee; margin: 15px 0;"></div>';
+            }
+
+            if (isset($item['is_promotion']) && $item['is_promotion']) {
+                // Render promotion block
+                $html[] = $this->renderBlockForEmail($item, $context, $siteId);
+            } else {
+                // Render page item WITHOUT blocks (to avoid re-injecting promotions)
+                $html[] = $this->renderDigestItem($newsletter, $item, $context, $member, $includeBlocks, $sendId, $siteId);
+            }
         }
 
         $html[] = '</div>';
@@ -1102,61 +1113,75 @@ class NewsletterPageBuilderService
 
     private function renderDigestItem(
         Newsletter    $newsletter,
-        Page          $page,
+        Page|array $page,
         RenderContext $context,
         ?Member       $member = null,
         bool          $includeBlocks = true,
         ?int          $sendId = null,
-        ?int          $siteId = null): string
+        ?int       $siteId = null
+    ): string
     {
         $isArray = is_array($page);
-        $pageId = $isArray ? $page['id'] : $page->id;
-        $title = $isArray ? $page['title'] : $page->title;
-        $subtitle = $isArray ? ($page['subtitle'] ?? '') : ($page->subtitle ?? '');
-        $slug = $isArray ? $page['slug'] : $page->slug;
+        if (!$isArray) {
+            $page = $page->toArray();
+        }
 
+        $pageId = $page['id'];
+        $title = $page['title'];
+        $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
         $html = [];
 
-        $html[] = '<div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">';
-        $html[] = '<h3 style="margin: 0 0 5px 0;">';
-        $html[] = '<a href="' . $url . '" style="color: #007bff; text-decoration: none;">';
-        $html[] = htmlspecialchars($page->title);
+        // Compact, scannable format
+        $html[] = '<div style="margin-bottom: 20px; display: table; width: 100%;">';
+
+        // Small thumbnail on left
+        $listingImageId = $page['listing_image_id'] ?? null;
+        $heroImageId = $page['hero_image_id'] ?? null;
+
+        if ($listingImageId || $heroImageId) {
+            $imageId = $listingImageId ?: $heroImageId;
+            $html[] = '<div style="display: table-cell; width: 100px; padding-right: 15px; vertical-align: top;">';
+            $html[] = '<a href="' . $url . '">';
+            $html[] = '<img src="' . url("/api/media/{$imageId}") . '" alt="' . htmlspecialchars($title) . '" style="width: 100px; height: 100px; object-fit: cover; border-radius: 4px; display: block;">';
+            $html[] = '</a>';
+            $html[] = '</div>';
+        }
+
+        $html[] = '<div style="display: table-cell; vertical-align: top;">';
+
+        // Compact title
+        $html[] = '<h3 style="margin: 0 0 6px 0; font-size: 16px; line-height: 1.4;">';
+        $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-weight: 600;">';
+        $html[] = htmlspecialchars($title);
         $html[] = '</a>';
         $html[] = '</h3>';
 
-        if ($page->meta_description) {
-            $html[] = '<p style="color: #666; font-size: 14px; margin: 0;">';
-            $html[] = htmlspecialchars(substr($page->meta_description, 0, 120)) . '...';
+        // Render blocks if requested
+        if ($includeBlocks) {
+            $pageBlocks = $page['blocks'] ?? null;
+
+            if ($pageBlocks && (is_array($pageBlocks) ? !empty($pageBlocks) : !$pageBlocks->isEmpty())) {
+                $blocksArray = is_array($pageBlocks) ? $pageBlocks : $pageBlocks->toArray();
+
+                foreach ($blocksArray as $block) {
+                    $blockArray = is_array($block) ? $block : $block->toArray();
+                    $html[] = $this->renderBlockForEmail($blockArray, $context, $siteId);
+                }
+            }
+        }
+
+        // Brief description
+        $metaDescription = $page['meta_description'] ?? null;
+        if ($metaDescription) {
+            $html[] = '<p style="color: #666; font-size: 13px; margin: 0; line-height: 1.5;">';
+            $html[] = htmlspecialchars(substr($metaDescription, 0, 100)) . '...';
             $html[] = '</p>';
         }
+
         $html[] = '</div>';
-
-        if ($includeBlocks) {
-            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
-
-            if ($blocks->count() > 0) {
-                $blocks = $blocks->toArray();
-                // Render first few blocks
-                $blockCount = 0;
-                foreach ($blocks as $block) {
-                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
-                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
-                    $blockCount++;
-                }
-            }
-        } else {
-            // Default: show description
-            if ($page->meta_description || $page->listing_synopsis) {
-                $description = $page->listing_synopsis ?: $page->meta_description;
-                $html[] = '<p style="color: #666; line-height: 1.6; margin: 0 0 15px 0;">';
-                $html[] = htmlspecialchars(substr($description, 0, 200));
-                if (strlen($description) > 200) {
-                    $html[] = '...';
-                }
-                $html[] = '</p>';
-            }
-        }
+        $html[] = '</div>';
 
         return implode("\n", $html);
     }
@@ -1194,124 +1219,173 @@ class NewsletterPageBuilderService
     {
         $html = [];
 
-        $html[] = '<div style="max-width: 800px; margin: 0 auto; font-family: Arial, sans-serif;">';
+        $html[] = '<div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #000000;">';
 
-        // First page as hero
+        // First page as dramatic hero (no promotions in hero)
         $featuredPage = $pages->first();
         if ($featuredPage) {
             $html[] = $this->renderHeroPage($featuredPage, $sendId);
             $pages = $pages->slice(1);
         }
 
-        // Rest as grid
-        $html[] = '<div style="padding: 20px;">';
-        $html[] = '<h2 style="color: #333; margin-bottom: 20px;">More Articles</h2>';
+        // Secondary articles with promotions
+        if ($pages->count() > 0) {
+            $html[] = '<div style="background: #ffffff; padding: 40px 20px;">';
+            $html[] = '<h2 style="color: #333; margin: 0 0 30px 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #000; padding-bottom: 10px;">Also in this issue</h2>';
 
-        foreach ($pages as $page) {
-            $html[] = $this->renderCompactCard($newsletter, $page, $context, $member, $includeBlocks, $sendId, $siteId);
+            // GET PROMOTIONS ONCE at the newsletter level
+            $promotionBlocks = $this->injector->getBlocksForSurface(
+                'newsletter_issue',
+                $newsletter->id,
+                $member,
+                $siteId,
+                'newsletter'
+            );
+
+            // Merge pages and promotions
+            $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks, $newsletter, $context, $member, $includeBlocks, $sendId, $siteId);
+
+            foreach ($allContent as $item) {
+                if (isset($item['is_promotion']) && $item['is_promotion']) {
+                    // Render promotion block
+                    $html[] = $this->renderBlockForEmail($item, $context, $siteId);
+                } else {
+                    // Render page card WITHOUT blocks
+                    $html[] = $this->renderCompactCard($newsletter, $item, $context, $member, $includeBlocks, $sendId, $siteId);
+                }
+            }
+
+            $html[] = '</div>';
         }
 
-        $html[] = '</div>';
         $html[] = $this->renderFooter($unsubscribeToken);
         $html[] = '</div>';
 
         return implode("\n", $html);
     }
 
-    private function renderHeroPage(Page $page, ?int $sendId = null): string
+    private function renderHeroPage(Page|array $page, ?int $sendId = null): string
     {
         $isArray = is_array($page);
-        $pageId = $isArray ? $page['id'] : $page->id;
-        $title = $isArray ? $page['title'] : $page->title;
-        $slug = $isArray ? $page['slug'] : $page->slug;
+        if (!$isArray) {
+            $page = $page->toArray();
+        }
 
+        $pageId = $page['id'];
+        $title = $page['title'];
+        $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
         $html = [];
 
-        $html[] = '<div style="position: relative; margin-bottom: 40px;">';
+        // Dramatic, magazine-style hero
+        $html[] = '<div style="position: relative; background: #000000; margin-bottom: 0;">';
 
-        if ($page->hero_image_id || $page->listing_image_id) {
-            $imageId = $page->hero_image_id ?: $page->listing_image_id;
-            $html[] = '<img src="' . url("/api/media/{$imageId}") . '" alt="' . htmlspecialchars($page->title) . '" style="width: 100%; height: 400px; object-fit: cover;">';
+        $heroImageId = $page['hero_image_id'] ?? null;
+        $listingImageId = $page['listing_image_id'] ?? null;
+
+        if ($heroImageId || $listingImageId) {
+            $imageId = $heroImageId ?: $listingImageId;
+            $html[] = '<a href="' . $url . '">';
+            $html[] = '<img src="' . url("/api/media/{$imageId}") . '" alt="' . htmlspecialchars($title) . '" style="width: 100%; height: 450px; object-fit: cover; display: block; opacity: 0.85;">';
+            $html[] = '</a>';
+
+            // Text overlay on image
+            $html[] = '<div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, transparent 100%); padding: 40px 30px;">';
+            $html[] = '<h1 style="margin: 0; font-size: 36px; line-height: 1.2; color: #ffffff; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">';
+            $html[] = '<a href="' . $url . '" style="color: #ffffff; text-decoration: none;">';
+            $html[] = htmlspecialchars($title);
+            $html[] = '</a>';
+            $html[] = '</h1>';
+
+            $metaDescription = $page['meta_description'] ?? null;
+            if ($metaDescription) {
+                $html[] = '<p style="color: rgba(255,255,255,0.95); font-size: 18px; line-height: 1.6; margin: 15px 0 20px 0; max-width: 600px; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">';
+                $html[] = htmlspecialchars($metaDescription);
+                $html[] = '</p>';
+            }
+
+            $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 14px 32px; background-color: #ffffff; color: #000000; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Read Now</a>';
+            $html[] = '</div>';
+        } else {
+            // No image fallback
+            $html[] = '<div style="padding: 60px 30px; background: #000000;">';
+            $html[] = '<h1 style="margin: 0 0 20px 0; font-size: 42px; color: #ffffff; font-weight: 800;">';
+            $html[] = '<a href="' . $url . '" style="color: #ffffff; text-decoration: none;">';
+            $html[] = htmlspecialchars($title);
+            $html[] = '</a>';
+            $html[] = '</h1>';
+
+            $metaDescription = $page['meta_description'] ?? null;
+            if ($metaDescription) {
+                $html[] = '<p style="color: rgba(255,255,255,0.9); font-size: 20px; line-height: 1.6; margin: 0 0 30px 0; max-width: 600px;">';
+                $html[] = htmlspecialchars($metaDescription);
+                $html[] = '</p>';
+            }
+
+            $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 14px 32px; background-color: #ffffff; color: #000000; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Read Full Story</a>';
+            $html[] = '</div>';
         }
 
-        $html[] = '<div style="padding: 30px; background: white;">';
-        $html[] = '<h1 style="margin: 0 0 15px 0; font-size: 32px;">';
-        $html[] = '<a href="' . $url . '" style="color: #333; text-decoration: none;">';
-        $html[] = htmlspecialchars($page->title);
-        $html[] = '</a>';
-        $html[] = '</h1>';
-
-        if ($page->meta_description) {
-            $html[] = '<p style="color: #666; font-size: 18px; line-height: 1.6; margin: 0 0 20px 0;">';
-            $html[] = htmlspecialchars($page->meta_description);
-            $html[] = '</p>';
-        }
-
-        $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 12px 30px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 16px;">Read Full Article</a>';
-        $html[] = '</div>';
         $html[] = '</div>';
 
         return implode("\n", $html);
     }
 
+
     private function renderCompactCard(
         Newsletter    $newsletter,
-        Page          $page,
+        Page|array $page,
         RenderContext $context,
         ?Member       $member = null,
         bool          $includeBlocks = true,
         ?int          $sendId = null,
-        ?int          $siteId = null): string
+        ?int       $siteId = null
+    ): string
     {
         $isArray = is_array($page);
-        $pageId = $isArray ? $page['id'] : $page->id;
-        $title = $isArray ? $page['title'] : $page->title;
-        $slug = $isArray ? $page['slug'] : $page->slug;
+        if (!$isArray) {
+            $page = $page->toArray();
+        }
 
+        $pageId = $page['id'];
+        $title = $page['title'];
+        $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
         $html = [];
 
-        $html[] = '<div style="margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 4px;">';
-        $html[] = '<h3 style="margin: 0 0 10px 0; font-size: 18px;">';
-        $html[] = '<a href="' . $url . '" style="color: #333; text-decoration: none;">';
-        $html[] = htmlspecialchars($page->title);
+        // Clean, minimal secondary cards
+        $html[] = '<div style="margin-bottom: 25px; padding-bottom: 25px; border-bottom: 2px solid #f0f0f0;">';
+
+        $html[] = '<h3 style="margin: 0 0 10px 0; font-size: 18px; line-height: 1.4;">';
+        $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-weight: 700;">';
+        $html[] = htmlspecialchars($title);
         $html[] = '</a>';
         $html[] = '</h3>';
 
-        if ($page->meta_description) {
-            $html[] = '<p style="color: #666; font-size: 14px; margin: 0;">';
-            $html[] = htmlspecialchars(substr($page->meta_description, 0, 100)) . '...';
+        // Render blocks if requested
+        if ($includeBlocks) {
+            $pageBlocks = $page['blocks'] ?? null;
+
+            if ($pageBlocks && (is_array($pageBlocks) ? !empty($pageBlocks) : !$pageBlocks->isEmpty())) {
+                $blocksArray = is_array($pageBlocks) ? $pageBlocks : $pageBlocks->toArray();
+
+                foreach ($blocksArray as $block) {
+                    $blockArray = is_array($block) ? $block : $block->toArray();
+                    $html[] = $this->renderBlockForEmail($blockArray, $context, $siteId);
+                }
+            }
+        }
+
+        $metaDescription = $page['meta_description'] ?? null;
+        if ($metaDescription) {
+            $html[] = '<p style="color: #666; font-size: 14px; margin: 0; line-height: 1.6;">';
+            $html[] = htmlspecialchars(substr($metaDescription, 0, 120)) . '...';
             $html[] = '</p>';
         }
+
         $html[] = '</div>';
-
-        // Description or blocks
-        if ($includeBlocks) {
-            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
-
-            if ($blocks->count() > 0) {
-                $blocks = $blocks->toArray();
-                // Render first few blocks
-                $blockCount = 0;
-                foreach ($blocks as $block) {
-                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
-                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
-                    $blockCount++;
-                }
-            }
-        } else {
-            // Default: show description
-            if ($page->meta_description || $page->listing_synopsis) {
-                $description = $page->listing_synopsis ?: $page->meta_description;
-                $html[] = '<p style="color: #666; line-height: 1.6; margin: 0 0 15px 0;">';
-                $html[] = htmlspecialchars(substr($description, 0, 200));
-                if (strlen($description) > 200) {
-                    $html[] = '...';
-                }
-                $html[] = '</p>';
-            }
-        }
 
         return implode("\n", $html);
     }
@@ -1329,37 +1403,135 @@ class NewsletterPageBuilderService
     {
         $html = [];
 
-        $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">';
-        $html[] = '<h2 style="color: #333;">' . htmlspecialchars($newsletter->title) . '</h2>';
-        $html[] = '<ul style="list-style: none; padding: 0;">';
+        $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Georgia, serif; background: #ffffff; padding: 40px 20px;">';
 
-        foreach ($pages as $page) {
-
-            $isArray = is_array($page);
-            $pageId = $isArray ? $page['id'] : $page->id;
-            $title = $isArray ? $page['title'] : $page->title;
-            $slug = $isArray ? $page['slug'] : $page->slug;
-
-            $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
-
-            $html[] = '<li style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee;">';
-            $html[] = '<a href="' . $url . '" style="color: #007bff; text-decoration: none; font-weight: bold;">';
-            $html[] = htmlspecialchars($page->title);
-            $html[] = '</a>';
-
-            if ($page->meta_description) {
-                $html[] = '<p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">';
-                $html[] = htmlspecialchars(substr($page->meta_description, 0, 150));
-                $html[] = '</p>';
-            }
-            $html[] = '</li>';
-        }
-
+        // Minimal header
+        $html[] = '<div style="text-align: center; border-bottom: 1px solid #000; padding-bottom: 20px; margin-bottom: 30px;">';
+        $html[] = '<h1 style="font-size: 32px; font-weight: 400; margin: 0; color: #000;">' . htmlspecialchars($newsletter->title) . '</h1>';
+        $html[] = '<p style="font-size: 12px; color: #666; margin: 10px 0 0 0; text-transform: uppercase; letter-spacing: 2px;">' . date('F j, Y') . '</p>';
         $html[] = '</div>';
+
+        // GET PROMOTIONS ONCE at the newsletter level
+        $promotionBlocks = $this->injector->getBlocksForSurface(
+            'newsletter_issue',
+            $newsletter->id,
+            $member,
+            $siteId,
+            CommunicationChannel::Newsletter->value
+        );
+
+        // Merge pages and promotions
+        $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks, $newsletter, $context, $member, false, $sendId, $siteId);
+
+        $html[] = '<div style="line-height: 1.8;">';
+        foreach ($allContent as $item) {
+            if (isset($item['is_promotion']) && $item['is_promotion']) {
+                // Render promotion block
+                $html[] = '<div style="margin-bottom: 25px;">';
+                $html[] = $this->renderBlockForEmail($item, $context, $siteId);
+                $html[] = '</div>';
+            } else {
+                // Render simple page item
+                $isArray = is_array($item);
+                $pageId = $isArray ? $item['id'] : $item->id;
+                $title = $isArray ? $item['title'] : $item->title;
+                $slug = $isArray ? $item['slug'] : $item->slug;
+                $metaDescription = $isArray ? ($item['meta_description'] ?? null) : $item->meta_description;
+                $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
+                $html[] = '<div style="margin-bottom: 25px;">';
+                $html[] = '<h2 style="font-size: 18px; font-weight: 600; margin: 0 0 8px 0;">';
+                $html[] = '<a href="' . $url . '" style="color: #000; text-decoration: none;">' . htmlspecialchars($title) . '</a>';
+                $html[] = '</h2>';
+
+                if ($metaDescription) {
+                    $html[] = '<p style="color: #666; margin: 0; font-size: 14px; line-height: 1.6;">';
+                    $html[] = htmlspecialchars(substr($metaDescription, 0, 120)) . '...';
+                    $html[] = '</p>';
+                }
+                $html[] = '</div>';
+            }
+        }
+        $html[] = '</div>';
+
         $html[] = $this->renderFooter($unsubscribeToken);
         $html[] = '</div>';
 
         return implode("\n", $html);
+    }
+
+    // NEW HELPER METHOD
+    private function mergeContentAndPromotions(
+        array         $pages,
+        array         $promotionBlocks,
+        Newsletter    $newsletter,
+        RenderContext $context,
+        ?Member       $member,
+        bool          $includeBlocks,
+        ?int          $sendId,
+        ?int          $siteId
+    ): array
+    {
+
+        if (empty($promotionBlocks)) {
+            // Convert pages to arrays but preserve blocks
+            return array_map(function ($page) {
+                return is_array($page) ? $page : [
+                    'id' => $page->id,
+                    'title' => $page->title,
+                    'slug' => $page->slug,
+                    'meta_description' => $page->meta_description,
+                    'listing_synopsis' => $page->listing_synopsis,
+                    'listing_image_id' => $page->listing_image_id,
+                    'hero_image_id' => $page->hero_image_id,
+                    'published_at' => $page->published_at,
+                    'blocks' => $page->blocks, // Preserve blocks
+                ];
+            }, $pages);
+        }
+
+        // Mark promotions
+        foreach ($promotionBlocks as &$block) {
+            $block['is_promotion'] = true;
+        }
+
+        // Convert pages to arrays preserving blocks
+        $pagesArray = array_map(function ($page) {
+            return is_array($page) ? $page : [
+                'id' => $page->id,
+                'title' => $page->title,
+                'slug' => $page->slug,
+                'meta_description' => $page->meta_description,
+                'listing_synopsis' => $page->listing_synopsis,
+                'listing_image_id' => $page->listing_image_id,
+                'hero_image_id' => $page->hero_image_id,
+                'published_at' => $page->published_at,
+                'blocks' => $page->blocks, // Preserve blocks
+            ];
+        }, $pages);
+
+        // Simple interleaving: insert promotions every N pages
+        $result = [];
+        $promotionIndex = 0;
+        $insertFrequency = max(2, (int)ceil(count($pagesArray) / (count($promotionBlocks) + 1)));
+
+        for ($i = 0; $i < count($pagesArray); $i++) {
+            $result[] = $pagesArray[$i];
+
+            // Insert promotion after every N pages
+            if (($i + 1) % $insertFrequency === 0 && $promotionIndex < count($promotionBlocks)) {
+                $result[] = $promotionBlocks[$promotionIndex];
+                $promotionIndex++;
+            }
+        }
+
+        // Append any remaining promotions
+        while ($promotionIndex < count($promotionBlocks)) {
+            $result[] = $promotionBlocks[$promotionIndex];
+            $promotionIndex++;
+        }
+
+        return $result;
     }
 
     private function buildDefaultTemplate(
@@ -1375,15 +1547,41 @@ class NewsletterPageBuilderService
     {
         $html = [];
 
-        // Header
-        $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">';
-        $html[] = '<h1 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">' .
-            htmlspecialchars($newsletter->title) . '</h1>';
+        $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #ffffff;">';
 
-        // Pages
-        foreach ($pages as $page) {
-            $html[] = $this->renderPageCard($newsletter, $page, $context, $member, $includeBlocks, $sendId, $siteId);
+        // Hero header section
+        $html[] = '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">';
+        $html[] = '<h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">' . htmlspecialchars($newsletter->title) . '</h1>';
+        $html[] = '<p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">' . date('F j, Y') . '</p>';
+        $html[] = '</div>';
+
+        // Content container
+        $html[] = '<div style="padding: 30px 20px;">';
+
+        // GET PROMOTIONS ONCE at the newsletter level
+        $promotionBlocks = $this->injector->getBlocksForSurface(
+            'newsletter_issue',
+            $newsletter->id,
+            $member,
+            $siteId,
+            CommunicationChannel::Newsletter->value
+        );
+
+
+        // Merge pages and promotions
+        $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks, $newsletter, $context, $member, $includeBlocks, $sendId, $siteId);
+
+        foreach ($allContent as $item) {
+            if (isset($item['is_promotion']) && $item['is_promotion']) {
+                // Render promotion block
+                $html[] = $this->renderBlockForEmail($item, $context, $siteId);
+            } else {
+                // Render page card WITHOUT blocks (to avoid re-injecting promotions)
+                $html[] = $this->renderPageCard($newsletter, $item, $context, $member, $includeBlocks, $sendId, $siteId);
+            }
         }
+
+        $html[] = '</div>';
 
         // Footer
         $html[] = $this->renderFooter($unsubscribeToken);
@@ -1394,7 +1592,7 @@ class NewsletterPageBuilderService
 
     private function renderPageCard(
         Newsletter    $newsletter,
-        Page          $page,
+        Page|array $page,
         RenderContext $context,
         ?Member       $member = null,
         bool          $includeBlocks = true,
@@ -1402,65 +1600,96 @@ class NewsletterPageBuilderService
         ?int          $siteId = null): string
     {
         $isArray = is_array($page);
-        $pageId = $isArray ? $page['id'] : $page->id;
-        $title = $isArray ? $page['title'] : $page->title;
-        $subtitle = $isArray ? ($page['subtitle'] ?? '') : ($page->subtitle ?? '');
-        $slug = $isArray ? $page['slug'] : $page->slug;
+        if (!$isArray) {
+            $page = $page->toArray();
+        }
 
+        $pageId = $page['id'];
+        $title = $page['title'];
+        $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+
 
         $html = [];
 
-        $html[] = '<div style="margin-bottom: 30px; padding: 20px; border: 1px solid #eee; border-radius: 8px;">';
+        // Modern card with shadow and hover effect
+        $html[] = '<div style="background: #ffffff; margin-bottom: 30px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">';
 
         // Image if available
-        if ($page->listing_image_id || $page->hero_image_id) {
-            $imageId = $page->listing_image_id ?: $page->hero_image_id;
-            $html[] = '<img src="' . url("/api/media/{$imageId}") . '" alt="' . htmlspecialchars($page->title) . '" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 15px;">';
+        $listingImageId = $page['listing_image_id'] ?? null;
+        $heroImageId = $page['hero_image_id'] ?? null;
+
+        if ($listingImageId || $heroImageId) {
+            $imageId = $listingImageId ?: $heroImageId;
+            $html[] = '<a href="' . $url . '" style="display: block;">';
+            $html[] = '<img src="' . url("/api/media/{$imageId}") . '" alt="' . htmlspecialchars($title) . '" style="width: 100%; height: 250px; object-fit: cover; display: block;">';
+            $html[] = '</a>';
         }
 
+        $html[] = '<div style="padding: 25px;">';
+
+        // Category/Meta bar
+        $html[] = '<div style="margin-bottom: 12px;">';
+
+        $publishedAt = $page['published_at'] ?? null;
+        if ($publishedAt) {
+            $publishedDate = is_string($publishedAt) ? new \DateTime($publishedAt) : $publishedAt;
+            $html[] = '<span style="color: #667eea; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">';
+            $html[] = $publishedDate->format('F j, Y');
+            $html[] = '</span>';
+        }
+
+        if ($page['authors'] && count($page['authors']) > 0) {
+            $html[] = '<span style="color: #999; font-size: 12px; margin: 0 8px;">•</span>';
+            $html[] = '<span style="color: #666; font-size: 12px;">' . htmlspecialchars($page['authors'][0]['name']) . '</span>';
+        }
+        $html[] = '</div>';
+
         // Title
-        $html[] = '<h2 style="margin: 0 0 10px 0;">';
-        $html[] = '<a href="' . $url . '" style="color: #333; text-decoration: none;">';
-        $html[] = htmlspecialchars($page->title);
+        $html[] = '<h2 style="margin: 0 0 12px 0; line-height: 1.3;">';
+        $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-size: 22px; font-weight: 700;">';
+        $html[] = htmlspecialchars($title);
         $html[] = '</a>';
         $html[] = '</h2>';
 
         // Meta
         $html[] = '<p style="color: #999; font-size: 14px; margin: 0 0 15px 0;">';
-        if ($page->published_at) {
-            $html[] = $page->published_at->format('F j, Y');
+        if ($page['published_at']) {
+            $html[] = $page['published_at']->format('F j, Y');
         }
-        if ($page->authors && $page->authors->count() > 0) {
-            $html[] = ' • By ' . htmlspecialchars($page->authors->first()->name);
+        if ($page['authors'] && count($page['authors']) > 0) {
+            $html[] = ' • By ' . htmlspecialchars($page['authors'][0]['name']);
         }
         $html[] = '</p>';
 
-        // Description or blocks
+        // Render PAGE blocks if includeBlocks is true and we have blocks
         if ($includeBlocks) {
-            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
 
-            if ($blocks->count() > 0) {
-                $blocks = $blocks->toArray();
-                // Render first few blocks
-                $blockCount = 0;
-                foreach ($blocks as $block) {
-                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
-                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
-                    $blockCount++;
+            // Get blocks - either from array or object
+            $pageBlocks = $page['blocks'] ?? null;
+
+            if ($pageBlocks && (is_array($pageBlocks) ? !empty($pageBlocks) : !$pageBlocks->isEmpty())) {
+                $blocksArray = is_array($pageBlocks) ? $pageBlocks : $pageBlocks->toArray();
+
+                foreach ($blocksArray as $block) {
+                    $blockArray = is_array($block) ? $block : $block->toArray();
+                    $html[] = $this->renderBlockForEmail($blockArray, $context, $siteId);
                 }
             }
-        } else {
-            // Default: show description
-            if ($page->meta_description || $page->listing_synopsis) {
-                $description = $page->listing_synopsis ?: $page->meta_description;
-                $html[] = '<p style="color: #666; line-height: 1.6; margin: 0 0 15px 0;">';
-                $html[] = htmlspecialchars(substr($description, 0, 200));
-                if (strlen($description) > 200) {
-                    $html[] = '...';
-                }
-                $html[] = '</p>';
+        }
+
+        // Show description if no blocks were rendered
+        $metaDescription = $page['meta_description'] ?? null;
+        $listingSynopsis = $page['listing_synopsis'] ?? null;
+
+        if ($metaDescription || $listingSynopsis) {
+            $description = $listingSynopsis ?: $metaDescription;
+            $html[] = '<p style="color: #666; line-height: 1.7; margin: 0 0 20px 0; font-size: 15px;">';
+            $html[] = htmlspecialchars(substr($description, 0, 200));
+            if (strlen($description) > 200) {
+                $html[] = '...';
             }
+            $html[] = '</p>';
         }
 
         // Read more button
@@ -1840,6 +2069,7 @@ class NewsletterPageBuilderService
         // Build the HTML for the deal
         $html = [];
         $html[] = '<div style="border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin: 20px 0; background-color: #f0fff4;">';
+        $html[] = "id:" . $product->id;
 
         $html[] = '<div style="margin-bottom: 15px;">';
         $html[] = '<span style="background-color: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">🔥 Deal Alert</span>';
