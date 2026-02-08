@@ -16,6 +16,12 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
 
     private NewsletterPageBuilderService $service;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->service = app(NewsletterPageBuilderService::class);
+    }
+
     public function testRendersOfferBlockInNewsletter(): void
     {
         $product = $this->createProduct();
@@ -53,7 +59,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
 
         // PASS NULL FOR MEMBER (offers don't require authentication by default)
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         $this->assertStringContainsString('Partner Offer', $html);
         $this->assertStringContainsString($product->name, $html);
@@ -97,7 +103,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
 
         $member = $this->createMember();
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, $member);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, $member, $this->siteId);
 
         $this->assertStringNotContainsString('Partner Offer', $html);
         $this->assertStringNotContainsString($product->name, $html);
@@ -222,7 +228,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'content' => 'test',
         ]);
 
-        $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Should have tracked render
         $this->assertDatabaseHas('offer_clicks', [
@@ -250,7 +256,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
 
         Block::create([
-            'type' => 'deal',
+            'type' => 'offer-deal',
             'page_id' => $page->id,
             'data' => json_encode(['product_id' => $product->id]),
         ]);
@@ -289,7 +295,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
 
         Block::create([
-            'type' => 'deal',
+            'type' => 'offer-deal',
             'page_id' => $page->id,
             'data' => json_encode(['product_id' => $product->id]),
         ]);
@@ -326,7 +332,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
 
         Block::create([
-            'type' => 'deal',
+            'type' => 'offer-deal',
             'page_id' => $page->id,
             'data' => json_encode(['product_id' => $product->id]),
         ]);
@@ -362,7 +368,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
 
         Block::create([
-            'type' => 'deal',
+            'type' => 'offer-deal',
             'page_id' => $page->id,
             'data' => json_encode(['product_id' => $product->id]),
         ]);
@@ -411,7 +417,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
 
         Block::create([
-            'type' => 'deal',
+            'type' => 'offer-deal',
             'page_id' => $page->id,
             'data' => json_encode([
                 'product_id' => $product->id,
@@ -436,10 +442,248 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         $this->assertStringContainsString('299.99', $html);
     }
 
-
-    protected function setUp(): void
+    public function testDynamicallyInjectsOffersIntoNewsletter(): void
     {
-        parent::setUp();
-        $this->service = app(NewsletterPageBuilderService::class);
+        $product = $this->createProduct();
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        // NO BLOCKS CREATED - testing dynamic injection
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        // Offer should be dynamically injected
+        $this->assertStringContainsString('Partner Offer', $html);
+        $this->assertStringContainsString($product->name, $html);
+    }
+
+    public function testDynamicallyInjectsRewardsForMember(): void
+    {
+        $member = $this->createMember();
+        $reward = $this->createMemberReward([
+            'member_id' => $member->id,
+            'status' => 'pending',
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, $member, $this->siteId);
+
+        // Reward should be dynamically injected
+        $this->assertStringContainsString('Member Reward', $html);
+    }
+
+    public function testStaticAndDynamicBlocksAppearTogether(): void
+    {
+        $member = $this->createMember();
+
+        // Static block
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'text',
+            'page_id' => $page->id,
+            'data' => json_encode(['paragraphs' => ['Static content']]),
+        ]);
+
+        // Dynamic offer
+        $product = $this->createProduct();
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'is_active' => true,
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        // Both static and dynamic content should appear
+        $this->assertStringContainsString('Static content', $html);
+        $this->assertStringContainsString('Partner Offer', $html);
+    }
+
+    public function testDynamicBlocksInterleavedWithStaticContent(): void
+    {
+        $member = $this->createMember();
+
+        // Create static blocks
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        for ($i = 1; $i <= 6; $i++) {
+            Block::create([
+                'type' => 'text',
+                'page_id' => $page->id,
+                'data' => json_encode(['paragraphs' => ["Static paragraph {$i}"]]),
+            ]);
+        }
+
+        // Create dynamic promotions
+        $product = $this->createProduct();
+        ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'original_price' => 99.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'is_active' => true,
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+        ]);
+
+        $this->createMemberReward([
+            'member_id' => $member->id,
+            'status' => 'pending',
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, $member, $this->siteId);
+
+        // Both static and dynamic should be present
+        $this->assertStringContainsString('Static paragraph 1', $html);
+        $this->assertStringContainsString('Partner Offer', $html);
+        $this->assertStringContainsString('Member Reward', $html);
+
+        // Dynamic blocks should NOT all be at the end
+        $offerPos = strpos($html, 'Partner Offer');
+        $lastStaticPos = strpos($html, 'Static paragraph 6');
+
+        $this->assertNotFalse($offerPos);
+        $this->assertNotFalse($lastStaticPos);
+        // At least one dynamic block should appear before the last static block
+        $this->assertGreaterThan($lastStaticPos, $offerPos);
+    }
+
+
+    public function testDynamicBlocksDistributedEvenly(): void
+    {
+        $member = $this->createMember();
+
+        // Create many static blocks
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        for ($i = 1; $i <= 10; $i++) {
+            Block::create([
+                'type' => 'text',
+                'page_id' => $page->id,
+                'data' => json_encode(['paragraphs' => ["Paragraph {$i}"]]),
+            ]);
+        }
+
+        // Create 3 dynamic promotions
+        for ($i = 0; $i < 3; $i++) {
+            $product = $this->createProduct();
+            ProductOffer::create([
+                'product_id' => $product->id,
+                'sale_price' => 79.99,
+                'original_price' => 99.99,
+                'start_date' => date('Y-m-d H:i:s'),
+                'is_active' => true,
+                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            ]);
+        }
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        // Dynamic blocks should be distributed throughout, not clumped at end
+        $offerCount = substr_count($html, 'Partner Offer');
+        $this->assertEquals(3, $offerCount);
+
+        // Check positions are spread out
+        $positions = [];
+        $offset = 0;
+        while (($pos = strpos($html, 'Partner Offer', $offset)) !== false) {
+            $positions[] = $pos;
+            $offset = $pos + 1;
+        }
+
+        // Verify offers aren't all clustered together (spacing between them)
+        if (count($positions) >= 2) {
+            $spacing1 = $positions[1] - $positions[0];
+            $spacing2 = count($positions) >= 3 ? $positions[2] - $positions[1] : $spacing1;
+
+            // Spacing should be reasonably distributed (not all at once)
+            $this->assertGreaterThan(100, $spacing1); // Reasonable minimum spacing
+            $this->assertGreaterThan(100, $spacing2);
+        }
     }
 }

@@ -100,7 +100,7 @@ class NewsletterSendServiceTest extends TestCase
         // Mock content building
         $this->mockContentBuilder->shouldReceive('build')
             ->once()
-            ->with($newsletter, $siteId, false)
+            ->with($newsletter, $siteId, false, null)
             ->andReturn($contentResult);
 
         // Mock recipient resolution - NEW STRUCTURE
@@ -267,7 +267,7 @@ class NewsletterSendServiceTest extends TestCase
 
         $this->mockContentBuilder->shouldReceive('build')
             ->once()
-            ->with($newsletter, $siteId, true)
+            ->with($newsletter, $siteId, true, null)
             ->andReturn([
                 'success' => true,
                 'html' => 'content',

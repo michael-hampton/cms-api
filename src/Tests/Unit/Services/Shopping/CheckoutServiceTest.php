@@ -1404,7 +1404,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn($allocations);
 
         // Mock Stripe payment intents
-        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+        $this->stripePaymentService->shouldReceive('createPaymentIntentWithCustomer')
             ->twice()
             ->andReturn([
                 'success' => true,
@@ -1488,6 +1488,9 @@ class CheckoutServiceTest extends FunctionalTestCase
             ]
         ];
 
+        $this->memberAuthWrapper->shouldReceive('check');
+        $this->memberAuthWrapper->shouldReceive('getMember')->andReturn(m::mock(Member::class));
+
         $this->cartService->shouldReceive('getItems')->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->andReturn(50.00);
         $this->mockSplittingService->shouldReceive('splitByMerchant')->andReturn($groups);
@@ -1503,7 +1506,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->setCurrencyExpectations();
         $this->setRequiresShippingExpectation();
 
-        $this->stripePaymentService->shouldReceive('createPaymentIntent')
+        $this->stripePaymentService->shouldReceive('createPaymentIntentWithCustomer')
             ->once()
             ->andReturn([
                 'success' => false,
@@ -1578,7 +1581,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->mockAllocationService->shouldReceive('allocate')->andReturn([
             'merchant_1' => ['total' => 45.00, 'stripe_eligible' => true, 'discount' => 10.00]
         ]);
-        $this->stripePaymentService->shouldReceive('createPaymentIntent')->andReturn([
+        $this->stripePaymentService->shouldReceive('createPaymentIntentWithCustomer')->andReturn([
             'success' => true,
             'payment_intent_id' => 'pi_123',
             'client_secret' => 'secret_123'

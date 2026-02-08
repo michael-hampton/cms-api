@@ -3,6 +3,7 @@
 namespace App\Services\Newsletter;
 
 use App\Framework\Support\Logger;
+use App\Models\Member;
 use App\Models\Newsletter;
 
 class NewsletterContentBuilder
@@ -15,7 +16,7 @@ class NewsletterContentBuilder
     {
     }
 
-    public function build(Newsletter $newsletter, int $siteId, bool $isPreview): array
+    public function build(Newsletter $newsletter, int $siteId, bool $isPreview, ?Member $member = null): array
     {
         $pages = [];
         $baseHtml = '';
@@ -42,9 +43,11 @@ class NewsletterContentBuilder
             $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
                 $newsletter,
                 $pagesCollection,
+                $member,
                 null,
                 $isPreview,
-                null
+                null,
+                $siteId
             );
         } else {
             $blocks = $this->parseNewsletterContent($newsletter->content);

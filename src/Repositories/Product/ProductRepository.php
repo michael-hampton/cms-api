@@ -94,6 +94,16 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return Product::bySlug($slug)->first();
     }
 
+    public function getActiveSaleProducts(int $siteId): Collection
+    {
+        return Product::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->whereNotNull('sale_price')
+            ->where('sale_price', '>', 0)
+            ->whereRaw('sale_price < price')
+            ->get();
+    }
+
 
     protected function getModelClass(): string
     {

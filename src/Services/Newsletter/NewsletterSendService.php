@@ -4,6 +4,7 @@ namespace App\Services\Newsletter;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\Newsletter;
 use App\Repositories\Members\MemberRepository;
@@ -39,20 +40,20 @@ class NewsletterSendService
     }
 
 
-    public function sendDueNewsletters(?int $siteId = null): array
+    public function sendDueNewsletters(?int $siteId = null, ?Member $member = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
         $newsletters = $this->newsletterRepository->getDueNewsletters($siteId);
         $results = [];
 
         foreach ($newsletters as $newsletter) {
-            $results[] = $this->sendNewsletter($newsletter, $siteId);
+            $results[] = $this->sendNewsletter($newsletter, $siteId, $member);
         }
 
         return $results;
     }
 
-    public function sendNewsletter(Newsletter $newsletter, ?int $siteId = null): array
+    public function sendNewsletter(Newsletter $newsletter, ?int $siteId = null, ?Member $member = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
 
@@ -69,7 +70,7 @@ class NewsletterSendService
         }
 
         // Build newsletter content
-        $contentResult = $this->contentBuilder->build($newsletter, $siteId, false);
+        $contentResult = $this->contentBuilder->build($newsletter, $siteId, false, $member);
         if (!$contentResult['success']) {
             return $contentResult;
         }
@@ -152,7 +153,7 @@ class NewsletterSendService
         return $formatted;
     }
 
-    public function previewNewsletter(Newsletter $newsletter, array $previewEmails, ?int $siteId = null): array
+    public function previewNewsletter(Newsletter $newsletter, array $previewEmails, ?int $siteId = null, ?Member $member = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
 
@@ -182,10 +183,13 @@ class NewsletterSendService
         }
 
         // Build newsletter content
-        $contentResult = $this->contentBuilder->build($newsletter, $siteId, true);
+        $contentResult = $this->contentBuilder->build($newsletter, $siteId, true, $member);
         if (!$contentResult['success']) {
             return $contentResult;
         }
+
+        echo $contentResult['html'];
+        die;
 
         return $this->database->transaction(function () use ($newsletter, $previewEmails, $contentResult, $siteId) {
             // Create preview send record

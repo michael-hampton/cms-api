@@ -688,17 +688,22 @@ class Subscription extends Model
         }
 
         // Phase 2: Access level matching
-        if ($newsletter->slug) {
+        if ($newsletter->slug) { //todo need to check if we have a plan with preimum access
+
             // Check direct premium access
             $hasDirectAccess = $this->hasPremiumAccess(
                 PremiumAccessType::Newsletter->value,
                 $newsletter->slug
             );
 
+            $hasAccessThroughPlan = $this->plan->grantsPremiumAccess(
+                PremiumAccessType::Newsletter->value, $newsletter->slug
+            );
+
             // Check bundle access
             $hasBundleAccess = $this->hasBundleAccessToNewsletter($newsletter->slug);
 
-            if (!$hasDirectAccess && !$hasBundleAccess && !$newsletter->requiresBundle()) {
+            if (!$hasDirectAccess && !$hasAccessThroughPlan && !$hasBundleAccess && !$newsletter->requiresBundle()) {
                 return NewsletterAccessResult::denied(
                     'access_level_mismatch',
                     "Subscription does not grant access to newsletter '{$newsletter->slug}'"

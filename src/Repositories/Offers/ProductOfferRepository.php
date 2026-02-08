@@ -310,6 +310,21 @@ class ProductOfferRepository extends Repository
         ];
     }
 
+    public function getActiveOffers(): Collection
+    {
+        return ProductOffer::where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', now());
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
     protected function getModelClass(): string
     {
         return ProductOffer::class;

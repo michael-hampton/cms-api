@@ -54,7 +54,7 @@ class NewsletterContentBuilderTest extends TestCase
 
         $this->mockPageBuilderService->shouldReceive('buildNewsletterHtml')
             ->once()
-            ->with($newsletter, $mockPages, null, false, null)
+            ->with($newsletter, $mockPages, null, null, false, null, 1)
             ->andReturn('<p>Automated content</p>{{UNSUBSCRIBE_LINK}}');
 
         $result = $this->builder->build($newsletter, $siteId, false);
@@ -274,7 +274,7 @@ class NewsletterContentBuilderTest extends TestCase
             ->andReturn($mockPages);
 
         $this->mockPageBuilderService->shouldReceive('buildNewsletterHtml')
-            ->with($newsletter, $mockPages, null, true, null)
+            ->with($newsletter, $mockPages, null, null, true, null, 1)
             ->andReturn('<p>Preview content</p>');
 
         $result = $this->builder->build($newsletter, $siteId, true);

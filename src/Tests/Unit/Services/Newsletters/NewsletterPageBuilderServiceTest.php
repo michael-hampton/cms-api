@@ -20,6 +20,7 @@ use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Adverts\DealTrackingRecorder;
 use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\OfferVisibilityResolver;
+use App\Services\Adverts\PromotionInjector;
 use App\Services\Adverts\RenderContext;
 use App\Services\Adverts\RewardVisibilityResolver;
 use App\Services\Newsletter\NewsletterPageBuilderService;
@@ -40,6 +41,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
     private readonly RewardsRepository $rewardsRepository;
     private DealVisibilityResolver $dealResolver;
     private readonly DealClickRepository $clickRepository;
+    private readonly PromotionInjector $promotionInjector;
 
     protected function setUp(): void
     {
@@ -52,6 +54,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->rewardsRepository = app(RewardsRepository::class);
         $this->clickRepository = app(DealClickRepository::class);
         $this->dealResolver = app(DealVisibilityResolver::class);
+        $this->promotionInjector = app(PromotionInjector::class);
 
         $this->service = new NewsletterPageBuilderService(
             $this->pageRepository,
@@ -61,6 +64,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             $this->rewardResolver,
             $this->trackingRecorder,
             $this->dealResolver,
+            $this->promotionInjector,
         );
     }
 
@@ -463,7 +467,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$page]);
 
         // Act
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, 'test-token', false);
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, 'test-token', false);
 
         // Assert
         $this->assertStringContainsString('Test Article', $html);
@@ -556,7 +560,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$featuredPage, $page2, $page3]);
 
         // Act
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, 'test-token');
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, 'test-token');
 
         // Assert
         // Featured page should be displayed as hero
@@ -606,7 +610,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$page1, $page2]);
 
         // Act
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, 'simple-token');
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, 'simple-token');
 
         // Assert
         $this->assertStringContainsString('Simple Newsletter', $html);
@@ -721,7 +725,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$page]);
 
         // Act
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, 'unique-token-123');
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, 'unique-token-123');
 
         // Assert
         $this->assertStringContainsString('/member/subscriptions/unsubscribe/unique-token-123', $html);
@@ -881,7 +885,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('First paragraph of content.', $html);
@@ -921,7 +925,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Main Heading', $html);
@@ -961,7 +965,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('https://example.com/image.jpg', $html);
@@ -1001,7 +1005,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('This is an inspiring quote.', $html);
@@ -1044,7 +1048,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('First item', $html);
@@ -1086,7 +1090,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Click Here', $html);
@@ -1130,7 +1134,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'content' => 'test'
         ]);
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringContainsString('Test Product', $html);
@@ -1175,7 +1179,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringContainsString('Header 1', $html);
@@ -1220,7 +1224,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringContainsString('Special Offer', $html);
@@ -1291,7 +1295,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringContainsString('Introduction', $html);
@@ -1322,7 +1326,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
 // Should still have basic structure even with no blocks
@@ -1360,7 +1364,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringNotContainsString('<script>', $html);
@@ -1403,7 +1407,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('John Doe', $html);
@@ -1461,7 +1465,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Product A vs Product B', $html);
@@ -1506,7 +1510,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('What is the return policy?', $html);
@@ -1547,7 +1551,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('How to Install', $html);
@@ -1605,7 +1609,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Our Achievements', $html);
@@ -1662,7 +1666,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('What Our Clients Say', $html);
@@ -1707,7 +1711,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Jane Doe', $html);
@@ -1750,7 +1754,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('1M', $html);
@@ -1797,7 +1801,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Best Product 2024', $html);
@@ -1845,7 +1849,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Important Note', $html);
@@ -1897,7 +1901,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Ultimate Laptop Guide', $html);
@@ -1951,7 +1955,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Get In Touch', $html);
@@ -2005,7 +2009,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Assert
         $this->assertStringContainsString('Black Friday Deal', $html);
@@ -2053,7 +2057,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringContainsString('Good Product', $html);
@@ -2096,7 +2100,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
 // Act
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
 // Assert
         $this->assertStringContainsString('Simple Deal', $html);
@@ -2128,7 +2132,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$page]);
 
         $sendId = 123;
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, $sendId);
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, null, false, $sendId);
         $html = urldecode($html);
 
         // Should contain tracking URL with placeholders
@@ -2176,17 +2180,17 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'content' => 'test'
         ]);
 
-        $pages = collect([
-            (object)[
-                'id' => 5,
-                'title' => 'Digest Item',
-                'subtitle' => 'Subtitle',
-                'slug' => 'digest-item'
-            ]
+        $page = new Page([
+            'id' => 5,
+            'title' => 'Digest Item',
+            'subtitle' => 'Subtitle',
+            'slug' => 'digest-item'
         ]);
 
+        $pages = collect([$page]);
+
         $sendId = 456;
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, $sendId);
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, null, false, $sendId);
         $html = urldecode($html);
 
         $this->assertStringContainsString('/newsletters/track-view', $html);
@@ -2257,7 +2261,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'content' => 'test',
         ]);
 
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         $this->assertStringNotContainsString('Partner Offer', $html);
         $this->assertStringNotContainsString($product->name, $html);
@@ -2295,7 +2299,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         ]);
 
         // PASS NULL FOR MEMBER
-        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         $this->assertStringNotContainsString('Member Reward', $html);
     }
@@ -2335,7 +2339,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'content' => 'test',
         ]);
 
-        $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+        $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
 
         // Should have tracked render
         $this->assertDatabaseHas('offer_clicks', [

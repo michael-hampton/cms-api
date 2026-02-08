@@ -4,6 +4,7 @@ namespace App\Services\Newsletter;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Models\MemberReward;
 use App\Models\Newsletter;
 use App\Models\Page;
@@ -15,6 +16,7 @@ use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Adverts\DealTrackingRecorder;
 use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\OfferVisibilityResolver;
+use App\Services\Adverts\PromotionInjector;
 use App\Services\Adverts\RenderContext;
 use App\Services\Adverts\RewardVisibilityResolver;
 use App\Services\Adverts\VisibilityDecision;
@@ -29,6 +31,7 @@ class NewsletterPageBuilderService
         private readonly RewardVisibilityResolver $rewardResolver,
         private readonly DealTrackingRecorder   $trackingRecorder,
         private readonly DealVisibilityResolver $dealResolver,
+        private readonly PromotionInjector      $injector,
     )
     {
     }
@@ -102,19 +105,28 @@ class NewsletterPageBuilderService
     /**
      * Build newsletter HTML from pages with tracking
      */
-    public function buildNewsletterHtml(Newsletter $newsletter, Collection $pages, ?string $unsubscribeToken = null, bool $includeBlocks = false, ?int $sendId = null): string
+    public function buildNewsletterHtml(
+        Newsletter $newsletter,
+        Collection $pages,
+        ?Member    $member = null,
+        ?string    $unsubscribeToken = null,
+        bool       $includeBlocks = false,
+        ?int       $sendId = null,
+        ?int       $siteId = null): string
     {
         $template = $newsletter->template ?? 'default';
 
+        $context = RenderContext::forNewsletter($newsletter->id, $member);
+
         switch ($template) {
             case 'digest':
-                return $this->buildDigestTemplate($newsletter, $pages, $unsubscribeToken, $sendId);
+                return $this->buildDigestTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
             case 'featured':
-                return $this->buildFeaturedTemplate($newsletter, $pages, $unsubscribeToken, $sendId);
+                return $this->buildFeaturedTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
             case 'simple':
-                return $this->buildSimpleTemplate($newsletter, $pages, $unsubscribeToken, $sendId);
+                return $this->buildSimpleTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
             default:
-                return $this->buildDefaultTemplate($newsletter, $pages, $unsubscribeToken, $includeBlocks, $sendId);
+                return $this->buildDefaultTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
         }
     }
 
@@ -146,19 +158,15 @@ class NewsletterPageBuilderService
      * Build newsletter HTML from page blocks
      */
     public function buildNewsletterHtmlFromBlocks(
-        Newsletter          $newsletter,
-        Page                $page,
-        ?string             $unsubscribeToken = null,
-        ?\App\Models\Member $member = null,
-        ?int                $siteId = null
+        Newsletter $newsletter,
+        Page       $page,
+        ?string    $unsubscribeToken = null,
+        ?Member    $member = null,
+        ?int       $siteId = null
     ): string
     {
         $siteId = $siteId ?? SiteContext::getId();
-        $blocks = $page->blocks;
 
-        if ($blocks->isEmpty()) {
-            $blocks = [];
-        }
 
         // Create render context
         $context = RenderContext::forNewsletter($newsletter->id, $member);
@@ -167,8 +175,10 @@ class NewsletterPageBuilderService
         $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px;">';
         $html[] = '<div style="background: white; padding: 30px; border-radius: 8px;">';
 
-        foreach ($blocks as $block) {
-            $html[] = $this->renderBlockForEmail($block->toArray(), $context, $siteId);
+        $allBlocks = $this->getBlocks($newsletter, $page, $member, $siteId);
+
+        foreach ($allBlocks as $block) {
+            $html[] = $this->renderBlockForEmail($block, $context, $siteId);
         }
 
         $html[] = '</div>';
@@ -176,6 +186,69 @@ class NewsletterPageBuilderService
         $html[] = '</div>';
 
         return implode("\n", $html);
+    }
+
+    private function getBlocks(Newsletter $newsletter, Page $page, ?Member $member = null, ?int $siteId = null): Collection
+    {
+        $blocks = $page->blocks;
+
+        if ($blocks->isEmpty()) {
+            $blocks = [];
+        }
+
+        $blocks = collect(!is_array($blocks) ? $blocks->toArray() : $blocks);
+
+        // DYNAMIC INJECTION: Get and merge dynamic blocks
+        $dynamicBlocks = $this->injector->getBlocksForSurface(
+            'newsletter_issue',
+            $newsletter->id,
+            $member,
+            $siteId,
+            'newsletter'
+        );
+
+        return !empty($dynamicBlocks) ? $blocks->concat($dynamicBlocks) : $blocks;
+    }
+
+    /**
+     * Merge static and dynamic blocks with smart placement
+     * Inserts dynamic blocks at strategic positions within static content
+     */
+    private function mergeStaticAndDynamicBlocks($staticBlocks, $dynamicBlocks): array
+    {
+        if ($dynamicBlocks->isEmpty()) {
+            return $staticBlocks->toArray();
+        }
+
+        if ($staticBlocks->isEmpty()) {
+            return $dynamicBlocks->toArray();
+        }
+
+        $result = [];
+        $staticArray = $staticBlocks->toArray();
+        $dynamicArray = $dynamicBlocks->toArray();
+        $dynamicIndex = 0;
+
+        // Insert dynamic blocks after every N static blocks
+        $insertFrequency = max(2, (int)ceil(count($staticArray) / (count($dynamicArray) + 1)));
+
+        for ($i = 0; $i < count($staticArray); $i++) {
+            $result[] = $staticArray[$i];
+
+            // Insert dynamic block after every N static blocks
+            if (($i + 1) % $insertFrequency === 0 && $dynamicIndex < count($dynamicArray)) {
+                $result[] = $dynamicArray[$dynamicIndex];
+                $dynamicIndex++;
+            }
+        }
+
+        // Append any remaining dynamic blocks at the end
+        while ($dynamicIndex < count($dynamicArray)) {
+            $result[] = $dynamicArray[$dynamicIndex];
+            $dynamicIndex++;
+        }
+
+        return $result;
     }
 
     /**
@@ -186,7 +259,7 @@ class NewsletterPageBuilderService
         $type = $block['type'] ?? 'text';
         $blockData = $block['data'] ?? [];
 
-        if (!$context && in_array($type, ['offer', 'reward', 'deal'])) {
+        if (!$context && in_array($type, ['offer', 'reward', 'offer-deal'])) {
             return '';
         }
 
@@ -198,7 +271,7 @@ class NewsletterPageBuilderService
             return $this->renderRewardBlock($blockData, $context, $siteId);
         }
 
-        if ($type === 'deal' && $context) {
+        if ($type === 'offer-deal' && $context) {
             return $this->renderDealBlockWithTracking($blockData, $context, $siteId);
         }
 
@@ -993,8 +1066,12 @@ class NewsletterPageBuilderService
     private function buildDigestTemplate(
         Newsletter $newsletter,
         Collection $pages,
+        RenderContext $context,
+        ?Member       $member = null,
         ?string    $unsubscribeToken = null,
-        ?int       $sendId = null
+        bool          $includeBlocks = false,
+        ?int          $sendId = null,
+        ?int          $siteId = null
     ): string
     {
         $html = [];
@@ -1013,7 +1090,7 @@ class NewsletterPageBuilderService
 
         // Compact page list
         foreach ($pages as $page) {
-            $html[] = $this->renderDigestItem($page, $sendId);
+            $html[] = $this->renderDigestItem($newsletter, $page, $context, $member, $includeBlocks, $sendId, $siteId);
         }
 
         $html[] = '</div>';
@@ -1023,7 +1100,14 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderDigestItem($page, ?int $sendId = null): string
+    private function renderDigestItem(
+        Newsletter    $newsletter,
+        Page          $page,
+        RenderContext $context,
+        ?Member       $member = null,
+        bool          $includeBlocks = true,
+        ?int          $sendId = null,
+        ?int          $siteId = null): string
     {
         $isArray = is_array($page);
         $pageId = $isArray ? $page['id'] : $page->id;
@@ -1047,6 +1131,32 @@ class NewsletterPageBuilderService
             $html[] = '</p>';
         }
         $html[] = '</div>';
+
+        if ($includeBlocks) {
+            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
+
+            if ($blocks->count() > 0) {
+                $blocks = $blocks->toArray();
+                // Render first few blocks
+                $blockCount = 0;
+                foreach ($blocks as $block) {
+                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
+                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
+                    $blockCount++;
+                }
+            }
+        } else {
+            // Default: show description
+            if ($page->meta_description || $page->listing_synopsis) {
+                $description = $page->listing_synopsis ?: $page->meta_description;
+                $html[] = '<p style="color: #666; line-height: 1.6; margin: 0 0 15px 0;">';
+                $html[] = htmlspecialchars(substr($description, 0, 200));
+                if (strlen($description) > 200) {
+                    $html[] = '...';
+                }
+                $html[] = '</p>';
+            }
+        }
 
         return implode("\n", $html);
     }
@@ -1074,8 +1184,12 @@ class NewsletterPageBuilderService
     private function buildFeaturedTemplate(
         Newsletter $newsletter,
         Collection $pages,
+        RenderContext $context,
+        ?Member       $member = null,
         ?string    $unsubscribeToken = null,
-        ?int       $sendId = null
+        bool          $includeBlocks = false,
+        ?int          $sendId = null,
+        ?int          $siteId = null
     ): string
     {
         $html = [];
@@ -1094,7 +1208,7 @@ class NewsletterPageBuilderService
         $html[] = '<h2 style="color: #333; margin-bottom: 20px;">More Articles</h2>';
 
         foreach ($pages as $page) {
-            $html[] = $this->renderCompactCard($page, $sendId);
+            $html[] = $this->renderCompactCard($newsletter, $page, $context, $member, $includeBlocks, $sendId, $siteId);
         }
 
         $html[] = '</div>';
@@ -1141,7 +1255,14 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderCompactCard(Page $page, ?int $sendId = null): string
+    private function renderCompactCard(
+        Newsletter    $newsletter,
+        Page          $page,
+        RenderContext $context,
+        ?Member       $member = null,
+        bool          $includeBlocks = true,
+        ?int          $sendId = null,
+        ?int          $siteId = null): string
     {
         $isArray = is_array($page);
         $pageId = $isArray ? $page['id'] : $page->id;
@@ -1165,14 +1286,45 @@ class NewsletterPageBuilderService
         }
         $html[] = '</div>';
 
+        // Description or blocks
+        if ($includeBlocks) {
+            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
+
+            if ($blocks->count() > 0) {
+                $blocks = $blocks->toArray();
+                // Render first few blocks
+                $blockCount = 0;
+                foreach ($blocks as $block) {
+                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
+                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
+                    $blockCount++;
+                }
+            }
+        } else {
+            // Default: show description
+            if ($page->meta_description || $page->listing_synopsis) {
+                $description = $page->listing_synopsis ?: $page->meta_description;
+                $html[] = '<p style="color: #666; line-height: 1.6; margin: 0 0 15px 0;">';
+                $html[] = htmlspecialchars(substr($description, 0, 200));
+                if (strlen($description) > 200) {
+                    $html[] = '...';
+                }
+                $html[] = '</p>';
+            }
+        }
+
         return implode("\n", $html);
     }
 
     private function buildSimpleTemplate(
         Newsletter $newsletter,
         Collection $pages,
+        RenderContext $context,
+        ?Member       $member = null,
         ?string    $unsubscribeToken = null,
-        ?int       $sendId = null
+        bool          $includeBlocks = false,
+        ?int          $sendId = null,
+        ?int          $siteId = null
     ): string
     {
         $html = [];
@@ -1203,7 +1355,7 @@ class NewsletterPageBuilderService
             $html[] = '</li>';
         }
 
-        $html[] = '</ul>';
+        $html[] = '</div>';
         $html[] = $this->renderFooter($unsubscribeToken);
         $html[] = '</div>';
 
@@ -1213,9 +1365,12 @@ class NewsletterPageBuilderService
     private function buildDefaultTemplate(
         Newsletter $newsletter,
         Collection $pages,
+        RenderContext $context,
+        ?Member       $member = null,
         ?string    $unsubscribeToken = null,
         bool       $includeBlocks = false,
-        ?int       $sendId = null
+        ?int          $sendId = null,
+        ?int          $siteId = null
     ): string
     {
         $html = [];
@@ -1227,7 +1382,7 @@ class NewsletterPageBuilderService
 
         // Pages
         foreach ($pages as $page) {
-            $html[] = $this->renderPageCard($page, $includeBlocks, $sendId);
+            $html[] = $this->renderPageCard($newsletter, $page, $context, $member, $includeBlocks, $sendId, $siteId);
         }
 
         // Footer
@@ -1237,7 +1392,14 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderPageCard(Page $page, bool $includeBlocks = true, ?int $sendId = null): string
+    private function renderPageCard(
+        Newsletter    $newsletter,
+        Page          $page,
+        RenderContext $context,
+        ?Member       $member = null,
+        bool          $includeBlocks = true,
+        ?int          $sendId = null,
+        ?int          $siteId = null): string
     {
         $isArray = is_array($page);
         $pageId = $isArray ? $page['id'] : $page->id;
@@ -1276,14 +1438,15 @@ class NewsletterPageBuilderService
 
         // Description or blocks
         if ($includeBlocks) {
-            $blocks = $page->blocks->toArray();
+            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
 
-            if (is_array($blocks)) {
+            if ($blocks->count() > 0) {
+                $blocks = $blocks->toArray();
                 // Render first few blocks
                 $blockCount = 0;
                 foreach ($blocks as $block) {
-                    if ($blockCount >= 3) break; // Limit to first 3 blocks
-                    $html[] = $this->renderBlockForEmail($block);
+                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
+                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
                     $blockCount++;
                 }
             }
@@ -1721,6 +1884,60 @@ class NewsletterPageBuilderService
         $html[] = '</div>';
         $html[] = '</div>';
         $html[] = '</div>';
+
+        return implode("\n", $html);
+    }
+
+    private function renderSimpleTemplate(Newsletter $newsletter, mixed $page, RenderContext $context, ?Member $member, bool $includeBlocks, ?int $sendId, ?int $siteId)
+    {
+        $isArray = is_array($page);
+        $pageId = $isArray ? $page['id'] : $page->id;
+        $title = $isArray ? $page['title'] : $page->title;
+        $slug = $isArray ? $page['slug'] : $page->slug;
+
+        $url = $this->buildTrackingUrl($pageId, $slug, $sendId);
+        $html = [];
+
+        $html[] = '<div style="margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 4px;">';
+        $html[] = '<h3 style="margin: 0 0 10px 0; font-size: 18px;">';
+        $html[] = '<a href="' . $url . '" style="color: #333; text-decoration: none;">';
+        $html[] = htmlspecialchars($page->title);
+        $html[] = '</a>';
+        $html[] = '</h3>';
+
+        if ($page->meta_description) {
+            $html[] = '<p style="color: #666; font-size: 14px; margin: 0;">';
+            $html[] = htmlspecialchars(substr($page->meta_description, 0, 100)) . '...';
+            $html[] = '</p>';
+        }
+        $html[] = '</div>';
+
+        // Description or blocks
+        if ($includeBlocks) {
+            $blocks = $this->getBlocks($newsletter, $page, $member, $siteId);
+
+            if ($blocks->count() > 0) {
+                $blocks = $blocks->toArray();
+                // Render first few blocks
+                $blockCount = 0;
+                foreach ($blocks as $block) {
+                    //if ($blockCount >= 3) break; // Limit to first 3 blocks
+                    $html[] = $this->renderBlockForEmail($block, $context, $siteId);
+                    $blockCount++;
+                }
+            }
+        } else {
+            // Default: show description
+            if ($page->meta_description || $page->listing_synopsis) {
+                $description = $page->listing_synopsis ?: $page->meta_description;
+                $html[] = '<p style="color: #666; line-height: 1.6; margin: 0 0 15px 0;">';
+                $html[] = htmlspecialchars(substr($description, 0, 200));
+                if (strlen($description) > 200) {
+                    $html[] = '...';
+                }
+                $html[] = '</p>';
+            }
+        }
 
         return implode("\n", $html);
     }

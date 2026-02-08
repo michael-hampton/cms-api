@@ -51,6 +51,8 @@ class NewsletterWebController extends Controller
     {
         $token = $request->query('token');
         $sendId = $request->query('send_id');
+        $siteId = SiteContext::getId();
+        $member = MemberAuth::getMember();
 
         $newsletter = $this->newsletterRepository->find($id);
 
@@ -127,9 +129,11 @@ class NewsletterWebController extends Controller
         $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
             $pages,
+            $member,
             $token,
             true,
-            null // No sendId = no tracking
+            null, // No sendId = no tracking
+            $siteId
         );
 
         return $this->view('newsletters/show', [
@@ -151,6 +155,8 @@ class NewsletterWebController extends Controller
     {
         $token = $request->query('token');
         $sendId = $request->query('send_id');
+        $siteId = SiteContext::getId();
+        $member = MemberAuth::getMember();
 
         $newsletter = $this->newsletterRepository->find($id);
 
@@ -214,9 +220,11 @@ class NewsletterWebController extends Controller
         $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
             $pages,
+            $member,
             $token,
             true,
-            null // No tracking for archive/preview views
+            null, // No tracking for archive/preview views
+            $siteId
         );
 
         $html = urldecode($html);
@@ -256,6 +264,8 @@ class NewsletterWebController extends Controller
     {
         $token = $request->query('token');
         $newsletter = $this->newsletterRepository->find($id);
+        $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
 
         if (!$newsletter) {
             return $this->redirectResponse('', 404);
@@ -278,8 +288,11 @@ class NewsletterWebController extends Controller
         $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
             $pages,
+            $member,
             $token,
-            true
+            true,
+            null,
+            $siteId
         );
 
         // Wrap in complete HTML document for PDF

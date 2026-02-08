@@ -19,8 +19,8 @@ use App\Services\Subscriptions\SubscriptionPlanService;
 class MemberNewslettersController extends Controller
 {
     public function __construct(
-        private readonly SubscriberRepository    $subscriberRepository,
-        private readonly NewsletterRepository    $newsletterRepository,
+        private readonly SubscriberRepository $subscriberRepository,
+        private readonly NewsletterRepository $newsletterRepository,
         private readonly NewsletterSignupService     $newsletterSignupService,
         private readonly NewsletterAccessService     $newsletterAccessService,
         private readonly SubscriptionPlanService     $subscriptionPlanService,
@@ -303,13 +303,9 @@ class MemberNewslettersController extends Controller
             // Get all active plans that grant access to this newsletter
             $plans = $this->subscriptionPlanService->getActivePlansForSite($siteId);
 
-            /**
-             * $eligiblePlans = $plans->filter(function($plan) use ($newsletter) {
-             * return $plan->grantsPremiumAccess('newsletter', $newsletter->slug ?? 'insider');
-             * })->map(function($plan) {
-             */
-
-            $eligiblePlans = $plans->map(function ($plan) {
+            $eligiblePlans = $plans->filter(function ($plan) use ($newsletter) {
+                return $plan->grantsPremiumAccess('newsletter', $newsletter->slug ?? 'insider');
+            })->map(function ($plan) {
                 return [
                     'id' => $plan->id,
                     'name' => $plan->name,

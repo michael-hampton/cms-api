@@ -1539,7 +1539,8 @@
                         color: '#fa755a',
                         iconColor: '#fa755a'
                     }
-                }
+                },
+                hidePostalCode: true,
             });
 
             cardElement.mount('#card-element');
@@ -1656,7 +1657,7 @@
         }
 
         // First, create the subscription on backend
-        const response = await fetch('/member/newsletters/process-upgrade', {
+        const response = await fetch('/' + SITE + '/member/newsletters/process-upgrade', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1672,12 +1673,14 @@
 
         const data = await response.json();
 
+        console.log('data', data, data.success)
+
         if (!data.success) {
-            throw new Error(data.message);
+            throw new Error(data.data.message);
         }
 
         // If we have a client secret, confirm the card payment
-        if (data.client_secret) {
+        if (data.data.client_secret) {
             const {error, paymentIntent} = await stripe.confirmCardPayment(data.client_secret, {
                 payment_method: {
                     card: cardElement,
@@ -1692,7 +1695,7 @@
                 // Confirm the subscription on backend
                 await confirmSubscription(data.subscription_id);
             }
-        } else if (data.subscription_id) {
+        } else if (data.data.subscription_id) {
             // Payment already processed (e.g., free with voucher)
             showUpgradeStep('success');
             setLoading(false);

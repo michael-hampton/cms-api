@@ -1,6 +1,4 @@
 <?php
-// App/Models/SubscriptionPlan.php
-
 namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
@@ -190,17 +188,7 @@ class SubscriptionPlan extends Model
      */
     public function getPremiumAccessGrants(): array
     {
-        if (!$this->premium_access) {
-            // Backward compatibility
-//            if ($this->includes_insider) {
-//                return [
-//                    ['type' => 'newsletter', 'identifier' => 'insider']
-//                ];
-//            }
-            return [];
-        }
-
-        return $this->premium_access;
+        return $this->premium_access ?? [];
     }
 
     /**

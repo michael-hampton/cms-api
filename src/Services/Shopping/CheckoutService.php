@@ -375,6 +375,8 @@ class CheckoutService
 
         $currency = $this->currencyResolver->resolve($siteId);
 
+        $member = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember() : null;
+
         // --- Stripe: one PaymentIntent per merchant order ---
         $stripeContexts = [];
         foreach ($groups as $key => $group) {
@@ -384,14 +386,16 @@ class CheckoutService
                 continue;
             }
 
-            $piResult = $this->stripeProcessor->createPaymentIntent([
+            $piResult = $this->stripeProcessor->createPaymentIntentWithCustomer([
                 'amount' => $allocations[$key]['total'],
+                'member' => $member,
                 'currency' => strtolower($data['currency'] ?? 'usd'),
                 'site_id' => $siteId,
                 'metadata' => [
                     'checkout_type' => 'multi_merchant',
                     'merchant_id' => $group['merchant_id'],
                     'stripe_group_key' => $group['stripe_group_key'],
+                    'member_id' => $member->id,
                 ],
             ]);
 
@@ -416,7 +420,8 @@ class CheckoutService
             $voucherId,
             $discount,
             $checkoutTotals,
-            $currency
+            $currency,
+            $member
         ) {
             // --- Persist orders + shipments ---
             $checkoutId = 'chk-' . uniqid('', true);
@@ -468,10 +473,7 @@ class CheckoutService
 
                 // Apply voucher once at checkout level if applicable
                 if (!empty($voucherId) && $discount > 0) {
-                    $userId = $this->memberAuthWrapper->check()
-                        ? $this->memberAuthWrapper->getMember()->id
-                        : null;
-                    $this->voucherService->applyVoucher($voucherId, $userId, $discount, $createdOrders[0]->id);
+                    $this->voucherService->applyVoucher($voucherId, $member->id, $discount, $createdOrders[0]->id);
                 }
 
                 // Clear cart
