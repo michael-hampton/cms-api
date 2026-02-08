@@ -11,12 +11,18 @@ class OfferClicks extends Model
         'member_id',
         'ip_address',
         'user_agent',
-        'action'
+        'action',
+        'channel',
+        'surface_type',
+        'surface_id',
+        'deal_id',
+        'clicked_at',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'clicked_at' => 'datetime',
     ];
 
     public function offer()

@@ -154,14 +154,26 @@ class ProductOfferRepository extends Repository
         return $query->orderBy('created_at', 'desc')->get();
     }
 
-    public function trackClick(int $offerId, ?int $memberId, string $action, ?string $ipAddress = null, ?string $userAgent = null): Model
+    public function trackClick(
+        int     $offerId,
+        ?int    $memberId,
+        string  $action,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+        array   $metadata = []  // ADD THIS
+    ): void
     {
-        return OfferClicks::create([
+        OfferClicks::create([
             'offer_id' => $offerId,
             'member_id' => $memberId,
+            'action' => $action,
             'ip_address' => $ipAddress,
             'user_agent' => $userAgent,
-            'action' => $action
+            'channel' => $metadata['channel'] ?? null,
+            'surface_type' => $metadata['surface_type'] ?? null,
+            'surface_id' => $metadata['surface_id'] ?? null,
+            'deal_id' => $metadata['deal_id'] ?? null,
+            'clicked_at' => date('Y-m-d H:i:s'),
         ]);
     }
 

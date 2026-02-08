@@ -11,8 +11,15 @@ use App\Models\PageAuthor;
 use App\Models\PageCategory;
 use App\Models\PageMetadata;
 use App\Models\PageTag;
+use App\Models\ProductOffer;
 use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Offers\ProductOfferRepository;
+use App\Repositories\Rewards\RewardsRepository;
+use App\Services\Adverts\DealTrackingRecorder;
+use App\Services\Adverts\OfferVisibilityResolver;
+use App\Services\Adverts\RenderContext;
+use App\Services\Adverts\RewardVisibilityResolver;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -22,6 +29,33 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
     use CreatesTestData;
 
     private NewsletterPageBuilderService $service;
+
+    private readonly PageRepository $pageRepository;
+    private readonly OfferVisibilityResolver $offerResolver;
+    private readonly RewardVisibilityResolver $rewardResolver;
+    private readonly DealTrackingRecorder $trackingRecorder;
+    private readonly ProductOfferRepository $offerRepository;
+    private readonly RewardsRepository $rewardsRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->pageRepository = new PageRepository();
+        $this->offerResolver = app(OfferVisibilityResolver::class);
+        $this->rewardResolver = app(RewardVisibilityResolver::class);
+        $this->trackingRecorder = app(DealTrackingRecorder::class);
+        $this->offerRepository = app(ProductOfferRepository::class);
+        $this->rewardsRepository = app(RewardsRepository::class);
+
+        $this->service = new NewsletterPageBuilderService(
+            $this->pageRepository,
+            $this->offerRepository,
+            $this->rewardsRepository,
+            $this->offerResolver,
+            $this->rewardResolver,
+            $this->trackingRecorder
+        );
+    }
 
     public function test_gets_pages_for_automated_newsletter(): void
     {
@@ -2182,9 +2216,181 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->assertStringContainsString('page_id=10', $html);
     }
 
-    protected function setUp(): void
+    public function testSuppressesInactiveOffer(): void
     {
-        parent::setUp();
-        $this->service = new NewsletterPageBuilderService(new PageRepository());
+        $product = $this->createProduct();
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => false,
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'offer',
+            'page_id' => $page->id,
+            'data' => json_encode(['offer_id' => $offer->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+
+        $this->assertStringNotContainsString('Partner Offer', $html);
+        $this->assertStringNotContainsString($product->name, $html);
+    }
+
+    public function testSuppressesRewardForUnauthenticated(): void
+    {
+        $member = $this->createMember();
+        $reward = $this->createMemberReward([
+            'member_id' => $member->id,
+            'status' => 'pending',
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'reward',
+            'page_id' => $page->id,
+            'data' => json_encode(['reward_id' => $reward->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        // PASS NULL FOR MEMBER
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+
+        $this->assertStringNotContainsString('Member Reward', $html);
+    }
+
+    public function testTracksOfferRender(): void
+    {
+        $product = $this->createProduct();
+
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'offer',
+            'page_id' => $page->id,
+            'data' => json_encode(['offer_id' => $offer->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null);
+
+        // Should have tracked render
+        $this->assertDatabaseHas('offer_clicks', [
+            'offer_id' => $offer->id,
+            'action' => 'render',
+        ]);
+    }
+
+    public function testResolveAndTrackOfferReturnsNullWhenSuppressed(): void
+    {
+        $product = $this->createProduct();
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => false, // Inactive
+        ]);
+
+        $context = RenderContext::forNewsletter(1, null);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('resolveAndTrackOffer');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $offer, $context);
+
+        $this->assertNull($result);
+
+        // Should NOT have tracked
+        $this->assertDatabaseMissing('offer_clicks', [
+            'offer_id' => $offer->id,
+        ]);
+    }
+
+    public function testResolveAndTrackOfferTracksWithMetadata(): void
+    {
+        $product = $this->createProduct();
+        $offer = ProductOffer::create([
+            'product_id' => $product->id,
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ]);
+
+        $context = RenderContext::forNewsletter(123, null);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('resolveAndTrackOffer');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $offer, $context);
+
+        $this->assertNotNull($result);
+
+        // Should have tracked with surface metadata
+        $this->assertDatabaseHas('offer_clicks', [
+            'offer_id' => $offer->id,
+            'action' => 'render',
+            'surface_id' => 123,
+            'channel' => 'newsletter',
+        ]);
     }
 }

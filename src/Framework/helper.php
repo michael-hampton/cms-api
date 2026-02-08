@@ -4,6 +4,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Container;
 use App\Framework\Date;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Http\Request;
 use App\Framework\Http\Router;
 use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
@@ -21,6 +22,13 @@ if (!function_exists('url')) {
     function url(string $path): ?string
     {
         return $path;
+    }
+}
+
+if (!function_exists('request')) {
+    function request(): Request
+    {
+        return new Request();
     }
 }
 

@@ -855,4 +855,30 @@ trait CreatesTestData
             'status' => 'active'
         ]);
     }
+
+    protected function createMemberWithSubscription(array $memberData = [], array $planData = [], array $subscriptionData = []): Member
+    {
+        $member = $this->createMember($memberData);
+
+        $plan = \App\Models\SubscriptionPlan::create(array_merge([
+            'name' => 'Test Plan',
+            'type' => 'paid',
+            'tier' => 'gold',
+            'price' => 9.99,
+            'site_id' => $this->siteId,
+            'slug' => 'test-plan'
+        ], $planData));
+
+        $subscription = \App\Models\Subscription::create(array_merge([
+            'member_id' => $member->id,
+            'plan_id' => $plan->id,
+            'status' => 'active',
+            'starts_at' => now(),
+            'site_id' => $this->siteId,
+            'plan_name' => 'Test Plan',
+            'start_date' => now(),
+        ], $subscriptionData));
+
+        return $member->fresh();
+    }
 }

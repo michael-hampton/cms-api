@@ -192,15 +192,28 @@ class RewardsRepository extends Repository
         return array_merge($topLevelStats, $this->getRewardClickStats($siteId));
     }
 
-    public function trackClick(int $memberRewardId, int $memberId, int $siteId, string $action, ?string $ipAddress = null, ?string $userAgent = null): void
+    public function trackClick(
+        int     $rewardId,
+        ?int    $memberId,
+        int     $siteId,
+        string  $action,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+        array   $metadata = []  // ADD THIS
+    ): void
     {
         RewardClick::create([
-            'member_reward_id' => $memberRewardId,
+            'member_reward_id' => $rewardId,
             'member_id' => $memberId,
             'site_id' => $siteId,
             'action' => $action,
             'ip_address' => $ipAddress,
-            'user_agent' => $userAgent
+            'user_agent' => $userAgent,
+            'channel' => $metadata['channel'] ?? null,
+            'surface_type' => $metadata['surface_type'] ?? null,
+            'surface_id' => $metadata['surface_id'] ?? null,
+            'deal_id' => $metadata['deal_id'] ?? null,
+            'clicked_at' => date('Y-m-d H:i:s'),
         ]);
     }
 

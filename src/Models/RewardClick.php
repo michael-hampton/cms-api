@@ -12,12 +12,20 @@ class RewardClick extends Model
         'site_id',
         'action',
         'ip_address',
-        'user_agent'
+        'user_agent',
+        'channel',
+        'surface_type',
+        'surface_id',
+        'created_at',
+        'updated_at',
+        'deal_id',
+        'clicked_at'
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'clicked_at' => 'datetime',
     ];
 
     public function memberReward($relation = false)

@@ -4,14 +4,28 @@ namespace App\Services\Newsletter;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\MemberReward;
 use App\Models\Newsletter;
 use App\Models\Page;
+use App\Models\ProductOffer;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Offers\ProductOfferRepository;
+use App\Repositories\Rewards\RewardsRepository;
+use App\Services\Adverts\DealTrackingRecorder;
+use App\Services\Adverts\OfferVisibilityResolver;
+use App\Services\Adverts\RenderContext;
+use App\Services\Adverts\RewardVisibilityResolver;
+use App\Services\Adverts\VisibilityDecision;
 
 class NewsletterPageBuilderService
 {
     public function __construct(
-        private readonly PageRepository $pageRepository
+        private readonly PageRepository           $pageRepository,
+        private readonly ProductOfferRepository   $offerRepository,
+        private readonly RewardsRepository        $rewardsRepository,
+        private readonly OfferVisibilityResolver  $offerResolver,
+        private readonly RewardVisibilityResolver $rewardResolver,
+        private readonly DealTrackingRecorder     $trackingRecorder
     )
     {
     }
@@ -128,20 +142,30 @@ class NewsletterPageBuilderService
     /**
      * Build newsletter HTML from page blocks
      */
-    public function buildNewsletterHtmlFromBlocks(Newsletter $newsletter, Page $page, ?string $unsubscribeToken = null): string
+    public function buildNewsletterHtmlFromBlocks(
+        Newsletter          $newsletter,
+        Page                $page,
+        ?string             $unsubscribeToken = null,
+        ?\App\Models\Member $member = null,
+        ?int                $siteId = null
+    ): string
     {
+        $siteId = $siteId ?? SiteContext::getId();
         $blocks = $page->blocks;
 
         if ($blocks->isEmpty()) {
             $blocks = [];
         }
 
+        // Create render context
+        $context = RenderContext::forNewsletter($newsletter->id, $member);
+
         $html = [];
         $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px;">';
         $html[] = '<div style="background: white; padding: 30px; border-radius: 8px;">';
 
         foreach ($blocks as $block) {
-            $html[] = $this->renderBlockForEmail($block->toArray());
+            $html[] = $this->renderBlockForEmail($block->toArray(), $context, $siteId);
         }
 
         $html[] = '</div>';
@@ -154,10 +178,22 @@ class NewsletterPageBuilderService
     /**
      * Render a single block for email
      */
-    private function renderBlockForEmail(array $block): string
+    private function renderBlockForEmail(array $block, ?RenderContext $context = null, ?int $siteId = null): string
     {
         $type = $block['type'] ?? 'text';
         $blockData = $block['data'] ?? [];
+
+        if (!$context && in_array($type, ['offer', 'reward'])) {
+            return '';
+        }
+
+        if ($type === 'offer' && $context) {
+            return $this->renderOfferBlock($blockData, $context);
+        }
+
+        if ($type === 'reward' && $context) {
+            return $this->renderRewardBlock($blockData, $context, $siteId);
+        }
 
         return match ($type) {
             'text' => $this->renderTextBlock($blockData),
@@ -185,6 +221,51 @@ class NewsletterPageBuilderService
             'deal' => $this->renderDealBlock($blockData),
             default => ''
         };
+    }
+
+    private function resolveAndTrackOffer(
+        ProductOffer  $offer,
+        RenderContext $context
+    ): ?VisibilityDecision
+    {
+        $decision = $this->offerResolver->resolve($offer, $context);
+
+        if (!$decision->shouldRender) {
+            return null;
+        }
+
+        // Track render with full context metadata
+        $dealId = $decision->metadata['deal_id'] ?? null;
+        $this->trackingRecorder->recordOfferRender(
+            $offer->id,
+            $dealId,
+            $context
+        );
+
+        return $decision;
+    }
+
+    private function resolveAndTrackReward(
+        MemberReward  $reward,
+        RenderContext $context
+    ): ?VisibilityDecision
+    {
+        $decision = $this->rewardResolver->resolve($reward, $context);
+
+        if (!$decision->shouldRender) {
+            return null;
+        }
+
+        // Track render with full context metadata
+        $dealId = $decision->metadata['deal_id'] ?? null;
+        $this->trackingRecorder->recordRewardRender(
+            $reward->id,
+            $dealId,
+            $context,
+            $reward->site_id
+        );
+
+        return $decision;
     }
 
     /**
@@ -1442,6 +1523,98 @@ class NewsletterPageBuilderService
 
             $html[] = '</div>';
         }
+
+        $html[] = '</div>';
+
+        return implode("\n", $html);
+    }
+
+    private function renderOfferBlock(array $block, RenderContext $context): string
+    {
+        $offerId = $block['offer_id'] ?? null;
+
+        if (!$offerId) {
+            return '';
+        }
+
+        $offer = $this->offerRepository->find($offerId);
+
+        if (!$offer) {
+            return '';
+        }
+
+        $decision = $this->resolveAndTrackOffer($offer, $context);
+
+        if (!$decision) {
+            return '';
+        }
+
+        // Build HTML
+        $html = [];
+        $html[] = '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0; background: #fafafa;">';
+        $html[] = '<div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 10px;">Partner Offer</div>';
+
+        if ($offer->product) {
+            $html[] = '<h3 style="margin: 0 0 10px 0;">' . htmlspecialchars($offer->product->name) . '</h3>';
+
+            if ($offer->sale_price) {
+                $html[] = '<div style="margin: 10px 0;">';
+                $html[] = '<span style="text-decoration: line-through; color: #999;">' . ($offer->currency ?? '$') . $offer->original_price . '</span>';
+                $html[] = ' <span style="color: #d9534f; font-size: 24px; font-weight: bold;">' . ($offer->currency ?? '$') . $offer->sale_price . '</span>';
+                $html[] = '</div>';
+            }
+        }
+
+        if ($offer->description) {
+            $html[] = '<p style="color: #666; margin: 10px 0;">' . htmlspecialchars($offer->description) . '</p>';
+        }
+
+        $trackingUrl = url("/offers/{$offerId}/click?context=" . urlencode($context->channel) . "&surface={$context->surfaceId}");
+        $html[] = '<a href="' . $trackingUrl . '" style="display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin-top: 10px;">View Offer</a>';
+
+        $html[] = '</div>';
+
+        return implode("\n", $html);
+    }
+
+    private function renderRewardBlock(array $block, RenderContext $context): string
+    {
+        $rewardId = $block['reward_id'] ?? null;
+
+        if (!$rewardId || !$context->memberId) {
+            return '';
+        }
+
+        $reward = $this->rewardsRepository->findMemberRewardById($rewardId);
+
+        if (!$reward) {
+            return '';
+        }
+
+        $decision = $this->resolveAndTrackReward($reward, $context);
+
+        if (!$decision) {
+            return '';
+        }
+
+        $html = [];
+        $html[] = '<div style="border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin: 20px 0; background: #f0fff4;">';
+        $html[] = '<div style="color: #28a745; font-size: 14px; font-weight: bold; margin-bottom: 10px;">🎁 Member Reward</div>';
+
+        if ($reward->rewardDefinition) {
+            $html[] = '<h3 style="margin: 0 0 10px 0; color: #28a745;">' . htmlspecialchars($reward->rewardDefinition->name) . '</h3>';
+            $html[] = '<p style="color: #666;">' . htmlspecialchars($reward->rewardDefinition->description ?? '') . '</p>';
+        }
+
+        if ($decision->metadata['voucher_code'] ?? null) {
+            $html[] = '<div style="background: white; border: 2px dashed #28a745; padding: 15px; margin: 15px 0; text-align: center;">';
+            $html[] = '<div style="color: #666; font-size: 12px; margin-bottom: 5px;">Your Code:</div>';
+            $html[] = '<div style="font-size: 20px; font-weight: bold; font-family: monospace; color: #28a745;">' . htmlspecialchars($decision->metadata['voucher_code']) . '</div>';
+            $html[] = '</div>';
+        }
+
+        $viewRewardUrl = url("/rewards/{$rewardId}/view");
+        $html[] = '<a href="' . $viewRewardUrl . '" style="display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin-top: 10px;">View Reward</a>';
 
         $html[] = '</div>';
 

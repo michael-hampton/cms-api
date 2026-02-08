@@ -28,6 +28,7 @@ class Member extends Model
         'communication_preferences',
         'region',
         'timezone',
+        'segment'
     ];
 
     protected $hidden = [
@@ -403,4 +404,12 @@ class Member extends Model
         return $this->timezone ?? 'UTC';
     }
 
+    public function isPaid(): bool
+    {
+        $subscription = $this->activeSubscription(false, $this->site_id);
+
+        return $subscription
+            && $subscription->status === 'active'
+            && $subscription->type === 'paid';
+    }
 }

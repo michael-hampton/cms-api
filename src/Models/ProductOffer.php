@@ -31,6 +31,7 @@ class ProductOffer extends Model
         'rejected_at',
         'rejected_by',
         'voucher_id',
+        'eligibility_rules',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class ProductOffer extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'is_active' => 'boolean',
+        'eligibility_rules' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'published_at' => 'datetime',
