@@ -7,11 +7,13 @@ use App\Framework\Support\SiteContext;
 use App\Models\MemberReward;
 use App\Models\Newsletter;
 use App\Models\Page;
+use App\Models\Product;
 use App\Models\ProductOffer;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Adverts\DealTrackingRecorder;
+use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\OfferVisibilityResolver;
 use App\Services\Adverts\RenderContext;
 use App\Services\Adverts\RewardVisibilityResolver;
@@ -25,7 +27,8 @@ class NewsletterPageBuilderService
         private readonly RewardsRepository        $rewardsRepository,
         private readonly OfferVisibilityResolver  $offerResolver,
         private readonly RewardVisibilityResolver $rewardResolver,
-        private readonly DealTrackingRecorder     $trackingRecorder
+        private readonly DealTrackingRecorder   $trackingRecorder,
+        private readonly DealVisibilityResolver $dealResolver,
     )
     {
     }
@@ -183,7 +186,7 @@ class NewsletterPageBuilderService
         $type = $block['type'] ?? 'text';
         $blockData = $block['data'] ?? [];
 
-        if (!$context && in_array($type, ['offer', 'reward'])) {
+        if (!$context && in_array($type, ['offer', 'reward', 'deal'])) {
             return '';
         }
 
@@ -193,6 +196,10 @@ class NewsletterPageBuilderService
 
         if ($type === 'reward' && $context) {
             return $this->renderRewardBlock($blockData, $context, $siteId);
+        }
+
+        if ($type === 'deal' && $context) {
+            return $this->renderDealBlockWithTracking($blockData, $context, $siteId);
         }
 
         return match ($type) {
@@ -221,6 +228,28 @@ class NewsletterPageBuilderService
             'deal' => $this->renderDealBlock($blockData),
             default => ''
         };
+    }
+
+    private function resolveAndTrackDeal(
+        Product       $product,
+        RenderContext $context,
+        ?int          $siteId = null
+    ): ?VisibilityDecision
+    {
+        $decision = $this->dealResolver->resolve($product, $context);
+
+        if (!$decision->shouldRender) {
+            return null;
+        }
+
+        // Track render
+        $this->trackingRecorder->recordDealRender(
+            $product->id,
+            $context,
+            $siteId
+        );
+
+        return $decision;
     }
 
     private function resolveAndTrackOffer(
@@ -1616,6 +1645,81 @@ class NewsletterPageBuilderService
         $viewRewardUrl = url("/rewards/{$rewardId}/view");
         $html[] = '<a href="' . $viewRewardUrl . '" style="display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin-top: 10px;">View Reward</a>';
 
+        $html[] = '</div>';
+
+        return implode("\n", $html);
+    }
+
+    private function renderDealBlockWithTracking(array $block, RenderContext $context, ?int $siteId = null): string
+    {
+        $productId = $block['product_id'] ?? null;
+
+        if (!$productId) {
+            return '';
+        }
+
+        $product = \App\Models\Product::with(['brand', 'images', 'category'])->find($productId);
+
+        if (!$product) {
+            return '';
+        }
+
+        $decision = $this->resolveAndTrackDeal($product, $context, $siteId);
+
+        if (!$decision) {
+            return '';
+        }
+
+        // Calculate savings
+        $savings = $product->price - $product->sale_price;
+        $savingsPercent = $product->discount_percentage;
+
+        // Build the HTML for the deal
+        $html = [];
+        $html[] = '<div style="border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin: 20px 0; background-color: #f0fff4;">';
+
+        $html[] = '<div style="margin-bottom: 15px;">';
+        $html[] = '<span style="background-color: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">🔥 Deal Alert</span>';
+        $html[] = '</div>';
+
+        // Product name and brand
+        $html[] = '<div style="display: table; width: 100%;">';
+
+        // Image if available
+        if ($product->main_image_url) {
+            $html[] = '<div style="display: table-cell; vertical-align: top; width: 150px; padding-right: 20px;">';
+            $html[] = '<img src="' . htmlspecialchars($product->main_image_url) . '" alt="' . htmlspecialchars($product->name) . '" style="width: 150px; height: auto; border-radius: 4px;">';
+            $html[] = '</div>';
+        }
+
+        $html[] = '<div style="display: table-cell; vertical-align: top;">';
+
+        if ($product->brand) {
+            $html[] = '<div style="color: #666; font-size: 14px; margin-bottom: 5px;">' . htmlspecialchars($product->brand->name) . '</div>';
+        }
+
+        $html[] = '<h3 style="color: #333; margin: 0 0 10px 0; font-size: 20px;">' . htmlspecialchars($product->name) . '</h3>';
+
+        if ($product->description) {
+            $description = strlen($product->description) > 150
+                ? substr($product->description, 0, 150) . '...'
+                : $product->description;
+            $html[] = '<p style="color: #666; margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">' . htmlspecialchars($description) . '</p>';
+        }
+
+        // Pricing
+        $html[] = '<div style="margin-bottom: 15px;">';
+        $html[] = '<span style="color: #999; text-decoration: line-through; font-size: 16px; margin-right: 10px;">£' . number_format($product->price, 2) . '</span>';
+        $html[] = '<span style="color: #28a745; font-size: 24px; font-weight: bold;">£' . number_format($product->sale_price, 2) . '</span>';
+        $html[] = '<div style="color: #28a745; font-size: 14px; font-weight: bold; margin-top: 5px;">Save £' . number_format($savings, 2) . ' (' . $savingsPercent . '%)</div>';
+        $html[] = '</div>';
+
+        // CTA
+        $dealUrl = url("/products/{$product->slug}");
+        $html[] = '<a href="' . $dealUrl . '" style="display: inline-block; padding: 12px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px;">View Deal</a>';
+
+        $html[] = '</div>';
+        $html[] = '</div>';
         $html[] = '</div>';
 
         return implode("\n", $html);

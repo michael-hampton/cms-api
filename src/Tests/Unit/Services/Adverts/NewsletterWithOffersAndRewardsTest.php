@@ -231,6 +231,212 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         ]);
     }
 
+    public function testRendersDealBlockInNewsletter(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'Special Product',
+            'price' => 100.00,
+            'sale_price' => 79.99,
+            'is_active' => true,
+            'description' => 'Limited time offer',
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'deal',
+            'page_id' => $page->id,
+            'data' => json_encode(['product_id' => $product->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        $this->assertStringContainsString('Special Product', $html);
+        $this->assertStringContainsString('79.99', $html);
+        $this->assertStringContainsString('100', $html);
+    }
+
+    public function testSuppressesInactiveDeal(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'Inactive Product',
+            'price' => 100.00,
+            'sale_price' => 79.99,
+            'is_active' => false,
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'deal',
+            'page_id' => $page->id,
+            'data' => json_encode(['product_id' => $product->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        $this->assertStringNotContainsString('Inactive Product', $html);
+    }
+
+    public function testSuppressesDealWithNoSale(): void
+    {
+        $product = $this->createProduct([
+            'name' => 'No Sale Product',
+            'price' => 100.00,
+            'sale_price' => 100.00, // No discount
+            'is_active' => true,
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'deal',
+            'page_id' => $page->id,
+            'data' => json_encode(['product_id' => $product->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        $this->assertStringNotContainsString('No Sale Product', $html);
+    }
+
+    public function testTracksDealRender(): void
+    {
+        $product = $this->createProduct([
+            'price' => 100.00,
+            'sale_price' => 79.99,
+            'is_active' => true,
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'deal',
+            'page_id' => $page->id,
+            'data' => json_encode(['product_id' => $product->id]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        // Should have tracked render
+        $this->assertDatabaseHas('deal_clicks', [
+            'product_id' => $product->id,
+            'action' => 'render',
+        ]);
+    }
+
+    public function testRendersDealBlockWithBrandAndImage(): void
+    {
+        $brand = \App\Models\Brand::create([
+            'name' => 'TechBrand',
+            'slug' => 'techbrand',
+            'site_id' => $this->siteId,
+        ]);
+
+        $product = $this->createProduct([
+            'name' => 'Premium Headphones',
+            'price' => 299.99,
+            'sale_price' => 199.99,
+            'is_active' => true,
+            'brand_id' => $brand->id,
+            'image' => 'https://example.com/headphones.jpg',
+        ]);
+
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        Block::create([
+            'type' => 'deal',
+            'page_id' => $page->id,
+            'data' => json_encode([
+                'product_id' => $product->id,
+                'title' => 'Black Friday Deal',
+            ]),
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Deal Newsletter',
+            'site_id' => $this->siteId,
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromBlocks($newsletter, $page, null, null, $this->siteId);
+
+        $this->assertStringContainsString('Premium Headphones', $html);
+        $this->assertStringContainsString('TechBrand', $html);
+        $this->assertStringContainsString('199.99', $html);
+        $this->assertStringContainsString('299.99', $html);
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

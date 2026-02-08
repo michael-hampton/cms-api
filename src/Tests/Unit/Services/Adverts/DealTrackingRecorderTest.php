@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Adverts;
 
 use App\Models\ProductOffer;
+use App\Repositories\Offers\DealClickRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Rewards\RewardAuditLogRepository;
 use App\Repositories\Rewards\RewardDefinitionRepository;
@@ -17,6 +18,23 @@ class DealTrackingRecorderTest extends FunctionalTestCase
     use CreatesTestData;
 
     private DealTrackingRecorder $recorder;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $offerRepo = new ProductOfferRepository();
+        $rewardDefRepo = new RewardDefinitionRepository(new RewardAuditLogRepository());
+        $dealClickRepo = new DealClickRepository();
+        $rewardsRepo = new RewardsRepository($rewardDefRepo, new RewardAuditLogRepository());
+
+        $this->recorder = new DealTrackingRecorder(
+            $offerRepo,
+            $rewardsRepo,
+            $dealClickRepo,
+            $this->database
+        );
+    }
 
     public function testRecordsOfferRender(): void
     {
@@ -164,14 +182,68 @@ class DealTrackingRecorderTest extends FunctionalTestCase
         $this->assertFalse($result);
     }
 
-    protected function setUp(): void
+    public function testRecordsDealRender(): void
     {
-        parent::setUp();
+        $product = $this->createProduct([
+            'price' => 100.00,
+            'sale_price' => 79.99,
+            'is_active' => true,
+        ]);
+        $member = $this->createMember();
 
-        $offerRepo = new ProductOfferRepository();
-        $rewardDefRepo = new RewardDefinitionRepository(new RewardAuditLogRepository());
-        $rewardsRepo = new RewardsRepository($rewardDefRepo, new RewardAuditLogRepository());
+        $context = RenderContext::forNewsletter(123, $member);
+        $this->recorder->recordDealRender($product->id, $context, $this->siteId);
 
-        $this->recorder = new DealTrackingRecorder($offerRepo, $rewardsRepo, $this->database);
+        $this->assertDatabaseHas('deal_clicks', [
+            'product_id' => $product->id,
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'action' => 'render',
+            'channel' => 'newsletter',
+            'surface_type' => 'newsletter_issue',
+            'surface_id' => 123,
+        ]);
+    }
+
+    public function testRecordsDealClick(): void
+    {
+        $product = $this->createProduct([
+            'price' => 100.00,
+            'sale_price' => 79.99,
+            'is_active' => true,
+        ]);
+        $member = $this->createMember();
+
+        $context = RenderContext::forWeb(456, $member);
+        $this->recorder->recordDealClick($product->id, $context, $this->siteId);
+
+        $this->assertDatabaseHas('deal_clicks', [
+            'product_id' => $product->id,
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'action' => 'click',
+            'channel' => 'web',
+            'surface_type' => 'page',
+            'surface_id' => 456,
+        ]);
+    }
+
+    public function testRecordsDealRenderWithoutMember(): void
+    {
+        $product = $this->createProduct([
+            'price' => 100.00,
+            'sale_price' => 79.99,
+            'is_active' => true,
+        ]);
+
+        $context = RenderContext::forNewsletter(123, null);
+        $this->recorder->recordDealRender($product->id, $context, $this->siteId);
+
+        $this->assertDatabaseHas('deal_clicks', [
+            'product_id' => $product->id,
+            //'member_id' => null,
+            'site_id' => $this->siteId,
+            'action' => 'render',
+        ]);
     }
 }

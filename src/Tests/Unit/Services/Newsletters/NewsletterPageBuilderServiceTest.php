@@ -14,9 +14,11 @@ use App\Models\PageTag;
 use App\Models\ProductOffer;
 use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Offers\DealClickRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Adverts\DealTrackingRecorder;
+use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\OfferVisibilityResolver;
 use App\Services\Adverts\RenderContext;
 use App\Services\Adverts\RewardVisibilityResolver;
@@ -36,6 +38,8 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
     private readonly DealTrackingRecorder $trackingRecorder;
     private readonly ProductOfferRepository $offerRepository;
     private readonly RewardsRepository $rewardsRepository;
+    private DealVisibilityResolver $dealResolver;
+    private readonly DealClickRepository $clickRepository;
 
     protected function setUp(): void
     {
@@ -46,6 +50,8 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->trackingRecorder = app(DealTrackingRecorder::class);
         $this->offerRepository = app(ProductOfferRepository::class);
         $this->rewardsRepository = app(RewardsRepository::class);
+        $this->clickRepository = app(DealClickRepository::class);
+        $this->dealResolver = app(DealVisibilityResolver::class);
 
         $this->service = new NewsletterPageBuilderService(
             $this->pageRepository,
@@ -53,7 +59,8 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             $this->rewardsRepository,
             $this->offerResolver,
             $this->rewardResolver,
-            $this->trackingRecorder
+            $this->trackingRecorder,
+            $this->dealResolver,
         );
     }
 
