@@ -12,6 +12,7 @@ use App\Models\Page;
 use App\Models\User;
 use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
+use App\Repositories\Cms\CollaboratorRepository;
 use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\UserRepository;
 use App\Services\Cms\Pages\PageService;
@@ -27,6 +28,36 @@ class ConvertBriefToPageTest extends FunctionalTestCase
     private $action;
     private $userRepository;
     private $imageRepository;
+    private $collaboratorRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->briefRepository = Mockery::mock(BriefRepository::class);
+        $this->pageService = Mockery::mock(PageService::class);
+        $this->authorRepository = Mockery::mock(AuthorRepository::class);
+        $this->userRepository = Mockery::mock(UserRepository::class);
+        $this->imageRepository = Mockery::mock(ImageRepository::class);
+        $this->collaboratorRepository = Mockery::mock(CollaboratorRepository::class);
+
+        $this->action = new ConvertBriefToPage(
+            $this->databaseMock,
+            $this->briefRepository,
+            $this->pageService,
+            $this->authorRepository,
+            $this->userRepository,
+            $this->imageRepository,
+            $this->collaboratorRepository
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function testHandleThrowsExceptionWhenBriefNotFound()
     {
@@ -84,6 +115,8 @@ class ConvertBriefToPageTest extends FunctionalTestCase
             ->with($briefId, 100)
             ->once();
 
+        $this->setCollaboratorExpectations($briefId, 1, 'reviewer');
+
         $conversionData = [
             'images' => [],
             'products' => []
@@ -125,6 +158,8 @@ class ConvertBriefToPageTest extends FunctionalTestCase
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
+
+        $this->setCollaboratorExpectations($briefId, 1, 'reviewer');
 
         $this->briefRepository->shouldReceive('getCompleteBriefData')
             ->with($briefId)
@@ -182,6 +217,8 @@ class ConvertBriefToPageTest extends FunctionalTestCase
             'productName' => 'Test Product',
             'product_price' => '$99.99'
         ];
+
+        $this->setCollaboratorExpectations($briefId, 1, 'reviewer');
 
         $this->briefRepository->shouldReceive('getAttachment')->with(30)->andReturn($attachment);
 
@@ -250,6 +287,8 @@ class ConvertBriefToPageTest extends FunctionalTestCase
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 100;
 
+        $this->setCollaboratorExpectations($briefId, $ownerId, 'owner');
+
         $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
@@ -307,6 +346,8 @@ class ConvertBriefToPageTest extends FunctionalTestCase
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 100;
 
+        $this->setCollaboratorExpectations($briefId, 1, 'reviewer');
+
         $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
@@ -341,30 +382,11 @@ class ConvertBriefToPageTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
-    protected function setUp(): void
+    private function setCollaboratorExpectations($briefId, $userId, $role)
     {
-        parent::setUp();
-
-        $this->databaseMock = Mockery::mock(Database::class);
-        $this->briefRepository = Mockery::mock(BriefRepository::class);
-        $this->pageService = Mockery::mock(PageService::class);
-        $this->authorRepository = Mockery::mock(AuthorRepository::class);
-        $this->userRepository = Mockery::mock(UserRepository::class);
-        $this->imageRepository = Mockery::mock(ImageRepository::class);
-
-        $this->action = new ConvertBriefToPage(
-            $this->databaseMock,
-            $this->briefRepository,
-            $this->pageService,
-            $this->authorRepository,
-            $this->userRepository,
-            $this->imageRepository
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
+        $this->collaboratorRepository->shouldReceive('getForCollaboratable')
+            ->with(Brief::class, $briefId)
+            ->once()
+            ->andReturn(collect([]));
     }
 }

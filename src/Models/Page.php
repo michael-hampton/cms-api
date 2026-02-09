@@ -350,8 +350,6 @@ class Page extends Model
         );
     }
 
-// Add to App/Models/Page.php
-
     public function requiresMemberLogin(): bool
     {
         return (bool) ($this->requires_member_login ?? false);
@@ -607,5 +605,87 @@ class Page extends Model
     public function isInternal(): bool
     {
         return $this->status === PageStatus::INTERNAL->value;
+    }
+
+    /**
+     * Scope query to pages visible to a specific member based on their territory
+     */
+    public function scopeVisibleToMember($query, ?Member $member = null)
+    {
+        // If no member or member has no territory, show all pages
+        if (!$member || !$member->hasTerritoryId()) {
+            return $query;
+        }
+
+        $territoryId = $member->getTerritoryId();
+
+        // Filter pages based on territories
+        return $query->where(function ($q) use ($territoryId) {
+            // Pages with no territories are visible to all
+            $q->whereDoesntHave('territories')
+                // OR pages with territories that include the member's territory
+                ->orWhereHas('territories', function ($subQ) use ($territoryId) {
+                    $subQ->where('page_territories.territory_id', $territoryId);
+                });
+        });
+    }
+
+    /**
+     * Check if a page is visible to a specific member
+     */
+    public function isVisibleToMember(?Member $member): bool
+    {
+        // If no member or member has no territory, page is visible
+        if (!$member || !$member->hasTerritory()) {
+            return true;
+        }
+
+        // If page has no region sets, it's visible to everyone
+        if (!$this->relationLoaded('regionSets')) {
+            $this->load(['regionSets']);
+        }
+
+        if ($this->regionSets->isEmpty()) {
+            return true;
+        }
+
+        // Check if any of the page's region sets include the member's territory
+        foreach ($this->regionSets as $regionSet) {
+            if (!$regionSet->relationLoaded('territories')) {
+                $regionSet->load('territories');
+            }
+
+            foreach ($regionSet->territories as $territory) {
+                if ($territory->code === $member->territory_code && !$territory->deleted_at) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function collaborators($relation = false)
+    {
+        return $this->morphMany(Collaborator::class, 'collaboratable', $relation);
+    }
+
+    public function hasCollaborator(int $userId): bool
+    {
+        if (!$this->relationLoaded('collaborators')) {
+            $this->load(['collaborators']);
+        }
+
+        return $this->collaborators->contains('user_id', $userId);
+    }
+
+    public function getCollaboratorRole(int $userId): ?string
+    {
+        if (!$this->relationLoaded('collaborators')) {
+            $this->load(['collaborators']);
+        }
+
+        $collaborator = $this->collaborators->firstWhere('user_id', $userId);
+        return $collaborator ? $collaborator->role : null;
     }
 }

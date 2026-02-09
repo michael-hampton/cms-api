@@ -735,7 +735,8 @@ trait CreatesTestData
             'title' => 'Test Brief',
             'description' => 'Test description',
             'status' => 'ready',
-            'site_id' => $this->siteId ?? 1
+            'site_id' => $this->siteId ?? 1,
+            'owner_id' => $this->createUser()->id,
         ];
 
         return Brief::create(array_merge($defaults, $attributes));

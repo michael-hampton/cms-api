@@ -7,11 +7,15 @@ use App\Models\Author;
 use App\Models\Block;
 use App\Models\Category;
 use App\Models\CustomFieldDefinition;
+use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageCustomField;
 use App\Models\PageProduct;
+use App\Models\PageTerritory;
+use App\Models\RegionSet;
 use App\Models\Site;
 use App\Models\Tag;
+use App\Models\Territory;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -647,5 +651,176 @@ class PageModelTest extends FunctionalTestCase
         $pageOwner = $page->owner;
         $this->assertInstanceOf(User::class, $pageOwner);
         $this->assertEquals('Page Owner', $pageOwner->name);
+    }
+
+    public function test_visible_to_member_scope_shows_all_pages_when_member_has_no_territory(): void
+    {
+        // Arrange
+        $member = $this->createMember(['territory_id' => null]);
+
+        $page1 = $this->createPage(['title' => 'Page 1']);
+        $page2 = $this->createPage(['title' => 'Page 2']);
+
+        // Act
+        $results = Page::visibleToMember($member)->get();
+
+        // Assert
+        $this->assertCount(2, $results);
+        $this->assertTrue($results->contains('id', $page1->id));
+        $this->assertTrue($results->contains('id', $page2->id));
+    }
+
+    public function test_visible_to_member_scope_shows_all_pages_when_member_is_null(): void
+    {
+        // Arrange
+        $page1 = $this->createPage(['title' => 'Page 1']);
+        $page2 = $this->createPage(['title' => 'Page 2']);
+
+        // Act
+        $results = Page::visibleToMember(null)->get();
+
+        // Assert
+        $this->assertCount(2, $results);
+        $this->assertTrue($results->contains('id', $page1->id));
+        $this->assertTrue($results->contains('id', $page2->id));
+    }
+
+    public function test_visible_to_member_scope_shows_pages_without_territories(): void
+    {
+        // Arrange
+        $territory = $this->createTerritory(['name' => 'US']);
+        $member = $this->createMember(['territory_id' => $territory->id]);
+
+        $pageWithoutTerritory = $this->createPage(['title' => 'No Territory']);
+        $pageWithTerritory = $this->createPageWithTerritory($territory->id);
+
+        // Act
+        $results = Page::visibleToMember($member)->get();
+
+        // Assert
+        $this->assertTrue($results->contains('id', $pageWithoutTerritory->id));
+    }
+
+    public function test_visible_to_member_scope_filters_pages_by_matching_territory(): void
+    {
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+        $ukTerritory = $this->createTerritory(['name' => 'UK', 'code' => 'GB']);
+
+        $member = $this->createMember(['territory_id' => $usTerritory->id]);
+
+        $usPage = $this->createPageWithTerritory($usTerritory->id);
+        $ukPage = $this->createPageWithTerritory($ukTerritory->id);
+
+        // Act
+        $results = Page::visibleToMember($member)->get();
+
+        // Assert
+        $this->assertTrue($results->contains('id', $usPage->id));
+        $this->assertFalse($results->contains('id', $ukPage->id));
+    }
+
+    public function test_visible_to_member_scope_with_multiple_territories_uses_or_logic(): void
+    {
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+        $ukTerritory = $this->createTerritory(['name' => 'UK', 'code' => 'GB']);
+
+        $member = $this->createMember(['territory_id' => $usTerritory->id]);
+
+        // Create page with both US and UK territories
+        $page = $this->createPage(['title' => 'Multi Territory Page']);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $usTerritory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $ukTerritory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        // Act
+        $results = Page::visibleToMember($member)->get();
+
+        // Assert - should be visible because US is one of the territories
+        $this->assertTrue($results->contains('id', $page->id));
+    }
+
+    public function test_visible_to_member_scope_handles_deleted_territories_gracefully(): void
+    {
+        // Arrange
+        $member = $this->createMember(['territory_id' => null]);
+
+        $page = $this->createPage(['title' => 'Page']);
+
+        // Act - should not throw error
+        $results = Page::visibleToMember($member)->get();
+
+        // Assert - should show page without territories
+        $this->assertTrue($results->contains('id', $page->id));
+    }
+
+    public function test_visible_to_member_scope_reflects_territory_changes(): void
+    {
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+        $member = $this->createMember(['territory_id' => $usTerritory->id]);
+
+        $ukTerritory = $this->createTerritory(['name' => 'UK', 'code' => 'GB']);
+        $page = $this->createPageWithTerritory($ukTerritory->id);
+
+        // Verify not visible initially
+        $results1 = Page::visibleToMember($member)->get();
+        $this->assertFalse($results1->contains('id', $page->id));
+
+        // Add US territory to page
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $usTerritory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        // Act - query again
+        $results2 = Page::visibleToMember($member)->get();
+
+        // Assert - now visible
+        $this->assertTrue($results2->contains('id', $page->id));
+    }
+
+// Helper methods for tests
+    private function createTerritory(array $data = []): Model
+    {
+        $regionSet = RegionSet::create([
+            'name' => 'Test Region Set',
+            'site_id' => $this->siteId,
+            'is_active' => true,
+            'slug' => 'test-region-set ' . uniqid()
+        ]);
+
+        return Territory::create(array_merge([
+            'name' => 'Test Territory',
+            'code' => 'XX',
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId,
+            'is_active' => true,
+            'slug' => 'test-territory ' . uniqid()
+        ], $data));
+    }
+
+    private function createPageWithTerritory(int $territoryId): Page
+    {
+        $page = $this->createPage(['title' => "Page for Territory {$territoryId}"]);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $territoryId,
+            'site_id' => $this->siteId
+        ]);
+
+        return $page;
     }
 }

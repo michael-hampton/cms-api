@@ -296,7 +296,7 @@ class BriefService
         $data['brief_id'] = $briefId;
         $data['assigned_at'] = date('Y-m-d H:i:s');
 
-        $collaborator = $this->collaboratorRepository->create($data);
+        $collaborator = $this->collaboratorRepository->createForBrief($briefId, $data);
 
         $this->logBriefActivity->handle(
             $briefId,

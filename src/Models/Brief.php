@@ -84,10 +84,10 @@ class Brief extends Model
         return $this->belongsTo(BriefTemplate::class, 'template_id');
     }
 
-    public function collaborators()
-    {
-        return $this->hasMany(BriefCollaborator::class);
-    }
+//    public function collaborators()
+//    {
+//        return $this->hasMany(BriefCollaborator::class);
+//    }
 
     public function tasks()
     {
@@ -122,5 +122,31 @@ class Brief extends Model
     public function lastActivityUser()
     {
         return $this->belongsTo(User::class, 'last_activity_user_id');
+    }
+
+    public function collaborators($relation = false)
+    {
+        die('mike');
+
+        return $this->morphMany(Collaborator::class, 'collaboratable', $relation);
+    }
+
+    public function hasCollaborator(int $userId): bool
+    {
+        if (!$this->relationLoaded('collaborators')) {
+            $this->load(['collaborators']);
+        }
+
+        return $this->collaborators->contains('user_id', $userId);
+    }
+
+    public function getCollaboratorRole(int $userId): ?string
+    {
+        if (!$this->relationLoaded('collaborators')) {
+            $this->load(['collaborators']);
+        }
+
+        $collaborator = $this->collaborators->firstWhere('user_id', $userId);
+        return $collaborator ? $collaborator->role : null;
     }
 }

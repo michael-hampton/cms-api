@@ -3,8 +3,11 @@
 namespace App\Actions\Brief;
 
 use App\Framework\Database\Database;
+use App\Models\Brief;
+use App\Models\Page;
 use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
+use App\Repositories\Cms\CollaboratorRepository;
 use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\UserRepository;
 use App\Services\Cms\Pages\PageService;
@@ -13,15 +16,15 @@ use Exception;
 class ConvertBriefToPage
 {
     public function __construct(
-        private readonly Database         $database,
-        private readonly BriefRepository  $briefRepository,
-        private readonly PageService      $pageService,
+        private readonly Database               $database,
+        private readonly BriefRepository        $briefRepository,
+        private readonly PageService            $pageService,
         private readonly AuthorRepository $authorRepository,
-        private readonly UserRepository   $userRepository,
-        private ImageRepository           $imageRepository
+        private readonly UserRepository         $userRepository,
+        private readonly ImageRepository        $imageRepository,
+        private readonly CollaboratorRepository $collaboratorRepository
     )
     {
-
     }
 
     public function handle(int $briefId, array $conversionData): array
@@ -153,6 +156,9 @@ class ConvertBriefToPage
             // Create the page
             $page = $this->pageService->createPageWithAllData($pageData, $brief->site_id);
 
+            // Copy collaborators from brief to page
+            $this->copyCollaborators($brief, $page);
+
             // Mark brief as converted
             $this->briefRepository->markAsConverted($briefId, $page->id);
 
@@ -162,6 +168,28 @@ class ConvertBriefToPage
                 'brief_id' => $briefId
             ];
         });
+    }
+
+    private function copyCollaborators(Brief $brief, Page $page): void
+    {
+        $briefCollaborators = $this->collaboratorRepository->getForCollaboratable(
+            Brief::class,
+            $brief->id
+        );
+
+        foreach ($briefCollaborators as $collaborator) {
+            $this->collaboratorRepository->createForCollaboratable(
+                Page::class,
+                $page->id,
+                [
+                    'user_id' => $collaborator->user_id,
+                    'role' => $collaborator->role,
+                    'assigned_at' => $collaborator->assigned_at,
+                    'assigned_by' => $collaborator->assigned_by,
+                    'site_id' => $page->site_id
+                ]
+            );
+        }
     }
 
     private function generateSlug(string $title): string

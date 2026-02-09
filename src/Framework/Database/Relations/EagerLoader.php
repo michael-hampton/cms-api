@@ -72,7 +72,8 @@ class EagerLoader
         }
 
         $relationData = $this->analyzer->analyzeRelationshipMethod($tempModel, $relationName);
-        $handler = (new RelationHandlerFactory($this->database))->create($relationData['type'], $relationData);;
+
+        $handler = (new RelationHandlerFactory($this->database))->create($relationData['type'], $relationData);
 
         if (!$handler) {
             return $results;

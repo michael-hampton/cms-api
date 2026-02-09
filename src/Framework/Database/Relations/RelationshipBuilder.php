@@ -118,4 +118,112 @@ trait RelationshipBuilder
         sort($models);
         return implode('_', $models);
     }
+
+    // Add to src/Models/Model.php
+
+    /**
+     * Define a polymorphic one-to-many relationship
+     */
+    protected function morphMany(
+        string  $related,
+        string  $name,
+        ?string $type = null,
+        ?string $id = null,
+        ?string $localKey = null,
+        bool    $returnRelation = false
+    )
+    {
+        $type = $type ?: $name . '_type';
+        $id = $id ?: $name . '_id';
+        $localKey = $localKey ?: 'id';
+
+        $relationData = [
+            'type' => 'morphMany',
+            'related' => $related,
+            'morph_type' => $type,
+            'morph_id' => $id,
+            'local_key' => $localKey
+        ];
+
+        $handler = new MorphManyHandler($this->database, $relationData, $returnRelation);
+        $handler->setContext($this, $relationData);
+
+        if ($returnRelation) {
+            return $handler->newQuery();
+        }
+
+        return $handler->loadForSingleModel($this, $relationData);
+    }
+
+    /**
+     * Define a polymorphic one-to-one relationship
+     */
+    protected function morphOne(
+        string  $related,
+        string  $name,
+        ?string $type = null,
+        ?string $id = null,
+        ?string $localKey = null,
+        bool    $returnRelation = false
+    )
+    {
+        $type = $type ?: $name . '_type';
+        $id = $id ?: $name . '_id';
+        $localKey = $localKey ?: 'id';
+
+        $relationData = [
+            'type' => 'morphOne',
+            'related' => $related,
+            'morph_type' => $type,
+            'morph_id' => $id,
+            'local_key' => $localKey
+        ];
+
+        $handler = new MorphOneHandler($this->database, $relationData, $returnRelation);
+        $handler->setContext($this, $relationData);
+
+        if ($returnRelation) {
+            return $handler->newQuery();
+        }
+
+        return $handler->loadForSingleModel($this, $relationData);
+    }
+
+    /**
+     * Define an inverse polymorphic relationship
+     */
+    protected function morphTo(
+        ?string $name = null,
+        ?string $type = null,
+        ?string $id = null,
+        ?string $ownerKey = null,
+        bool    $returnRelation = false
+    )
+    {
+        // Guess the name from the calling method if not provided
+        if ($name === null) {
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+            $name = $backtrace[1]['function'];
+        }
+
+        $type = $type ?: $name . '_type';
+        $id = $id ?: $name . '_id';
+        $ownerKey = $ownerKey ?: 'id';
+
+        $relationData = [
+            'type' => 'morphTo',
+            'morph_type' => $type,
+            'morph_id' => $id,
+            'owner_key' => $ownerKey
+        ];
+
+        $handler = new MorphToHandler($this->database, $relationData, $returnRelation);
+        $handler->setContext($this, $relationData);
+
+        if ($returnRelation) {
+            return $handler->newQuery();
+        }
+
+        return $handler->loadForSingleModel($this, $relationData);
+    }
 }

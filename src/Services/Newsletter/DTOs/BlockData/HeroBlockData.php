@@ -8,7 +8,11 @@ class HeroBlockData extends BaseBlockData
         public readonly string  $title,
         public readonly ?string $subtitle,
         public readonly ?string $ctaText,
-        public readonly ?string $ctaUrl
+        public readonly ?string $ctaUrl,
+        public readonly ?string $secondaryCtaText,
+        public readonly ?string $secondaryCtaUrl,
+        public readonly ?string $backgroundImage,
+        public readonly bool    $showSearch
     )
     {
     }
@@ -19,7 +23,11 @@ class HeroBlockData extends BaseBlockData
             title: $data['title'] ?? '',
             subtitle: $data['subtitle'] ?? null,
             ctaText: $data['ctaText'] ?? null,
-            ctaUrl: $data['ctaUrl'] ?? null
+            ctaUrl: $data['ctaUrl'] ?? null,
+            secondaryCtaText: $data['secondaryCtaText'] ?? null,
+            secondaryCtaUrl: $data['secondaryCtaUrl'] ?? null,
+            backgroundImage: $data['backgroundImage'] ?? null,
+            showSearch: (bool)($data['showSearch'] ?? false)
         );
     }
 }

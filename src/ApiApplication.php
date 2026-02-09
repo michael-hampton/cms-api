@@ -41,19 +41,27 @@ use App\Observers\PageObserver;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
 use App\Services\Newsletter\Renderers\BannerBlockRenderer;
 use App\Services\Newsletter\Renderers\BuyingGuideBlockRenderer;
+use App\Services\Newsletter\Renderers\CardBlockRenderer;
+use App\Services\Newsletter\Renderers\CardGroupBlockRenderer;
 use App\Services\Newsletter\Renderers\ContactFormBlockRenderer;
 use App\Services\Newsletter\Renderers\CtaBlockRenderer;
 use App\Services\Newsletter\Renderers\DealOfferRenderer;
 use App\Services\Newsletter\Renderers\DefaultEmailBlockRendererRegistry;
 use App\Services\Newsletter\Renderers\DividerBlockRenderer;
 use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
+use App\Services\Newsletter\Renderers\EventBlockRenderer;
+use App\Services\Newsletter\Renderers\GalleryBlockRenderer;
 use App\Services\Newsletter\Renderers\HeadingBlockRenderer;
 use App\Services\Newsletter\Renderers\HeroBlockRenderer;
 use App\Services\Newsletter\Renderers\ImageBlockRenderer;
 use App\Services\Newsletter\Renderers\InfoBlockRenderer;
 use App\Services\Newsletter\Renderers\ListBlockRenderer;
+use App\Services\Newsletter\Renderers\MapLocationBlockRenderer;
+use App\Services\Newsletter\Renderers\NewsFeedBlockRenderer;
 use App\Services\Newsletter\Renderers\NoteBlockRenderer;
 use App\Services\Newsletter\Renderers\OfferBlockRenderer;
+use App\Services\Newsletter\Renderers\PageGridBlockRenderer;
+use App\Services\Newsletter\Renderers\PageLinksBlockRenderer;
 use App\Services\Newsletter\Renderers\PersonBlockRenderer;
 use App\Services\Newsletter\Renderers\ProductBlockRenderer;
 use App\Services\Newsletter\Renderers\ProductComparisonBlockRenderer;
@@ -61,8 +69,11 @@ use App\Services\Newsletter\Renderers\QuoteBlockRenderer;
 use App\Services\Newsletter\Renderers\RewardBlockRenderer;
 use App\Services\Newsletter\Renderers\SchemaBlockRenderer;
 use App\Services\Newsletter\Renderers\SectionBlockRenderer;
+use App\Services\Newsletter\Renderers\ServicesBlockRenderer;
 use App\Services\Newsletter\Renderers\StaticDealBlockRenderer;
 use App\Services\Newsletter\Renderers\TableBlockRenderer;
+use App\Services\Newsletter\Renderers\TeamBlockRenderer;
+use App\Services\Newsletter\Renderers\TeaserBlockRenderer;
 use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
 use App\Services\Newsletter\Renderers\TextBlockRenderer;
 use App\Services\Shared\NativeSessionStore;
@@ -123,6 +134,17 @@ class ApiApplication
                     new TableBlockRenderer(),
                     new TestimonialBlockRenderer(),
                     new TextBlockRenderer(),
+                    new PagelinksBlockRenderer(),
+                    new ServicesBlockRenderer(),
+                    new NewsFeedBlockRenderer(),
+                    new CardBlockRenderer(),
+                    new CardGroupBlockRenderer(new CardBlockRenderer()),
+                    new TeaserBlockRenderer(),
+                    new TeamBlockRenderer(),
+                    new GalleryBlockRenderer(),
+                    new EventBlockRenderer(),
+                    new MapLocationBlockRenderer(),
+                    new PagegridBlockRenderer(),
                 ]);
             }
         );

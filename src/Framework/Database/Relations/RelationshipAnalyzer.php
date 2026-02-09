@@ -75,6 +75,57 @@ class RelationshipAnalyzer
                         'owner_key' => $ownerKey
                     ];
                 }
+
+                // Parse morphMany
+                if (preg_match('/\$this->morphMany\s*\(\s*([^,\)]+)\s*,\s*[\'"]([^\'",\)]+)[\'"](?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?/', $source, $matches)) {
+                    $relatedClass = $this->normalizeClassName(trim($matches[1], '"\''), $model);
+                    $name = $matches[2];
+                    $type = isset($matches[3]) && !empty($matches[3]) ? $matches[3] : $name . '_type';
+                    $id = isset($matches[4]) && !empty($matches[4]) ? $matches[4] : $name . '_id';
+                    $localKey = isset($matches[5]) && !empty($matches[5]) ? $matches[5] : 'id';
+
+                    return [
+                        'type' => 'morphMany',
+                        'related' => $relatedClass,
+                        'morph_type' => $type,
+                        'morph_id' => $id,
+                        'local_key' => $localKey,
+                        'parent_class' => get_class($model),
+                    ];
+                }
+
+                // Parse morphOne
+                if (preg_match('/\$this->morphOne\s*\(\s*([^,\)]+)\s*,\s*[\'"]([^\'",\)]+)[\'"](?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?/', $source, $matches)) {
+                    $relatedClass = $this->normalizeClassName(trim($matches[1], '"\''), $model);
+                    $name = $matches[2];
+                    $type = isset($matches[3]) && !empty($matches[3]) ? $matches[3] : $name . '_type';
+                    $id = isset($matches[4]) && !empty($matches[4]) ? $matches[4] : $name . '_id';
+                    $localKey = isset($matches[5]) && !empty($matches[5]) ? $matches[5] : 'id';
+
+                    return [
+                        'type' => 'morphOne',
+                        'related' => $relatedClass,
+                        'morph_type' => $type,
+                        'morph_id' => $id,
+                        'local_key' => $localKey,
+                        'parent_class' => get_class($model),
+                    ];
+                }
+
+                // Parse morphTo
+                if (preg_match('/\$this->morphTo\s*\((?:\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?(?:\s*,\s*[\'"]([^\'",\)]+)[\'"])?/', $source, $matches)) {
+                    $name = isset($matches[1]) && !empty($matches[1]) ? $matches[1] : $relation;
+                    $type = isset($matches[2]) && !empty($matches[2]) ? $matches[2] : $name . '_type';
+                    $id = isset($matches[3]) && !empty($matches[3]) ? $matches[3] : $name . '_id';
+                    $ownerKey = isset($matches[4]) && !empty($matches[4]) ? $matches[4] : 'id';
+
+                    return [
+                        'type' => 'morphTo',
+                        'morph_type' => $type,
+                        'morph_id' => $id,
+                        'owner_key' => $ownerKey
+                    ];
+                }
             }
         } catch (Exception $e) {
             // Continue to fallback

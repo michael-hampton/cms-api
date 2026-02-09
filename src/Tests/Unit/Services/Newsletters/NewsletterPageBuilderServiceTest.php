@@ -13,8 +13,10 @@ use App\Models\PageCategory;
 use App\Models\PageMetadata;
 use App\Models\PageTag;
 use App\Models\ProductOffer;
+use App\Models\Site;
 use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Rewards\RewardsRepository;
@@ -65,6 +67,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
     private NewsletterPageBuilderService $service;
     private Logger $logger;
     private TrackingUrlBuilder $trackingUrlBuilder;
+    private $newsletterRepository;
 
     protected function setUp(): void
     {
@@ -80,6 +83,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $dealEligibilityService = app(DealVisibilityResolver::class);
         $offerEligibilityService = app(OfferVisibilityResolver::class);
         $rewardEligibilityService = app(RewardVisibilityResolver::class);
+        $this->newsletterRepository = app(NewsletterRepository::class);
 
         // Create tracking services
         $dealTrackingService = app(DealTrackingService::class);
@@ -140,6 +144,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             $this->trackingUrlBuilder,
             $blockDataFactory,
             $this->logger,
+            $this->newsletterRepository,
             new DefaultEmailBlockRendererRegistry($renderers)
         );
     }
@@ -2420,4 +2425,108 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'action' => 'render',
         ]);
     }
+
+    public function test_newsletter_html_includes_site_logo_url(): void
+    {
+        // Arrange
+        $site = Site::create([
+            'name' => 'Test Site',
+            'logo' => 'https://example.com/logo.png',
+            'slug' => 'test-site',
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'site_id' => $site->id,
+            'active' => true,
+            'interval' => Newsletter::INTERVAL_WEEKLY
+        ]);
+
+        // Act
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([]), null, false, true, null, $site->id);
+
+
+        // Assert
+        $this->assertStringContainsString('https://example.com/logo.png', $html);
+        $this->assertStringContainsString('alt="Test Site"', $html);
+    }
+
+    public function test_newsletter_html_includes_logo_from_image(): void
+    {
+        // Arrange
+        $image = $this->createImage(['file_path' => '/images/logo.png']);
+
+        $site = Site::create([
+            'name' => 'Test Site',
+            'logo_image_id' => $image->id
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'site_id' => $site->id,
+            'active' => true,
+            'interval' => Newsletter::INTERVAL_WEEKLY
+        ]);
+
+        // Act
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([]), null, false, true, null, $site->id);
+
+        // Assert
+        $this->assertStringContainsString('/images/logo.png', $html);
+    }
+
+    public function test_newsletter_html_uses_placeholder_when_no_logo(): void
+    {
+        // Arrange
+        $site = Site::create([
+            'name' => 'Test Site'
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'site_id' => $site->id,
+            'active' => true,
+            'interval' => Newsletter::INTERVAL_WEEKLY
+        ]);
+
+        // Act
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([]), null, false, true, null, $site->id);
+
+        // Assert
+        $this->assertStringContainsString('https://via.placeholder.com/200x60?text=Logo', $html);
+    }
+
+    public function test_newsletter_html_prefers_logo_url_over_image(): void
+    {
+        // Arrange
+        $image = $this->createImage([
+            'file_path' => '/images/logo.png',
+            'site_id' => $this->siteId
+        ]);
+
+        $site = Site::create([
+            'name' => 'Test Site',
+            'logo' => 'https://example.com/priority-logo.png',
+            'logo_image_id' => $image->id
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'site_id' => $site->id,
+            'active' => true,
+            'interval' => Newsletter::INTERVAL_WEEKLY
+        ]);
+
+        // Act
+        $html = $this->service->buildNewsletterHtml($newsletter, collect([]), null, false, true, null, $site->id);
+
+        // Assert
+        $this->assertStringContainsString('https://example.com/priority-logo.png', $html);
+        $this->assertStringNotContainsString('/images/logo.png', $html);
+    }
+
 }

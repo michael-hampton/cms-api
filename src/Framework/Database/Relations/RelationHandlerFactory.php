@@ -21,6 +21,9 @@ class RelationHandlerFactory
             'hasOne' => HasOneHandler::class,
             'belongsTo' => BelongsToHandler::class,
             'belongsToMany' => BelongsToManyHandler::class,
+            'morphMany' => MorphManyHandler::class,
+            'morphOne' => MorphOneHandler::class,
+            'morphTo' => MorphToHandler::class,
         ];
     }
 

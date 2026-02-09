@@ -188,8 +188,8 @@ class NewsletterSendService
             return $contentResult;
         }
 
-//        echo $contentResult['html'];
-//        die;
+        echo $contentResult['html'];
+        die;
 
         return $this->database->transaction(function () use ($newsletter, $previewEmails, $contentResult, $siteId) {
             // Create preview send record

@@ -3,6 +3,10 @@
 namespace App\Tests\Unit\Repositories\Newsletter;
 
 use App\Models\Newsletter;
+use App\Models\Page;
+use App\Models\PageTerritory;
+use App\Models\RegionSet;
+use App\Models\Territory;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -12,6 +16,12 @@ class NewsletterRepositoryTest extends RepositoryTestCase
     use CreatesTestData;
 
     private NewsletterRepository $repository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repository = new NewsletterRepository();
+    }
 
     public function test_find_returns_newsletter_with_correct_id(): void
     {
@@ -462,9 +472,167 @@ class NewsletterRepositoryTest extends RepositoryTestCase
         $this->assertCount(1, $result);
         $this->assertEquals($this->siteId, $result->first()->site_id);
     }
-    protected function setUp(): void
+
+    public function test_get_pages_for_newsletter_filters_by_member_territory(): void
     {
-        parent::setUp();
-        $this->repository = new NewsletterRepository();
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+        $ukTerritory = $this->createTerritory(['name' => 'UK', 'code' => 'GB']);
+
+        $member = $this->createMember(['territory_id' => $usTerritory->id]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'automated' => true
+        ]);
+
+        $usPage = $this->createPageWithTerritory($usTerritory->id, ['status' => 'published']);
+        $ukPage = $this->createPageWithTerritory($ukTerritory->id, ['status' => 'published']);
+        $noTerritoryPage = $this->createPage(['status' => 'published']);
+
+        // Act
+        $results = $this->repository->getPagesForNewsletter($newsletter, $this->siteId, $member);
+
+        // Assert
+        $this->assertTrue($results->contains('id', $usPage->id));
+        $this->assertFalse($results->contains('id', $ukPage->id));
+        $this->assertTrue($results->contains('id', $noTerritoryPage->id));
+    }
+
+    public function test_get_pages_for_newsletter_shows_all_pages_when_member_has_no_territory(): void
+    {
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+
+        $member = $this->createMember(['territory_id' => null]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'automated' => true
+        ]);
+
+        $usPage = $this->createPageWithTerritory($usTerritory->id, ['status' => 'published']);
+        $ukPage = $this->createPageWithTerritory($this->createTerritory(['code' => 'GB'])->id, ['status' => 'published']);
+
+        // Act
+        $results = $this->repository->getPagesForNewsletter($newsletter, $this->siteId, $member);
+
+        // Assert
+        $this->assertTrue($results->contains('id', $usPage->id));
+        $this->assertTrue($results->contains('id', $ukPage->id));
+    }
+
+    public function test_get_pages_for_newsletter_shows_all_pages_when_no_member_provided(): void
+    {
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'automated' => true
+        ]);
+
+        $usPage = $this->createPageWithTerritory($usTerritory->id, ['status' => 'published']);
+        $ukPage = $this->createPageWithTerritory($this->createTerritory(['code' => 'GB'])->id, ['status' => 'published']);
+
+        // Act
+        $results = $this->repository->getPagesForNewsletter($newsletter, $this->siteId, null);
+
+        // Assert
+        $this->assertTrue($results->contains('id', $usPage->id));
+        $this->assertTrue($results->contains('id', $ukPage->id));
+    }
+
+    public function test_get_pages_for_newsletter_respects_or_logic_for_multiple_territories(): void
+    {
+        // Arrange
+        $usTerritory = $this->createTerritory(['name' => 'US', 'code' => 'US']);
+        $ukTerritory = $this->createTerritory(['name' => 'UK', 'code' => 'GB']);
+
+        $member = $this->createMember(['territory_id' => $usTerritory->id]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'automated' => true
+        ]);
+
+        // Create page with US and UK territories
+        $page = $this->createPage(['status' => 'published']);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $usTerritory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $ukTerritory->id,
+            'site_id' => $this->siteId
+        ]);
+
+        // Act
+        $results = $this->repository->getPagesForNewsletter($newsletter, $this->siteId, $member);
+
+        // Assert - visible because US matches
+        $this->assertTrue($results->contains('id', $page->id));
+    }
+
+    private function createTerritory(array $data = []): Territory
+    {
+        $regionSet = RegionSet::create([
+            'name' => 'Test Region Set',
+            'site_id' => $this->siteId,
+            'is_active' => true,
+            'slug' => 'test-region-set-' . uniqid()
+        ]);
+
+        return Territory::create(array_merge([
+            'name' => 'Test Territory',
+            'code' => 'XX',
+            'region_set_id' => $regionSet->id,
+            'site_id' => $this->siteId,
+            'is_active' => true,
+            'slug' => 'test-territory-' . uniqid()
+        ], $data));
+    }
+
+    private function createPageWithTerritory(int $territoryId, array $pageData = []): Page
+    {
+        $page = $this->createPage($pageData);
+
+        PageTerritory::create([
+            'page_id' => $page->id,
+            'territory_id' => $territoryId,
+            'site_id' => $this->siteId
+        ]);
+
+        return $page;
+    }
+
+    private function createPage(array $data = []): Page
+    {
+        return Page::create(array_merge([
+            'title' => 'Test Page',
+            'site_id' => $this->siteId,
+            'status' => 'draft',
+            'slug' => 'test-page-' . uniqid()
+        ], $data));
     }
 }

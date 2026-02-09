@@ -4,10 +4,13 @@ namespace App\Services\Newsletter;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
+use App\Framework\Support\Str;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Models\Page;
+use App\Models\Site;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Adverts\PromotionInjector;
 use App\Services\Newsletter\Contracts\EmailBlockRenderer;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
@@ -24,12 +27,13 @@ class NewsletterPageBuilderService
     private array $renderers = [];
 
     public function __construct(
-        private readonly PageRepository     $pageRepository,
-        private readonly PromotionInjector  $injector,
-        private readonly TrackingUrlBuilder $trackingUrlBuilder,
-        private readonly BlockDataFactory   $blockDataFactory,
-        private readonly Logger             $logger,
-        EmailBlockRendererRegistry $rendererRegistry
+        private readonly PageRepository       $pageRepository,
+        private readonly PromotionInjector    $injector,
+        private readonly TrackingUrlBuilder   $trackingUrlBuilder,
+        private readonly BlockDataFactory     $blockDataFactory,
+        private readonly Logger               $logger,
+        private readonly NewsletterRepository $newsletterRepository,
+        EmailBlockRendererRegistry            $rendererRegistry,
     )
     {
         $this->renderers = $rendererRegistry->all();
@@ -40,53 +44,7 @@ class NewsletterPageBuilderService
      */
     public function getPagesForNewsletter(Newsletter $newsletter, int $siteId): Collection
     {
-        if (!$newsletter->isAutomated()) {
-            return collect([]);
-        }
-
-        $filters = $newsletter->page_filters ?? [];
-
-        $query = Page::with(['categories', 'tags', 'authors', 'metadata', 'blocks'])
-            ->where('site_id', $siteId)
-            ->where('status', 'published');
-
-        if ($newsletter->last_sent) {
-            $query->where('published_at', '>=', $newsletter->last_sent->format('Y-m-d H:i:s'));
-        } elseif (isset($filters['date_range_days'])) {
-            $query->where('published_at', '>=', date('Y-m-d H:i:s', strtotime("-{$filters['date_range_days']} days")));
-        }
-
-        if (!empty($filters['categories'])) {
-            $query->whereHas('categories', function ($q) use ($filters) {
-                $q->whereIn('categories.id', $filters['categories']);
-            });
-        }
-
-        if (!empty($filters['tags'])) {
-            $query->whereHas('tags', function ($q) use ($filters) {
-                $q->whereIn('tags.id', $filters['tags']);
-            });
-        }
-
-        if (!empty($filters['page_types'])) {
-            $query->whereIn('page_type', $filters['page_types']);
-        }
-
-        if (isset($filters['featured_only']) && $filters['featured_only']) {
-            $query->whereHas('metadata', function ($q) {
-                $q->where('featured', true);
-            });
-        }
-
-        $sortBy = $newsletter->sort_by ?? 'published_at';
-        $sortOrder = $newsletter->sort_order ?? 'desc';
-        $query->orderBy($sortBy, $sortOrder);
-
-        if ($newsletter->max_pages) {
-            $query->limit($newsletter->max_pages);
-        }
-
-        return $query->get();
+        return $this->newsletterRepository->getPagesForNewsletter($newsletter, $siteId);
     }
 
     /**
@@ -101,6 +59,21 @@ class NewsletterPageBuilderService
         ?int       $sendId = null,
         ?int $siteId = null
     ): string
+    {
+        $pageHtml = $this->buildPages($newsletter, $pages, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
+
+        return $this->buildTemplate($newsletter, $pageHtml, $siteId);
+    }
+
+    private function buildPages(
+        Newsletter $newsletter,
+        Collection $pages,
+        ?Member    $member = null,
+        ?string    $unsubscribeToken = null,
+        bool       $includeBlocks = false,
+        ?int       $sendId = null,
+        ?int       $siteId = null
+    )
     {
         $template = $newsletter->template ?? 'default';
 
@@ -118,6 +91,58 @@ class NewsletterPageBuilderService
             'simple' => $this->buildSimpleTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks),
             default => $this->buildDefaultTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks),
         };
+    }
+
+    private function buildTemplate(Newsletter $newsletter, string $blockHtml, ?int $siteId = null)
+    {
+        if (!$siteId) {
+            return '';
+        }
+
+        $site = Site::findOrFail($siteId);
+
+        $logoUrl = $site->getLogoUrl();
+
+        $html = '<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>' . Str::sanitize($newsletter->title) . '</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+                <td align="center" style="padding: 20px 0;">
+                    <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff;">
+                        <!-- Logo Header -->
+                        <tr>
+                            <td align="center" style="padding: 30px 20px; background-color: #ffffff; border-bottom: 2px solid #e0e0e0;">
+                                <img src="' . Str::sanitize($logoUrl) . '" alt="' . Str::sanitize($site->name) . '" style="max-width: 200px; height: auto;">
+                            </td>
+                        </tr>
+                        
+                        <!-- Newsletter Content -->
+                        <tr>
+                            <td style="padding: 20px;">
+                                ' . $blockHtml . '
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td style="padding: 20px; background-color: #f8f8f8; text-align: center; font-size: 12px; color: #666;">
+                                <p>&copy; ' . date('Y') . ' ' . htmlspecialchars($site->name) . '. All rights reserved.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>';
+
+        return $html;
     }
 
     /**
@@ -287,12 +312,36 @@ class NewsletterPageBuilderService
 
         $html[] = '<div style="display: table-cell; vertical-align: top;">';
 
+        // Categories
+        if (!empty($page['categories'])) {
+            $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
+            $html[] = '<div style="color: #007bff; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">' . implode(', ', $categoryNames) . '</div>';
+        }
+
+        if (!empty($page['tags'])) {
+            $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['tags']);
+            $html[] = '<div style="color: #007bff; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">' . implode(', ', $categoryNames) . '</div>';
+        }
+
         // Compact title
         $html[] = '<h3 style="margin: 0 0 6px 0; font-size: 16px; line-height: 1.4;">';
         $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-weight: 600;">';
         $html[] = htmlspecialchars($title);
         $html[] = '</a>';
         $html[] = '</h3>';
+
+        // Meta info
+        $metaInfo = [];
+        if (!empty($page['authors'])) {
+            $metaInfo[] = 'By ' . htmlspecialchars($page['authors'][0]['name']);
+        }
+        if (isset($page['published_at'])) {
+            $publishedDate = is_string($page['published_at']) ? new \DateTime($page['published_at']) : $page['published_at'];
+            $metaInfo[] = $publishedDate->format('M j, Y');
+        }
+        if (!empty($metaInfo)) {
+            $html[] = '<div style="color: #999; font-size: 12px; margin-bottom: 6px;">' . implode(' • ', $metaInfo) . '</div>';
+        }
 
         // Render blocks if requested
         if ($includeBlocks) {
@@ -392,8 +441,6 @@ class NewsletterPageBuilderService
         $url = $this->buildTrackingUrl($pageId, $slug, $context->sendId, $context->includeTracking);
 
         $html = [];
-
-        // Dramatic, magazine-style hero
         $html[] = '<div style="position: relative; background: #000000; margin-bottom: 0;">';
 
         $heroImageId = $page['hero_image_id'] ?? null;
@@ -405,8 +452,29 @@ class NewsletterPageBuilderService
             $html[] = '<img src="' . url("/api/media/{$imageId}") . '" alt="' . htmlspecialchars($title) . '" style="width: 100%; height: 450px; object-fit: cover; display: block; opacity: 0.85;">';
             $html[] = '</a>';
 
-            // Text overlay on image
             $html[] = '<div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, transparent 100%); padding: 40px 30px;">';
+
+            // Categories and meta
+            $metaItems = [];
+            if (!empty($page['categories'])) {
+                $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
+                $metaItems[] = '<span style="color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase;">' . implode(' • ', $categoryNames) . '</span>';
+            }
+            if (!empty($page['tags'])) {
+                $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['tags']);
+                $metaItems[] = '<span style="color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase;">' . implode(' • ', $categoryNames) . '</span>';
+            }
+            if (!empty($page['authors'])) {
+                $metaItems[] = '<span style="color: rgba(255,255,255,0.8); font-size: 12px;">By ' . htmlspecialchars($page['authors'][0]['name']) . '</span>';
+            }
+            if (isset($page['published_at'])) {
+                $publishedDate = is_string($page['published_at']) ? new \DateTime($page['published_at']) : $page['published_at'];
+                $metaItems[] = '<span style="color: rgba(255,255,255,0.8); font-size: 12px;">' . $publishedDate->format('F j, Y') . '</span>';
+            }
+            if (!empty($metaItems)) {
+                $html[] = '<div style="margin-bottom: 15px;">' . implode(' • ', $metaItems) . '</div>';
+            }
+
             $html[] = '<h1 style="margin: 0; font-size: 36px; line-height: 1.2; color: #ffffff; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">';
             $html[] = '<a href="' . $url . '" style="color: #ffffff; text-decoration: none;">';
             $html[] = htmlspecialchars($title);
@@ -423,8 +491,25 @@ class NewsletterPageBuilderService
             $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 14px 32px; background-color: #ffffff; color: #000000; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Read Now</a>';
             $html[] = '</div>';
         } else {
-            // No image fallback
             $html[] = '<div style="padding: 60px 30px; background: #000000;">';
+
+            // Meta info for no-image version
+            $metaItems = [];
+            if (!empty($page['categories'])) {
+                $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
+                $metaItems[] = implode(' • ', $categoryNames);
+            }
+            if (!empty($page['authors'])) {
+                $metaItems[] = 'By ' . htmlspecialchars($page['authors'][0]['name']);
+            }
+            if (isset($page['published_at'])) {
+                $publishedDate = is_string($page['published_at']) ? new \DateTime($page['published_at']) : $page['published_at'];
+                $metaItems[] = $publishedDate->format('F j, Y');
+            }
+            if (!empty($metaItems)) {
+                $html[] = '<div style="color: rgba(255,255,255,0.7); font-size: 14px; text-transform: uppercase; margin-bottom: 15px;">' . implode(' • ', $metaItems) . '</div>';
+            }
+
             $html[] = '<h1 style="margin: 0 0 20px 0; font-size: 42px; color: #ffffff; font-weight: 800;">';
             $html[] = '<a href="' . $url . '" style="color: #ffffff; text-decoration: none;">';
             $html[] = htmlspecialchars($title);
@@ -456,9 +541,28 @@ class NewsletterPageBuilderService
         $url = $this->buildTrackingUrl($pageId, $slug, $context->sendId, $context->includeTracking);
 
         $html = [];
-
-        // Clean, minimal secondary cards
         $html[] = '<div style="margin-bottom: 25px; padding-bottom: 25px; border-bottom: 2px solid #f0f0f0;">';
+
+        // Meta bar
+        $metaItems = [];
+        if (!empty($page['categories'])) {
+            $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
+            $metaItems[] = '<span style="color: #007bff; font-size: 11px; text-transform: uppercase;">' . implode(', ', $categoryNames) . '</span>';
+        }
+        if (!empty($page['tags'])) {
+            $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
+            $metaItems[] = '<span style="color: #007bff; font-size: 11px; text-transform: uppercase;">' . implode(', ', $categoryNames) . '</span>';
+        }
+        if (!empty($page['authors'])) {
+            $metaItems[] = '<span style="color: #999; font-size: 11px;">By ' . htmlspecialchars($page['authors'][0]['name']) . '</span>';
+        }
+        if (isset($page['published_at'])) {
+            $publishedDate = is_string($page['published_at']) ? new \DateTime($page['published_at']) : $page['published_at'];
+            $metaItems[] = '<span style="color: #999; font-size: 11px;">' . $publishedDate->format('M j, Y') . '</span>';
+        }
+        if (!empty($metaItems)) {
+            $html[] = '<div style="margin-bottom: 8px;">' . implode(' • ', $metaItems) . '</div>';
+        }
 
         $html[] = '<h3 style="margin: 0 0 10px 0; font-size: 18px; line-height: 1.4;">';
         $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-weight: 700;">';
@@ -466,7 +570,6 @@ class NewsletterPageBuilderService
         $html[] = '</a>';
         $html[] = '</h3>';
 
-        // Render blocks if requested
         if ($includeBlocks) {
             $pageBlocks = $page['blocks'] ?? [];
             if (!empty($pageBlocks)) {
@@ -623,11 +726,8 @@ class NewsletterPageBuilderService
         $url = $this->buildTrackingUrl($pageId, $slug, $context->sendId, $context->includeTracking);
 
         $html = [];
-
-        // Modern card with shadow and hover effect
         $html[] = '<div style="background: #ffffff; margin-bottom: 30px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">';
 
-        // Image if available
         $listingImageId = $page['listing_image_id'] ?? null;
         $heroImageId = $page['hero_image_id'] ?? null;
 
@@ -642,18 +742,24 @@ class NewsletterPageBuilderService
 
         // Category/Meta bar
         $html[] = '<div style="margin-bottom: 12px;">';
+        $metaItems = [];
 
-        $publishedAt = $page['published_at'] ?? null;
-        if ($publishedAt) {
-            $publishedDate = is_string($publishedAt) ? new \DateTime($publishedAt) : $publishedAt;
-            $html[] = '<span style="color: #667eea; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">';
-            $html[] = $publishedDate->format('F j, Y');
-            $html[] = '</span>';
+        if (!empty($page['categories'])) {
+            $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
+            $metaItems[] = '<span style="color: #667eea; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">' . implode(', ', $categoryNames) . '</span>';
         }
 
-        if (isset($page['authors']) && count($page['authors']) > 0) {
-            $html[] = '<span style="color: #999; font-size: 12px; margin: 0 8px;">•</span>';
-            $html[] = '<span style="color: #666; font-size: 12px;">' . htmlspecialchars($page['authors'][0]['name']) . '</span>';
+        if (isset($page['published_at'])) {
+            $publishedDate = is_string($page['published_at']) ? new \DateTime($page['published_at']) : $page['published_at'];
+            $metaItems[] = '<span style="color: #999; font-size: 12px;">' . $publishedDate->format('F j, Y') . '</span>';
+        }
+
+        if (!empty($page['authors'])) {
+            $metaItems[] = '<span style="color: #666; font-size: 12px;">By ' . htmlspecialchars($page['authors'][0]['name']) . '</span>';
+        }
+
+        if (!empty($metaItems)) {
+            $html[] = implode('<span style="color: #999; font-size: 12px; margin: 0 8px;">•</span>', $metaItems);
         }
         $html[] = '</div>';
 
@@ -664,20 +770,17 @@ class NewsletterPageBuilderService
         $html[] = '</a>';
         $html[] = '</h2>';
 
-        // Meta
-        $html[] = '<p style="color: #999; font-size: 14px; margin: 0 0 15px 0;">';
-        if ($page['published_at']) {
-            $html[] = $page['published_at']->format('F j, Y');
+        // Tags
+        if (!empty($page['tags'])) {
+            $html[] = '<div style="margin-bottom: 15px;">';
+            foreach (array_slice($page['tags'], 0, 3) as $tag) {
+                $html[] = '<span style="display: inline-block; padding: 4px 8px; background-color: #f0f0f0; color: #666; font-size: 11px; border-radius: 3px; margin-right: 5px; margin-bottom: 5px;">' . htmlspecialchars($tag['name']) . '</span>';
+            }
+            $html[] = '</div>';
         }
-        if ($page['authors'] && count($page['authors']) > 0) {
-            $html[] = ' • By ' . htmlspecialchars($page['authors'][0]['name']);
-        }
-        $html[] = '</p>';
 
-        // Render PAGE blocks if includeBlocks is true and we have blocks
         if ($includeBlocks) {
             $pageBlocks = $page['blocks'] ?? [];
-
             if (!empty($pageBlocks)) {
                 foreach ($pageBlocks as $block) {
                     $rendered = $this->renderBlock($block, $context);
@@ -688,7 +791,6 @@ class NewsletterPageBuilderService
             }
         }
 
-        // Show description if no blocks were rendered OR if includeBlocks is false
         if (!$includeBlocks || empty($page['blocks'])) {
             $metaDescription = $page['meta_description'] ?? null;
             $listingSynopsis = $page['listing_synopsis'] ?? null;
@@ -704,7 +806,6 @@ class NewsletterPageBuilderService
             }
         }
 
-        // Read more button
         $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px;">Read More</a>';
 
         $html[] = '</div>';

@@ -6,6 +6,7 @@ use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Newsletter;
+use App\Models\Page;
 use App\Repositories\Repository;
 
 class NewsletterRepository extends Repository
@@ -79,6 +80,58 @@ class NewsletterRepository extends Repository
     public function findBySite(int $siteId): Collection
     {
         return Newsletter::where('site_id', $siteId)->get();
+    }
+
+    public function getPagesForNewsletter(Newsletter $newsletter, int $siteId, ?Member $member = null): Collection
+    {
+        if (!$newsletter->isAutomated()) {
+            return collect([]);
+        }
+
+        $filters = $newsletter->page_filters ?? [];
+
+        $query = Page::with(['categories', 'tags', 'authors', 'metadata', 'blocks'])
+            ->where('site_id', $siteId)
+            ->where('status', 'published')
+            ->visibleToMember($member);
+
+        if ($newsletter->last_sent) {
+            $query->where('published_at', '>=', $newsletter->last_sent->format('Y-m-d H:i:s'));
+        } elseif (isset($filters['date_range_days'])) {
+            $query->where('published_at', '>=', date('Y-m-d H:i:s', strtotime("-{$filters['date_range_days']} days")));
+        }
+
+        if (!empty($filters['categories'])) {
+            $query->whereHas('categories', function ($q) use ($filters) {
+                $q->whereIn('categories.id', $filters['categories']);
+            });
+        }
+
+        if (!empty($filters['tags'])) {
+            $query->whereHas('tags', function ($q) use ($filters) {
+                $q->whereIn('tags.id', $filters['tags']);
+            });
+        }
+
+        if (!empty($filters['page_types'])) {
+            $query->whereIn('page_type', $filters['page_types']);
+        }
+
+        if (isset($filters['featured_only']) && $filters['featured_only']) {
+            $query->whereHas('metadata', function ($q) {
+                $q->where('featured', true);
+            });
+        }
+
+        $sortBy = $newsletter->sort_by ?? 'published_at';
+        $sortOrder = $newsletter->sort_order ?? 'desc';
+        $query->orderBy($sortBy, $sortOrder);
+
+        if ($newsletter->max_pages) {
+            $query->limit($newsletter->max_pages);
+        }
+
+        return $query->get();
     }
 
     protected function getModelClass(): string

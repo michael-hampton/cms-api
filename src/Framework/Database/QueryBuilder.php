@@ -1622,6 +1622,15 @@ class QueryBuilder
                     INNER JOIN {$relationData['pivot_table']} ON {$relatedTable}.id = {$relationData['pivot_table']}.{$relationData['related_key']} 
                     WHERE {$relationData['pivot_table']}.{$relationData['foreign_key']} = {$this->table}.id";
                 break;
+            case 'morphMany':
+            case 'morphOne':
+                $parentClass = $this->getModelClassFromTable($this->table);
+                $subquery = "{$selectClause} FROM {$relatedTable} WHERE {$relatedTable}.{$relationData['morph_type']} = '{$parentClass}' AND {$relatedTable}.{$relationData['morph_id']} = {$this->table}.{$relationData['local_key']}";
+                break;
+
+            case 'morphTo':
+                // MorphTo is more complex - skip for now in whereHas
+                throw new BadMethodCallException("whereHas is not supported for morphTo relationships");
             default:
                 throw new BadMethodCallException("Unknown relation: {$relationData['type']}");
         }

@@ -107,4 +107,9 @@ class Territory extends Model
     {
         return PageGridPage::where('territory_id', $this->id)->get()->count();
     }
+
+    public function members($relation = false)
+    {
+        return $this->hasMany(Member::class, 'territory_id', 'id', $relation);
+    }
 }

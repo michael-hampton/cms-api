@@ -2,36 +2,30 @@
 
 namespace App\Repositories\Cms\Briefs;
 
-use App\Models\BriefCollaborator;
-use App\Repositories\Repository;
+use App\Models\Brief;
+use App\Models\Collaborator;
+use App\Models\Model;
+use App\Repositories\Cms\CollaboratorRepository;
 
-class BriefCollaboratorRepository extends Repository
+class BriefCollaboratorRepository extends CollaboratorRepository
 {
     public function getForBrief(int $briefId): array
     {
-        return BriefCollaborator::where('brief_id', $briefId)
-            ->with(['user'])
-            ->orderBy('created_at')
-            ->get()
-            ->toArray();
+        return $this->getForCollaboratable(Brief::class, $briefId)->toArray();
     }
 
-    public function removeForUser(int $briefId, int $userId): bool
+    public function removeForUser(int $id, int $userId, string $type = 'brief'): bool
     {
-        return BriefCollaborator::where('brief_id', $briefId)
-                ->where('user_id', $userId)
-                ->delete() > 0;
+        return parent::removeForUser($id, $userId, Brief::class);
     }
 
-    protected function getModelClass(): string
+    public function findByBriefAndUser(int $briefId, int $userId): ?Collaborator
     {
-        return BriefCollaborator::class;
+        return $this->findByCollaboratableAndUser(Brief::class, $briefId, $userId);
     }
 
-    public function findByBriefAndUser(int $briefId, int $userId): ?BriefCollaborator
+    public function createForBrief(int $briefId, array $data): Model
     {
-        return BriefCollaborator::where('brief_id', $briefId)
-            ->where('user_id', $userId)
-            ->first();
+        return $this->createForCollaboratable(Brief::class, $briefId, $data);
     }
 }

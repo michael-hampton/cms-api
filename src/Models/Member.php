@@ -28,7 +28,8 @@ class Member extends Model
         'communication_preferences',
         'region',
         'timezone',
-        'segment'
+        'segment',
+        'territory_id',
     ];
 
     protected $hidden = [
@@ -411,5 +412,25 @@ class Member extends Model
         return $subscription
             && $subscription->status === 'active'
             && $subscription->type === 'paid';
+    }
+
+    public function territory($relation = false)
+    {
+        return $this->belongsTo(Territory::class, 'territory_id', 'id', $relation);
+    }
+
+    public function hasTerritoryId(): bool
+    {
+        return $this->territory_id ?? false;
+    }
+
+    public function getTerritoryId(): ?int
+    {
+        return $this->territory_id;
+    }
+
+    public function setTerritoryId(?int $territoryId): void
+    {
+        $this->territory_id = $territoryId;
     }
 }

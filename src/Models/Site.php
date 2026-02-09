@@ -28,7 +28,8 @@ class Site extends Model
         'twitter_url',
         'linkedin_url',
         'settings',
-        'url_handle'
+        'url_handle',
+        'logo_image_id'
     ];
 
     protected $casts = [
@@ -206,5 +207,24 @@ class Site extends Model
                 'linkedin' => $this->linkedin_url
             ]
         ];
+    }
+
+    public function logoImage($relation = false)
+    {
+        return $this->belongsTo(Image::class, 'logo_image_id', 'id', $relation);
+    }
+
+    public function getLogoUrl(): string
+    {
+        if ($this->logo) {
+            return $this->logo;
+        }
+
+        if ($this->logo_image_id && $this->logoImage) {
+            return $this->logoImage->url;
+        }
+
+        // Return placeholder
+        return 'https://via.placeholder.com/200x60?text=Logo';
     }
 }
