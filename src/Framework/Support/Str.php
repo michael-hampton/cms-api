@@ -201,4 +201,24 @@ class Str
 
         return implode(' ', array_slice($wordArray, 0, $words)) . '...';
     }
+
+    /**
+     * Truncate string safely with multibyte support
+     */
+    public static function truncate(string $text, int $length, string $suffix = '...'): string
+    {
+        if (mb_strlen($text) <= $length) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $length) . $suffix;
+    }
+
+    /**
+     * Sanitize HTML for email output
+     */
+    public static function sanitize(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
 }

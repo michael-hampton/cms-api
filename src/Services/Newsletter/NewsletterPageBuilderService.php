@@ -4,7 +4,7 @@ namespace App\Services\Newsletter;
 
 use App\Enums\Newsletters\CommunicationChannel;
 use App\Framework\Support\Collection;
-use App\Framework\Support\SiteContext;
+use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\MemberReward;
 use App\Models\Newsletter;
@@ -12,29 +12,32 @@ use App\Models\Page;
 use App\Models\Product;
 use App\Models\ProductOffer;
 use App\Repositories\Cms\Pages\PageRepository;
-use App\Repositories\Offers\ProductOfferRepository;
-use App\Repositories\Rewards\RewardsRepository;
-use App\Services\Adverts\DealTrackingRecorder;
-use App\Services\Adverts\DealVisibilityResolver;
-use App\Services\Adverts\OfferVisibilityResolver;
 use App\Services\Adverts\PromotionInjector;
 use App\Services\Adverts\RenderContext;
-use App\Services\Adverts\RewardVisibilityResolver;
 use App\Services\Adverts\VisibilityDecision;
+use App\Services\Newsletter\Contracts\EmailBlockRenderer;
+use App\Services\Newsletter\DTOs\NewsletterRenderContext;
+use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class NewsletterPageBuilderService
 {
+    /**
+     * @var EmailBlockRenderer[]
+     */
+    private array $renderers = [];
+
     public function __construct(
-        private readonly PageRepository           $pageRepository,
-        private readonly ProductOfferRepository   $offerRepository,
-        private readonly RewardsRepository        $rewardsRepository,
-        private readonly OfferVisibilityResolver  $offerResolver,
-        private readonly RewardVisibilityResolver $rewardResolver,
-        private readonly DealTrackingRecorder   $trackingRecorder,
-        private readonly DealVisibilityResolver $dealResolver,
-        private readonly PromotionInjector      $injector,
+        private readonly PageRepository     $pageRepository,
+        private readonly PromotionInjector  $injector,
+        private readonly TrackingUrlBuilder $trackingUrlBuilder,
+        private readonly BlockDataFactory   $blockDataFactory,
+        private readonly Logger             $logger,
+        EmailBlockRenderer                  ...$renderers
     )
     {
+        foreach ($renderers as $renderer) {
+            $this->renderers[] = $renderer;
+        }
     }
 
     /**
@@ -48,60 +51,49 @@ class NewsletterPageBuilderService
 
         $filters = $newsletter->page_filters ?? [];
 
-        // Build query for published pages
         $query = Page::with(['categories', 'tags', 'authors', 'metadata', 'blocks'])
             ->where('site_id', $siteId)
             ->where('status', 'published');
 
-        // Apply date range filter (e.g., pages published since last newsletter)
         if ($newsletter->last_sent) {
             $query->where('published_at', '>=', $newsletter->last_sent->format('Y-m-d H:i:s'));
         } elseif (isset($filters['date_range_days'])) {
             $query->where('published_at', '>=', date('Y-m-d H:i:s', strtotime("-{$filters['date_range_days']} days")));
         }
 
-        // Filter by categories
         if (!empty($filters['categories'])) {
             $query->whereHas('categories', function ($q) use ($filters) {
                 $q->whereIn('categories.id', $filters['categories']);
             });
         }
 
-        // Filter by tags
         if (!empty($filters['tags'])) {
             $query->whereHas('tags', function ($q) use ($filters) {
                 $q->whereIn('tags.id', $filters['tags']);
             });
         }
 
-        // Filter by page type
         if (!empty($filters['page_types'])) {
             $query->whereIn('page_type', $filters['page_types']);
         }
 
-        // Filter by featured status
         if (isset($filters['featured_only']) && $filters['featured_only']) {
             $query->whereHas('metadata', function ($q) {
                 $q->where('featured', true);
             });
         }
 
-        // Apply sorting
         $sortBy = $newsletter->sort_by ?? 'published_at';
         $sortOrder = $newsletter->sort_order ?? 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
-        // Apply limit
         if ($newsletter->max_pages) {
             $query->limit($newsletter->max_pages);
         }
 
-//        echo '<pre>';
-//        print_r($query->toSql());
-
         return $query->get();
-
     }
+
 
     /**
      * Build newsletter HTML from pages with tracking
@@ -113,46 +105,25 @@ class NewsletterPageBuilderService
         ?string    $unsubscribeToken = null,
         bool       $includeBlocks = false,
         ?int       $sendId = null,
-        ?int       $siteId = null): string
+        ?int $siteId = null
+    ): string
     {
         $template = $newsletter->template ?? 'default';
 
-        $context = RenderContext::forNewsletter($newsletter->id, $member);
+        $context = new NewsletterRenderContext(
+            siteId: $siteId,
+            newsletter: $newsletter,
+            member: $member,
+            sendId: $sendId,
+            includeTracking: $includeBlocks
+        );
 
-        switch ($template) {
-            case 'digest':
-                return $this->buildDigestTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
-            case 'featured':
-                return $this->buildFeaturedTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
-            case 'simple':
-                return $this->buildSimpleTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
-            default:
-                return $this->buildDefaultTemplate($newsletter, $pages, $context, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
-        }
-    }
-
-    /**
-     * Add tracking parameters to page URLs
-     */
-    /**
-     * Build tracking URL for a page
-     *
-     * @param int $pageId
-     * @param string $slug
-     * @param int|null $sendId
-     * @return string
-     */
-    private function buildTrackingUrl(int $pageId, string $slug, ?int $sendId = null): string
-    {
-        // Build tracking URL with placeholders that will be replaced per-recipient
-        $params = [
-            'send_id' => '{{SEND_ID}}',
-            'page_id' => $pageId,
-            'e' => '{{TRACKING_EMAIL}}',
-            'redirect' => $slug
-        ];
-
-        return url('/' . SiteContext::slug() . '/newsletters/track-view?' . http_build_query($params));
+        return match ($template) {
+            'digest' => $this->buildDigestTemplate($newsletter, $pages, $context, $unsubscribeToken),
+            'featured' => $this->buildFeaturedTemplate($newsletter, $pages, $context, $unsubscribeToken),
+            'simple' => $this->buildSimpleTemplate($newsletter, $pages, $context, $unsubscribeToken),
+            default => $this->buildDefaultTemplate($newsletter, $pages, $context, $unsubscribeToken),
+        };
     }
 
     /**
@@ -166,19 +137,25 @@ class NewsletterPageBuilderService
         ?int       $siteId = null
     ): string
     {
-        $siteId = $siteId ?? SiteContext::getId();
-
-        // Create render context
-        $context = RenderContext::forNewsletter($newsletter->id, $member);
+        $context = new NewsletterRenderContext(
+            siteId: $siteId,
+            newsletter: $newsletter,
+            member: $member,
+            sendId: null,
+            includeTracking: false
+        );
 
         $html = [];
         $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px;">';
         $html[] = '<div style="background: white; padding: 30px; border-radius: 8px;">';
 
-        $allBlocks = $this->getBlocks($newsletter, $page, $member, $siteId);
+        $blocks = $this->getBlocks($page);
 
-        foreach ($allBlocks as $block) {
-            $html[] = $this->renderBlockForEmail($block, $context, $siteId);
+        foreach ($blocks as $blockArray) {
+            $rendered = $this->renderBlock($blockArray, $context);
+            if ($rendered->wasRendered) {
+                $html[] = $rendered->html;
+            }
         }
 
         $html[] = '</div>';
@@ -188,59 +165,47 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function getBlocks(Newsletter $newsletter, Page $page, ?Member $member = null, ?int $siteId = null): Collection
+    private function renderBlock(array $block, RenderContext $context): RenderedBlock
+    {
+        $type = $block['type'] ?? 'text';
+        $data = $block['data'] ?? $block;
+
+        try {
+            // Convert raw array to typed DTO
+            $blockData = $this->blockDataFactory->create($type, $data);
+
+            // Find renderer
+            foreach ($this->renderers as $renderer) {
+                if ($renderer->supports($type)) {
+                    return $renderer->render($blockData, $context);
+                }
+            }
+
+            $this->logger->warning('No renderer found for block type', [
+                'type' => $type
+            ]);
+
+            return RenderedBlock::skipped();
+
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to render block', [
+                'type' => $type,
+                'error' => $e->getMessage()
+            ]);
+
+            return RenderedBlock::skipped();
+        }
+    }
+
+    private function getBlocks(Page $page): Collection
     {
         $blocks = $page->blocks;
 
         if ($blocks->isEmpty()) {
-            $blocks = [];
+            return collect([]);
         }
 
-        $blocks = collect(!is_array($blocks) ? $blocks->toArray() : $blocks);
-
-        // NO MORE PROMOTION INJECTION HERE
-        return $blocks;
-    }
-
-    /**
-     * Merge static and dynamic blocks with smart placement
-     * Inserts dynamic blocks at strategic positions within static content
-     */
-    private function mergeStaticAndDynamicBlocks($staticBlocks, $dynamicBlocks): array
-    {
-        if ($dynamicBlocks->isEmpty()) {
-            return $staticBlocks->toArray();
-        }
-
-        if ($staticBlocks->isEmpty()) {
-            return $dynamicBlocks->toArray();
-        }
-
-        $result = [];
-        $staticArray = $staticBlocks->toArray();
-        $dynamicArray = $dynamicBlocks->toArray();
-        $dynamicIndex = 0;
-
-        // Insert dynamic blocks after every N static blocks
-        $insertFrequency = max(2, (int)ceil(count($staticArray) / (count($dynamicArray) + 1)));
-
-        for ($i = 0; $i < count($staticArray); $i++) {
-            $result[] = $staticArray[$i];
-
-            // Insert dynamic block after every N static blocks
-            if (($i + 1) % $insertFrequency === 0 && $dynamicIndex < count($dynamicArray)) {
-                $result[] = $dynamicArray[$dynamicIndex];
-                $dynamicIndex++;
-            }
-        }
-
-        // Append any remaining dynamic blocks at the end
-        while ($dynamicIndex < count($dynamicArray)) {
-            $result[] = $dynamicArray[$dynamicIndex];
-            $dynamicIndex++;
-        }
-
-        return $result;
+        return collect(!is_array($blocks) ? $blocks->toArray() : $blocks);
     }
 
     /**
@@ -1189,7 +1154,6 @@ class NewsletterPageBuilderService
     private function renderFooter(?string $unsubscribeToken = null): string
     {
         $html = [];
-
         $html[] = '<div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999; font-size: 12px;">';
         $html[] = '<p>You received this email because you are subscribed to our newsletter.</p>';
 
@@ -1537,13 +1501,10 @@ class NewsletterPageBuilderService
     private function buildDefaultTemplate(
         Newsletter $newsletter,
         Collection $pages,
-        RenderContext $context,
-        ?Member       $member = null,
-        ?string    $unsubscribeToken = null,
-        bool       $includeBlocks = false,
-        ?int          $sendId = null,
-        ?int          $siteId = null
+        NewsletterRenderContext $newsletterRenderContext,
+        ?string                 $unsubscribeToken
     ): string
+    {
     {
         $html = [];
 

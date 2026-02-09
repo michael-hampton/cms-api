@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Services\Newsletter\Renderers;
+
+use App\Framework\Support\Str;
+use App\Services\Newsletter\Contracts\EmailBlockRenderer;
+use App\Services\Newsletter\DTOs\BlockData\BaseBlockData;
+use App\Services\Newsletter\DTOs\BlockData\ListBlockData;
+use App\Services\Newsletter\DTOs\NewsletterRenderContext;
+use App\Services\Newsletter\DTOs\RenderedBlock;
+
+class ListBlockRenderer implements EmailBlockRenderer
+{
+    public function supports(string $type): bool
+    {
+        return $type === 'list';
+    }
+
+    public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
+    {
+        if (!$blockData instanceof ListBlockData) {
+            return RenderedBlock::skipped();
+        }
+
+        $listType = $blockData->listType;
+        $html = [];
+        $html[] = "<{$listType} style=\"color: #333; font-size: 16px; line-height: 1.6; margin: 15px 0; padding-left: 30px;\">";
+
+        foreach ($blockData->items as $item) {
+            $html[] = '<li style="margin-bottom: 8px;">';
+            $html[] = Str::sanitize($item);
+            $html[] = '</li>';
+        }
+
+        $html[] = "</{$listType}>";
+
+        return RenderedBlock::rendered(implode("\n", $html));
+    }
+}
