@@ -11,9 +11,10 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class HeroBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'hero';
     public function supports(string $type): bool
     {
-        return $type === 'hero';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

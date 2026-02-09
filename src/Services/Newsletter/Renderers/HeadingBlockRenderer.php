@@ -11,6 +11,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class HeadingBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'heading';
     private const SIZES = [
         1 => '32px',
         2 => '28px',
@@ -22,7 +23,7 @@ class HeadingBlockRenderer implements EmailBlockRenderer
 
     public function supports(string $type): bool
     {
-        return $type === 'heading';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

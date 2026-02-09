@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Newsletters;
 
+use App\Framework\Support\Logger;
 use App\Models\Author;
 use App\Models\Block;
 use App\Models\Category;
@@ -14,16 +15,46 @@ use App\Models\PageTag;
 use App\Models\ProductOffer;
 use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
-use App\Repositories\Offers\DealClickRepository;
 use App\Repositories\Offers\ProductOfferRepository;
+use App\Repositories\Product\ProductRepository;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Services\Adverts\DealTrackingRecorder;
 use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\OfferVisibilityResolver;
 use App\Services\Adverts\PromotionInjector;
-use App\Services\Adverts\RenderContext;
 use App\Services\Adverts\RewardVisibilityResolver;
 use App\Services\Newsletter\NewsletterPageBuilderService;
+use App\Services\Newsletter\Renderers\AwardBlockRenderer;
+use App\Services\Newsletter\Renderers\BannerBlockRenderer;
+use App\Services\Newsletter\Renderers\BuyingGuideBlockRenderer;
+use App\Services\Newsletter\Renderers\ContactFormBlockRenderer;
+use App\Services\Newsletter\Renderers\CtaBlockRenderer;
+use App\Services\Newsletter\Renderers\DealOfferRenderer;
+use App\Services\Newsletter\Renderers\DefaultEmailBlockRendererRegistry;
+use App\Services\Newsletter\Renderers\DividerBlockRenderer;
+use App\Services\Newsletter\Renderers\HeadingBlockRenderer;
+use App\Services\Newsletter\Renderers\HeroBlockRenderer;
+use App\Services\Newsletter\Renderers\ImageBlockRenderer;
+use App\Services\Newsletter\Renderers\InfoBlockRenderer;
+use App\Services\Newsletter\Renderers\ListBlockRenderer;
+use App\Services\Newsletter\Renderers\NoteBlockRenderer;
+use App\Services\Newsletter\Renderers\OfferBlockRenderer;
+use App\Services\Newsletter\Renderers\PersonBlockRenderer;
+use App\Services\Newsletter\Renderers\ProductBlockRenderer;
+use App\Services\Newsletter\Renderers\ProductComparisonBlockRenderer;
+use App\Services\Newsletter\Renderers\QuoteBlockRenderer;
+use App\Services\Newsletter\Renderers\RewardBlockRenderer;
+use App\Services\Newsletter\Renderers\SchemaBlockRenderer;
+use App\Services\Newsletter\Renderers\SectionBlockRenderer;
+use App\Services\Newsletter\Renderers\StaticDealBlockRenderer;
+use App\Services\Newsletter\Renderers\StatsBlockRenderer;
+use App\Services\Newsletter\Renderers\TableBlockRenderer;
+use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
+use App\Services\Newsletter\Renderers\TextBlockRenderer;
+use App\Services\Newsletter\Services\BlockDataFactory;
+use App\Services\Newsletter\Services\DealTrackingService;
+use App\Services\Newsletter\Services\OfferTrackingService;
+use App\Services\Newsletter\Services\RewardTrackingService;
+use App\Services\Newsletter\Services\TrackingUrlBuilder;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
@@ -32,39 +63,84 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
     use CreatesTestData;
 
     private NewsletterPageBuilderService $service;
-
-    private readonly PageRepository $pageRepository;
-    private readonly OfferVisibilityResolver $offerResolver;
-    private readonly RewardVisibilityResolver $rewardResolver;
-    private readonly DealTrackingRecorder $trackingRecorder;
-    private readonly ProductOfferRepository $offerRepository;
-    private readonly RewardsRepository $rewardsRepository;
-    private DealVisibilityResolver $dealResolver;
-    private readonly DealClickRepository $clickRepository;
-    private readonly PromotionInjector $promotionInjector;
+    private Logger $logger;
+    private TrackingUrlBuilder $trackingUrlBuilder;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pageRepository = new PageRepository();
-        $this->offerResolver = app(OfferVisibilityResolver::class);
-        $this->rewardResolver = app(RewardVisibilityResolver::class);
-        $this->trackingRecorder = app(DealTrackingRecorder::class);
-        $this->offerRepository = app(ProductOfferRepository::class);
-        $this->rewardsRepository = app(RewardsRepository::class);
-        $this->clickRepository = app(DealClickRepository::class);
-        $this->dealResolver = app(DealVisibilityResolver::class);
-        $this->promotionInjector = app(PromotionInjector::class);
+
+        $this->logger = app(Logger::class);
+        $this->trackingUrlBuilder = new TrackingUrlBuilder();
+        $blockDataFactory = new BlockDataFactory();
+
+        // Bind interface to implementation
+
+        // Create eligibility services
+        $dealEligibilityService = app(DealVisibilityResolver::class);
+        $offerEligibilityService = app(OfferVisibilityResolver::class);
+        $rewardEligibilityService = app(RewardVisibilityResolver::class);
+
+        // Create tracking services
+        $dealTrackingService = app(DealTrackingService::class);
+        $offerTrackingService = app(OfferTrackingService::class);
+        $rewardTrackingService = app(RewardTrackingService::class);
+
+        // Create ALL renderers
+        $renderers = [
+            new DealOfferRenderer(
+                app(ProductRepository::class),
+                $dealEligibilityService,
+                $dealTrackingService,
+                $this->trackingUrlBuilder,
+                $this->logger
+            ),
+            new OfferBlockRenderer(
+                app(ProductOfferRepository::class),
+                $offerEligibilityService,
+                $offerTrackingService,
+                $this->trackingUrlBuilder,
+                $this->logger
+            ),
+            new RewardBlockRenderer(
+                app(RewardsRepository::class),
+                $rewardEligibilityService,
+                $rewardTrackingService,
+                $this->trackingUrlBuilder,
+                $this->logger
+            ),
+            new TextBlockRenderer(),
+            new HeadingBlockRenderer(),
+            new ImageBlockRenderer(),
+            new ListBlockRenderer(),
+            new QuoteBlockRenderer(),
+            new CtaBlockRenderer(),
+            new ProductBlockRenderer(),
+            new TableBlockRenderer(),
+            new StatsBlockRenderer(),
+            new TestimonialBlockRenderer(),
+            new DividerBlockRenderer(),
+            new BannerBlockRenderer(),
+            new HeroBlockRenderer(),
+            new InfoBlockRenderer(),
+            new SectionBlockRenderer(),
+            new PersonBlockRenderer(),
+            new ProductComparisonBlockRenderer(),
+            new SchemaBlockRenderer(),
+            new AwardBlockRenderer(),
+            new NoteBlockRenderer(),
+            new BuyingGuideBlockRenderer(),
+            new ContactFormBlockRenderer(),
+            new StaticDealBlockRenderer(),
+        ];
 
         $this->service = new NewsletterPageBuilderService(
-            $this->pageRepository,
-            $this->offerRepository,
-            $this->rewardsRepository,
-            $this->offerResolver,
-            $this->rewardResolver,
-            $this->trackingRecorder,
-            $this->dealResolver,
-            $this->promotionInjector,
+            app(PageRepository::class),
+            app(PromotionInjector::class),
+            $this->trackingUrlBuilder,
+            $blockDataFactory,
+            $this->logger,
+            new DefaultEmailBlockRendererRegistry($renderers)
         );
     }
 
@@ -2217,7 +2293,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $pages = collect([$page]);
 
         $sendId = 789;
-        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, $sendId);
+        $html = $this->service->buildNewsletterHtml($newsletter, $pages, null, false, true, null, $this->siteId);
         $html = urldecode($html);
 
         $this->assertStringContainsString('/newsletters/track-view', $html);
@@ -2342,63 +2418,6 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->assertDatabaseHas('offer_clicks', [
             'offer_id' => $offer->id,
             'action' => 'render',
-        ]);
-    }
-
-    public function testResolveAndTrackOfferReturnsNullWhenSuppressed(): void
-    {
-        $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => false, // Inactive
-        ]);
-
-        $context = RenderContext::forNewsletter(1, null);
-
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('resolveAndTrackOffer');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->service, $offer, $context);
-
-        $this->assertNull($result);
-
-        // Should NOT have tracked
-        $this->assertDatabaseMissing('offer_clicks', [
-            'offer_id' => $offer->id,
-        ]);
-    }
-
-    public function testResolveAndTrackOfferTracksWithMetadata(): void
-    {
-        $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        $context = RenderContext::forNewsletter(123, null);
-
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('resolveAndTrackOffer');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->service, $offer, $context);
-
-        $this->assertNotNull($result);
-
-        // Should have tracked with surface metadata
-        $this->assertDatabaseHas('offer_clicks', [
-            'offer_id' => $offer->id,
-            'action' => 'render',
-            'surface_id' => 123,
-            'channel' => 'newsletter',
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Newsletter\Renderers;
 
+use App\Framework\Support\Logger;
 use App\Framework\Support\Str;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Adverts\RenderContext;
@@ -13,23 +14,23 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Services\RewardTrackingService;
 use App\Services\Newsletter\Services\TrackingUrlBuilder;
-use Psr\Log\LoggerInterface;
 
 class RewardBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'reward';
     public function __construct(
         private readonly RewardsRepository        $rewardsRepository,
         private readonly RewardVisibilityResolver $eligibilityService,
         private readonly RewardTrackingService    $trackingService,
         private readonly TrackingUrlBuilder       $trackingUrlBuilder,
-        private readonly LoggerInterface          $logger
+        private readonly Logger $logger
     )
     {
     }
 
     public function supports(string $type): bool
     {
-        return $type === 'reward';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
@@ -104,7 +105,8 @@ class RewardBlockRenderer implements EmailBlockRenderer
             $html[] = '<p style="color: #666;">' . Str::sanitize($reward->rewardDefinition->description ?? '') . '</p>';
         }
 
-        $voucherCode = $eligibility->getMetadata('voucher_code');
+        //$voucherCode = $eligibility->getMetadata('voucher_code');
+        $voucherCode = null; //todo
         if ($voucherCode) {
             $html[] = '<div style="background: white; border: 2px dashed #28a745; padding: 15px; margin: 15px 0; text-align: center;">';
             $html[] = '<div style="color: #666; font-size: 12px; margin-bottom: 5px;">Your Code:</div>';

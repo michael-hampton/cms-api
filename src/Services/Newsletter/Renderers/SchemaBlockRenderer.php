@@ -11,9 +11,10 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class SchemaBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'schema';
     public function supports(string $type): bool
     {
-        return $type === 'schema';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

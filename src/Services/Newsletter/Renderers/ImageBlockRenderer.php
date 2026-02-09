@@ -11,9 +11,10 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class ImageBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'image';
     public function supports(string $type): bool
     {
-        return $type === 'image';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

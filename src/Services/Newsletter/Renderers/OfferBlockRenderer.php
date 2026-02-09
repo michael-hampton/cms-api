@@ -2,6 +2,7 @@
 
 namespace App\Services\Newsletter\Renderers;
 
+use App\Framework\Support\Logger;
 use App\Framework\Support\Str;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Services\Adverts\OfferVisibilityResolver;
@@ -13,23 +14,23 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Services\OfferTrackingService;
 use App\Services\Newsletter\Services\TrackingUrlBuilder;
-use Psr\Log\LoggerInterface;
 
 class OfferBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'offer';
     public function __construct(
         private readonly ProductOfferRepository  $offerRepository,
         private readonly OfferVisibilityResolver $offerVisibilityResolver,
         private readonly OfferTrackingService    $trackingService,
         private readonly TrackingUrlBuilder      $trackingUrlBuilder,
-        private readonly LoggerInterface         $logger
+        private readonly Logger $logger
     )
     {
     }
 
     public function supports(string $type): bool
     {
-        return $type === 'offer';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

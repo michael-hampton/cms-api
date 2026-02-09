@@ -11,9 +11,10 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class QuoteBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'quote';
     public function supports(string $type): bool
     {
-        return $type === 'quote';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

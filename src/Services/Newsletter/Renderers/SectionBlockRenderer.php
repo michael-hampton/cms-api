@@ -11,6 +11,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class SectionBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'section';
     private const SIZES = [
         'h1' => '32px',
         'h2' => '28px',
@@ -22,7 +23,7 @@ class SectionBlockRenderer implements EmailBlockRenderer
 
     public function supports(string $type): bool
     {
-        return $type === 'section';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

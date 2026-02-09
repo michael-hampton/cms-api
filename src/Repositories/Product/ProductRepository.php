@@ -647,4 +647,9 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 return $product;
             });
     }
+
+    public function findWithRelations(int $productId, array $relations = [])
+    {
+        return Product::with($relations)->find($productId);
+    }
 }

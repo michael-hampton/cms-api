@@ -2,8 +2,9 @@
 
 namespace App\Services\Newsletter\Renderers;
 
+use App\Framework\Support\Logger;
 use App\Framework\Support\Str;
-use App\Repositories\Product\ProductRepositoryInterface;
+use App\Repositories\Product\ProductRepository;
 use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\RenderContext;
 use App\Services\Newsletter\Contracts\EmailBlockRenderer;
@@ -13,23 +14,23 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Services\DealTrackingService;
 use App\Services\Newsletter\Services\TrackingUrlBuilder;
-use Psr\Log\LoggerInterface;
 
 class DealOfferRenderer implements EmailBlockRenderer
 {
+    public $type = 'offer-deal';
     public function __construct(
-        private readonly ProductRepositoryInterface $productRepository,
+        private readonly ProductRepository $productRepository,
         private readonly DealVisibilityResolver     $dealVisibilityResolver,
         private readonly DealTrackingService        $trackingService,
         private readonly TrackingUrlBuilder         $trackingUrlBuilder,
-        private readonly LoggerInterface            $logger
+        private readonly Logger            $logger
     )
     {
     }
 
     public function supports(string $type): bool
     {
-        return $type === 'offer-deal';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

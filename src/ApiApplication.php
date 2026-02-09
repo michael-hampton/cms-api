@@ -38,6 +38,33 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
+use App\Services\Newsletter\Renderers\AwardBlockRenderer;
+use App\Services\Newsletter\Renderers\BannerBlockRenderer;
+use App\Services\Newsletter\Renderers\BuyingGuideBlockRenderer;
+use App\Services\Newsletter\Renderers\ContactFormBlockRenderer;
+use App\Services\Newsletter\Renderers\CtaBlockRenderer;
+use App\Services\Newsletter\Renderers\DealOfferRenderer;
+use App\Services\Newsletter\Renderers\DefaultEmailBlockRendererRegistry;
+use App\Services\Newsletter\Renderers\DividerBlockRenderer;
+use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
+use App\Services\Newsletter\Renderers\HeadingBlockRenderer;
+use App\Services\Newsletter\Renderers\HeroBlockRenderer;
+use App\Services\Newsletter\Renderers\ImageBlockRenderer;
+use App\Services\Newsletter\Renderers\InfoBlockRenderer;
+use App\Services\Newsletter\Renderers\ListBlockRenderer;
+use App\Services\Newsletter\Renderers\NoteBlockRenderer;
+use App\Services\Newsletter\Renderers\OfferBlockRenderer;
+use App\Services\Newsletter\Renderers\PersonBlockRenderer;
+use App\Services\Newsletter\Renderers\ProductBlockRenderer;
+use App\Services\Newsletter\Renderers\ProductComparisonBlockRenderer;
+use App\Services\Newsletter\Renderers\QuoteBlockRenderer;
+use App\Services\Newsletter\Renderers\RewardBlockRenderer;
+use App\Services\Newsletter\Renderers\SchemaBlockRenderer;
+use App\Services\Newsletter\Renderers\SectionBlockRenderer;
+use App\Services\Newsletter\Renderers\StaticDealBlockRenderer;
+use App\Services\Newsletter\Renderers\TableBlockRenderer;
+use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
+use App\Services\Newsletter\Renderers\TextBlockRenderer;
 use App\Services\Shared\NativeSessionStore;
 use App\Services\Shared\RequestContext;
 use App\Services\Shared\SessionStore;
@@ -66,6 +93,40 @@ class ApiApplication
         $this->container->bind(\DateTimeInterface::class, Date::class);
         $this->container->bind(RequestContext::class, WebRequestContext::class);
         $this->container->bind(SessionStore::class, NativeSessionStore::class);
+
+        $this->container->bind(
+            EmailBlockRendererRegistry::class,
+            function () {
+                return new DefaultEmailBlockRendererRegistry([
+                    new AwardBlockRenderer(),
+                    new BannerBlockRenderer(),
+                    new BuyingGuideBlockRenderer(),
+                    new ContactFormBlockRenderer(),
+                    new CtaBlockRenderer(),
+                    app(DealOfferRenderer::class),
+                    new DividerBlockRenderer(),
+                    new HeadingBlockRenderer(),
+                    new HeroBlockRenderer(),
+                    new ImageBlockRenderer(),
+                    new InfoBlockRenderer(),
+                    new ListBlockRenderer(),
+                    new NoteBlockRenderer(),
+                    app(OfferblockRenderer::class),
+                    new PersonBlockRenderer(),
+                    new ProductBlockRenderer(),
+                    new ProductComparisonBlockRenderer(),
+                    new QuoteBlockRenderer(),
+                    app(RewardBlockRenderer::class),
+                    new SchemaBlockRenderer(),
+                    new SectionBlockRenderer(),
+                    new StaticDealBlockRenderer(),
+                    new TableBlockRenderer(),
+                    new TestimonialBlockRenderer(),
+                    new TextBlockRenderer(),
+                ]);
+            }
+        );
+
 
         $this->registerEvents();
 

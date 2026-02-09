@@ -10,9 +10,10 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class DividerBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'divider';
     public function supports(string $type): bool
     {
-        return $type === 'divider';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

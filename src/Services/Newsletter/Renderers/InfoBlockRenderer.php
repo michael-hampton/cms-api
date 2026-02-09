@@ -11,6 +11,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class InfoBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'info';
     private const COLORS = [
         'info' => ['bg' => '#e7f3ff', 'border' => '#007bff'],
         'warning' => ['bg' => '#fff3cd', 'border' => '#ffc107'],
@@ -20,7 +21,7 @@ class InfoBlockRenderer implements EmailBlockRenderer
 
     public function supports(string $type): bool
     {
-        return $type === 'info';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock

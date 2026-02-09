@@ -12,9 +12,10 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class TestimonialBlockRenderer implements EmailBlockRenderer
 {
+    public $type = 'testimonial';
     public function supports(string $type): bool
     {
-        return $type === 'testimonial';
+        return $type === $this->type;
     }
 
     public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
