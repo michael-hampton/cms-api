@@ -2,10 +2,18 @@
 
 namespace App\Parsers;
 
+use App\Parsers\Dtos\DividerBlockDto;
+use App\Parsers\Renderers\DividerBlockRenderer;
 use App\Validation\Custom\DividerStyleRule;
 
 class DividerBlockParser extends BaseBlockParser
 {
+    private DividerBlockRenderer $renderer;
+
+    public function __construct()
+    {
+        $this->renderer = new DividerBlockRenderer();
+    }
     public function getType(): string
     {
         return 'divider';
@@ -22,59 +30,16 @@ class DividerBlockParser extends BaseBlockParser
 
     public function parse(array $data): array
     {
-        $style = $data['style'] ?? 'solid';
+        // Build DTO (handles normalization + structural validation)
+        $dto = DividerBlockDto::fromArray($data);
 
-        return [
-            'style' => $style,
-            'style_label' => $this->getStyleLabel($style),
-            'css_class' => $this->getCssClass($style),
-            'is_decorative' => $this->isDecorative($style),
-            'thickness' => $this->getThickness($style)
-        ];
-    }
-
-    private function getStyleLabel(string $style): string
-    {
-        $labels = [
-            'solid' => 'Solid Line',
-            'dashed' => 'Dashed Line',
-            'dotted' => 'Dotted Line',
-            'double' => 'Double Line',
-            'thick' => 'Thick Line',
-            'thin' => 'Thin Line',
-            'decorative' => 'Decorative'
-        ];
-
-        return $labels[$style] ?? 'Solid Line';
-    }
-
-    private function getCssClass(string $style): string
-    {
-        return 'divider-' . $style;
-    }
-
-    private function isDecorative(string $style): bool
-    {
-        return in_array($style, ['decorative', 'dotted', 'double']);
-    }
-
-    private function getThickness(string $style): string
-    {
-        $thickness = [
-            'thin' => '1px',
-            'solid' => '2px',
-            'thick' => '4px',
-            'double' => '3px',
-            'dashed' => '2px',
-            'dotted' => '2px',
-            'decorative' => '3px'
-        ];
-
-        return $thickness[$style] ?? '2px';
+        // Return array for legacy compatibility
+        return $dto->toArray();
     }
 
     public function generateHtml(array $parsedData): string
     {
-       return '';
+        $dto = DividerBlockDto::fromArray($parsedData);
+        return $this->renderer->render($dto);
     }
 }

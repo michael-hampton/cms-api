@@ -19,6 +19,11 @@ class PageCollaboratorRepository extends CollaboratorRepository
         return parent::removeForUser($id, $userId, Page::class);
     }
 
+    public function remove(int $id, string $type = 'page'): bool
+    {
+        return parent::remove($id, Page::class);
+    }
+
     public function findByPageAndUser(int $pageId, int $userId): ?Collaborator
     {
         return $this->findByCollaboratableAndUser(Page::class, $pageId, $userId);

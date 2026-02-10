@@ -13,8 +13,7 @@ final class AccordionBlockDto extends BaseBlockDto
 
     // All known fields for validation
     private const KNOWN_KEYS = [
-        'title', 'introContent', 'items', 'allowMultipleOpen',
-        'openFirstByDefault', 'theme', 'context', 'visibleItemsCount'
+        'title', 'items', 'allowMultipleOpen',
     ];
 
     public function __construct(

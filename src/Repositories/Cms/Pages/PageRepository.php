@@ -5,6 +5,7 @@ namespace App\Repositories\Cms\Pages;
 use App\Framework\Support\Collection;
 use App\Models\Author;
 use App\Models\Block;
+use App\Models\Brief;
 use App\Models\Category;
 use App\Models\CustomFieldDefinition;
 use App\Models\Model;
@@ -911,5 +912,20 @@ class PageRepository extends Repository
                 'owner_id' => $sourcePage->owner_id
             ]);
         }
+    }
+
+    public function getBrief(int $pageId): Brief
+    {
+        return Brief::with([
+            'comments',
+            'owner',
+            'category',
+            'attachments',
+            'tasks',
+            'relationships',
+            'collaborators',
+            'collaborators.user',
+            'relationships'
+        ])->where('page_id', $pageId)->first();
     }
 }

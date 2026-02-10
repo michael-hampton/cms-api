@@ -54,7 +54,8 @@ class Page extends Model
         'updated_by',
         'zones',
         'scheduled_at',
-        'owner_id'
+        'owner_id',
+        'brief_id'
     ];
 
     protected $alwaysInclude = [

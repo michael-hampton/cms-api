@@ -9,9 +9,9 @@ final class DealBlockDto extends BaseBlockDto
 
     private const KNOWN_KEYS = [
         'link', 'noFollow', 'sponsored', 'openInNewTab', 'title', 'brand',
-        'productName', 'image', 'currency', 'price', 'salePrice', 'savingMode',
-        'description', 'showDealButton', 'starBlock', 'voucherId', 'context',
-        'product_id', 'variant_id', 'opted_out_product_match'
+        'productName', 'image', 'currency', 'price', 'salePrice',
+        'description', 'showDealButton', 'starBlock',
+        'product_id'
     ];
 
     public function __construct(

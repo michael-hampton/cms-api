@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class TestimonialBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['testimonials', 'layout'];
+    private const KNOWN_KEYS = ['testimonials'];
     private const ALLOWED_LAYOUTS = ['grid', 'list', 'carousel'];
 
     public function __construct(

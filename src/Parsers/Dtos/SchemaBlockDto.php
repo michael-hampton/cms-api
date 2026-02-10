@@ -7,8 +7,7 @@ use InvalidArgumentException;
 final class SchemaBlockDto extends BaseBlockDto
 {
     private const KNOWN_KEYS = [
-        'schemaType', 'title', 'description', 'image', 'question',
-        'answer', 'expansion', 'showExpansion'
+        'schemaType'
     ];
 
     private const ALLOWED_SCHEMA_TYPES = ['how-to', 'question'];

@@ -12,19 +12,22 @@ abstract class BaseBlockDto implements BlockDtoInterface
     /**
      * Validate that all array keys map to DTO properties
      */
-    protected static function validateKeys(array $data, array $knownKeys): void
+    protected static function validateKeys(array $data, array $requiredKeys): void
     {
         if (!self::$debugMode) {
             return;
         }
 
-        $unknownKeys = array_diff(array_keys($data), $knownKeys);
+        $missingKeys = array_diff($requiredKeys, array_keys($data));
 
-        if (!empty($unknownKeys)) {
+        if ($missingKeys !== []) {
             $className = static::class;
-            $unknownList = implode(', ', $unknownKeys);
-            error_log("WARNING: DTO {$className} received unknown fields: {$unknownList}");
-            echo "WARNING: DTO {$className} received unknown fields: {$unknownList}";
+            $missingList = implode(', ', $missingKeys);
+
+            $message = "WARNING: DTO {$className} is missing required input fields: {$missingList}";
+
+            error_log($message);
+            echo $message;
             die;
         }
     }

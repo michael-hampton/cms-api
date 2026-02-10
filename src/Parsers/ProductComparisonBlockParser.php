@@ -5,9 +5,17 @@ namespace App\Parsers;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Parsers\Dtos\ProductComparisonBlockDto;
+use App\Parsers\Renderers\ProductComparisonBlockRenderer;
 
 class ProductComparisonBlockParser extends BaseBlockParser
 {
+    private ProductComparisonBlockRenderer $renderer;
+
+    public function __construct()
+    {
+        $this->renderer = new ProductComparisonBlockRenderer();
+    }
     public function getType(): string
     {
         return 'product-comparison';
@@ -37,91 +45,11 @@ class ProductComparisonBlockParser extends BaseBlockParser
 
     public function parse(array $data): array
     {
-        $comparisons = $this->parseComparisons($data['comparisons'] ?? []);
+        // Build DTO (handles normalization + structural validation)
+        $dto = ProductComparisonBlockDto::fromArray($data);
 
-        return [
-            'title' => trim($data['title'] ?? ''),
-            'productA' => trim($data['productA'] ?? ''),
-            'productB' => trim($data['productB'] ?? ''),
-            'comparisons' => $comparisons,
-            'comparison_count' => count($comparisons),
-            'total_word_count' => $this->calculateTotalWordCount($comparisons),
-            'product_a_id' => $data['product_a_id'] ?? null,
-            'product_b_id' => $data['product_b_id'] ?? null,
-        ];
-    }
-
-    private function parseComparisons(array $comparisons): array
-    {
-        $parsed = [];
-
-        foreach ($comparisons as $comparison) {
-            if (!is_array($comparison)) {
-                continue;
-            }
-
-            $subtitle = trim($comparison['subtitle'] ?? '');
-            $items = $comparison['items'] ?? [];
-
-            if (empty($subtitle) || !is_array($items) || count($items) < 2) {
-                continue;
-            }
-
-            $parsedComparison = [
-                'subtitle' => $subtitle,
-                'items' => $this->parseComparisonItems($items),
-                'word_count' => str_word_count($subtitle)
-            ];
-
-            $parsed[] = $parsedComparison;
-        }
-
-        return $parsed;
-    }
-
-    private function parseComparisonItems(array $items): array
-    {
-        $parsed = [];
-
-        foreach ($items as $item) {
-            if (is_array($item) && isset($item['value'])) {
-                $value = trim($item['value']);
-            } else {
-                $value = trim((string)$item);
-            }
-
-            $parsed[] = [
-                'value' => $value,
-                'formatted_value' => htmlspecialchars($value),
-                'word_count' => str_word_count($value)
-            ];
-        }
-
-        // Ensure we always have exactly 2 items
-        while (count($parsed) < 2) {
-            $parsed[] = [
-                'value' => '',
-                'formatted_value' => '',
-                'word_count' => 0
-            ];
-        }
-
-        return array_slice($parsed, 0, 2);
-    }
-
-    private function calculateTotalWordCount(array $comparisons): int
-    {
-        $totalWords = 0;
-
-        foreach ($comparisons as $comparison) {
-            $totalWords += $comparison['word_count'] ?? 0;
-
-            foreach ($comparison['items'] ?? [] as $item) {
-                $totalWords += $item['word_count'] ?? 0;
-            }
-        }
-
-        return $totalWords;
+        // Return array for legacy compatibility
+        return $dto->toArray();
     }
 
     public function getComparisonValidationRules(): array
@@ -140,31 +68,7 @@ class ProductComparisonBlockParser extends BaseBlockParser
 
     public function generateHtml(array $parsedData): string
     {
-        $html = "<div class=\"product-comparison-block\">";
-
-        $html .= "<h3 class=\"comparison-title\">{$parsedData['title']}</h3>";
-
-        $html .= "<div class=\"comparison-table\">";
-        $html .= "<div class=\"comparison-header\">";
-        $html .= "<div class=\"comparison-header-cell\"></div>";
-        $html .= "<div class=\"comparison-header-cell product-a\">{$parsedData['productA']}</div>";
-        $html .= "<div class=\"comparison-header-cell product-b\">{$parsedData['productB']}</div>";
-        $html .= "</div>";
-
-        foreach ($parsedData['comparisons'] as $comparison) {
-            $html .= "<div class=\"comparison-row\">";
-            $html .= "<div class=\"comparison-label\">{$comparison['subtitle']}</div>";
-
-            foreach ($comparison['items'] as $item) {
-                $html .= "<div class=\"comparison-value\">{$item['formatted_value']}</div>";
-            }
-
-            $html .= "</div>";
-        }
-
-        $html .= "</div>";
-        $html .= "</div>";
-
-        return $html;
+        $dto = ProductComparisonBlockDto::fromArray($parsedData);
+        return $this->renderer->render($dto);
     }
 }

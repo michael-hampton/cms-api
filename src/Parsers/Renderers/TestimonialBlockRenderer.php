@@ -16,14 +16,17 @@ class TestimonialBlockRenderer extends BaseBlockRenderer
     public function render(BlockDtoInterface $dto): string
     {
         if (!$dto instanceof TestimonialBlockDto) {
-            return '';
+            throw new \InvalidArgumentException('Expected TestimonialBlockDto');
         }
 
-        if ($dto->layout === 'carousel') {
+        $isCarousel = $dto->layout === 'carousel';
+
+        if ($isCarousel) {
             return $this->renderCarousel($dto);
         }
 
         return $this->renderBlock($dto);
+
     }
 
     private function renderBlock(TestimonialBlockDto $dto): string

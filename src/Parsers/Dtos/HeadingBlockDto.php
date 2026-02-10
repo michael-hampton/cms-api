@@ -7,7 +7,7 @@ use InvalidArgumentException;
 
 final class HeadingBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['text', 'subtitle', 'level', 'context'];
+    private const KNOWN_KEYS = ['text', 'level'];
     private const MAX_TEXT_LENGTH = 255;
     private const MAX_SUBTITLE_LENGTH = 500;
 
@@ -15,7 +15,7 @@ final class HeadingBlockDto extends BaseBlockDto
         public string $text,
         public string $subtitle,
         public string $level,
-        public string $context
+        public string $context = 'default'
     )
     {
     }

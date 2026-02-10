@@ -2,9 +2,12 @@
 
 namespace App\Repositories\Product;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Merchant;
+use App\Models\MerchantNote;
 use App\Models\MerchantUrl;
+use App\Models\Model;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -121,4 +124,133 @@ class MerchantRepository extends Repository
     {
         return Merchant::class;
     }
+
+    public function getStatistics(?int $merchantId = null): array
+    {
+        $query = Merchant::query();
+
+        if ($merchantId) {
+            $query->where('id', $merchantId);
+        }
+
+        $totalMerchants = (clone $query)->count();
+        $activeMerchants = (clone $query)->where('is_active', true)->count();
+
+        // Build product merchants query with optional merchant filter
+        $pmQuery = Database::table('product_merchants as pm')
+            ->join('merchants as m', 'pm.merchant_id', '=', 'm.id')
+            ->where('m.is_active', true);
+
+        if ($merchantId) {
+            $pmQuery->where('m.id', $merchantId);
+        }
+
+        $productMerchants = $pmQuery->select([
+            'pm.product_id',
+            'pm.merchant_id',
+            'pm.price',
+            'pm.sale_price',
+        ])->get();
+
+        $totalProducts = $productMerchants
+            ->pluck('product_id')
+            ->unique()
+            ->count();
+
+        $productsOnSale = $productMerchants
+            ->filter(fn($pm) => isset($pm['sale_price'], $pm['price']) &&
+                $pm['sale_price'] > 0 &&
+                $pm['price'] > 0 &&
+                $pm['sale_price'] < $pm['price']
+            )
+            ->pluck('product_id')
+            ->unique()
+            ->count();
+
+        $discounts = $productMerchants
+            ->filter(fn($pm) => $pm['sale_price'] !== null &&
+                $pm['sale_price'] > 0 &&
+                $pm['price'] > 0 &&
+                $pm['sale_price'] < $pm['price']
+            )
+            ->map(fn($pm) => (($pm['price'] - $pm['sale_price']) / $pm['price']) * 100
+            );
+
+        $avgDiscount = $discounts->isEmpty()
+            ? 0
+            : round($discounts->avg(), 2);
+
+        $totalRevenue = round(
+            $productMerchants->sum(fn($pm) => $pm['sale_price'] ?? $pm['price'] ?? 0
+            ),
+            2
+        );
+
+        // Get merchant names for the filtered set
+        $merchantQuery = Merchant::where('is_active', true);
+        if ($merchantId) {
+            $merchantQuery->where('id', $merchantId);
+        }
+        $merchantNames = $merchantQuery->pluck('name', 'id');
+
+        $topMerchantsByProducts = $productMerchants
+            ->groupBy('merchant_id')
+            ->map(fn($items) => $items->pluck('product_id')->unique()->count())
+            ->sortByDesc()
+            ->take(5)
+            ->map(function ($count, $id) use ($merchantNames) {
+                return [
+                    'merchant_id' => $id,
+                    'product_count' => $count,
+                    'name' => $merchantNames[$id] ?? null,
+                ];
+            })
+            ->values();
+
+        return [
+            'total_merchants' => $totalMerchants,
+            'active_merchants' => $activeMerchants,
+            'total_products' => $totalProducts,
+            'products_on_sale' => $productsOnSale,
+            'avg_discount_percentage' => $avgDiscount,
+            'total_revenue_estimate' => $totalRevenue,
+            'top_merchants_by_products' => $topMerchantsByProducts,
+            'filtered_merchant_id' => $merchantId,
+        ];
+    }
+
+    public function getNotes(int $merchantId): Collection
+    {
+        return MerchantNote::where('merchant_id', $merchantId)
+            ->with(['user'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    public function createNote(int $merchantId, int $userId, string $content): Model
+    {
+        return MerchantNote::create([
+            'merchant_id' => $merchantId,
+            'user_id' => $userId,
+            'content' => $content,
+        ]);
+    }
+
+    public function updateNote(int $noteId, string $content): ?Model
+    {
+        $note = MerchantNote::find($noteId);
+
+        if (!$note) {
+            return null;
+        }
+
+        $note->update(['content' => $content]);
+        return $note->fresh(['user']);
+    }
+
+    public function deleteNote(int $noteId): bool
+    {
+        return MerchantNote::where('id', $noteId)->delete() > 0;
+    }
+
 }

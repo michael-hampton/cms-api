@@ -8,9 +8,7 @@ final class BannerBlockDto extends BaseBlockDto
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
 
     private const KNOWN_KEYS = [
-        'bannerType', 'title', 'subtitle', 'ctaText', 'ctaUrl', 'backgroundColor',
-        'textColor', 'image', 'providers', 'rating', 'reviewCount', 'showDismiss',
-        'dismissible', 'context'
+        'bannerType', 'title', 'backgroundColor', 'textColor',
     ];
 
     public function __construct(

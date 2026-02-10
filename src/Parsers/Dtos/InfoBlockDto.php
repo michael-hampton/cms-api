@@ -7,7 +7,7 @@ use InvalidArgumentException;
 
 final class InfoBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['infoType', 'description', 'context'];
+    private const KNOWN_KEYS = ['infoType', 'description'];
     private const MAX_DESCRIPTION_LENGTH = 2000;
 
     public function __construct(

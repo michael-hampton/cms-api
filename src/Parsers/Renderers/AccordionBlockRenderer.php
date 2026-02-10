@@ -27,15 +27,16 @@ class AccordionBlockRenderer extends BaseBlockRenderer
 
     private function renderSidebar(AccordionBlockDto $dto): string
     {
-        $html = "<div class=\"accordion-block accordion-sidebar accordion-theme-{$dto->theme}\">";
+        $theme = $dto->theme ?? 'light';
+        $html = "<div class=\"accordion-block accordion-sidebar accordion-theme-{$theme}\">";
 
         if (!empty($dto->title)) {
-            $escapedTitle = $this->escape($dto->title);
+            $escapedTitle = htmlspecialchars($dto->title);
             $html .= "<h4 class=\"accordion-title-sidebar\">{$escapedTitle}</h4>";
         }
 
         if (!empty($dto->introContent)) {
-            $html .= "<div class=\"accordion-intro-sidebar\">" . $this->escapeWithBreaks($dto->introContent) . "</div>";
+            $html .= "<div class=\"accordion-intro-sidebar\">" . nl2br(htmlspecialchars($dto->introContent)) . "</div>";
         }
 
         $html .= $this->renderItems($dto, 'sidebar');
@@ -47,15 +48,16 @@ class AccordionBlockRenderer extends BaseBlockRenderer
 
     private function renderDefault(AccordionBlockDto $dto): string
     {
-        $html = "<div class=\"accordion-block accordion-theme-{$dto->theme}\">";
+        $theme = $dto->theme ?? 'light';
+        $html = "<div class=\"accordion-block accordion-theme-{$theme}\">";
 
         if (!empty($dto->title)) {
-            $escapedTitle = $this->escape($dto->title);
+            $escapedTitle = htmlspecialchars($dto->title);
             $html .= "<h3 class=\"accordion-title\">{$escapedTitle}</h3>";
         }
 
         if (!empty($dto->introContent)) {
-            $html .= "<div class=\"accordion-intro\">" . $this->escapeWithBreaks($dto->introContent) . "</div>";
+            $html .= "<div class=\"accordion-intro\">" . nl2br(htmlspecialchars($dto->introContent)) . "</div>";
         }
 
         $html .= $this->renderItems($dto, 'default');
@@ -67,10 +69,12 @@ class AccordionBlockRenderer extends BaseBlockRenderer
 
     private function renderItems(AccordionBlockDto $dto, string $context): string
     {
+        $items = $dto->items ?? [];
+        $visibleCount = $dto->visibleItemsCount ?? 0;
+        $allowMultiple = $dto->allowMultipleOpen ?? false;
         $suffix = $context === 'sidebar' ? '-sidebar' : '';
-        $allowMultiple = $dto->allowMultipleOpen ? 'true' : 'false';
 
-        $html = "<div class=\"accordion-container{$suffix}\" data-allow-multiple=\"{$allowMultiple}\" data-visible-count=\"{$dto->visibleItemsCount}\">";
+        $html = "<div class=\"accordion-container{$suffix}\" data-allow-multiple=\"" . ($allowMultiple ? 'true' : 'false') . "\" data-visible-count=\"{$visibleCount}\">";
 
         $accordionId = uniqid('accordion-');
 
@@ -95,7 +99,8 @@ class AccordionBlockRenderer extends BaseBlockRenderer
 
         $html .= "</div>";
 
-        if (count($dto->items) > $dto->visibleItemsCount) {
+        // Add "Load More" button if needed
+        if (count($items) > $visibleCount) {
             $html .= "<div class=\"accordion-load-more-container{$suffix}\">";
             $html .= "<button class=\"accordion-load-more-btn{$suffix}\" data-accordion-id=\"{$accordionId}\">Load More Questions</button>";
             $html .= "</div>";

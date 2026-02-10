@@ -8,10 +8,7 @@ final class ContactFormBlockDto extends BaseBlockDto
 
     private const KNOWN_KEYS = [
         'title', 'subtitle', 'showName', 'showEmail', 'showPhone', 'showSubject',
-        'showMessage', 'showPropertyInterest', 'submitButtonText', 'successMessage',
-        'recipientEmail', 'requireName', 'requireEmail', 'requirePhone', 'requireSubject',
-        'requireMessage', 'override_email', 'override_phone', 'override_address',
-        'override_social', 'context'
+        'showMessage', 'submitButtonText', 'requireName'
     ];
 
     public function __construct(

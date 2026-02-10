@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class TextBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['paragraphs', 'context'];
+    private const KNOWN_KEYS = ['paragraphs'];
     private const MAX_PARAGRAPH_LENGTH = 10000;
 
     public function __construct(

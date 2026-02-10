@@ -3,14 +3,16 @@
 namespace App\Parsers;
 
 use App\Framework\Validation\Rules\MaxLengthRule;
+use App\Parsers\Dtos\CardGroupBlockDto;
+use App\Parsers\Renderers\CardGroupBlockRenderer;
 
 class CardGroupBlockParser extends BaseBlockParser
 {
-    private CardBlockParser $cardParser;
+    private CardGroupBlockRenderer $renderer;
 
     public function __construct()
     {
-        $this->cardParser = new CardBlockParser();
+        $this->renderer = new CardgroupBlockRenderer();
     }
 
     public function getType(): string
@@ -31,21 +33,11 @@ class CardGroupBlockParser extends BaseBlockParser
 
     public function parse(array $data): array
     {
-        $cards = [];
-        if (isset($data['cards']) && is_array($data['cards'])) {
-            foreach ($data['cards'] as $card) {
-                // Only include cards that have some content
-                if ($this->hasCardContent($card)) {
-                    $cards[] = $this->cardParser->parse($card);
-                }
-            }
-        }
+        // Build DTO (handles normalization + structural validation)
+        $dto = CardGroupBlockDto::fromArray($data);
 
-        return [
-            'itemsPerRow' => $this->parseItemsPerRow($data['itemsPerRow'] ?? null),
-            'gap' => $this->sanitize($data['gap'] ?? 'medium'),
-            'cards' => $cards
-        ];
+        // Return array for legacy compatibility
+        return $dto->toArray();
     }
 
     private function hasCardContent(array $card): bool
@@ -55,44 +47,10 @@ class CardGroupBlockParser extends BaseBlockParser
             !empty($card['image']['src']);
     }
 
-    private function parseItemsPerRow($value): int
-    {
-        $value = (int)$value;
-        // Validate range 1-4
-        if ($value < 1 || $value > 4) {
-            return 3; // Default
-        }
-        return $value;
-    }
-
-    private function sanitize(string $value): string
-    {
-        return htmlspecialchars(trim($value), ENT_QUOTES, 'UTF-8');
-    }
 
     public function generateHtml(array $parsedData): string
     {
-        if (empty($parsedData['cards'])) {
-            return '';
-        }
-
-        $itemsPerRow = $parsedData['itemsPerRow'] ?? 3;
-        $gap = $parsedData['gap'] ?? 'medium';
-
-        $containerClass = "card-group-block card-group-items-{$itemsPerRow} card-group-gap-{$gap}";
-
-        $html = "<div class=\"{$containerClass}\">";
-        $html .= "<div class=\"card-group-container\">";
-
-        foreach ($parsedData['cards'] as $card) {
-            $html .= "<div class=\"card-group-item\">";
-            $html .= $this->cardParser->generateHtml($card);
-            $html .= "</div>";
-        }
-
-        $html .= "</div>"; // card-group-container
-        $html .= "</div>"; // card-group-block
-
-        return $html;
+        $dto = CardGroupBlockDto::fromArray($parsedData);
+        return $this->renderer->render($dto);
     }
 }

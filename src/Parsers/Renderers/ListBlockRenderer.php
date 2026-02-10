@@ -3,6 +3,7 @@
 namespace App\Parsers\Renderers;
 
 use App\Parsers\Dtos\BlockDtoInterface;
+use App\Parsers\Dtos\ListBlockDto;
 
 class ListBlockRenderer extends BaseBlockRenderer
 {

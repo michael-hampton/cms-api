@@ -7,9 +7,17 @@ use App\Enums\Blocks\HeadingLevel;
 use App\Framework\Validation\Rules\EnumRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Parsers\Dtos\HeadingBlockDto;
+use App\Parsers\Renderers\HeadingBlockRenderer;
 
 class HeadingBlockParser extends BaseBlockParser
 {
+    private HeadingBlockRenderer $renderer;
+
+    public function __construct()
+    {
+        $this->renderer = new HeadingBlockRenderer();
+    }
     public function getType(): string
     {
         return 'heading';
@@ -46,51 +54,16 @@ class HeadingBlockParser extends BaseBlockParser
 
     public function parse(array $data): array
     {
-        $text = trim($data['text'] ?? '');
-        $subtitle = trim($data['subtitle'] ?? '');
-        $levelEnum = $this->getLevel($data);
+        // Build DTO (handles normalization + structural validation)
+        $dto = HeadingBlockDto::fromArray($data);
 
-        return [
-            'text' => $text,
-            'subtitle' => $subtitle,
-            'level' => $levelEnum->getLevel(),
-            'word_count' => str_word_count($text . ' ' . $subtitle),
-            'formatted_text' => htmlspecialchars($text),
-            'formatted_subtitle' => htmlspecialchars($subtitle),
-            'has_subtitle' => !empty($subtitle),
-            'context' => $data['context'] ?? 'default',
-        ];
-    }
-
-    private function getLevel(array $data): HeadingLevel
-    {
-        $levelInput = $data['level'] ?? 2; // default to 2
-
-        if (is_int($levelInput)) {
-            $levelValue = 'h' . $levelInput; // 3 -> 'h3'
-        } elseif (is_string($levelInput) && preg_match('/^h[1-6]$/', $levelInput)) {
-            $levelValue = $levelInput;
-        } else {
-            $levelValue = 'h2'; // fallback default
-        }
-
-        return HeadingLevel::from($levelValue);
+        // Return array for legacy compatibility
+        return $dto->toArray();
     }
 
     public function generateHtml(array $parsedData): string
     {
-        $level = $parsedData['level'];
-        $contextClass = $parsedData['context'] === 'sidebar' ? ' heading-sidebar' : '';
-        $html = "<div class=\"heading-block heading-level-{$level}{$contextClass}\">";
-
-        $html .= "<h{$level} class=\"heading-text\">{$parsedData['formatted_text']}</h{$level}>";
-
-        if ($parsedData['has_subtitle']) {
-            $html .= "<div class=\"heading-subtitle\">{$parsedData['formatted_subtitle']}</div>";
-        }
-
-        $html .= "</div>";
-
-        return $html;
+        $dto = HeadingBlockDto::fromArray($parsedData);
+        return $this->renderer->render($dto);
     }
 }

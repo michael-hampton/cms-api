@@ -7,10 +7,10 @@ final class EventBlockDto extends BaseBlockDto
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
 
     private const KNOWN_KEYS = [
-        'title', 'description', 'startDate', 'endDate', 'startTime', 'endTime',
-        'location', 'address', 'mapUrl', 'ticketPrice', 'currency', 'ticketUrl',
-        'capacity', 'organizerName', 'organizerEmail', 'organizerPhone', 'category',
-        'image', 'showSignupForm', 'featured', 'context'
+        'title', 'description', 'startDate', 'startTime', 'endTime',
+        'location', 'address', 'ticketPrice', 'currency',
+        'capacity', 'organizerName', 'organizerEmail', 'category',
+        'showSignupForm'
     ];
 
     public function __construct(

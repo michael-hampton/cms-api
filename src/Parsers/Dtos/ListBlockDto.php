@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 final class ListBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['listType', 'startIndex', 'schemaType', 'items', 'context'];
+    private const KNOWN_KEYS = ['listType', 'items'];
 
     public function __construct(
         public string $listType,

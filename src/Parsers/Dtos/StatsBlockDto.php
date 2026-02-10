@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class StatsBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['title', 'stats', 'layout', 'context'];
+    private const KNOWN_KEYS = ['title', 'stats'];
     private const MAX_TITLE_LENGTH = 255;
     private const ALLOWED_LAYOUTS = ['grid', 'row', 'column'];
 

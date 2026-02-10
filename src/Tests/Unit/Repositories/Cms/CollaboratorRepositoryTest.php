@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Repositories;
+namespace App\Tests\Unit\Repositories\Cms;
 
 use App\Models\Brief;
 use App\Models\Model;
@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Repositories\Cms\CollaboratorRepository;
 use App\Repositories\Cms\Pages\PageCollaboratorRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use App\Tests\Unit\Repositories\RepositoryTestCase;
 
 class CollaboratorRepositoryTest extends RepositoryTestCase
 {

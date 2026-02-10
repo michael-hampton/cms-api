@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Repositories\Product;
 
 use App\Models\MerchantUrl;
+use App\Models\ProductMerchant;
 use App\Repositories\Product\MerchantRepository;
 use App\Search\SearchCriteria;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -231,4 +232,208 @@ class MerchantRepositoryTest extends RepositoryTestCase
 //        $this->assertContains($merchant1->id, $ids);
 //        $this->assertContains($merchant2->id, $ids);
 //    }
+
+    public function test_get_statistics_returns_correct_structure(): void
+    {
+        $merchant1 = $this->createMerchant(['is_active' => true]);
+        $merchant2 = $this->createMerchant(['is_active' => true]);
+        $merchant3 = $this->createMerchant(['is_active' => false]);
+
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        ProductMerchant::create([
+            'merchant_id' => $merchant1->id,
+            'product_id' => $product1->id,
+            'price' => 100.00,
+            'sale_price' => 80.00,
+            'is_available' => true,
+            'url' => 'https://url1.com',
+        ]);
+
+        ProductMerchant::create([
+            'merchant_id' => $merchant2->id,
+            'product_id' => $product2->id,
+            'price' => 200.00,
+            'sale_price' => null,
+            'is_available' => true,
+            'url' => 'https://url2.com',
+        ]);
+
+        $stats = $this->repository->getStatistics();
+
+        $this->assertArrayHasKey('total_merchants', $stats);
+        $this->assertArrayHasKey('active_merchants', $stats);
+        $this->assertArrayHasKey('total_products', $stats);
+        $this->assertArrayHasKey('products_on_sale', $stats);
+        $this->assertArrayHasKey('avg_discount_percentage', $stats);
+        $this->assertArrayHasKey('total_revenue_estimate', $stats);
+        $this->assertArrayHasKey('top_merchants_by_products', $stats);
+
+        $this->assertEquals(3, $stats['total_merchants']);
+        $this->assertEquals(2, $stats['active_merchants']);
+        $this->assertEquals(2, $stats['total_products']);
+        $this->assertEquals(1, $stats['products_on_sale']);
+    }
+
+
+    public function test_statistics_calculates_average_discount_correctly(): void
+    {
+        $merchant = $this->createMerchant(['is_active' => true]);
+
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        // 20% discount
+        ProductMerchant::create([
+            'merchant_id' => $merchant->id,
+            'product_id' => $product1->id,
+            'price' => 100.00,
+            'sale_price' => 80.00,
+            'is_available' => true,
+            'url' => 'https://url1.com',
+        ]);
+
+        // 50% discount
+        ProductMerchant::create([
+            'merchant_id' => $merchant->id,
+            'product_id' => $product2->id,
+            'price' => 100.00,
+            'sale_price' => 50.00,
+            'is_available' => true,
+            'url' => 'https://url2.com',
+        ]);
+
+        $stats = $this->repository->getStatistics();
+
+        // (20 + 50) / 2 = 35
+        $this->assertEquals(35.00, $stats['avg_discount_percentage']);
+    }
+
+
+    public function test_statistics_excludes_inactive_merchants(): void
+    {
+        $activeMerchant = $this->createMerchant(['is_active' => true]);
+        $inactiveMerchant = $this->createMerchant(['is_active' => false]);
+
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        ProductMerchant::create([
+            'merchant_id' => $activeMerchant->id,
+            'product_id' => $product1->id,
+            'price' => 100.00,
+            'sale_price' => null,
+            'is_available' => true,
+            'url' => 'https://url1.com',
+        ]);
+
+        ProductMerchant::create([
+            'merchant_id' => $inactiveMerchant->id,
+            'product_id' => $product2->id,
+            'price' => 200.00,
+            'sale_price' => null,
+            'is_available' => true,
+            'url' => 'https://url2.com',
+        ]);
+
+        $stats = $this->repository->getStatistics();
+
+        $this->assertEquals(1, $stats['total_products']);
+        $this->assertEquals(100.00, $stats['total_revenue_estimate']);
+    }
+
+    public function test_get_statistics_can_filter_by_merchant(): void
+    {
+        $merchant1 = $this->createMerchant(['is_active' => true]);
+        $merchant2 = $this->createMerchant(['is_active' => true]);
+
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        ProductMerchant::create([
+            'merchant_id' => $merchant1->id,
+            'product_id' => $product1->id,
+            'price' => 100.00,
+            'sale_price' => 80.00,
+            'is_available' => true,
+            'url' => 'https://url1.com',
+        ]);
+
+        ProductMerchant::create([
+            'merchant_id' => $merchant2->id,
+            'product_id' => $product2->id,
+            'price' => 200.00,
+            'sale_price' => null,
+            'is_available' => true,
+            'url' => 'https://url2.com',
+        ]);
+
+        $stats = $this->repository->getStatistics($merchant1->id);
+
+        $this->assertEquals(1, $stats['total_merchants']);
+        $this->assertEquals(1, $stats['active_merchants']);
+        $this->assertEquals(1, $stats['total_products']);
+        $this->assertEquals(1, $stats['products_on_sale']);
+        $this->assertEquals($merchant1->id, $stats['filtered_merchant_id']);
+    }
+
+    public function test_create_note_stores_note_correctly(): void
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $note = $this->repository->createNote(
+            $merchant->id,
+            $user->id,
+            'Test note content'
+        );
+
+        $this->assertNotNull($note);
+        $this->assertEquals($merchant->id, $note->merchant_id);
+        $this->assertEquals($user->id, $note->user_id);
+        $this->assertEquals('Test note content', $note->content);
+    }
+
+    public function test_get_notes_returns_notes_with_user(): void
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $this->repository->createNote($merchant->id, $user->id, 'Note 1');
+        $this->repository->createNote($merchant->id, $user->id, 'Note 2');
+
+        $notes = $this->repository->getNotes($merchant->id);
+
+        $this->assertCount(2, $notes);
+        $this->assertNotNull($notes->first()->user);
+        $this->assertEquals($user->name, $notes->first()->user['name']);
+    }
+
+    public function test_update_note_modifies_content(): void
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $note = $this->repository->createNote($merchant->id, $user->id, 'Original');
+
+        $updated = $this->repository->updateNote($note->id, 'Updated content');
+
+        $this->assertNotNull($updated);
+        $this->assertEquals('Updated content', $updated->content);
+    }
+
+    public function test_delete_note_removes_note(): void
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $note = $this->repository->createNote($merchant->id, $user->id, 'Test');
+
+        $result = $this->repository->deleteNote($note->id);
+
+        $this->assertTrue($result);
+        $this->assertDatabaseMissing('merchant_notes', ['id' => $note->id]);
+    }
+
 }

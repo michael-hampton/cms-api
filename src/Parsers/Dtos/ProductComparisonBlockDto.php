@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class ProductComparisonBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['title', 'productA', 'productB', 'comparisons', 'product_a_id', 'product_b_id'];
+    private const KNOWN_KEYS = ['title', 'productA', 'productB', 'comparisons'];
     private const MAX_TITLE_LENGTH = 255;
     private const MAX_PRODUCT_NAME_LENGTH = 255;
 

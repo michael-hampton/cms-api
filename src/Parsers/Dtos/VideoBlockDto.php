@@ -14,6 +14,7 @@ final class VideoBlockDto extends BaseBlockDto
 
     public function __construct(
         public string  $url,
+        public string $preview,
         public string  $caption,
         public string  $platform,
         public ?string $videoId,
@@ -48,7 +49,7 @@ final class VideoBlockDto extends BaseBlockDto
         $videoId = self::extractVideoId($url, $platform);
         $embedUrl = self::generateEmbedUrl($videoId, $platform);
 
-        return new self($url, $caption, $platform, $videoId, $embedUrl);
+        return new self($url, $data['preview'] ?? '', $caption, $platform, $videoId, $embedUrl);
     }
 
     private static function detectPlatform(string $url): string
@@ -98,7 +99,8 @@ final class VideoBlockDto extends BaseBlockDto
             'platform' => $this->platform,
             'video_id' => $this->videoId,
             'embed_url' => $this->embedUrl,
-            'has_caption' => !empty($this->caption)
+            'has_caption' => !empty($this->caption),
+            'preview' => $this->preview,
         ];
     }
 

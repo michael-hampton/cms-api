@@ -8,7 +8,7 @@ final class AgentProfileBlockDto extends BaseBlockDto
 
     private const KNOWN_KEYS = [
         'name', 'title', 'bio', 'phone', 'email', 'license', 'experience',
-        'specialties', 'languages', 'profileImageUrl', 'socialMedia', 'context'
+        'specialties', 'profileImageUrl', 'socialMedia', 'context'
     ];
 
     public function __construct(

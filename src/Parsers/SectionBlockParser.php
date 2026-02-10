@@ -1,14 +1,20 @@
 <?php
-
-// SectionBlockParser.php
 namespace App\Parsers;
 
 use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Parsers\Dtos\SectionBlockDto;
+use App\Parsers\Renderers\SectionBlockRenderer;
 
 class SectionBlockParser extends BaseBlockParser
 {
+    private SectionBlockRenderer $renderer;
+
+    public function __construct()
+    {
+        $this->renderer = new SectionBlockRenderer();
+    }
     public function getType(): string
     {
         return 'section';
@@ -37,30 +43,16 @@ class SectionBlockParser extends BaseBlockParser
 
     public function parse(array $data): array
     {
-        return [
-            'title' => trim($data['title'] ?? ''),
-            'headingType' => $data['headingType'] ?? 'h2',
-            'navigationText' => trim($data['navigationText'] ?? ''),
-            'excludeFromNav' => (bool)($data['excludeFromNav'] ?? false),
-            'heading_level' => $this->getHeadingLevel($data['headingType'] ?? 'h2')
-        ];
-    }
+        // Build DTO (handles normalization + structural validation)
+        $dto = SectionBlockDto::fromArray($data);
 
-    private function getHeadingLevel(string $headingType): int
-    {
-        return (int)str_replace('h', '', $headingType);
+        // Return array for legacy compatibility
+        return $dto->toArray();
     }
 
     public function generateHtml(array $parsedData): string
     {
-        $level = $parsedData['heading_level'];
-        $contextClass = $parsedData['context'] === 'sidebar' ? ' section-sidebar' : '';
-        $html = "<div class=\"section-block section-level-{$level}{$contextClass}\">";
-
-        $html .= "<{$parsedData['headingType']} class=\"section-title\">{$parsedData['title']}</{$parsedData['headingType']}>";
-
-        $html .= "</div>";
-
-        return $html;
+        $dto = SectionBlockDto::fromArray($parsedData);
+        return $this->renderer->render($dto);
     }
 }

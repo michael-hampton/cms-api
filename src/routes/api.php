@@ -435,6 +435,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/merchants/bulk-update-status', [MerchantController::class, 'bulkUpdateStatus']);
         $router->post('/merchants/bulk-delete', [MerchantController::class, 'bulkDelete']);
         $router->get('/merchants/active', [MerchantController::class, 'active']);
+        $router->get('/merchants/statistics', [MerchantController::class, 'statistics']);
+        $router->get('/merchants/{merchantId}/notes', [MerchantController::class, 'getNotes']);
+        $router->put('/merchants/notes/{id}', [MerchantController::class, 'updateNote']);
+        $router->delete('/merchants/notes/{id}', [MerchantController::class, 'deleteNote']);
+        $router->post('/merchants/{merchantId}/notes', [MerchantController::class, 'createNote']);
 
         // merchant contacts
         $router->get('/merchant-contacts', MerchantContactController::class, 'index');
@@ -586,13 +591,19 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/territories/{id}/assign-pages', [TerritoryController::class, 'assignPages']);
         $router->post('/territories/{id}/unassign-pages', [TerritoryController::class, 'unassignPages']);
 
+        // CMS Page Collaborators & Brief
+        $router->get('/pages/{pageId}/collaborators', [PageController::class, 'getCollaborators']);
+        $router->post('/pages/{pageId}/collaborators', [PageController::class, 'addCollaborator']);
+        $router->delete('/pages/{pageId}/collaborators/{collaboratorId}', [PageController::class, 'removeCollaborator']);
+        $router->get('/pages/{pageId}/brief', [PageController::class, 'getBrief']);
+
         // Search
         $router->get('/search/pages', SearchController::class, 'pages');
         $router->get('/search/categories', SearchController::class, 'categories');
 
         $router->get('/vouchers', VoucherController::class, 'index');
         $router->post('/vouchers', VoucherController::class, 'store');
-        $router->get('/vouchers/active', VoucherController::class, 'active');
+        $router->get('/vouchers/active', [VoucherController::class, 'active']);
         $router->get('/vouchers/{id}', VoucherController::class, 'show');
         $router->put('/vouchers/{id}', VoucherController::class, 'update');
         $router->delete('/vouchers/{id}', VoucherController::class, 'destroy');

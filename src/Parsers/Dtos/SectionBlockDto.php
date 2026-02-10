@@ -7,7 +7,7 @@ use InvalidArgumentException;
 final class SectionBlockDto extends BaseBlockDto
 {
     private const KNOWN_KEYS = [
-        'title', 'headingType', 'navigationText', 'excludeFromNav', 'context'
+        'title', 'headingType', 'navigationText', 'excludeFromNav'
     ];
 
     private const ALLOWED_HEADING_TYPES = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];

@@ -8,8 +8,7 @@ final class BoxoutBlockDto extends BaseBlockDto
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
 
     private const KNOWN_KEYS = [
-        'title', 'paragraphs', 'image', 'alignment', 'linkUrl', 'linkText',
-        'noFollow', 'sponsored', 'openInNewTab', 'context'
+        'title', 'paragraphs', 'alignment',
     ];
 
     public function __construct(

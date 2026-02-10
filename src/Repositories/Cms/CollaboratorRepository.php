@@ -26,6 +26,13 @@ class CollaboratorRepository extends Repository
                 ->delete() > 0;
     }
 
+    public function remove(int $id, string $type = 'brief'): bool
+    {
+        return Collaborator::where('collaboratable_type', $type)
+                ->where('id', $id)
+                ->delete() > 0;
+    }
+
     public function findByCollaboratableAndUser(string $type, int $id, int $userId): ?Collaborator
     {
         return Collaborator::where('collaboratable_type', $type)

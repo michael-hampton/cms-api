@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class ServicesBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['title', 'subtitle', 'services', 'layout'];
+    private const KNOWN_KEYS = ['title', 'services', 'layout'];
     private const MAX_TITLE_LENGTH = 255;
     private const MAX_SUBTITLE_LENGTH = 500;
     private const ALLOWED_LAYOUTS = ['grid', 'list', 'carousel'];

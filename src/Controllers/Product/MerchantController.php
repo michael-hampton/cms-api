@@ -3,6 +3,7 @@
 namespace App\Controllers\Product;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -204,6 +205,98 @@ class MerchantController extends Controller
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function statistics(string $siteName, Request $request): JsonResponse
+    {
+        $merchantId = $request->get('merchant_id') ?? null;
+
+        try {
+            $stats = $this->merchantRepository->getStatistics($merchantId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getNotes(int $merchantId): JsonResponse
+    {
+        try {
+            $notes = $this->merchantRepository->getNotes($merchantId);
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $notes
+            ]);
+
+        } catch (Exception $exception) {
+            return $this->errorResponse($exception->getMessage(), 500);
+        }
+    }
+
+    public function createNote(Request $request, int $merchantId): JsonResponse
+    {
+        try {
+            $result = $this->merchantRepository->createNote($merchantId, Auth::id(), $request->input('content'));
+
+            if (!$result) {
+                return $this->errorResponse(
+                    'Something went wrong',
+                );
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Merchant note created successfully',
+            ]);
+
+        } catch (Exception $exception) {
+            return $this->errorResponse($exception->getMessage(), 500);
+        }
+    }
+
+    public function updateNote(Request $request, int $id): JsonResponse
+    {
+        try {
+            $result = $this->merchantRepository->updateNote($id, $request->input('content'));
+
+            if (!$result) {
+                return $this->errorResponse(
+                    'Something went wrong',
+                );
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Merchant note updated successfully',
+            ]);
+
+        } catch (Exception $exception) {
+            return $this->errorResponse($exception->getMessage(), 500);
+        }
+    }
+
+    public function deleteNote(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $result = $this->merchantRepository->deleteNote($id);
+
+            if (!$result) {
+                return $this->errorResponse(
+                    'Something went wrong',
+                );
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Merchant note deleted successfully',
+            ]);
+        } catch (Exception $exception) {
+            return $this->errorResponse($exception->getMessage(), 500);
         }
     }
 }

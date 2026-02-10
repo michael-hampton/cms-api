@@ -7,8 +7,7 @@ final class AwardBlockDto extends BaseBlockDto
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
 
     private const KNOWN_KEYS = [
-        'subcategory', 'productName', 'image', 'caption', 'alt', 'winner',
-        'strapline', 'rating', 'context'
+        'subcategory', 'productName', 'winner', 'rating'
     ];
 
     public function __construct(

@@ -28,6 +28,7 @@ use App\Framework\Support\SiteContext;
 use App\Parsers\BlockRegistry;
 use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\Pages\PageCollaboratorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 use App\Resources\PageResource;
@@ -44,6 +45,7 @@ class PageController extends Controller
         private readonly CategoryRepository $categoryRepository,
         private readonly TagRepository      $tagRepository,
         private readonly AuthorRepository   $authorRepository,
+        private readonly PageCollaboratorRepository $collaboratorRepository,
     )
     {
         parent::__construct();
@@ -922,6 +924,101 @@ class PageController extends Controller
             return $this->jsonResponse(['page' => $page->toArray()]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 400);
+        }
+    }
+
+    public function getCollaborators(string $siteName, int $pageId): JsonResponse
+    {
+        try {
+            // Verify user has access to this page
+            $page = $this->pageRepository->find($pageId);
+            if (!$page) {
+                return $this->errorResponse('Page not found', 404);
+            }
+
+            $collaborators = $this->collaboratorRepository->getForPage($pageId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $collaborators
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getBrief(string $siteName, int $pageId): JsonResponse
+    {
+        try {
+            $page = $this->pageRepository->find($pageId);
+            if (!$page) {
+                return $this->errorResponse('Page not found', 404);
+            }
+
+            $brief = $this->pageRepository->getBrief($pageId);
+
+            if (!$brief) {
+                return $this->resourceResponse([
+                    'success' => true,
+                    'data' => null,
+                    'message' => 'This page was not created from a brief'
+                ]);
+            }
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $brief->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function addCollaborator(Request $request, int $pageId): JsonResponse
+    {
+        try {
+            $data = $request->all();
+
+            if (!isset($data['user_id'])) {
+                return $this->errorResponse('User ID is required', 400);
+            }
+
+            $role = $data['role'] ?? 'editor';
+            $allowed_roles = ['viewer', 'editor', 'admin'];
+
+            if (!in_array($role, $allowed_roles)) {
+                return $this->errorResponse('Invalid role', 400);
+            }
+
+            $success = $this->collaboratorRepository->createForPage(
+                $pageId,
+                ['user_id' => (int)$data['user_id'], 'role' => $role],
+            );
+
+            if (!$success) {
+                return $this->errorResponse('Collaborator already exists', 409);
+            }
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Collaborator added successfully'
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function removeCollaborator(string $siteName, int $pageId, int $collaboratorId): JsonResponse
+    {
+        try {
+            $success = $this->collaboratorRepository->remove($collaboratorId);
+
+            return $this->resourceResponse([
+                'success' => $success,
+                'message' => $success ? 'Collaborator removed' : 'Failed to remove collaborator'
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 

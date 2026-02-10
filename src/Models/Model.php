@@ -309,14 +309,14 @@ abstract class Model
         return $this->performUpdate();
     }
 
-    public function fresh(): ?self
+    public function fresh(array $relations = []): ?self
     {
         $id = $this->getAttribute($this->primaryKey);
         if (!$id) {
             return null;
         }
 
-        return static::find($id);
+        return static::find($id, $relations);
     }
 
     protected function performUpdate(): bool
@@ -522,10 +522,12 @@ abstract class Model
         return $query->where($column, $operator, $value);
     }
 
-    public static function find(int $id): ?self
+    public static function find(int $id, array $relations = []): ?self
     {
         $instance = new static();
-        $result = $instance->newQuery()->find($id);
+        $result = !empty($relations) ?
+            $instance->newQuery()->with($relations)->find($id) :
+            $instance->newQuery()->find($id);
 
         if (!$result) {
             return null;
