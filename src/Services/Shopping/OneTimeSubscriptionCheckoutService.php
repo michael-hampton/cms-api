@@ -7,6 +7,7 @@ use App\Framework\Database\Database;
 use App\Services\Billing\Order\OrderDraftService;
 use App\Services\Billing\Payments\PaymentIntentService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
+use App\Services\Vouchers\DiscountResolver;
 
 class OneTimeSubscriptionCheckoutService
 {
@@ -17,7 +18,8 @@ class OneTimeSubscriptionCheckoutService
         private readonly PaymentIntentService     $paymentIntentService,
         private readonly CheckoutResponseBuilder  $responseBuilder,
         private readonly MemberAuthWrapper        $memberAuth,
-        private readonly Database                 $database
+        private readonly Database         $database,
+        private readonly DiscountResolver $discountResolver
     )
     {
     }
@@ -45,14 +47,32 @@ class OneTimeSubscriptionCheckoutService
 
         $member = $this->memberAuth->getMember();
 
+        // 2.5 RESOLVE DISCOUNTS (ADD THIS SECTION)
+        $baseSubtotalCents = $this->calculateBaseSubtotalCents($subscriptionItems);
+
+        $discountContext = new \App\Services\Vouchers\DiscountContext(
+            items: $subscriptionItems,
+            baseSubtotalCents: $baseSubtotalCents,
+            currentSubtotalCents: $baseSubtotalCents,
+            currentOfferDiscountCents: 0,
+            appliedDiscounts: [],
+            member: $member,
+            isSubscription: true,
+            isFirstSubscriptionCycle: true,
+            siteId: $siteId
+        );
+
+        $resolvedDiscounts = $this->discountResolver->resolve($discountContext);
+
         // 3. PHASE 1: Database transaction (create subscriptions + order)
-        [$order, $subscriptions] = $this->database->transaction(function () use ($subscriptionItems, $data, $member, $siteId) {
+        [$order, $subscriptions] = $this->database->transaction(function () use ($subscriptionItems, $data, $member, $siteId, $resolvedDiscounts) {
             // Create subscriptions in pending_payment status
             $subscriptions = $this->subscriptionBatchFactory->createPendingSubscriptions(
                 $subscriptionItems,
                 $data,
                 $member,
-                $siteId
+                $siteId,
+                $resolvedDiscounts  // PASS DISCOUNTS
             );
 
             // Create order in pending status
@@ -60,7 +80,8 @@ class OneTimeSubscriptionCheckoutService
                 $subscriptions,
                 $member,
                 $siteId,
-                $data
+                $data,
+                $resolvedDiscounts  // PASS DISCOUNTS
             );
 
             return [$order, $subscriptions];
@@ -103,6 +124,19 @@ class OneTimeSubscriptionCheckoutService
             $subscriptions,
             $paymentResult
         );
+    }
+
+    private function calculateBaseSubtotalCents(array $items): int
+    {
+        $totalCents = 0;
+
+        foreach ($items as $item) {
+            $priceCents = (int)round(($item['base_price'] ?? $item['price']) * 100);
+            $quantity = $item['quantity'] ?? 1;
+            $totalCents += $priceCents * $quantity;
+        }
+
+        return $totalCents;
     }
 
     private function getSubscriptionItems(): array

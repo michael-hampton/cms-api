@@ -31,7 +31,8 @@ Voucher extends Model
         'applies_to_subscriptions',
         'subscription_plan_ids',
         'stripe_coupon_id',
-        'duration_in_months'
+        'duration_in_months',
+        'is_stackable'
     ];
 
     protected $casts = [

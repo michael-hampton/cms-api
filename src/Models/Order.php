@@ -42,7 +42,10 @@ class Order extends Model
         'checkout_id',
         'one_time_subscription_id',
         'payment_intent_id',
-        'stripe_customer_id'
+        'stripe_customer_id',
+        'reward_discount',
+        'offer_discount',
+        'voucher_discount',
     ];
 
     protected $casts = [

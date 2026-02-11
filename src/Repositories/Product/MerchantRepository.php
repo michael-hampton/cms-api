@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Merchant;
 use App\Models\MerchantNote;
+use App\Models\MerchantTransaction;
 use App\Models\MerchantUrl;
 use App\Models\Model;
 use App\Repositories\Repository;
@@ -251,6 +252,99 @@ class MerchantRepository extends Repository
     public function deleteNote(int $noteId): bool
     {
         return MerchantNote::where('id', $noteId)->delete() > 0;
+    }
+
+    /**
+     * Update merchant balance
+     *
+     * @param int $merchantId
+     * @param float $newBalance
+     * @return bool
+     */
+    public function updateBalance(int $merchantId, float $newBalance): bool
+    {
+        return Merchant::where('id', $merchantId)
+                ->update(['balance' => $newBalance]) > 0;
+    }
+
+    /**
+     * Create merchant transaction record
+     *
+     * @param array $data
+     * @return Model
+     */
+    public function createTransaction(array $data): Model
+    {
+        return MerchantTransaction::create($data);
+    }
+
+    /**
+     * Get merchant transactions
+     *
+     * @param int $merchantId
+     * @param array $filters
+     * @return Collection
+     */
+    public function getTransactions(int $merchantId, array $filters = []): Collection
+    {
+        $query = MerchantTransaction::where('merchant_id', $merchantId);
+
+        if (isset($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['from_date'])) {
+            $query->where('created_at', '>=', $filters['from_date']);
+        }
+
+        if (isset($filters['to_date'])) {
+            $query->where('created_at', '<=', $filters['to_date']);
+        }
+
+        return $query->orderBy('created_at', 'desc')->get();
+    }
+
+    /**
+     * Get pending review transactions
+     *
+     * @param int|null $merchantId
+     * @return Collection
+     */
+    public function getPendingReviewTransactions(?int $merchantId = null): Collection
+    {
+        $query = MerchantTransaction::where('status', 'pending_review');
+
+        if ($merchantId) {
+            $query->where('merchant_id', $merchantId);
+        }
+
+        return $query->with(['merchant', 'order', 'voucher'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Update transaction status
+     *
+     * @param int $transactionId
+     * @param string $status
+     * @param string|null $notes
+     * @return bool
+     */
+    public function updateTransactionStatus(int $transactionId, string $status, ?string $notes = null): bool
+    {
+        $data = ['status' => $status];
+
+        if ($notes) {
+            $data['notes'] = $notes;
+        }
+
+        return MerchantTransaction::where('id', $transactionId)
+                ->update($data) > 0;
     }
 
 }

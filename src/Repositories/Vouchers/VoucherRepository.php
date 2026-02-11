@@ -137,6 +137,14 @@ class VoucherRepository extends Repository
         }
     }
 
+    public function syncSubscriptionPlans(int $voucherId, array $planIds): void
+    {
+        $voucher = Voucher::find($voucherId);
+        if ($voucher) {
+            $voucher->subscriptionPlans(true)->sync(array_unique($planIds));
+        }
+    }
+
     public function syncBrands(int $voucherId, array $brandIds): void
     {
         $voucher = Voucher::find($voucherId);

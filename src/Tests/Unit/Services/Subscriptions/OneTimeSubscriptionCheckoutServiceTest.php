@@ -14,6 +14,8 @@ use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutResponseBuilder;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
+use App\Services\Vouchers\DiscountResolver;
+use App\Services\Vouchers\ResolvedDiscounts;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
@@ -30,6 +32,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     private $responseBuilder;
     private $memberAuth;
     private $database;
+    private DiscountResolver $discountResolver;
 
     protected function setUp(): void
     {
@@ -42,6 +45,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->responseBuilder = Mockery::mock(CheckoutResponseBuilder::class);
         $this->memberAuth = Mockery::mock(MemberAuthWrapper::class);
         $this->database = Mockery::mock(Database::class);
+        $this->discountResolver = Mockery::mock(DiscountResolver::class);
 
         $this->service = new OneTimeSubscriptionCheckoutService(
             $this->cartService,
@@ -50,7 +54,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             $this->paymentIntentService,
             $this->responseBuilder,
             $this->memberAuth,
-            $this->database
+            $this->database,
+            $this->discountResolver
         );
     }
 
@@ -103,6 +108,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 return $callback();
             });
 
+        $this->setResolvedDiscountExpectations();
+
         $subscriptionsWithPricing = [[
             'subscription' => $subscription,
             'pricing' => $this->createMockPricing()
@@ -132,6 +139,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
+        $this->setResolvedDiscountExpectations();
 
         $transactionCallOrder = [];
 
@@ -144,6 +152,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 $transactionCallOrder[] = 'transaction_end';
                 return $result;
             });
+
 
         $subscriptionsWithPricing = [[
             'subscription' => $subscription,
@@ -198,6 +207,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = $this->createMockMember();
 
         $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
 
         // Ensure cart returns the expected structure
         $this->cartService->shouldReceive('getItems')
@@ -258,6 +268,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $order = $this->createMockOrder();
 
         $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
 
         // Cart with 3 subscriptions
         $this->cartService->shouldReceive('getItems')
@@ -284,7 +295,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                     return $data['voucher_code'] === 'SAVE10';
                 }),
                 $member,
-                1
+                1,
+                Mockery::any()
             )
             ->andReturn([
                 ['subscription' => $this->createMockSubscription(), 'pricing' => $this->createMockPricing()],
@@ -313,6 +325,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = $this->createMockMember();
         $order = $this->createMockOrder();
         $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1],
@@ -347,6 +360,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     {
         $member = $this->createMockMember();
         $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1, 'options' => ['delivery_type' => 'digital']]
@@ -379,6 +393,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     {
         $member = $this->createMockMember();
         $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1, 'options' => ['delivery_type' => 'print']]
@@ -413,6 +428,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     {
         $member = $this->createMockMember();
         $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1]
@@ -445,7 +461,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         // 1. Verify Factory call
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
-            ->with(Mockery::any(), Mockery::subset(['voucher_code' => $voucherCode]), $member, $siteId)
+            ->with(Mockery::any(), Mockery::subset(['voucher_code' => $voucherCode]), $member, $siteId, Mockery::any())
             ->andReturn($subs);
 
         // 2. FIX: Order matching signature: ($subscriptions, $member, $siteId, $data)
@@ -455,7 +471,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 $subs,                               // 1st: array $subscriptions
                 $member,                             // 2nd: Member $member
                 $siteId,                             // 3rd: int $siteId
-                Mockery::subset($inputData)          // 4th: array $data (contains voucher)
+                Mockery::subset($inputData),          // 4th: array $data (contains voucher)
+                Mockery::any(),
             )
             ->andReturn($order);
 
@@ -485,6 +502,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $subscriptionMock = Mockery::mock(Subscription::class)->makePartial();
         $orderMock = Mockery::mock(Order::class)->makePartial();
         $member = $this->createMockMember();
+        $this->setResolvedDiscountExpectations();
 
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
@@ -669,4 +687,449 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     {
         $this->cartService->shouldReceive('clear')->once();
     }
+
+    private function setResolvedDiscountExpectations()
+    {
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100, 'quantity' => 1]
+        ];
+
+        $resolvedDiscounts = new ResolvedDiscounts(
+            items: $subscriptionItems,
+            baseSubtotalCents: 10000,
+            finalSubtotalCents: 9000,
+            offerDiscountCents: 1000,
+            tieredDiscountCents: 0,
+            voucherDiscountCents: 0,
+            rewardDiscountCents: 0,
+            storeCreditCents: 0,
+            merchantFundedCents: 1000,
+            platformFundedCents: 0,
+            customerCreditCents: 0
+        );
+
+        $this->discountResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn($resolvedDiscounts);
+    }
+
+    public function test_process_checkout_returns_error_when_no_subscription_items(): void
+    {
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn([
+                ['id' => 1, 'price' => 100] // No subscription_plan_id
+            ]);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('No subscription in cart', $result['message']);
+    }
+
+    public function test_process_checkout_returns_error_when_not_authenticated(): void
+    {
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn([
+                ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
+            ]);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(false);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('login', $result['message']);
+        $this->assertArrayHasKey('redirect', $result);
+    }
+
+    public function test_process_checkout_resolves_discounts(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100, 'quantity' => 1]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = new ResolvedDiscounts(
+            items: $subscriptionItems,
+            baseSubtotalCents: 10000,
+            finalSubtotalCents: 9000,
+            offerDiscountCents: 1000,
+            tieredDiscountCents: 0,
+            voucherDiscountCents: 0,
+            rewardDiscountCents: 0,
+            storeCreditCents: 0,
+            merchantFundedCents: 1000,
+            platformFundedCents: 0,
+            customerCreditCents: 0
+        );
+
+        $this->discountResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->id = 1;
+        $subscriptions = [['subscription' => Mockery::mock()]];
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->once()
+            ->with(
+                $subscriptionItems,
+                [],
+                $member,
+                1,
+                $resolvedDiscounts
+            )
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->once()
+            ->with(
+                $subscriptions,
+                $member,
+                1,
+                [],
+                $resolvedDiscounts
+            )
+            ->andReturn($order);
+
+        $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn($paymentResult);
+
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')
+            ->once();
+
+        $this->cartService->shouldReceive('clear')->once();
+
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_creates_subscriptions_and_order_in_transaction(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100, 'quantity' => 1]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = Mockery::mock(ResolvedDiscounts::class);
+        $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->id = 1;
+        $subscriptions = [['subscription' => Mockery::mock()]];
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->once()
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->once()
+            ->andReturn($order);
+
+        $paymentResult = ['success' => true];
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn($paymentResult);
+
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
+        $this->cartService->shouldReceive('clear')->once();
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_handles_payment_failure(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = Mockery::mock(ResolvedDiscounts::class);
+        $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->shouldReceive('update')->once();
+
+        $subscription = Mockery::mock();
+        $subscription->shouldReceive('update')->once();
+
+        $subscriptions = [['subscription' => $subscription]];
+
+        $this->database->shouldReceive('transaction')
+            ->twice() // Once for creation, once for failure handling
+            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->andReturn($order);
+
+        $paymentResult = ['success' => false];
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn($paymentResult);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Payment', $result['message']);
+    }
+
+    public function test_process_checkout_handles_payment_exception(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = Mockery::mock(ResolvedDiscounts::class);
+        $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->shouldReceive('update')->once();
+
+        $subscription = Mockery::mock();
+        $subscription->shouldReceive('update')->once();
+
+        $subscriptions = [['subscription' => $subscription]];
+
+        $this->database->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->andReturn($order);
+
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andThrow(new \Exception('Payment service error'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Payment service error');
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_process_checkout_attaches_payment_intent_after_success(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = Mockery::mock(ResolvedDiscounts::class);
+        $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $subscriptions = [['subscription' => Mockery::mock()]];
+
+        $this->database->shouldReceive('transaction')
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->andReturn($order);
+
+        $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn($paymentResult);
+
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')
+            ->once()
+            ->with($order, $paymentResult);
+
+        $this->cartService->shouldReceive('clear')->once();
+
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_clears_cart_after_success(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = Mockery::mock(ResolvedDiscounts::class);
+        $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $subscriptions = [['subscription' => Mockery::mock()]];
+
+        $this->database->shouldReceive('transaction')
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->andReturn($order);
+
+        $paymentResult = ['success' => true];
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn($paymentResult);
+
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
+
+        $this->cartService->shouldReceive('clear')
+            ->once();
+
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_builds_response(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 1;
+
+        $subscriptionItems = [
+            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
+        ];
+
+        $this->cartService->shouldReceive('getItems')
+            ->andReturn($subscriptionItems);
+
+        $this->memberAuth->shouldReceive('check')->andReturn(true);
+        $this->memberAuth->shouldReceive('getMember')->andReturn($member);
+
+        $resolvedDiscounts = Mockery::mock(ResolvedDiscounts::class);
+        $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $subscriptions = [['subscription' => Mockery::mock()]];
+
+        $this->database->shouldReceive('transaction')
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            })
+            ->andReturn([$order, $subscriptions]);
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->andReturn($order);
+
+        $paymentResult = ['success' => true];
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn($paymentResult);
+
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
+        $this->cartService->shouldReceive('clear')->once();
+
+        $expectedResponse = [
+            'success' => true,
+            'order_id' => 1,
+            'redirect_url' => '/success'
+        ];
+
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->once()
+            ->with($order, $subscriptions, $paymentResult)
+            ->andReturn($expectedResponse);
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertEquals($expectedResponse, $result);
+    }
+
+
+
 }

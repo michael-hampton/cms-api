@@ -436,4 +436,272 @@ class MerchantRepositoryTest extends RepositoryTestCase
         $this->assertDatabaseMissing('merchant_notes', ['id' => $note->id]);
     }
 
+    public function test_update_balance_updates_merchant_balance(): void
+    {
+        $merchant = $this->createMerchant(['balance' => 100.00]);
+
+        $result = $this->repository->updateBalance($merchant->id, 250.50);
+
+        $this->assertTrue($result);
+        $this->assertEquals(250.50, $merchant->fresh()->balance);
+    }
+
+    public function test_update_balance_returns_false_for_nonexistent_merchant(): void
+    {
+        $result = $this->repository->updateBalance(99999, 100.00);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_create_transaction_stores_transaction(): void
+    {
+        $merchant = $this->createMerchant();
+        $order = $this->createOrder();
+
+        $transaction = $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'order_id' => $order->id,
+            'type' => 'credit',
+            'amount' => 50.00,
+            'status' => 'completed',
+            'description' => 'Order payment',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $this->assertNotNull($transaction);
+        $this->assertEquals($merchant->id, $transaction->merchant_id);
+        $this->assertEquals('credit', $transaction->type);
+        $this->assertEquals(50.00, $transaction->amount);
+    }
+
+    public function test_get_transactions_returns_all_transactions_for_merchant(): void
+    {
+        $merchant1 = $this->createMerchant();
+        $merchant2 = $this->createMerchant();
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant1->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'completed',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant1->id,
+            'type' => 'debit',
+            'amount' => 50.00,
+            'status' => 'completed',
+            'balance_before' => 50.00,
+            'balance_after' => 50,
+        ]);
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant2->id,
+            'type' => 'credit',
+            'amount' => 75.00,
+            'status' => 'completed',
+            'balance_before' => 75.00,
+            'balance_after' => 50,
+        ]);
+
+        $transactions = $this->repository->getTransactions($merchant1->id);
+
+        $this->assertCount(2, $transactions);
+    }
+
+    public function test_get_transactions_filters_by_type(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'completed',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'debit',
+            'amount' => 50.00,
+            'status' => 'completed',
+            'balance_before' => 50.00,
+            'balance_after' => 50,
+        ]);
+
+        $transactions = $this->repository->getTransactions($merchant->id, ['type' => 'credit']);
+
+        $this->assertCount(1, $transactions);
+        $this->assertEquals('credit', $transactions->first()->type);
+    }
+
+    public function test_get_transactions_filters_by_status(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'completed',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 50.00,
+            'status' => 'pending',
+            'balance_before' => 50.00,
+            'balance_after' => 50,
+        ]);
+
+        $transactions = $this->repository->getTransactions($merchant->id, ['status' => 'pending']);
+
+        $this->assertCount(1, $transactions);
+        $this->assertEquals('pending', $transactions->first()->status);
+    }
+
+    public function test_get_transactions_filters_by_date_range(): void
+    {
+        $merchant = $this->createMerchant();
+
+        // Create transaction with older date
+        $old = $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'completed',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+        $old->update(['created_at' => '2024-01-01']);
+
+        // Create recent transaction
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 50.00,
+            'status' => 'completed',
+            'balance_before' => 50.00,
+            'balance_after' => 50,
+        ]);
+
+        $transactions = $this->repository->getTransactions($merchant->id, [
+            'from_date' => '2024-06-01'
+        ]);
+
+        $this->assertCount(1, $transactions);
+    }
+
+    public function test_get_pending_review_transactions_returns_only_pending(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'pending_review',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 50.00,
+            'status' => 'completed',
+            'balance_before' => 50.00,
+            'balance_after' => 50,
+        ]);
+
+        $pending = $this->repository->getPendingReviewTransactions();
+
+        $this->assertCount(1, $pending);
+        $this->assertEquals('pending_review', $pending->first()->status);
+    }
+
+    public function test_get_pending_review_transactions_filters_by_merchant(): void
+    {
+        $merchant1 = $this->createMerchant();
+        $merchant2 = $this->createMerchant();
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant1->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'pending_review',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $this->repository->createTransaction([
+            'merchant_id' => $merchant2->id,
+            'type' => 'credit',
+            'amount' => 50.00,
+            'status' => 'pending_review',
+            'balance_before' => 50.00,
+            'balance_after' => 50,
+        ]);
+
+        $pending = $this->repository->getPendingReviewTransactions($merchant1->id);
+
+        $this->assertCount(1, $pending);
+        $this->assertEquals($merchant1->id, $pending->first()->merchant_id);
+    }
+
+    public function test_update_transaction_status_updates_status(): void
+    {
+        $merchant = $this->createMerchant();
+        $transaction = $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'pending_review',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $result = $this->repository->updateTransactionStatus($transaction->id, 'completed');
+
+        $this->assertTrue($result);
+        $this->assertEquals('completed', $transaction->fresh()->status);
+    }
+
+    public function test_update_transaction_status_updates_notes(): void
+    {
+        $merchant = $this->createMerchant();
+        $transaction = $this->repository->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'credit',
+            'amount' => 100.00,
+            'status' => 'pending_review',
+            'balance_before' => 0,
+            'balance_after' => 50,
+        ]);
+
+        $result = $this->repository->updateTransactionStatus(
+            $transaction->id,
+            'completed',
+            'Approved by admin'
+        );
+
+        $this->assertTrue($result);
+        $this->assertEquals('Approved by admin', $transaction->fresh()->notes);
+    }
+
+    public function test_update_transaction_status_returns_false_for_nonexistent(): void
+    {
+        $result = $this->repository->updateTransactionStatus(99999, 'completed');
+
+        $this->assertFalse($result);
+    }
+
 }

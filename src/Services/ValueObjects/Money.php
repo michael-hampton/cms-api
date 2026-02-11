@@ -247,4 +247,14 @@ class Money
     {
         return $this->format();
     }
+
+    public static function convertDollarsToCents(float $dollars): int
+    {
+        return (int)round($dollars * 100);
+    }
+
+    public static function convertCentsToDollars(int $cents): float
+    {
+        return $cents / 100;
+    }
 }

@@ -42,7 +42,7 @@ class OrderDraftService
 
             $totalSubtotalCents += $pricing->subtotalCents;
             $totalShippingCents += $pricing->shippingCents;
-            $totalDiscountCents += $pricing->discountCents;
+            $totalDiscountCents += $pricing->discountCents; //todo need to plug in discounts
 
             $orderItems[] = [
                 'product_id' => null,

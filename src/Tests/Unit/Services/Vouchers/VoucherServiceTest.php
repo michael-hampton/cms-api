@@ -873,4 +873,57 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertFalse($result->valid);
         $this->assertEquals('Voucher has expired', $result->message);
     }
+
+    public function testValidateVoucherForCheckoutWithMixedEligibility()
+    {
+        $code = 'MIXED10';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'price' => 50.00,
+                'quantity' => 1,
+                'subtotal' => 50.00
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2, // Not eligible
+                'price' => 50.00,
+                'quantity' => 1,
+                'subtotal' => 50.00
+            ],
+            [
+                'id' => 3,
+                'subscription_plan_id' => 1,
+                'price' => 30.00,
+                'quantity' => 1,
+                'subtotal' => 30.00
+            ]
+        ];
+
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+        $voucher->minimum_order_value = null;
+        $voucher->per_user_limit = null;
+        $voucher->campaign_id = null;
+        $voucher->is_stackable = true;
+
+        $voucher->shouldReceive('isValid')->andReturn(true);
+        $voucher->shouldReceive('isApplicableToProduct')->with(1)->andReturn(true);
+        $voucher->shouldReceive('isApplicableToProduct')->with(2)->andReturn(false);
+        $voucher->shouldReceive('isApplicableToSubscriptionPlan')->with(1)->andReturn(true);
+        $voucher->shouldReceive('calculateDiscount')->with(80.00)->andReturn(8.00);
+
+        $this->repository->shouldReceive('findByCode')
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->validateVoucherForCheckout($code, $cartItems);
+
+        $this->assertTrue($result['valid']);
+        $this->assertEquals(80.00, $result['eligible_subtotal']); // 50 + 30
+        $this->assertCount(2, $result['eligible_items']);
+        $this->assertEquals(8.00, $result['discount']);
+    }
 }

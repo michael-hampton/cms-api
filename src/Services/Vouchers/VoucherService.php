@@ -98,7 +98,148 @@ class VoucherService
         return $this->repository->getAlternatives($voucherId);
     }
 
-    public function validateVoucher(string $code, float $orderValue, ?int $userId = null, ?int $productId = null): array
+    public function validateVoucherForCheckout($code, $cartItems, $userId = null)
+    {
+        $voucher = $this->repository->findByCode($code);
+
+        if (!$voucher) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher not found',
+                'discount' => 0
+            ];
+        }
+
+        if (!$voucher->isValid()) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher has expired',
+                'discount' => 0
+            ];
+        }
+
+        // Check campaign status if voucher is part of a campaign
+        if ($voucher->campaign_id) {
+            $campaign = $voucher->campaign;
+            if (!$campaign || $campaign->status !== 'active' || !$campaign->isActive()) {
+                return [
+                    'valid' => false,
+                    'message' => 'Campaign is not active',
+                    'discount' => 0
+                ];
+            }
+        }
+
+        // Check per-user limit
+        if ($voucher->per_user_limit && $userId) {
+            $usageCount = $voucher->getUserUsageCount($userId);
+            if ($usageCount >= $voucher->per_user_limit) {
+                return [
+                    'valid' => false,
+                    'message' => 'You have already used this voucher the maximum number of times',
+                    'discount' => 0
+                ];
+            }
+        }
+
+        // Get eligible items (products and subscription plans)
+        $eligibleItems = $this->getEligibleItems($voucher, $cartItems);
+
+        if (empty($eligibleItems)) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher is not applicable to any items in your cart',
+                'discount' => 0,
+                'eligible_items' => []
+            ];
+        }
+
+        // Calculate eligible subtotal
+        $eligibleSubtotal = array_sum(array_column($eligibleItems, 'subtotal'));
+
+        // Check minimum order value
+        if ($voucher->minimum_order_value && $eligibleSubtotal < $voucher->minimum_order_value) {
+            return [
+                'valid' => false,
+                'message' => "Minimum order value of £{$voucher->minimum_order_value} required for eligible items",
+                'discount' => 0
+            ];
+        }
+
+        // Calculate discount
+        $discount = $voucher->calculateDiscount($eligibleSubtotal);
+
+        // Check if cart has offer discounts
+        $hasOfferDiscount = $this->cartHasOfferDiscount($cartItems);
+
+        // FIXED: Don't reject non-stackable vouchers - let CheckoutService decide
+        // Return constraint information for CheckoutService to handle
+        return [
+            'valid' => true,
+            'discount' => $discount,
+            'discount_type' => $voucher->discount_type,
+            'max_discount' => $voucher->max_discount_amount,
+            'voucher_id' => $voucher->id,
+            'voucher_code' => $voucher->code,
+            'campaign_id' => $voucher->campaign_id,
+            'merchant_id' => $voucher->merchant_id,
+            'eligible_items' => $eligibleItems,
+            'eligible_subtotal' => $eligibleSubtotal,
+            'is_stackable' => $voucher->is_stackable,
+            'has_offer_discount' => $hasOfferDiscount,
+            'requires_override_decision' => $hasOfferDiscount && !$voucher->is_stackable,
+            'message' => 'Voucher validated successfully'
+        ];
+    }
+
+    private function getEligibleItems($voucher, $cartItems)
+    {
+        $eligible = [];
+
+        foreach ($cartItems as $item) {
+            $isEligible = false;
+
+            // Check product eligibility
+            if (isset($item['product_id']) && $voucher->isApplicableToProduct($item['product_id'])) {
+                $isEligible = true;
+            }
+
+            // Check subscription plan eligibility
+            if (isset($item['subscription_plan_id']) && $voucher->isApplicableToSubscriptionPlan($item['subscription_plan_id'])) {
+                $isEligible = true;
+            }
+
+            if ($isEligible) {
+                $eligible[] = $item;
+            }
+        }
+
+        return $eligible;
+    }
+
+    private function cartHasOfferDiscount($cartItems)
+    {
+        foreach ($cartItems as $item) {
+            // Check if item has offer or bundle pricing
+            if (isset($item['item_type']) && in_array($item['item_type'], ['offer', 'bundle'])) {
+                return true;
+            }
+
+            // Check if sale_price exists and differs from base price
+            if (isset($item['price']) && isset($item['base_price']) && $item['price'] < $item['base_price']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function validateVoucher(
+        string $code,
+        float  $orderValue,
+        ?int   $userId = null,
+        ?int   $productId = null
+    ): array
     {
         $voucher = $this->repository->findByCode($code);
 
@@ -158,14 +299,15 @@ class VoucherService
             ];
         }
 
-        $discount = $voucher->calculateDiscount($orderValue); //todo this doesnt determine whether this is for a subscription
+        $discount = $voucher->calculateDiscount($orderValue);
 
         return [
             'valid' => true,
             'message' => 'Voucher applied successfully',
             'discount' => $discount,
             'voucher_id' => $voucher->id,
-            'voucher' => $voucher
+            'voucher' => $voucher,
+            'is_stackable' => $voucher->is_stackable
         ];
     }
 

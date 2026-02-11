@@ -30,7 +30,7 @@ class SubscriptionBatchFactory
     ): array
     {
         $subscriptions = [];
-        $voucherCode = $checkoutData['voucher_code'] ?? null;
+        $voucherCode = $checkoutData['voucher_code'] ?? null; //todo discount needs plugging in
         $voucherUsed = false;
 
         foreach ($cartItems as $item) {

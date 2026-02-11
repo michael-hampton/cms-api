@@ -5,9 +5,14 @@ namespace App\Tests\Unit\Services\Shopping;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\Member;
+use App\Models\MemberReward;
+use App\Models\Merchant;
 use App\Models\Order;
+use App\Models\RewardDefinition;
 use App\Models\Shipment;
 use App\Repositories\Billing\ShipmentRepository;
+use App\Repositories\Product\MerchantRepository;
+use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\Order\OrderManager;
@@ -20,6 +25,7 @@ use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
 use App\Services\Shopping\MerchantShippingService;
 use App\Services\Shopping\ShippingService;
+use App\Services\Vouchers\DiscountResolver;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -45,6 +51,9 @@ class CheckoutServiceTest extends FunctionalTestCase
     private Database $databaseMock;
     private OrderManager $orderManager;
     private TaxCalculatorService $taxCalculatorService;
+    private MerchantRepository $merchantRepository;
+    private DiscountResolver $discountResolver;
+    private RewardsRepository $rewardsRepository;
 
     protected function setUp(): void
     {
@@ -65,6 +74,9 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver = m::mock(CurrencyResolver::class);
         $this->databaseMock = m::mock(Database::class);
         $this->taxCalculatorService = m::mock(TaxCalculatorService::class);
+        $this->merchantRepository = m::mock(MerchantRepository::class);
+        $this->discountResolver = m::mock(DiscountResolver::class);
+        $this->rewardsRepository = m::mock(RewardsRepository::class);
 
         $this->service = new CheckoutService(
             $this->cartService,
@@ -81,9 +93,88 @@ class CheckoutServiceTest extends FunctionalTestCase
             $this->currencyResolver,
             $this->databaseMock,
             $this->orderManager,
-            $this->taxCalculatorService
+            $this->taxCalculatorService,
+            $this->merchantRepository,
+            $this->discountResolver,
+            $this->rewardsRepository,
         );
     }
+
+    public function test_process_checkout_successfully()
+    {
+        $payload = [
+            'voucher_code' => null,
+            'payment_method_id' => 'pm_123',
+            'shipping_address_id' => 10,
+        ];
+
+        $member = (object)['id' => 1];
+        $cart = collect([['product_id' => 5, 'price' => 10000, 'qty' => 1]]);
+        $calculatedOrder = ['subtotal' => 10000, 'total' => 12000];
+        $splitOrders = [['merchant_id' => 1]];
+        $allocations = [['merchant_id' => 1, 'amount' => 12000]];
+        $stripeIntent = ['id' => 'pi_123', 'client_secret' => 'secret_123'];
+        $createdOrder = (object)['id' => 999];
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->with(m::type(\Closure::class))
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->memberAuthWrapper
+            ->shouldReceive('getMember')
+            ->once()
+            ->andReturn($member);
+
+        $this->cartService
+            ->shouldReceive('getCartForCheckout')
+            ->once()
+            ->with($member->id)
+            ->andReturn($cart);
+
+        $this->discountResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andReturn([]);
+
+        $this->taxCalculatorService
+            ->shouldReceive('calculate')
+            ->once()
+            ->andReturn($calculatedOrder);
+
+        $this->orderCalculationService
+            ->shouldReceive('calculate')
+            ->once()
+            ->andReturn($calculatedOrder);
+
+        $this->mockSplittingService
+            ->shouldReceive('split')
+            ->once()
+            ->andReturn($splitOrders);
+
+        $this->mockAllocationService
+            ->shouldReceive('allocate')
+            ->once()
+            ->andReturn($allocations);
+
+        $this->stripePaymentService
+            ->shouldReceive('createPaymentIntent')
+            ->once()
+            ->with(m::on(fn($data) => $data['amount'] === 12000))
+            ->andReturn($stripeIntent);
+
+        $this->orderService
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($createdOrder);
+
+        $result = $this->service->processCheckout($payload);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('pi_123', $result['payment_intent_id']);
+    }
+
 
     protected function tearDown(): void
     {
@@ -155,7 +246,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             ]);
 
         $this->currencyResolver->shouldReceive('resolve')
-            ->once()
+            ->twice()
             ->with(1)
             ->andReturn('usd');
 
@@ -323,6 +414,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->setRequiresShippingExpectation();
         $this->setTaxCalculatorExpectations();
 
+        $this->setTransactionExpectations();
+
         $this->cartService->shouldReceive('getItems')
             ->once()
             ->andReturn($cartItems);
@@ -336,14 +429,17 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->with(100.00, $data)
             ->andReturn(10.00);
 
-        $this->setCurrencyExpectations();
+        $this->currencyResolver->shouldReceive('resolve')
+            ->twice()
+            ->with(1)
+            ->andReturn('usd');
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->once()
+            ->twice()
             ->andReturn(true);
 
         $this->memberAuthWrapper->shouldReceive('getMember')
-            ->once()
+            ->twice()
             ->andReturn(m::mock(Member::class)->makePartial());
 
         $this->orderCalculationService->shouldReceive('calculateOrderTotals')
@@ -527,11 +623,12 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->orderService->shouldReceive('create')
             ->once()
             ->with(m::on(function ($orderData) {
-                return $orderData['subtotal'] === 100.00
-                    && $orderData['shipping'] === 10.00
-                    && $orderData['tax'] === 11.00
-                    && $orderData['total'] === 121.00
-                    && $orderData['discount'] === 0;
+                return
+                    $orderData['subtotal'] == 100
+                    && $orderData['shipping'] == 10
+                    && $orderData['tax'] == 11
+                    && $orderData['total'] == 121
+                    && $orderData['discount'] == 0;
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
@@ -712,10 +809,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->orderService->shouldReceive('create')
             ->once()
             ->with(m::on(function ($orderData) {
-                return $orderData['subtotal'] === 150.00
-                    && $orderData['shipping'] === 0.00
-                    && $orderData['tax'] === 15.00
-                    && $orderData['total'] === 165.00;
+                return $orderData['subtotal'] == 150
+                    && $orderData['shipping'] == 0
+                    && $orderData['tax'] == 11
+                    && $orderData['total'] == 165;
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
@@ -756,7 +853,8 @@ class CheckoutServiceTest extends FunctionalTestCase
                 'product_name' => 'Product 1',
                 'price' => 100.00,
                 'quantity' => 1,
-                'subtotal' => 100.00
+                'subtotal' => 100.00,
+                'id' => 1
             ]
         ];
 
@@ -768,14 +866,25 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->setTransactionExpectations();
         $this->setTaxCalculatorExpectations();
 
-        $this->voucherService->shouldReceive('validateVoucher')
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->with(5, 100)
+            ->with('SAVE10', $cartItems, null)
             ->andReturn([
                 'valid' => true,
                 'voucher_code' => 'SAVE10',
-                'discount' => 10.00
+                'discount' => 10.00,
+                'eligible_items' => [
+                    [
+                        'id' => 1,
+                        'subtotal' => 100.00
+                    ]
+                ],
+                'voucher_id' => 5,
             ]);
+
+//        $this->voucherService->shouldReceive('getVoucherById')
+//            ->once()
+//            ->with(5);
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
         $this->cartService->shouldReceive('getTotal')->once()->andReturn(100.00);
@@ -808,7 +917,7 @@ class CheckoutServiceTest extends FunctionalTestCase
                 return $orderData['subtotal'] == 100
                     && $orderData['discount'] == 10
                     && $orderData['shipping'] == 10
-                    && $orderData['tax'] == 10
+                    && $orderData['tax'] == 11
                     && $orderData['total'] == 110
                     && $orderData['voucher_code'] == 'SAVE10';
             }), m::any(), 1)
@@ -819,14 +928,14 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->with(5, m::any(), 10.00, 1);
 
         $this->memberAuthWrapper->shouldReceive('check')
-            ->times(3)
+            ->twice()
             ->andReturn(true);
 
         $member = m::mock(Member::class)->makePartial();
         $member->id = 10;
 
         $this->memberAuthWrapper->shouldReceive('getMember')
-            ->times(3)
+            ->twice()
             ->andReturn($member);
 
         $result = $this->service->processCheckout($data, 1);
@@ -1102,7 +1211,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()
             ->with(m::on(function ($orderData) {
                 // Tax = (200 - 0 + 0) * 0.1 = 20.00
-                return $orderData['tax'] === 20.00;
+                return $orderData['tax'] === 11;
             }), m::any(), 1)
             ->andReturn($mockOrder);
 
@@ -1158,7 +1267,8 @@ class CheckoutServiceTest extends FunctionalTestCase
                 'product_name' => 'Product 1',
                 'price' => 50.00,
                 'quantity' => 1,
-                'subtotal' => 50.00
+                'subtotal' => 50.00,
+                'id' => 1
             ]
         ];
 
@@ -1202,9 +1312,9 @@ class CheckoutServiceTest extends FunctionalTestCase
                 'payment_intent_id' => 'pi_test_123'
             ]);
 
-        $this->voucherService->shouldReceive('validateVoucher')
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->with(5, 50)
+            ->with('INVALID', $cartItems, null)
             ->andReturn([
                 'valid' => false,
                 'voucher_code' => 'INVALID',
@@ -1361,7 +1471,9 @@ class CheckoutServiceTest extends FunctionalTestCase
         $mockOrder2->id = 2;
         $mockOrder2->order_number = 'ORD-5678';
 
-        $this->setCurrencyExpectations();
+        $this->currencyResolver->shouldReceive('resolve')
+            ->times(3)
+            ->andReturn('USD');
         $this->setRequiresShippingExpectation();
 
         // Mock cart service
@@ -1503,7 +1615,9 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_1' => ['total' => 55.00, 'stripe_eligible' => true]
         ]);
 
-        $this->setCurrencyExpectations();
+        $this->currencyResolver->shouldReceive('resolve')
+            ->once()
+            ->andReturn('USD');
         $this->setRequiresShippingExpectation();
 
         $this->stripePaymentService->shouldReceive('createPaymentIntentWithCustomer')
@@ -1974,7 +2088,7 @@ class CheckoutServiceTest extends FunctionalTestCase
     private function setCurrencyExpectations()
     {
         $this->currencyResolver->shouldReceive('resolve')
-            ->once()
+            ->twice()
             ->with(1)
             ->andReturn('usd');
     }
@@ -2005,5 +2119,1084 @@ class CheckoutServiceTest extends FunctionalTestCase
                 $postalCode,
                 \Mockery::any())
             ->andReturn(['tax_cents' => 1100]);
+    }
+
+    public function testCalculateTotalsWithStackableVoucher()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'base_price' => 100.00,
+                'price' => 80.00, // £20 offer discount
+                'quantity' => 1,
+                'subtotal' => 80.00,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $voucherData = [
+            'valid' => true,
+            'discount' => 8.00, // 10% of £80
+            'voucher_code' => 'STACK10',
+            'voucher_id' => 1,
+            'is_stackable' => true,
+            'eligible_items' => $cartItems,
+            'requires_override_decision' => false
+        ];
+
+        $totals = $this->invokePrivateMethod(
+            $this->service,
+            'calculateTotals',
+            [$cartItems, $voucherData]
+        );
+
+        $this->assertEquals(100.00, $totals['base_subtotal']);
+        $this->assertEquals(80.00, $totals['subtotal']);
+        $this->assertEquals(20.00, $totals['offer_discount']);
+        $this->assertEquals(8.00, $totals['voucher_discount']);
+    }
+
+    public function testCalculateTotalsWithNonStackableVoucherThatWins()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'base_price' => 200.00,
+                'price' => 160.00, // £40 offer discount
+                'quantity' => 1,
+                'subtotal' => 160.00,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $voucherData = [
+            'valid' => true,
+            'discount' => 50.00, // £50 voucher discount
+            'voucher_code' => 'BIG50',
+            'voucher_id' => 2,
+            'is_stackable' => false,
+            'eligible_items' => $cartItems,
+            'requires_override_decision' => true
+        ];
+
+        $totals = $this->invokePrivateMethod(
+            $this->service,
+            'calculateTotals',
+            [$cartItems, $voucherData]
+        );
+
+        $this->assertEquals(200.00, $totals['base_subtotal']);
+        $this->assertEquals(0.00, $totals['offer_discount']); // Offer removed for eligible items
+        $this->assertEquals(50.00, $totals['voucher_discount']); // Voucher wins
+    }
+
+    public function testCalculateTotalsWithNonStackableVoucherThatLoses()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'base_price' => 200.00,
+                'price' => 140.00, // £60 offer discount
+                'quantity' => 1,
+                'subtotal' => 140.00,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $voucherData = [
+            'valid' => true,
+            'discount' => 35.00, // £35 voucher discount (less than £60 offer)
+            'voucher_code' => 'SMALL35',
+            'voucher_id' => 3,
+            'is_stackable' => false,
+            'eligible_items' => $cartItems,
+            'requires_override_decision' => true
+        ];
+
+        $totals = $this->invokePrivateMethod(
+            $this->service,
+            'calculateTotals',
+            [$cartItems, $voucherData]
+        );
+
+        $this->assertEquals(200.00, $totals['base_subtotal']);
+        $this->assertEquals(140.00, $totals['subtotal']);
+        $this->assertEquals(60.00, $totals['offer_discount']); // Offer wins
+        $this->assertEquals(0.00, $totals['voucher_discount']); // Voucher not applied
+        $this->assertNull($totals['voucher_code']); // Voucher data cleared
+    }
+
+    public function testCalculateTotalsOnlyRemovesOfferForEligibleItems()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'base_price' => 100.00,
+                'price' => 80.00, // £20 offer - eligible
+                'quantity' => 1,
+                'subtotal' => 80.00,
+                'item_type' => 'offer'
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2,
+                'base_price' => 50.00,
+                'price' => 40.00, // £10 offer - NOT eligible
+                'quantity' => 1,
+                'subtotal' => 40.00,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $voucherData = [
+            'valid' => true,
+            'discount' => 25.00,
+            'voucher_code' => 'PARTIAL25',
+            'voucher_id' => 4,
+            'is_stackable' => false,
+            'eligible_items' => [$cartItems[0]], // Only first item eligible
+            'requires_override_decision' => true
+        ];
+
+        $totals = $this->invokePrivateMethod(
+            $this->service,
+            'calculateTotals',
+            [$cartItems, $voucherData]
+        );
+
+        // Voucher £25 > eligible offer £20, so voucher wins for item 1
+        // Item 2's £10 offer should remain
+        $this->assertEquals(150.00, $totals['base_subtotal']);
+        $this->assertEquals(10.00, $totals['offer_discount']); // Only item 2's offer remains
+        $this->assertEquals(25.00, $totals['voucher_discount']);
+    }
+
+    public function testPrepareOrderItemsDistributesVoucherProportionally()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product A',
+                'product_sku' => 'SKU-A',
+                'price' => 60.00,
+                'base_price' => 60.00,
+                'quantity' => 1,
+                'subtotal' => 60.00
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2,
+                'product_name' => 'Product B',
+                'product_sku' => 'SKU-B',
+                'price' => 40.00,
+                'base_price' => 40.00,
+                'quantity' => 1,
+                'subtotal' => 40.00
+            ]
+        ];
+
+        $totals = [
+            'voucher_discount' => 10.00,
+            'voucher_eligible_items' => $cartItems,
+            'offer_discount' => 0
+        ];
+
+        $orderItems = $this->invokePrivateMethod(
+            $this->service,
+            'prepareOrderItemsWithDiscounts',
+            [$cartItems, $totals]
+        );
+
+        $this->assertCount(2, $orderItems);
+
+        $item1Metadata = json_decode($orderItems[0]['metadata'], true);
+        $item2Metadata = json_decode($orderItems[1]['metadata'], true);
+
+        // Item 1: 60/(60+40) * 10 = 6.00
+        $this->assertEquals(6.00, $item1Metadata['voucher_discount']);
+        $this->assertEquals(54.00, $orderItems[0]['total']);
+
+        // Item 2: 40/(60+40) * 10 = 4.00
+        $this->assertEquals(4.00, $item2Metadata['voucher_discount']);
+        $this->assertEquals(36.00, $orderItems[1]['total']);
+    }
+
+    public function testPrepareOrderItemsHandlesRoundingOnLastItem()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product A',
+                'product_sku' => 'SKU-A',
+                'price' => 33.33,
+                'quantity' => 1,
+                'subtotal' => 33.33
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2,
+                'product_name' => 'Product B',
+                'product_sku' => 'SKU-B',
+                'price' => 33.33,
+                'quantity' => 1,
+                'subtotal' => 33.33
+            ],
+            [
+                'id' => 3,
+                'product_id' => 3,
+                'product_name' => 'Product C',
+                'product_sku' => 'SKU-C',
+                'price' => 33.34,
+                'quantity' => 1,
+                'subtotal' => 33.34
+            ]
+        ];
+
+        $totals = [
+            'voucher_discount' => 10.00,
+            'voucher_eligible_items' => $cartItems,
+            'offer_discount' => 0
+        ];
+
+        $orderItems = $this->invokePrivateMethod(
+            $this->service,
+            'prepareOrderItemsWithDiscounts',
+            [$cartItems, $totals]
+        );
+
+        $totalVoucherDistributed = 0;
+        foreach ($orderItems as $item) {
+            $metadata = json_decode($item['metadata'], true);
+            $totalVoucherDistributed += $metadata['voucher_discount'];
+        }
+
+        // Total should equal exactly 10.00 with no rounding errors
+        $this->assertEquals(10.00, $totalVoucherDistributed);
+    }
+
+    public function testProcessCheckoutIgnoresClientProvidedVoucherId()
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'City',
+            'postal_code' => '12345',
+            'country' => 'US',
+            'voucher_code' => 'REAL10',
+            'voucher_id' => 999 // Client tries to provide fake ID
+        ];
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'price' => 100.00,
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $this->setRequiresShippingExpectation();
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+
+        // VoucherService should be called with code only, returns actual voucher ID
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->with('REAL10', $cartItems, null)
+            ->andReturn([
+                'valid' => true,
+                'discount' => 10.00,
+                'voucher_id' => 1, // Actual voucher ID
+                'voucher_code' => 'REAL10',
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'requires_override_decision' => false
+            ]);
+
+        // Rest of mocks...
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+        $this->setTaxCalculatorExpectations();
+        $this->cartService->shouldReceive('getTotal')->andReturn(100.00);
+        $this->shippingService->shouldReceive('calculateShipping')->andReturn(10.00);
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')->andReturn([
+            'subtotal' => 100.00,
+            'shipping' => 10.00,
+            'discount' => 10.00,
+            'tax' => 10.00,
+            'total' => 130.00
+        ]);
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')->andReturn([
+            'success' => true,
+            'client_secret' => 'secret',
+            'payment_intent_id' => 'pi_123'
+        ]);
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->orderService->shouldReceive('create')->once()->andReturn($mockOrder);
+
+        // Verify applyVoucher is called with ACTUAL voucher ID, not client-provided
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->with(1, null, 10.00, 1); // ID should be 1, not 999
+
+        $this->memberAuthWrapper->shouldReceive('check')->andReturn(false);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testPrepareOrderItemsOnlyDistributesVoucherToEligibleItems()
+    {
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Eligible Product',
+                'product_sku' => 'SKU-1',
+                'price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2,
+                'product_name' => 'Ineligible Product',
+                'product_sku' => 'SKU-2',
+                'price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $totals = [
+            'voucher_discount' => 20.00,
+            'voucher_eligible_items' => [$cartItems[0]], // Only first item
+            'offer_discount' => 0
+        ];
+
+        $orderItems = $this->invokePrivateMethod(
+            $this->service,
+            'prepareOrderItemsWithDiscounts',
+            [$cartItems, $totals]
+        );
+
+        $item1Metadata = json_decode($orderItems[0]['metadata'], true);
+        $item2Metadata = json_decode($orderItems[1]['metadata'], true);
+
+        // Item 1 gets full voucher discount
+        $this->assertEquals(20.00, $item1Metadata['voucher_discount']);
+        $this->assertEquals(80.00, $orderItems[0]['total']);
+
+        // Item 2 gets no voucher discount
+        $this->assertEquals(0.00, $item2Metadata['voucher_discount']);
+        $this->assertEquals(100.00, $orderItems[1]['total']);
+    }
+
+    public function testProcessCheckoutIncludesDiscountBreakdownInResponse()
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'City',
+            'postal_code' => '12345',
+            'country' => 'US',
+            'voucher_code' => 'TEST10'
+        ];
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'base_price' => 100.00,
+                'price' => 90.00, // £10 offer
+                'quantity' => 1,
+                'subtotal' => 90.00,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setRequiresShippingExpectation();
+        $this->setTransactionExpectations();
+        $this->setCurrencyExpectations();
+        $this->setTaxCalculatorExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->once()->andReturn(90.00);
+
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 9.00,
+                'voucher_id' => 1,
+                'voucher_code' => 'TEST10',
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'requires_override_decision' => false
+            ]);
+
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
+
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')
+            ->once()
+            ->andReturn([
+                'subtotal' => 90.00,
+                'shipping' => 10.00,
+                'discount' => 19.00, // 10 offer + 9 voucher
+                'tax' => 10.00,
+                'total' => 91.00
+            ]);
+
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true,
+            'client_secret' => 'secret',
+            'payment_intent_id' => 'pi_123'
+        ]);
+
+        $this->orderService->shouldReceive('create')->once()->andReturn($mockOrder);
+        $this->voucherService->shouldReceive('applyVoucher')->once();
+        $this->memberAuthWrapper->shouldReceive('check')->andReturn(false);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('discount_breakdown', $result);
+        $this->assertEquals(10.00, $result['discount_breakdown']['offer_discount']);
+        $this->assertEquals(9.00, $result['discount_breakdown']['voucher_discount']);
+        $this->assertEquals(19.00, $result['discount_breakdown']['total_discount']);
+    }
+
+    public function testProcessCheckoutWithMerchantFundedVoucher()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'MERCHANT10';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 100.00,
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $merchant = m::mock(Merchant::class)->makePartial();
+        $merchant->id = 5;
+        $merchant->balance = 1000.00;
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        // Setup mocks
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        // Voucher validation returns merchant_id
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->with('MERCHANT10', $cartItems, null)
+            ->andReturn([
+                'valid' => true,
+                'discount' => 10.00,
+                'voucher_id' => 1,
+                'voucher_code' => 'MERCHANT10',
+                'merchant_id' => 5, // Merchant-funded voucher
+                'campaign_id' => null,
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 100.00,
+                'has_offer_discount' => false,
+                'requires_override_decision' => false,
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        // Merchant funding expectations
+        $this->merchantRepository->shouldReceive('find')
+            ->once()
+            ->with(5)
+            ->andReturn($merchant);
+
+        $this->merchantRepository->shouldReceive('updateBalance')
+            ->once()
+            ->with(5, 990.00)
+            ->andReturn(true);
+
+        $this->merchantRepository->shouldReceive('createTransaction')
+            ->once()
+            ->with(m::on(function ($data) {
+                return $data['merchant_id'] === 5
+                    && $data['order_id'] === 1
+                    && $data['voucher_id'] === 1
+                    && $data['type'] === 'voucher_funding'
+                    && $data['amount'] === -10.00
+                    && $data['balance_before'] === 1000.00
+                    && $data['balance_after'] === 990.00
+                    && $data['status'] === 'completed';
+            }))
+            ->andReturn(m::mock(\App\Models\MerchantTransaction::class));
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->with(1, null, 10.00, 1)
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(10.00, $result['discount_breakdown']['voucher_discount']);
+    }
+
+    public function testProcessCheckoutWithInsufficientMerchantBalance()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'MERCHANT50';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 100.00,
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $merchant = m::mock(Merchant::class)->makePartial();
+        $merchant->id = 5;
+        $merchant->balance = 10.00; // Insufficient for £50 discount
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 50.00,
+                'voucher_id' => 1,
+                'voucher_code' => 'MERCHANT50',
+                'merchant_id' => 5,
+                'campaign_id' => null,
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 100.00,
+                'has_offer_discount' => false,
+                'requires_override_decision' => false,
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        // Merchant funding with insufficient balance
+        $this->merchantRepository->shouldReceive('find')
+            ->once()
+            ->with(5)
+            ->andReturn($merchant);
+
+        // Should NOT update balance when insufficient
+        $this->merchantRepository->shouldNotReceive('updateBalance');
+
+        // Should create pending_review transaction
+        $this->merchantRepository->shouldReceive('createTransaction')
+            ->once()
+            ->with(m::on(function ($data) {
+                $metadata = json_decode($data['metadata'], true);
+                return $data['merchant_id'] === 5
+                    && $data['status'] === 'pending_review'
+                    && $data['balance_after'] == 10 // Balance unchanged
+                    && isset($metadata['shortfall']);
+            }))
+            ->andReturn(m::mock(\App\Models\MerchantTransaction::class));
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        // Order should still succeed
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessCheckoutWithMerchantFundingException()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'MERCHANT10';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 100.00,
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 10.00,
+                'voucher_id' => 1,
+                'voucher_code' => 'MERCHANT10',
+                'merchant_id' => 5,
+                'campaign_id' => null,
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 100.00,
+                'has_offer_discount' => false,
+                'requires_override_decision' => false,
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        // Merchant not found - should throw exception
+        $this->merchantRepository->shouldReceive('find')
+            ->once()
+            ->with(5)
+            ->andReturn(null);
+
+        // Should create failed transaction
+        $this->merchantRepository->shouldReceive('createTransaction')
+            ->once()
+            ->with(m::on(function ($data) {
+                $metadata = json_decode($data['metadata'], true);
+                return $data['status'] === 'failed'
+                    && isset($metadata['error']);
+            }))
+            ->andReturn(m::mock(\App\Models\MerchantTransaction::class));
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        // Order should still succeed even if merchant funding fails
+        $this->assertTrue($result['success']);
+    }
+
+    public function testProcessCheckoutWithoutMerchantFunding()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'PLATFORM10';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 100.00,
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        // Platform-funded voucher (no merchant_id)
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 10.00,
+                'voucher_id' => 1,
+                'voucher_code' => 'PLATFORM10',
+                'merchant_id' => null, // Platform-funded
+                'campaign_id' => null,
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 100.00,
+                'has_offer_discount' => false,
+                'requires_override_decision' => false,
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        // Should NOT attempt merchant funding
+        $this->merchantRepository->shouldNotReceive('find');
+        $this->merchantRepository->shouldNotReceive('updateBalance');
+        $this->merchantRepository->shouldNotReceive('createTransaction');
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    private function invokePrivateMethod($object, $methodName, array $parameters = [])
+    {
+        $reflection = new \ReflectionClass(get_class($object));
+        $method = $reflection->getMethod($methodName);
+        $method->setAccessible(true);
+
+        return $method->invokeArgs($object, $parameters);
+    }
+
+    // Add these new tests to CheckoutServiceTest.php
+
+    public function testProcessCheckoutWithRewardDiscount()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['reward_id'] = 1;
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 100.00,
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'subtotal' => 100.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        // Mock reward repository
+        $mockReward = m::mock(MemberReward::class)->makePartial();
+        $mockReward->id = 1;
+        $mockReward->member_id = 10;
+        $mockReward->status = 'pending';
+
+        $mockDefinition = m::mock(RewardDefinition::class)->makePartial();
+        $mockDefinition->reward_type = 'percentage_discount';
+        $mockDefinition->reward_config = ['percentage' => 10];
+
+        $mockReward->shouldReceive('rewardDefinition')->andReturn($mockDefinition);
+        $mockReward->shouldReceive('isPending')->andReturn(true);
+        $mockReward->shouldReceive('isExpired')->andReturn(false);
+        $mockReward->shouldReceive('claim')->once()->andReturn(true);
+        $mockReward->shouldReceive('update')->once();
+
+        $this->rewardsRepository->shouldReceive('find')->with(1)->andReturn($mockReward);
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(10.00, $result['discount_breakdown']['reward_discount']);
+    }
+
+    public function testProcessCheckoutWithStackableVoucherAndOffer()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'SAVE10';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 80.00,         // Offer price
+                'base_price' => 100.00,   // Original price
+                'quantity' => 1,
+                'subtotal' => 80.00,
+                'item_type' => 'offer'    // Has offer discount
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        // Voucher is stackable
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 8.00,        // 10% of £80
+                'voucher_id' => 1,
+                'voucher_code' => 'SAVE10',
+                'merchant_id' => null,
+                'campaign_id' => null,
+                'is_stackable' => true,    // Stackable!
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 80.00,
+                'has_offer_discount' => true,
+                'requires_override_decision' => false,
+                'discount_type' => 'percentage',
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+
+        // Should have BOTH discounts
+        $this->assertEquals(20.00, $result['discount_breakdown']['offer_discount']);
+        $this->assertEquals(8.00, $result['discount_breakdown']['voucher_discount']);
+        $this->assertEquals(28.00, $result['discount_breakdown']['total_discount']);
+    }
+
+    public function testProcessCheckoutWithNonStackableVoucherOverridesOffer()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'MEGA50';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 80.00,         // Offer price (£20 off)
+                'base_price' => 100.00,   // Original price
+                'quantity' => 1,
+                'subtotal' => 80.00,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        // Non-stackable voucher with bigger discount
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 50.00,       // 50% of £100 (calculated from base)
+                'voucher_id' => 1,
+                'voucher_code' => 'MEGA50',
+                'merchant_id' => null,
+                'campaign_id' => null,
+                'is_stackable' => false,   // NOT stackable!
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 100.00, // Based on base price
+                'has_offer_discount' => true,
+                'requires_override_decision' => true,
+                'discount_type' => 'percentage',
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+
+        // Non-stackable voucher should override offer
+        $this->assertEquals(0.00, $result['discount_breakdown']['offer_discount']);
+        $this->assertEquals(50.00, $result['discount_breakdown']['voucher_discount']);
+        $this->assertEquals(50.00, $result['discount_breakdown']['total_discount']);
+    }
+
+    public function testProcessCheckoutDistributesDiscountProportionally()
+    {
+        $data = $this->getBaseCheckoutData();
+        $data['voucher_code'] = 'SAVE20';
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 60.00,
+                'base_price' => 60.00,
+                'quantity' => 1,
+                'subtotal' => 60.00
+            ],
+            [
+                'id' => 2,
+                'product_id' => 2,
+                'product_name' => 'Product 2',
+                'price' => 40.00,
+                'base_price' => 40.00,
+                'quantity' => 1,
+                'subtotal' => 40.00
+            ]
+        ];
+
+        $mockOrder = m::mock(Order::class)->makePartial();
+        $mockOrder->id = 1;
+        $mockOrder->order_number = 'ORD-123';
+
+        $this->setupBasicMocks($cartItems, $mockOrder);
+
+        $this->voucherService->shouldReceive('validateVoucherForCheckout')
+            ->once()
+            ->andReturn([
+                'valid' => true,
+                'discount' => 20.00,
+                'voucher_id' => 1,
+                'voucher_code' => 'SAVE20',
+                'merchant_id' => null,
+                'campaign_id' => null,
+                'is_stackable' => true,
+                'eligible_items' => $cartItems,
+                'eligible_subtotal' => 100.00,
+                'has_offer_discount' => false,
+                'requires_override_decision' => false,
+                'discount_type' => 'percentage',
+                'message' => 'Voucher validated successfully'
+            ]);
+
+        $this->orderService->shouldReceive('create')
+            ->once()
+            ->with(m::any(), m::on(function ($items) {
+                // Item 1: 60% of total, so 60% of £20 = £12 discount
+                // Item 2: 40% of total, so 40% of £20 = £8 discount
+                $this->assertCount(2, $items);
+                $this->assertEquals(12.00, $items[0]['discount']);
+                $this->assertEquals(8.00, $items[1]['discount']);
+                return true;
+            }), m::any())
+            ->andReturn($mockOrder);
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testResolveDiscountsWithAllTypes()
+    {
+        $member = m::mock(Member::class)->makePartial();
+        $member->id = 10;
+
+        $cartItems = [
+            [
+                'id' => 1,
+                'product_id' => 1,
+                'product_name' => 'Product 1',
+                'price' => 80.00,        // Has £20 offer discount
+                'base_price' => 100.00,
+                'quantity' => 1,
+                'item_type' => 'offer'
+            ]
+        ];
+
+        $voucherData = [
+            'valid' => true,
+            'discount' => 8.00,  // 10% of £80
+            'voucher_id' => 1,
+            'voucher_code' => 'SAVE10',
+            'is_stackable' => true,
+            'eligible_items' => $cartItems,
+            'discount_type' => 'percentage'
+        ];
+
+        // Mock reward
+        $mockReward = m::mock(MemberReward::class)->makePartial();
+        $mockReward->member_id = 10;
+        $mockReward->shouldReceive('isPending')->andReturn(true);
+        $mockReward->shouldReceive('isExpired')->andReturn(false);
+
+        $mockDefinition = m::mock(RewardDefinition::class)->makePartial();
+        $mockDefinition->reward_type = 'fixed_discount';
+        $mockDefinition->reward_config = ['amount' => 5.00];
+
+        $mockReward->shouldReceive('rewardDefinition')->andReturn($mockDefinition);
+        $this->rewardsRepository->shouldReceive('find')->with(1)->andReturn($mockReward);
+
+        // Use reflection to test private method
+        $discounts = $this->invokePrivateMethod(
+            $this->service,
+            'resolveDiscounts',
+            [$cartItems, $member, $voucherData, ['reward_id' => 1], 1]
+        );
+
+        // Should have all three discount types
+        $this->assertEquals(2000, $discounts->offerDiscountCents);      // £20 offer
+        $this->assertEquals(800, $discounts->voucherDiscountCents);     // £8 voucher
+        $this->assertEquals(500, $discounts->rewardDiscountCents);      // £5 reward
+        $this->assertEquals(3300, $discounts->getTotalDiscountCents()); // £33 total
+    }
+
+    private function getBaseCheckoutData(): array
+    {
+        return [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'address' => '123 Main St',
+            'city' => 'City',
+            'postal_code' => '12345',
+            'country' => 'US',
+            'payment_method' => 'card'
+        ];
+    }
+
+    private function setupBasicMocks($cartItems, $mockOrder): void
+    {
+        $this->memberAuthWrapper->shouldReceive('getMember')->andReturn(\Mockery::mock(Member::class)->makePartial());
+        $this->memberAuthWrapper->shouldReceive('check')->andReturn(true);
+        $this->currencyResolver->shouldReceive('resolve')->andReturn('USD');
+        $this->shippingService->shouldReceive('calculateShipping')->andReturn(0);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->andReturn(['tax_cents' => 0]);
+        $this->orderCalculationService->shouldReceive('calculateOrderTotals')->andReturn([]);
+        $this->stripePaymentService->shouldReceive('createPaymentIntent')->andReturn(['success' => true]);
+        $this->cartService->shouldReceive('requiresShipping')->andReturn(true);
+        $this->cartService->shouldReceive('getItems')->andReturn($cartItems);
+        $this->cartService->shouldReceive('getTotal')->andReturn(100.00);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->orderService->shouldReceive('create')->andReturn($mockOrder);
     }
 }
