@@ -2,6 +2,8 @@
 
 namespace App\Parsers\Dtos;
 
+use App\Framework\Support\SiteContext;
+
 final class ContactFormBlockDto extends BaseBlockDto
 {
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
@@ -32,7 +34,8 @@ final class ContactFormBlockDto extends BaseBlockDto
         public ?string $override_phone,
         public ?array  $override_address,
         public ?array  $override_social,
-        public string  $context
+        public string $context,
+        public array  $contactInfo = []
     )
     {
     }
@@ -65,6 +68,9 @@ final class ContactFormBlockDto extends BaseBlockDto
             'context' => 'default'
         ]);
 
+        $site = SiteContext::get();
+        $contactInfo = $site ? $site->getContactInfo() : self::getDefaultContactInfo();
+
         return new self(
             trim($data['title']),
             trim($data['subtitle']),
@@ -86,7 +92,14 @@ final class ContactFormBlockDto extends BaseBlockDto
             $data['override_phone'],
             $data['override_address'],
             $data['override_social'],
-            self::validateEnum($data['context'], self::ALLOWED_CONTEXTS, 'default', 'context')
+            self::validateEnum($data['context'], self::ALLOWED_CONTEXTS, 'default', 'context'),
+            [
+                'email' => $data['override_email'] ?? $data['contact_info']['email'] ?? $contactInfo['email'],
+                'phone' => $data['override_phone'] ?? $data['contact_info']['phone'] ?? $contactInfo['phone'],
+                'address' => $data['override_address'] ?? $data['contact_info']['address'] ?? $contactInfo['address'],
+                'social' => $data['override_social'] ?? $data['contact_info']['social'] ?? $contactInfo['social']
+            ]
+
         );
     }
 
@@ -113,10 +126,10 @@ final class ContactFormBlockDto extends BaseBlockDto
             'formatted_subtitle' => htmlspecialchars($this->subtitle),
             'context' => $this->context,
             'contact_info' => [
-                'email' => $this->override_email,
-                'phone' => $this->override_phone,
-                'address' => $this->override_address,
-                'social' => $this->override_social
+                'email' => $this->contactInfo['email'],
+                'phone' => $this->contactInfo['phone'],
+                'address' => $this->contactInfo['address'],
+                'social' => $this->contactInfo['social']
             ]
         ];
     }
@@ -124,5 +137,26 @@ final class ContactFormBlockDto extends BaseBlockDto
     public function getType(): string
     {
         return 'contact-form';
+    }
+
+    private static function getDefaultContactInfo(): array
+    {
+        return [
+            'email' => 'hello@example.com',
+            'phone' => '+44 20 7123 4567',
+            'address' => [
+                'line1' => '123 Example Street',
+                'line2' => '',
+                'city' => 'London',
+                'postcode' => 'SW1A 1AA',
+                'country' => 'UK'
+            ],
+            'social' => [
+                'facebook' => '#',
+                'instagram' => '#',
+                'twitter' => '#',
+                'linkedin' => '#'
+            ]
+        ];
     }
 }

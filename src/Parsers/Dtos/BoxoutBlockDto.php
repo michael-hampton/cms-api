@@ -4,7 +4,7 @@ namespace App\Parsers\Dtos;
 
 final class BoxoutBlockDto extends BaseBlockDto
 {
-    private const ALLOWED_ALIGNMENTS = ['fullscreen', 'left', 'right', 'center'];
+    private const ALLOWED_ALIGNMENTS = ['fullscreen', 'left', 'right', 'center', 'centre'];
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
 
     private const KNOWN_KEYS = [

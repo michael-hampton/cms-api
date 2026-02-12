@@ -3,9 +3,11 @@
 namespace App\Tests\Functional\Controllers\Product;
 
 use App\Models\Merchant;
+use App\Models\MerchantNote;
 use App\Models\MerchantUrl;
 use App\Models\Model;
 use App\Models\Site;
+use App\Repositories\Product\MerchantRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -262,4 +264,143 @@ class MerchantControllerTest extends FunctionalTestCase
             'url' => 'https://old.com'
         ]);
     }
+
+    public function testGetMerchantNotes()
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $repo = app(MerchantRepository::class);
+
+        $repo->createNote($merchant->id, $user->id, 'Test note 1');
+        $repo->createNote($merchant->id, $user->id, 'Test note 2');
+
+        $response = $this->getForSite("/api/merchants/{$merchant->id}/notes");
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(2, $data['data']);
+    }
+
+    public function testCreateMerchantNote()
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $response = $this->postForSite("/api/merchants/{$merchant->id}/notes", [
+            'content' => 'This is a test note'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $repo = app(MerchantRepository::class);
+
+        $notes = $repo->getNotes($merchant->id);
+        $this->assertCount(1, $notes);
+        $this->assertEquals('This is a test note', $notes->first()->content);
+    }
+
+    public function testUpdateMerchantNote()
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $repo = app(MerchantRepository::class);
+
+        $note = $repo->createNote($merchant->id, $user->id, 'Original content');
+
+        $response = $this->putForSite("/api/merchants/notes/{$note->id}", [
+            'content' => 'Updated content'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $updatedNote = MerchantNote::find($note->id);
+        $this->assertEquals('Updated content', $updatedNote->content);
+    }
+
+    public function testDeleteMerchantNote()
+    {
+        $merchant = $this->createMerchant();
+        $user = $this->createUser();
+
+        $repo = app(MerchantRepository::class);
+
+        $note = $repo->createNote($merchant->id, $user->id, 'Test note');
+
+        $response = $this->deleteForSite("/api/merchants/notes/{$note->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $this->assertDatabaseMissing('merchant_notes', ['id' => $note->id]);
+    }
+
+    public function testGetMerchantTransactions()
+    {
+        $merchant = $this->createMerchant();
+
+        $repo = app(MerchantRepository::class);
+
+        // Create test transactions
+        $repo->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'sale',
+            'amount' => 100.00,
+            'status' => 'completed',
+            'description' => 'Test sale',
+            'balance_before' => 0,
+            'balance_after' => 0,
+        ]);
+
+        $repo->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'refund',
+            'amount' => -20.00,
+            'status' => 'pending_review',
+            'description' => 'Test refund',
+            'balance_before' => 0,
+            'balance_after' => 0,
+        ]);
+
+        $response = $this->getForSite("/api/merchants/{$merchant->id}/transactions");
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertArrayHasKey('transactions', $data['data']);
+        $this->assertCount(2, $data['data']['transactions']);
+    }
+
+    public function testGetMerchantTransactionsWithFilters()
+    {
+        $merchant = $this->createMerchant();
+
+        $repo = app(MerchantRepository::class);
+
+        $repo->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'sale',
+            'amount' => 100.00,
+            'status' => 'completed',
+            'balance_before' => 0,
+            'balance_after' => 0,
+        ]);
+
+        $repo->createTransaction([
+            'merchant_id' => $merchant->id,
+            'type' => 'refund',
+            'amount' => -20.00,
+            'status' => 'pending_review',
+            'balance_before' => 0,
+            'balance_after' => 0,
+        ]);
+
+        $response = $this->getForSite("/api/merchants/{$merchant->id}/transactions?type=sale");
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['data']['transactions']);
+        $this->assertEquals('sale', $data['data']['transactions'][0]['type']);
+    }
+
 }

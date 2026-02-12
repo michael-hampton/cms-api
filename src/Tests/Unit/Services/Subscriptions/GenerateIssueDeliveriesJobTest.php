@@ -13,6 +13,11 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+    }
+
     public function test_creates_deliveries_for_eligible_subscriptions(): void
     {
         $plan = $this->createSubscriptionPlan();
@@ -114,10 +119,5 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $result = $job->handle($issueDelivery);
 
         $this->assertEquals(0, $result['created']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
     }
 }

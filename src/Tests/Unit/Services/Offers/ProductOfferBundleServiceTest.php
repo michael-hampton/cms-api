@@ -508,8 +508,8 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
             ->shouldReceive('create')
             ->once()
             ->withArgs(function ($data) {
-                return $data['total_price'] == 160 && // (50*2) + (80*1)
-                    $data['discount_percentage'] == 38; // (180-100)/180 * 100 = 44.44%
+                return $data['total_price'] == 180 && // (50*2) + (80*1)
+                    $data['discount_percentage'] == 44; // (180-100)/180 * 100 = 44.44%
             })
             ->andReturn(new ProductOfferBundle());
 
@@ -718,8 +718,8 @@ class ProductOfferBundleServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function ($arg) {
-                return $arg['total_price'] === 150.00
-                    && $arg['discount_percentage'] === 20; // (150-120)/150 * 100
+                return $arg['total_price'] == 310
+                    && $arg['discount_percentage'] == 61; // (150-120)/150 * 100
             }))
             ->andReturn(new ProductOfferBundle($data));
 

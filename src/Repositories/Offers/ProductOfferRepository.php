@@ -161,9 +161,9 @@ class ProductOfferRepository extends Repository
         ?string $ipAddress = null,
         ?string $userAgent = null,
         array   $metadata = []  // ADD THIS
-    ): void
+    ): Model
     {
-        OfferClicks::create([
+        return OfferClicks::create([
             'offer_id' => $offerId,
             'member_id' => $memberId,
             'action' => $action,

@@ -6,7 +6,6 @@ enum Alignment: string
 {
     case LEFT = 'left';
     case RIGHT = 'right';
-    case CENTRE = 'centre';
     case CENTER = 'center';
     case FULLSCREEN = 'fullscreen';
 

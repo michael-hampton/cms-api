@@ -16,7 +16,10 @@ class OrderItem extends Model
         'subtotal',
         'tax',
         'total',
-        'metadata'
+        'metadata',
+        'commission_rate',
+        'commission_amount',
+        'net_amount',
     ];
 
     protected $casts = [

@@ -557,4 +557,48 @@ class ImageService
             }
         }
     }
+
+    public function archiveImage(int $imageId): bool
+    {
+        $image = $this->imageRepository->find($imageId);
+        if (!$image) {
+            throw new Exception('Image not found');
+        }
+
+        return $this->imageRepository->update($imageId, ['is_archived' => true]) !== null;
+    }
+
+    public function unarchiveImage(int $imageId): bool
+    {
+        $image = $this->imageRepository->find($imageId);
+        if (!$image) {
+            throw new Exception('Image not found');
+        }
+
+        return $this->imageRepository->update($imageId, ['is_archived' => false]) !== null;
+    }
+
+    public function bulkArchiveImages(array $imageIds): array
+    {
+        $results = [
+            'archived' => 0,
+            'failed' => 0,
+            'errors' => []
+        ];
+
+        foreach ($imageIds as $imageId) {
+            try {
+                if ($this->archiveImage($imageId)) {
+                    $results['archived']++;
+                } else {
+                    $results['failed']++;
+                }
+            } catch (Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = "Image {$imageId}: " . $e->getMessage();
+            }
+        }
+
+        return $results;
+    }
 }

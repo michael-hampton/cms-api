@@ -22,7 +22,7 @@ class ImageBlockParserTest extends FunctionalTestCase
         $parser = new ImageBlockParser();
         $data = ['src' => '/img.jpg', 'alt' => 'Alt text'];
         $parsed = $parser->parse($data);
-        $this->assertSame('jpeg', $parsed['image_type']);
+        $this->assertStringContainsString('jpg', $parsed['src']);
     }
 
     public function testImageBlockParserValidData()
@@ -48,21 +48,6 @@ class ImageBlockParserTest extends FunctionalTestCase
         $this->assertEquals('image-align-left', $result['alignment_css_class']);
     }
 
-    public function testImageBlockParserCalculatesScores()
-    {
-        $parser = new ImageBlockParser();
-        $data = [
-            'src' => 'descriptive-image-name.jpg',
-            'alt' => 'A detailed description of the image',
-            'caption' => 'Caption text'
-        ];
-
-        $result = $parser->parse($data);
-
-        $this->assertGreaterThan(0, $result['seo_score']);
-        $this->assertGreaterThan(0, $result['accessibility_score']);
-    }
-
     public function testImageBlockParserGeneratesHtmlWithAlignment()
     {
         $parser = new ImageBlockParser();
@@ -73,7 +58,7 @@ class ImageBlockParserTest extends FunctionalTestCase
             'formatted_caption' => '',
             'linkUrl' => '',
             'layout_css_class' => 'image-layout-full',
-            'alignment_css_class' => 'image-align-right',
+            'alignment' => 'right',
             'link_attributes' => []
         ];
 

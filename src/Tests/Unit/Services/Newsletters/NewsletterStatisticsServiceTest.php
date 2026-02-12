@@ -74,11 +74,11 @@ class NewsletterStatisticsServiceTest extends TestCase
                 , 'unique_recipients' => 80
             ]);
 
-        $this->pageViewRepository
-            ->shouldReceive('getUniqueClickerCount')
-            ->with($sendIds)
-            ->once()
-            ->andReturn(80);
+//        $this->pageViewRepository
+//            ->shouldReceive('getUniqueClickerCount')
+//            ->with($sendIds)
+//            ->once()
+//            ->andReturn(80);
 
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 1;

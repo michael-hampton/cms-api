@@ -6,7 +6,7 @@ final class CardGroupBlockDto extends BaseBlockDto
 {
     private const ALLOWED_GAPS = ['small', 'medium', 'large'];
 
-    private const KNOWN_KEYS = ['itemsPerRow', 'gap', 'cards'];
+    private const KNOWN_KEYS = ['itemsPerRow', 'cards'];
 
     public function __construct(
         public int    $itemsPerRow,

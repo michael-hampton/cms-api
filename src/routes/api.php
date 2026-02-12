@@ -361,6 +361,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/images/{id}', ImageController::class, 'update');
         $router->delete('/images/{id}', ImageController::class, 'destroy');
         $router->post('/images/{id}/duplicate', ImageController::class, 'duplicate');
+        $router->post('/images/bulk-archive', [ImageController::class, 'bulkArchive']);
+        $router->post('/images/{id}/archive', [ImageController::class, 'archive']);
+        $router->post('/images/{id}/unarchive', [ImageController::class, 'unarchive']);
+
+        //bulk-archive
 
         // Bulk operations
         $router->delete('/images/bulk', ImageController::class, 'bulkDestroy');
@@ -440,6 +445,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/merchants/notes/{id}', [MerchantController::class, 'updateNote']);
         $router->delete('/merchants/notes/{id}', [MerchantController::class, 'deleteNote']);
         $router->post('/merchants/{merchantId}/notes', [MerchantController::class, 'createNote']);
+        $router->get('/merchants/{id}/transactions', [MerchantController::class, 'getTransactions']);
 
         // merchant contacts
         $router->get('/merchant-contacts', MerchantContactController::class, 'index');

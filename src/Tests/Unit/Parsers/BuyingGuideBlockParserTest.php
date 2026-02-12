@@ -5,7 +5,6 @@ namespace App\Tests\Unit\Parsers;
 use App\Framework\Validation\Validator;
 use App\Parsers\BuyingGuideBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class BuyingGuideBlockParserTest extends FunctionalTestCase
 {
@@ -18,7 +17,7 @@ class BuyingGuideBlockParserTest extends FunctionalTestCase
     public function testBuyingGuideParserParse(): void
     {
         $parser = new BuyingGuideBlockParser();
-        $data = ['title' => 'T', 'specs' => [['text' => 'A', 'value' => 'B']]];
+        $data = ['title' => 'T', 'specs' => [['text' => 'A', 'value' => 'B'], 'subtitle' => 'Test', 'pros' => [], 'cons' => []]];
         $parsed = $parser->parse($data);
         $this->assertTrue($parsed['has_specs']);
     }

@@ -4,7 +4,7 @@ namespace App\Parsers\Dtos;
 
 final class GalleryBlockDto extends BaseBlockDto
 {
-    private const ALLOWED_LAYOUTS = ['carousel', 'grid', 'list'];
+    private const ALLOWED_LAYOUTS = ['carousel', 'grid', 'list', 'masonry', 'slider'];
     private const KNOWN_KEYS = ['layout', 'slides'];
 
     public function __construct(
@@ -59,12 +59,24 @@ final class GalleryBlockDto extends BaseBlockDto
         return [
             'layout' => $this->layout,
             'slides' => $this->slides,
-            'slide_count' => count($this->slides)
+            'slide_count' => count($this->slides),
+            'total_word_count' => $this->calculateTotalWordCount($this->slides),
         ];
     }
 
     public function getType(): string
     {
         return 'gallery';
+    }
+
+    private function calculateTotalWordCount(array $slides): int
+    {
+        $totalWords = 0;
+
+        foreach ($slides as $slide) {
+            $totalWords += str_word_count(strip_tags($slide['title'] . ' ' . $slide['description'] . ' ' . $slide['caption'])) ?? 0;
+        }
+
+        return $totalWords;
     }
 }

@@ -43,9 +43,13 @@ class Order extends Model
         'one_time_subscription_id',
         'payment_intent_id',
         'stripe_customer_id',
-        'reward_discount',
+        'discount',
         'offer_discount',
+        'tiered_discount',
         'voucher_discount',
+        'reward_discount',
+        'merchant_funded',
+        'platform_funded',
     ];
 
     protected $casts = [

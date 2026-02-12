@@ -460,9 +460,9 @@ class BriefServiceTest extends TestCase
         $collaborator->role = 'writer';
 
         $this->collaboratorRepository
-            ->shouldReceive('create')
+            ->shouldReceive('createForBrief')
             ->once()
-            ->with(Mockery::on(function ($createData) use ($briefId) {
+            ->with(1, Mockery::on(function ($createData) use ($briefId) {
                 return $createData['brief_id'] === $briefId
                     && isset($createData['assigned_at']);
             }))

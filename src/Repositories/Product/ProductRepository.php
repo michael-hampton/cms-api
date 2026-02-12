@@ -11,6 +11,8 @@ use App\Models\Page;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
+use App\Models\ProductOffer;
+use App\Models\ProductOfferBundleItem;
 use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
@@ -101,6 +103,22 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->whereNotNull('sale_price')
             ->where('sale_price', '>', 0)
             ->whereRaw('sale_price < price')
+            ->get();
+    }
+
+    public function getBundlesForProduct(int $productId): Collection
+    {
+        return ProductOfferBundleItem::with(['bundle'])
+            ->where('product_id', $productId)
+            ->get();
+    }
+
+    public function getActiveOffersForProduct(int $productId): Collection
+    {
+        return ProductOffer::forProduct($productId)
+            ->with(['merchant', 'product'])
+            ->active()
+            ->orderBy('start_date', 'desc')
             ->get();
     }
 

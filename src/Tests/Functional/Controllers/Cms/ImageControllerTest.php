@@ -498,4 +498,116 @@ class ImageControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('attribution_required', $data['data']['image']['image_rights']);
     }
+
+    public function testArchiveSingleImage()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 6,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/images/{$image->id}/archive");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $updatedImage = Image::find($image->id);
+        $this->assertTrue($updatedImage->is_archived);
+    }
+
+    public function testUnarchivedImage()
+    {
+        $image = Image::create([
+            'url' => 'test',
+            'file_size' => 6,
+            'filename' => 'test.jpg',
+            'file_path' => '/uploads/test.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test.jpg',
+            'is_archived' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite("/api/images/{$image->id}/unarchive");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $updatedImage = Image::find($image->id);
+        $this->assertFalse($updatedImage->is_archived);
+    }
+
+    public function testBulkArchiveImages()
+    {
+        $image1 = Image::create([
+            'url' => 'test1',
+            'file_size' => 6,
+            'filename' => 'test1.jpg',
+            'file_path' => '/uploads/test1.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test1.jpg',
+            'site_id' => $this->siteId
+        ]);
+
+        $image2 = Image::create([
+            'url' => 'test2',
+            'file_size' => 6,
+            'filename' => 'test2.jpg',
+            'file_path' => '/uploads/test2.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'test2.jpg',
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite('/api/images/bulk-archive', [
+            'image_ids' => [$image1->id, $image2->id]
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals(2, $data['data']['results']['archived']);
+
+        $this->assertTrue(Image::find($image1->id)->is_archived);
+        $this->assertTrue(Image::find($image2->id)->is_archived);
+    }
+
+    public function testArchivedImagesNotInIndex()
+    {
+        $activeImage = Image::create([
+            'url' => 'active',
+            'file_size' => 6,
+            'filename' => 'active.jpg',
+            'file_path' => '/uploads/active.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'active.jpg',
+            'site_id' => $this->siteId
+        ]);
+
+        $archivedImage = Image::create([
+            'url' => 'archived',
+            'file_size' => 6,
+            'filename' => 'archived.jpg',
+            'file_path' => '/uploads/archived.jpg',
+            'size' => 1024,
+            'mime_type' => 'image/jpeg',
+            'original_name' => 'archived.jpg',
+            'is_archived' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->getForSite('/api/images');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals($activeImage->id, $data['items'][0]['id']);
+    }
 }

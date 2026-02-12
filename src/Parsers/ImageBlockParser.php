@@ -77,6 +77,7 @@ class ImageBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $dto = ImageBlockDto::fromArray($parsedData);
+
         return $this->renderer->render($dto);
     }
 }

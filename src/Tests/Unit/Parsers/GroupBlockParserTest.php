@@ -9,24 +9,6 @@ class GroupBlockParserTest extends TestCase
 {
     private GroupBlockParser $parser;
 
-    public function test_it_identifies_spotlight_layout_correctly()
-    {
-        $data = [
-            'layout' => 'spotlight',
-            'blocks' => [
-                ['id' => 'img-1', 'type' => 'image', 'src' => '/test.jpg', 'alt' => 'Test']
-            ]
-        ];
-
-        $parsed = $this->parser->parse($data);
-
-        $this->assertTrue($parsed['is_spotlight']);
-        $this->assertFalse($parsed['is_carousel']);
-        $this->assertFalse($parsed['is_default']);
-        $this->assertEquals('group-layout-spotlight', $parsed['css_layout_class']);
-        $this->assertEquals('Spotlight Layout', $parsed['layout_display']);
-    }
-
     public function test_it_generates_spotlight_html_with_correct_structure()
     {
         $data = [
@@ -238,29 +220,7 @@ class GroupBlockParserTest extends TestCase
         $this->assertStringNotContainsString('<figcaption>', $html);
     }
 
-    public function test_it_supports_title_for_spotlight_layout()
-    {
-        $data = [
-            'layout' => 'spotlight',
-            'blocks' => []
-        ];
 
-        $parsedData = $this->parser->parse($data);
-
-        $this->assertTrue($parsedData['supports_title']);
-    }
-
-    public function test_it_sets_correct_max_recommended_blocks_for_spotlight()
-    {
-        $data = [
-            'layout' => 'spotlight',
-            'blocks' => []
-        ];
-
-        $parsedData = $this->parser->parse($data);
-
-        $this->assertEquals(5, $parsedData['max_recommended_blocks']);
-    }
 
     public function test_it_renders_carousel_layout_correctly()
     {

@@ -7,6 +7,7 @@ use App\Framework\Database\Database;
 use App\Services\Billing\Order\OrderDraftService;
 use App\Services\Billing\Payments\PaymentIntentService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
+use App\Services\Vouchers\DiscountContext;
 use App\Services\Vouchers\DiscountResolver;
 
 class OneTimeSubscriptionCheckoutService
@@ -50,7 +51,7 @@ class OneTimeSubscriptionCheckoutService
         // 2.5 RESOLVE DISCOUNTS (ADD THIS SECTION)
         $baseSubtotalCents = $this->calculateBaseSubtotalCents($subscriptionItems);
 
-        $discountContext = new \App\Services\Vouchers\DiscountContext(
+        $discountContext = new DiscountContext(
             items: $subscriptionItems,
             baseSubtotalCents: $baseSubtotalCents,
             currentSubtotalCents: $baseSubtotalCents,

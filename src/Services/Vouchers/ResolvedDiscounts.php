@@ -47,4 +47,17 @@ class ResolvedDiscounts
             + $this->rewardDiscountCents
             + $this->storeCreditCents;
     }
+
+    public function getStripeMetadata(): array
+    {
+        return [
+            'discount_breakdown_json' => json_encode($this->toArray()),
+            'first_cycle_discount_total' => $this->getTotalDiscountCents() / 100,
+            'recurring_discount_total' => 0, // For future recurring discount implementation
+            'offer_discount' => $this->offerDiscountCents / 100,
+            'tiered_discount' => $this->tieredDiscountCents / 100,
+            'voucher_discount' => $this->voucherDiscountCents / 100,
+            'reward_discount' => $this->rewardDiscountCents / 100,
+        ];
+    }
 }

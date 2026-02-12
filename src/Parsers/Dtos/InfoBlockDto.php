@@ -3,7 +3,6 @@
 namespace App\Parsers\Dtos;
 
 use App\Enums\Blocks\InfoType;
-use InvalidArgumentException;
 
 final class InfoBlockDto extends BaseBlockDto
 {
@@ -28,10 +27,7 @@ final class InfoBlockDto extends BaseBlockDto
             'context' => 'default'
         ]);
 
-        $description = trim($data['description']);
-        if (empty($description)) {
-            throw new InvalidArgumentException('Info description is required');
-        }
+        $description = trim($data['description']) ?? '';
 
         if (strlen($description) > self::MAX_DESCRIPTION_LENGTH) {
             $description = substr($description, 0, self::MAX_DESCRIPTION_LENGTH);

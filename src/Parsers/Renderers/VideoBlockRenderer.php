@@ -20,15 +20,31 @@ class VideoBlockRenderer extends BaseBlockRenderer
 
         $html = "<div class=\"video-block video-platform-{$dto->platform}\">";
 
-        if ($dto->embedUrl) {
+        $embedUrl = $dto->embedUrl;
+
+        // Auto-generate embed URLs for known platforms
+        if (!$embedUrl) {
+            $platform = strtolower($dto->platform);
+            $url = $dto->url;
+
+            if ($platform === 'youtube' && preg_match('/[?&]v=([\w-]+)/', $url, $matches)) {
+                $embedUrl = "https://www.youtube.com/embed/{$matches[1]}";
+            }
+
+            if ($platform === 'vimeo' && preg_match('#vimeo\.com/(?:.*?/)?(\d+)#', $url, $matches)) {
+                $embedUrl = "https://player.vimeo.com/video/{$matches[1]}";
+            }
+        }
+
+        // Render iframe if we have an embed URL
+        if ($embedUrl) {
             $html .= "<div class=\"video-container\">";
-            $html .= "<iframe src=\"{$this->escape($dto->embedUrl)}\" class=\"video-iframe\" frameborder=\"0\" allowfullscreen></iframe>";
+            $html .= "<iframe src=\"{$this->escape($embedUrl)}\" class=\"video-iframe\" frameborder=\"0\" allowfullscreen></iframe>";
             $html .= "</div>";
         } else {
+            // Fallback link for unknown platforms
             $html .= "<div class=\"video-fallback\">";
-            $html .= "<a href=\"{$this->escape($dto->url)}\" class=\"video-link\" target=\"_blank\" rel=\"noopener noreferrer\">";
-            $html .= "Watch Video";
-            $html .= "</a>";
+            $html .= "<a href=\"{$this->escape($dto->url)}\" class=\"video-link\" target=\"_blank\" rel=\"noopener noreferrer\">Watch Video</a>";
             $html .= "</div>";
         }
 
@@ -40,4 +56,5 @@ class VideoBlockRenderer extends BaseBlockRenderer
 
         return $html;
     }
+
 }

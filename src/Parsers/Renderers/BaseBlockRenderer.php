@@ -31,4 +31,20 @@ abstract class BaseBlockRenderer implements BlockRendererInterface
     {
         return nl2br($this->escape($value));
     }
+
+    protected function sanitizeBasicHtml(string $html): string
+    {
+        // Remove script and style blocks
+        $html = preg_replace('#<(script|style).*?>.*?</\1>#is', '', $html);
+
+        // Allow only basic tags
+        $allowedTags = '<strong><em><i><u><p><br>';
+        $html = strip_tags($html, $allowedTags);
+
+        // Remove all attributes from allowed tags
+        $html = preg_replace('/<(strong|em|i|u|p|br)(\s+[^>]*)?>/i', '<$1>', $html);
+
+        return $html;
+    }
+
 }

@@ -4,7 +4,7 @@ namespace App\Parsers;
 
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Parsers\Dtos\CardBlockDto;
-use App\Services\Newsletter\Renderers\CardBlockRenderer;
+use App\Parsers\Renderers\CardBlockRenderer;
 
 class CardBlockParser extends BaseBlockParser
 {

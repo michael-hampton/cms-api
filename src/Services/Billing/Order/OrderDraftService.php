@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\TaxCalculatorService;
+use App\Services\Vouchers\ResolvedDiscounts;
 
 class OrderDraftService
 {
@@ -24,10 +25,11 @@ class OrderDraftService
      * This happens BEFORE payment
      */
     public function createPendingOrder(
-        array  $subscriptionsWithPricing,
-        Member $member,
-        int    $siteId,
-        array  $checkoutData
+        array              $subscriptionsWithPricing,
+        Member             $member,
+        int                $siteId,
+        array              $checkoutData,
+        ?ResolvedDiscounts $resolvedDiscounts = null
     ): Order
     {
         $orderItems = [];
@@ -42,7 +44,7 @@ class OrderDraftService
 
             $totalSubtotalCents += $pricing->subtotalCents;
             $totalShippingCents += $pricing->shippingCents;
-            $totalDiscountCents += $pricing->discountCents; //todo need to plug in discounts
+            $totalDiscountCents += $pricing->discountCents;
 
             $orderItems[] = [
                 'product_id' => null,
@@ -91,7 +93,12 @@ class OrderDraftService
             }
         }
 
-        $totalCents = $totalSubtotalCents - $totalDiscountCents + $totalShippingCents + $totalTaxCents;
+        if (!empty($resolvedDiscounts)) {
+            $totalDiscountCents = $resolvedDiscounts->getTotalDiscountCents();
+            $totalCents = $resolvedDiscounts->finalSubtotalCents + $totalShippingCents + $totalTaxCents;
+        } else {
+            $totalCents = $totalSubtotalCents - $totalDiscountCents + $totalShippingCents + $totalTaxCents;
+        }
 
         // Prepare order data
         $orderData = [
@@ -105,6 +112,12 @@ class OrderDraftService
             'discount' => $totalDiscountCents / 100,
             'total' => $totalCents / 100,
             'currency' => 'USD', // Should be from config or plan
+            'reward_discount' => $resolvedDiscounts ? $resolvedDiscounts->rewardDiscountCents / 100 : 0,
+            'offer_discount' => $resolvedDiscounts ? $resolvedDiscounts->offerDiscountCents / 100 : 0,
+            'voucher_discount' => $resolvedDiscounts ? $resolvedDiscounts->voucherDiscountCents / 100 : 0,
+            'tiered_discount' => $resolvedDiscounts ? $resolvedDiscounts->tieredDiscountCents / 100 : 0,
+            'merchant_funded' => $resolvedDiscounts->merchantFundedCents / 100,
+            'platform_funded' => $resolvedDiscounts->platformFundedCents / 100,
         ];
 
         // Add subscription IDs to order

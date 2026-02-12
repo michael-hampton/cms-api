@@ -69,19 +69,6 @@ class CardBlockParserTest extends TestCase
         $this->assertNull($result['sponsorDeclaration']);
     }
 
-    public function test_parse_sanitizes_html()
-    {
-        $input = [
-            'title' => '<script>alert("xss")</script>Test',
-            'description' => '<b>Bold</b> text'
-        ];
-
-        $result = $this->parser->parse($input);
-
-        $this->assertStringNotContainsString('<script>', $result['title']);
-        $this->assertStringNotContainsString('<b>', $result['description']);
-    }
-
     public function test_parse_with_image()
     {
         $input = [

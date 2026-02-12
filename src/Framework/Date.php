@@ -21,6 +21,11 @@ class Date extends \DateTime
         return $this->sub(new DateInterval("P{$days}D"));
     }
 
+    public function subDay(): self
+    {
+        return $this->sub(new DateInterval("P1D"));
+    }
+
     public function subMonths(int $months): self
     {
         return $this->sub(new DateInterval("P{$months}M"));
@@ -41,6 +46,10 @@ class Date extends \DateTime
         return $this->add(new \DateInterval("PT{$minutes}M"));
     }
 
+    public function addDay(): self
+    {
+        return $this->add(new DateInterval("P1D"));
+    }
 
     public function addDays(int $days): self
     {

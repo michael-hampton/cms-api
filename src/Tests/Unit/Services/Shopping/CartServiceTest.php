@@ -13,6 +13,7 @@ use App\Repositories\Product\ProductRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shopping\CartService;
+use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
@@ -25,6 +26,7 @@ class CartServiceTest extends FunctionalTestCase
     private $productRepository;
     private CartService $service;
     private $subscriptionPlanRepository;
+    private VoucherService $voucherService;
 
     protected function setUp(): void
     {
@@ -35,13 +37,15 @@ class CartServiceTest extends FunctionalTestCase
         $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->offerRepository = Mockery::mock(ProductOfferRepository::class);
         $this->bundleRepository = Mockery::mock(ProductOfferBundleRepository::class);
+        $this->voucherService = Mockery::mock(VoucherService::class);
 
         $this->service = new CartService(
             $this->cartRepository,
             $this->productRepository,
             $this->subscriptionPlanRepository,
             $this->offerRepository,
-            $this->bundleRepository
+            $this->bundleRepository,
+            $this->voucherService
         );
 
         $_SESSION['cart_session_id'] = 'test_session_123';

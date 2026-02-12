@@ -61,6 +61,7 @@ class ContactFormBlockParser extends BaseBlockParser
     public function generateHtml(array $parsedData): string
     {
         $dto = ContactFormBlockDto::fromArray($parsedData);
+
         return $this->renderer->render($dto);
     }
 }

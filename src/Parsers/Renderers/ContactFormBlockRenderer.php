@@ -75,21 +75,6 @@ class ContactFormBlockRenderer extends BaseBlockRenderer
     private function renderDefault(ContactFormBlockDto $dto): string
     {
         $site = SiteContext::get();
-        $contactInfo = $site ? $site->getContactInfo() : $this->getDefaultContactInfo();
-
-        // Override with DTO values if provided
-        if (!empty($dto->override_email)) {
-            $contactInfo['email'] = $dto->override_email;
-        }
-        if (!empty($dto->override_phone)) {
-            $contactInfo['phone'] = $dto->override_phone;
-        }
-        if (!empty($dto->override_address)) {
-            $contactInfo['address'] = $dto->override_address;
-        }
-        if (!empty($dto->override_social)) {
-            $contactInfo['social'] = $dto->override_social;
-        }
 
         $html = "<section class=\"contact\">";
         $html .= "<div class=\"contact-container\">";
@@ -103,11 +88,11 @@ class ContactFormBlockRenderer extends BaseBlockRenderer
         $html .= "<div class=\"contact-icon\">📍</div>";
         $html .= "<div>";
         $html .= "<h4>Visit Our Studio</h4>";
-        $html .= "<p>{$contactInfo['address']['line1']}<br>";
-        if (!empty($contactInfo['address']['line2'])) {
-            $html .= "{$contactInfo['address']['line2']}<br>";
+        $html .= "<p>{$dto->contactInfo['address']['line1']}<br>";
+        if (!empty($dto->contactInfo['address']['line2'])) {
+            $html .= "{$dto->contactInfo['address']['line2']}<br>";
         }
-        $html .= "{$contactInfo['address']['city']}, {$contactInfo['address']['postcode']}</p>";
+        $html .= "{$dto->contactInfo['address']['city']}, {$dto->contactInfo['address']['postcode']}</p>";
         $html .= "</div>";
         $html .= "</div>";
 
@@ -115,7 +100,7 @@ class ContactFormBlockRenderer extends BaseBlockRenderer
         $html .= "<div class=\"contact-icon\">📞</div>";
         $html .= "<div>";
         $html .= "<h4>Call Us</h4>";
-        $html .= "<p>{$contactInfo['phone']}<br>Mon-Fri: 9AM-6PM</p>";
+        $html .= "<p>{$dto->contactInfo['phone']}<br>Mon-Fri: 9AM-6PM</p>";
         $html .= "</div>";
         $html .= "</div>";
 
@@ -123,22 +108,22 @@ class ContactFormBlockRenderer extends BaseBlockRenderer
         $html .= "<div class=\"contact-icon\">✉️</div>";
         $html .= "<div>";
         $html .= "<h4>Email Us</h4>";
-        $html .= "<p>{$contactInfo['email']}</p>";
+        $html .= "<p>{$dto->contactInfo['email']}</p>";
         $html .= "</div>";
         $html .= "</div>";
 
         $html .= "<div class=\"social-links\">";
-        if (!empty($contactInfo['social']['facebook'])) {
-            $html .= "<a href=\"{$contactInfo['social']['facebook']}\" class=\"social-link\">📘</a>";
+        if (!empty($dto->contactInfo['social']['facebook'])) {
+            $html .= "<a href=\"{$dto->contactInfo['social']['facebook']}\" class=\"social-link\">📘</a>";
         }
-        if (!empty($contactInfo['social']['instagram'])) {
-            $html .= "<a href=\"{$contactInfo['social']['instagram']}\" class=\"social-link\">📷</a>";
+        if (!empty($dto->contactInfo['social']['instagram'])) {
+            $html .= "<a href=\"{$dto->contactInfo['social']['instagram']}\" class=\"social-link\">📷</a>";
         }
-        if (!empty($contactInfo['social']['twitter'])) {
-            $html .= "<a href=\"{$contactInfo['social']['twitter']}\" class=\"social-link\">🐦</a>";
+        if (!empty($dto->contactInfo['social']['twitter'])) {
+            $html .= "<a href=\"{$dto->contactInfo['social']['twitter']}\" class=\"social-link\">🐦</a>";
         }
-        if (!empty($contactInfo['social']['linkedin'])) {
-            $html .= "<a href=\"{$contactInfo['social']['linkedin']}\" class=\"social-link\">💼</a>";
+        if (!empty($dto->contactInfo['social']['linkedin'])) {
+            $html .= "<a href=\"{$dto->contactInfo['social']['linkedin']}\" class=\"social-link\">💼</a>";
         }
         $html .= "</div>";
 

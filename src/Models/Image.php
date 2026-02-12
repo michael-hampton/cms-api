@@ -30,7 +30,8 @@ class Image extends Model
         'site_id',
         'name',
         'credit',
-        'image_rights'
+        'image_rights',
+        'is_archived'
     ];
 
     protected $casts = [
@@ -39,7 +40,8 @@ class Image extends Model
         'height' => 'integer',
         'is_active' => 'boolean',
         'created_at' => 'date',
-        'updated_at' => 'date'
+        'updated_at' => 'date',
+        'is_archived' => 'boolean'
     ];
 
     protected $hidden = ['file_path'];

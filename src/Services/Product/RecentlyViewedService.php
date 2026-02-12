@@ -18,7 +18,7 @@ class RecentlyViewedService
     {
     }
 
-    public function addProduct(Product $product): void
+    public function addProduct(Product $product): bool
     {
         $viewedIds = $this->sessionStore->get('recently_viewed', []);
 
@@ -32,6 +32,8 @@ class RecentlyViewedService
         $viewedIds = array_slice($viewedIds, 0, self::MAX_RECENT_ITEMS);
 
         $this->sessionStore->put('recently_viewed', $viewedIds);
+
+        return true;
     }
 
     public function getProducts(int $limit = 6): Collection

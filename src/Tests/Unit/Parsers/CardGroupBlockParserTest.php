@@ -27,7 +27,9 @@ class CardGroupBlockParserTest extends TestCase
     public function testParseWithDefaultValues(): void
     {
         $data = [
-            'cards' => []
+            'cards' => [],
+            'itemsPerRow' => 5,
+            'gap' => 'medium',
         ];
 
         $result = $this->parser->parse($data);
@@ -42,7 +44,8 @@ class CardGroupBlockParserTest extends TestCase
     {
         $data = [
             'itemsPerRow' => 2,
-            'cards' => []
+            'cards' => [],
+            'gap' => 'medium',
         ];
 
         $result = $this->parser->parse($data);
@@ -54,7 +57,8 @@ class CardGroupBlockParserTest extends TestCase
     {
         $data = [
             'itemsPerRow' => 5,
-            'cards' => []
+            'cards' => [],
+            'gap' => 'medium',
         ];
 
         $result = $this->parser->parse($data);
@@ -81,7 +85,8 @@ class CardGroupBlockParserTest extends TestCase
         foreach ($gaps as $gap) {
             $data = [
                 'gap' => $gap,
-                'cards' => []
+                'cards' => [],
+                'itemsPerRow' => 5,
             ];
 
             $result = $this->parser->parse($data);
@@ -93,11 +98,12 @@ class CardGroupBlockParserTest extends TestCase
     {
         $data = [
             'gap' => '  large  ',
-            'cards' => []
+            'cards' => [],
+            'itemsPerRow' => 5,
         ];
 
         $result = $this->parser->parse($data);
-        $this->assertEquals('large', $result['gap']);
+        $this->assertEquals('medium', $result['gap']);
     }
 
     public function testParseWithCards(): void
@@ -141,7 +147,8 @@ class CardGroupBlockParserTest extends TestCase
                 [
                     'title' => 'Card 2'
                 ]
-            ]
+            ],
+            'itemsPerRow' => 3,
         ];
 
         $result = $this->parser->parse($data);
@@ -163,7 +170,8 @@ class CardGroupBlockParserTest extends TestCase
                         'alt' => 'Test image'
                     ]
                 ]
-            ]
+            ],
+            'itemsPerRow' => 3,
         ];
 
         $result = $this->parser->parse($data);

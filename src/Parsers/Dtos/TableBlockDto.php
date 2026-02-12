@@ -29,18 +29,30 @@ final class TableBlockDto extends BaseBlockDto
         }
 
         $rows = [];
+
         foreach ($data['rows'] as $row) {
             if (!is_array($row)) {
+                // skip invalid row
                 continue;
             }
 
-            $parsedRow = [];
-            foreach ($row as $cell) {
-                $parsedRow[] = trim($cell);
+            // Backwards compatibility: numeric array → old format
+            if (array_keys($row) === range(0, count($row) - 1)) {
+                $parsedRow = array_map('trim', $row);
+                $rows[] = [
+                    'cells' => $parsedRow,
+                    'is_header' => false,
+                ];
+                continue;
             }
 
-            if (!empty($parsedRow)) {
-                $rows[] = $parsedRow;
+            // New format: associative row with 'cells' key
+            if (isset($row['cells']) && is_array($row['cells'])) {
+                $parsedRow = array_map('trim', $row['cells']);
+                $rows[] = [
+                    'cells' => $parsedRow,
+                    'is_header' => !empty($row['is_header']),
+                ];
             }
         }
 
@@ -51,31 +63,23 @@ final class TableBlockDto extends BaseBlockDto
         return new self((bool)$data['hasHeader'], $rows);
     }
 
-    public function getColumnCount(): int
-    {
-        if (empty($this->rows)) {
-            return 0;
-        }
-        return max(array_map('count', $this->rows));
-    }
-
-    public function getCellCount(): int
-    {
-        $total = 0;
-        foreach ($this->rows as $row) {
-            $total += count($row);
-        }
-        return $total;
-    }
 
     public function getTotalWordCount(): int
     {
         $total = 0;
+
         foreach ($this->rows as $row) {
-            foreach ($row as $cell) {
+            // Backwards-compatible: numeric arrays
+            $cells = $row['cells'] ?? (is_array($row) ? $row : []);
+
+            foreach ($cells as $cell) {
+                if (!is_string($cell)) {
+                    continue; // skip non-strings just in case
+                }
                 $total += str_word_count(strip_tags($cell));
             }
         }
+
         return $total;
     }
 
@@ -94,5 +98,19 @@ final class TableBlockDto extends BaseBlockDto
     public function getType(): string
     {
         return 'table';
+    }
+
+    public function getColumnCount(): int
+    {
+        if (empty($this->rows)) {
+            return 0;
+        }
+
+        return max(array_map(fn($r) => count($r['cells']), $this->rows));
+    }
+
+    public function getCellCount(): int
+    {
+        return array_sum(array_map(fn($r) => count($r['cells']), $this->rows));
     }
 }

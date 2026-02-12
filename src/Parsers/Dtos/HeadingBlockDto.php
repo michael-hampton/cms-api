@@ -69,7 +69,7 @@ final class HeadingBlockDto extends BaseBlockDto
         return [
             'text' => $this->text,
             'subtitle' => $this->subtitle,
-            'level' => $this->level,
+            'level' => (int)$this->level,
             'context' => $this->context,
             'has_subtitle' => !empty($this->subtitle),
             'word_count' => str_word_count($this->text . ' ' . $this->subtitle)

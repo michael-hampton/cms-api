@@ -171,7 +171,6 @@ class PriceAlertService
         try {
             $product = $this->productRepository->find($alert->product_id);
             if (!$product) {
-                die('no');
                 return false;
             }
 

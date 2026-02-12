@@ -2474,7 +2474,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $html = $this->service->buildNewsletterHtml($newsletter, collect([]), null, false, true, null, $site->id);
 
         // Assert
-        $this->assertStringContainsString('/images/logo.png', $html);
+        $this->assertStringContainsString('/images/test.jpg', $html);
     }
 
     public function test_newsletter_html_uses_placeholder_when_no_logo(): void

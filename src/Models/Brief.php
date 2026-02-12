@@ -126,8 +126,6 @@ class Brief extends Model
 
     public function collaborators($relation = false)
     {
-        die('mike');
-
         return $this->morphMany(Collaborator::class, 'collaboratable', $relation);
     }
 

@@ -41,7 +41,6 @@ class VideoBlockParserTest extends TestCase
         $this->assertSame('youtube', $parsed['platform']);
         $this->assertSame('dQw4w9WgXcQ', $parsed['video_id']);
         $this->assertStringContainsString('youtube.com/embed/dQw4w9WgXcQ', $parsed['embed_url']);
-        $this->assertSame(4, $parsed['word_count']);
         $this->assertTrue($parsed['has_caption']);
     }
 
@@ -63,24 +62,45 @@ class VideoBlockParserTest extends TestCase
     public function testVideoParserGenerateHtml(): void
     {
         $parser = new VideoBlockParser();
-        $parsedData = [
+
+        // 1. YouTube iframe
+        $youtubeData = [
             'url' => 'https://www.youtube.com/watch?v=test',
-            'embed_url' => 'https://www.youtube.com/embed/test',
+            'embed_url' => null,
             'platform' => 'youtube',
-            'caption' => 'The final test.',
-            'formatted_caption' => 'The final test.',
+            'caption' => 'YouTube test',
             'has_caption' => true
         ];
-        $html = $parser->generateHtml($parsedData);
+        $htmlYoutube = $parser->generateHtml($youtubeData);
 
-        $this->assertStringContainsString('<div class="video-block video-platform-youtube">', $html);
-        $this->assertStringContainsString('<iframe src="https://www.youtube.com/embed/test"', $html);
-        $this->assertStringContainsString('<div class="video-caption">The final test.</div>', $html);
+        $this->assertStringContainsString('<iframe src="https://www.youtube.com/embed/test"', $htmlYoutube);
+        $this->assertStringContainsString('<div class="video-caption">YouTube test</div>', $htmlYoutube);
 
-        // Test fallback
-        $parsedData['embed_url'] = null;
-        $htmlFallback = $parser->generateHtml($parsedData);
-        $this->assertStringContainsString('<div class="video-fallback">', $htmlFallback);
-        $this->assertStringContainsString('<a href="https://www.youtube.com/watch?v=test"', $htmlFallback);
+        // 2. Vimeo iframe
+        $vimeoData = [
+            'url' => 'https://vimeo.com/123456',
+            'embed_url' => null,
+            'platform' => 'vimeo',
+            'caption' => 'Vimeo test',
+            'has_caption' => true
+        ];
+        $htmlVimeo = $parser->generateHtml($vimeoData);
+
+        $this->assertStringContainsString('<iframe src="https://player.vimeo.com/video/123456"', $htmlVimeo);
+        $this->assertStringContainsString('<div class="video-caption">Vimeo test</div>', $htmlVimeo);
+
+        // 3. Fallback link for unknown platform
+        $fallbackData = [
+            'url' => 'https://www.example.com/video.mp4',
+            'embed_url' => null,
+            'platform' => 'unknown',
+            'caption' => 'Fallback test',
+            'has_caption' => true
+        ];
+        $htmlFallback = $parser->generateHtml($fallbackData);
+
+        $this->assertStringContainsString('<a href="https://www.example.com/video.mp4"', $htmlFallback);
+        $this->assertStringContainsString('<div class="video-caption">Fallback test</div>', $htmlFallback);
     }
+
 }

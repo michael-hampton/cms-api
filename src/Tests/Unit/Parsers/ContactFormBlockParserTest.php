@@ -173,7 +173,7 @@ class ContactFormBlockParserTest extends TestCase
             'requireMessage' => true
         ]);
 
-        $html = $this->parser->generateDefaultHtml($parsedData);
+        $html = $this->parser->generateHtml($parsedData);
 
         // Check HTML contains site contact information
         $this->assertStringContainsString('test@example.com', $html);
@@ -209,7 +209,7 @@ class ContactFormBlockParserTest extends TestCase
             ]
         ]);
 
-        $html = $this->parser->generateDefaultHtml($parsedData);
+        $html = $this->parser->generateHtml($parsedData);
 
         // Check HTML contains overridden contact information
         $this->assertStringContainsString('support@custom.com', $html);
@@ -320,7 +320,7 @@ class ContactFormBlockParserTest extends TestCase
             'requireEmail' => true
         ]);
 
-        $html = $this->parser->generateDefaultHtml($parsedData);
+        $html = $this->parser->generateHtml($parsedData);
 
         // Should only include twitter link
         $this->assertStringContainsString('https://twitter.com/test', $html);
@@ -354,7 +354,7 @@ class ContactFormBlockParserTest extends TestCase
             'requireEmail' => true
         ]);
 
-        $html = $this->parser->generateDefaultHtml($parsedData);
+        $html = $this->parser->generateHtml($parsedData);
 
         // Should not have extra <br> for empty line2
         $this->assertStringContainsString('123 Test Street', $html);

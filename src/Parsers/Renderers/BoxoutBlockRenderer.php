@@ -33,6 +33,7 @@ class BoxoutBlockRenderer extends BaseBlockRenderer
         }
 
         if (!empty($dto->linkUrl)) {
+
             $linkAttrs = '';
             if ($dto->openInNewTab) {
                 $linkAttrs .= ' target="_blank"';

@@ -21,7 +21,7 @@ class HeadingBlockRenderer extends BaseBlockRenderer
         $contextClass = $dto->context === 'sidebar' ? ' heading-sidebar' : '';
         $html = "<div class=\"heading-block heading-level-{$dto->level}{$contextClass}\">";
 
-        $html .= "<{$dto->level} class=\"heading-text\">{$this->escape($dto->text)}</{$dto->level}>";
+        $html .= "<h{$dto->level} class=\"heading-text\">{$this->escape($dto->text)}</h{$dto->level}>";
 
         if (!empty($dto->subtitle)) {
             $html .= "<div class=\"heading-subtitle\">{$this->escape($dto->subtitle)}</div>";

@@ -17,7 +17,7 @@ class ImageBlockRenderer extends BaseBlockRenderer
         $alt = htmlspecialchars($dto->alt, ENT_QUOTES, 'UTF-8');
         $caption = $dto->caption;
         $credit = $dto->credit ?? '';
-        $shouldDisplayCredit = $dto->should_display_credit ?? false;
+        $shouldDisplayCredit = $dto->shouldDisplayCredit ?? false;
         $layoutClass = 'image-layout-' . $dto->layout;
         $alignmentClass = 'image-align-' . $dto->alignment;
 

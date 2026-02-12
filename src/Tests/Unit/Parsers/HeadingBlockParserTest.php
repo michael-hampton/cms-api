@@ -56,8 +56,8 @@ class HeadingBlockParserTest extends FunctionalTestCase
         $parser = new HeadingBlockParser();
         $parsedData = [
             'level' => 1,
-            'formatted_text' => 'The Main H1',
-            'formatted_subtitle' => 'H1 Subtitle',
+            'text' => 'The Main H1',
+            'subtitle' => 'H1 Subtitle',
             'has_subtitle' => true
         ];
         $html = $parser->generateHtml($parsedData);
@@ -67,7 +67,7 @@ class HeadingBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('<div class="heading-subtitle">H1 Subtitle</div>', $html);
 
         // Test without subtitle
-        $parsedData['has_subtitle'] = false;
+        $parsedData['subtitle'] = '';
         $htmlNoSubtitle = $parser->generateHtml($parsedData);
         $this->assertStringNotContainsString('<div class="heading-subtitle">', $htmlNoSubtitle);
     }

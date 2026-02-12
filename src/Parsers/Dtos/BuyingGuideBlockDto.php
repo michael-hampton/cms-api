@@ -5,8 +5,7 @@ namespace App\Parsers\Dtos;
 final class BuyingGuideBlockDto extends BaseBlockDto
 {
     private const KNOWN_KEYS = [
-        'title', 'subtitle', 'specs', 'pros', 'cons',
-        'showReviewPanel',
+        'title', 'specs',
     ];
 
     public function __construct(

@@ -33,18 +33,15 @@ if (!function_exists('request')) {
 }
 
 if (!function_exists('dispatch')) {
-    function dispatch(object $job): void
+    function dispatch(object $job, ...$args): void
     {
-        // If your jobs have a standard interface or method
-        if (method_exists($job, 'handle')) {
-            $job->handle();
-            return;
+        if (!method_exists($job, 'handle')) {
+            throw new InvalidArgumentException('Dispatched job must have a handle() method.');
         }
 
-        throw new InvalidArgumentException(
-            'Dispatched job must have a handle() method.'
-        );
+        $job->handle(...$args);
     }
+
 }
 
 if (!function_exists('message')) {
@@ -168,10 +165,12 @@ if (!function_exists('config')) {
                 'database' => 'config/database.php',
                 'routing' => 'config/routing.php',
                 'recommendations' => 'config/recommendations.php',
+                'commission' => 'config/commission.php',
                 'bundles' => 'config/bundles.php',
             ];
 
             foreach ($configFiles as $name => $file) {
+                $file = base_path($file);
                 if (file_exists($file)) {
                     $config[$name] = require $file;
                 }
@@ -190,6 +189,22 @@ if (!function_exists('config')) {
         }
 
         return $value;
+    }
+}
+
+if (!function_exists('base_path')) {
+    function base_path(string $path = ''): string
+    {
+        static $basePath;
+
+        if ($basePath === null) {
+            // Resolve project root relative to this file
+            $basePath = realpath(__DIR__ . '/../');
+        }
+
+        return $path
+            ? $basePath . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR)
+            : $basePath;
     }
 }
 

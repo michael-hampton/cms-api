@@ -50,10 +50,13 @@ class ProductOfferService
 
     private function validateOfferDates(string $startDate, string $endDate): void
     {
-        $start = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $startDate);
-        $end = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $endDate);
+        $start = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $startDate)
+            ?? \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $startDate);
 
-        if ($start === false || $end === false) {
+        $end = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $endDate)
+            ?? \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $endDate);
+
+        if (!$start || !$end) {
             throw new Exception('Invalid date format');
         }
 

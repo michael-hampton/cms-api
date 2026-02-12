@@ -1557,7 +1557,19 @@
             }
 
             const responseData = result.data;
-            clientSecret = responseData.client_secret;
+
+            const contexts = data.stripe_contexts;
+            let firstValue = null;
+
+            if (contexts && Object.keys(contexts).length > 0) {
+                // Get the first key (e.g., "1") and use it to get the value
+                const firstKey = Object.keys(contexts)[0]; //todo
+                console.log('test', contexts[firstKey])
+                clientSecret = contexts[firstKey].client_secret;
+            } else {
+                clientSecret = responseData.client_secret;
+            }
+
             subscriptionId = responseData.subscription_ids || responseData.subscription_id; // Handle both
             orderId = responseData.order_id;
 
@@ -1659,9 +1671,17 @@
                 return;
             }
 
-            console.log('result', result, result.stripe_contexts.__system__.client_secret, result.checkout_id)
+            const contexts = result.stripe_contexts;
 
-            const clientSecret = result.stripe_contexts.__system__.client_secret;
+            if (contexts && Object.keys(contexts).length > 0) {
+                // Get the first key (e.g., "1") and use it to get the value
+                const firstKey = Object.keys(contexts)[0]; //todo
+                console.log('test', contexts[firstKey])
+                clientSecret = contexts[firstKey].client_secret;
+            } else {
+                clientSecret = data.client_secret;
+            }
+
             const orderId = result.checkout_id;
 
             let paymentResult;

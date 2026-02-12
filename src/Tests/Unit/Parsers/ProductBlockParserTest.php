@@ -95,7 +95,11 @@ class ProductBlockParserTest extends FunctionalTestCase
         ];
         $html = $parser->generateHtml($parsedData);
 
-        $this->assertStringContainsString('<div class="product-card-container"><div class="product-card" data-product-id="product-1">', $html);
+        $this->assertStringContainsString('<div class="product-card-container"><div class="product-card"', $html);
+        $this->assertStringContainsString(
+            'data-product-id="product-',
+            $html
+        );
         $this->assertStringContainsString('<h3 class="product-name"><a href="http://buy.com">The Gadget</a></h3>', $html);
         $this->assertStringContainsString('<div class="product-price"><span class="price-sale">$80.00</span><span class="price-original">$100.00</span></div>', $html);
         $this->assertStringContainsString('<a href="http://buy.com" class="btn-add-to-cart btn-primary" rel="nofollow" target="_blank">Get Yours</a>', $html);

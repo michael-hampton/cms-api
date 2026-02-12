@@ -24,8 +24,9 @@ final class GroupBlockDto extends BaseBlockDto
         ]);
 
         return new self(
-            trim($data['heading']),
-            $data['blocks']
+            $data['layout'],
+            $data['blocks'],
+            trim($data['carouselTitle'] ?? ''),
         );
     }
 

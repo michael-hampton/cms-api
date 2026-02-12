@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Offers;
 
 use App\Framework\Authorization\AuthenticationService;
 use App\Models\Model;
+use App\Models\OfferClicks;
 use App\Models\ProductOffer;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Services\Offers\OfferStatusTransitionHandler;
@@ -316,7 +317,8 @@ class ProductOfferServiceTest extends FunctionalTestCase
     {
         $this->repository->shouldReceive('trackClick')
             ->once()
-            ->with(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0');
+            ->with(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0')
+            ->andReturn(Mockery::mock(OfferClicks::class));
 
         $result = $this->service->trackClick(1, 2, 'click', '127.0.0.1', 'Mozilla/5.0');
 

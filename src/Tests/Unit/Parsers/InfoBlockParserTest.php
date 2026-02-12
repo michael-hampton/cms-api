@@ -48,7 +48,7 @@ class InfoBlockParserTest extends FunctionalTestCase
         $parser = new InfoBlockParser();
         $parsedData = [
             'infoType' => 'tip',
-            'formatted_description' => 'Use this shortcut.',
+            'description' => 'Use this shortcut.',
             'icon' => '💡'
         ];
         $html = $parser->generateHtml($parsedData);

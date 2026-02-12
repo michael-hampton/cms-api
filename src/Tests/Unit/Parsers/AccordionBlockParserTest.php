@@ -45,7 +45,8 @@ class AccordionBlockParserTest extends TestCase
                 ['question' => 'Q1?', 'answer' => 'A1']
             ],
             'theme' => 'colored',
-            'visibleItemsCount' => 10
+            'visibleItemsCount' => 10,
+            'allowMultipleOpen' => true,
         ];
 
         $result = $this->parser->parse($data);
@@ -62,7 +63,9 @@ class AccordionBlockParserTest extends TestCase
                 ['question' => 'Q3?', 'answer' => 'A3']
             ],
             'theme' => 'dark',
-            'visibleItemsCount' => 2
+            'visibleItemsCount' => 2,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -75,7 +78,9 @@ class AccordionBlockParserTest extends TestCase
         $data = [
             'items' => [['question' => 'Q?', 'answer' => 'A']],
             'theme' => 'light',
-            'visibleItemsCount' => 0
+            'visibleItemsCount' => 0,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -88,7 +93,9 @@ class AccordionBlockParserTest extends TestCase
         $data = [
             'items' => [['question' => 'Q?', 'answer' => 'A']],
             'theme' => 'light',
-            'visibleItemsCount' => 100
+            'visibleItemsCount' => 100,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -104,7 +111,9 @@ class AccordionBlockParserTest extends TestCase
             $data = [
                 'items' => [['question' => 'Q?', 'answer' => 'A']],
                 'theme' => $theme,
-                'visibleItemsCount' => 5
+                'visibleItemsCount' => 5,
+                'allowMultipleOpen' => true,
+                'title' => 'Test'
             ];
 
             $result = $this->parser->parse($data);
@@ -118,7 +127,9 @@ class AccordionBlockParserTest extends TestCase
         $data = [
             'items' => [['question' => 'Q?', 'answer' => 'A']],
             'theme' => 'invalid-theme',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -135,7 +146,9 @@ class AccordionBlockParserTest extends TestCase
                 ['question' => 'Second', 'answer' => 'A2', 'order' => 1]
             ],
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -157,7 +170,9 @@ class AccordionBlockParserTest extends TestCase
                 ['question' => 'Q3', 'answer' => 'A3', 'order' => 15]
             ],
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -177,7 +192,9 @@ class AccordionBlockParserTest extends TestCase
                 ['question' => 'Another valid', 'answer' => 'Valid answer']
             ],
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -195,7 +212,8 @@ class AccordionBlockParserTest extends TestCase
                 ['question' => '  Question?  ', 'answer' => '  Answer.  ']
             ],
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
         ];
 
         $result = $this->parser->parse($data);
@@ -215,7 +233,9 @@ class AccordionBlockParserTest extends TestCase
             ],
             'openFirstByDefault' => true,
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -233,7 +253,9 @@ class AccordionBlockParserTest extends TestCase
             ],
             'openFirstByDefault' => false,
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -248,7 +270,8 @@ class AccordionBlockParserTest extends TestCase
             'items' => [['question' => 'Q?', 'answer' => 'A']],
             'allowMultipleOpen' => true,
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -262,7 +285,9 @@ class AccordionBlockParserTest extends TestCase
             'items' => [['question' => 'Q?', 'answer' => 'A']],
             'context' => 'sidebar',
             'theme' => 'minimal',
-            'visibleItemsCount' => 3
+            'visibleItemsCount' => 3,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -276,7 +301,9 @@ class AccordionBlockParserTest extends TestCase
             'items' => [['question' => 'Q?', 'answer' => 'A']],
             'context' => 'invalid',
             'theme' => 'light',
-            'visibleItemsCount' => 5
+            'visibleItemsCount' => 5,
+            'allowMultipleOpen' => true,
+            'title' => 'Test'
         ];
 
         $result = $this->parser->parse($data);
@@ -370,7 +397,8 @@ class AccordionBlockParserTest extends TestCase
             'context' => 'default',
             'theme' => 'light',
             'visibleItemsCount' => 5,
-            'total_items' => 2
+            'total_items' => 2,
+            'title' => 'Test'
         ];
 
         $html = $this->parser->generateHtml($parsedData);

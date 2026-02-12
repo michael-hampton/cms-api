@@ -4,8 +4,8 @@ namespace App\Parsers\Dtos;
 
 final class ProductBlockDto extends BaseBlockDto
 {
-    private const ALLOWED_DISPLAY_AS = ['button', 'link', 'card'];
-    private const ALLOWED_LAYOUTS = ['standard', 'compact', 'detailed'];
+    private const ALLOWED_DISPLAY_AS = ['button', 'link', 'card', 'inline'];
+    private const ALLOWED_LAYOUTS = ['standard', 'compact', 'detailed', 'wide'];
 
     private const KNOWN_KEYS = [
         'link',

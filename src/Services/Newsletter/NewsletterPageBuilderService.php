@@ -200,8 +200,6 @@ class NewsletterPageBuilderService
                 }
             }
 
-            die('no renderer found ' . $type);
-
             $this->logger->warning('No renderer found for block type', [
                 'type' => $type
             ]);

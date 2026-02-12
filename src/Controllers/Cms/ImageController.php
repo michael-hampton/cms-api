@@ -334,4 +334,54 @@ class ImageController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    public function archive(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $result = $this->imageService->archiveImage($id);
+
+            if (!$result) {
+                return $this->errorResponse('Failed to archive image', 500);
+            }
+
+            return $this->successResponse('Image archived successfully');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function bulkArchive(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $imageIds = $request->get('image_ids', []);
+
+            if (empty($imageIds)) {
+                return $this->errorResponse('No image IDs provided', 400);
+            }
+
+            $results = $this->imageService->bulkArchiveImages($imageIds);
+
+            return $this->jsonResponse([
+                'results' => $results,
+                'message' => "Archived {$results['archived']} images, {$results['failed']} failed"
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function unarchive(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $result = $this->imageService->unarchiveImage($id);
+
+            if (!$result) {
+                return $this->errorResponse('Failed to unarchive image', 500);
+            }
+
+            return $this->successResponse('Image unarchived successfully');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
 }

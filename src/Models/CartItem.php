@@ -16,6 +16,7 @@ class CartItem extends Model
         'site_id',
         'subtotal',
         'subscription_plan_id',
+        'merchant_id'
     ];
 
     protected $casts = [
@@ -83,6 +84,6 @@ class CartItem extends Model
     public function getMerchantId(): ?int
     {
         $options = $this->options ?? [];
-        return $options['merchant_id'] ?? null;
+        return $this->merchant_id ?? $options['merchant_id'] ?? null;
     }
 }

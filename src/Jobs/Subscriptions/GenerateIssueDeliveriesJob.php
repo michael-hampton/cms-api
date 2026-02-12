@@ -45,7 +45,7 @@ class GenerateIssueDeliveriesJob
                 $created++;
 
                 // Dispatch delivery job
-                dispatch(new DeliverIssueDeliveryJob($issueDelivered->id));
+                dispatch(DeliverIssueDeliveryJob::for(), $issueDelivered->id);
                 $dispatched++;
             }
 

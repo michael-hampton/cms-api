@@ -94,8 +94,6 @@ class FileUpload
         }
 
 
-        die('b');
-
         throw new Exception("Failed to upload file");
     }
 

@@ -33,7 +33,7 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
                 'role' => 'editor',
                 'assigned_at' => now_datetime(),
                 'site_id' => $this->siteId
-            ]
+            ], $this->siteId
         );
 
         // Assert
@@ -65,13 +65,13 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
             'user_id' => $user1->id,
             'role' => 'editor',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         $this->repository->createForCollaboratable(Page::class, $page->id, [
             'user_id' => $user2->id,
             'role' => 'viewer',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         // Act
         $collaborators = $this->repository->getForCollaboratable(Page::class, $page->id);
@@ -90,7 +90,7 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
             'user_id' => $user->id,
             'role' => 'editor',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         // Act
         $found = $this->repository->findByCollaboratableAndUser(Page::class, $page->id, $user->id);
@@ -110,7 +110,7 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
             'user_id' => $user->id,
             'role' => 'editor',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         // Act
         $result = $this->repository->removeForUser($page->id, $user->id, Page::class);
@@ -153,13 +153,13 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
             'user_id' => $user->id,
             'role' => 'editor',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         $this->repository->createForCollaboratable(Brief::class, $brief->id, [
             'user_id' => $user->id,
             'role' => 'viewer',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         // Act
         $pageCollaborators = $this->repository->getForCollaboratable(Page::class, $page->id);
@@ -182,7 +182,7 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
             'user_id' => $user->id,
             'role' => 'editor',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
 
         // Act & Assert
         $this->expectException(\Exception::class);
@@ -190,7 +190,7 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
             'user_id' => $user->id,
             'role' => 'viewer',
             'site_id' => $this->siteId
-        ]);
+        ], $this->siteId);
     }
 
     protected function setUp(): void

@@ -28,7 +28,7 @@ abstract class BaseBlockDto implements BlockDtoInterface
 
             error_log($message);
             echo $message;
-            die;
+            //die;
         }
     }
 
@@ -67,5 +67,22 @@ abstract class BaseBlockDto implements BlockDtoInterface
             return $clamped;
         }
         return $value;
+    }
+
+    protected function sanitizeUrl(string $url): string
+    {
+        $url = trim($url);
+
+        // Allow relative URLs, anchors, and full URLs
+        if (empty($url)) {
+            return '';
+        }
+
+        // If it starts with #, /, or http, it's valid
+        if (preg_match('/^(#|\/|https?:\/\/)/', $url)) {
+            return htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        }
+
+        return '';
     }
 }

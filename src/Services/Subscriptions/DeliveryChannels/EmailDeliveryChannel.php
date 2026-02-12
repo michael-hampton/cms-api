@@ -19,6 +19,8 @@ class EmailDeliveryChannel implements DeliveryChannelInterface
         // TODO: Implement actual email sending
         // mail()->to($member->email)->send(new IssueDeliveryMail($issueDelivery));
 
+        return;
+
         // Placeholder - replace with real email logic
         if (rand(1, 10) === 1) {
             throw new \Exception('Email delivery failed');

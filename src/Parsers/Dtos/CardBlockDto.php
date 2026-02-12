@@ -5,15 +5,11 @@ namespace App\Parsers\Dtos;
 final class CardBlockDto extends BaseBlockDto
 {
     private const ALLOWED_BUTTON_TYPES = ['primary', 'secondary', 'text'];
-    private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
-    private const ALLOWED_LAYOUTS = ['full', 'compact'];
-    private const ALLOWED_ALIGNMENTS = ['left', 'center', 'right'];
+    private const ALLOWED_CONTEXTS = ['default', 'sidebar', 'featured', 'premium'];
+    private const ALLOWED_LAYOUTS = ['full', 'compact', 'inline', 'extended'];
+    private const ALLOWED_ALIGNMENTS = ['left', 'center', 'right', 'fullscreen'];
 
-    private const KNOWN_KEYS = [
-        'title', 'image', 'endorsement', 'description', 'linkUrl', 'buttonType',
-        'buttonText', 'noFollow', 'sponsored', 'openInNewTab', 'sponsorDeclaration',
-        'context', 'layout', 'alignment', 'itemsPerRow'
-    ];
+    private const KNOWN_KEYS = [];
 
     public function __construct(
         public string $title,
@@ -124,7 +120,7 @@ final class CardBlockDto extends BaseBlockDto
             'image' => $this->image,
             'endorsement' => $this->endorsement,
             'description' => $this->description,
-            'linkUrl' => $this->linkUrl,
+            'linkUrl' => $this->sanitizeUrl($this->linkUrl),
             'buttonType' => $this->buttonType,
             'buttonText' => $this->buttonText,
             'noFollow' => $this->noFollow,

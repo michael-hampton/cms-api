@@ -299,4 +299,25 @@ class MerchantController extends Controller
             return $this->errorResponse($exception->getMessage(), 500);
         }
     }
+
+    public function getTransactions(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $filters = [
+                'type' => $request->get('type'),
+                'status' => $request->get('status'),
+                'from_date' => $request->get('from_date'),
+                'to_date' => $request->get('to_date'),
+            ];
+
+            $transactions = $this->merchantRepository->getTransactions($id, $filters);
+
+            return $this->jsonResponse([
+                'transactions' => $transactions->toArray(),
+                'merchant' => $this->merchantRepository->find($id)->toArray()
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
 }

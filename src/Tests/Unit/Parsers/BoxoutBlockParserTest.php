@@ -8,7 +8,6 @@ use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
 use App\Parsers\BoxoutBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class BoxoutBlockParserTest extends FunctionalTestCase
 {
@@ -66,10 +65,13 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'formatted_title' => 'Title',
             'formatted_paragraphs' => ['P1'],
             'image' => ['src' => '/img.jpg'],
-            'has_image' => true
+            'has_image' => true,
+            'title' => 'Title',
+            'alignment' => 'left',
+            'paragraphs' => ['P1'],
         ];
         $html = $parser->generateHtml($parsedData);
-        $this->assertStringContainsString('<div class="note-block note-align-"><div class="note-image"><img src="/img.jpg" alt="Title" class="note-img"></div><div class="note-content"><h4 class="note-title">Title</h4><p class="note-paragraph">P1</p></div></div>', $html);
+        $this->assertStringContainsString('<div class="note-block note-align-left"><div class="note-image"><img src="/img.jpg" alt="Title" class="note-img"></div><div class="note-content"><h4 class="note-title">Title</h4><p class="note-paragraph">P1</p></div></div>', $html);
         $this->assertStringContainsString('<h4 class="note-title">Title</h4>', $html);
     }
 
@@ -83,18 +85,18 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'formatted_paragraphs' => ['Para 1', 'Para 2'],
             'has_image' => false,
             'image' => null,
-            'alignment' => 'centre',
+            'alignment' => 'center',
             'has_link' => true,
             'linkUrl' => 'https://example.com',
             'linkText' => 'Learn More',
-            'link_attributes' => ['target' => '_blank', 'rel' => 'noopener noreferrer nofollow'],
+            'openInNewTab' => true,
             'word_count' => 5
         ];
 
         $html = $parser->generateHtml($parsed);
 
         $this->assertStringContainsString('note-block', $html);
-        $this->assertStringContainsString('note-align-centre', $html);
+        $this->assertStringContainsString('note-align-center', $html);
         $this->assertStringContainsString('https://example.com', $html);
         $this->assertStringContainsString('Learn More', $html);
         $this->assertStringContainsString('target="_blank"', $html);
@@ -109,7 +111,8 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'linkUrl' => 'https://example.com',
             'noFollow' => true,
             'sponsored' => true,
-            'openInNewTab' => true
+            'openInNewTab' => true,
+            'alignment' => 'left',
         ];
 
         $result = $parser->parse($data);

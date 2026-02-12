@@ -23,7 +23,7 @@ class ProductBlockRenderer extends BaseBlockRenderer
         $hasSalePrice = !empty($salePrice);
         $discountPercentage = 0;
         $isLoggedIn = MemberAuth::check();
-        $inWishlist = $isLoggedIn && Wishlist::where('product_id', $dto->product_id)->where('site_id', SiteContext::getId())->exists();
+        $inWishlist = $isLoggedIn && !empty($dto->product_id) && Wishlist::where('product_id', $dto->product_id)->where('site_id', SiteContext::getId())->exists();
         $wishlistClass = $inWishlist ? 'active' : '';
         $brand = $dto && $dto->brand ? $dto->brand : null;
         $isBestValue = $dto->isBestValue ?? false; // Assuming you pass a flag for "Best Value"

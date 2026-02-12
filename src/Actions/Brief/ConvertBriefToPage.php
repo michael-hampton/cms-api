@@ -187,7 +187,8 @@ class ConvertBriefToPage
                     'assigned_at' => $collaborator->assigned_at,
                     'assigned_by' => $collaborator->assigned_by,
                     'site_id' => $page->site_id
-                ]
+                ],
+                $page->site_id
             );
         }
     }

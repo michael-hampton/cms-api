@@ -72,7 +72,9 @@ class CartService
 
     public function addItem(int $productId, int $quantity = 1, array $options = []): array
     {
-        $product = $this->productRepository->find($productId);
+        $product = $this->productRepository->find($productId, ['availableMerchants']);
+
+
 
         if (!$product || !$product->is_active) {
             return ['success' => false, 'message' => 'Product not found or inactive'];
@@ -116,6 +118,7 @@ class CartService
                 'subtotal' => $price * $quantity,
                 'options' => json_encode($options),
                 'site_id' => $product->site_id,
+                'merchant_id' => $product->availableMerchants?->count() > 0 ? $product->availableMerchants->first()->id : null
             ]);
         }
 

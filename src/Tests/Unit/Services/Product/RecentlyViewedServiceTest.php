@@ -1,6 +1,4 @@
 <?php
-// src/Tests/Unit/Services/Product/RecentlyViewedServiceTest.php
-
 namespace App\Tests\Unit\Services\Product;
 
 use App\Framework\Support\Collection;
@@ -29,7 +27,8 @@ class RecentlyViewedServiceTest extends FunctionalTestCase
             ->once()
             ->with('recently_viewed', [5, 1, 2, 3]);
 
-        $this->service->addProduct($product);
+        $result = $this->service->addProduct($product);
+        $this->assertTrue($result);
     }
 
     public function testAddProductRemovesDuplicates()
@@ -43,7 +42,8 @@ class RecentlyViewedServiceTest extends FunctionalTestCase
             ->once()
             ->with('recently_viewed', [2, 1, 3, 4]);
 
-        $this->service->addProduct($product);
+        $result = $this->service->addProduct($product);
+        $this->assertTrue($result);
     }
 
     public function testGetProductsReturnsEmpty()

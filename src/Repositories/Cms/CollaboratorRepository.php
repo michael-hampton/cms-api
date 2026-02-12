@@ -3,6 +3,7 @@
 namespace App\Repositories\Cms;
 
 use App\Framework\Support\Collection;
+use App\Framework\Support\SiteContext;
 use App\Models\Collaborator;
 use App\Models\Model;
 use App\Repositories\Repository;
@@ -41,13 +42,14 @@ class CollaboratorRepository extends Repository
             ->first();
     }
 
-    public function createForCollaboratable(string $type, int $id, array $data): Model
+    public function createForCollaboratable(string $type, int $id, array $data, ?int $siteId = null): Model
     {
-        return $this->create(array_merge($data, [
+        $siteId = $siteId ?? SiteContext::getId();
+        return $this->create(array_merge([
             'collaboratable_type' => $type,
             'collaboratable_id' => $id,
-            'site_id' => $this->siteId
-        ]));
+            'site_id' => $siteId
+        ], $data));
     }
 
     protected function getModelClass(): string

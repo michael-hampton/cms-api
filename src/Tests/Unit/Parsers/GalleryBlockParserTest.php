@@ -71,8 +71,7 @@ class GalleryBlockParserTest extends FunctionalTestCase
         $this->assertSame(9, $parsed['total_word_count']);
 
         $this->assertTrue($parsed['slides'][0]['noFollow']);
-        $this->assertTrue($parsed['slides'][0]['has_link']);
-        $this->assertStringContainsString('Image description.', $parsed['slides'][0]['formatted_description']);
+        $this->assertStringContainsString('Image description.', $parsed['slides'][0]['description']);
     }
 
     public function testGalleryParserGenerateHtmlCarousel(): void

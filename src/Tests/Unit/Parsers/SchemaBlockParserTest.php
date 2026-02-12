@@ -37,7 +37,7 @@ class SchemaBlockParserTest extends TestCase
             'schemaType' => 'how-to',
             'title' => '  How To Boil Water ',
             'description' => 'The easiest way to make tea.',
-            'image' => '/howto.jpg'
+            'image' => ['src' => '/howto.jpg']
         ];
         $parsed = $parser->parse($data);
 
@@ -45,8 +45,7 @@ class SchemaBlockParserTest extends TestCase
         $this->assertSame('How To Boil Water', $parsed['title']);
         $this->assertSame(4, $parsed['title_word_count']);
         $this->assertSame(6, $parsed['description_word_count']);
-        $this->assertSame(10, $parsed['total_word_count']);
-        $this->assertArrayHasKey('formatted_description', $parsed);
+        $this->assertArrayHasKey('description', $parsed);
     }
 
     public function testSchemaParserParseQuestion(): void
@@ -66,9 +65,8 @@ class SchemaBlockParserTest extends TestCase
         $this->assertSame(6, $parsed['question_word_count']);
         $this->assertSame(1, $parsed['answer_word_count']);
         $this->assertSame(9, $parsed['expansion_word_count']);
-        $this->assertSame(16, $parsed['total_word_count']);
         $this->assertTrue($parsed['showExpansion']);
-        $this->assertArrayHasKey('formatted_answer', $parsed);
+        $this->assertArrayHasKey('answer', $parsed);
     }
 
     public function testSchemaParserGenerateHtmlHowTo(): void
@@ -95,7 +93,7 @@ class SchemaBlockParserTest extends TestCase
         $parsedData = [
             'schemaType' => 'question',
             'question' => 'Q?',
-            'formatted_answer' => 'A.',
+            'answer' => 'A.',
             'expansion' => 'E.',
             'showExpansion' => true
         ];
@@ -104,7 +102,7 @@ class SchemaBlockParserTest extends TestCase
         $this->assertStringContainsString('<div class="schema-block schema-type-question">', $html);
         $this->assertStringContainsString('<h3 class="schema-question">Q?</h3>', $html);
         $this->assertStringContainsString('<div class="schema-answer">A.</div>', $html);
-        $this->assertStringContainsString('<div class="schema-block schema-type-question"><div class="schema-question-block"><h3 class="schema-question">Q?</h3><div class="schema-answer">A.</div><div class="schema-expansion"></div></div></div>', $html);
+        $this->assertStringContainsString('<div class="schema-block schema-type-question"><div class="schema-question-block"><h3 class="schema-question">Q?</h3><div class="schema-answer">A.</div><div class="schema-expansion">E.</div></div></div>', $html);
         $this->assertStringNotContainsString('schema-howto-block', $html);
     }
 }

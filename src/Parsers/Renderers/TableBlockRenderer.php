@@ -18,40 +18,59 @@ class TableBlockRenderer extends BaseBlockRenderer
             return '';
         }
 
-        $html = "<div class=\"table-block\">";
-        $html .= "<table class=\"data-table\">";
+        $html = '<div class="table-block">';
+        $html .= '<table class="data-table">';
 
-        $startIndex = 0;
+        $rows = $dto->rows;
+        $theadRows = [];
+        $tbodyRows = [];
 
-        if ($dto->hasHeader && !empty($dto->rows)) {
-            $html .= "<thead>";
-            $html .= "<tr class=\"table-header-row\">";
-
-            foreach ($dto->rows[0] as $cell) {
-                $html .= "<th class=\"table-header-cell\">{$this->escape($cell)}</th>";
+        // Split rows into <thead> and <tbody> based on hasHeader
+        if ($dto->hasHeader && !empty($rows)) {
+            $firstRow = array_shift($rows); // remove first row
+            // Handle backwards-compatible row (numeric array)
+            if (array_keys($firstRow) === range(0, count($firstRow) - 1)) {
+                $firstRow = ['cells' => $firstRow, 'is_header' => true];
             }
-
-            $html .= "</tr>";
-            $html .= "</thead>";
-            $startIndex = 1;
+            $theadRows[] = $firstRow['cells'];
         }
 
-        $html .= "<tbody>";
-
-        for ($i = $startIndex; $i < count($dto->rows); $i++) {
-            $html .= "<tr class=\"table-row\">";
-
-            foreach ($dto->rows[$i] as $cell) {
-                $html .= "<td class=\"table-cell\">{$this->escape($cell)}</td>";
+        foreach ($rows as $row) {
+            // Backwards-compatible: old numeric-array row
+            if (array_keys($row) === range(0, count($row) - 1)) {
+                $row = ['cells' => $row, 'is_header' => false];
             }
-
-            $html .= "</tr>";
+            $tbodyRows[] = $row['cells'];
         }
 
-        $html .= "</tbody>";
-        $html .= "</table>";
-        $html .= "</div>";
+        // Render <thead>
+        if (!empty($theadRows)) {
+            $html .= '<thead>';
+            foreach ($theadRows as $row) {
+                $html .= '<tr class="table-header-row">';
+                foreach ($row as $cell) {
+                    $html .= '<th class="table-header-cell">' . $this->escape($cell) . '</th>';
+                }
+                $html .= '</tr>';
+            }
+            $html .= '</thead>';
+        }
+
+        // Render <tbody>
+        $html .= '<tbody>';
+        foreach ($tbodyRows as $row) {
+            $html .= '<tr class="table-row">';
+            foreach ($row as $cell) {
+                $html .= '<td class="table-cell">' . $this->escape($cell) . '</td>';
+            }
+            $html .= '</tr>';
+        }
+        $html .= '</tbody>';
+
+        $html .= '</table>';
+        $html .= '</div>';
 
         return $html;
     }
+
 }

@@ -7,6 +7,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Shopping\OneTimeSubscriptionService;
+use App\Services\Vouchers\ResolvedDiscounts;
 
 class SubscriptionBatchFactory
 {
@@ -26,11 +27,12 @@ class SubscriptionBatchFactory
         array  $cartItems,
         array  $checkoutData,
         Member $member,
-        int    $siteId
+        int                $siteId,
+        ?ResolvedDiscounts $resolvedDiscounts,
     ): array
     {
         $subscriptions = [];
-        $voucherCode = $checkoutData['voucher_code'] ?? null; //todo discount needs plugging in
+        $voucherCode = $checkoutData['voucher_code'] ?? null;
         $voucherUsed = false;
 
         foreach ($cartItems as $item) {
@@ -55,7 +57,7 @@ class SubscriptionBatchFactory
                 deliveryType: $pricing->deliveryType,
                 siteId: $siteId,
                 voucherId: $pricing->voucherId,
-                discountAmountCents: $pricing->getDiscount(),
+                discountAmountCents: $resolvedDiscounts ? $resolvedDiscounts->getTotalDiscountCents() / 100 : $pricing->getDiscount(),
                 status: SubscriptionStatus::PENDING,
                 selectedStartDate: $item['options']['start_date'] ?? null
             );

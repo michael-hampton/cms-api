@@ -216,15 +216,18 @@ class CheckoutService
                     'order_internal_id' => $order->id,
                     'total' => $totalCents / 100,
                     'discount_breakdown' => [
-                        'offer_discount' => $discounts->offerDiscountCents / 100,
-                        'voucher_discount' => $discounts->voucherDiscountCents / 100,
-                        'reward_discount' => $discounts->rewardDiscountCents / 100,
-                        'total_discount' => $discounts->getTotalDiscountCents() / 100
+                        'offer_discount' => $discounts ? $discounts->offerDiscountCents / 100 : 0,
+                        'voucher_discount' => $discounts ? $discounts->voucherDiscountCents / 100 : 0,
+                        'reward_discount' => $discounts ? $discounts->rewardDiscountCents / 100 : 0,
+                        'total_discount' => $discounts ? $discounts->getTotalDiscountCents() / 100 : 0,
+                        'tiered_discount' => $discounts ? $discounts->tieredDiscountCents / 100 : 0,
                     ]
                 ];
             });
 
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             return [
                 'success' => false,
                 'message' => 'Failed to create order: ' . $e->getMessage()
@@ -307,7 +310,7 @@ class CheckoutService
             'subtotal' => $discounts->baseSubtotalCents / 100,
             'offer_discount' => $discounts->offerDiscountCents / 100,
             'voucher_discount' => $discounts->voucherDiscountCents / 100,
-            'discount' => $discounts->voucherDiscountCents / 100, //todo should be total of everything
+            'discount' => $discounts->getTotalDiscountCents() / 100,
             'reward_discount' => $discounts->rewardDiscountCents / 100,
             'shipping' => $shippingCents / 100,
             'tax' => $taxCents / 100,
@@ -928,7 +931,7 @@ class CheckoutService
                 }
 
                 // Clear cart AFTER successful transaction
-                $this->cartService->clear();
+                //$this->cartService->clear();
 
                 event(new MultiMerchantCheckoutCompletedEvent($checkoutId, $createdOrders));
 
@@ -946,6 +949,8 @@ class CheckoutService
             });
 
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             return [
                 'success' => false,
                 'message' => 'Checkout failed'

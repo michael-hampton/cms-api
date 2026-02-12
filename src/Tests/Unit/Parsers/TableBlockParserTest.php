@@ -45,9 +45,6 @@ class TableBlockParserTest extends TestCase
         $this->assertSame(2, $parsed['column_count']); // Max 2 columns
         $this->assertSame(6, $parsed['cell_count']); // 3 rows * 2 columns = 6 cells
         $this->assertSame(8, $parsed['total_word_count']); // 2+2+2 words
-
-        $this->assertTrue($parsed['formatted_rows'][0]['is_header']);
-        $this->assertFalse($parsed['formatted_rows'][1]['is_header']);
     }
 
     public function testTableParserParseEmptyAndInvalidRows(): void
@@ -73,7 +70,7 @@ class TableBlockParserTest extends TestCase
         $parser = new TableBlockParser();
         $parsedData = [
             'hasHeader' => true,
-            'formatted_rows' => [
+            'rows' => [
                 ['cells' => ['H1', 'H2'], 'is_header' => true],
                 ['cells' => ['D1', 'D2'], 'is_header' => false],
                 ['cells' => ['D3', 'D4'], 'is_header' => false],

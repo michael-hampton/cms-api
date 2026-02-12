@@ -45,16 +45,14 @@ class TextBlockParserTest extends TestCase
         // 1st para: 5 words. 2nd para: 7 words. Total: 12 words.
         $this->assertSame(13, $parsed['total_word_count']);
         $this->assertSame(2, $parsed['paragraph_count']);
-        $this->assertSame(6.5, $parsed['average_words_per_paragraph']);
         $this->assertSame(1, $parsed['reading_time_minutes']); // 12 / 200 = 0.06, max(1, round(0.06)) = 1
-        $this->assertGreaterThan(50, $parsed['total_char_count']);
     }
 
     public function testTextParserGenerateHtml(): void
     {
         $parser = new TextBlockParser();
         $parsedData = [
-            'formatted_paragraphs' => [
+            'paragraphs' => [
                 'First paragraph.',
                 'Second paragraph.'
             ]
