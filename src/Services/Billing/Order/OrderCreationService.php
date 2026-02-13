@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing\Order;
 
+use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\Orders\OrderCreatedEvent;
@@ -189,6 +190,10 @@ class OrderCreationService
             if (!isset($itemData['total'])) {
                 $itemData['total'] = $itemData['subtotal'] + ($itemData['tax'] ?? 0);
             }
+
+            $itemData['status'] = $item['order_line_status'] ?? OrderLineStatus::READY_TO_SHIP->value;
+            $itemData['expected_ship_date'] = $item['expected_ship_date'] ?? null;
+            $itemData['quantity_allocated'] = $item['quantity_allocated'] ?? $itemData['quantity'];
 
             // CRITICAL: Calculate commission ONLY if merchant_id and product_id are present
             if (!empty($item['merchant_id']) && !empty($item['product_id'])) {

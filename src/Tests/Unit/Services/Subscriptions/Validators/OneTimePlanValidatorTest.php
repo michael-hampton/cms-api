@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Subscriptions\Validators;
+namespace App\Tests\Unit\Services\Billing\Preorder\Validators;
 
 use App\Enums\Subscriptions\BillingPeriod;
 use App\Exceptions\Subscriptions\InvalidDeliveryTypeException;

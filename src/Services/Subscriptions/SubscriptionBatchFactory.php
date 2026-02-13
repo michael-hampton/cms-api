@@ -12,7 +12,7 @@ use App\Services\Vouchers\ResolvedDiscounts;
 class SubscriptionBatchFactory
 {
     public function __construct(
-        private readonly OneTimeSubscriptionService    $subscriptionService,
+        private readonly OneTimeSubscriptionService $subscriptionService,
         private readonly SubscriptionPricingService $pricingCalculator
     )
     {
@@ -59,15 +59,42 @@ class SubscriptionBatchFactory
                 voucherId: $pricing->voucherId,
                 discountAmountCents: $resolvedDiscounts ? $resolvedDiscounts->getTotalDiscountCents() / 100 : $pricing->getDiscount(),
                 status: SubscriptionStatus::PENDING,
-                selectedStartDate: $item['options']['start_date'] ?? null
+                selectedStartDate: $item['options']['start_date'] ?? null,
+                accessStartsAt: $item['estimated_delivery_to'],
+                firstShipmentAt: $item['estimated_delivery_to'] ?? null,
             );
 
             $subscriptions[] = [
                 'subscription' => $subscription,
-                'pricing' => $pricing
+                'pricing' => $pricing,
+                'meta' => $this->mergeMetaData($item)
             ];
         }
 
         return $subscriptions;
+    }
+
+    private function mergeMetaData(array $item): array
+    {
+        $metaKeys = [
+            'is_pre_release',
+            'release_date',
+            'expected_ship_date',
+            'is_preorder',
+            'next_issue_id',
+            'next_issue_number',
+            'next_issue_title',
+            'next_issue_on_sale_date',
+            'availability_message',
+            'estimated_dispatch',
+            'estimated_delivery_from',
+            'estimated_delivery_to',
+            'estimated_delivery_formatted',
+        ];
+
+        return array_merge(
+            array_fill_keys($metaKeys, null), // default values
+            array_intersect_key($item, array_flip($metaKeys)) // override with actual $item values
+        );
     }
 }

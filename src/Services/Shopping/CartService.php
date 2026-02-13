@@ -108,6 +108,7 @@ class CartService
                 'quantity' => $newQuantity,
                 'subtotal' => $price * $newQuantity
             ]);
+
         } else {
             $this->cartRepository->create([
                 'session_id' => $sessionId,
@@ -118,7 +119,7 @@ class CartService
                 'subtotal' => $price * $quantity,
                 'options' => json_encode($options),
                 'site_id' => $product->site_id,
-                'merchant_id' => $product->availableMerchants?->count() > 0 ? $product->availableMerchants->first()->id : null
+                'merchant_id' => $product->availableMerchants?->count() > 0 ? $product->availableMerchants->first()->merchant_id : null
             ]);
         }
 
@@ -195,7 +196,7 @@ class CartService
 
     protected function getUserId(): ?int
     {
-        $authId = auth()->id();
+        $authId = member_auth()->id();
         // Return null for guest users (don't use default value of 1)
         return $authId ?: null;
     }

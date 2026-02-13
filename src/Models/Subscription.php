@@ -64,6 +64,8 @@ class Subscription extends Model
         'upgrade_price_difference',
         'premium_access',
         'bundle_id',
+        'access_starts_at',
+        'first_shipment_at',
     ];
 
     protected $casts = [
@@ -84,6 +86,8 @@ class Subscription extends Model
         'upgraded_at' => 'datetime',
         'upgrade_price_difference' => 'float',
         'premium_access' => 'array',
+        'access_starts_at' => 'datetime',
+        'first_shipment_at' => 'datetime',
     ];
 
     public function member($relation = false)
@@ -793,6 +797,24 @@ class Subscription extends Model
         }
 
         return $bundle->includesNewsletter($newsletterSlug);
+    }
+
+    public function hasAccess(): bool
+    {
+        if (!$this->access_starts_at) {
+            return true; // No restriction
+        }
+
+        return $this->access_starts_at <= now();
+    }
+
+    public function canShip(): bool
+    {
+        if (!$this->first_shipment_at) {
+            return true; // No restriction
+        }
+
+        return $this->first_shipment_at <= now();
     }
 
 }

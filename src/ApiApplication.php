@@ -80,6 +80,10 @@ use App\Services\Shared\NativeSessionStore;
 use App\Services\Shared\RequestContext;
 use App\Services\Shared\SessionStore;
 use App\Services\Shared\WebRequestContext;
+use App\Services\Shipping\DeliveryEstimatorInterface;
+use App\Services\Shipping\HolidayProviderInterface;
+use App\Services\Shipping\InternalBusinessDayEstimator;
+use App\Services\Shipping\UkHolidayProvider;
 use Exception;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -104,6 +108,9 @@ class ApiApplication
         $this->container->bind(\DateTimeInterface::class, Date::class);
         $this->container->bind(RequestContext::class, WebRequestContext::class);
         $this->container->bind(SessionStore::class, NativeSessionStore::class);
+        $this->container->bind(DeliveryEstimatorInterface::class, InternalBusinessDayEstimator::class);
+        $this->container->bind(HolidayProviderInterface::class, UkHolidayProvider::class);
+
 
         $this->container->bind(
             EmailBlockRendererRegistry::class,

@@ -6,7 +6,7 @@ use App\DTO\VoucherValidationResult;
 use App\Models\Member;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
-use App\Services\Shopping\ShippingService;
+use App\Services\Shipping\ShippingService;
 use App\Services\Subscriptions\SubscriptionPricingService;
 use App\Services\Vouchers\VoucherService;
 use Mockery;

@@ -2,14 +2,20 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Order\OrderDraftService;
 use App\Services\Billing\Payments\PaymentIntentService;
+use App\Services\Shipping\FulfilmentResolver;
+use App\Services\Shipping\FulfilmentTypeInterface;
+use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutResponseBuilder;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
@@ -33,6 +39,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     private $memberAuth;
     private $database;
     private DiscountResolver $discountResolver;
+    private InternalBusinessDayEstimator $businessDayEstimator;
+    private FulfilmentResolver $fulfilmentResolver;
+    private SubscriptionPlanRepository $subscriptionPlanRepository;
 
     protected function setUp(): void
     {
@@ -46,6 +55,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->memberAuth = Mockery::mock(MemberAuthWrapper::class);
         $this->database = Mockery::mock(Database::class);
         $this->discountResolver = Mockery::mock(DiscountResolver::class);
+        $this->businessDayEstimator = Mockery::mock(InternalBusinessDayEstimator::class);
+        $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
+        $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
 
         $this->service = new OneTimeSubscriptionCheckoutService(
             $this->cartService,
@@ -55,7 +67,10 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             $this->responseBuilder,
             $this->memberAuth,
             $this->database,
-            $this->discountResolver
+            $this->discountResolver,
+            $this->businessDayEstimator,
+            $this->fulfilmentResolver,
+            $this->subscriptionPlanRepository,
         );
     }
 
@@ -101,6 +116,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
 
+        $this->setDeliveryEstimateExpectations();
+
         // Critical: verify transaction wraps subscription + order creation
         $this->database->shouldReceive('transaction')
             ->once()
@@ -140,6 +157,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         $transactionCallOrder = [];
 
@@ -208,6 +226,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setupAuthenticatedMember($member);
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         // Ensure cart returns the expected structure
         $this->cartService->shouldReceive('getItems')
@@ -269,6 +288,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setupAuthenticatedMember($member);
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         // Cart with 3 subscriptions
         $this->cartService->shouldReceive('getItems')
@@ -326,6 +346,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $order = $this->createMockOrder();
         $this->setupAuthenticatedMember($member);
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1],
@@ -361,6 +382,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = $this->createMockMember();
         $this->setupAuthenticatedMember($member);
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1, 'options' => ['delivery_type' => 'digital']]
@@ -394,6 +416,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = $this->createMockMember();
         $this->setupAuthenticatedMember($member);
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1, 'options' => ['delivery_type' => 'print']]
@@ -429,6 +452,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = $this->createMockMember();
         $this->setupAuthenticatedMember($member);
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
             ['subscription_plan_id' => 1]
@@ -503,6 +527,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $orderMock = Mockery::mock(Order::class)->makePartial();
         $member = $this->createMockMember();
         $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
 
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
@@ -747,6 +772,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
 
+        $this->setDeliveryEstimateExpectations();
+
         $subscriptionItems = [
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100, 'quantity' => 1]
         ];
@@ -789,7 +816,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
             ->with(
-                $subscriptionItems,
+                Mockery::any(),
                 [],
                 $member,
                 1,
@@ -836,6 +863,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService->shouldReceive('getItems')
             ->andReturn($subscriptionItems);
+
+        $this->setDeliveryEstimateExpectations();
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
         $this->memberAuth->shouldReceive('getMember')->andReturn($member);
@@ -888,6 +917,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->cartService->shouldReceive('getItems')
             ->andReturn($subscriptionItems);
 
+        $this->setDeliveryEstimateExpectations();
+
         $this->memberAuth->shouldReceive('check')->andReturn(true);
         $this->memberAuth->shouldReceive('getMember')->andReturn($member);
 
@@ -934,6 +965,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
         ];
 
+        $this->setDeliveryEstimateExpectations();
+
         $this->cartService->shouldReceive('getItems')
             ->andReturn($subscriptionItems);
 
@@ -977,6 +1010,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
+
+        $this->setDeliveryEstimateExpectations();
 
         $subscriptionItems = [
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
@@ -1029,6 +1064,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
 
+        $this->setDeliveryEstimateExpectations();
+
         $subscriptionItems = [
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
         ];
@@ -1078,6 +1115,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
+
+        $this->setDeliveryEstimateExpectations();
 
         $subscriptionItems = [
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
@@ -1130,6 +1169,28 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->assertEquals($expectedResponse, $result);
     }
 
+    private function setDeliveryEstimateExpectations()
+    {
+        $subscriptionPlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
 
+        $this->subscriptionPlanRepository->shouldReceive('lockForUpdate')
+            ->atLeast()->once()
+            ->andReturn($subscriptionPlan);
+
+        $fulfilment = Mockery::mock(FulfilmentTypeInterface::class)->makePartial();
+
+        $this->fulfilmentResolver->shouldReceive('resolve')
+            ->atLeast()->once()
+            ->with($subscriptionPlan)
+            ->andReturn($fulfilment);
+
+        $today = new \DateTimeImmutable();
+
+        $estimatedDelivery = new EstimatedDelivery(false, $today, $today, $today);
+
+        $this->businessDayEstimator->shouldReceive('estimate')
+            ->atLeast()->once()
+            ->andReturn($estimatedDelivery);
+    }
 
 }

@@ -702,6 +702,12 @@
                                                         onclick="updateQuantity(<?= $item['id'] ?>, <?= $item['quantity'] + 1 ?>)">
                                                     +
                                                 </button>
+                                                <?php if (!empty($item['estimated_delivery'])): ?>
+                                                    <div class="item-delivery"
+                                                         style="font-size: 0.75rem; color: var(--success-color); margin-top: 0.25rem;">
+                                                        📦 Delivery: <?= htmlspecialchars($item['estimated_delivery']) ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                         <div class="item-actions">

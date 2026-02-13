@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\IssueDeliveryStatus;
 
 class IssuesDelivered extends Model
 {
@@ -18,7 +18,7 @@ class IssuesDelivered extends Model
     ];
 
     protected $casts = [
-        'status' => IssueDeliveredStatus::class,
+        'status' => IssueDeliveryStatus::class,
         'attempts' => 'integer',
         'delivered_at' => 'datetime',
         'created_at' => 'datetime',
@@ -37,12 +37,12 @@ class IssuesDelivered extends Model
 
     public function isScheduled(): bool
     {
-        return $this->status === IssueDeliveredStatus::SCHEDULED;
+        return $this->status === IssueDeliveryStatus::SCHEDULED;
     }
 
     public function isDelivered(): bool
     {
-        return $this->status === IssueDeliveredStatus::DELIVERED;
+        return $this->status === IssueDeliveryStatus::DELIVERED;
     }
 
     public function canRetry(int $maxAttempts = 3): bool
@@ -52,13 +52,13 @@ class IssuesDelivered extends Model
 
     public function isFailed(): bool
     {
-        return $this->status === IssueDeliveredStatus::FAILED;
+        return $this->status === IssueDeliveryStatus::FAILED;
     }
 
     public function markAsDelivered(?\DateTime $deliveredAt = null): void
     {
         $this->update([
-            'status' => IssueDeliveredStatus::DELIVERED->value,
+            'status' => IssueDeliveryStatus::DELIVERED->value,
             'delivered_at' => ($deliveredAt ?? new \DateTime())->format('Y-m-d H:i:s'),
         ]);
     }
@@ -66,7 +66,7 @@ class IssuesDelivered extends Model
     public function markAsFailed(string $reason): void
     {
         $this->update([
-            'status' => IssueDeliveredStatus::FAILED->value,
+            'status' => IssueDeliveryStatus::FAILED->value,
             'attempts' => $this->attempts + 1,
             'failure_reason' => $this->buildFailureLog($reason),
         ]);
@@ -86,17 +86,17 @@ class IssuesDelivered extends Model
 
     public function scopeScheduled($query)
     {
-        return $query->where('status', IssueDeliveredStatus::SCHEDULED->value);
+        return $query->where('status', IssueDeliveryStatus::SCHEDULED->value);
     }
 
     public function scopeFailed($query)
     {
-        return $query->where('status', IssueDeliveredStatus::FAILED->value);
+        return $query->where('status', IssueDeliveryStatus::FAILED->value);
     }
 
     public function scopeCanRetry($query, int $maxAttempts = 3)
     {
-        return $query->where('status', IssueDeliveredStatus::FAILED->value)
+        return $query->where('status', IssueDeliveryStatus::FAILED->value)
             ->where('attempts', '<', $maxAttempts);
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Orders\OrderLineStatus;
+
 class OrderItem extends Model
 {
     protected $table = 'order_items';
@@ -20,6 +22,10 @@ class OrderItem extends Model
         'commission_rate',
         'commission_amount',
         'net_amount',
+        'status',
+        'expected_ship_date',
+        'quantity_allocated',
+        'preorder_enabled'
     ];
 
     protected $casts = [
@@ -28,7 +34,9 @@ class OrderItem extends Model
         'subtotal' => 'float',
         'tax' => 'float',
         'total' => 'float',
-        'metadata' => 'json'
+        'metadata' => 'json',
+        'expected_ship_date' => 'datetime',
+        'quantity_allocated' => 'integer'
     ];
 
     public function order($relation = false)
@@ -58,5 +66,20 @@ class OrderItem extends Model
         }
 
         return $data;
+    }
+
+    public function isPreorder(): bool
+    {
+        return $this->status === OrderLineStatus::PENDING_PREORDER;
+    }
+
+    public function isFullyAllocated(): bool
+    {
+        return $this->quantity_allocated === $this->quantity;
+    }
+
+    public function getRemainingQuantity(): int
+    {
+        return $this->quantity - $this->quantity_allocated;
     }
 }

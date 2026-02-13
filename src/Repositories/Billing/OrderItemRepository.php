@@ -2,6 +2,8 @@
 
 namespace App\Repositories\Billing;
 
+use App\Enums\Orders\OrderLineStatus;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\OrderItem;
 use App\Repositories\Repository;
@@ -36,5 +38,22 @@ class OrderItemRepository extends Repository
         }
 
         return true;
+    }
+
+    public function getPendingPreorderQuantity(int $productId): int
+    {
+        return OrderItem::where('product_id', $productId)
+            ->where('status', OrderLineStatus::PENDING_PREORDER->value)
+            ->sum(Database::raw('quantity - quantity_allocated'));
+    }
+
+    public function getPendingPreorders(int $productId): Collection
+    {
+        return OrderItem::where('product_id', $productId)
+            ->where('status', OrderLineStatus::PENDING_PREORDER->value)
+            ->whereColumn('quantity_allocated', '<', 'quantity')
+            ->orderBy('created_at', 'asc')
+            //->lockForUpdate()
+            ->get();
     }
 }

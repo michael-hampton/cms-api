@@ -46,6 +46,8 @@ class OrderDraftService
             $totalShippingCents += $pricing->shippingCents;
             $totalDiscountCents += $pricing->discountCents;
 
+            $meta = $subData['meta'] ?? [];
+
             $orderItems[] = [
                 'product_id' => null,
                 'product_name' => $subscription->plan_name . ' (' . ucfirst($pricing->deliveryType) . ')',
@@ -55,10 +57,15 @@ class OrderDraftService
                 'subtotal' => $pricing->getSubtotal(),
                 'tax' => 0, // Will be calculated below
                 'total' => $pricing->getSubtotal() + $pricing->getShipping(),
-                'metadata' => [
-                    'subscription_id' => $subscription->id,
-                    'delivery_type' => $pricing->deliveryType
-                ]
+                'preorder_enabled' => $meta['is_preorder'] ?? false,
+                'expected_ship_date' => $meta['expected_ship_date'] ?? $meta['estimated_delivery_to'] ?? null,
+                'metadata' => array_merge(
+                    $meta, // meta overrides defaults if keys collide
+                    [
+                        'subscription_id' => $subscription->id,
+                        'delivery_type' => $pricing->deliveryType
+                    ]
+                )
             ];
         }
 

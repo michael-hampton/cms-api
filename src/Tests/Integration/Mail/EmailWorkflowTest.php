@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Integration\Mail;
+namespace App\Tests\Unit\Services\Billing\Preorder\Mail;
 
 use App\Framework\Mail\ArrayMailer;
 use App\Framework\Support\Config;

@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
+use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
@@ -250,6 +251,17 @@ class IssueDeliveryRepository extends Repository
             page: $page,
             perPage: $perPage,
         );
+    }
+
+    /**
+     * Get the total quantity of pending pre-orders for a specific issue
+     * This counts subscribers who have pre-ordered this issue but haven't received it yet
+     */
+    public function getPendingPreorderQuantity(int $issueId): int
+    {
+        return IssueDelivery::where('id', $issueId)
+            ->where('status', OrderLineStatus::PENDING_PREORDER->value)
+            ->count();
     }
 
 }

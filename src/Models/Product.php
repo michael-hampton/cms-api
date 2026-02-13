@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
 use App\Models\Concerns\TracksCreator;
+use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
+use App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy;
 
 class Product extends Model
 {
@@ -32,6 +34,9 @@ class Product extends Model
         'created_at',
         'updated_at',
         'in_stock',
+        'preorder_enabled',
+        'preorder_restock_date',
+        'dispatch_days'
     ];
 
     protected $casts = [
@@ -41,6 +46,8 @@ class Product extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
         'clone_history' => 'array',
+        'preorder_enabled' => 'boolean',
+        'preorder_restock_date' => 'datetime',
     ];
 
     protected $table = 'products';
@@ -227,5 +234,15 @@ class Product extends Model
             'product_id',
             'specification_group_id'
         )->distinct();
+    }
+
+    public function availabilityPolicy(): AvailabilityPolicyInterface
+    {
+        return new PhysicalProductAvailabilityPolicy($this);
+    }
+
+    public function stockAlerts()
+    {
+        return $this->hasMany(ProductStockAlert::class);
     }
 }

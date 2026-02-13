@@ -5,7 +5,7 @@ namespace App\Services\Subscriptions;
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Models\Member;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
-use App\Services\Shopping\ShippingService;
+use App\Services\Shipping\ShippingService;
 use App\Services\Vouchers\VoucherService;
 
 class SubscriptionPricingService

@@ -2,6 +2,8 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Enums\Subscriptions\IssueDeliveryStatus;
+use App\Models\IssueDelivery;
 use App\Models\SubscriptionPlan;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
@@ -578,5 +580,320 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         ]);
 
         $this->assertIsArray($plan->premium_access);
+    }
+
+    public function testGetNextIssueReturnsUpcomingIssue(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        // Create future issue
+        $futureIssue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 101,
+            'issue_title' => 'Future Issue',
+            'on_sale_date' => now_datetime()->modify('+14 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        $nextIssue = $plan->getNextIssue();
+
+        $this->assertNotNull($nextIssue);
+        $this->assertEquals($futureIssue->id, $nextIssue->id);
+        $this->assertEquals('Future Issue', $nextIssue->issue_title);
+    }
+
+    public function testGetNextIssueReturnsCurrentIssueIfNoUpcoming(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        // Create current issue (on sale recently)
+        $currentIssue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 100,
+            'issue_title' => 'Current Issue',
+            'on_sale_date' => now_datetime()->modify('-2 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 50,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+
+        $nextIssue = $plan->getNextIssue();
+
+        $this->assertNotNull($nextIssue);
+        $this->assertEquals($currentIssue->id, $nextIssue->id);
+    }
+
+    public function testGetNextIssueReturnsNullWhenNoIssues(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        $nextIssue = $plan->getNextIssue();
+
+        $this->assertNull($nextIssue);
+    }
+
+    public function testGetCurrentIssueReturnsLatestReleasedIssue(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        // Create older issue
+        $olderIssue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 99,
+            'issue_title' => 'Older Issue',
+            'on_sale_date' => now_datetime()->modify('-30 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 10,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        // Create current issue
+        $currentIssue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 100,
+            'issue_title' => 'Current Issue',
+            'on_sale_date' => now_datetime()->modify('-2 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 50,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+
+        $current = $plan->getCurrentIssue();
+
+        $this->assertNotNull($current);
+        $this->assertEquals($currentIssue->id, $current->id);
+        $this->assertEquals('Current Issue', $current->issue_title);
+    }
+
+    public function testGetCurrentIssueReturnsNullForFutureOnlyIssues(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        // Create future issue only
+        $futureIssue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 101,
+            'title' => 'Future Issue',
+            'on_sale_date' => now_datetime()->modify('+30 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+
+        $current = $plan->getCurrentIssue();
+
+        $this->assertNull($current);
+    }
+
+    public function testGetUpcomingIssuesReturnsAllFutureIssues(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        // Create past issue (should not be included)
+        $pastIssue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 99,
+            'title' => 'Past Issue',
+            'on_sale_date' => now_datetime()->modify('-30 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 10,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        // Create future issues
+        $futureIssue1 = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 101,
+            'title' => 'Next Month',
+            'on_sale_date' => now_datetime()->modify('+30 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        $futureIssue2 = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 102,
+            'title' => 'Two Months Ahead',
+            'on_sale_date' => now_datetime()->modify('+60 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        $upcoming = $plan->getUpcomingIssues();
+
+        $this->assertCount(2, $upcoming);
+        $this->assertEquals($futureIssue1->id, $upcoming->first()->id);
+        $this->assertEquals($futureIssue2->id, $upcoming->last()->id);
+    }
+
+    public function testGetUpcomingIssuesReturnsEmptyCollectionWhenNone(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        $upcoming = $plan->getUpcomingIssues();
+
+        $this->assertCount(0, $upcoming);
+    }
+
+    public function testGetUpcomingIssuesOrdersByDateAscending(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Magazine Plan',
+            'slug' => 'magazine',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'print_shipping_required' => true,
+        ]);
+
+        // Create issues in random order
+        $issue2 = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 102,
+            'title' => 'Issue 2',
+            'on_sale_date' => now_datetime()->modify('+60 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        $issue1 = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 101,
+            'title' => 'Issue 1',
+            'on_sale_date' => now_datetime()->modify('+30 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        $issue3 = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 103,
+            'title' => 'Issue 3',
+            'on_sale_date' => now_datetime()->modify('+90 days'),
+            'status' => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity' => 100,
+            'subscription_plan_id' => $plan->id,
+        ]);
+
+        $upcoming = $plan->getUpcomingIssues();
+
+        $this->assertCount(3, $upcoming);
+        $this->assertEquals($issue1->id, $upcoming->first()->id);
+        $this->assertEquals($issue2->id, $upcoming->get(1)->id);
+        $this->assertEquals($issue3->id, $upcoming->last()->id);
+    }
+
+    public function testIsPreReleaseReturnsTrueForUnreleasedPlan(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Future Plan',
+            'slug' => 'future',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'release_date' => now_datetime()->modify('+30 days'),
+            'pre_release_enabled' => true,
+        ]);
+
+        $this->assertTrue($plan->isPreRelease());
+    }
+
+    public function testIsPreReleaseReturnsFalseForReleasedPlan(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Released Plan',
+            'slug' => 'released',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'release_date' => now_datetime()->modify('-30 days'),
+            'pre_release_enabled' => true,
+        ]);
+
+        $this->assertFalse($plan->isPreRelease());
+    }
+
+    public function testIsPreReleaseReturnsFalseWhenPreReleaseDisabled(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Future Plan',
+            'slug' => 'future',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'release_date' => now_datetime()->modify('+30 days'),
+            'pre_release_enabled' => false,
+        ]);
+
+        $this->assertFalse($plan->isPreRelease());
     }
 }

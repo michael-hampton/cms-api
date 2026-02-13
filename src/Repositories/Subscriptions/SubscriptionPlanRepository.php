@@ -120,4 +120,11 @@ class SubscriptionPlanRepository extends Repository
 
         return $query->orderBy('price', 'asc')->get();
     }
+
+    public function lockForUpdate(int $planId): ?SubscriptionPlan
+    {
+        return SubscriptionPlan::where('id', $planId)
+            //->lockForUpdate()
+            ->first();
+    }
 }

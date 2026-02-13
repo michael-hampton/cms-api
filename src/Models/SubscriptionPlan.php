@@ -1,7 +1,11 @@
 <?php
 namespace App\Models;
 
+use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Framework\Database\QueryBuilder;
+use App\Framework\Support\Collection;
+use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
+use App\Services\Billing\Preorder\SubscriptionAvailabilityPolicy;
 
 class SubscriptionPlan extends Model
 {
@@ -27,7 +31,10 @@ class SubscriptionPlan extends Model
         'includes_insider',
         'is_upgrade_option',
         'upgrade_from_plan_id',
-        'premium_access'
+        'premium_access',
+        'release_date',
+        'pre_release_enabled',
+        'dispatch_days'
     ];
 
     protected $casts = [
@@ -41,6 +48,8 @@ class SubscriptionPlan extends Model
         'includes_insider' => 'boolean',
         'is_upgrade_option' => 'boolean',
         'premium_access' => 'array',
+        'release_date' => 'datetime',
+        'pre_release_enabled' => 'boolean',
     ];
 
     public function site($relation = false)
@@ -267,6 +276,66 @@ class SubscriptionPlan extends Model
         return $this->hasMany(IssueDelivery::class, 'subscription_plan_id')
             ->where('is_active', true)
             ->orderBy('sort_order');
+    }
+
+    public function availabilityPolicy(): AvailabilityPolicyInterface
+    {
+        return new SubscriptionAvailabilityPolicy($this);
+    }
+
+    public function isPreRelease(): bool
+    {
+        return $this->availabilityPolicy()->isPreRelease();
+    }
+
+    /**
+     * Get the next scheduled issue for this subscription plan
+     * This is the issue that new subscribers would receive first
+     */
+    public function getNextIssue(): ?IssueDelivery
+    {
+
+        return IssueDelivery::query()
+            ->whereHas('subscriptionPlans', function ($q) {
+                $q->where('id', $this->id);
+            })
+            ->where('status', IssueDeliveryStatus::ACTIVE->value)
+            ->where(function ($q) {
+                // Get issues that are either:
+                // 1. On sale date is in the future (upcoming)
+                // 2. On sale date is today or recent past (current issue)
+                $q->where('on_sale_date', '>=', now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'))
+                    ->orWhereNull('on_sale_date'); // Draft issues without sale date yet
+            })
+            ->orderBy('on_sale_date', 'asc')
+            ->first();
+    }
+
+    public function getCurrentIssue(): ?IssueDelivery
+    {
+        return IssueDelivery::query()
+            ->whereHas('subscriptionPlans', function ($q) {
+                $q->where('id', $this->id);
+            })
+            ->where('status', IssueDeliveryStatus::ACTIVE->value)
+            ->where('on_sale_date', '<=', now())
+            ->orderBy('on_sale_date', 'desc')
+            ->first();
+    }
+
+    /**
+     * Get all future issues for this plan
+     */
+    public function getUpcomingIssues(): Collection
+    {
+        return IssueDelivery::query()
+            ->whereHas('subscriptionPlans', function ($q) {
+                $q->where('id', $this->id);
+            })
+            ->where('status', IssueDeliveryStatus::ACTIVE->value)
+            ->where('on_sale_date', '>', now())
+            ->orderBy('on_sale_date', 'asc')
+            ->get();
     }
 
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Subscriptions\ValueObjects;
+namespace App\Tests\Unit\Services\Billing\Preorder\ValueObjects;
 
 use App\Services\ValueObjects\Money;
 use InvalidArgumentException;

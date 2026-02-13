@@ -6,37 +6,51 @@ use App\Framework\Database\Database;
 
 abstract class BaseJob
 {
-    /**
-     * Creates a job instance with default dependencies automatically.
-     * Uses reflection to inspect constructor, auto-resolves Database singleton,
-     * and blindly calls `new $type()` for other classes.
-     */
     public static function for(): static
     {
-        $constructor = new \ReflectionClass(static::class);
-        $params = $constructor->getConstructor()?->getParameters() ?? [];
+        return static::resolve(static::class);
+    }
+
+    private static function resolve(string $class)
+    {
+        $reflection = new \ReflectionClass($class);
+
+        if (!$reflection->isInstantiable()) {
+            throw new \RuntimeException("Class {$class} is not instantiable");
+        }
+
+        $constructor = $reflection->getConstructor();
+
+        if (!$constructor) {
+            return new $class();
+        }
 
         $dependencies = [];
 
-        foreach ($params as $param) {
-            $type = $param->getType()?->getName() ?? null;
+        foreach ($constructor->getParameters() as $param) {
+            $type = $param->getType();
 
-            if ($type === Database::class) {
-                // singleton DB
-                $dependencies[] = Database::getInstance();
-            } elseif ($type && class_exists($type)) {
-                // naive reflection for everything else
-                $dependencies[] = new $type();
-            } elseif ($param->isDefaultValueAvailable()) {
-                $dependencies[] = $param->getDefaultValue();
-            } else {
+            if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
+                if ($param->isDefaultValueAvailable()) {
+                    $dependencies[] = $param->getDefaultValue();
+                    continue;
+                }
+
                 throw new \RuntimeException(
-                    "Cannot resolve constructor parameter '{$param->name}' of type '{$type}' for job "
-                    . static::class
+                    "Cannot resolve parameter '{$param->getName()}' in {$class}"
                 );
+            }
+
+            $typeName = $type->getName();
+
+            if ($typeName === Database::class) {
+                $dependencies[] = Database::getInstance();
+            } else {
+                $dependencies[] = static::resolve($typeName); // 🔥 recursive
             }
         }
 
-        return $constructor->newInstanceArgs($dependencies);
+        return $reflection->newInstanceArgs($dependencies);
     }
+
 }

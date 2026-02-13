@@ -2,14 +2,18 @@
 
 namespace App\Services\Shopping;
 
+use App\DTO\Checkout\DeliveryMethodConfig;
+use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\Checkout\MultiMerchantCheckoutCompletedEvent;
 use App\Events\Orders\OrderCompletedEvent;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\ShipmentRepository;
 use App\Repositories\Product\MerchantRepository;
+use App\Repositories\Product\ProductRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\Order\OrderCreationService;
@@ -17,8 +21,13 @@ use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\PaymentAllocationService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Preorder\Actions\CalculateSellableStockAction;
+use App\Services\Billing\Preorder\Actions\ResolveAvailabilityAction;
 use App\Services\Billing\TaxCalculatorService;
 use App\Services\Currency\CurrencyResolver;
+use App\Services\Shipping\FulfilmentResolver;
+use App\Services\Shipping\InternalBusinessDayEstimator;
+use App\Services\Shipping\ShippingService;
 use App\Services\ValueObjects\Money;
 use App\Services\Vouchers\DiscountContext;
 use App\Services\Vouchers\DiscountResolver;
@@ -27,6 +36,7 @@ use App\Services\Vouchers\Providers\RewardDiscountProvider;
 use App\Services\Vouchers\Providers\VoucherDiscountProvider;
 use App\Services\Vouchers\ResolvedDiscounts;
 use App\Services\Vouchers\VoucherService;
+use DateTimeImmutable;
 use Exception;
 
 class CheckoutService
@@ -50,7 +60,11 @@ class CheckoutService
         private readonly MerchantRepository      $merchantRepository,
         private readonly DiscountResolver        $discountResolver,
         private readonly RewardsRepository       $rewardsRepository,
-
+        private readonly InternalBusinessDayEstimator $deliveryEstimator,
+        private readonly FulfilmentResolver           $fulfilmentResolver,
+        private readonly ProductRepository            $productRepository,
+        private readonly ResolveAvailabilityAction    $resolveAvailabilityAction,
+        private readonly CalculateSellableStockAction $calculateSellableStockAction
     )
     {
     }
@@ -77,6 +91,14 @@ class CheckoutService
                     'message' => 'Cart is empty'
                 ];
             }
+
+            // ========================================
+            // PREORDER INTEGRATION - VALIDATE & RESOLVE
+            // ========================================
+            $cartItems = $this->validateAndResolveAvailability($cartItems);
+
+            // ← ATTACH DELIVERY ESTIMATES
+            $cartItems = $this->attachDeliveryEstimates($cartItems);
 
             $member = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember() : null;
 
@@ -226,8 +248,8 @@ class CheckoutService
             });
 
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
+//            echo $e->getMessage();
+//            die;
             return [
                 'success' => false,
                 'message' => 'Failed to create order: ' . $e->getMessage()
@@ -380,7 +402,12 @@ class CheckoutService
                 'price' => $item['price'],
                 'quantity' => $item['quantity'] ?? 1,
                 'subtotal' => $itemSubtotalCents / 100,
-                'discount' => $itemDiscountCents / 100
+                'discount' => $itemDiscountCents / 100,
+                'order_line_status' => $item['order_line_status'] ?? OrderLineStatus::READY_TO_SHIP->value,
+                'expected_ship_date' => $item['expected_ship_date'] ?? null,
+                'quantity_allocated' => ($item['order_line_status'] ?? OrderLineStatus::READY_TO_SHIP->value) === OrderLineStatus::READY_TO_SHIP->value
+                    ? ($item['quantity'] ?? 1)
+                    : 0,
             ];
         }
 
@@ -507,159 +534,159 @@ class CheckoutService
         return ['valid' => true];
     }
 
-    public function calculateTotals($cartItems, $voucherData = null)
-    {
-        $subtotal = 0;
-        $offerDiscount = 0;
-        $voucherDiscount = 0;
-        $baseSubtotal = 0;
+//    public function calculateTotals($cartItems, $voucherData = null)
+//    {
+//        $subtotal = 0;
+//        $offerDiscount = 0;
+//        $voucherDiscount = 0;
+//        $baseSubtotal = 0;
+//
+//        // First pass: calculate base prices and offer discounts
+//        $itemsWithDiscounts = [];
+//
+//        // 1️⃣ First pass: calculate base prices and offer discounts
+//        foreach ($cartItems as $item) {
+//            $basePrice = $item['base_price'] ?? $item['price'];
+//            $salePrice = $item['price'];
+//            $quantity = $item['quantity'];
+//
+//            $itemBaseSubtotal = $basePrice * $quantity;
+//            $itemSubtotal = $salePrice * $quantity;
+//            $itemOfferDiscount = max(0, $itemBaseSubtotal - $itemSubtotal);
+//
+//            $baseSubtotal += $itemBaseSubtotal;
+//            $subtotal += $itemSubtotal;
+//            $offerDiscount += $itemOfferDiscount;
+//
+//            $itemsWithDiscounts[] = array_merge($item, [
+//                'base_subtotal' => $itemBaseSubtotal,
+//                'subtotal' => $itemSubtotal,
+//                'item_offer_discount' => $itemOfferDiscount
+//            ]);
+//        }
+//
+//        // 2️⃣ Apply voucher if provided
+//        $voucherEligibleItems = [];
+//
+//        if ($voucherData && $voucherData['valid']) {
+//            $potentialVoucherDiscount = $voucherData['discount'];
+//            $voucherEligibleItems = $voucherData['eligible_items'] ?? [];
+//            $isStackable = $voucherData['is_stackable'] ?? false;
+//            $requiresOverride = $voucherData['requires_override_decision'] ?? false;
+//
+//            if ($isStackable) {
+//                // Stackable voucher applies on top of offers
+//                $voucherDiscount = $potentialVoucherDiscount;
+//
+//            } elseif ($requiresOverride) {
+//                // Non-stackable: compare offer vs voucher for eligible items
+//                $eligibleItemIds = array_column($voucherEligibleItems, 'id');
+//                $offerDiscountForEligibleItems = 0;
+//
+//                foreach ($itemsWithDiscounts as $item) {
+//                    if (in_array($item['id'], $eligibleItemIds)) {
+//                        $offerDiscountForEligibleItems += $item['item_offer_discount'];
+//                    }
+//                }
+//
+//                if ($potentialVoucherDiscount > $offerDiscountForEligibleItems) {
+//                    // Voucher wins - remove offer discount only for eligible items
+//                    $voucherDiscount = $potentialVoucherDiscount;
+//                    $offerDiscount -= $offerDiscountForEligibleItems;
+//
+//                    // MISSING: Recalculate subtotal after resetting prices
+//                    $subtotal = 0; // Reset and recalculate
+//
+//                    foreach ($itemsWithDiscounts as &$item) {
+//                        if (in_array($item['id'], $eligibleItemIds)) {
+//                            $item['item_offer_discount'] = 0;
+//                            $item['price'] = $item['base_price'];
+//                            $item['subtotal'] = $item['base_subtotal'];
+//                        }
+//                        $subtotal += $item['subtotal']; // Recalculate from updated items
+//                    }
+//                    unset($item);
+//                } else {
+//                    // Offer wins - voucher ignored
+//                    $voucherDiscount = 0;
+//                    $voucherData = null;
+//                }
+//            } else {
+//                // Stackable without conflicts
+//                $voucherDiscount = $potentialVoucherDiscount;
+//            }
+//        }
+//
+//        return [
+//            'base_subtotal' => $baseSubtotal,
+//            'subtotal' => $subtotal, // Now recalculated
+//            'offer_discount' => $offerDiscount,
+//            'voucher_discount' => $voucherDiscount,
+//            'voucher_code' => $voucherData['voucher_code'] ?? null,
+//            'voucher_id' => $voucherData['voucher_id'] ?? null,
+//            'campaign_id' => $voucherData['campaign_id'] ?? null,
+//            'merchant_id' => $voucherData['merchant_id'] ?? null,
+//            'is_stackable' => $voucherData['is_stackable'] ?? null,
+//            'voucher_eligible_items' => $voucherData['eligible_items'] ?? [],
+//            'items_with_discounts' => $itemsWithDiscounts, // Use updated items
+//            'prices_adjusted' => !$isStackable && $requiresOverride // Flag for UI
+//        ];
+//
+//    }
 
-        // First pass: calculate base prices and offer discounts
-        $itemsWithDiscounts = [];
-
-        // 1️⃣ First pass: calculate base prices and offer discounts
-        foreach ($cartItems as $item) {
-            $basePrice = $item['base_price'] ?? $item['price'];
-            $salePrice = $item['price'];
-            $quantity = $item['quantity'];
-
-            $itemBaseSubtotal = $basePrice * $quantity;
-            $itemSubtotal = $salePrice * $quantity;
-            $itemOfferDiscount = max(0, $itemBaseSubtotal - $itemSubtotal);
-
-            $baseSubtotal += $itemBaseSubtotal;
-            $subtotal += $itemSubtotal;
-            $offerDiscount += $itemOfferDiscount;
-
-            $itemsWithDiscounts[] = array_merge($item, [
-                'base_subtotal' => $itemBaseSubtotal,
-                'subtotal' => $itemSubtotal,
-                'item_offer_discount' => $itemOfferDiscount
-            ]);
-        }
-
-        // 2️⃣ Apply voucher if provided
-        $voucherEligibleItems = [];
-
-        if ($voucherData && $voucherData['valid']) {
-            $potentialVoucherDiscount = $voucherData['discount'];
-            $voucherEligibleItems = $voucherData['eligible_items'] ?? [];
-            $isStackable = $voucherData['is_stackable'] ?? false;
-            $requiresOverride = $voucherData['requires_override_decision'] ?? false;
-
-            if ($isStackable) {
-                // Stackable voucher applies on top of offers
-                $voucherDiscount = $potentialVoucherDiscount;
-
-            } elseif ($requiresOverride) {
-                // Non-stackable: compare offer vs voucher for eligible items
-                $eligibleItemIds = array_column($voucherEligibleItems, 'id');
-                $offerDiscountForEligibleItems = 0;
-
-                foreach ($itemsWithDiscounts as $item) {
-                    if (in_array($item['id'], $eligibleItemIds)) {
-                        $offerDiscountForEligibleItems += $item['item_offer_discount'];
-                    }
-                }
-
-                if ($potentialVoucherDiscount > $offerDiscountForEligibleItems) {
-                    // Voucher wins - remove offer discount only for eligible items
-                    $voucherDiscount = $potentialVoucherDiscount;
-                    $offerDiscount -= $offerDiscountForEligibleItems;
-
-                    // MISSING: Recalculate subtotal after resetting prices
-                    $subtotal = 0; // Reset and recalculate
-
-                    foreach ($itemsWithDiscounts as &$item) {
-                        if (in_array($item['id'], $eligibleItemIds)) {
-                            $item['item_offer_discount'] = 0;
-                            $item['price'] = $item['base_price'];
-                            $item['subtotal'] = $item['base_subtotal'];
-                        }
-                        $subtotal += $item['subtotal']; // Recalculate from updated items
-                    }
-                    unset($item);
-                } else {
-                    // Offer wins - voucher ignored
-                    $voucherDiscount = 0;
-                    $voucherData = null;
-                }
-            } else {
-                // Stackable without conflicts
-                $voucherDiscount = $potentialVoucherDiscount;
-            }
-        }
-
-        return [
-            'base_subtotal' => $baseSubtotal,
-            'subtotal' => $subtotal, // Now recalculated
-            'offer_discount' => $offerDiscount,
-            'voucher_discount' => $voucherDiscount,
-            'voucher_code' => $voucherData['voucher_code'] ?? null,
-            'voucher_id' => $voucherData['voucher_id'] ?? null,
-            'campaign_id' => $voucherData['campaign_id'] ?? null,
-            'merchant_id' => $voucherData['merchant_id'] ?? null,
-            'is_stackable' => $voucherData['is_stackable'] ?? null,
-            'voucher_eligible_items' => $voucherData['eligible_items'] ?? [],
-            'items_with_discounts' => $itemsWithDiscounts, // Use updated items
-            'prices_adjusted' => !$isStackable && $requiresOverride // Flag for UI
-        ];
-
-    }
-
-    private function prepareOrderData($data, $totals, $cartItems, $siteId)
-    {
-        // Resolve currency once from CurrencyResolver
-        $currency = $this->currencyResolver->resolve($siteId);
-
-        $orderData = [
-            'user_id' => $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember()->id : null,
-            'site_id' => $siteId,
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'],
-            'subtotal' => $totals['subtotal'],
-            'shipping' => $totals['shipping'],
-            'tax' => $totals['tax'],
-            'discount' => $totals['voucher_discount'] + $totals['offer_discount'],
-            'total' => $totals['total'],
-            'currency' => strtoupper($currency), // Use resolved currency consistently
-            'payment_method' => $data['payment_method'] ?? 'card',
-            'status' => 'pending',
-            'payment_status' => 'pending',
-            'metadata' => json_encode([
-                'offer_discount' => $totals['offer_discount'],
-                'voucher_discount' => $totals['voucher_discount'],
-                'voucher_code' => $totals['voucher_code'],
-                'voucher_id' => $totals['voucher_id'],
-                'campaign_id' => $totals['campaign_id'],
-                'is_stackable' => $totals['is_stackable']
-            ])
-        ];
-
-        // Handle shipping address
-        if ($this->cartService->requiresShipping()) {
-            if (isset($data['saved_address'])) {
-                $orderData['shipping_address_id'] = $data['saved_address'];
-            } else {
-                $orderData['shipping_address'] = json_encode([
-                    'address' => $data['address'],
-                    'city' => $data['city'],
-                    'state' => $data['state'] ?? '',
-                    'postal_code' => $data['postal_code'],
-                    'country' => $data['country']
-                ]);
-            }
-        }
-
-        // Add voucher code if present
-        if (!empty($totals['voucher_code'])) {
-            $orderData['voucher_code'] = $totals['voucher_code'];
-        }
-
-        return $orderData;
-    }
+//    private function prepareOrderData($data, $totals, $cartItems, $siteId)
+//    {
+//        // Resolve currency once from CurrencyResolver
+//        $currency = $this->currencyResolver->resolve($siteId);
+//
+//        $orderData = [
+//            'user_id' => $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember()->id : null,
+//            'site_id' => $siteId,
+//            'first_name' => $data['first_name'],
+//            'last_name' => $data['last_name'],
+//            'email' => $data['email'],
+//            'phone' => $data['phone'],
+//            'subtotal' => $totals['subtotal'],
+//            'shipping' => $totals['shipping'],
+//            'tax' => $totals['tax'],
+//            'discount' => $totals['voucher_discount'] + $totals['offer_discount'],
+//            'total' => $totals['total'],
+//            'currency' => strtoupper($currency), // Use resolved currency consistently
+//            'payment_method' => $data['payment_method'] ?? 'card',
+//            'status' => 'pending',
+//            'payment_status' => 'pending',
+//            'metadata' => json_encode([
+//                'offer_discount' => $totals['offer_discount'],
+//                'voucher_discount' => $totals['voucher_discount'],
+//                'voucher_code' => $totals['voucher_code'],
+//                'voucher_id' => $totals['voucher_id'],
+//                'campaign_id' => $totals['campaign_id'],
+//                'is_stackable' => $totals['is_stackable']
+//            ])
+//        ];
+//
+//        // Handle shipping address
+//        if ($this->cartService->requiresShipping()) {
+//            if (isset($data['saved_address'])) {
+//                $orderData['shipping_address_id'] = $data['saved_address'];
+//            } else {
+//                $orderData['shipping_address'] = json_encode([
+//                    'address' => $data['address'],
+//                    'city' => $data['city'],
+//                    'state' => $data['state'] ?? '',
+//                    'postal_code' => $data['postal_code'],
+//                    'country' => $data['country']
+//                ]);
+//            }
+//        }
+//
+//        // Add voucher code if present
+//        if (!empty($totals['voucher_code'])) {
+//            $orderData['voucher_code'] = $totals['voucher_code'];
+//        }
+//
+//        return $orderData;
+//    }
 
     private function prepareOrderItems(array $cartItems): array
     {
@@ -673,7 +700,9 @@ class CheckoutService
                 'unit_price' => $cartItem['price'],
                 'subtotal' => $cartItem['subtotal'],
                 'tax' => 0,
-                'total' => $cartItem['subtotal']
+                'total' => $cartItem['subtotal'],
+                'expected_ship_date' => $cartItem['expected_ship_date'],
+                'preorder_enabled' => $cartItem['is_preorder'],
             ];
         }
         return $items;
@@ -698,7 +727,7 @@ class CheckoutService
                     PaymentStatus::PAID->value
                 );
 
-                //$this->cartService->clear();
+                $this->cartService->clear();
 
                 $order = $this->orderService->find($orderId);
                 event(new OrderCompletedEvent($order));
@@ -742,6 +771,15 @@ class CheckoutService
             if (empty($cartItems)) {
                 return ['success' => false, 'message' => 'Cart is empty'];
             }
+
+            // ========================================
+            // PREORDER INTEGRATION - VALIDATE & RESOLVE
+            // ========================================
+            $cartItems = $this->validateAndResolveAvailability($cartItems);
+            // ========================================
+
+            // ← ATTACH DELIVERY ESTIMATES
+            $cartItems = $this->attachDeliveryEstimates($cartItems);
 
             $member = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember() : null;
 
@@ -931,7 +969,7 @@ class CheckoutService
                 }
 
                 // Clear cart AFTER successful transaction
-                //$this->cartService->clear();
+                $this->cartService->clear();
 
                 event(new MultiMerchantCheckoutCompletedEvent($checkoutId, $createdOrders));
 
@@ -949,12 +987,125 @@ class CheckoutService
             });
 
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
+//            echo $e->getMessage();
+//            die;
             return [
                 'success' => false,
                 'message' => 'Checkout failed'
             ];
         }
+    }
+
+    private function attachDeliveryEstimates(array $cartItems): array
+    {
+        $itemsWithEstimates = [];
+        $deliveryMethod = DeliveryMethodConfig::default();
+        $orderDate = new DateTimeImmutable();
+
+        foreach ($cartItems as $item) {
+            // Get the purchasable item (Product or SubscriptionPlan)
+            $purchasable = $this->resolvePurchasable($item);
+
+            if (!$purchasable) {
+                // If we can't resolve, skip delivery estimation
+                $itemsWithEstimates[] = $item;
+                continue;
+            }
+
+            $fulfilment = $this->fulfilmentResolver->resolve($purchasable);
+
+            $estimate = $this->deliveryEstimator->estimate(
+                $fulfilment,
+                $deliveryMethod,
+                $orderDate
+            );
+
+            $itemsWithEstimates[] = array_merge($item, [
+                'estimated_dispatch' => $estimate->dispatchDate?->format('Y-m-d'),
+                'estimated_delivery_from' => $estimate->from?->format('Y-m-d'),
+                'estimated_delivery_to' => $estimate->to?->format('Y-m-d'),
+                'estimated_delivery_formatted' => $estimate->formattedRange(),
+                'requires_shipping' => $estimate->requiresShipping
+            ]);
+        }
+
+        return $itemsWithEstimates;
+    }
+
+    private function resolvePurchasable(array $item): mixed
+    {
+        // Check if it's a subscription
+        if (!empty($item['subscription_plan_id'])) {
+            return SubscriptionPlan::find($item['subscription_plan_id']);
+        }
+
+        // Otherwise it's a product
+        if (!empty($item['product_id'])) {
+            return $this->productRepository->find($item['product_id']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Validate product availability and resolve preorder/stock status
+     *
+     * This runs INSIDE the transaction to ensure atomic stock checks
+     * Uses row locking to prevent race conditions
+     */
+    private function validateAndResolveAvailability(array $cartItems): array
+    {
+        foreach ($cartItems as &$item) {
+            // Skip non-product items (e.g., subscriptions, fees)
+            if (empty($item['product_id'])) {
+                continue;
+            }
+
+            // Lock product row for atomic stock check
+            $product = $this->productRepository->lockForUpdate($item['product_id']);
+
+            if (!$product) {
+                throw new \Exception("Product not found: {$item['product_name']}");
+            }
+
+            $policy = $product->availabilityPolicy();
+
+            // Check if product can be purchased at all
+            if (!$policy->canPurchase()) {
+                throw new \Exception("{$product->name} is not available for purchase");
+            }
+
+            // ========================================
+            // CRITICAL: Check sellable stock FIRST
+            // This prevents normal purchases from starving preorders
+            // ========================================
+            $sellableStock = $this->calculateSellableStockAction->execute($product);
+
+            // If requesting more than sellable stock, check if preorder is available
+            if ($item['quantity'] > $sellableStock) {
+                // Must be preorder to proceed
+                if (!$policy->isPreOrder()) {
+                    throw new \Exception(
+                        "{$product->name} has insufficient stock. " .
+                        "Available: {$sellableStock}, Requested: {$item['quantity']}"
+                    );
+                }
+
+                // Validate preorder has restock date
+                if (!$policy->getExpectedShipDate()) {
+                    throw new \Exception("{$product->name} preorder is not configured correctly");
+                }
+            }
+
+            // Resolve availability state for order line
+            $availability = $this->resolveAvailabilityAction->execute($product, $item['quantity']);
+
+            // Snapshot preorder data
+            $item['order_line_status'] = $availability['status'];
+            $item['expected_ship_date'] = $availability['expected_ship_date']?->format('Y-m-d H:i:s') ?? null;
+            $item['is_preorder'] = $availability['is_preorder'];
+        }
+
+        return $cartItems;
     }
 }

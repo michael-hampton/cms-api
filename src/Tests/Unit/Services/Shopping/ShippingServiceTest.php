@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Shopping;
 
-use App\Services\Shopping\ShippingService;
+use App\Services\Shipping\ShippingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class ShippingServiceTest extends FunctionalTestCase

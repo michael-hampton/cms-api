@@ -1,6 +1,7 @@
 <?php
 
 use App\Framework\Authorization\Auth;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Container;
 use App\Framework\Date;
 use App\Framework\Events\EventDispatcher;
@@ -18,10 +19,26 @@ if (!function_exists('auth')) {
     }
 }
 
+if (!function_exists('member_auth')) {
+    function member_auth(): MemberAuth
+    {
+        return new MemberAuth();
+    }
+}
+
 if (!function_exists('url')) {
     function url(string $path): ?string
     {
         return $path;
+    }
+}
+
+if (!function_exists('dd')) {
+    function dd(mixed $value): ?string
+    {
+        echo '<pre>';
+        print_r($value);
+        die;
     }
 }
 
@@ -167,6 +184,7 @@ if (!function_exists('config')) {
                 'recommendations' => 'config/recommendations.php',
                 'commission' => 'config/commission.php',
                 'bundles' => 'config/bundles.php',
+                'shipping' => 'config/shipping.php',
             ];
 
             foreach ($configFiles as $name => $file) {

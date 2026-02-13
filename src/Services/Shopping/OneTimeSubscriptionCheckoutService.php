@@ -2,13 +2,19 @@
 
 namespace App\Services\Shopping;
 
+use App\DTO\Checkout\DeliveryMethodConfig;
+use App\Enums\Orders\OrderLineStatus;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Order\OrderDraftService;
 use App\Services\Billing\Payments\PaymentIntentService;
+use App\Services\Shipping\DeliveryEstimatorInterface;
+use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
 use App\Services\Vouchers\DiscountContext;
 use App\Services\Vouchers\DiscountResolver;
+use DateTimeImmutable;
 
 class OneTimeSubscriptionCheckoutService
 {
@@ -20,7 +26,10 @@ class OneTimeSubscriptionCheckoutService
         private readonly CheckoutResponseBuilder  $responseBuilder,
         private readonly MemberAuthWrapper        $memberAuth,
         private readonly Database         $database,
-        private readonly DiscountResolver $discountResolver
+        private readonly DiscountResolver           $discountResolver,
+        private readonly DeliveryEstimatorInterface $deliveryEstimator,
+        private readonly FulfilmentResolver         $fulfilmentResolver,
+        private readonly SubscriptionPlanRepository $subscriptionPlanRepository
     )
     {
     }
@@ -45,6 +54,9 @@ class OneTimeSubscriptionCheckoutService
                 'redirect' => '/member/login?redirect=/checkout'
             ];
         }
+
+        // 2.5. VALIDATE AVAILABILITY AND ATTACH DELIVERY ESTIMATES
+        $subscriptionItems = $this->validateAndAttachEstimates($subscriptionItems);
 
         $member = $this->memberAuth->getMember();
 
@@ -165,6 +177,121 @@ class OneTimeSubscriptionCheckoutService
                 $subData['subscription']->update(['status' => 'cancelled']);
             }
         });
+    }
+
+    private function validateAndAttachEstimates(array $subscriptionItems): array
+    {
+        $itemsWithEstimates = [];
+        $deliveryMethod = DeliveryMethodConfig::default();
+        $orderDate = new DateTimeImmutable();
+
+        foreach ($subscriptionItems as $item) {
+            // Lock subscription plan for availability check
+            $plan = $this->subscriptionPlanRepository->lockForUpdate($item['subscription_plan_id']);
+
+            if (!$plan) {
+                throw new \Exception("Subscription plan not found");
+            }
+
+            // ========================================
+            // STEP 1: Check plan availability via policy
+            // ========================================
+            $policy = $plan->availabilityPolicy();
+
+            if (!$policy->canPurchase()) {
+                $message = $policy->getAvailabilityMessage();
+                throw new \Exception("Subscription not available: {$message}");
+            }
+
+            // ========================================
+            // STEP 2: For PRINT subscriptions, validate next issue
+            // ========================================
+            $orderLineStatus = null;
+            $expectedShipDate = null;
+            $isPreorder = false;
+            $nextIssue = null;
+
+            if ($plan->print_shipping_required) {
+                $nextIssue = $plan->getNextIssue();
+
+                if (!$nextIssue) {
+                    throw new \Exception("No issues scheduled for {$plan->name}");
+                }
+
+                $issuePolicy = $nextIssue->availabilityPolicy();
+
+                if (!$issuePolicy->canPurchase()) {
+                    throw new \Exception(
+                        "Next issue not available: " . $issuePolicy->getAvailabilityMessage()
+                    );
+                }
+
+                // Determine order line status based on next issue stock
+                $quantity = $item['quantity'] ?? 1;
+
+                if ($nextIssue->stock_quantity >= $quantity) {
+                    $orderLineStatus = OrderLineStatus::READY_TO_SHIP->value;
+
+                } else if ($issuePolicy->isPreOrder()) {
+                    $orderLineStatus = OrderLineStatus::PENDING_PREORDER->value;
+                    $expectedShipDate = $issuePolicy->getExpectedShipDate();
+                    $isPreorder = true;
+
+                    if (!$expectedShipDate) {
+                        throw new \Exception('Pre-order requires expected ship date');
+                    }
+                } else {
+                    throw new \Exception(
+                        "Issue #{$nextIssue->issue_number} out of stock. " .
+                        "Available: {$nextIssue->stock_quantity}, Requested: {$quantity}"
+                    );
+                }
+            }
+
+            // ========================================
+            // STEP 3: Calculate delivery estimates
+            // ========================================
+            $fulfilment = $this->fulfilmentResolver->resolve($plan);
+
+            $estimate = $this->deliveryEstimator->estimate(
+                $fulfilment,
+                $deliveryMethod,
+                $orderDate
+            );
+
+            // ========================================
+            // STEP 4: Attach all metadata to cart item
+            // This data flows through to SubscriptionBatchFactory and OrderDraftService
+            // ========================================
+            $itemsWithEstimates[] = array_merge($item, [
+                // Plan-level pre-release (content not ready)
+                'is_pre_release' => $policy->isPreRelease(),
+                'release_date' => $plan->release_date?->format('Y-m-d'),
+
+                // Issue-level pre-order (stock not ready) - ONLY for print
+                'order_line_status' => $orderLineStatus,
+                'expected_ship_date' => $expectedShipDate?->format('Y-m-d'),
+                'is_preorder' => $isPreorder,
+
+                // Next issue info (for display and order item metadata)
+                'next_issue_id' => $nextIssue?->id,
+                'next_issue_number' => $nextIssue?->issue_number,
+                'next_issue_title' => $nextIssue?->issue_title,
+                'next_issue_on_sale_date' => $nextIssue?->on_sale_date?->format('Y-m-d'),
+
+                // Availability message for UI
+                'availability_message' => $policy->getAvailabilityMessage(),
+
+                // Delivery estimates for UI
+                'estimated_dispatch' => $estimate->dispatchDate?->format('Y-m-d'),
+                'estimated_delivery_from' => $estimate->from?->format('Y-m-d'),
+                'estimated_delivery_to' => $estimate->to?->format('Y-m-d'),
+                'estimated_delivery_formatted' => $estimate->formattedRange(),
+                'requires_shipping' => $estimate->requiresShipping
+            ]);
+        }
+
+        return $itemsWithEstimates;
     }
 
 }

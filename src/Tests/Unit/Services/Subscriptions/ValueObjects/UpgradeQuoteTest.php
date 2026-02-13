@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Subscriptions\ValueObjects;
+namespace App\Tests\Unit\Services\Billing\Preorder\ValueObjects;
 
 use App\Services\Subscriptions\ValueObjects\UpgradeQuote;
 use App\Services\ValueObjects\Money;

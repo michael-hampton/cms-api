@@ -374,7 +374,7 @@
             align-items: center;
             gap: 1rem;
             padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
+            /*border-bottom: 1px solid var(--border-color);*/
         }
 
         .item-image {
@@ -984,6 +984,7 @@
                 <h3>Order Summary</h3>
 
                 <div id="order-items">
+
                     <?php
                     // Group items by merchant
                     $itemsByMerchant = [];
@@ -1008,7 +1009,7 @@
 
                                    as $merchantId => $merchantData): ?>
                     <div class="merchant-group"
-                         style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
+                         style="margin-bottom: 1.5rem; padding-bottom: 1.5rem;">
                         <div class="merchant-header" style="margin-bottom: 1rem;">
                             <strong style="font-size: 0.875rem; color: var(--text-primary);">
                                 <?= htmlspecialchars($merchantData['name']) ?>
@@ -1033,7 +1034,14 @@
                                     <input type="hidden" name="plan_id"
                                            value="<?= $item['options']['subscription_plan_id'] ?>">
                                 <?php endif; ?>
+                                <?php if (!empty($item['estimated_delivery'])): ?>
+                                    <div class="item-delivery"
+                                         style="font-size: 0.75rem; color: var(--success-color); margin-top: 0.25rem;">
+                                        📦 Delivery: <?= htmlspecialchars($item['estimated_delivery']) ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
+
                         <?php endforeach; ?>
                         <?php endforeach; ?>
                     </div>
@@ -1101,6 +1109,31 @@
                         <span>Total:</span>
                         <span id="total">$<?= number_format($finalTotal, 2) ?></span>
                     </div>
+
+                    <?php if (!empty($hasPreOrders)): ?>
+                        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                            <div style="font-weight: 600; color: #92400e; margin-bottom: 0.75rem;">
+                                ⚠️ Pre-Order Items in Cart
+                            </div>
+                            <?php foreach ($hasPreOrders as $preOrder): ?>
+                                <div style="font-size: 0.875rem; color: #78350f; margin-bottom: 0.5rem;">
+                                    <strong><?= htmlspecialchars($preOrder['name']) ?></strong><br>
+                                    <?= htmlspecialchars($preOrder['message']) ?>
+                                    <?php if ($preOrder['ship_date']): ?>
+                                        <br>Ships: <?= htmlspecialchars($preOrder['ship_date']) ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+
+                            <label style="display: flex; align-items: start; gap: 0.75rem; cursor: pointer; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #fbbf24;">
+                                <input type="checkbox" id="accept-pre-order" name="accept_pre_order" required
+                                       style="margin-top: 0.25rem; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+                                <span style="flex: 1; font-size: 0.875rem; color: #92400e;">
+                I understand this order contains pre-order items and accept the delivery timelines shown above.
+            </span>
+                            </label>
+                        </div>
+                    <?php endif; ?>
 
                     <button type="button" class="btn btn-primary" id="place-order-btn">
                         Place Order
@@ -1479,6 +1512,12 @@
         const form = document.getElementById('checkout-form');
         const formData = new FormData(form);
         const data = Object.fromEntries(formData);
+
+        const acceptPreOrder = document.getElementById('accept-pre-order');
+        if (acceptPreOrder && !acceptPreOrder.checked) {
+            showAlert('You must accept the pre-order terms to continue', 'error');
+            return;
+        }
 
         // Clear previous errors
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');

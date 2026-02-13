@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Product\FeedMappers;
+namespace App\Tests\Unit\Services\Billing\Preorder\FeedMappers;
 
 use App\Services\Product\FeedMappers\AmazonFeedMapper;
 use PHPUnit\Framework\TestCase;

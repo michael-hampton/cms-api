@@ -2,7 +2,6 @@
 
 namespace App\Tests\Unit\Actions\Product;
 
-use App\Actions\Product\CloneProduct;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Product;
@@ -12,6 +11,7 @@ use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductViewRepository;
+use App\Services\Billing\Preorder\Actions\CloneProduct;
 use App\Services\Cms\ImageUploadService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;

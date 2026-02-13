@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssuesDelivered;
 use App\Services\Subscriptions\DeliveryService;
@@ -34,7 +34,7 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
 
         $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
 
-        $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);
+        $this->assertEquals(IssueDeliveryStatus::DELIVERED->value, $issuesDelivered->status);
         $this->assertNotNull($issuesDelivered->delivered_at);
     }
 
@@ -43,7 +43,7 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $issueDelivery = $this->createIssueDelivery();
         $subscription = $this->createSubscription();
         $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveredStatus::SCHEDULED->value,
+            'status' => IssueDeliveryStatus::SCHEDULED->value,
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'attempts' => 0,
@@ -64,7 +64,7 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
 
         $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
 
-        $this->assertEquals(IssueDeliveredStatus::FAILED->value, $issuesDelivered->status);
+        $this->assertEquals(IssueDeliveryStatus::FAILED->value, $issuesDelivered->status);
         $this->assertEquals(1, $issuesDelivered->attempts);
         $this->assertStringContainsString('Delivery failed', $issuesDelivered->failure_reason);
     }
@@ -74,7 +74,7 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $issueDelivery = $this->createIssueDelivery();
         $subscription = $this->createSubscription();
         $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveredStatus::DELIVERED->value,
+            'status' => IssueDeliveryStatus::DELIVERED->value,
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'delivered_at' => (new \DateTime())->format('Y-m-d H:i:s'),
@@ -88,6 +88,6 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $job->handle($issuesDelivered->id);
 
         $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
-        $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);
+        $this->assertEquals(IssueDeliveryStatus::DELIVERED->value, $issuesDelivered->status);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssuesDelivered;
 use App\Repositories\Repository;
@@ -45,7 +45,7 @@ class IssuesDeliveredRepository extends Repository
         return $this->create([
             'subscription_id' => $subscriptionId,
             'issue_delivery_id' => $issueDeliveryId,
-            'status' => IssueDeliveredStatus::SCHEDULED->value,
+            'status' => IssueDeliveryStatus::SCHEDULED->value,
             'attempts' => 0,
         ]);
     }

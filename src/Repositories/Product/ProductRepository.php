@@ -122,6 +122,13 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->get();
     }
 
+    public function lockForUpdate(int $id): Model
+    {
+        //todo implement locking later
+
+        return $this->find($id);
+    }
+
 
     protected function getModelClass(): string
     {

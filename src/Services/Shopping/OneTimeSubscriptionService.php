@@ -75,7 +75,9 @@ class OneTimeSubscriptionService
         ?int                $voucherId = null,
         int                 $discountAmountCents = 0,
         ?SubscriptionStatus $status = null,
-        ?string $selectedStartDate = null
+        ?string $selectedStartDate = null,
+        ?string $accessStartsAt = null,
+        ?string $firstShipmentAt = null
     ): Subscription
     {
         return $this->database->transaction(function () use (

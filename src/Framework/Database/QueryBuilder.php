@@ -1048,7 +1048,9 @@ class QueryBuilder
                 $secondColumn = $this->quoteColumn($where['second']);
                 $operator = $where['operator'];
 
+                // Match Basic case: return array with SQL fragment and bindings
                 return ["{$firstColumn} {$operator} {$secondColumn}", $bindings];
+
 
 
             case 'In':
@@ -1746,15 +1748,18 @@ class QueryBuilder
     public function whereColumn(string $first, string $operatorOrSecond, ?string $second = null): self
     {
         if ($second === null) {
+            // Called with 2 params: assume operator '='
             $second = $operatorOrSecond;
             $operatorOrSecond = '=';
         }
 
+        // Add a proper ColumnComparison where clause
         $this->wheres[] = [
             'type' => 'ColumnComparison',
             'first' => $first,
             'operator' => $operatorOrSecond,
             'second' => $second,
+            'boolean' => 'AND',
         ];
 
         return $this;

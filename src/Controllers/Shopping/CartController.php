@@ -3,6 +3,7 @@
 namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
+use App\DTO\Checkout\DeliveryMethodConfig;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -10,13 +11,17 @@ use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Product\ProductRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\Payments\SavedPaymentMethodService;
 use App\Services\Billing\TaxCalculatorService;
+use App\Services\Shipping\FulfilmentResolver;
+use App\Services\Shipping\InternalBusinessDayEstimator;
+use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
-use App\Services\Shopping\ShippingService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
 use DateTimeImmutable;
 use Exception;
@@ -24,15 +29,19 @@ use Exception;
 class CartController extends Controller
 {
     public function __construct(
-        private readonly CartService               $cartService,
-        private readonly OrderService              $orderService,
-        private readonly CheckoutService             $checkoutService,
-        private readonly SubscriptionCheckoutService $subscriptionCheckoutService,
-        private readonly OrderRepository           $orderRepository,
-        private readonly ShippingService           $shippingService,
-        private readonly SavedPaymentMethodService $savedPaymentMethodService,
-        private readonly TaxCalculatorService      $taxCalculatorService,
-        private readonly IssueDeliveryRepository   $issueDeliveryRepository
+        private readonly CartService                  $cartService,
+        private readonly OrderService                 $orderService,
+        private readonly CheckoutService              $checkoutService,
+        private readonly SubscriptionCheckoutService  $subscriptionCheckoutService,
+        private readonly OrderRepository              $orderRepository,
+        private readonly ShippingService              $shippingService,
+        private readonly SavedPaymentMethodService    $savedPaymentMethodService,
+        private readonly TaxCalculatorService         $taxCalculatorService,
+        private readonly IssueDeliveryRepository      $issueDeliveryRepository,
+        private readonly ProductRepository            $productRepository,
+        private readonly FulfilmentResolver           $fulfilmentResolver,
+        private readonly InternalBusinessDayEstimator $businessDayEstimator,
+        private readonly SubscriptionPlanRepository   $subscriptionPlanRepository,
     )
     {
         parent::__construct();
@@ -43,6 +52,28 @@ class CartController extends Controller
         $items = $this->cartService->getItems();
         $subtotal = collect($items)->sum('subtotal');
         $startOptions = $this->calculateStartOptions($items);
+
+        // ← CREATE VALUE OBJECT FROM CONFIG OR DEFAULTS
+        $deliveryMethod = DeliveryMethodConfig::default();
+
+        // Enrich items with delivery estimates
+        $items = array_map(function ($item) use ($deliveryMethod) {
+            $product = !empty($item['subscription_plan_id']) ?
+                $this->subscriptionPlanRepository->find($item['subscription_plan_id']) :
+                $this->productRepository->find($item['product_id']);
+
+            $fulfilment = $this->fulfilmentResolver->resolve($product);
+
+            $estimate = $this->businessDayEstimator->estimate(
+                $fulfilment,
+                $deliveryMethod, // ← VALUE OBJECT PASSED HERE
+                new DateTimeImmutable()
+            );
+
+            return array_merge($item, [
+                'estimated_delivery' => $estimate->formattedRange()
+            ]);
+        }, $items);
 
         $shipping = $this->cartService->requiresShipping()
             ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
@@ -166,6 +197,24 @@ class CartController extends Controller
 
         $items = $this->cartService->getItems();
 
+        $deliveryMethod = DeliveryMethodConfig::default();
+
+        // Enrich items with delivery estimates
+        $items = array_map(function ($item) use ($deliveryMethod) {
+            $product = !empty($item['subscription_plan_id']) ? $this->subscriptionPlanRepository->find($item['subscription_plan_id']) : $this->productRepository->find($item['product_id']);
+            $fulfilment = $this->fulfilmentResolver->resolve($product);
+
+            $estimate = $this->businessDayEstimator->estimate(
+                $fulfilment,
+                $deliveryMethod, // ← VALUE OBJECT PASSED HERE
+                new DateTimeImmutable()
+            );
+
+            return array_merge($item, [
+                'estimated_delivery' => $estimate->formattedRange()
+            ]);
+        }, $items);
+
         $subtotal = collect($items)->sum('subtotal');
 
         $shipping = $this->cartService->requiresShipping()
@@ -180,10 +229,56 @@ class CartController extends Controller
             'shipping' => $shipping,
             'subtotal' => $subtotal,
             'savedCards' => $savedCards,
-            'tax' => $this->calculateTax($subtotal, $shipping)
+            'tax' => $this->calculateTax($subtotal, $shipping),
+            'hasPreOrders' => $this->detectPreOrders($items),
         ];
 
         return $this->view('checkout/index', $cartData);
+    }
+
+    private function detectPreOrders(array $items): array
+    {
+        $preOrderItems = [];
+
+        foreach ($items as $item) {
+            $isPreOrder = false;
+            $message = '';
+            $shipDate = null;
+
+            if (!empty($item['subscription_plan_id'])) {
+                $plan = $this->subscriptionPlanRepository->find($item['subscription_plan_id']);
+
+                if ($plan) {
+                    $policy = $plan->availabilityPolicy();
+
+                    if ($policy->isPreRelease() || $policy->isPreOrder()) {
+                        $isPreOrder = true;
+                        $message = $policy->getAvailabilityMessage();
+                        $shipDate = $policy->getExpectedShipDate();
+                    }
+                }
+            } elseif (!empty($item['product_id'])) {
+                $product = $this->productRepository->find($item['product_id']);
+                if ($product) {
+                    $policy = $product->availabilityPolicy();
+                    if ($policy->isPreOrder()) {
+                        $isPreOrder = true;
+                        $message = $policy->getAvailabilityMessage();
+                        $shipDate = $policy->getExpectedShipDate();
+                    }
+                }
+            }
+
+            if ($isPreOrder) {
+                $preOrderItems[] = [
+                    'name' => $item['name'] ?? 'Unknown Item',
+                    'message' => $message,
+                    'ship_date' => $shipDate?->format('F j, Y'),
+                ];
+            }
+        }
+
+        return $preOrderItems;
     }
 
     public function processCheckout(Request $request)

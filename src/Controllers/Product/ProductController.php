@@ -2,7 +2,6 @@
 
 namespace App\Controllers\Product;
 
-use App\Actions\Product\CloneProduct;
 use App\Controllers\Controller;
 use App\Framework\Container;
 use App\Framework\Exceptions\ValidationException;
@@ -18,6 +17,7 @@ use App\Requests\CreateProductRequest;
 use App\Requests\UpdateProductRequest;
 use App\Resources\ProductResource;
 use App\Search\SearchCriteriaParser;
+use App\Services\Billing\Preorder\Actions\CloneProduct;
 use App\Services\Product\ProductSchemaService;
 use App\Services\Product\ProductService;
 use App\Services\Product\RecentlyViewedService;

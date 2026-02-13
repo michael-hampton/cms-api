@@ -322,6 +322,52 @@
                         </label>
                     </div>
 
+                    <!-- ADD THIS BLOCK AFTER LINE 328 (before card details) -->
+
+                    <?php
+                    // Check if any item is pre-release
+                    $isPreRelease = $plan->release_date
+                            && $plan->release_date > now_datetime()
+                            && $plan->pre_release_enabled;
+                    ?>
+
+                    <?php if ($isPreRelease): ?>
+                        <div class="card"
+                             style="background: #fef3c7; border: 2px solid #f59e0b; margin-bottom: 1.5rem;">
+                            <h3 style="color: #92400e; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <span>⚠️</span> Pre-Release Subscription
+                            </h3>
+                            <div style="color: #78350f; margin-bottom: 1rem;">
+                                <p style="margin-bottom: 0.5rem;">
+                                    <strong>Access begins:</strong> <?= $plan->release_date->format('F j, Y') ?>
+                                </p>
+                                <?php if ($plan->print_shipping_required): ?>
+                                    <p style="margin-bottom: 0.5rem;">
+                                        <strong>First print issue
+                                            ships:</strong> <?= $plan->release_date->format('F j, Y') ?>
+                                    </p>
+                                <?php endif; ?>
+                                <p style="margin-top: 1rem; font-size: 0.875rem;">
+                                    You will be charged today, but access to this subscription will begin on the date
+                                    above.
+                                </p>
+                            </div>
+                            <label style="display: flex; align-items: start; gap: 0.75rem; cursor: pointer; padding: 1rem; background: white; border-radius: 0.5rem;">
+                                <input
+                                        type="checkbox"
+                                        name="accept_pre_release"
+                                        id="accept-pre-release"
+                                        style="margin-top: 0.25rem; width: 18px; height: 18px; cursor: pointer;"
+                                        required
+                                >
+                                <span style="flex: 1; color: #1e293b;">
+            I understand this is a pre-release subscription and access will begin on
+            <strong><?= $plan->release_date->format('F j, Y') ?></strong>
+        </span>
+                            </label>
+                        </div>
+                    <?php endif; ?>
+
                     <div id="card-details" style="margin-top: 2rem;">
                         <div class="section-title">Card Details</div>
                         <div id="card-element" style="padding: 1rem; border: 1px solid var(--border-color);
@@ -479,6 +525,15 @@
 
             if (pmError) {
                 showAlert(pmError.message, 'error');
+                document.getElementById('loading-overlay').classList.remove('show');
+                document.getElementById('subscribe-btn').disabled = false;
+                return;
+            }
+
+            // ADD THIS: Check pre-release acceptance
+            const acceptPreRelease = document.getElementById('accept-pre-release');
+            if (acceptPreRelease && !acceptPreRelease.checked) {
+                showAlert('You must accept the pre-release terms to continue', 'error');
                 document.getElementById('loading-overlay').classList.remove('show');
                 document.getElementById('subscribe-btn').disabled = false;
                 return;

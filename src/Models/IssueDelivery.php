@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
+use App\Services\Billing\Preorder\IssueAvailabilityPolicy;
 
 class IssueDelivery extends Model
 {
@@ -22,7 +24,10 @@ class IssueDelivery extends Model
         'cut_off_date',
         'fulfilment_date',
         'site_id',
-        'issue_code'
+        'issue_code',
+        'stock_quantity',
+        'preorder_enabled',
+        'restock_date'
     ];
 
     protected $casts = [
@@ -34,7 +39,8 @@ class IssueDelivery extends Model
         'cut_off_date' => 'date',
         'fulfilment_date' => 'date',
         'status' => 'string',
-        'tracking_info' => 'array'
+        'tracking_info' => 'array',
+        'restock_date' => 'datetime',
     ];
 
     public function subscription($relation = false)
@@ -44,12 +50,7 @@ class IssueDelivery extends Model
 
     public function subscriptionPlans()
     {
-        return $this->belongsToMany(
-            SubscriptionPlan::class,
-            'subscription_plan_issue_schedule',
-            'issue_schedule_id',
-            'subscription_plan_id'
-        )->withPivot('sort_order')->withTimestamps();
+        return $this->hasMany(SubscriptionPlan::class, 'id', 'subscription_plan_id');
     }
 
     /**
@@ -143,5 +144,13 @@ class IssueDelivery extends Model
     public function scopeForSite($query, int $siteId)
     {
         return $query->where('site_id', $siteId);
+    }
+
+    /**
+     * Get the availability policy for this issue
+     */
+    public function availabilityPolicy(): AvailabilityPolicyInterface
+    {
+        return new IssueAvailabilityPolicy($this);
     }
 }

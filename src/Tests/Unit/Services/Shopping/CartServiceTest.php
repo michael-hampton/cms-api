@@ -129,7 +129,7 @@ class CartServiceTest extends FunctionalTestCase
             ->andReturn(collect([]));
 
         $this->productRepository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants'])
             ->once()
             ->andReturn($product);
 
@@ -151,7 +151,7 @@ class CartServiceTest extends FunctionalTestCase
     public function testAddItemFailsWhenProductNotFound()
     {
         $this->productRepository->shouldReceive('find')
-            ->with(999)
+            ->with(999, ['availableMerchants'])
             ->once()
             ->andReturn(null);
 
@@ -170,7 +170,7 @@ class CartServiceTest extends FunctionalTestCase
         $product->is_active = false;
 
         $this->productRepository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants'])
             ->once()
             ->andReturn($product);
 
@@ -201,7 +201,7 @@ class CartServiceTest extends FunctionalTestCase
             ->andReturn($product);
 
         $this->productRepository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants'])
             ->once()
             ->andReturn($product);
 
@@ -238,7 +238,7 @@ class CartServiceTest extends FunctionalTestCase
             ->andReturn(collect([$existingItem]));
 
         $this->productRepository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants'])
             ->once()
             ->andReturn($product);
 
@@ -466,7 +466,7 @@ class CartServiceTest extends FunctionalTestCase
         $existingCartItem->shouldReceive('isBundle')->andReturn(false);
 
         $this->productRepository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants'])
             ->once()
             ->andReturn($product);
 
@@ -493,7 +493,7 @@ class CartServiceTest extends FunctionalTestCase
         $existingCartItem->shouldReceive('isBundle')->andReturn(true);
 
         $this->productRepository->shouldReceive('find')
-            ->with(1)
+            ->with(1, ['availableMerchants'])
             ->once()
             ->andReturn($product);
 
