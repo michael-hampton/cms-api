@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Members;
+namespace App\Services\Members\Consents;
 
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;

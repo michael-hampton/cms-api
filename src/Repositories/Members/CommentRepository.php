@@ -2,6 +2,8 @@
 
 namespace App\Repositories\Members;
 
+use App\DTO\Comments\CreateCommentDTO;
+use App\Enums\CommentStatus;
 use App\Framework\Support\Collection;
 use App\Models\Comment;
 use App\Models\Model;
@@ -43,16 +45,6 @@ class CommentRepository extends Repository
             ->orderBy('created_at', 'asc')
             ->get()
             ->toArray();
-    }
-
-    public function createComment(array $data): Model
-    {
-        // Auto-detect spam or require moderation
-        $data['status'] = $this->determineCommentStatus($data);
-        $data['ip_address'] = $_SERVER['REMOTE_ADDR'] ?? null;
-        $data['user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? null;
-
-        return $this->create($data);
     }
 
     public function getRecentComments(int $limit = 10): Collection
@@ -156,5 +148,35 @@ class CommentRepository extends Repository
         }
 
         return $query->get();
+    }
+
+    public function createComment(CreateCommentDTO $dto, CommentStatus $status): Model
+    {
+        return Comment::create([
+            'page_id' => $dto->pageId,
+            'member_id' => $dto->memberId,
+            'name' => $dto->name,
+            'email' => $dto->email,
+            'content' => $dto->content,
+            'parent_id' => $dto->parentId,
+            'site_id' => $dto->siteId,
+            'status' => $status->value,
+            'ip_address' => $dto->ipAddress,
+            'user_agent' => $dto->userAgent,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+    }
+
+    public function updateStatus(int $commentId, CommentStatus $status): bool
+    {
+        $comment = $this->findById($commentId);
+
+        if (!$comment) {
+            return false;
+        }
+
+        $comment->status = $status->value;
+        return $comment->save();
     }
 }

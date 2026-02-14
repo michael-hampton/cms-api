@@ -3,17 +3,21 @@
 namespace App\Controllers\Members;
 
 use App\Controllers\Controller;
+use App\DTO\Consents\ConsentActionContext;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\ConsentType;
-use App\Services\Members\ConsentService;
+use App\Services\Members\ConsentCommandService;
+use App\Services\Members\Consents\ConsentQueryService;
+use App\Services\Members\Consents\ConsentService;
 
 class MemberConsentController extends Controller
 {
     public function __construct(
-        private ConsentService $consentService
+        private readonly ConsentCommandService $commandService,
+        private readonly ConsentQueryService   $queryService
     )
     {
         parent::__construct();
@@ -29,9 +33,8 @@ class MemberConsentController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $consents = $this->consentService->getMemberConsents($member);
+        $consents = $this->queryService->getMemberConsents($member);
 
-        // Group by category
         $groupedConsents = [];
         foreach ($consents as $consent) {
             $category = $consent['consent_type']['category'];
@@ -53,21 +56,36 @@ class MemberConsentController extends Controller
      */
     public function update(Request $request)
     {
-
         if (!MemberAuth::check()) {
             return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $member = MemberAuth::getMember();
         $consents = $request->input('consents', []);
+        $context = ConsentActionContext::fromRequest($request, 'web');
 
         try {
-            $results = $this->consentService->updateConsents(
-                $member,
-                $consents,
-                'web',
-                $request
-            );
+            $results = [];
+
+            foreach ($consents as $consentCode => $granted) {
+                try {
+                    if ($granted) {
+                        $results[$consentCode] = $this->commandService->grantConsent(
+                            $member,
+                            $consentCode,
+                            $context
+                        );
+                    } else {
+                        $results[$consentCode] = $this->commandService->revokeConsent(
+                            $member,
+                            $consentCode,
+                            $context
+                        );
+                    }
+                } catch (\Exception $e) {
+                    $results[$consentCode] = ['error' => $e->getMessage()];
+                }
+            }
 
             return $this->resourceResponse([
                 'success' => true,
@@ -92,14 +110,10 @@ class MemberConsentController extends Controller
         }
 
         $member = MemberAuth::getMember();
+        $context = ConsentActionContext::fromRequest($request, 'web');
 
         try {
-            $consent = $this->consentService->grantConsent(
-                $member,
-                $consentCode,
-                'web',
-                $request
-            );
+            $consent = $this->commandService->grantConsent($member, $consentCode, $context);
 
             return $this->resourceResponse([
                 'success' => true,
@@ -127,14 +141,10 @@ class MemberConsentController extends Controller
         }
 
         $member = MemberAuth::getMember();
+        $context = ConsentActionContext::fromRequest($request, 'web');
 
         try {
-            $this->consentService->revokeConsent(
-                $member,
-                $consentCode,
-                'web',
-                $request
-            );
+            $this->commandService->revokeConsent($member, $consentCode, $context);
 
             return $this->resourceResponse([
                 'success' => true,
@@ -160,7 +170,7 @@ class MemberConsentController extends Controller
         $member = MemberAuth::getMember();
         $consentCode = $request->input('consent_code');
 
-        $auditTrail = $this->consentService->getAuditTrail($member, $consentCode);
+        $auditTrail = $this->queryService->getAuditTrail($member, $consentCode);
 
         return $this->view('member/consent/audit-trail', [
             'member' => $member,
@@ -168,6 +178,7 @@ class MemberConsentController extends Controller
             'auditTrail' => $auditTrail
         ]);
     }
+
 
     /**
      * Download consent data (GDPR data portability)
@@ -186,8 +197,8 @@ class MemberConsentController extends Controller
                 'email' => $member->email,
                 'name' => $member->getFullNameAttribute()
             ],
-            'consents' => $this->consentService->getMemberConsents($member),
-            'audit_trail' => $this->consentService->getAuditTrail($member),
+            'consents' => $this->queryService->getMemberConsents($member),
+            'audit_trail' => $this->queryService->getAuditTrail($member),
             'exported_at' => now_datetime()->format('Y-m-d H:i:s')
         ];
 
@@ -208,15 +219,17 @@ class MemberConsentController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $type = $request->input('type'); // 'specific_consent', 'all_marketing', 'complete_deletion'
+        $type = $request->input('type');
         $consentTypes = $request->input('consent_types', []);
 
         try {
-            $withdrawalRequest = $this->consentService->createWithdrawalRequest(
-                $member,
-                $type,
-                $consentTypes
-            );
+            $withdrawalRequest = \App\Models\ConsentWithdrawalRequest::create([
+                'member_id' => $member->id,
+                'type' => $type,
+                'consent_types' => $consentTypes,
+                'status' => 'pending',
+                'requested_at' => now()
+            ]);
 
             return $this->resourceResponse([
                 'success' => true,
@@ -241,7 +254,7 @@ class MemberConsentController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $hasConsent = $this->consentService->hasConsent($member, $consentCode);
+        $hasConsent = $this->queryService->hasConsent($member, $consentCode);
 
         return $this->resourceResponse([
             'success' => true,
@@ -262,17 +275,17 @@ class MemberConsentController extends Controller
         $member = MemberAuth::getMember();
         $consentsToGrant = $request->input('consents', []);
         $siteSlug = SiteContext::slug();
+        $context = ConsentActionContext::fromRequest($request, 'web');
 
         Session::put('consent_banner_shown_' . $siteSlug, true);
 
         try {
             $results = [];
             foreach ($consentsToGrant as $consentCode) {
-                $results[$consentCode] = $this->consentService->grantConsent(
+                $results[$consentCode] = $this->commandService->grantConsent(
                     $member,
                     $consentCode,
-                    'web',
-                    $request
+                    $context
                 );
             }
 

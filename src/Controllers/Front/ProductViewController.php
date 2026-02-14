@@ -8,7 +8,7 @@ use App\Models\Page;
 use App\Services\Product\ProductSchemaService;
 use App\Services\Product\ProductService;
 use App\Services\Product\RecentlyViewedService;
-use App\Services\ReviewService;
+use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\WishlistService;
 use App\Services\Url\UrlResolutionResult;
 use function App\Controllers\abort;

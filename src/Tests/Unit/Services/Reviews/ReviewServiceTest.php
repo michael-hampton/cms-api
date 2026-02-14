@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Product;
+namespace App\Tests\Unit\Services\Reviews;
 
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Support\Collection;
@@ -10,7 +10,7 @@ use App\Models\ReviewHelpful;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\ReviewHelpfulRepository;
 use App\Repositories\ReviewRepository;
-use App\Services\ReviewService;
+use App\Services\Reviews\ReviewService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\DTO\VoucherValidationResult;
+use App\DTO\Vouchers\VoucherValidationResult;
 use App\Models\Member;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;

@@ -1,20 +1,19 @@
 <?php
-// App/Controllers/CommentController.php
-
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
-use App\Events\ArticleGifting\ActivityTracking;
+use App\Events\ActivityTracking;
+use App\Exceptions\Comments\InvalidCommentStatusException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Requests\CreateCommentRequest;
-use App\Services\Members\CommentService;
+use App\Services\Members\Comments\CommentService;
 
 class CommentController extends Controller
 {
     public function __construct(
-        private readonly CommentService   $commentService,
+        private readonly CommentService $commentService,
         private readonly ActivityTracking $activityTracking
     ) {
         parent::__construct();
@@ -23,9 +22,16 @@ class CommentController extends Controller
     public function store(CreateCommentRequest $request)
     {
         try {
-            $data = $request->validated();
-            $data['site_id'] = SiteContext::getId();
-            $comment = $this->commentService->createComment($data);
+            $validated = $request->validated();
+
+            $dto = CreateCommentDTO::fromArray([
+                ...$validated,
+                'site_id' => SiteContext::getId(),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
+            $comment = $this->commentService->createComment($dto);
 
             $this->activityTracking->trackComment($comment);
 
@@ -36,7 +42,7 @@ class CommentController extends Controller
                     'id' => $comment->id,
                     'name' => $comment->name,
                     'email' => $comment->email,
-                    'member_id' => $comment->member_id ?? null,
+                    'member_id' => $comment->member_id,
                     'content' => $comment->content,
                     'created_at' => $comment->created_at,
                     'status' => $comment->status
@@ -80,7 +86,7 @@ class CommentController extends Controller
                 'message' => 'Comment not found'
             ], 404);
 
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidCommentStatusException $e) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => $e->getMessage()
@@ -102,7 +108,7 @@ class CommentController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'comments' => $comments->toArray(),
-                'stats' => $stats
+                'stats' => $stats->toArray()
             ]);
         } catch (\Exception $e) {
             return $this->resourceResponse([

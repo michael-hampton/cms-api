@@ -3,14 +3,18 @@
 namespace App\Tests\Unit\Services\Vouchers;
 
 use App\Exceptions\CannotDeleteException;
+use App\Exceptions\Vouchers\VoucherNotDeletableException;
 use App\Framework\Database\Database;
+use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Vouchers\VoucherService;
+use App\Services\Vouchers\VoucherValidationService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
+use Stripe\Plan;
 
 class VoucherServiceTest extends FunctionalTestCase
 {
@@ -18,9 +22,9 @@ class VoucherServiceTest extends FunctionalTestCase
 
     private $databaseMock;
     private $repository;
-    private $service;
-
     private $subscriptionPlanRepository;
+    private $validationService;
+    private $service;
 
     protected function setUp(): void
     {
@@ -29,7 +33,14 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(VoucherRepository::class);
         $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
-        $this->service = new VoucherService($this->databaseMock, $this->repository, $this->subscriptionPlanRepository);
+        $this->validationService = Mockery::mock(VoucherValidationService::class);
+
+        $this->service = new VoucherService(
+            $this->databaseMock,
+            $this->repository,
+            $this->subscriptionPlanRepository,
+            $this->validationService
+        );
     }
 
     protected function tearDown(): void
@@ -51,7 +62,14 @@ class VoucherServiceTest extends FunctionalTestCase
         ];
 
         $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
         $voucher->code = 'TEST10';
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) use ($voucher) {
+                return $callback();
+            });
 
         $this->repository->shouldReceive('create')
             ->once()
@@ -75,6 +93,12 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->name = 'Updated Voucher';
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) use ($voucher) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('update')
             ->once()
             ->with($voucherId, $data)
@@ -97,6 +121,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($voucherId)
             ->andReturn($voucher);
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) use ($voucher) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('delete')
             ->once()
             ->with($voucherId)
@@ -107,21 +137,26 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertTrue($result);
     }
 
-    public function testDeleteVoucherWithUsageThrowsException()
+    public function testDeleteVoucherThrowsExceptionWhenUsed()
     {
-        $voucherId = 1;
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->usage_count = 5;
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('find')
             ->once()
-            ->with($voucherId)
+            ->with(1)
             ->andReturn($voucher);
 
-        $this->expectException(CannotDeleteException::class);
+        $this->expectException(VoucherNotDeletableException::class);
 
-        $this->service->delete($voucherId);
+        $this->service->delete(1);
     }
 
     public function testDeleteNonExistentVoucherThrowsException()
@@ -132,6 +167,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->with($voucherId)
             ->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Voucher not found');
@@ -863,6 +904,13 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->status = 'expired';
         $voucher->shouldReceive('isValid')->andReturn(false);
+
+        $subscriptipnPlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $subscriptipnPlan->price = 100;
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->andReturn($subscriptipnPlan);
+
+        $this->validationService->shouldReceive('validate')->andReturn(true);
 
         $this->repository->shouldReceive('findByCode')
             ->once()

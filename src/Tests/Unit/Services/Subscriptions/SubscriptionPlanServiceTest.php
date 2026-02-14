@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\DTO\VoucherValidationResult;
+use App\DTO\Vouchers\VoucherValidationResult;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
 use App\Exceptions\Subscriptions\PlanNotFoundException;

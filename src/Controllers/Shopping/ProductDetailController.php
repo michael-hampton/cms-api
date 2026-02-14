@@ -14,7 +14,7 @@ use App\Models\ProductOfferBundle;
 use App\Repositories\Product\ProductRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\ProductService;
-use App\Services\ReviewService;
+use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\WishlistService;
 use Exception;
 
