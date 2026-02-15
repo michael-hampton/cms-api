@@ -1,6 +1,4 @@
 <?php
-// src/Listeners/Product/TrackProductViewListener.php
-
 namespace App\Listeners\Products;
 
 use App\Events\Products\ProductViewedEvent;

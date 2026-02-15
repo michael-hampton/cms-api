@@ -12,6 +12,8 @@ enum OrderStatus: string
     case CANCELLED = 'cancelled';
     case REFUNDED = 'refunded';
     case ON_HOLD = 'on_hold';
+    case PARTIALLY_REFUNDED = 'partially_refunded';
+
 
     public static function values(): array
     {

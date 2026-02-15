@@ -202,7 +202,7 @@ class OrderController extends Controller
             $refundData = $request->all();
             $refundData['order_id'] = $id;
 
-            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\RefundService::class);
+            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\Refund\RefundService::class);
             $refund = $refundService->createRefund($refundData, $request->user()->id ?? null);
 
             return $this->jsonResponse([
@@ -305,7 +305,7 @@ class OrderController extends Controller
     public function refunds(int $id): JsonResponse
     {
         try {
-            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\RefundService::class);
+            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\Refund\RefundService::class);
             $refunds = $refundService->getRefundsByOrder($id);
 
             return $this->jsonResponse([

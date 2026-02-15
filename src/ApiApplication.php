@@ -9,6 +9,7 @@ use App\Events\Badges\PointsAwardedEvent;
 use App\Events\DatabaseEventSubscriber;
 use App\Events\Orders\OrderCreatedEvent;
 use App\Events\Products\ProductViewedEvent;
+use App\Events\Refunds\RefundCreated;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -34,6 +35,8 @@ use App\Listeners\GiftCreatedListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
 use App\Listeners\PointsAwardedListener;
 use App\Listeners\Products\TrackProductViewListener;
+use App\Listeners\Refunds\LogRefundHistory;
+use App\Listeners\Refunds\SendRefundNotification;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
@@ -298,6 +301,10 @@ class ApiApplication
         $eventDispatcher->listen(BadgeEarnedEvent::class, [BadgeEarnedListener::class, 'handle']);
         $eventDispatcher->listen(OrderCreatedEvent::class, [SendOrderConfirmationListener::class, 'handle']);
         $eventDispatcher->listen(ProductViewedEvent::class, [TrackProductViewListener::class, 'handle']);
+        $eventDispatcher->listen(RefundCreated::class, [LogRefundHistory::class, 'handle']);
+        $eventDispatcher->listen(RefundCreated::class, [SendRefundNotification::class, 'handle']);
+
+
 
     }
 }
