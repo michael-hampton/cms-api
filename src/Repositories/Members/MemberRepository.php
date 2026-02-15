@@ -2,8 +2,10 @@
 
 namespace App\Repositories\Members;
 
+use App\Framework\Database\Exceptions\UniqueConstraintViolationException;
 use App\Framework\Support\Collection;
 use App\Models\Member;
+use App\Models\Model;
 use App\Repositories\Repository;
 
 class MemberRepository extends Repository
@@ -81,7 +83,10 @@ class MemberRepository extends Repository
     {
         $email = trim(strtolower($email));
 
-        $query = $this->model::whereRaw('LOWER(TRIM(email)) = ?', [$email]);
+        $query = $this->model::whereRaw(
+            'LOWER(TRIM(email)) = :email',
+            ['email' => $email]
+        );
 
         if ($siteId !== null) {
             $query->where('site_id', $siteId);
@@ -89,6 +94,7 @@ class MemberRepository extends Repository
 
         return $query->first();
     }
+
 
     /**
      * Update member account details
@@ -160,7 +166,7 @@ class MemberRepository extends Repository
      *
      * @throws UniqueConstraintViolationException if email already exists
      */
-    public function createAnonymousMember(string $email, int $siteId): Member
+    public function createAnonymousMember(string $email, int $siteId, array $data = []): Model
     {
         $now = now_datetime()->format('Y-m-d H:i:s');
 
@@ -172,6 +178,8 @@ class MemberRepository extends Repository
             'email_verified_at' => null,
             'created_at' => $now,
             'updated_at' => $now,
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name']
         ]);
     }
 

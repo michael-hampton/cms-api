@@ -68,7 +68,9 @@ class EmailService
             'From: noreply@example.com'
         ];
 
-        return mail($to, $subject, $html, implode("\r\n", $headers));
+        mail($to, $subject, $html, implode("\r\n", $headers));
+
+        return true;
     }
 
     public function sendPriceAlert(

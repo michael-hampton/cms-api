@@ -676,6 +676,7 @@
             background: rgba(37, 99, 235, 0.05);
         }
     </style>
+    @css('checkout-auth.css')
 </head>
 <body>
 <!-- Header -->
@@ -1169,6 +1170,7 @@
 </div>
 
 <script src="https://js.stripe.com/v3/"></script>
+@js('checkout-auth.js')
 
 <script>
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';

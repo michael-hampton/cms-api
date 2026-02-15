@@ -28,15 +28,17 @@ class GuestMemberService
      * @return Member
      * @throws \RuntimeException if email already exists
      */
-    public function createAnonymousMember(string $email, int $siteId): Member
+    public function createAnonymousMember(string $email, int $siteId, array $data = []): Member
     {
         // Normalize email
         $email = trim(strtolower($email));
 
         try {
             // Let the DB handle uniqueness via constraint
-            return $this->memberRepository->createAnonymousMember($email, $siteId);
+            return $this->memberRepository->createAnonymousMember($email, $siteId, $data);
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             // Race condition caught by DB constraint
             throw new \RuntimeException('Email already exists');
         }

@@ -6,9 +6,9 @@ use App\Models\OTPVerification;
 use App\Repositories\Auth\OTPRepository;
 use App\Services\Auth\OTPService;
 use App\Services\Members\EmailService;
-use PHPUnit\Framework\TestCase;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 
-class OTPServiceTest extends TestCase
+class OTPServiceTest extends FunctionalTestCase
 {
     private OTPRepository $otpRepository;
     private EmailService $emailService;

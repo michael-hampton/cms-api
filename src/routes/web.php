@@ -231,6 +231,10 @@ $router->get('/{siteName}/checkout', [CartController::class, 'checkoutPage']);
 $router->post('/api/{site}/checkout/process', [CartController::class, 'processCheckout']);
 $router->post('/{site}/member/subscriptions/{subscriptionId}/reactivate', [MemberSubscriptionsController::class, 'reactivate']);
 $router->get('/{site}/member/subscriptions/{subscriptionId}/issue-deliveries', [MemberIssueDeliveriesController::class, 'index']);
+//otp
+$router->get('/api/{site}/checkout/pending-otp', [CartController::class, 'checkPendingOTP']);
+$router->post('/api/{site}/checkout/verify-email', [CartController::class, 'verifyEmail']);
+$router->post('/api/{site}/checkout/verify-otp', [CartController::class, 'verifyOTP']);
 
 $router->get('/{site}/member/subscriptions/{subscriptionId}/upgrade', [MemberSubscriptionUpgradeController::class, 'index']);
 $router->post('/{site}/member/subscriptions/{subscriptionId}/upgrade', [MemberSubscriptionUpgradeController::class, 'upgrade']);

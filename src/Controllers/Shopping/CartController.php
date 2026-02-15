@@ -10,16 +10,19 @@ use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlan;
+use App\Repositories\Auth\OTPRepository;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Services\Auth\CheckoutIdentityService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\Payments\SavedPaymentMethodService;
 use App\Services\Billing\TaxCalculatorService;
 use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\ShippingService;
+use App\Services\Shopping\CartPersistenceService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
@@ -42,6 +45,10 @@ class CartController extends Controller
         private readonly FulfilmentResolver           $fulfilmentResolver,
         private readonly InternalBusinessDayEstimator $businessDayEstimator,
         private readonly SubscriptionPlanRepository   $subscriptionPlanRepository,
+        private readonly OTPRepository           $OTPRepository,
+        private readonly CheckoutIdentityService $identityService,
+        private readonly CartPersistenceService  $cartPersistence,
+
     )
     {
         parent::__construct();
@@ -287,6 +294,28 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
         $sessionId = Session::getId();
 
+        // Check if member is authenticated
+        $member = MemberAuth::getMember();
+
+        // If not authenticated and email provided, create anonymous member
+        if (!$member && !empty($data['email'])) {
+            $email = $data['email'];
+
+            try {
+                $result = $this->identityService->createAnonymous($email, $siteId, $data);
+
+                // Temporarily authenticate for this checkout
+                $member = \App\Models\Member::find($result->userId);
+                MemberAuth::login($member);
+            } catch (\RuntimeException $e) {
+                return $this->errorResponse($e->getMessage(), 400);
+            }
+        }
+
+        if (!$member) {
+            return $this->errorResponse('Authentication required', 401);
+        }
+
         // Check if this is a subscription checkout
         if (!empty($data['subscription_plan_id'])) {
             return $this->processSubscription($request);
@@ -300,7 +329,10 @@ class CartController extends Controller
         }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
+
         Session::forget('applied_voucher_code');
+        Session::forget('checkout_token'); // Clean up after successful checkout
+        Session::forget('pending_otp_email');
 
         $statusCode = $result['success'] ? 200 : 400;
         return $this->resourceResponse($result, $statusCode);
@@ -544,6 +576,8 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
         $sessionId = Session::getId();
 
+        Session::put('cart_items', $this->cartService->getItems());
+
         // Validate email
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->errorResponse('Valid email is required', 422);
@@ -551,6 +585,21 @@ class CartController extends Controller
 
         try {
             $result = $this->identityService->resolveIdentity($email, $sessionId, $siteId);
+
+            if ($result->requiresOTP()) {
+
+                // CRITICAL: Snapshot cart before OTP flow
+                // This prevents cart loss during OTP authentication
+                $checkoutToken = $this->cartPersistence->snapshotCartForOTP(
+                    $email,
+                    $sessionId,
+                    $siteId
+                );
+
+                // Store token and email in session for continuity
+                $this->cartPersistence->setCheckoutToken($checkoutToken);
+                Session::put('pending_otp_email', $email);
+            }
 
             return $this->jsonResponse([
                 'success' => true,
@@ -561,6 +610,55 @@ class CartController extends Controller
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 429);
         }
+    }
+
+    /**
+     * Check if there's a pending OTP verification
+     *
+     * GET /api/{site}/checkout/pending-otp
+     *
+     * Called when checkout page loads to detect interrupted OTP flow
+     */
+    public function checkPendingOTP()
+    {
+        $pendingEmail = Session::get('pending_otp_email');
+        $sessionId = Session::getId();
+        $siteId = SiteContext::getId();
+
+        die('here');
+
+        if (!$pendingEmail) {
+            return $this->jsonResponse([
+                'success' => true,
+                'has_pending' => false
+            ]);
+        }
+
+        // Check if there's an active (not expired, not verified) OTP
+        $activeOTP = $this->OTPRepository->getActiveOTP($pendingEmail, $siteId, $sessionId);
+
+        if ($activeOTP) {
+            $expiresAt = new \DateTimeImmutable($activeOTP['expires_at']);
+            $now = now_datetime();
+            $remainingSeconds = max(0, $expiresAt->getTimestamp() - $now->getTimestamp());
+
+            return $this->jsonResponse([
+                'success' => true,
+                'has_pending' => true,
+                'email' => $pendingEmail,
+                'expires_in' => $remainingSeconds,
+                'attempts_remaining' => 5 - $activeOTP['attempts'],
+                'resends_remaining' => 5 - $activeOTP['resend_count']
+            ]);
+        }
+
+        // No active OTP - clean up stale session data
+        Session::forget('pending_otp_email');
+
+        return $this->jsonResponse([
+            'success' => true,
+            'has_pending' => false
+        ]);
     }
 
     /**
@@ -593,9 +691,18 @@ class CartController extends Controller
 
             MemberAuth::login($member);
 
+            // CRITICAL: Restore cart after successful authentication
+            // This ensures cart items are not lost during OTP flow
+            $cartRestored = $this->cartPersistence->restoreCartAfterAuth($email, $siteId);
+
+            // Clean up pending OTP session data
+            Session::forget('pending_otp_email');
+            Session::forget('checkout_token');
+
             return $this->jsonResponse([
                 'success' => true,
                 'message' => $result->message,
+                'cart_restored' => $cartRestored,
                 'member' => [
                     'id' => $member->id,
                     'email' => $member->email,
@@ -609,6 +716,34 @@ class CartController extends Controller
                 'message' => $e->getMessage()
             ], 400);
         }
+    }
+
+    /**
+     * Cancel OTP flow
+     *
+     * POST /api/{site}/checkout/cancel-otp
+     *
+     * Allows member to cancel incomplete OTP and start fresh
+     */
+    public function cancelOTP(Request $request)
+    {
+        $email = $request->input('email');
+        $sessionId = Session::getId();
+        $siteId = SiteContext::getId();
+
+        if ($email) {
+            // Invalidate OTPs for this email/session
+            $this->OTPRepository->cancelOTP($sessionId, $email);
+        }
+
+        // Clean up session
+        Session::forget('pending_otp_email');
+        Session::forget('checkout_token');
+
+        return $this->jsonResponse([
+            'success' => true,
+            'message' => 'OTP flow cancelled'
+        ]);
     }
 
     /**
@@ -647,4 +782,40 @@ class CartController extends Controller
         }
     }
 
+    /**
+     * Get current checkout session status
+     *
+     * GET /api/{site}/checkout/status
+     */
+    public function getStatus()
+    {
+        $member = MemberAuth::getMember();
+        $sessionId = Session::getId();
+        $siteId = SiteContext::getId();
+        $pendingOTPEmail = Session::get('pending_otp_email');
+
+        // Check if there's a pending cart snapshot
+        $pendingCartItems = 0;
+        if ($member) {
+            $pendingCartItems = $this->cartPersistence->getSnapshotItemCount(
+                $member->email,
+                $siteId
+            );
+        }
+
+        return $this->jsonResponse([
+            'success' => true,
+            'authenticated' => $member !== null,
+            'member' => $member ? [
+                'id' => $member->id,
+                'email' => $member->email,
+                'first_name' => $member->first_name ?? '',
+                'last_name' => $member->last_name ?? '',
+                'anonymous' => $member->anonymous ?? false,
+            ] : null,
+            'session_id' => $sessionId,
+            'pending_cart_items' => $pendingCartItems,
+            'pending_otp_email' => $pendingOTPEmail,
+        ]);
+    }
 }

@@ -84,10 +84,10 @@ class CheckoutIdentityService
     /**
      * Create anonymous member
      */
-    public function createAnonymous(string $email, int $siteId): CheckoutIdentityResult
+    public function createAnonymous(string $email, int $siteId, array $data = []): CheckoutIdentityResult
     {
         try {
-            $member = $this->guestMemberService->createAnonymousMember($email, $siteId);
+            $member = $this->guestMemberService->createAnonymousMember($email, $siteId, $data);
 
             return new CheckoutIdentityResult(
                 type: CheckoutIdentityResult::TYPE_ANONYMOUS_CREATED,

@@ -2,10 +2,10 @@
 
 namespace App\Repositories\Auth;
 
+use App\Framework\Date;
 use App\Models\Model;
 use App\Models\OTPVerification;
 use App\Repositories\Repository;
-use DateTimeImmutable;
 
 class OTPRepository extends Repository
 {
@@ -30,7 +30,7 @@ class OTPRepository extends Repository
         string            $hashedOTP,
         string            $sessionId,
         int               $siteId,
-        DateTimeImmutable $expiresAt
+        Date $expiresAt
     ): Model
     {
         return $this->create([
@@ -53,7 +53,7 @@ class OTPRepository extends Repository
         return $this->model::where('email', $email)
             ->where('session_id', $sessionId)
             ->where('site_id', $siteId)
-            ->where('verified', false)
+            ->where('verified', 0)
             ->update(['verified' => true]); // Mark as verified to invalidate
     }
 
@@ -80,6 +80,26 @@ class OTPRepository extends Repository
             ->where('site_id', $siteId)
             ->where('created_at', '>=', $since)
             ->count();
+    }
+
+    public function getActiveOTP(string $email, int $siteId, string $sessionId): Model
+    {
+        return $this->model::where('email', $email)
+            ->where('site_id', $siteId)
+            ->where('session_id', $sessionId)
+            ->where('verified', 0)
+            ->where('expires_at', '>', now_datetime()->format('Y-m-d H:i:s'))
+            ->first();
+    }
+
+    public function cancelOTP(string $sessionId, string $email, int $siteId)
+    {
+        return OTPVerification::where('verified', 0)
+            ->where('email', $email)
+            ->where('session_id', $sessionId)
+            ->where('site_id', $siteId)
+            ->update(['verified' => 1]);
+
     }
 
     protected function getModelClass(): string
