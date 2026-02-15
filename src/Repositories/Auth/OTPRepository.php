@@ -82,7 +82,7 @@ class OTPRepository extends Repository
             ->count();
     }
 
-    public function getActiveOTP(string $email, int $siteId, string $sessionId): Model
+    public function getActiveOTP(string $email, int $siteId, string $sessionId): ?Model
     {
         return $this->model::where('email', $email)
             ->where('site_id', $siteId)

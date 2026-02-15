@@ -625,8 +625,6 @@ class CartController extends Controller
         $sessionId = Session::getId();
         $siteId = SiteContext::getId();
 
-        die('here');
-
         if (!$pendingEmail) {
             return $this->jsonResponse([
                 'success' => true,
@@ -638,7 +636,7 @@ class CartController extends Controller
         $activeOTP = $this->OTPRepository->getActiveOTP($pendingEmail, $siteId, $sessionId);
 
         if ($activeOTP) {
-            $expiresAt = new \DateTimeImmutable($activeOTP['expires_at']);
+            $expiresAt = new \DateTimeImmutable($activeOTP->expires_at);
             $now = now_datetime();
             $remainingSeconds = max(0, $expiresAt->getTimestamp() - $now->getTimestamp());
 
@@ -647,8 +645,8 @@ class CartController extends Controller
                 'has_pending' => true,
                 'email' => $pendingEmail,
                 'expires_in' => $remainingSeconds,
-                'attempts_remaining' => 5 - $activeOTP['attempts'],
-                'resends_remaining' => 5 - $activeOTP['resend_count']
+                'attempts_remaining' => 5 - $activeOTP->attempts,
+                'resends_remaining' => 5 - $activeOTP->resend_count
             ]);
         }
 

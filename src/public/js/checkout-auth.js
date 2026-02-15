@@ -26,17 +26,18 @@ const CheckoutAuth = {
         try {
             const response = await fetch(`${API_BASE}/checkout/pending-otp`);
             const result = await response.json();
+            const responseData = result.data
 
-            if (result.has_pending) {
+            if (responseData.has_pending) {
                 // Interrupted flow detected!
                 this.currentEmail = result.email;
-                this.otpExpiresAt = Date.now() + (result.expires_in * 1000);
+                this.otpExpiresAt = Date.now() + (responseData.expires_in * 1000);
 
                 // Show notification banner
-                this.showPendingOTPBanner(result);
+                this.showPendingOTPBanner(responseData);
 
                 // Auto-show modal if expires_in > 0
-                if (result.expires_in > 0) {
+                if (responseData.expires_in > 0) {
                     this.showOTPModal();
                     this.startCountdown();
                 }
