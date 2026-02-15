@@ -85,8 +85,9 @@ class AdminSubscriptionPlansController extends Controller
 
     public function update(Request $request, int $id)
     {
+        $siteId = SiteContext::getId();
         try {
-            $plan = $this->planService->updatePlan($id, $request->all());
+            $plan = $this->planService->updatePlan($id, $request->all(), $siteId);
 
             if (!$plan) {
                 if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {

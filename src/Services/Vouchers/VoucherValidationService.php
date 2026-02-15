@@ -113,14 +113,14 @@ class VoucherValidationService
         // Get eligible items
         $eligibleItems = $this->eligibilityResolver->resolveEligibleItems($voucher, $context->cartItems);
 
-        if (empty($eligibleItems)) {
+        if (empty($eligibleItems) && $context->forCart === true) {
             return VoucherValidationResult::invalid(
                 'Voucher is not applicable to any items in your cart'
             );
         }
 
         // Calculate eligible subtotal
-        $eligibleSubtotal = array_sum(array_column($eligibleItems, 'subtotal'));
+        $eligibleSubtotal = $context->forCart === true ? array_sum(array_column($eligibleItems, 'subtotal')) : $context->orderValue;
 
         // Check minimum order value
         if ($voucher->minimum_order_value && $eligibleSubtotal < $voucher->minimum_order_value) {

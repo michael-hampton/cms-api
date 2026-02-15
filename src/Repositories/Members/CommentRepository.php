@@ -110,7 +110,8 @@ class CommentRepository extends Repository
             'rejected' => Comment::where('status', 'rejected')->count()
         ];
     }
-    public function findById(int $id): Model
+
+    public function findById(int $id): ?Model
     {
         return Comment::find($id);
     }

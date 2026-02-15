@@ -122,8 +122,8 @@ class VoucherService
         }
 
         $context = $productId
-            ? VoucherValidationContext::forProduct($productId, $orderValue, $userId)
-            : VoucherValidationContext::forProduct(0, $orderValue, $userId);
+            ? VoucherValidationContext::forProduct($productId, $orderValue, $userId, false)
+            : VoucherValidationContext::forProduct(0, $orderValue, $userId, false);
 
         $result = $this->validationService->validate($voucher, $context);
 

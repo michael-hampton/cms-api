@@ -1108,7 +1108,7 @@
                     </div>
                     <div class="summary-row total">
                         <span>Total:</span>
-                        <span id="total">$<?= number_format($finalTotal, 2) ?></span>
+                        <span id="total" data-total="<?= $finalTotal ?>">$<?= number_format($finalTotal, 2) ?></span>
                     </div>
 
                     <?php if (!empty($hasPreOrders)): ?>
@@ -1850,13 +1850,17 @@
             return;
         }
 
+        const totalElement = document.getElementById('total')
+        const totalAmount = totalElement.dataset.total;
+
         // Detect if this is a subscription checkout
         const isSubscription = window.location.search.includes('type=subscription') ||
             document.querySelector('[name="plan_id"]');
 
         const requestBody = {
             code: voucherCode,
-            is_subscription: !!isSubscription
+            is_subscription: !!isSubscription,
+            order_value: parseFloat(totalAmount)
         };
 
         // Add plan_id if this is a subscription

@@ -71,28 +71,23 @@ class SubscriptionRepository extends Repository
 
     public function createSubscription(int $memberId, int $planId, int $siteId, array $additionalData = []): Model
     {
-        $plan = SubscriptionPlan::find($planId);
+        $plan = SubscriptionPlan::findOrFail($planId);
 
-        $startDate = new \DateTime();
+        $startDate = new \DateTimeImmutable();
         $endDate = null;
         $nextBillingDate = null;
 
         if ($plan->billing_period !== 'lifetime') {
-            $endDate = clone $startDate;
-            $nextBillingDate = clone $startDate;
-
-            match ($plan->billing_period) {
-                'monthly' => $endDate->modify('+1 month'),
-                'quarterly' => $endDate->modify('+3 months'),
-                'yearly' => $endDate->modify('+1 year'),
+            $interval = match ($plan->billing_period) {
+                'weekly' => '+1 week',
+                'monthly' => '+1 month',
+                'quarterly' => '+3 months',
+                'yearly' => '+1 year',
+                default => throw new \InvalidArgumentException('Unrecognized billing period'),
             };
 
-            // Set next billing date same as end date initially
-            match ($plan->billing_period) {
-                'monthly' => $nextBillingDate->modify('+1 month'),
-                'quarterly' => $nextBillingDate->modify('+3 months'),
-                'yearly' => $nextBillingDate->modify('+1 year'),
-            };
+            $endDate = $startDate->modify($interval);
+            $nextBillingDate = $startDate->modify($interval);
         }
 
         $subscription = Subscription::create(array_merge([
@@ -106,7 +101,7 @@ class SubscriptionRepository extends Repository
             'next_billing_date' => $nextBillingDate?->format('Y-m-d H:i:s'),
             'price' => $plan->price,
             'currency' => $plan->currency,
-            'auto_renew' => $plan->billing_period !== 'lifetime'
+            'auto_renew' => $plan->billing_period !== 'lifetime',
         ], $additionalData));
 
         // **GRANT PREMIUM ACCESS FROM PLAN**

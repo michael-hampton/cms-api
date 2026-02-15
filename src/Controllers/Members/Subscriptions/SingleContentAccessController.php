@@ -37,6 +37,14 @@ class SingleContentAccessController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
+        if (!MemberAuth::check()) {
+            return $this->view('member/single-access/already-purchased', [
+                'site' => SiteContext::get(),
+                'access' => false,
+                'content_type' => $contentType
+            ]);
+        }
+
         // Check if already has access
         $accessCheck = $this->accessService->checkAccess($member->id, $contentType, $contentId, $siteId);
 

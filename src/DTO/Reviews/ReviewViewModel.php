@@ -24,7 +24,7 @@ class ReviewViewModel
         return [
             'id' => $this->id,
             'rating' => $this->rating,
-            'title' => $this->title,
+            'title' => $this->title ?? '',
             'comment' => $this->comment,
             'author_name' => $this->authorName,
             'is_verified_purchase' => $this->isVerifiedPurchase,

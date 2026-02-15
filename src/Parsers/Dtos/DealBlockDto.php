@@ -5,7 +5,7 @@ namespace App\Parsers\Dtos;
 final class DealBlockDto extends BaseBlockDto
 {
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
-    private const ALLOWED_SAVING_MODES = ['percent', 'amount'];
+    private const ALLOWED_SAVING_MODES = ['percent', 'amount', 'none'];
 
     private const KNOWN_KEYS = [
         'link', 'noFollow', 'sponsored', 'openInNewTab', 'title', 'brand',

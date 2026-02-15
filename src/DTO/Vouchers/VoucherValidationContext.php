@@ -11,7 +11,8 @@ class VoucherValidationContext
         public readonly ?int  $productId = null,
         public readonly ?int  $subscriptionPlanId = null,
         public readonly bool   $hasOfferDiscount = false,
-        public readonly ?float $finalPrice = null
+        public readonly ?float $finalPrice = null,
+        public readonly bool   $forCart = true
 
     )
     {
@@ -50,14 +51,16 @@ class VoucherValidationContext
     public static function forProduct(
         int   $productId,
         float $orderValue,
-        ?int  $userId = null
+        ?int $userId = null,
+        bool $forCart = true
     ): self
     {
         return new self(
             userId: $userId,
             orderValue: $orderValue,
             cartItems: [],
-            productId: $productId
+            productId: $productId,
+            forCart: $forCart
         );
     }
 }

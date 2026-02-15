@@ -14,13 +14,15 @@ use App\Requests\MemberRegistrationRequest;
 use App\Requests\ResetPasswordRequest;
 use App\Services\Cms\MenuRenderer;
 use App\Services\EmailVerificationService;
+use App\Services\Members\ArticleGiftingService;
 use App\Services\PasswordResetService;
 
 class MemberAuthController extends Controller
 {
     public function __construct(
-        private EmailVerificationService $emailVerificationService,
-        private PasswordResetService $passwordResetService
+        private readonly EmailVerificationService $emailVerificationService,
+        private readonly PasswordResetService     $passwordResetService,
+        private readonly ArticleGiftingService    $articleGiftingService
     )
     {
         parent::__construct();
@@ -88,10 +90,7 @@ class MemberAuthController extends Controller
 
         // Auto-claim any pending gifts sent to this email
         try {
-            $giftingService = new \App\Services\Members\ArticleGiftingService(
-                new \App\Repositories\Members\GiftedArticleRepository()
-            );
-            $claimedCount = $giftingService->autoClaimGiftsOnSignup($member);
+            $claimedCount = $this->articleGiftingService->autoClaimGiftsOnSignup($member);
 
             if ($claimedCount > 0) {
                 $request->session()->put('gifted_articles_claimed', $claimedCount);

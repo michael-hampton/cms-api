@@ -3,7 +3,7 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
-use App\Events\ArticleGifting\ActivityTracking;
+use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;

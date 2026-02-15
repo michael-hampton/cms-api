@@ -22,7 +22,7 @@ class ReviewQueryService
             return new ReviewViewModel(
                 id: $review->id,
                 rating: $review->rating,
-                title: $review->title,
+                title: $review->title ?? '',
                 comment: $review->comment,
                 authorName: $review->author_name,
                 isVerifiedPurchase: $review->is_verified_purchase,

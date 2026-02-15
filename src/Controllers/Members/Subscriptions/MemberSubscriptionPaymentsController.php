@@ -41,7 +41,7 @@ class MemberSubscriptionPaymentsController extends Controller
 
         // Sort by date
         $payments = $payments->sortByDesc(function ($payment) {
-            return $payment->created_at;
+            return $payment->created_at->format('Y-m-d H:i:s');
         });
 
         // Calculate summary

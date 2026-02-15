@@ -353,7 +353,7 @@ class OrderControllerTest extends FunctionalTestCase
     {
         $anotherUser = Member::create([
             'name' => 'Test Customer',
-            'email' => 'customer@example.com',
+            'email' => 'customer_' . uniqid() . '@example.com',
             'first_name' => 'Test',
             'last_name' => 'Customer',
             'password' => password_hash('password', PASSWORD_DEFAULT),

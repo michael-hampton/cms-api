@@ -293,7 +293,7 @@ class SubscriptionPlanService
                 throw new \InvalidArgumentException($validation->message);
             }
 
-            $voucherId = $validation->voucherId;
+            $voucherId = $validation->voucher->id;
             $discountAmountCents = (int)round($validation->discount * 100);
 
             // Ensure discount doesn't exceed price
