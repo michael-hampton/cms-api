@@ -33,8 +33,8 @@ class MemberConsentSnapshot
                 'retention_days' => $this->retentionDays
             ],
             'is_granted' => $this->isGranted,
-            'granted_at' => $this->grantedAt?->format('Y-m-d H:i:s'),
-            'expires_at' => $this->expiresAt?->format('Y-m-d H:i:s'),
+            'granted_at' => $this->grantedAt,
+            'expires_at' => $this->expiresAt,
             'channel' => $this->channel
         ];
     }

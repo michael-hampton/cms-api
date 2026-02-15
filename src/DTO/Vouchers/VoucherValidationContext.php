@@ -10,7 +10,9 @@ class VoucherValidationContext
         public readonly array $cartItems,
         public readonly ?int  $productId = null,
         public readonly ?int  $subscriptionPlanId = null,
-        public readonly bool  $hasOfferDiscount = false
+        public readonly bool   $hasOfferDiscount = false,
+        public readonly ?float $finalPrice = null
+
     )
     {
     }

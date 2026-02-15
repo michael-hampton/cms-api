@@ -44,4 +44,18 @@ class ConsentTypeRepository
     {
         return $this->findActiveByCategory('marketing');
     }
+
+    public function getAuditLog(int $memberId, string $consentCode = ''): Collection
+    {
+        $query = \App\Models\ConsentAuditLog::where('member_id', $memberId)
+            ->orderBy('created_at', 'desc');
+
+        if ($consentCode) {
+            $consentType = $this->findActiveByCode($consentCode);
+            $query->where('consent_type_id', $consentType->id);
+        }
+
+        return $query->with(['consentType', 'adminUser'])
+            ->get();
+    }
 }

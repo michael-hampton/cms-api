@@ -5,35 +5,47 @@ namespace App\Services\Billing\Preorder\Actions;
 use App\Enums\Orders\OrderLineStatus;
 use App\Framework\Database\Database;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductVariantRepository;
 
 class AllocatePreorderStockAction
 {
     public function __construct(
-        private readonly ProductRepository   $productRepository,
-        private readonly OrderItemRepository $orderItemRepository,
-        private readonly Database            $database
+        private readonly ProductRepository        $productRepository,
+        private readonly ProductVariantRepository $variantRepository,
+        private readonly OrderItemRepository      $orderItemRepository,
+        private readonly Database                 $database
     )
     {
     }
 
-    public function execute(Product $product): int
+    public function execute(Product|ProductVariant $purchasable): int
     {
-        return $this->database->transaction(function () use ($product) {
-            // Lock product row
-            $product = $this->productRepository->lockForUpdate($product->id);
+        return $this->database->transaction(function () use ($purchasable) {
 
-            if ($product->stock_quantity <= 0) {
-                return 0; // No stock to allocate
+            $isVariant = $purchasable instanceof ProductVariant;
+
+            $lock = fn() => $isVariant
+                ? $this->variantRepository->lockForUpdate($purchasable->id)
+                : $this->productRepository->lockForUpdate($purchasable->id);
+
+            $updateStock = fn(int $qty) => $isVariant
+                ? $this->variantRepository->update($purchasable->id, ['stock_quantity' => $qty])
+                : $this->productRepository->update($purchasable->id, ['stock_quantity' => $qty]);
+
+            $purchasable = $lock();
+
+            if ($purchasable->stock_quantity <= 0) {
+                return 0;
             }
 
-            // Fetch pending preorder lines (oldest first)
             $pendingLines = $this->orderItemRepository
-                ->getPendingPreorders($product->id);
+                ->getPendingPreorders($purchasable->id);
 
-            $allocatedCount = 0;
-            $remainingStock = $product->stock_quantity;
+            $remainingStock = $purchasable->stock_quantity;
+            $allocated = 0;
 
             foreach ($pendingLines as $line) {
                 if ($remainingStock <= 0) {
@@ -41,29 +53,22 @@ class AllocatePreorderStockAction
                 }
 
                 $remainingForLine = $line->quantity - $line->quantity_allocated;
-                $allocateAmount = min($remainingStock, $remainingForLine);
-
-                // Update order line
-                $newAllocated = $line->quantity_allocated + $allocateAmount;
-                $newStatus = ($newAllocated === $line->quantity)
-                    ? OrderLineStatus::READY_TO_SHIP->value
-                    : OrderLineStatus::PENDING_PREORDER->value;
+                $allocate = min($remainingStock, $remainingForLine);
 
                 $this->orderItemRepository->update($line->id, [
-                    'quantity_allocated' => $newAllocated,
-                    'status' => $newStatus,
+                    'quantity_allocated' => $line->quantity_allocated + $allocate,
+                    'status' => $allocate === $remainingForLine
+                        ? OrderLineStatus::READY_TO_SHIP->value
+                        : OrderLineStatus::PENDING_PREORDER->value,
                 ]);
 
-                $remainingStock -= $allocateAmount;
-                $allocatedCount += $allocateAmount;
+                $remainingStock -= $allocate;
+                $allocated += $allocate;
             }
 
-            // Update product stock
-            $this->productRepository->update($product->id, [
-                'stock_quantity' => $remainingStock,
-            ]);
+            $updateStock($remainingStock);
 
-            return $allocatedCount;
+            return $allocated;
         });
     }
 }

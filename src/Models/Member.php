@@ -30,6 +30,7 @@ class Member extends Model
         'timezone',
         'segment',
         'territory_id',
+        'anonymous'
     ];
 
     protected $hidden = [
@@ -43,7 +44,8 @@ class Member extends Model
         'is_active' => 'boolean',
         'last_login_at' => 'datetime',
         'created_at' => 'datetime',
-        'communication_preferences' => 'array'
+        'communication_preferences' => 'array',
+        'anonymous' => 'boolean'
     ];
 
     public $table = 'members';

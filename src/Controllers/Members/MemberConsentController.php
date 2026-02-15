@@ -9,9 +9,8 @@ use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\ConsentType;
-use App\Services\Members\ConsentCommandService;
+use App\Services\Members\Consents\ConsentCommandService;
 use App\Services\Members\Consents\ConsentQueryService;
-use App\Services\Members\Consents\ConsentService;
 
 class MemberConsentController extends Controller
 {

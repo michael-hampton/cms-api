@@ -136,10 +136,13 @@ class VoucherValidationService
         return VoucherValidationResult::valid(
             voucher: $voucher,
             discount: $discount,
+            finalPrice: max(0, $eligibleSubtotal - $discount),
             eligibleSubtotal: $eligibleSubtotal,
             eligibleItems: $eligibleItems,
-            isStackable: $voucher->is_stackable ?? true,
-            requiresOverrideDecision: $context->hasOfferDiscount && !($voucher->is_stackable ?? true)
+            isStackable: !$voucher->isNonStackable(),
+            requiresOverrideDecision: $voucher->requiresOverrideForOfferDiscount(
+                $context->hasOfferDiscount
+            )
         );
     }
 

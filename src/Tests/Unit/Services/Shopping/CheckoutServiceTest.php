@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Repositories\Billing\ShipmentRepository;
 use App\Repositories\Product\MerchantRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\Order\OrderCreationService;
@@ -72,6 +73,70 @@ class CheckoutServiceTest extends FunctionalTestCase
     private ProductRepository $productRepository;
     private ResolveAvailabilityAction $resolveAvailabilityAction;
     private CalculateSellableStockAction $calculateSellableStockAction;
+    private ProductVariantRepository $productVariantRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->cartService = Mockery::mock(CartService::class);
+        $this->orderCreationService = Mockery::mock(OrderCreationService::class);
+        $this->voucherService = Mockery::mock(VoucherService::class);
+        $this->shippingService = Mockery::mock(ShippingService::class);
+        $this->memberAuthWrapper = Mockery::mock(MemberAuthWrapper::class);
+        $this->calculationService = Mockery::mock(OrderCalculationService::class);
+        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
+        $this->splittingService = Mockery::mock(CheckoutSplittingService::class);
+        $this->allocationService = Mockery::mock(PaymentAllocationService::class);
+        $this->merchantShippingService = Mockery::mock(MerchantShippingService::class);
+        $this->shipmentRepository = Mockery::mock(ShipmentRepository::class);
+        $this->currencyResolver = Mockery::mock(CurrencyResolver::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->orderManager = Mockery::mock(OrderManager::class);
+        $this->taxCalculatorService = Mockery::mock(TaxCalculatorService::class);
+        $this->merchantRepository = Mockery::mock(MerchantRepository::class);
+        $this->discountResolver = Mockery::mock(DiscountResolver::class);
+        $this->rewardsRepository = Mockery::mock(RewardsRepository::class);
+        $this->businessDayEstimator = Mockery::mock(InternalBusinessDayEstimator::class);
+        $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
+        $this->productRepository = Mockery::mock(ProductRepository::class);
+        $this->resolveAvailabilityAction = Mockery::mock(ResolveAvailabilityAction::class);
+        $this->calculateSellableStockAction = Mockery::mock(CalculateSellableStockAction::class);
+        $this->productVariantRepository = Mockery::mock(ProductVariantRepository::class);
+
+        $this->service = new CheckoutService(
+            $this->cartService,
+            $this->orderCreationService,
+            $this->voucherService,
+            $this->shippingService,
+            $this->memberAuthWrapper,
+            $this->calculationService,
+            $this->stripeProcessor,
+            $this->splittingService,
+            $this->allocationService,
+            $this->merchantShippingService,
+            $this->shipmentRepository,
+            $this->currencyResolver,
+            $this->databaseMock,
+            $this->orderManager,
+            $this->taxCalculatorService,
+            $this->merchantRepository,
+            $this->discountResolver,
+            $this->rewardsRepository,
+            $this->businessDayEstimator,
+            $this->fulfilmentResolver,
+            $this->productRepository,
+            $this->resolveAvailabilityAction,
+            $this->calculateSellableStockAction,
+            $this->productVariantRepository
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_it_returns_error_when_required_fields_are_missing(): void
     {
@@ -2433,71 +2498,5 @@ class CheckoutServiceTest extends FunctionalTestCase
         // - quantity_allocated = 0
 
         $this->assertTrue(true); // Placeholder - implement based on actual checkout flow
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->cartService = Mockery::mock(CartService::class);
-        $this->orderCreationService = Mockery::mock(OrderCreationService::class);
-        $this->voucherService = Mockery::mock(VoucherService::class);
-        $this->shippingService = Mockery::mock(ShippingService::class);
-        $this->memberAuthWrapper = Mockery::mock(MemberAuthWrapper::class);
-        $this->calculationService = Mockery::mock(OrderCalculationService::class);
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
-        $this->splittingService = Mockery::mock(CheckoutSplittingService::class);
-        $this->allocationService = Mockery::mock(PaymentAllocationService::class);
-        $this->merchantShippingService = Mockery::mock(MerchantShippingService::class);
-        $this->shipmentRepository = Mockery::mock(ShipmentRepository::class);
-        $this->currencyResolver = Mockery::mock(CurrencyResolver::class);
-        $this->databaseMock = Mockery::mock(Database::class);
-        $this->orderManager = Mockery::mock(OrderManager::class);
-        $this->taxCalculatorService = Mockery::mock(TaxCalculatorService::class);
-        $this->merchantRepository = Mockery::mock(MerchantRepository::class);
-        $this->discountResolver = Mockery::mock(DiscountResolver::class);
-        $this->rewardsRepository = Mockery::mock(RewardsRepository::class);
-        $this->businessDayEstimator = Mockery::mock(InternalBusinessDayEstimator::class);
-        $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
-        $this->productRepository = Mockery::mock(ProductRepository::class);
-        $this->resolveAvailabilityAction = Mockery::mock(ResolveAvailabilityAction::class);
-        $this->calculateSellableStockAction = Mockery::mock(CalculateSellableStockAction::class);
-
-        $this->service = new CheckoutService(
-            $this->cartService,
-            $this->orderCreationService,
-            $this->voucherService,
-            $this->shippingService,
-            $this->memberAuthWrapper,
-            $this->calculationService,
-            $this->stripeProcessor,
-            $this->splittingService,
-            $this->allocationService,
-            $this->merchantShippingService,
-            $this->shipmentRepository,
-            $this->currencyResolver,
-            $this->databaseMock,
-            $this->orderManager,
-            $this->taxCalculatorService,
-            $this->merchantRepository,
-            $this->discountResolver,
-            $this->rewardsRepository,
-            $this->businessDayEstimator,
-            $this->fulfilmentResolver,
-            $this->productRepository,
-            $this->resolveAvailabilityAction,
-            $this->calculateSellableStockAction,
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
-    private function setRequiresShippingExpectation()
-    {
-        $this->cartService->shouldReceive('requiresShipping')->atLeast()->once()->andReturn(true);
     }
 }

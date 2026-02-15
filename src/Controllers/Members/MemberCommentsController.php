@@ -7,7 +7,6 @@ use App\Events\ActivityTracking;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\CommentRepository;
 
 class MemberCommentsController extends Controller
@@ -23,7 +22,7 @@ class MemberCommentsController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
 
         $comments = $this->commentRepository->where('email', $member->email)
             ->orderBy('created_at', 'desc')

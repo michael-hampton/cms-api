@@ -3,11 +3,12 @@
 namespace App\Services\Shipping;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 
 class PhysicalProductFulfilment implements FulfilmentTypeInterface
 {
     public function __construct(
-        private readonly Product $product
+        private readonly Product|ProductVariant $purchasable
     )
     {
     }

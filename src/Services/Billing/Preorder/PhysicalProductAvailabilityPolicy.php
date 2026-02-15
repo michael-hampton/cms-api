@@ -3,13 +3,14 @@
 namespace App\Services\Billing\Preorder;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 
 class PhysicalProductAvailabilityPolicy implements AvailabilityPolicyInterface
 {
     public function __construct(
-        private readonly Product              $product,
+        private readonly Product|ProductVariant $product,
         private readonly ?OrderItemRepository $orderItemRepository = null,
     )
     {

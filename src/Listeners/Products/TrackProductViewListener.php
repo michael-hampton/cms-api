@@ -18,8 +18,6 @@ class TrackProductViewListener
 
     public function handle(ProductViewedEvent $event): void
     {
-        die('here5 - track view');
-
         // Track in session
         $this->recentlyViewedService->addProduct($event->product);
 

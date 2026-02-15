@@ -315,7 +315,7 @@
         }
 
         try {
-            const response = await fetch(`/member/comments/${commentId}`, {
+            const response = await fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/comments/${commentId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'

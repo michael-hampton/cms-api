@@ -77,9 +77,17 @@ class MemberRepository extends Repository
         return $query->get();
     }
 
-    public function findByEmail(string $email): ?Member
+    public function findByEmail(string $email, ?int $siteId = null): ?Member
     {
-        return $this->where('email', $email)->first();
+        $email = trim(strtolower($email));
+
+        $query = $this->model::whereRaw('LOWER(TRIM(email)) = ?', [$email]);
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query->first();
     }
 
     /**
@@ -145,5 +153,73 @@ class MemberRepository extends Repository
         }
 
         return $query->get();
+    }
+
+    /**
+     * Create anonymous member
+     *
+     * @throws UniqueConstraintViolationException if email already exists
+     */
+    public function createAnonymousMember(string $email, int $siteId): Member
+    {
+        $now = now_datetime()->format('Y-m-d H:i:s');
+
+        return $this->create([
+            'email' => trim(strtolower($email)),
+            'site_id' => $siteId,
+            'anonymous' => true,
+            'is_active' => true,
+            'email_verified_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /**
+     * Convert anonymous member to full account
+     */
+    public function convertToFullAccount(
+        int     $memberId,
+        string  $firstName,
+        string  $lastName,
+        ?string $password = null
+    ): ?Member
+    {
+        $member = $this->find($memberId);
+
+        if (!$member || !$member->anonymous) {
+            return null;
+        }
+
+        $now = now_datetime()->format('Y-m-d H:i:s');
+
+        $updateData = [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'display_name' => trim("{$firstName} {$lastName}"),
+            'anonymous' => false,
+            'email_verified_at' => $now,
+        ];
+
+        if ($password) {
+            $updateData['password'] = password_hash($password, PASSWORD_BCRYPT);
+        }
+
+        return $this->update($memberId, $updateData);
+    }
+
+    /**
+     * Get anonymous members older than X days (for cleanup)
+     */
+    public function getOldAnonymousMembers(int $days = 90): array
+    {
+        $cutoffDate = now_datetime()
+            ->modify("-{$days} days")
+            ->format('Y-m-d H:i:s');
+
+        return $this->model::where('anonymous', true)
+            ->where('created_at', '<', $cutoffDate)
+            ->get()
+            ->toArray();
     }
 }

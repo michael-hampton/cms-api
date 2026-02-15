@@ -4,12 +4,19 @@ namespace App\Services\Members\Consents;
 
 use App\DTO\Consents\ConsentActionContext;
 use App\Enums\ConsentAction;
-use App\Models\ConsentAuditLog;
 use App\Models\ConsentType;
 use App\Models\Member;
+use App\Models\Model;
+use App\Repositories\Members\Consents\ConsentAuditLogRepository;
 
 class ConsentAuditService
 {
+    public function __construct(
+        private readonly ConsentAuditLogRepository $auditLogRepository
+    )
+    {
+    }
+
     public function log(
         Member               $member,
         ConsentType          $type,
@@ -17,21 +24,20 @@ class ConsentAuditService
         ?bool                $previousState,
         bool                 $newState,
         ConsentActionContext $context
-    ): void
+    ): Model
     {
-        $log = new ConsentAuditLog();
-        $log->member_id = $member->id;
-        $log->consent_type_id = $type->id;
-        $log->action = $action->value;
-        $log->previous_state = $previousState;
-        $log->new_state = $newState;
-        $log->source = $context->source;
-        $log->reason = $context->reason;
-        $log->admin_user_id = $context->adminUserId;
-        $log->ip_address = $context->ipAddress;
-        $log->user_agent = $context->userAgent;
-        $log->created_at = now();
-
-        $log->save();
+        return $this->auditLogRepository->create([
+            'member_id' => $member->id,
+            'consent_type_id' => $type->id,
+            'action' => $action->value,
+            'previous_state' => $previousState,
+            'new_state' => $newState,
+            'source' => $context->source,
+            'reason' => $context->reason,
+            'admin_user_id' => $context->adminUserId,
+            'ip_address' => $context->ipAddress,
+            'user_agent' => $context->userAgent,
+            'created_at' => now(),
+        ]);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Repositories\Members\Consents;
 
-use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\MemberConsent;
 
@@ -23,13 +22,35 @@ class MemberConsentRepository
     public function findExpired(): Collection
     {
         return MemberConsent::where('is_granted', true)
-            ->where('expires_at', '<=', now_datetime()->format('Y-m-d H:i:s'))
+            ->where('expires_at', '<=', now())
             ->whereNull('revoked_at')
             ->get();
     }
 
-    public function queryByType(int $consentTypeId): QueryBuilder
+    public function queryByType(int $consentTypeId)
     {
         return MemberConsent::where('consent_type_id', $consentTypeId);
+    }
+
+    /**
+     * Create a new MemberConsent instance (not yet saved)
+     */
+    public function createNew(array $attributes = []): MemberConsent
+    {
+        $consent = new MemberConsent();
+
+        foreach ($attributes as $key => $value) {
+            $consent->{$key} = $value;
+        }
+
+        return $consent;
+    }
+
+    /**
+     * Save a MemberConsent instance
+     */
+    public function save(MemberConsent $consent): bool
+    {
+        return $consent->save();
     }
 }

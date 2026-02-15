@@ -228,4 +228,14 @@ Voucher extends Model
 
         return round($discount, 2);
     }
+
+    public function isNonStackable(): bool
+    {
+        return $this->is_stackable === false;
+    }
+
+    public function requiresOverrideForOfferDiscount(bool $hasOfferDiscount): bool
+    {
+        return $hasOfferDiscount && $this->isNonStackable();
+    }
 }

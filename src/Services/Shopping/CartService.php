@@ -2,23 +2,36 @@
 
 namespace App\Services\Shopping;
 
+use App\Exceptions\Cart\InsufficientStockException;
+use App\Framework\Database\Database;
 use App\Framework\Session\Session;
 use App\Repositories\Offers\ProductOfferBundleRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Services\Shipping\ShippingService;
+use App\Services\Shopping\Factories\CartItemFactory;
+use App\Services\Shopping\Resolvers\CartPriceResolver;
+use App\Services\Shopping\Resolvers\CartStockResolver;
 use App\Services\Vouchers\VoucherService;
 
 class CartService
 {
     public function __construct(
-        private readonly CartRepository             $cartRepository,
-        private readonly ProductRepository          $productRepository,
+        private readonly CartRepository           $cartRepository,
+        private readonly ProductRepository        $productRepository,
         private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
-        private readonly ProductOfferRepository       $offerRepository,
+        private readonly ProductOfferRepository   $offerRepository,
         private readonly ProductOfferBundleRepository $bundleRepository,
-        private readonly VoucherService               $voucherService
+        private readonly VoucherService           $voucherService,
+        private readonly ProductVariantRepository $productVariantRepository,
+        private readonly Database                 $database,
+        private readonly CartStockResolver        $stockResolver,
+        private readonly CartPriceResolver        $priceResolver,
+        private readonly CartItemFactory          $itemFactory,
+        private readonly ShippingService          $shippingService
     )
     {
     }
@@ -29,6 +42,11 @@ class CartService
             Session::put('cart_session_id', uniqid('cart_', true));
         }
         return Session::get('cart_session_id');
+    }
+
+    private function getUserId(): ?int
+    {
+        return Session::get('user_id');
     }
 
     public function getItems(): array
@@ -44,6 +62,7 @@ class CartService
             $itemData = [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
+                'variant_id' => $item->variant_id,
                 'product_name' => $product->name ?? 'Unknown',
                 'product_slug' => $product->slug ?? '',
                 'product_image' => $product->image ?? '',
@@ -55,6 +74,13 @@ class CartService
                 'merchant_id' => $item->getMerchantId(),
                 'subscription_plan_id' => $item->subscription_plan_id,
             ];
+
+            if ($item->variant_id) {
+                $variant = $this->productRepository->getVariantById($item->variant_id);
+
+                $itemData['variant_options'] = $item->variant->options;
+                $itemData['sku'] = $variant->sku;
+            }
 
             if ($item->isOffer()) {
                 $itemData['offer_id'] = $item->getOfferId();
@@ -70,38 +96,61 @@ class CartService
         })->toArray();
     }
 
-    public function addItem(int $productId, int $quantity = 1, array $options = []): array
+    public function addItem(
+        int   $productId,
+        int   $quantity = 1,
+        array $options = [],
+        ?int  $variantId = null
+    ): array
     {
-        $product = $this->productRepository->find($productId, ['availableMerchants']);
-
-
+        $product = $this->productRepository->find($productId, ['availableMerchants', 'variants']);
 
         if (!$product || !$product->is_active) {
             return ['success' => false, 'message' => 'Product not found or inactive'];
         }
 
+        $variant = null;
+        if ($variantId) {
+            $variant = $this->productRepository->getVariantById($variantId);
+
+            if (!$variant) {
+                return ['success' => false, 'message' => 'Variant not found'];
+            }
+        }
+
+        // Check for conflicting promotions BEFORE stock check
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
-
-        // Check for conflicting promotions
         $existingItems = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
 
         foreach ($existingItems as $existingItem) {
+            // Check if same product+variant combination with promotion
             if ($existingItem->product_id === $productId &&
+                $existingItem->variant_id === $variantId &&
                 ($existingItem->isOffer() || $existingItem->isBundle())) {
                 return ['success' => false, 'message' => 'Product already in cart with a promotion'];
             }
         }
 
-        $price = $product->sale_price > 0 ? $product->sale_price : $product->price;
+        // Validate stock BEFORE any DB operations
+        try {
+            $this->stockResolver->assertCanAdd($product, $variant, $quantity);
+        } catch (InsufficientStockException $e) {
+            return ['success' => false, 'message' => $e->getUserMessage()];
+        }
+
+        $price = $this->priceResolver->resolve($product, $variant);
 
         $existingItem = $this->cartRepository->findItemByProduct($productId, $userId, $sessionId);
 
         if ($existingItem) {
             $newQuantity = $existingItem->quantity + $quantity;
 
-            if ($product->stock_quantity !== null && $product->stock_quantity < $newQuantity) {
-                return ['success' => false, 'message' => 'Cannot add more items. Stock limit reached.'];
+            // Validate updated quantity against stock
+            try {
+                $this->stockResolver->assertCanAdd($product, $variant, $newQuantity);
+            } catch (InsufficientStockException $e) {
+                return ['success' => false, 'message' => $e->getUserMessage()];
             }
 
             $existingItem->update([
@@ -110,17 +159,22 @@ class CartService
             ]);
 
         } else {
-            $this->cartRepository->create([
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'product_id' => $productId,
-                'quantity' => $quantity,
-                'price' => $product->sale_price ?? $product->price,
-                'subtotal' => $price * $quantity,
-                'options' => json_encode($options),
-                'site_id' => $product->site_id,
-                'merchant_id' => $product->availableMerchants?->count() > 0 ? $product->availableMerchants->first()->merchant_id : null
-            ]);
+            $merchantId = $product->availableMerchants?->count() > 0
+                ? $product->availableMerchants->first()->merchant_id
+                : null;
+
+            $cartItemData = $this->itemFactory->fromProduct(
+                $sessionId,
+                $userId,
+                $product,
+                $quantity,
+                $price,
+                $options,
+                $variantId,
+                $merchantId
+            );
+
+            $this->cartRepository->create($cartItemData->toArray());
         }
 
         return ['success' => true, 'message' => 'Product added to cart'];
@@ -142,9 +196,13 @@ class CartService
         }
 
         $product = $cartItem->product;
+        $variant = $cartItem->variant_id ? $cartItem->variant : null;
 
-        if ($product && $product->stock_quantity !== null && $product->stock_quantity < $quantity) {
-            return ['success' => false, 'message' => 'Insufficient stock'];
+        // Use stock resolver to check variant or product stock
+        try {
+            $this->stockResolver->assertCanUpdate($product, $variant, $quantity);
+        } catch (InsufficientStockException $e) {
+            return ['success' => false, 'message' => $e->getUserMessage()];
         }
 
         $this->cartRepository->update($cartItemId, [
@@ -179,13 +237,22 @@ class CartService
         $this->cartRepository->deleteBySessionOrUser($userId, $sessionId);
     }
 
+    /**
+     * Get cart total by summing all item subtotals.
+     */
     public function getTotal(): float
     {
-        $items = $this->getItems();
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
 
-        return array_sum(array_column($items, 'subtotal'));
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+
+        return (float)$items->sum('subtotal');
     }
 
+    /**
+     * Get total item count (sum of all quantities).
+     */
     public function getCount(): int
     {
         $sessionId = $this->getSessionId();
@@ -194,83 +261,108 @@ class CartService
         return $this->cartRepository->getCountBySessionOrUser($userId, $sessionId);
     }
 
-    protected function getUserId(): ?int
+    /**
+     * Add subscription to cart.
+     *
+     * For one-time subscriptions: validates delivery type.
+     * For recurring subscriptions: requires associated product.
+     */
+    public function addSubscriptionToCart(int $subscriptionPlanId, string $deliveryType = 'print'): array
     {
-        $authId = member_auth()->id();
-        // Return null for guest users (don't use default value of 1)
-        return $authId ?: null;
-    }
-
-    public function addOneTimeSubscription(
-        int    $planId,
-        string $deliveryType,
-        array $options = [],
-        ?int  $pricingId = null
-    ): array
-    {
-        $plan = $this->subscriptionPlanRepository->find($planId, ['pricingTiers']);
-
-        if (!$plan || !$plan->isOneTime()) {
-            return ['success' => false, 'message' => 'Invalid subscription plan'];
-        }
-
-        // Validate delivery type
-        $validDeliveryTypes = $plan->getDeliveryOptions();
-
-        if (!in_array($deliveryType, $validDeliveryTypes)) {
-            return ['success' => false, 'message' => 'Invalid delivery type'];
-        }
-
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
-        // Check if subscription plan already in cart
-        $existingItem = $this->cartRepository->findBySubscriptionPlan($planId, $userId, $sessionId);
+        $subscriptionPlan = $this->subscriptionPlanRepository->find($subscriptionPlanId, ['pricingTiers']);
 
-        if ($existingItem) {
-            return ['success' => false, 'message' => 'Subscription plan already in cart'];
+        if (!$subscriptionPlan) {
+            return ['success' => false, 'message' => 'Subscription plan not found or inactive'];
         }
 
-        // Get pricing tier
+        // Check if one-time subscription
+        if ($subscriptionPlan->isOneTime()) {
+            // Validate delivery type
+            $allowedDeliveryTypes = $subscriptionPlan->getDeliveryOptions();
+            if (!in_array($deliveryType, $allowedDeliveryTypes)) {
+                return ['success' => false, 'message' => 'Invalid delivery type'];
+            }
 
-        $pricing = $pricingId
-            ? $plan->pricingTiers->where('id', $pricingId)->first()
-            : $plan->getDefaultPricing();
+            // Check if already in cart
+            $existingItem = $this->cartRepository->findBySubscriptionPlan($subscriptionPlanId, $userId, $sessionId);
 
-        $cartData = [
-            'session_id' => $sessionId,
-            'user_id' => $userId,
-            'product_id' => null, // No product for subscriptions
-            'subscription_plan_id' => $planId,
-            'quantity' => 1,
-            'price' => !empty($pricing) && $deliveryType === 'digital' && $pricing->digital_price !== null && $pricing->digital_price > 0
-                ? $pricing->digital_price
-                : ($pricing->price ?? $plan->price),
-            'subtotal' => !empty($pricing) && $deliveryType === 'digital' && $pricing->digital_price !== null && $pricing->digital_price > 0
-                ? $pricing->digital_price
-                : ($pricing->price ?? $plan->price),
-            'options' => json_encode(array_merge($options, [
-                'delivery_type' => $deliveryType,
-                'plan_name' => $plan->name,
-                'billing_period' => $plan->billing_period,
-                'subscription_plan_id' => $planId,
-            ])),
-            'site_id' => $plan->site_id,
-        ];
+            if ($existingItem) {
+                return ['success' => false, 'message' => 'Subscription plan already in cart'];
+            }
 
-        $this->cartRepository->create($cartData);
+            $price = $subscriptionPlan->price;
 
-        return [
-            'success' => true,
-            'message' => 'Subscription added to cart'
-        ];
+            // One-time subscriptions don't need a product
+            $cartData = [
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'product_id' => null, // No product for one-time
+                'quantity' => 1,
+                'price' => $price,
+                'subtotal' => $price,
+                'subscription_plan_id' => $subscriptionPlanId,
+                'options' => json_encode([
+                    'delivery_type' => $deliveryType,
+                ]),
+                'site_id' => $subscriptionPlan->site_id,
+                'merchant_id' => null,
+                'variant_id' => null,
+            ];
+
+            $this->cartRepository->create($cartData);
+
+            return ['success' => true, 'message' => 'Subscription added to cart'];
+        }
+
+        // Regular subscription - needs product
+        $product = $subscriptionPlan->product;
+
+        if (!$product || !$product->is_active) {
+            return ['success' => false, 'message' => 'Associated product not found or inactive'];
+        }
+
+        // Check if subscription already in cart
+        $existingItem = $this->cartRepository->findBySubscriptionPlan($subscriptionPlanId, $userId, $sessionId);
+
+        if ($existingItem) {
+            return ['success' => false, 'message' => 'Subscription already in cart'];
+        }
+
+        $price = $subscriptionPlan->price;
+
+        $cartItemData = $this->itemFactory->fromSubscription(
+            $sessionId,
+            $userId,
+            $product,
+            1,
+            $price,
+            $subscriptionPlanId,
+            $deliveryType
+        );
+
+        $this->cartRepository->create($cartItemData->toArray());
+
+        return ['success' => true, 'message' => 'Subscription added to cart'];
     }
 
-    public function addOfferToCart(int $offerId, int $quantity = 1): array
+    /**
+     * Alias for addSubscriptionToCart for one-time subscriptions.
+     *
+     * This method name is more explicit for one-time use cases.
+     */
+    public function addOneTimeSubscription(int $subscriptionPlanId, string $deliveryType = 'print'): array
+    {
+        return $this->addSubscriptionToCart($subscriptionPlanId, $deliveryType);
+    }
+
+    public function addOfferToCart(int $offerId): array
     {
         $offer = $this->offerRepository->find($offerId);
 
-        if (!$offer || !$offer->isCurrentlyActive()) {
+        if (!$offer || !$offer->is_active) {
             return ['success' => false, 'message' => 'Offer not available'];
         }
 
@@ -280,83 +372,73 @@ class CartService
             return ['success' => false, 'message' => 'Product not available'];
         }
 
-        // Check if product already has an offer in cart
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
+        // Check if product already in cart
         $existingItem = $this->cartRepository->findItemByProduct($product->id, $userId, $sessionId);
 
         if ($existingItem) {
             return ['success' => false, 'message' => 'Product already in cart'];
         }
 
-        $cartItem = $this->cartRepository->create([
-            'session_id' => $sessionId,
-            'user_id' => $userId,
-            'product_id' => $product->id,
-            'quantity' => $quantity,
-            'price' => $offer->sale_price,
-            'subtotal' => $offer->sale_price * $quantity,
-            'options' => json_encode([
-                'type' => 'offer',
-                'offer_id' => $offerId,
-                'merchant_id' => $offer->merchant_id,
-            ]),
-            'site_id' => $product->site_id,
-        ]);
+        $price = $offer->sale_price ?? $product->price;
+        $merchantId = $offer->merchant?->id;
 
-        return [
-            'success' => true,
-            'message' => 'Offer added to cart',
-            'cart_item' => $cartItem
-        ];
+        $cartItemData = $this->itemFactory->fromOffer(
+            $sessionId,
+            $userId,
+            $product,
+            1,
+            $price,
+            $offerId,
+            $merchantId
+        );
+
+        $this->cartRepository->create($cartItemData->toArray());
+
+        return ['success' => true, 'message' => 'Offer added to cart'];
     }
 
     public function addBundleToCart(int $bundleId): array
     {
-        $bundle = $this->bundleRepository->find($bundleId);
+        return $this->database->transaction(function () use ($bundleId) {
+            $bundle = $this->bundleRepository->find($bundleId);
 
-        if (!$bundle || !$bundle->isCurrentlyActive()) {
-            return ['success' => false, 'message' => 'Bundle not available'];
-        }
-
-        $sessionId = $this->getSessionId();
-        $userId = $this->getUserId();
-
-        $cartItems = [];
-
-        foreach ($bundle->items as $bundleItem) {
-            $product = $bundleItem->getEffectiveProduct();
-            $price = $bundleItem->getEffectivePrice();
-            $merchant = $bundleItem->getEffectiveMerchant();
-
-            if (!$product || !$product->is_active) {
-                continue;
+            if (!$bundle || !$bundle->is_active) {
+                return ['success' => false, 'message' => 'Bundle not available'];
             }
 
-            $cartItem = $this->cartRepository->create([
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'product_id' => $product->id,
-                'quantity' => $bundleItem->quantity,
-                'price' => $price,
-                'subtotal' => $price * $bundleItem->quantity,
-                'options' => json_encode([
-                    'type' => 'bundle',
-                    'bundle_id' => $bundleId,
-                    'merchant_id' => $merchant?->id,
-                ]),
-                'site_id' => $product->site_id,
-            ]);
+            $sessionId = $this->getSessionId();
+            $userId = $this->getUserId();
 
-            $cartItems[] = $cartItem;
-        }
+            $cartItems = [];
 
-        return [
-            'success' => true,
-            'message' => 'Bundle added to cart',
-            'cart_items' => $cartItems
-        ];
+            foreach ($bundle->items as $bundleItem) {
+                $product = $bundleItem->getEffectiveProduct();
+                $merchant = $bundleItem->getEffectiveMerchant();
+                $price = $bundleItem->getEffectivePrice();
+
+                $cartItemData = $this->itemFactory->fromBundle(
+                    $sessionId,
+                    $userId,
+                    $product,
+                    $bundleItem->quantity,
+                    $price,
+                    $bundleId,
+                    $merchant?->id
+                );
+
+                $cartItem = $this->cartRepository->create($cartItemData->toArray());
+                $cartItems[] = $cartItem;
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Bundle added to cart',
+                'cart_items' => $cartItems
+            ];
+        });
     }
 
     public function getItemsGroupedByMerchant(): array
@@ -372,14 +454,11 @@ class CartService
             $merchantName = 'Direct';
 
             if ($merchantId > 0) {
-                // Get merchant name from product or offer/bundle
                 $product = $item->product;
                 if ($item->isOffer()) {
                     $offer = $this->offerRepository->find($item->getOfferId());
                     $merchantName = $offer->merchant?->name ?? 'Merchant ' . $merchantId;
                 } elseif ($item->isBundle()) {
-                    // For bundles, we'll split items by their respective merchants
-                    // This is handled separately
                     continue;
                 }
             }
@@ -409,7 +488,6 @@ class CartService
             $grouped[$merchantId]['subtotal'] += $item->subtotal;
         }
 
-        // Handle bundle items - they need special grouping
         foreach ($items as $item) {
             if ($item->isBundle()) {
                 $bundleId = $item->getBundleId();
@@ -456,19 +534,26 @@ class CartService
         return array_values($grouped);
     }
 
-    public function getShipmentBreakdown(): array
+    public function getShipmentBreakdown(array $shippingData = []): array
     {
         $merchantGroups = $this->getItemsGroupedByMerchant();
+        $requiresShipping = $this->requiresShipping();
 
         $shipments = [];
 
         foreach ($merchantGroups as $group) {
+            $shipping = $this->shippingService->calculateShipping(
+                $group['subtotal'],
+                $shippingData,
+                $requiresShipping
+            );
+
             $shipments[] = [
                 'merchant_id' => $group['merchant_id'],
                 'merchant_name' => $group['merchant_name'],
                 'item_count' => count($group['items']),
                 'subtotal' => $group['subtotal'],
-                'shipping' => $this->calculateShippingForMerchant($group['merchant_id'], $group['subtotal']),
+                'shipping' => $shipping,
                 'items' => $group['items'],
             ];
         }
@@ -476,37 +561,36 @@ class CartService
         return $shipments;
     }
 
-    private function calculateShippingForMerchant(int $merchantId, float $subtotal): float
-    {
-        // Simple shipping calculation - can be enhanced
-        if ($subtotal >= 100) {
-            return 0.00; // Free shipping over $100
-        }
-
-        return 10.00; // Flat rate per merchant
-    }
-
     public function hasOnlyDigitalItems(): bool
     {
-        $items = $this->getItems();
+        $items = $this->cartRepository->findBySessionOrUser(
+            $this->getUserId(),
+            $this->getSessionId()
+        );
 
         foreach ($items as $item) {
+            if (!empty($item->subscription_plan_id)) {
+                $options = is_string($item->options) ? json_decode($item->options, true) : $item->options;
 
-            if (!empty($item['subscription_plan_id']) && ($item['options']['delivery_type'] ?? '') === 'digital') {
+                if (($options['delivery_type'] ?? '') === 'digital') {
+                    continue;
+                }
+
+                return false;
+            }
+
+            if ($item->variant_id && $item->variant) {
+                if ($item->variant->is_digital) {
+                    continue;
+                }
+
+                return false;
+            }
+
+            if ($item->product && isset($item->product->is_digital) && $item->product->is_digital) {
                 continue;
             }
 
-            // Check if item is a digital subscription
-            if (isset($item['item_type']) && $item['item_type'] === 'subscription') {
-                continue; // Digital item, check next
-            }
-
-            // Check if item is a digital product
-            if (isset($item['product']) && isset($item['product']['is_digital']) && $item['product']['is_digital']) {
-                continue; // Digital item, check next
-            }
-
-            // Found a physical item
             return false;
         }
 
@@ -521,15 +605,9 @@ class CartService
             return ['success' => false, 'message' => 'Cart item not found'];
         }
 
-        // Validate start date
         $startDateTime = new \DateTime($startDate);
         $now = new \DateTime();
 
-//        if ($startDateTime < $now) {
-//            return ['success' => false, 'message' => 'Start date cannot be in the past'];
-//        }
-
-        // Update options
         $options = $item->options ?? [];
         $options['start_date'] = $startDate;
 

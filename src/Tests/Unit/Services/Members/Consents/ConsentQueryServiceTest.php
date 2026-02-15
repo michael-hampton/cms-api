@@ -125,11 +125,15 @@ class ConsentQueryServiceTest extends TestCase
         $this->assertFalse($result);
     }
 
+    // Around line 130-160 - Fix the assertion:
+
     public function testGetMemberConsents()
     {
         $member = $this->createMockMember(1);
         $consentType1 = $this->createMockConsentType('marketing_email', false);
         $consentType2 = $this->createMockConsentType('analytics', false);
+        $consentType2->id = 2; // Different ID
+        $consentType2->code = 'analytics';
 
         $consent1 = Mockery::mock(MemberConsent::class)->makePartial();
         $consent1->consent_type_id = 1;
@@ -151,9 +155,18 @@ class ConsentQueryServiceTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
-        $this->assertArrayHasKey('consent_type', $result[0]);
+
+        // Check structure - getMemberConsents returns flat arrays with MemberConsentSnapshot data
+        $this->assertArrayHasKey('id', $result[0]['consent_type']);
+        $this->assertArrayHasKey('code', $result[0]['consent_type']);
         $this->assertArrayHasKey('is_granted', $result[0]);
+
+        // First consent (marketing_email) is granted
+        $this->assertEquals('marketing_email', $result[0]['consent_type']['code']);
         $this->assertTrue($result[0]['is_granted']);
+
+        // Second consent (analytics) is not granted (not in memberConsents)
+        $this->assertEquals('analytics', $result[1]['consent_type']['code']);
         $this->assertFalse($result[1]['is_granted']);
     }
 
@@ -179,8 +192,12 @@ class ConsentQueryServiceTest extends TestCase
     public function testGetAuditTrail()
     {
         $member = $this->createMockMember(1);
+        $consentType = $this->createMockConsentType('marketing_email', false);
 
-        // This would need database mocking in a real test
+        $this->consentTypeRepository->shouldReceive('getAuditLog')
+            ->with(1, '')
+            ->andReturn(collect([$consentType]));
+
         $trail = $this->service->getAuditTrail($member);
 
         $this->assertIsArray($trail);
@@ -191,10 +208,10 @@ class ConsentQueryServiceTest extends TestCase
         $member = $this->createMockMember(1);
         $consentType = $this->createMockConsentType('marketing_email', false);
 
-        $this->consentTypeRepository->shouldReceive('findActiveByCode')
-            ->once()
-            ->with('marketing_email')
-            ->andReturn($consentType);
+        // Mock the query builder
+        $this->consentTypeRepository->shouldReceive('getAuditLog')
+            ->with(1, 'marketing_email')
+            ->andReturn(collect([$consentType]));
 
         $trail = $this->service->getAuditTrail($member, 'marketing_email');
 

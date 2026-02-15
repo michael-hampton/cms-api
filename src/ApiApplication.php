@@ -38,6 +38,8 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
+use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
+use App\Services\Members\Comments\SimpleSpamDetector;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
 use App\Services\Newsletter\Renderers\BannerBlockRenderer;
 use App\Services\Newsletter\Renderers\BuyingGuideBlockRenderer;
@@ -110,6 +112,7 @@ class ApiApplication
         $this->container->bind(SessionStore::class, NativeSessionStore::class);
         $this->container->bind(DeliveryEstimatorInterface::class, InternalBusinessDayEstimator::class);
         $this->container->bind(HolidayProviderInterface::class, UkHolidayProvider::class);
+        $this->container->bind(SpamDetectionInterface::class, SimpleSpamDetector::class);
 
 
         $this->container->bind(

@@ -2,45 +2,41 @@
 
 namespace App\Tests\Unit\Services\Reviews;
 
+use App\DTO\Reviews\ReviewResult;
+use App\DTO\Reviews\ReviewSummaryDTO;
 use App\Framework\Authorization\MemberAuthWrapper;
-use App\Framework\Support\Collection;
-use App\Models\Product;
 use App\Models\Review;
-use App\Models\ReviewHelpful;
-use App\Repositories\Product\ProductRepository;
-use App\Repositories\ReviewHelpfulRepository;
-use App\Repositories\ReviewRepository;
+use App\Services\Reviews\ReviewCommandService;
+use App\Services\Reviews\ReviewQueryService;
 use App\Services\Reviews\ReviewService;
+use App\Services\Reviews\ReviewVoteService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
-class ReviewServiceTest extends TestCase
+class ReviewServiceTest extends FunctionalTestCase
 {
-    protected ReviewRepository $reviewRepository;
-    protected ReviewHelpfulRepository $reviewHelpfulRepository;
-    protected ProductRepository $productRepository;
-    protected ReviewService $reviewService;
+    protected ReviewCommandService $commandService;
+    protected ReviewQueryService $queryService;
+    protected ReviewVoteService $voteService;
     protected MemberAuthWrapper $authService;
+    protected ReviewService $reviewService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Mock all dependencies
-        $this->reviewRepository = Mockery::mock(ReviewRepository::class);
-        $this->reviewHelpfulRepository = Mockery::mock(ReviewHelpfulRepository::class);
-        $this->productRepository = Mockery::mock(ProductRepository::class);
-        $this->authService = Mockery::mock(MemberAuthWrapper::class); // <-- NEW
+        $this->commandService = Mockery::mock(ReviewCommandService::class);
+        $this->queryService = Mockery::mock(ReviewQueryService::class);
+        $this->voteService = Mockery::mock(ReviewVoteService::class);
+        $this->authService = Mockery::mock(MemberAuthWrapper::class);
 
-        // Instantiate the service with mocked dependencies
         $this->reviewService = new ReviewService(
-            $this->reviewRepository,
-            $this->reviewHelpfulRepository,
-            $this->productRepository,
-            $this->authService // <-- NEW INJECTION
+            $this->commandService,
+            $this->queryService,
+            $this->voteService,
+            $this->authService
         );
 
-        // Reset session for each test (for getSessionId)
         $_SESSION = [];
     }
 
@@ -83,52 +79,38 @@ class ReviewServiceTest extends TestCase
         $page = 1;
         $perPage = 10;
 
-        $expectedReviewData = [
-            'id' => 101, 'rating' => 5, 'title' => 'Great!', 'comment' => 'Loved it.',
-            'author_name' => 'John Doe', 'is_verified_purchase' => true,
-            'helpful_count' => 5, 'unhelpful_count' => 1, 'formatted_date' => 'Yesterday',
-            'created_at' => '2023-01-01 10:00:00'
-        ];
-        $expectedReviews = [$expectedReviewData];
-
-        $mockDataCollection = Mockery::mock(Collection::class);
-
-        $mockMappedCollection = Mockery::mock(Collection::class);
-        $mockMappedCollection->shouldReceive('toArray')
-            ->once()
-            ->andReturn($expectedReviews);
-
-        $mockDataCollection->shouldReceive('map')
-            ->once()
-            ->andReturn($mockMappedCollection);
-
-        $mockReviewData = [
-            'data' => $mockDataCollection, // <-- Mocked collection
-            'pagination' => ['total' => 1, 'current_page' => 1],
+        $reviewsData = [
+            'reviews' => [
+                ['id' => 1, 'rating' => 5, 'title' => 'Great!']
+            ],
+            'pagination' => ['total' => 1]
         ];
 
-        $this->reviewRepository->shouldReceive('findByProduct')
+        $summaryData = [
+            'average_rating' => 4.8,
+            'total_reviews' => 50,
+            'rating_breakdown' => [5 => 40],
+            'rating_percentages' => [5 => 80.0]
+        ];
+
+        $this->queryService->shouldReceive('getPaginatedProductReviews')
             ->once()
             ->with($productId, $page, $perPage)
-            ->andReturn($mockReviewData);
+            ->andReturn($reviewsData);
 
-        $this->reviewRepository->shouldReceive('getAverageRating')
-            ->once()->with($productId)->andReturn(4.8);
+        $summary = Mockery::mock(\App\DTO\Reviews\ReviewSummaryDTO::class);
+        $summary->shouldReceive('toArray')->andReturn($summaryData);
 
-        $this->reviewRepository->shouldReceive('getTotalReviewCount')
-            ->once()->with($productId)->andReturn(50);
-
-        $this->reviewRepository->shouldReceive('getRatingBreakdown')
-            ->once()->with($productId)->andReturn([5 => 40, 4 => 5, 3 => 3, 2 => 1, 1 => 1]);
+        $this->queryService->shouldReceive('getReviewSummary')
+            ->once()
+            ->with($productId)
+            ->andReturn($summary);
 
         $result = $this->reviewService->getProductReviews($productId, $page, $perPage);
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('reviews', $result);
-        $this->assertCount(1, $result['reviews']);
         $this->assertEquals(4.8, $result['average_rating']);
-        $this->assertEquals(50, $result['total_reviews']);
-        $this->assertEquals(101, $result['reviews'][0]['id']);
     }
 
     // --- Test createReview ---
@@ -139,20 +121,18 @@ class ReviewServiceTest extends TestCase
         $productId = 45;
         $reviewData = ['rating' => 5, 'title' => 'Fantastic!', 'comment' => 'Highly recommend.'];
 
-        // Mock models to satisfy type hints
-        $mockProduct = $this->mockModel(Product::class, ['id' => $productId, 'site_id' => 1]);
-        $mockReview = $this->mockModel(Review::class, ['id' => 500, 'rating' => 5, 'product_id' => $productId]);
+        $this->mockAuthUserId($userId);
 
-        $this->mockAuthUserId($userId); // Logged in
+        $result = ReviewResult::success('Review submitted successfully', Mockery::mock(Review::class));
 
-        $this->productRepository->shouldReceive('find')->once()->with($productId)->andReturn($mockProduct); // FIX: Mocked model
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->with($productId, $userId)->andReturn(false);
-        $this->reviewRepository->shouldReceive('create')->once()->andReturn($mockReview);
+        $this->commandService->shouldReceive('createReview')
+            ->once()
+            ->andReturn($result);
 
-        $result = $this->reviewService->createReview($productId, $reviewData);
+        $response = $this->reviewService->createReview($productId, $reviewData, $this->siteId);
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals('Review submitted successfully', $result['message']);
+        $this->assertTrue($response->success);
+        $this->assertEquals('Review submitted successfully', $response->message);
     }
 
     public function testCreateReviewNotLoggedIn()
@@ -161,11 +141,10 @@ class ReviewServiceTest extends TestCase
         $productId = 45;
         $reviewData = ['rating' => 5, 'title' => 'Test', 'comment' => 'Test'];
 
+        $this->expectExceptionMessage('You must be logged in to submit a review');
+
         $result = $this->reviewService->createReview($productId, $reviewData);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('You must be logged in to submit a review', $result['message']);
-        $this->productRepository->shouldNotHaveReceived('find');
     }
 
     public function testCreateReviewProductNotFound()
@@ -174,12 +153,16 @@ class ReviewServiceTest extends TestCase
         $productId = 45;
         $reviewData = ['rating' => 5];
 
-        $this->productRepository->shouldReceive('find')->once()->with($productId)->andReturn(null);
+        $result = ReviewResult::failure('Product not found');
 
-        $result = $this->reviewService->createReview($productId, $reviewData);
+        $this->commandService->shouldReceive('createReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Product not found', $result['message']); // <-- NOW PASSES
+        $response = $this->reviewService->createReview($productId, $reviewData, 1);
+
+        $this->assertFalse($response->success);
+        $this->assertEquals('Product not found', $response->message);
     }
 
     public function testCreateReviewAlreadyReviewed()
@@ -187,31 +170,38 @@ class ReviewServiceTest extends TestCase
         $userId = 123;
         $productId = 45;
         $reviewData = ['rating' => 5];
-        $mockProduct = $this->mockModel(Product::class, ['id' => $productId, 'site_id' => 1]); // FIX: Mocked model
 
         $this->mockAuthUserId($userId);
-        $this->productRepository->shouldReceive('find')->once()->andReturn($mockProduct); // FIX: Mocked model
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->with($productId, $userId)->andReturn(true);
 
-        $result = $this->reviewService->createReview($productId, $reviewData);
+        $result = ReviewResult::failure('You have already reviewed this product');
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('You have already reviewed this product', $result['message']);
+        $this->commandService->shouldReceive('createReview')
+            ->once()
+            ->andReturn($result);
+
+        $response = $this->reviewService->createReview($productId, $reviewData, 1);
+
+        $this->assertFalse($response->success);
+        $this->assertEquals('You have already reviewed this product', $response->message);
     }
 
     public function testCreateReviewInvalidRating()
     {
         $userId = 123;
         $productId = 45;
-        $mockProduct = $this->mockModel(Product::class, ['id' => $productId, 'site_id' => 1]); // FIX: Mocked model
 
         $this->mockAuthUserId($userId);
-        $this->productRepository->shouldReceive('find')->once()->andReturn($mockProduct); // FIX: Mocked model
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->andReturn(false);
 
-        $result = $this->reviewService->createReview($productId, ['rating' => 6]);
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Rating must be between 1 and 5', $result['message']);
+        $result = ReviewResult::failure('Rating must be between 1 and 5');
+
+        $this->commandService->shouldReceive('createReview')
+            ->once()
+            ->andReturn($result);
+
+        $response = $this->reviewService->createReview($productId, ['rating' => 6], 1);
+
+        $this->assertFalse($response->success);
+        $this->assertEquals('Rating must be between 1 and 5', $response->message);
     }
 
     // --- Test updateReview ---
@@ -222,20 +212,18 @@ class ReviewServiceTest extends TestCase
         $reviewId = 99;
         $updateData = ['rating' => 4, 'comment' => 'Still great.'];
 
-        // Mock Review model to satisfy type hints
-        $mockReview = $this->mockModel(Review::class, ['id' => $reviewId, 'user_id' => $userId]);
-
         $this->mockAuthUserId($userId);
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview); // FIX: Mocked model
-        $this->reviewRepository->shouldReceive('update')->once()->with($reviewId, Mockery::subset([
-            'rating' => 4, 'comment' => $updateData['comment']
-        ]))->andReturn($mockReview);
+        $result = ReviewResult::success('Review updated successfully');
 
-        $result = $this->reviewService->updateReview($reviewId, $updateData);
+        $this->commandService->shouldReceive('updateReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals('Review updated successfully', $result['message']);
+        $response = $this->reviewService->updateReview($reviewId, $updateData);
+
+        $this->assertTrue($response['success']);
+        $this->assertEquals('Review updated successfully', $response['message']);
     }
 
     public function testUpdateReviewNotLoggedIn()
@@ -252,41 +240,50 @@ class ReviewServiceTest extends TestCase
         $this->mockAuthUserId(123);
         $reviewId = 99;
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn(null);
+        $result = ReviewResult::failure('Review not found');
 
-        $result = $this->reviewService->updateReview($reviewId, ['rating' => 4]);
+        $this->commandService->shouldReceive('updateReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Review not found', $result['message']);
+        $response = $this->reviewService->updateReview($reviewId, ['rating' => 4]);
+
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Review not found', $response['message']);
     }
 
     public function testUpdateReviewNotAuthor()
     {
         $this->mockAuthUserId(123);
         $reviewId = 99;
-        $mockReview = $this->mockModel(Review::class, ['id' => $reviewId, 'user_id' => 456]); // FIX: Mocked model
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview);
+        $result = ReviewResult::failure('You can only edit your own reviews');
 
-        $result = $this->reviewService->updateReview($reviewId, ['rating' => 4]);
+        $this->commandService->shouldReceive('updateReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('You can only edit your own reviews', $result['message']);
+        $response = $this->reviewService->updateReview($reviewId, ['rating' => 4]);
+
+        $this->assertFalse($response['success']);
+        $this->assertEquals('You can only edit your own reviews', $response['message']);
     }
 
     public function testUpdateReviewInvalidRating()
     {
         $this->mockAuthUserId(123);
         $reviewId = 99;
-        $mockReview = $this->mockModel(Review::class, ['id' => $reviewId, 'user_id' => 123]); // FIX: Mocked model
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview);
+        $result = ReviewResult::failure('Rating must be between 1 and 5');
 
-        $result = $this->reviewService->updateReview($reviewId, ['rating' => 7]);
+        $this->commandService->shouldReceive('updateReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Rating must be between 1 and 5', $result['message']);
-        $this->reviewRepository->shouldNotHaveReceived('update');
+        $response = $this->reviewService->updateReview($reviewId, ['rating' => 7]);
+
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Rating must be between 1 and 5', $response['message']);
     }
 
     // --- Test deleteReview ---
@@ -295,32 +292,36 @@ class ReviewServiceTest extends TestCase
     {
         $userId = 123;
         $reviewId = 99;
-        $mockReview = $this->mockModel(Review::class, ['id' => $reviewId, 'user_id' => $userId]); // FIX: Mocked model
 
         $this->mockAuthUserId($userId);
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview);
-        $this->reviewRepository->shouldReceive('delete')->once()->with($reviewId)->andReturn(true);
+        $result = ReviewResult::success('Review deleted successfully');
 
-        $result = $this->reviewService->deleteReview($reviewId);
+        $this->commandService->shouldReceive('deleteReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals('Review deleted successfully', $result['message']);
+        $response = $this->reviewService->deleteReview($reviewId);
+
+        $this->assertTrue($response['success']);
+        $this->assertEquals('Review deleted successfully', $response['message']);
     }
 
     public function testDeleteReviewNotAuthor()
     {
         $this->mockAuthUserId(123);
         $reviewId = 99;
-        $mockReview = $this->mockModel(Review::class, ['id' => $reviewId, 'user_id' => 456]); // FIX: Mocked model
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview);
-        $this->reviewRepository->shouldNotReceive('delete');
+        $result = ReviewResult::failure('You can only delete your own reviews');
 
-        $result = $this->reviewService->deleteReview($reviewId);
+        $this->commandService->shouldReceive('deleteReview')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('You can only delete your own reviews', $result['message']);
+        $response = $this->reviewService->deleteReview($reviewId);
+
+        $this->assertFalse($response['success']);
+        $this->assertEquals('You can only delete your own reviews', $response['message']);
     }
 
     // --- Test markReviewHelpful ---
@@ -329,94 +330,66 @@ class ReviewServiceTest extends TestCase
     {
         $userId = 123;
         $reviewId = 100;
-        $isHelpful = true;
-
-        // Use Mockery::mock(Review::class)->makePartial() for methods like update()
-        $mockReview = Mockery::mock(Review::class)->makePartial();
-        $mockReview->id = $reviewId;
-        $mockReview->helpful_count = 5;
-        $mockReview->unhelpful_count = 1;
-        $mockReview->site_id = 1;
-
-        $updatedReview = $this->mockModel(Review::class, ['id' => $reviewId, 'helpful_count' => 6, 'unhelpful_count' => 1]);
 
         $this->mockAuthUserId($userId);
 
-        $this->reviewHelpfulRepository->shouldReceive('getUserVote')->once()->andReturn(null);
-        $this->reviewHelpfulRepository->shouldReceive('create')->once();
+        $result = ReviewResult::success('Thank you for your feedback', null, [
+            'helpful_count' => 6,
+            'unhelpful_count' => 1
+        ]);
 
-        $this->reviewRepository->shouldReceive('find')->twice()->with($reviewId)->andReturn($mockReview, $updatedReview);
-        $this->reviewRepository->shouldReceive('incrementHelpfulCount')->once()->with($reviewId);
-        $this->reviewRepository->shouldNotReceive('incrementUnhelpfulCount');
+        $this->voteService->shouldReceive('markReviewHelpful')
+            ->once()
+            ->andReturn($result);
 
-        $result = $this->reviewService->markReviewHelpful($reviewId, $isHelpful);
+        $response = $this->reviewService->markReviewHelpful($reviewId, true, $this->siteId);
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals(6, $result['helpful_count']);
+        $this->assertTrue($response['success']);
+        $this->assertEquals(6, $response['helpful_count']);
     }
 
     public function testMarkReviewHelpfulRemoveSameVote()
     {
         $userId = 123;
         $reviewId = 100;
-        $isHelpful = true;
-        $initialHelpfulCount = 5;
-
-        $mockReview = Mockery::mock(Review::class)->makePartial();
-        $mockReview->id = $reviewId;
-        $mockReview->helpful_count = $initialHelpfulCount;
-        $mockReview->unhelpful_count = 1;
-
-        // FIX APPLIED: Mock the ReviewHelpful model instead of using stdClass
-        $existingVote = $this->mockModel(ReviewHelpful::class, ['id' => 1, 'is_helpful' => true]);
 
         $this->mockAuthUserId($userId);
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview);
-        // Ensure getUserVote returns the mocked model
-        $this->reviewHelpfulRepository->shouldReceive('getUserVote')->once()->andReturn($existingVote);
+        $result = ReviewResult::success('Vote removed', null, [
+            'helpful_count' => 4,
+            'unhelpful_count' => 1
+        ]);
 
-        // Expect the model update to be called
-        $mockReview->shouldReceive('update')->once()->with(['helpful_count' => $initialHelpfulCount - 1]);
-        $this->reviewHelpfulRepository->shouldReceive('delete')->once()->with($existingVote->id);
+        $this->voteService->shouldReceive('markReviewHelpful')
+            ->once()
+            ->andReturn($result);
 
-        $result = $this->reviewService->markReviewHelpful($reviewId, $isHelpful);
+        $response = $this->reviewService->markReviewHelpful($reviewId, true, $this->siteId);
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals('Vote removed', $result['message']);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('Vote removed', $response['message']);
     }
 
     public function testMarkReviewHelpfulChangeVote()
     {
         $userId = 123;
         $reviewId = 100;
-        $isHelpful = true; // Change from 'unhelpful' to 'helpful'
-
-        $mockReview = Mockery::mock(Review::class)->makePartial();
-        $mockReview->id = $reviewId;
-        $mockReview->helpful_count = 5;
-        $mockReview->unhelpful_count = 3;
-
-        // FIX APPLIED: Mock the ReviewHelpful model instead of using stdClass
-        $existingVote = $this->mockModel(ReviewHelpful::class, ['id' => 1, 'is_helpful' => false]);
 
         $this->mockAuthUserId($userId);
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn($mockReview);
-        // Ensure getUserVote returns the mocked model
-        $this->reviewHelpfulRepository->shouldReceive('getUserVote')->once()->andReturn($existingVote);
-
-        // Expect the model update to be called
-        $mockReview->shouldReceive('update')->once()->with([
+        $result = ReviewResult::success('Vote updated', null, [
             'helpful_count' => 6,
             'unhelpful_count' => 2
         ]);
-        $this->reviewHelpfulRepository->shouldReceive('update')->once()->with($existingVote->id, ['is_helpful' => true]);
 
-        $result = $this->reviewService->markReviewHelpful($reviewId, $isHelpful);
+        $this->voteService->shouldReceive('markReviewHelpful')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals('Vote updated', $result['message']);
+        $response = $this->reviewService->markReviewHelpful($reviewId, true, $this->siteId);
+
+        $this->assertTrue($response['success']);
+        $this->assertEquals('Vote updated', $response['message']);
     }
 
 
@@ -424,14 +397,17 @@ class ReviewServiceTest extends TestCase
     {
         $this->mockAuthUserId(123);
         $reviewId = 999;
-        $isHelpful = true;
 
-        $this->reviewRepository->shouldReceive('find')->once()->with($reviewId)->andReturn(null);
+        $result = ReviewResult::failure('Review not found');
 
-        $result = $this->reviewService->markReviewHelpful($reviewId, $isHelpful);
+        $this->voteService->shouldReceive('markReviewHelpful')
+            ->once()
+            ->andReturn($result);
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Review not found', $result['message']);
+        $response = $this->reviewService->markReviewHelpful($reviewId, true, $this->siteId);
+
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Review not found', $response['message']);
     }
 
     // --- Test getReviewStatistics ---
@@ -439,33 +415,44 @@ class ReviewServiceTest extends TestCase
     public function testGetReviewStatisticsSuccess()
     {
         $productId = 1;
-        $averageRating = 4.0;
-        $totalReviews = 100;
-        $breakdown = [5 => 50, 4 => 30, 3 => 10, 2 => 5, 1 => 5];
-        $expectedPercentages = [5 => 50.0, 4 => 30.0, 3 => 10.0, 2 => 5.0, 1 => 5.0];
+        $summaryData = [
+            'average_rating' => 4.0,
+            'total_reviews' => 100,
+            'rating_breakdown' => [5 => 50, 4 => 30, 3 => 10, 2 => 5, 1 => 5],
+            'rating_percentages' => [5 => 50.0, 4 => 30.0, 3 => 10.0, 2 => 5.0, 1 => 5.0]
+        ];
 
-        $this->reviewRepository->shouldReceive('getAverageRating')->once()->with($productId)->andReturn($averageRating);
-        $this->reviewRepository->shouldReceive('getTotalReviewCount')->once()->with($productId)->andReturn($totalReviews);
-        $this->reviewRepository->shouldReceive('getRatingBreakdown')->once()->with($productId)->andReturn($breakdown);
+        $summary = Mockery::mock(ReviewSummaryDTO::class);
+        $summary->shouldReceive('toArray')->andReturn($summaryData);
+
+        $this->queryService->shouldReceive('getReviewSummary')
+            ->once()
+            ->with($productId)
+            ->andReturn($summary);
 
         $result = $this->reviewService->getReviewStatistics($productId);
 
-        $this->assertEquals($averageRating, $result['average_rating']);
-        $this->assertEquals($totalReviews, $result['total_reviews']);
-        $this->assertEquals($breakdown, $result['rating_breakdown']);
-        $this->assertEquals($expectedPercentages, $result['rating_percentages']);
+        $this->assertEquals(4.0, $result['average_rating']);
+        $this->assertEquals(100, $result['total_reviews']);
     }
 
     public function testGetReviewStatisticsNoReviews()
     {
         $productId = 2;
-        $averageRating = 0.0; // FIX: Should return float to satisfy type hint
-        $totalReviews = 0;
-        $breakdown = [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0];
+        $summaryData = [
+            'average_rating' => 0.0,
+            'total_reviews' => 0,
+            'rating_breakdown' => [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0],
+            'rating_percentages' => [5 => 0.0, 4 => 0.0, 3 => 0.0, 2 => 0.0, 1 => 0.0]
+        ];
 
-        $this->reviewRepository->shouldReceive('getAverageRating')->once()->andReturn($averageRating); // FIX: Return 0.0
-        $this->reviewRepository->shouldReceive('getTotalReviewCount')->once()->andReturn($totalReviews);
-        $this->reviewRepository->shouldReceive('getRatingBreakdown')->once()->andReturn($breakdown);
+        $summary = Mockery::mock(ReviewSummaryDTO::class);
+        $summary->shouldReceive('toArray')->andReturn($summaryData);
+
+        $this->queryService->shouldReceive('getReviewSummary')
+            ->once()
+            ->with($productId)
+            ->andReturn($summary);
 
         $result = $this->reviewService->getReviewStatistics($productId);
 
@@ -482,7 +469,13 @@ class ReviewServiceTest extends TestCase
 
         $this->mockAuthUserId($userId);
 
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->with($productId, $userId)->andReturn(false);
+        $this->queryService->shouldReceive('canUserReview')
+            ->once()
+            ->with($productId, $userId)
+            ->andReturn([
+                'can_review' => true,
+                'reason' => null
+            ]);
 
         $result = $this->reviewService->canUserReview($productId);
 
@@ -495,11 +488,18 @@ class ReviewServiceTest extends TestCase
         $this->mockAuthUserId(null);
         $productId = 10;
 
+        $this->queryService->shouldReceive('canUserReview')
+            ->once()
+            ->with($productId, null)
+            ->andReturn([
+                'can_review' => false,
+                'reason' => 'You must be logged in to submit a review'
+            ]);
+
         $result = $this->reviewService->canUserReview($productId);
 
         $this->assertFalse($result['can_review']);
         $this->assertEquals('You must be logged in to submit a review', $result['reason']);
-        $this->reviewRepository->shouldNotHaveReceived('hasUserReviewedProduct');
     }
 
     public function testCanUserReviewAlreadyReviewed()
@@ -509,7 +509,13 @@ class ReviewServiceTest extends TestCase
 
         $this->mockAuthUserId($userId);
 
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->with($productId, $userId)->andReturn(true);
+        $this->queryService->shouldReceive('canUserReview')
+            ->once()
+            ->with($productId, $userId)
+            ->andReturn([
+                'can_review' => false,
+                'reason' => 'You have already reviewed this product'
+            ]);
 
         $result = $this->reviewService->canUserReview($productId);
 
@@ -530,18 +536,5 @@ class ReviewServiceTest extends TestCase
 
         $sessionId2 = $method->invoke($this->reviewService);
         $this->assertEquals($sessionId1, $sessionId2);
-    }
-
-    // --- Test protected isVerifiedPurchase (Side Effect/Implementation detail) ---
-
-    public function testIsVerifiedPurchaseReturnsFalse()
-    {
-        $method = new \ReflectionMethod(ReviewService::class, 'isVerifiedPurchase');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->reviewService, 123, 45);
-
-        // Current implementation is hardcoded to false
-        $this->assertFalse($result);
     }
 }

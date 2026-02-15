@@ -12,7 +12,9 @@ use App\Models\Product;
 use App\Models\ProductOffer;
 use App\Models\ProductOfferBundle;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductViewRepository;
 use App\Services\Cms\MenuRenderer;
+use App\Services\Product\ProductSchemaService;
 use App\Services\Product\ProductService;
 use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\WishlistService;
@@ -23,7 +25,9 @@ class ProductDetailController extends Controller
     public function __construct(
         private readonly ProductService $productService,
         private readonly WishlistService $wishlistService,
-        private readonly ProductRepository $productRepository
+        private readonly ProductRepository     $productRepository,
+        private readonly ProductViewRepository $productViewRepository,
+        private readonly ProductSchemaService  $productSchemaService
     ) {
         parent::__construct();
     }
@@ -48,8 +52,10 @@ class ProductDetailController extends Controller
 
         $this->productService->trackView($product);
 
+        $member = MemberAuth::getMember();
+
         $relatedProducts = $this->productService->getRelatedProducts($product, 8);
-        $recentlyViewed = $this->productService->getRecentlyViewedProducts(6);
+        $recentlyViewed = $this->productViewRepository->getViewedProductsByMember($member->id, 6);
 
         $user = MemberAuth::getMember();
         $isInWishlist = $this->wishlistService->isInWishlist($user, $product);
@@ -113,7 +119,7 @@ class ProductDetailController extends Controller
             'relatedProducts' => $relatedProducts,
             'recentlyViewed' => $recentlyViewed,
             'isInWishlist' => $isInWishlist,
-            'structuredData' => $this->productService->generateStructuredData($product),
+            'structuredData' => $this->productSchemaService->generateStructuredData($product),
             'reviewStats' => $reviewStats,
             'canReview' => ['can_review' => true],
             'reviewData' => $reviewData,

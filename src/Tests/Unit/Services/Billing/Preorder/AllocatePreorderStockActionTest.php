@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductVariantRepository;
 use App\Services\Billing\Preorder\Actions\AllocatePreorderStockAction;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -18,6 +19,30 @@ class AllocatePreorderStockActionTest extends FunctionalTestCase
     private OrderItemRepository $orderItemRepository;
     private Database $databaseMock;
     private AllocatePreorderStockAction $action;
+    private ProductVariantRepository $productVariantRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->productRepository = Mockery::mock(ProductRepository::class);
+        $this->orderItemRepository = Mockery::mock(OrderItemRepository::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->productVariantRepository = Mockery::mock(ProductVariantRepository::class);
+
+        $this->action = new AllocatePreorderStockAction(
+            $this->productRepository,
+            $this->productVariantRepository,
+            $this->orderItemRepository,
+            $this->databaseMock
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_allocates_stock_to_oldest_preorder_first(): void
     {
@@ -342,26 +367,5 @@ class AllocatePreorderStockActionTest extends FunctionalTestCase
 
         $result = $this->action->execute($product);
         $this->assertEquals(5, $result);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->productRepository = Mockery::mock(ProductRepository::class);
-        $this->orderItemRepository = Mockery::mock(OrderItemRepository::class);
-        $this->databaseMock = Mockery::mock(Database::class);
-
-        $this->action = new AllocatePreorderStockAction(
-            $this->productRepository,
-            $this->orderItemRepository,
-            $this->databaseMock
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 }

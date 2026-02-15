@@ -365,7 +365,7 @@ $router->get('/{site}/member/invoices/{paymentId}/download', [MemberInvoiceContr
 
 // Member Comments Routes
 $router->get('/{site}/member/comments', [MemberCommentsController::class, 'index']);
-$router->delete('/{site}/member/comments/{id}', [MemberCommentsController::class, 'destroy']);
+$router->delete('/{site}/member/comments/{commentId}', [MemberCommentsController::class, 'destroy']);
 
 $router->get('/{site}/member/settings', [MemberAuthController::class, 'showChangePasswordForm']);
 

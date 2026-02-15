@@ -3,6 +3,7 @@
 namespace App\Services\Billing\Preorder\Actions;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Repositories\Billing\OrderItemRepository;
 
 class CalculateSellableStockAction
@@ -13,13 +14,13 @@ class CalculateSellableStockAction
     {
     }
 
-    public function execute(Product $product): int
+    public function execute(Product|ProductVariant $purchasable): int
     {
         // Calculate reserved quantity for pending preorders
         $reservedQuantity = $this->orderItemRepository
-            ->getPendingPreorderQuantity($product->id);
+            ->getPendingPreorderQuantity($purchasable->id);
 
         // Sellable stock = actual stock - reserved for preorders
-        return max(0, $product->stock_quantity - $reservedQuantity);
+        return max(0, $purchasable->stock_quantity - $reservedQuantity);
     }
 }

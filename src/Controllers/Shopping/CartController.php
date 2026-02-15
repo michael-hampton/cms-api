@@ -285,6 +285,7 @@ class CartController extends Controller
     {
         $data = $request->all();
         $siteId = SiteContext::getId();
+        $sessionId = Session::getId();
 
         // Check if this is a subscription checkout
         if (!empty($data['subscription_plan_id'])) {
@@ -458,7 +459,7 @@ class CartController extends Controller
             ], 400);
         }
 
-        $result = $this->cartService->addOneTimeSubscription($planId, $deliveryType, $options, $request->get('pricing_id') ?? null);
+        $result = $this->cartService->addSubscriptionToCart($planId, $deliveryType);
 
         return $this->resourceResponse(array_merge($result, [
             'count' => $this->cartService->getCount(),
@@ -530,4 +531,120 @@ class CartController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
+
+    /**
+     * Verify email and initiate appropriate flow
+     *
+     * POST /api/{site}/checkout/verify-email
+     * Body: { "email": "user@example.com" }
+     */
+    public function verifyEmail(Request $request)
+    {
+        $email = $request->input('email');
+        $siteId = SiteContext::getId();
+        $sessionId = Session::getId();
+
+        // Validate email
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->errorResponse('Valid email is required', 422);
+        }
+
+        try {
+            $result = $this->identityService->resolveIdentity($email, $sessionId, $siteId);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'flow' => $result->requiresOTP() ? 'otp' : 'anonymous',
+                'message' => $result->message,
+                'expires_in' => $result->expiresIn
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 429);
+        }
+    }
+
+    /**
+     * Verify OTP code
+     *
+     * POST /api/{site}/checkout/verify-otp
+     * Body: { "email": "user@example.com", "otp": "123456" }
+     */
+    public function verifyOTP(Request $request)
+    {
+        $email = $request->input('email');
+        $otp = $request->input('otp');
+        $siteId = SiteContext::getId();
+        $sessionId = Session::getId();
+
+        // Validate inputs
+        if (!$email || !$otp) {
+            return $this->errorResponse('Email and OTP are required', 422);
+        }
+
+        try {
+            $result = $this->identityService->verifyOTP($email, $otp, $sessionId, $siteId);
+
+            // Authenticate member
+            $member = \App\Models\Member::find($result->userId);
+
+            if (!$member) {
+                return $this->errorResponse('Member not found', 404);
+            }
+
+            MemberAuth::login($member);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => $result->message,
+                'member' => [
+                    'id' => $member->id,
+                    'email' => $member->email,
+                    'first_name' => $member->first_name ?? '',
+                    'last_name' => $member->last_name ?? '',
+                ]
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Resend OTP
+     *
+     * POST /api/{site}/checkout/resend-otp
+     * Body: { "email": "user@example.com" }
+     */
+    public function resendOTP(Request $request)
+    {
+        $email = $request->input('email');
+        $siteId = SiteContext::getId();
+        $sessionId = Session::getId();
+
+        if (!$email) {
+            return $this->errorResponse('Email is required', 422);
+        }
+
+        try {
+            $result = $this->identityService->resendOTP($email, $sessionId, $siteId);
+
+            if (!$result['success']) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 429);
+            }
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'New verification code sent',
+                'expires_in' => $result['expires_in'] ?? null
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
 }

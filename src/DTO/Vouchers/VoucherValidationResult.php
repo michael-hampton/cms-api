@@ -14,7 +14,8 @@ class VoucherValidationResult
         public readonly array    $eligibleItems,
         public readonly bool     $isStackable,
         public readonly bool     $requiresOverrideDecision,
-        public readonly ?Voucher $voucher
+        public readonly ?Voucher $voucher,
+        public readonly ?float   $finalPrice = null
     )
     {
     }
@@ -37,7 +38,8 @@ class VoucherValidationResult
             eligibleItems: $eligibleItems,
             isStackable: $isStackable,
             requiresOverrideDecision: $requiresOverrideDecision,
-            voucher: $voucher
+            voucher: $voucher,
+            finalPrice: $finalPrice
         );
     }
 
@@ -64,7 +66,8 @@ class VoucherValidationResult
             'eligible_subtotal' => $this->eligibleSubtotal,
             'eligible_items' => $this->eligibleItems,
             'is_stackable' => $this->isStackable,
-            'requires_override_decision' => $this->requiresOverrideDecision
+            'requires_override_decision' => $this->requiresOverrideDecision,
+            'final_price' => $this->finalPrice
         ];
 
         if ($this->voucher) {

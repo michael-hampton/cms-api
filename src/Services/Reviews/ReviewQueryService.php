@@ -29,7 +29,7 @@ class ReviewQueryService
                 helpfulCount: $review->helpful_count,
                 unhelpfulCount: $review->unhelpful_count,
                 formattedDate: $review->formatted_date,
-                createdAt: $review->created_at
+                createdAt: $review->created_at?->format('Y-m-d H:i:s')
             );
         });
 

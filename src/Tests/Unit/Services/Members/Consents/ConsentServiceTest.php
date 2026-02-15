@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Members\Consents\Consents\Consents;
+namespace App\Tests\Unit\Services\Members\Consents;
 
 use App\Models\ConsentAuditLog;
 use App\Models\ConsentType;

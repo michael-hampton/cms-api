@@ -296,9 +296,14 @@ class VoucherValidationServiceTest extends TestCase
 
         $this->eligibilityResolver->shouldReceive('resolveEligibleItems')
             ->once()
+            ->with($voucher, $cartItems)
             ->andReturn($eligibleItems);
 
-        $context = VoucherValidationContext::forCheckout($cartItems, null, true);
+        $context = VoucherValidationContext::forCheckout(
+            cartItems: $cartItems,
+            userId: null,
+            hasOfferDiscount: true
+        );
 
         $result = $this->service->validate($voucher, $context);
 

@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Billing\Preorder;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy;
 use Mockery;
@@ -164,6 +165,23 @@ class PhysicalProductAvailabilityPolicyTest extends TestCase
         $policyAfterRestock = new PhysicalProductAvailabilityPolicy($product, $this->orderItemRepository);
         $this->assertFalse($policyAfterRestock->isPreOrder());
         $this->assertEquals('In Stock', $policyAfterRestock->getAvailabilityMessage());
+    }
+
+    public function test_works_with_product_variant(): void
+    {
+        $variant = Mockery::mock(ProductVariant::class)->makePartial();
+        $variant->id = 1;
+        $variant->stock_quantity = 10;
+        $variant->preorder_enabled = false;
+        $variant->preorder_restock_date = null;
+
+        $this->setPendingPreorderQuantity();
+
+        $policy = new PhysicalProductAvailabilityPolicy($variant, $this->orderItemRepository);
+
+        $this->assertTrue($policy->canPurchase());
+        $this->assertFalse($policy->isPreOrder());
+        $this->assertEquals('In Stock', $policy->getAvailabilityMessage());
     }
 
     protected function tearDown(): void

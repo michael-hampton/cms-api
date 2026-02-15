@@ -41,6 +41,34 @@ class CartRepository extends Repository
         return $query->first();
     }
 
+    /**
+     * Find cart item by product and variant combination
+     */
+    public function findItemByProductAndVariant(
+        int    $productId,
+        ?int   $variantId,
+        ?int   $userId,
+        string $sessionId
+    ): ?Model
+    {
+        $query = $this->model->query()
+            ->where('product_id', $productId);
+
+        if ($variantId) {
+            $query->where('variant_id', $variantId);
+        } else {
+            $query->whereNull('variant_id');
+        }
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        } else {
+            $query->where('session_id', $sessionId);
+        }
+
+        return $query->first();
+    }
+
     public function deleteBySessionOrUser(?int $userId, string $sessionId): bool
     {
         $query = $this->model->query();

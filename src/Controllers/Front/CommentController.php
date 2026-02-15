@@ -2,6 +2,7 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
+use App\DTO\Comments\CreateCommentDTO;
 use App\Events\ActivityTracking;
 use App\Exceptions\Comments\InvalidCommentStatusException;
 use App\Framework\Exceptions\ValidationException;
@@ -103,6 +104,7 @@ class CommentController extends Controller
     {
         try {
             $comments = $this->commentService->getCommentsForPage($pageId);
+
             $stats = $this->commentService->getCommentStats($pageId);
 
             return $this->resourceResponse([

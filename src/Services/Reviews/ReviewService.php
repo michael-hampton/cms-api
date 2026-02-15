@@ -4,9 +4,11 @@ namespace App\Services\Reviews;
 
 use App\DTO\Reviews\CreateReviewDTO;
 use App\DTO\Reviews\ReviewActionContext;
+use App\DTO\Reviews\ReviewResult;
 use App\DTO\Reviews\UpdateReviewDTO;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Support\SiteContext;
+use Exception;
 
 class ReviewService
 {
@@ -25,23 +27,22 @@ class ReviewService
         return array_merge($reviews, $summary->toArray());
     }
 
-    public function createReview(int $productId, array $data): array
+    public function createReview(int $productId, array $data, ?int $siteId = null): ReviewResult
     {
         $userId = $this->authService->memberId();
+        $siteId = $siteId ?? SiteContext::getId();
 
         if (!$userId) {
-            return ['success' => false, 'message' => 'You must be logged in to submit a review'];
+            throw new Exception('You must be logged in to submit a review');
         }
 
         $dto = CreateReviewDTO::fromArray(
             array_merge($data, ['product_id' => $productId]),
             $userId,
-            SiteContext::getId()
+            $siteId
         );
 
-        $result = $this->commandService->createReview($dto, $userId);
-
-        return $result->toArray();
+        return $this->commandService->createReview($dto, $userId);
     }
 
     public function updateReview(int $reviewId, array $data): array
@@ -71,12 +72,12 @@ class ReviewService
         return $result->toArray();
     }
 
-    public function markReviewHelpful(int $reviewId, bool $isHelpful): array
+    public function markReviewHelpful(int $reviewId, bool $isHelpful, ?int $siteId = null): array
     {
         $context = ReviewActionContext::fromAuth(
             $this->authService->memberId(),
             $this->getSessionId(),
-            SiteContext::getId()
+            $siteId ?? SiteContext::getId()
         );
 
         $result = $this->voteService->markReviewHelpful($reviewId, $isHelpful, $context);

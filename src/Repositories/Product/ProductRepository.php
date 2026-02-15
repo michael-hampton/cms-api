@@ -373,6 +373,11 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return ProductVariant::with(['images'])->where('product_id', $productId)->get();
     }
 
+    public function getVariantById(int $variantId): ?Model
+    {
+        return ProductVariant::with(['images'])->where('id', $variantId)->first();
+    }
+
     public function deleteVariants(int $productId): void
     {
         ProductVariant::where('product_id', $productId)->delete();

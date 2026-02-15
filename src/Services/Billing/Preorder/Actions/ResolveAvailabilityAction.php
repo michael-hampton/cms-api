@@ -4,19 +4,20 @@ namespace App\Services\Billing\Preorder\Actions;
 
 use App\Enums\Orders\OrderLineStatus;
 use App\Models\Product;
+use App\Models\ProductVariant;
 
 class ResolveAvailabilityAction
 {
-    public function execute(Product $product, int $quantity): array
+    public function execute(Product|ProductVariant $purchasable, int $quantity): array
     {
-        $policy = $product->availabilityPolicy();
+        $policy = $purchasable->availabilityPolicy();
 
         if (!$policy->canPurchase()) {
             throw new \Exception('Product not available for purchase');
         }
 
         // Determine order line status
-        if ($product->stock_quantity >= $quantity) {
+        if ($purchasable->stock_quantity >= $quantity) {
             return [
                 'status' => OrderLineStatus::READY_TO_SHIP->value,
                 'expected_ship_date' => null,

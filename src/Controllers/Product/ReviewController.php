@@ -34,8 +34,8 @@ class ReviewController extends Controller
 
         $result = $this->reviewService->createReview($productId, $data);
 
-        $statusCode = $result['success'] ? 200 : 400;
-        return $this->resourceResponse($result, $statusCode);
+        $statusCode = $result->success ? 200 : 400;
+        return $this->resourceResponse($result->toArray(), $statusCode);
     }
 
     public function update(Request $request, int $reviewId)

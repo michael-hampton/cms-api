@@ -16,7 +16,8 @@ class CartItem extends Model
         'site_id',
         'subtotal',
         'subscription_plan_id',
-        'merchant_id'
+        'merchant_id',
+        'variant_id'
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class CartItem extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'subscription_plan_id' => 'integer',
+        'variant_id' => 'integer'
     ];
 
     public function product()

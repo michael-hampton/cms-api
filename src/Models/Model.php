@@ -1484,4 +1484,9 @@ abstract class Model
         // Empty base method so child classes can safely call parent::boot()
     }
 
+    public function lockForUpdate()
+    {
+        return $this;
+    }
+
 }

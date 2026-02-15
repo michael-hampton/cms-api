@@ -295,6 +295,101 @@ class CartRepositoryTest extends RepositoryTestCase
         $this->assertEquals($member->id, $found->user_id);
     }
 
+    public function test_find_item_by_product_and_variant_returns_correct_item(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+
+        $cartItem = CartItem::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'quantity' => 2,
+            'price' => 25.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 50.00,
+        ]);
+
+        $found = $this->repository->findItemByProductAndVariant(
+            $product->id,
+            $variant->id,
+            null,
+            $this->sessionId
+        );
+
+        $this->assertNotNull($found);
+        $this->assertEquals($cartItem->id, $found->id);
+        $this->assertEquals($variant->id, $found->variant_id);
+    }
+
+    public function test_find_item_by_product_and_variant_distinguishes_variants(): void
+    {
+        $product = $this->createProduct();
+        $variant1 = $this->createProductVariant($product->id);
+        $variant2 = $this->createProductVariant($product->id);
+
+        CartItem::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $product->id,
+            'variant_id' => $variant1->id,
+            'quantity' => 2,
+            'price' => 25.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 50.00,
+        ]);
+
+        $item2 = CartItem::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $product->id,
+            'variant_id' => $variant2->id,
+            'quantity' => 1,
+            'price' => 30.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 30.00,
+        ]);
+
+        $found = $this->repository->findItemByProductAndVariant(
+            $product->id,
+            $variant2->id,
+            null,
+            $this->sessionId
+        );
+
+        $this->assertNotNull($found);
+        $this->assertEquals($item2->id, $found->id);
+        $this->assertEquals($variant2->id, $found->variant_id);
+    }
+
+    public function test_find_item_by_product_and_variant_null_variant(): void
+    {
+        $product = $this->createProduct();
+
+        $cartItem = CartItem::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $product->id,
+            'variant_id' => null,
+            'quantity' => 2,
+            'price' => 25.00,
+            'site_id' => $this->siteId,
+            'subtotal' => 50.00,
+        ]);
+
+        $found = $this->repository->findItemByProductAndVariant(
+            $product->id,
+            null,
+            null,
+            $this->sessionId
+        );
+
+        $this->assertNotNull($found);
+        $this->assertEquals($cartItem->id, $found->id);
+        $this->assertNull($found->variant_id);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

@@ -2,7 +2,8 @@
 
 namespace App\Tests\Unit\Services\Vouchers;
 
-use App\Exceptions\CannotDeleteException;
+use App\DTO\Vouchers\VoucherValidationContext;
+use App\DTO\Vouchers\VoucherValidationResult;
 use App\Exceptions\Vouchers\VoucherNotDeletableException;
 use App\Framework\Database\Database;
 use App\Models\SubscriptionPlan;
@@ -14,7 +15,6 @@ use App\Services\Vouchers\VoucherValidationService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
-use Stripe\Plan;
 
 class VoucherServiceTest extends FunctionalTestCase
 {
@@ -243,14 +243,14 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher->status = 'expired';
 
-        $voucher->shouldReceive('isValid')
-            ->once()
-            ->andReturn(false);
-
         $this->repository->shouldReceive('findByCode')
             ->once()
             ->with($code)
             ->andReturn($voucher);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('Voucher has expired'));
 
         $result = $this->service->validateVoucher($code, 100);
 
@@ -273,6 +273,10 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($code)
             ->andReturn($voucher);
 
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('Minimum order value not met'));
+
         $result = $this->service->validateVoucher($code, 30);
 
         $this->assertFalse($result['valid']);
@@ -291,6 +295,14 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('calculateDiscount')->with($orderValue)->andReturn($expectedDiscount);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->with(
+                $voucher,
+                Mockery::type(VoucherValidationContext::class)
+            )
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
 
         $this->repository->shouldReceive('findByCode')
             ->once()
@@ -316,6 +328,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($voucherId)
             ->andReturn(true);
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('createRedemption')
             ->once()
             ->with($voucherId, $userId, $discountAmount, null)
@@ -337,6 +355,10 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('getUserUsageCount')->with($userId)->andReturn(2);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('You have already used this voucher the maximum number of times'));
 
         $this->repository->shouldReceive('findByCode')
             ->once()
@@ -383,6 +405,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with(1, [1, 2, 3])
             ->once();
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $result = $this->service->create($data);
 
         $this->assertInstanceOf(Voucher::class, $result);
@@ -401,6 +429,12 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('syncProducts')
             ->with(1, [4,5])
             ->once();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->repository->shouldReceive('update')
             ->once()
@@ -429,6 +463,10 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($voucher);
 
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
+
         $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
 
         $this->assertTrue($result['valid']);
@@ -446,6 +484,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('findByCode')
             ->once()
             ->andReturn($voucher);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('Voucher not applicable to this product'));
 
         $result = $this->service->validateVoucher($code, 100, null, $productId);
 
@@ -471,6 +513,12 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('create')
             ->once()
             ->andReturn($voucher);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->repository->shouldReceive('syncCategories')
             ->once()
@@ -500,6 +548,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($voucher);
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('syncBrands')
             ->once()
             ->with(1, [1, 2]);
@@ -519,6 +573,12 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->name = 'Updated Voucher';
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->repository->shouldReceive('update')
             ->once()
@@ -548,6 +608,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($voucher);
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('syncBrands')
             ->once()
             ->with($voucherId, [6, 7]);
@@ -571,6 +637,12 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('update')
             ->once()
             ->andReturn($voucher);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->repository->shouldNotReceive('syncCategories');
         $this->repository->shouldNotReceive('syncBrands');
@@ -598,6 +670,10 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($voucher);
 
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
+
         $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
 
         $this->assertTrue($result['valid']);
@@ -616,6 +692,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('isApplicableToProduct')->with($productId)->andReturn(true);
         $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
 
         $this->repository->shouldReceive('findByCode')
             ->once()
@@ -638,6 +718,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($voucherId)
             ->andReturn(true);
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->repository->shouldReceive('createRedemption')
             ->once()
             ->with($voucherId, $userId, $discountAmount, $orderId)
@@ -657,6 +743,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($voucherId)
             ->andReturn(true);
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->repository->shouldNotReceive('createRedemption');
 
         $result = $this->service->applyVoucher($voucherId);
@@ -673,6 +765,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->with($voucherId)
             ->andReturn(true);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->repository->shouldNotReceive('createRedemption');
 
@@ -691,6 +789,12 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->with($voucherId)
             ->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->repository->shouldNotReceive('createRedemption');
 
@@ -713,6 +817,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('getUserUsageCount')->with($userId)->andReturn(1);
         $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
 
         $this->repository->shouldReceive('findByCode')
             ->once()
@@ -737,6 +845,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldNotReceive('getUserUsageCount');
         $voucher->shouldReceive('calculateDiscount')->andReturn(10);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
 
         $this->repository->shouldReceive('findByCode')
             ->once()
@@ -768,6 +880,10 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($code)
             ->andReturn($voucher);
 
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 10, 10, 10));
+
         $result = $this->service->validateVoucher($code, 100, $userId);
 
         $this->assertTrue($result['valid']);
@@ -794,6 +910,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isApplicableToSubscriptionPlan')->with($planId)->andReturn(true);
         $voucher->shouldReceive('calculateSubscriptionDiscount')->with($subscriptionPrice)->andReturn(2.99);
 
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 2.99, 10, 10));
+
         $this->repository->shouldReceive('findByCode')
             ->once()
             ->with($code)
@@ -807,7 +927,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertTrue($result->valid);
         $this->assertEquals('Voucher applied successfully', $result->message);
         $this->assertEquals(2.99, $result->discount);
-        $this->assertEquals(1, $result->voucherId);
+        $this->assertEquals(1, $result->voucher->id);
     }
 
     public function testValidateVoucherForSubscriptionNotFound()
@@ -834,6 +954,14 @@ class VoucherServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($voucher);
 
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 10.99;
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->once()->andReturn($plan);
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('This voucher cannot be used for subscriptions'));
+
         $result = $this->service->validateVoucherForSubscription('TEST', 1);
 
         $this->assertFalse($result->valid);
@@ -847,9 +975,17 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
         $voucher->shouldReceive('isApplicableToSubscriptionPlan')->with(1)->andReturn(false);
 
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 10.99;
+
         $this->repository->shouldReceive('findByCode')
             ->once()
             ->andReturn($voucher);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->once()->andReturn($plan);
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('Voucher not applicable to this subscription plan'));
 
         $result = $this->service->validateVoucherForSubscription('TEST', 1);
 
@@ -865,6 +1001,9 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->per_user_limit = 2;
 
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 10.99;
+
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
         $voucher->shouldReceive('isApplicableToSubscriptionPlan')->andReturn(true);
@@ -873,6 +1012,11 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->repository->shouldReceive('findByCode')
             ->once()
             ->andReturn($voucher);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->once()->andReturn($plan);
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('You have already used this voucher the maximum number of times'));
 
         $result = $this->service->validateVoucherForSubscription('TEST', $planId, $userId);
 
@@ -910,7 +1054,9 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $this->subscriptionPlanRepository->shouldReceive('find')->andReturn($subscriptipnPlan);
 
-        $this->validationService->shouldReceive('validate')->andReturn(true);
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::invalid('Voucher has expired'));
 
         $this->repository->shouldReceive('findByCode')
             ->once()
@@ -962,6 +1108,10 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->shouldReceive('isApplicableToProduct')->with(2)->andReturn(false);
         $voucher->shouldReceive('isApplicableToSubscriptionPlan')->with(1)->andReturn(true);
         $voucher->shouldReceive('calculateDiscount')->with(80.00)->andReturn(8.00);
+
+        $this->validationService->shouldReceive('validate')
+            ->once()
+            ->andReturn(VoucherValidationResult::valid($voucher, 8, 10, 80, ['test', 'test']));
 
         $this->repository->shouldReceive('findByCode')
             ->once()

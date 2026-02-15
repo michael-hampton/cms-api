@@ -71,17 +71,7 @@ class ConsentQueryService
 
     public function getAuditTrail(Member $member, ?string $consentCode = null): array
     {
-        $query = \App\Models\ConsentAuditLog::where('member_id', $member->id)
-            ->orderBy('created_at', 'desc');
-
-        if ($consentCode) {
-            $consentType = $this->consentTypeRepository->findActiveByCode($consentCode);
-            $query->where('consent_type_id', $consentType->id);
-        }
-
-        return $query->with(['consentType', 'adminUser'])
-            ->get()
-            ->toArray();
+        return $this->consentTypeRepository->getAuditLog($member->id, $consentCode ?? '')->toArray();
     }
 
     public function getConsentStatistics(?int $siteId = null): array

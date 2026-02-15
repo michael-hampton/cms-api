@@ -14,7 +14,6 @@ use App\Models\Member;
 use App\Models\MemberConsent;
 use App\Repositories\Members\Consents\ConsentTypeRepository;
 use App\Repositories\Members\Consents\MemberConsentRepository;
-use App\Services\Members\Consents\ConsentAuditService;
 
 class ConsentCommandService
 {
@@ -44,9 +43,10 @@ class ConsentCommandService
             $previousState = $consent ? $consent->is_granted : null;
 
             if (!$consent) {
-                $consent = new MemberConsent();
-                $consent->member_id = $member->id;
-                $consent->consent_type_id = $consentType->id;
+                $consent = $this->memberConsentRepository->createNew([
+                    'member_id' => $member->id,
+                    'consent_type_id' => $consentType->id,
+                ]);
             }
 
             $consent->is_granted = true;
@@ -62,7 +62,7 @@ class ConsentCommandService
                 $consent->expires_at = $expiryDate->format('Y-m-d H:i:s');
             }
 
-            $consent->save();
+            $this->memberConsentRepository->save($consent);
 
             $this->auditService->log(
                 $member,
@@ -103,7 +103,8 @@ class ConsentCommandService
 
             $consent->is_granted = false;
             $consent->revoked_at = now();
-            $consent->save();
+
+            $this->memberConsentRepository->save($consent);
 
             $this->auditService->log(
                 $member,
@@ -127,7 +128,8 @@ class ConsentCommandService
             $this->database->transaction(function () use ($consent, &$count) {
                 $consent->is_granted = false;
                 $consent->revoked_at = now();
-                $consent->save();
+
+                $this->memberConsentRepository->save($consent);
 
                 $context = ConsentActionContext::fromSystem('Consent expired');
 
@@ -213,9 +215,6 @@ class ConsentCommandService
 
     private function handleCompleteDeletion(Member $member, ConsentActionContext $context): void
     {
-        // This would trigger full data deletion process
-        // Implementation depends on data deletion policies
-        // For now, just revoke all optional consents
         $optionalConsents = $this->consentTypeRepository->findActiveOptional();
 
         foreach ($optionalConsents as $consentType) {

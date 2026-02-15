@@ -14,6 +14,7 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\ShipmentRepository;
 use App\Repositories\Product\MerchantRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Billing\CheckoutSplittingService;
 use App\Services\Billing\Order\OrderCreationService;
@@ -64,7 +65,8 @@ class CheckoutService
         private readonly FulfilmentResolver           $fulfilmentResolver,
         private readonly ProductRepository            $productRepository,
         private readonly ResolveAvailabilityAction    $resolveAvailabilityAction,
-        private readonly CalculateSellableStockAction $calculateSellableStockAction
+        private readonly CalculateSellableStockAction $calculateSellableStockAction,
+        private readonly ProductVariantRepository     $productVariantRepository
     )
     {
     }
@@ -1034,12 +1036,18 @@ class CheckoutService
 
     private function resolvePurchasable(array $item): mixed
     {
-        // Check if it's a subscription
+        // Check subscription
         if (!empty($item['subscription_plan_id'])) {
             return SubscriptionPlan::find($item['subscription_plan_id']);
         }
 
-        // Otherwise it's a product
+        // Check variant
+        if (!empty($item['variant_id'])) {
+            return app(\App\Repositories\Product\ProductVariantRepository::class)
+                ->find($item['variant_id']);
+        }
+
+        // Check product
         if (!empty($item['product_id'])) {
             return $this->productRepository->find($item['product_id']);
         }
@@ -1062,10 +1070,23 @@ class CheckoutService
             }
 
             // Lock product row for atomic stock check
-            $product = $this->productRepository->lockForUpdate($item['product_id']);
+            // Determine if we're dealing with a variant or product
+            if (!empty($item['variant_id'])) {
+                $variant = $this->productVariantRepository->lockForUpdate($item['variant_id']);
 
-            if (!$product) {
-                throw new \Exception("Product not found: {$item['product_name']}");
+                if (!$variant) {
+                    throw new \Exception("Variant not found: {$item['product_name']}");
+                }
+
+                $purchasable = $variant;
+            } else {
+                $product = $this->productRepository->lockForUpdate($item['product_id']);
+
+                if (!$product) {
+                    throw new \Exception("Product not found: {$item['product_name']}");
+                }
+
+                $purchasable = $product;
             }
 
             $policy = $product->availabilityPolicy();
@@ -1079,7 +1100,7 @@ class CheckoutService
             // CRITICAL: Check sellable stock FIRST
             // This prevents normal purchases from starving preorders
             // ========================================
-            $sellableStock = $this->calculateSellableStockAction->execute($product);
+            $sellableStock = $this->calculateSellableStockAction->execute($purchasable);
 
             // If requesting more than sellable stock, check if preorder is available
             if ($item['quantity'] > $sellableStock) {
@@ -1098,7 +1119,7 @@ class CheckoutService
             }
 
             // Resolve availability state for order line
-            $availability = $this->resolveAvailabilityAction->execute($product, $item['quantity']);
+            $availability = $this->resolveAvailabilityAction->execute($purchasable, $item['quantity']);
 
             // Snapshot preorder data
             $item['order_line_status'] = $availability['status'];

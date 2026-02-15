@@ -17,6 +17,9 @@ class ProductVariant extends Model
         'is_active',
         'created_at',
         'updated_at',
+        'stock_quantity',
+        'preorder_restock_date',
+        'preorder_enabled'
     ];
 
 
