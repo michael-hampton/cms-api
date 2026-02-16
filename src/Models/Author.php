@@ -101,7 +101,7 @@ class Author extends Model
         return $query->where('slug', $slug);
     }
 
-    public function toArray(): array
+    public function getCounts(): array
     {
         $data = parent::toArray();
         $data['url'] = $this->getUrlAttribute();

@@ -288,13 +288,13 @@ class NewsletterController extends Controller
                 $siteId
             );
 
-            if (!$resolution['success']) {
-                return $this->errorResponse($resolution['error'], 400);
+            if (!$resolution->success) {
+                return $this->errorResponse($resolution->error, 400);
             }
 
-            $resolvedNewsletterId = $resolution['newsletter_id'];
-            $campaignId = $resolution['campaign_id'];
-            $campaign = $resolution['campaign'];
+            $resolvedNewsletterId = $resolution->newsletterId;
+            $campaignId = $resolution->campaignId;
+            $campaign = $resolution->campaign;
 
             // Newsletter signup with optional newsletter_id
             $result = $this->newsletterSignupService->signup(

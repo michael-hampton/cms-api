@@ -2,9 +2,12 @@
 
 namespace App\Tests\Unit\Services\Cms;
 
+use App\DTO\Campaigns\SignupContext;
+use App\Framework\Database\Database;
 use App\Models\Campaign;
 use App\Models\Newsletter;
 use App\Repositories\Cms\CampaignRepository;
+use App\Repositories\Cms\CampaignSignupRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Cms\CampaignService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -13,8 +16,33 @@ use Mockery;
 class CampaignServiceTest extends FunctionalTestCase
 {
     private CampaignService $service;
-    private $campaignRepository;
-    private $newsletterRepository;
+    private CampaignRepository $campaignRepository;
+    private NewsletterRepository $newsletterRepository;
+    private CampaignSignupRepository $campaignSignupRepository;
+    private Database $databaseMock;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->campaignRepository = Mockery::mock(CampaignRepository::class);
+        $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);
+        $this->campaignSignupRepository = Mockery::mock(CampaignSignupRepository::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+
+        $this->service = new CampaignService(
+            $this->campaignRepository,
+            $this->newsletterRepository,
+            $this->campaignSignupRepository,
+            $this->databaseMock
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_get_campaign_for_signup_returns_active_campaign(): void
     {
@@ -125,9 +153,9 @@ class CampaignServiceTest extends FunctionalTestCase
             $this->siteId
         );
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals(5, $result['newsletter_id']); // Campaign's newsletter used
-        $this->assertEquals(1, $result['campaign_id']);
+        $this->assertTrue($result->success);
+        $this->assertEquals(5, $result->newsletterId); // Campaign's newsletter used
+        $this->assertEquals(1, $result->campaignId);
     }
 
     private function createMockNewsletter(array $attributes)
@@ -159,9 +187,9 @@ class CampaignServiceTest extends FunctionalTestCase
             $this->siteId
         );
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals(10, $result['newsletter_id']);
-        $this->assertNull($result['campaign_id']);
+        $this->assertTrue($result->success);
+        $this->assertEquals(10, $result->newsletterId);
+        $this->assertNull($result->campaignId);
     }
 
     public function test_resolve_uses_default_newsletter_when_nothing_provided(): void
@@ -179,9 +207,9 @@ class CampaignServiceTest extends FunctionalTestCase
             $this->siteId
         );
 
-        $this->assertTrue($result['success']);
-        $this->assertEquals(1, $result['newsletter_id']);
-        $this->assertNull($result['campaign_id']);
+        $this->assertTrue($result->success);
+        $this->assertEquals(1, $result->newsletterId);
+        $this->assertNull($result->campaignId);
     }
 
     public function test_can_access_premium_content_returns_true_for_gating_campaign(): void
@@ -222,22 +250,70 @@ class CampaignServiceTest extends FunctionalTestCase
         $this->assertFalse($result);
     }
 
-    protected function setUp(): void
+    public function test_track_campaign_signup_creates_record_and_increments_count(): void
     {
-        parent::setUp();
+        $campaignId = 1;
+        $siteId = 10;
 
-        $this->campaignRepository = Mockery::mock(CampaignRepository::class);
-        $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);
+        $campaign = Mockery::mock(Campaign::class)->makePartial();
+        $campaign->id = $campaignId;
+        $campaign->site_id = $siteId;
 
-        $this->service = new CampaignService(
-            $this->campaignRepository,
-            $this->newsletterRepository
+        // Campaign exists
+        $this->campaignRepository->shouldReceive('find')
+            ->with($campaignId)
+            ->once()
+            ->andReturn($campaign);
+
+        // Transaction executes the closure immediately
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($closure) {
+                $closure();
+            });
+
+        // Expect signup repository to create a record
+        $this->campaignSignupRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) use ($campaignId, $siteId) {
+                return $data['campaign_id'] === $campaignId
+                    && $data['site_id'] === $siteId
+                    && array_key_exists('user_id', $data)
+                    && array_key_exists('email', $data);
+            }));
+
+        // Expect campaign signup count to increment
+        $this->campaignRepository->shouldReceive('incrementSignupCount')
+            ->once()
+            ->with($campaignId);
+
+        $signupContext = new SignupContext(
+            '127.0.0.1',
+            'PHPUnit',
+            'https://example.com'
         );
+
+        $result = $this->service->trackCampaignSignup($campaignId, 42, 'foo@example.com', $signupContext);
+        $this->assertTrue($result['success']);
+        $this->assertEquals(42, $result['user_id']);
+        $this->assertEquals('foo@example.com', $result['email']);
+        $this->assertEquals(1, $result['campaign_id']);
     }
 
-    protected function tearDown(): void
+    public function test_track_campaign_signup_no_campaign_does_nothing(): void
     {
-        Mockery::close();
-        parent::tearDown();
+        $campaignId = 999;
+
+        $this->campaignRepository->shouldReceive('find')
+            ->with($campaignId)
+            ->once()
+            ->andReturnNull();
+
+        $this->campaignSignupRepository->shouldReceive('create')->never();
+        $this->campaignRepository->shouldReceive('incrementSignupCount')->never();
+        $this->databaseMock->shouldReceive('transaction')->never();
+
+        $result = $this->service->trackCampaignSignup($campaignId, 42, 'foo@example.com');
+        $this->assertFalse($result['success']);
     }
 }

@@ -227,4 +227,9 @@ class Site extends Model
         // Return placeholder
         return 'https://via.placeholder.com/200x60?text=Logo';
     }
+
+    public function subscriptionPlans(bool $relation = false)
+    {
+        return $this->hasMany(SubscriptionPlan::class, 'site_id', 'id', $relation);
+    }
 }

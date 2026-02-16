@@ -34,13 +34,17 @@ class SubscriptionPlan extends Model
         'premium_access',
         'release_date',
         'pre_release_enabled',
-        'dispatch_days'
+        'dispatch_days',
+        'categories',
+        'tags'
     ];
 
     protected $casts = [
         'price' => 'float',
         'trial_days' => 'integer',
         'features' => 'array',
+        'categories' => 'array',
+        'tags' => 'array',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
         'sort_order' => 'integer',

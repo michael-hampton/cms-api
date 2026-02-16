@@ -141,4 +141,9 @@ class Campaign extends Model
         $this->is_active = true;
         $this->updated_at = new \DateTime();
     }
+
+    public function isValidForSignup(): bool
+    {
+        return $this->isActive() && !$this->hasEnded();
+    }
 }

@@ -483,6 +483,15 @@ class CartController extends Controller
         $planId = $request->input('plan_id');
         $deliveryType = $request->input('delivery_type');
         $options = $request->input('options', []);
+        $requestData = $request->all();
+
+        $data = [
+            'pricing_tier_id' => $requestData['pricing_id'] ?? null,
+            'duration_months' => $requestData['duration_months'] ?? null,
+            'issue_count' => $requestData['issues'] ?? null,
+            'voucher_code' => $requestData['voucher_code'] ?? null,
+            'delivery_type' => $requestData['delivery_type']
+        ];
 
         if (!$planId || !$deliveryType) {
             return $this->resourceResponse([
@@ -491,7 +500,7 @@ class CartController extends Controller
             ], 400);
         }
 
-        $result = $this->cartService->addSubscriptionToCart($planId, $deliveryType);
+        $result = $this->cartService->addSubscriptionToCart($planId, $deliveryType, $data);
 
         return $this->resourceResponse(array_merge($result, [
             'count' => $this->cartService->getCount(),

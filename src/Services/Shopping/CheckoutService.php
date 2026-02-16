@@ -348,7 +348,7 @@ class CheckoutService
 
         if (!empty($data['saved_address'])) {
             $orderData['shipping_address_id'] = $data['saved_address'];
-        } else if ($this->cartService->requiresShipping()) { //todo needs test
+        } else if ($this->cartService->requiresShipping()) {
             $shippingAddress = [
                 'address_line_1' => $data['address'],
                 'address_line_2' => $data['address2'] ?? '',
@@ -518,7 +518,7 @@ class CheckoutService
     {
         $requiresShipping = $this->cartService->requiresShipping();
 
-        $required = $requiresShipping ? ['first_name', 'last_name', 'email', 'phone'] : []; //todo needs test
+        $required = $requiresShipping ? ['first_name', 'last_name', 'email', 'phone'] : [];
 
         if ($requiresShipping && empty($data['saved_address'])) {
             $required = array_merge($required, ['address', 'city', 'postal_code', 'country']);

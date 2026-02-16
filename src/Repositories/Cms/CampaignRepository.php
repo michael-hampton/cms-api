@@ -4,6 +4,7 @@ namespace App\Repositories\Cms;
 
 use App\Framework\Support\Collection;
 use App\Models\Campaign;
+use App\Models\CampaignSignup;
 use App\Models\Model;
 use App\Repositories\Repository;
 
@@ -91,6 +92,33 @@ class CampaignRepository extends Repository
 
         return $this->create($data);
     }
+
+    // CampaignRepository.php
+    public function incrementSignupCount(int $campaignId): void
+    {
+        $this->model
+            ->where('id', $campaignId)
+            ->increment('signup_count');
+    }
+
+    public function incrementDailySignupCount(int $campaignId, int $siteId): void
+    {
+        $today = now_datetime();
+
+        CampaignSignup::updateOrInsert(
+            [
+                'campaign_id' => $campaignId,
+                'signup_date' => $today,
+            ],
+            [
+                'site_id' => $siteId,
+                'signup_count' => DB::raw('signup_count + 1'),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+    }
+
 
     protected function getModelClass(): string
     {

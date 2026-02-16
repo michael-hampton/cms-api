@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscribe - YourStore</title>
-    <script src="https://js.stripe.com/v3/"></script>
+    <title>Subscription Shop - YourStore</title>
     <style>
         * {
             margin: 0;
@@ -16,7 +15,6 @@
             --primary-color: #2563eb;
             --primary-dark: #1e40af;
             --success-color: #10b981;
-            --danger-color: #ef4444;
             --border-color: #e2e8f0;
             --bg-light: #f8fafc;
             --text-primary: #1e293b;
@@ -33,7 +31,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 0 20px;
         }
@@ -42,45 +40,281 @@
             background: white;
             box-shadow: var(--shadow);
             padding: 1rem 0;
-            margin-bottom: 3rem;
+            margin-bottom: 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .hero {
             text-align: center;
             padding: 3rem 0;
-            background: white;
-            margin-bottom: 3rem;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            margin-bottom: 2rem;
             border-radius: 1rem;
-            box-shadow: var(--shadow);
         }
 
         .hero h1 {
             font-size: 2.5rem;
             font-weight: 700;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
+            margin-bottom: 0.5rem;
         }
 
         .hero p {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
-            max-width: 600px;
-            margin: 0 auto;
+            font-size: 1.125rem;
+            opacity: 0.9;
         }
 
+        /* Category Carousel */
+        .category-carousel-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .category-carousel {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-color) var(--bg-light);
+        }
+
+        .category-carousel::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .category-carousel::-webkit-scrollbar-track {
+            background: var(--bg-light);
+            border-radius: 4px;
+        }
+
+        .category-carousel::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        .category-tile {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1.25rem 1.5rem;
+            background: white;
+            border-radius: 1rem;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: 2px solid var(--border-color);
+            min-width: 120px;
+        }
+
+        .category-tile:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-color);
+        }
+
+        .category-tile.selected {
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
+            box-shadow: var(--shadow);
+        }
+
+        .category-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+        .category-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .category-tile.active .category-name {
+            color: var(--primary-color);
+        }
+
+        .carousel-nav {
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .carousel-nav:hover {
+            border-color: var(--primary-color);
+            background: var(--primary-color);
+        }
+
+        .carousel-nav svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .carousel-nav:hover svg {
+            stroke: white;
+        }
+
+        .carousel-nav:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .carousel-nav:disabled:hover {
+            border-color: var(--border-color);
+            background: white;
+        }
+
+        .carousel-nav:disabled:hover svg {
+            stroke: var(--text-secondary);
+        }
+
+        /* Filters Section */
+        .filters-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-secondary);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--text-secondary);
+        }
+
+        /* Results Header */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .results-count {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+        }
+
+        .results-count strong {
+            color: var(--text-primary);
+        }
+
+        /* Plans Grid */
         .plans-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 2rem;
-            margin-bottom: 4rem;
+            margin-bottom: 3rem;
         }
 
         .plan-card {
             background: white;
             border-radius: 1rem;
-            padding: 2rem;
+            overflow: hidden;
             box-shadow: var(--shadow);
-            transition: transform 0.3s, box-shadow 0.3s;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
         }
 
         .plan-card:hover {
@@ -88,228 +322,370 @@
             box-shadow: var(--shadow-lg);
         }
 
+        .plan-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .plan-content {
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
         .plan-header {
-            text-align: center;
-            margin-bottom: 2rem;
-            padding-bottom: 2rem;
-            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 1rem;
         }
 
         .plan-name {
             font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .plan-site {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .plan-description {
             color: var(--text-secondary);
             font-size: 0.95rem;
             margin-bottom: 1.5rem;
+            flex: 1;
+            line-height: 1.6;
         }
 
-        .duration-options {
-            margin-bottom: 2rem;
+        .plan-features {
+            margin-bottom: 1.5rem;
         }
 
-        .duration-option {
-            border: 2px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-        }
-
-        .duration-option:hover {
-            border-color: var(--primary-color);
-        }
-
-        .duration-option.selected {
-            border-color: var(--primary-color);
-            background: rgba(37, 99, 235, 0.05);
-        }
-
-        .duration-option input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-        }
-
-        .duration-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        .feature-tag {
+            display: inline-block;
+            background: var(--bg-light);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
             margin-bottom: 0.5rem;
         }
 
-        .duration-label {
-            font-weight: 600;
-            font-size: 1.1rem;
+        .feature-tag.digital {
+            background: #dbeafe;
+            color: #1e40af;
         }
 
-        .duration-price {
-            font-size: 1.5rem;
+        .feature-tag.print {
+            background: #fce7f3;
+            color: #9f1239;
+        }
+
+        .feature-tag.tag-badge {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .plan-pricing {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 2px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .price-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .price-amount {
+            font-size: 1.75rem;
             font-weight: 700;
             color: var(--primary-color);
         }
 
-        .duration-details {
+        .price-from {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-right: 0.25rem;
+        }
+
+        /* Pagination */
+        .pagination {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            font-size: 0.875rem;
-            color: var(--text-secondary);
+            gap: 0.5rem;
+            margin: 3rem 0;
         }
 
-        .duration-period {
-            font-size: 0.875rem;
-        }
-
-        .savings-badge {
-            background: var(--danger-color);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .original-price {
-            text-decoration: line-through;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-left: 0.5rem;
-        }
-
-        .delivery-options {
-            margin-bottom: 2rem;
-        }
-
-        .delivery-section-title {
-            font-weight: 600;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-        }
-
-        .delivery-option {
+        .pagination button {
+            padding: 0.75rem 1rem;
             border: 2px solid var(--border-color);
+            background: white;
             border-radius: 0.5rem;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
             cursor: pointer;
             transition: all 0.3s;
+            font-weight: 600;
         }
 
-        .delivery-option:hover {
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .pagination button.active {
+            background: var(--primary-color);
+            color: white;
             border-color: var(--primary-color);
         }
 
-        .delivery-option.selected {
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 1.5rem;
+            stroke: var(--text-secondary);
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Featured Badge */
+        .featured-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #fbbf24;
+            color: #78350f;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sale-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #ef4444;
+            color: white;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+
+        .offer-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #8b5cf6;
+            color: white;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+
+        .plan-categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .category-badge {
+            display: inline-block;
+            background: var(--bg-light);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.625rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .plan-card {
+            position: relative;
+        }
+
+        /* Price Range Inputs */
+        .price-range-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .price-input {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .price-input span {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .price-input input {
+            flex: 1;
+        }
+
+        /* Tags Filter */
+        .tags-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .tag-checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .tag-checkbox:hover {
             border-color: var(--primary-color);
             background: rgba(37, 99, 235, 0.05);
         }
 
-        .delivery-option input[type="radio"] {
-            margin-right: 0.75rem;
+        .tag-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
         }
 
-        .delivery-label {
+        .tag-checkbox input[type="checkbox"]:checked + .tag-label {
+            color: var(--primary-color);
             font-weight: 600;
-            display: block;
-            margin-bottom: 0.25rem;
         }
 
-        .delivery-desc {
+        .tag-label {
             font-size: 0.875rem;
             color: var(--text-secondary);
-        }
-
-        .features-list {
-            list-style: none;
-            margin-bottom: 2rem;
-        }
-
-        .features-list li {
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .features-list li:last-child {
-            border-bottom: none;
-        }
-
-        .check-icon {
-            color: var(--success-color);
-            font-weight: 700;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 1rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
             transition: all 0.3s;
-            font-size: 1rem;
+        }
+
+        .tag-checkbox:has(input:checked) {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        /* Active Filters Display */
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
             background: var(--primary-color);
             color: white;
-        }
-
-        .btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: white;
-            padding: 1rem 1.5rem;
+            padding: 0.5rem 0.75rem;
             border-radius: 0.5rem;
-            box-shadow: var(--shadow-lg);
-            display: none;
-            align-items: center;
-            gap: 1rem;
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
+            font-size: 0.875rem;
         }
 
-        .toast.show {
-            display: flex;
-        }
-
-        .toast.success {
-            border-left: 4px solid var(--success-color);
-        }
-
-        .toast.error {
-            border-left: 4px solid var(--danger-color);
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+        .filter-chip button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.125rem;
+            padding: 0;
+            line-height: 1;
         }
 
         @media (max-width: 768px) {
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
             .plans-grid {
                 grid-template-columns: 1fr;
             }
@@ -317,564 +693,660 @@
             .hero h1 {
                 font-size: 2rem;
             }
-        }
 
-        /* Mini Cart Styles */
-        .mini-cart {
-            position: fixed;
-            top: 0;
-            right: -400px;
-            width: 400px;
-            height: 100vh;
-            background: white;
-            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
-            z-index: 1001;
-            transition: right 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
+            .filter-actions {
+                flex-direction: column;
+            }
 
-        .mini-cart.open {
-            right: 0;
-        }
-
-        .cart-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            display: none;
-        }
-
-        .cart-overlay.show {
-            display: block;
-        }
-
-        .mini-cart-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.5rem;
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 2rem;
-            cursor: pointer;
-            color: var(--text-secondary);
-            line-height: 1;
-        }
-
-        .cart-items {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .cart-item {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .cart-item-name {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .cart-item-details {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .cart-item-price {
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-
-        .cart-footer {
-            padding: 1.5rem;
-            border-top: 2px solid var(--border-color);
-        }
-
-        .cart-total {
-            display: flex;
-            justify-content: space-between;
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-        }
-
-        .btn-secondary {
-            width: 100%;
-            padding: 0.875rem;
-            background: white;
-            color: var(--primary-color);
-            border: 2px solid var(--primary-color);
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 0.5rem;
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-light);
-        }
-
-        /* Search and Sort Styles */
-        .controls-container {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .search-input, .sort-select {
-            padding: 0.75rem;
-            border: 2px solid var(--border-color);
-            border-radius: 0.5rem;
-            font-size: 1rem;
-        }
-
-        .search-input {
-            flex: 1;
-        }
-
-        .sort-select {
-            min-width: 200px;
-        }
-
-        .cart-badge {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background: var(--danger-color);
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 600;
+            .filter-actions .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
-        <h2>YourStore</h2>
-        <button onclick="openMiniCart()"
-                style="position: relative; background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="9" cy="21" r="1"></circle>
-                <circle cx="20" cy="21" r="1"></circle>
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-            Cart
-            <span id="header-cart-count" class="cart-badge" style="display: none;">0</span>
-        </button>
-    </div>
-</header>
-<main class="container">
-
-    <!-- Mini Cart -->
-    <div id="mini-cart" class="mini-cart">
-        <div class="mini-cart-header">
-            <h3>Cart (<span id="cart-count">0</span>)</h3>
-            <button onclick="closeMiniCart()" class="close-btn">×</button>
-        </div>
-        <div id="cart-items" class="cart-items"></div>
-        <div class="cart-footer">
-            <div class="cart-total">
-                <span>Total:</span>
-                <span id="cart-total">£0.00</span>
-            </div>
-            <button class="btn" onclick="goToCheckout()">Proceed to Checkout</button>
-            <button class="btn-secondary" onclick="closeMiniCart()">Continue Shopping</button>
+<div class="header">
+    <div class="container">
+        <div class="header-content">
+            <h2>Subscription Shop</h2>
         </div>
     </div>
-    <div id="cart-overlay" class="cart-overlay" onclick="closeMiniCart()"></div>
+</div>
 
-    <!-- Search and Sort Controls -->
-    <div class="controls-container">
-        <input type="text" id="search-plans" placeholder="Search plans..." class="search-input">
-        <select id="sort-plans" class="sort-select">
-            <option value="">Sort by...</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-            <option value="name">Name: A-Z</option>
-        </select>
-    </div>
-
+<div class="container">
     <div class="hero">
-        <h1>Choose Your Subscription</h1>
-        <p>Select the perfect plan for your needs. Digital or print delivery available.</p>
+        <h1>Find Your Perfect Subscription</h1>
+        <p>Browse subscriptions across all our publications</p>
     </div>
 
-    <div class="plans-grid">
-        <?php foreach ($plans as $plan): ?>
-            <div class="plan-card">
-                <div class="plan-header">
-                    <div class="plan-name"><?= htmlspecialchars($plan['name']) ?></div>
-                    <?php if (!empty($plan['description'])): ?>
-                        <div class="plan-description">
-                            <?= htmlspecialchars($plan['description']) ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
+    <!-- Category Carousel -->
+    <?php
+    $activeCategory = $filters['category'] ?? 'All';
+    ?>
 
-                <!-- Duration Options -->
-                <!-- Replace lines 347-396 with this: -->
-                <div class="duration-options">
-                    <?php foreach ($plan['pricing_tiers'] as $tier): ?>
-                        <div class="duration-option" data-plan="<?= $plan['id'] ?>">
-                            <input type="radio"
-                                   name="duration_<?= $plan['id'] ?>"
-                                   value="<?= $tier['duration_months'] ?>"
-                                   data-price="<?= $tier['price'] ?>"
-                                   data-digital="<?= $tier['digital_price'] ?>"
-                                   data-issues="<?= $tier['issue_count'] ?>"
-                                   data-pricing-id="<?= $tier['id'] ?>"
-                                    <?= $tier['is_default'] ? 'checked' : '' ?>>
-                            <div class="duration-header">
-                                <span class="duration-label"><?= htmlspecialchars($tier['label']) ?></span>
-                                <div>
-                                    <?php if ($tier['has_discount']): ?>
-                                        <span class="original-price">£<?= number_format($tier['original_price'], 2) ?></span>
-                                    <?php endif; ?>
-                                    <span class="duration-price">£<?= number_format($tier['price'], 2) ?></span>
-                                </div>
+    <?php if (!empty($available_categories)): ?>
+        <div style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+            <label style="font-weight: 600; font-size: 0.875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 1rem;">
+                Browse by Category
+            </label>
+
+            <div class="category-carousel-wrapper">
+                <button class="carousel-nav carousel-prev" onclick="scrollCarousel('left')"
+                        aria-label="Previous categories">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+
+                <div class="category-carousel" id="category-carousel">
+                    <?php
+                    $selectedCategories = !empty($filters['categories']) ? (is_array($filters['categories']) ? $filters['categories'] : explode(',', $filters['categories'])) : [];
+
+                    foreach ($available_categories as $category):
+                        $isSelected = in_array($category['name'], $selectedCategories);
+                        $iconKey = strtolower($category['name']);
+                        $icon = $category['icon'] ?? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>';
+                        ?>
+                        <div class="category-tile <?= $isSelected ? 'selected' : '' ?>"
+                             data-category="<?= htmlspecialchars($category['name']) ?>"
+                             onclick="toggleCategory('<?= htmlspecialchars($category['name']) ?>')">
+                            <div class="category-icon">
+                                <?= $icon ?>
                             </div>
-                            <div class="duration-details">
-                                <span class="duration-period"><?= htmlspecialchars($tier['period_description']) ?></span>
-                                <?php if ($tier['savings_text']): ?>
-                                    <span class="savings-badge"><?= htmlspecialchars($tier['savings_text']) ?></span>
-                                <?php endif; ?>
+                            <div class="category-name">
+                                <?= htmlspecialchars(ucfirst($category['name'])) ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
 
-                <!-- Delivery Options -->
-                <?php if (count($plan['delivery_options']) > 1): ?>
-                    <div class="delivery-options">
-                        <div class="delivery-section-title">Delivery Method</div>
-                        <div class="delivery-option" data-plan="<?= $plan['id'] ?>">
-                            <input type="radio" name="delivery_<?= $plan['id'] ?>" value="print" checked>
-                            <div>
-                                <span class="delivery-label">Print</span>
-                                <span class="delivery-desc">Print magazine delivered to your door</span>
-                            </div>
-                        </div>
-                        <div class="delivery-option" data-plan="<?= $plan['id'] ?>">
-                            <input type="radio" name="delivery_<?= $plan['id'] ?>" value="digital">
-                            <div>
-                                <span class="delivery-label">Digital</span>
-                                <span class="delivery-desc">Instant digital access</span>
-                            </div>
-                        </div>
+                <button class="carousel-nav carousel-next" onclick="scrollCarousel('right')"
+                        aria-label="Next categories">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Hidden inputs for selected categories -->
+            <div id="category-inputs"></div>
+        </div>
+    <?php endif; ?>
+
+    <!-- Filters Section -->
+    <div class="filters-section">
+        <form id="filter-form">
+            <input type="hidden" id="category" name="category"
+                   value="<?= htmlspecialchars($filters['category'] ?? '') ?>">
+
+            <div class="filters-grid">
+                <!-- Search -->
+                <div class="filter-group">
+                    <label for="search">Search</label>
+                    <input type="text" id="search" name="search" placeholder="Search subscriptions..."
+                           value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
+                </div>
+
+                <!-- Site Filter -->
+                <div class="filter-group">
+                    <label for="site_id">Publication</label>
+                    <select id="site_id" name="site_id">
+                        <option value="">All Publications</option>
+                        <?php foreach ($available_sites as $site): ?>
+                            <option value="<?= $site->id ?>"
+                                    <?= ($filters['site_id'] ?? '') == $site->id ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($site->name) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Category Filter -->
+                <?php if (!empty($available_categories)): ?>
+                    <div class="filter-group">
+                        <label for="category">Category</label>
+                        <select id="category" name="category">
+                            <option value="">All Categories</option>
+                            <?php foreach ($available_categories as $category): ?>
+                                <option value="<?= htmlspecialchars($category['name']) ?>"
+                                        <?= ($filters['category']['name'] ?? '') === $category ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars(ucfirst($category['name'])) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 <?php endif; ?>
 
-                <?php if (!empty($plan['features'])): ?>
-                    <ul class="features-list">
-                        <?php foreach ($plan['features'] as $feature): ?>
-                            <li>
-                                <span class="check-icon">✓</span>
-                                <?= htmlspecialchars($feature) ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
+                <!-- Delivery Type -->
+                <div class="filter-group">
+                    <label for="delivery_type">Delivery Type</label>
+                    <select id="delivery_type" name="delivery_type">
+                        <option value="">All Types</option>
+                        <option value="digital" <?= ($filters['delivery_type'] ?? '') === 'digital' ? 'selected' : '' ?>>
+                            Digital Only
+                        </option>
+                        <option value="print" <?= ($filters['delivery_type'] ?? '') === 'print' ? 'selected' : '' ?>>
+                            Print Only
+                        </option>
+                    </select>
+                </div>
 
-                <button class="btn" onclick="addToCart(<?= $plan['id'] ?>)">
-                    Add to basket
+                <!-- Sales & Offers Filter -->
+                <div class="filter-group">
+                    <label for="special_filter">Special Offers</label>
+                    <select id="special_filter" name="special_filter">
+                        <option value="">All Subscriptions</option>
+                        <option value="on_sale" <?= ($filters['special_filter'] ?? '') === 'on_sale' ? 'selected' : '' ?>>
+                            On Sale
+                        </option>
+                        <option value="limited_offer" <?= ($filters['special_filter'] ?? '') === 'limited_offer' ? 'selected' : '' ?>>
+                            Limited Time Offers
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Sort -->
+                <div class="filter-group">
+                    <label for="sort">Sort By</label>
+                    <select id="sort" name="sort">
+                        <?php foreach ($sort_options as $option): ?>
+                            <option value="<?= $option->value ?>"
+                                    <?= ($filters['sort'] ?? '') === $option->value ? 'selected' : '' ?>>
+                                <?= $option->label() ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Price Range -->
+                <div class="filter-group" style="grid-column: span 2;">
+                    <label>Price Range</label>
+                    <div class="price-range-group">
+                        <div class="price-input">
+                            <span>£</span>
+                            <input type="number" id="price_min" name="price_min"
+                                   placeholder="Min" min="0" step="0.01"
+                                   value="<?= htmlspecialchars($filters['price_min'] ?? '') ?>">
+                        </div>
+                        <div class="price-input">
+                            <span>£</span>
+                            <input type="number" id="price_max" name="price_max"
+                                   placeholder="Max" min="0" step="0.01"
+                                   value="<?= htmlspecialchars($filters['price_max'] ?? '') ?>">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tags Filter - Checkboxes -->
+            <?php if (!empty($available_tags)): ?>
+                <div style="margin-top: 1.5rem;">
+                    <label style="font-weight: 600; font-size: 0.875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 0.75rem;">
+                        Filter by Tags
+                    </label>
+                    <div class="tags-filter">
+                        <?php
+                        $selectedTags = !empty($filters['tags']) ? (is_array($filters['tags']) ? $filters['tags'] : explode(',', $filters['tags'])) : [];
+                        foreach ($available_tags as $tag):
+                            ?>
+                            <label class="tag-checkbox">
+                                <input
+                                        type="checkbox"
+                                        name="tags[]"
+                                        value="<?= htmlspecialchars($tag) ?>"
+                                        <?= in_array($tag, $selectedTags) ? 'checked' : '' ?>>
+                                <span class="tag-label">
+                                    <?= htmlspecialchars(ucwords(str_replace('-', ' ', $tag))) ?>
+                                </span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <div class="filter-actions">
+                <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                    Clear All
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Apply Filters
                 </button>
             </div>
-        <?php endforeach; ?>
-    </div>
-</main>
 
-<div id="toast" class="toast"></div>
+            <!-- Active Filters Display -->
+            <div id="active-filters" class="active-filters"></div>
+        </form>
+    </div>
+
+    <!-- Results Header -->
+    <div class="results-header">
+        <div class="results-count">
+            <strong><?= number_format($pagination['total']) ?></strong>
+            subscription<?= $pagination['total'] !== 1 ? 's' : '' ?> found
+        </div>
+    </div>
+
+    <!-- Plans Grid -->
+    <?php if (empty($plans)): ?>
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            <h3>No subscriptions found</h3>
+            <p>Try adjusting your filters or search terms</p>
+            <button class="btn btn-primary" onclick="clearFilters()">Clear Filters</button>
+        </div>
+    <?php else: ?>
+        <div class="plans-grid">
+            <?php foreach ($plans as $plan): ?>
+                <div class="plan-card">
+                    <?php if ($plan->is_featured): ?>
+                        <div class="featured-badge">Featured</div>
+                    <?php endif; ?>
+
+                    <?php
+                    // Check if plan is on sale or limited offer
+                    $isOnSale = false;
+                    $isLimitedOffer = false;
+                    $hasDiscount = false;
+
+                    foreach ($plan->pricingTiers ?? [] as $tier) {
+                        if ($tier->hasDiscount()) {
+                            $hasDiscount = true;
+                            break;
+                        }
+                    }
+
+                    // Limited offer: has end date in near future (within 30 days)
+                    if ($plan->end_date && $plan->end_date->diffInDays(now()) <= 30) {
+                        $isLimitedOffer = true;
+                    }
+
+                    $isOnSale = $hasDiscount;
+                    ?>
+
+                    <?php if ($isOnSale && !$plan->is_featured): ?>
+                        <div class="sale-badge">On Sale</div>
+                    <?php elseif ($isLimitedOffer && !$plan->is_featured && !$isOnSale): ?>
+                        <div class="offer-badge">Limited Offer</div>
+                    <?php endif; ?>
+
+                    <div class="plan-image">
+                        <?= strtoupper(substr($plan->name, 0, 1)) ?>
+                    </div>
+
+
+                    <div class="plan-content">
+                        <div class="plan-header">
+                            <div class="plan-site">
+                                <?= htmlspecialchars($plan->site->name ?? 'Publication') ?>
+                            </div>
+                            <h3 class="plan-name"><?= htmlspecialchars($plan->name) ?></h3>
+
+                            <?php
+                            // Display categories if present
+                            if (is_array($plan->categories) && count($plan->categories) > 0):
+                                ?>
+                                <div class="plan-categories">
+                                    <?php foreach (array_slice($plan->categories, 0, 2) as $cat): ?>
+                                        <span class="category-badge">
+                                            <?= htmlspecialchars(ucfirst($cat)) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <p class="plan-description">
+                            <?= htmlspecialchars(substr($plan->description ?? '', 0, 120)) ?>
+                            <?= strlen($plan->description ?? '') > 120 ? '...' : '' ?>
+                        </p>
+
+                        <div class="plan-features">
+                            <?php if ($plan->hasDigitalOption()): ?>
+                                <span class="feature-tag digital">Digital</span>
+                            <?php endif; ?>
+                            <?php if ($plan->hasPrintOption()): ?>
+                                <span class="feature-tag print">Print</span>
+                            <?php endif; ?>
+                            <?php if ($plan->includes_insider): ?>
+                                <span class="feature-tag">Insider Access</span>
+                            <?php endif; ?>
+
+                            <?php
+                            // Display plan tags
+                            if (is_array($plan->tags) && count($plan->tags) > 0):
+                                foreach (array_slice($plan->tags, 0, 3) as $tag):
+                                    ?>
+                                    <span class="feature-tag tag-badge">
+                                    <?= htmlspecialchars(ucwords(str_replace('-', ' ', $tag))) ?>
+                                </span>
+                                <?php
+                                endforeach;
+                            endif;
+                            ?>
+                        </div>
+
+                        <div class="plan-pricing">
+                            <div class="price-label">Starting at</div>
+                            <div>
+                                <span class="price-from">from</span>
+                                <span class="price-amount">
+                                    £<?= number_format($plan->price, 2) ?>
+                                </span>
+                            </div>
+                        </div>
+
+                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/<?= $plan->id ?>"
+                           class="btn btn-primary" style="width: 100%;">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Pagination -->
+        <?php if ($pagination['total_pages'] > 1): ?>
+            <div class="pagination">
+                <button
+                        onclick="goToPage(<?= $pagination['current_page'] - 1 ?>)"
+                        <?= $pagination['current_page'] <= 1 ? 'disabled' : '' ?>>
+                    Previous
+                </button>
+
+                <?php
+                $start = max(1, $pagination['current_page'] - 2);
+                $end = min($pagination['total_pages'], $pagination['current_page'] + 2);
+
+                if ($start > 1): ?>
+                    <button onclick="goToPage(1)">1</button>
+                    <?php if ($start > 2): ?>
+                        <span class="pagination-info">...</span>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+                <?php for ($i = $start; $i <= $end; $i++): ?>
+                    <button
+                            onclick="goToPage(<?= $i ?>)"
+                            class="<?= $i === $pagination['current_page'] ? 'active' : '' ?>">
+                        <?= $i ?>
+                    </button>
+                <?php endfor; ?>
+
+                <?php if ($end < $pagination['total_pages']): ?>
+                    <?php if ($end < $pagination['total_pages'] - 1): ?>
+                        <span class="pagination-info">...</span>
+                    <?php endif; ?>
+                    <button onclick="goToPage(<?= $pagination['total_pages'] ?>)">
+                        <?= $pagination['total_pages'] ?>
+                    </button>
+                <?php endif; ?>
+
+                <button
+                        onclick="goToPage(<?= $pagination['current_page'] + 1 ?>)"
+                        <?= $pagination['current_page'] >= $pagination['total_pages'] ? 'disabled' : '' ?>>
+                    Next
+                </button>
+            </div>
+
+            <div style="text-align: center; color: var(--text-secondary); font-size: 0.95rem;">
+                Showing <?= (($pagination['current_page'] - 1) * $pagination['per_page']) + 1 ?>
+                - <?= min($pagination['current_page'] * $pagination['per_page'], $pagination['total']) ?>
+                of <?= number_format($pagination['total']) ?> subscriptions
+            </div>
+        <?php endif; ?>
+    <?php endif; ?>
+</div>
 
 <script>
-    const SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
-    const API_BASE = '/api/' + SITE;
-    let cartData = {items: [], total: 0, count: 0};
-    let allPlans = [];
+    const form = document.getElementById('filter-form');
+    let selectedCategories = new Set(<?= json_encode($selectedCategories ?? []) ?>);
 
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function () {
-        allPlans = Array.from(document.querySelectorAll('.plan-card'));
-        loadCart();
-        initializeEventListeners();
-    });
+    // Category filtering
+    function filterByCategory(event, category) {
+        event.preventDefault();
 
-    function initializeEventListeners() {
-        // Duration option selection
-        document.querySelectorAll('.duration-option').forEach(option => {
-            option.addEventListener('click', function () {
-                const planId = this.dataset.plan;
-                const radio = this.querySelector('input[type="radio"]');
-                document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
-                    .forEach(opt => opt.classList.remove('selected'));
-                this.classList.add('selected');
-                radio.checked = true;
-            });
+        // Update hidden input
+        document.getElementById('category').value = category;
+
+        // Update active state
+        document.querySelectorAll('.category-tile').forEach(tile => {
+            tile.classList.remove('active');
         });
+        event.currentTarget.classList.add('active');
 
-        // Delivery option selection
-        document.querySelectorAll('.delivery-option').forEach(option => {
-            option.addEventListener('click', function () {
-                const planId = this.dataset.plan;
-                const radio = this.querySelector('input[type="radio"]');
-
-                if (radio.value === 'digital') {
-                    document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
-                        .forEach(function (test) {
-                            const radio = test.querySelector('input[type="radio"]');
-                            const digitalPrice = radio.dataset.digital;
-                            if (digitalPrice && digitalPrice > 0) {
-                                test.querySelector('.duration-price').textContent = '£' + parseFloat(digitalPrice).toFixed(2);
-                            } else {
-                                test.querySelector('.duration-price').textContent = '£' + parseFloat(radio.dataset.price).toFixed(2);
-                            }
-                        });
-                } else {
-                    document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
-                        .forEach(function (test) {
-                            test.querySelector('.duration-price').textContent = '£' + parseFloat(test.querySelector('input[type="radio"]').dataset.price).toFixed(2);
-                        });
-                }
-
-                document.querySelectorAll(`.delivery-option[data-plan="${planId}"]`)
-                    .forEach(opt => opt.classList.remove('selected'));
-                this.classList.add('selected');
-                radio.checked = true;
-            });
-        });
-
-        // Set initial selected state
-        document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
-            const parentOption = radio.closest('.duration-option') || radio.closest('.delivery-option');
-            if (parentOption) {
-                parentOption.classList.add('selected');
-            }
-        });
-
-        // Search
-        document.getElementById('search-plans').addEventListener('input', filterAndSortPlans);
-
-        // Sort
-        document.getElementById('sort-plans').addEventListener('change', filterAndSortPlans);
+        // Apply filters
+        applyFilters();
     }
 
-    async function loadCart() {
-        try {
-            const response = await fetch(`${API_BASE}/cart`);
-            const result = await response.json();
-            cartData = result;
-            updateCartDisplay();
-        } catch (error) {
-            console.error('Error loading cart:', error);
-        }
-    }
+    // Category carousel functions
+    function scrollCarousel(direction) {
+        const carousel = document.getElementById('category-carousel');
+        const scrollAmount = 300;
 
-    function updateCartDisplay() {
-        const count = cartData.count || 0;
-        document.getElementById('cart-count').textContent = count;
-        document.getElementById('cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
-
-        // Update header badge
-        const headerBadge = document.getElementById('header-cart-count');
-        if (count > 0) {
-            headerBadge.textContent = count;
-            headerBadge.style.display = 'flex';
+        if (direction === 'left') {
+            carousel.scrollBy({left: -scrollAmount, behavior: 'smooth'});
         } else {
-            headerBadge.style.display = 'none';
+            carousel.scrollBy({left: scrollAmount, behavior: 'smooth'});
         }
-
-        const cartItemsContainer = document.getElementById('cart-items');
-        if (!cartData.items || cartData.items.length === 0) {
-            cartItemsContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Your cart is empty</p>';
-            return;
-        }
-
-        cartItemsContainer.innerHTML = cartData.items.map(item => `
-        <div class="cart-item">
-            <div class="cart-item-name">${item.name || 'Subscription'}</div>
-            <div class="cart-item-details">
-                ${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months
-            </div>
-            <div class="cart-item-price">£${(item.price || 0).toFixed(2)}</div>
-        </div>
-    `).join('');
     }
 
+    function toggleCategory(category) {
+        if (selectedCategories.has(category)) {
+            selectedCategories.delete(category);
+        } else {
+            selectedCategories.add(category);
+        }
 
-    // Handle duration option selection
-    document.querySelectorAll('.duration-option').forEach(option => {
-        option.addEventListener('click', function () {
-            const planId = this.dataset.plan;
-            const radio = this.querySelector('input[type="radio"]');
+        // Update UI
+        updateCategoryUI();
 
-            document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
-                .forEach(opt => opt.classList.remove('selected'));
+        // Apply filters
+        applyFilters();
+    }
 
-            this.classList.add('selected');
-            radio.checked = true;
-        });
-    });
-
-    // Handle delivery option selection
-    document.querySelectorAll('.delivery-option').forEach(option => {
-        option.addEventListener('click', function () {
-            const planId = this.dataset.plan;
-            const radio = this.querySelector('input[type="radio"]');
-
-            if (radio.value === 'digital') {
-                document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
-                    .forEach(function (test) {
-                        const radio = test.querySelector('input[type="radio"]');
-                        const digitalPrice = radio.dataset.digital
-
-                        if (digitalPrice && digitalPrice > 0) {
-                            test.querySelector('.duration-price').textContent = digitalPrice;
-                        } else {
-                            test.querySelector('.duration-price').textContent = radio.dataset.price;
-                        }
-                    });
+    function updateCategoryUI() {
+        // Update tile selected states
+        document.querySelectorAll('.category-tile').forEach(tile => {
+            const category = tile.dataset.category;
+            if (selectedCategories.has(category)) {
+                tile.classList.add('selected');
             } else {
-                document.querySelectorAll(`.duration-option[data-plan="${planId}"]`)
-                    .forEach(function (test) {
-                        test.querySelector('.duration-price').textContent = test.querySelector('input[type="radio"]').dataset.price;
-                    });
+                tile.classList.remove('selected');
             }
+        });
 
-            document.querySelectorAll(`.delivery-option[data-plan="${planId}"]`)
-                .forEach(opt => opt.classList.remove('selected'));
+        // Update hidden inputs
+        const container = document.getElementById('category-inputs');
+        container.innerHTML = '';
+        selectedCategories.forEach(cat => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'categories[]';
+            input.value = cat;
+            container.appendChild(input);
+        });
+    }
 
-            this.classList.add('selected');
-            radio.checked = true;
+    // Initialize category UI
+    updateCategoryUI();
+
+    // Apply filters on form submit
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        applyFilters();
+    });
+
+    // Apply filters on input changes
+    document.querySelectorAll('#filter-form input, #filter-form select').forEach(input => {
+        input.addEventListener('change', function () {
+            if (this.type !== 'text') {
+                applyFilters();
+            }
         });
     });
 
-    // Set initial selected state
-    document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
-        const parentOption = radio.closest('.duration-option') || radio.closest('.delivery-option');
-        if (parentOption) {
-            parentOption.classList.add('selected');
-        }
+    // Debounce search input
+    let searchTimeout;
+    document.getElementById('search').addEventListener('input', function () {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            applyFilters();
+        }, 500);
     });
 
-    async function addToCart(planId) {
-        const durationRadio = document.querySelector(`input[name="duration_${planId}"]:checked`);
-        const deliveryRadio = document.querySelector(`input[name="delivery_${planId}"]:checked`);
+    function applyFilters() {
+        const formData = new FormData(form);
+        const params = new URLSearchParams();
 
-        const pricingId = durationRadio ? durationRadio.dataset.pricingId : null;
-        const duration = durationRadio ? durationRadio.value : '12';
-        const price = durationRadio ? durationRadio.dataset.price : null;
-        const issues = durationRadio ? durationRadio.dataset.issues : '12';
-        const deliveryType = deliveryRadio ? deliveryRadio.value : 'print';
-
-        try {
-            const response = await fetch(`${API_BASE}/cart/subscription`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    plan_id: planId,
-                    pricing_id: pricingId,
-                    delivery_type: deliveryType,
-                    duration_months: parseInt(duration),
-                    price: parseFloat(price),
-                    issues: parseInt(issues)
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                cartData = result;
-
-                console.log('cartData: ', cartData)
-
-                updateCartDisplay();
-                openMiniCart();
-                showToast('Added to cart!', 'success');
-            } else {
-                showToast(result.message || 'Failed to add to cart', 'error');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            showToast('An error occurred', 'error');
-        }
-    }
-
-    function openMiniCart() {
-        document.getElementById('mini-cart').classList.add('open');
-        document.getElementById('cart-overlay').classList.add('show');
-    }
-
-    function closeMiniCart() {
-        document.getElementById('mini-cart').classList.remove('open');
-        document.getElementById('cart-overlay').classList.remove('show');
-    }
-
-    function goToCheckout() {
-        window.location.href = '/' + SITE + '/checkout?type=subscription';
-    }
-
-    function filterAndSortPlans() {
-        const searchTerm = document.getElementById('search-plans').value.toLowerCase();
-        const sortBy = document.getElementById('sort-plans').value;
-
-        let filteredPlans = allPlans.filter(plan => {
-            const name = plan.querySelector('.plan-name').textContent.toLowerCase();
-            const description = plan.querySelector('.plan-description')?.textContent.toLowerCase() || '';
-            return name.includes(searchTerm) || description.includes(searchTerm);
-        });
-
-        // Sort
-        if (sortBy) {
-            filteredPlans.sort((a, b) => {
-                if (sortBy === 'price-low' || sortBy === 'price-high') {
-                    const priceA = parseFloat(a.querySelector('.duration-option.selected .duration-price')?.textContent.replace('£', '') || 0);
-                    const priceB = parseFloat(b.querySelector('.duration-option.selected .duration-price')?.textContent.replace('£', '') || 0);
-                    return sortBy === 'price-low' ? priceA - priceB : priceB - priceA;
-                } else if (sortBy === 'name') {
-                    const nameA = a.querySelector('.plan-name').textContent;
-                    const nameB = b.querySelector('.plan-name').textContent;
-                    return nameA.localeCompare(nameB);
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                // Handle arrays (tags and categories)
+                if (key === 'tags[]' || key === 'categories[]') {
+                    params.append(key, value);
+                } else {
+                    params.set(key, value);
                 }
-                return 0;
-            });
+            }
         }
 
-        // Update display
-        const grid = document.querySelector('.plans-grid');
-        grid.innerHTML = '';
-        filteredPlans.forEach(plan => grid.appendChild(plan));
-        allPlans.forEach(plan => plan.style.display = 'none');
-        filteredPlans.forEach(plan => plan.style.display = 'block');
+        // Add selected categories from carousel
+        selectedCategories.forEach(cat => {
+            params.append('categories[]', cat);
+        });
+
+        window.location.href = '?' + params.toString();
     }
 
-
-    function showToast(message, type = 'success') {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.className = `toast ${type} show`;
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
+    function clearFilters() {
+        window.location.href = window.location.pathname;
     }
+
+    function goToPage(page) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', page);
+        window.location.href = '?' + params.toString();
+    }
+
+    // Display active filters
+    function displayActiveFilters() {
+        const container = document.getElementById('active-filters');
+        const params = new URLSearchParams(window.location.search);
+        const chips = [];
+
+        const filterLabels = {
+            search: 'Search',
+            site_id: 'Publication',
+            delivery_type: 'Delivery Type',
+            special_filter: 'Special Offer',
+            price_min: 'Min Price',
+            price_max: 'Max Price',
+            sort: 'Sort'
+        };
+
+        // Handle regular filters
+        for (const [key, value] of params.entries()) {
+            if (key === 'tags[]' || key === 'categories[]') continue; // Handle separately
+
+            if (value && key !== 'page' && filterLabels[key]) {
+                let displayValue = value;
+
+                // Get display text for select options
+                const select = document.getElementById(key);
+                if (select && select.tagName === 'SELECT') {
+                    const option = select.querySelector(`option[value="${value}"]`);
+                    if (option) {
+                        displayValue = option.textContent;
+                    }
+                }
+
+                chips.push(`
+                    <div class="filter-chip">
+                        <span>${filterLabels[key]}: ${displayValue}</span>
+                        <button onclick="removeFilter('${key}')" type="button">×</button>
+                    </div>
+                `);
+            }
+        }
+
+        // Handle categories
+        const categories = params.getAll('categories[]');
+        categories.forEach(cat => {
+            const displayCat = cat.split('-').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+
+            chips.push(`
+                <div class="filter-chip">
+                    <span>Category: ${displayCat}</span>
+                    <button onclick="removeCategory('${cat}')" type="button">×</button>
+                </div>
+            `);
+        });
+
+        // Handle tags
+        const tags = params.getAll('tags[]');
+        tags.forEach(tag => {
+            const displayTag = tag.split('-').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+
+            chips.push(`
+                <div class="filter-chip">
+                    <span>Tag: ${displayTag}</span>
+                    <button onclick="removeTag('${tag}')" type="button">×</button>
+                </div>
+            `);
+        });
+
+        container.innerHTML = chips.join('');
+        container.style.display = chips.length > 0 ? 'flex' : 'none';
+    }
+
+    function removeFilter(key) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete(key);
+        window.location.href = '?' + params.toString();
+    }
+
+    function removeCategory(catValue) {
+        const params = new URLSearchParams(window.location.search);
+        const categories = params.getAll('categories[]');
+
+        // Remove all categories first
+        params.delete('categories[]');
+
+        // Add back all categories except the one to remove
+        categories.forEach(cat => {
+            if (cat !== catValue) {
+                params.append('categories[]', cat);
+            }
+        });
+
+        window.location.href = '?' + params.toString();
+    }
+
+    function removeTag(tagValue) {
+        const params = new URLSearchParams(window.location.search);
+        const tags = params.getAll('tags[]');
+
+        // Remove all tags first
+        params.delete('tags[]');
+
+        // Add back all tags except the one to remove
+        tags.forEach(tag => {
+            if (tag !== tagValue) {
+                params.append('tags[]', tag);
+            }
+        });
+
+        window.location.href = '?' + params.toString();
+    }
+
+    // Initialize active filters display
+    displayActiveFilters();
 </script>
 </body>
 </html>

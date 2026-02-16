@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscription Details - YourStore</title>
+    <title>Subscription Confirmed - YourStore</title>
     <style>
         * {
             margin: 0;
@@ -19,6 +19,7 @@
             --text-primary: #1e293b;
             --text-secondary: #64748b;
             --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
 
         body {
@@ -41,7 +42,7 @@
             padding: 3rem 2rem;
             border-radius: 1rem;
             margin-bottom: 2rem;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-lg);
         }
 
         .success-icon {
@@ -53,6 +54,16 @@
             align-items: center;
             justify-content: center;
             margin: 0 auto 1.5rem;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
         }
 
         .success-icon svg {
@@ -60,6 +71,16 @@
             height: 48px;
             stroke: var(--success-color);
             stroke-width: 3;
+        }
+
+        .success-banner h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .success-banner p {
+            font-size: 1.125rem;
+            opacity: 0.95;
         }
 
         .card {
@@ -75,11 +96,13 @@
             margin-bottom: 1.5rem;
             padding-bottom: 1rem;
             border-bottom: 2px solid var(--border-color);
+            color: var(--text-primary);
         }
 
         .detail-row {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             padding: 1rem 0;
             border-bottom: 1px solid var(--border-color);
         }
@@ -91,10 +114,13 @@
         .detail-label {
             font-weight: 600;
             color: var(--text-secondary);
+            font-size: 0.95rem;
         }
 
         .detail-value {
             color: var(--text-primary);
+            text-align: right;
+            font-size: 0.95rem;
         }
 
         .status-badge {
@@ -121,6 +147,7 @@
             transition: all 0.3s;
             text-decoration: none;
             text-align: center;
+            font-size: 1rem;
         }
 
         .btn-primary {
@@ -130,6 +157,8 @@
 
         .btn-primary:hover {
             background: #1e40af;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
 
         .btn-secondary {
@@ -138,7 +167,12 @@
             border: 2px solid var(--primary-color);
         }
 
-        .download-section {
+        .btn-secondary:hover {
+            background: var(--bg-light);
+        }
+
+        .download-section,
+        .shipping-section {
             background: var(--bg-light);
             border: 2px dashed var(--border-color);
             border-radius: 0.75rem;
@@ -147,11 +181,90 @@
             margin-top: 1.5rem;
         }
 
-        .download-section svg {
+        .download-section svg,
+        .shipping-section svg {
             width: 48px;
             height: 48px;
             stroke: var(--primary-color);
-            margin-bottom: 1rem;
+            margin: 0 auto 1rem;
+        }
+
+        .download-section h3,
+        .shipping-section h3 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .download-section p,
+        .shipping-section p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .highlight-row {
+            background: var(--bg-light);
+            border-radius: 0.5rem;
+            padding: 1rem !important;
+            margin: 1rem 0;
+            font-weight: 700;
+            font-size: 1.125rem;
+            border: 2px solid var(--primary-color) !important;
+        }
+
+        .discount-row {
+            color: var(--success-color);
+        }
+
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid var(--primary-color);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .info-box p {
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .success-banner {
+                padding: 2rem 1rem;
+            }
+
+            .success-banner h1 {
+                font-size: 1.5rem;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .detail-value {
+                text-align: left;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .action-buttons .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -168,102 +281,147 @@
     </div>
 
     <?php
+    // Prepare payment breakdown with defaults
     $breakdown = $payment_breakdown ?? [
-            'subtotal' => $subscription['price'],
+            'subtotal' => $subscription['price'] ?? 0,
             'discount' => $subscription['discount_amount'] ?? 0,
             'shipping' => 0,
             'tax' => 0,
-            'total' => $subscription['price']
+            'total' => $subscription['price'] ?? 0
     ];
     ?>
 
     <div class="card">
         <h2>Subscription Details</h2>
+
         <div class="detail-row">
             <span class="detail-label">Plan:</span>
-            <span class="detail-value"><?= htmlspecialchars($subscription['plan_name']) ?></span>
+            <span class="detail-value"><?= htmlspecialchars($subscription['plan_name'] ?? 'N/A') ?></span>
         </div>
-        <div class="detail-row">
-            <span class="detail-label">Delivery Type:</span>
-            <span class="detail-value"><?= htmlspecialchars(ucfirst($subscription['delivery_type'])) ?></span>
-        </div>
+
+        <?php if (!empty($subscription['delivery_type'])): ?>
+            <div class="detail-row">
+                <span class="detail-label">Delivery Type:</span>
+                <span class="detail-value"><?= htmlspecialchars(ucfirst($subscription['delivery_type'])) ?></span>
+            </div>
+        <?php endif; ?>
+
         <div class="detail-row">
             <span class="detail-label">Status:</span>
-            <span class="status-badge <?= htmlspecialchars($subscription['status']) ?>">
-                    <?= htmlspecialchars(ucfirst($subscription['status'])) ?>
+            <span class="status-badge <?= htmlspecialchars($subscription['status'] ?? 'active') ?>">
+                <?= htmlspecialchars(ucfirst($subscription['status'] ?? 'Active')) ?>
+            </span>
+        </div>
+
+        <?php if (!empty($subscription['start_date'])): ?>
+            <div class="detail-row">
+                <span class="detail-label">Start Date:</span>
+                <span class="detail-value">
+                    <?= $subscription['start_date']->format('F j, Y') ?>
                 </span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">Start Date:</span>
-            <span class="detail-value"><?= $subscription['start_date']->format('F j, Y') ?></span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">End Date:</span>
-            <span class="detail-value"><?= $subscription['end_date']->format('F j, Y') ?></span>
-        </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($subscription['end_date'])): ?>
+            <div class="detail-row">
+                <span class="detail-label">End Date:</span>
+                <span class="detail-value">
+                    <?= $subscription['end_date']->format('F j, Y') ?>
+                </span>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Payment Breakdown -->
+    <div class="card">
+        <h2>Payment Summary</h2>
+
         <div class="detail-row">
             <span class="detail-label">Subtotal:</span>
-            <span class="detail-value">$<?= number_format($breakdown['subtotal'], 2) ?></span>
+            <span class="detail-value">£<?= number_format($breakdown['subtotal'], 2) ?></span>
         </div>
 
         <?php if ($breakdown['discount'] > 0): ?>
-            <div class="detail-row" style="color: var(--success-color);">
+            <div class="detail-row discount-row">
                 <span class="detail-label">Discount:</span>
-                <span class="detail-value">-$<?= number_format($breakdown['discount'], 2) ?></span>
+                <span class="detail-value">-£<?= number_format($breakdown['discount'], 2) ?></span>
             </div>
         <?php endif; ?>
 
         <?php if ($breakdown['shipping'] > 0): ?>
             <div class="detail-row">
                 <span class="detail-label">Shipping:</span>
-                <span class="detail-value">$<?= number_format($breakdown['shipping'], 2) ?></span>
+                <span class="detail-value">£<?= number_format($breakdown['shipping'], 2) ?></span>
             </div>
         <?php endif; ?>
 
         <div class="detail-row">
             <span class="detail-label">Tax:</span>
-            <span class="detail-value">$<?= number_format($breakdown['tax'], 2) ?></span>
+            <span class="detail-value">£<?= number_format($breakdown['tax'], 2) ?></span>
         </div>
 
-        <div class="detail-row"
-             style="font-weight: 700; font-size: 1.125rem; padding-top: 1rem; margin-top: 1rem; border-top: 2px solid var(--border-color);">
+        <div class="detail-row highlight-row">
             <span class="detail-label">Total Paid:</span>
-            <span class="detail-value">$<?= number_format($breakdown['total'], 2) ?></span>
+            <span class="detail-value">£<?= number_format($breakdown['total'], 2) ?></span>
         </div>
+    </div>
 
-        <?php if ($subscription['delivery_type'] === 'digital' && $can_download): ?>
+    <!-- Digital Download Section -->
+    <?php if (($subscription['delivery_type'] ?? '') === 'digital' && ($can_download ?? false)): ?>
+        <div class="card">
             <div class="download-section">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="7 10 12 15 17 10"></polyline>
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
-                <h3 style="margin-bottom: 0.5rem;">Your Content is Ready</h3>
-                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                    Download expires: <?= date('F j, Y', strtotime($download_expires_at)) ?>
+                <h3>Your Content is Ready</h3>
+                <p>
+                    Download expires: <?= date('F j, Y', strtotime($download_expires_at ?? '+30 days')) ?>
                 </p>
-                <a href="<?= htmlspecialchars($subscription['download_url']) ?>" class="btn btn-primary">
+                <a href="<?= htmlspecialchars($subscription['download_url'] ?? '#') ?>"
+                   class="btn btn-primary">
                     Download Now
                 </a>
             </div>
-        <?php elseif ($subscription['delivery_type'] === 'print'): ?>
-            <div class="download-section">
+        </div>
+    <?php endif; ?>
+
+    <!-- Print Shipping Section -->
+    <?php if (($subscription['delivery_type'] ?? '') === 'print'): ?>
+        <div class="card">
+            <div class="shipping-section">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <rect x="1" y="3" width="15" height="13"></rect>
                     <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
                     <circle cx="5.5" cy="18.5" r="2.5"></circle>
                     <circle cx="18.5" cy="18.5" r="2.5"></circle>
                 </svg>
-                <h3 style="margin-bottom: 0.5rem;">Your Order is Being Shipped</h3>
-                <p style="color: var(--text-secondary);">
+                <h3>Your Order is Being Prepared</h3>
+                <p>
                     You'll receive a tracking number via email once your order ships.
                 </p>
             </div>
-        <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <!-- Next Steps Info -->
+    <div class="info-box">
+        <p>
+            <strong>What's Next?</strong><br>
+            A confirmation email has been sent to your inbox with all the details of your subscription.
+            If you have any questions, please contact our support team.
+        </p>
     </div>
 
-    <div style="text-align: center;">
-        <a href="/" class="btn btn-secondary">Return to Home</a>
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+        <a href="/subscriptions" class="btn btn-secondary">
+            Browse More Subscriptions
+        </a>
+        <a href="/" class="btn btn-primary">
+            Return to Home
+        </a>
     </div>
 </div>
 </body>

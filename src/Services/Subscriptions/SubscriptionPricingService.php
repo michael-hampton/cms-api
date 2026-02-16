@@ -6,14 +6,16 @@ use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Models\Member;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shipping\ShippingService;
+use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Vouchers\VoucherService;
 
 class SubscriptionPricingService
 {
     public function __construct(
-        private readonly SubscriptionPlanRepository $planRepository,
-        private readonly VoucherService             $voucherService,
-        private readonly ShippingService            $shippingService
+        private readonly SubscriptionPlanRepository  $planRepository,
+        private readonly VoucherService              $voucherService,
+        private readonly ShippingService             $shippingService,
+        private readonly SubscriptionPricingResolver $pricingResolver
     )
     {
     }
@@ -29,7 +31,7 @@ class SubscriptionPricingService
         array   $checkoutData
     ): SubscriptionPricing
     {
-        // Get authoritative plan price (don't trust cart price)
+        // Get authoritative plan (don't trust cart data)
         $plan = $this->planRepository->find($item['subscription_plan_id']);
         if (!$plan) {
             throw new \InvalidArgumentException('Invalid subscription plan');
@@ -37,26 +39,22 @@ class SubscriptionPricingService
 
         $deliveryType = $item['options']['delivery_type'] ?? 'digital';
 
-        // Convert to cents immediately
-        $subtotalCents = (int)round($plan->price * 100);
-        $discountCents = 0;
-        $voucherId = null;
+        // Build resolver data from cart item
+        $resolverData = [
+            'variant' => $deliveryType,
+            'pricing_tier_id' => $item['options']['pricing_tier_id'] ?? null,
+            'voucher_code' => $voucherCode,
+        ];
 
-        // Apply voucher if provided
-        if ($voucherCode) {
-            $voucherValidation = $this->voucherService->validateVoucherForSubscription(
-                $voucherCode,
-                $plan->id,
-                $member->id
-            );
+        // Resolve pricing using tier-aware resolver
+        $resolvedPrice = $this->pricingResolver->resolve($plan, $resolverData, $member->id);
 
-            if ($voucherValidation->valid) {
-                $voucherId = $voucherValidation->voucherId;
-                $discountCents = (int)round($voucherValidation->discount * 100);
-            }
-        }
+        // Convert final price to cents
+        $subtotalCents = (int)round($resolvedPrice->finalPrice * 100);
+        $discountCents = (int)round($resolvedPrice->discountAmount * 100);
+        $voucherId = $resolvedPrice->voucherId;
 
-        $afterDiscountCents = $subtotalCents - $discountCents;
+        $afterDiscountCents = $subtotalCents;
 
         // Calculate shipping for print delivery
         $shippingCents = 0;

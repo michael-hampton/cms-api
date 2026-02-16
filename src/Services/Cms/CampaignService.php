@@ -2,84 +2,85 @@
 
 namespace App\Services\Cms;
 
+use App\DTO\Campaigns\CampaignResolutionResult;
+use App\DTO\Campaigns\SignupContext;
+use App\Enums\Campaigns\CampaignStatus;
+use App\Framework\Database\Database;
 use App\Models\Campaign;
+use App\Models\Model;
 use App\Repositories\Cms\CampaignRepository;
+use App\Repositories\Cms\CampaignSignupRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 
 class CampaignService
 {
     public function __construct(
         private readonly CampaignRepository   $campaignRepository,
-        private readonly NewsletterRepository $newsletterRepository
+        private readonly NewsletterRepository $newsletterRepository,
+        private CampaignSignupRepository      $campaignSignupRepository,
+        private Database                      $database
     )
     {
     }
 
-    public function resolveCampaignOrNewsletter(?string $campaignSlug, ?int $newsletterId, int $siteId): array
+    public function resolveCampaignOrNewsletter(?string $campaignSlug, ?int $newsletterId, int $siteId): CampaignResolutionResult
     {
         // Priority 1: Campaign
         if ($campaignSlug) {
-            $campaign = $this->getCampaignForSignup($campaignSlug, $siteId);
-
-            if ($campaign) {
-                $validation = $this->validateCampaign($campaign);
-
-                if (!$validation['valid']) {
-                    return [
-                        'success' => false,
-                        'error' => implode(', ', $validation['errors'])
-                    ];
-                }
-
-                // If campaign has a newsletter, use it
-                if ($campaign->newsletter_id) {
-                    return [
-                        'success' => true,
-                        'newsletter_id' => $campaign->newsletter_id,
-                        'campaign_id' => $campaign->id,
-                        'campaign' => $campaign
-                    ];
-                }
-
-                // Campaign exists but no newsletter - valid for tracking only
-                return [
-                    'success' => true,
-                    'newsletter_id' => null,
-                    'campaign_id' => $campaign->id,
-                    'campaign' => $campaign
-                ];
-            }
+            $result = $this->resolveCampaign($campaignSlug, $siteId);
+            if ($result) return $result;
         }
 
-        // Priority 2: Explicit newsletter ID
+        // Priority 2: Explicit newsletter
         if ($newsletterId) {
-            return [
-                'success' => true,
-                'newsletter_id' => $newsletterId,
-                'campaign_id' => null,
-                'campaign' => null
-            ];
+            return new CampaignResolutionResult(
+                success: true,
+                newsletterId: $newsletterId
+            );
         }
 
         // Priority 3: Default newsletter
-        $defaultNewsletter = $this->newsletterRepository->getDefaultNewsletterForSite($siteId);
-
-        if (!$defaultNewsletter) {
-            return [
-                'success' => false,
-                'error' => 'No newsletter available for subscription'
-            ];
-        }
-
-        return [
-            'success' => true,
-            'newsletter_id' => $defaultNewsletter->id,
-            'campaign_id' => null,
-            'campaign' => null
-        ];
+        return $this->resolveDefaultNewsletter($siteId);
     }
 
-    public function getCampaignForSignup(?string $campaignSlug, int $siteId): ?Campaign
+    private function resolveCampaign(string $campaignSlug, int $siteId): ?CampaignResolutionResult
+    {
+        $campaign = $this->getCampaignForSignup($campaignSlug, $siteId);
+        if (!$campaign) return null;
+
+        $validation = $this->validateCampaign($campaign);
+        if (!$validation['valid']) {
+            return new CampaignResolutionResult(
+                success: false,
+                error: implode('. ', $validation['errors'])
+            );
+        }
+
+        return new CampaignResolutionResult(
+            success: true,
+            newsletterId: $campaign->newsletter_id,
+            campaignId: $campaign->id,
+            campaign: $campaign->toArray()
+        );
+    }
+
+    private function resolveDefaultNewsletter(int $siteId): CampaignResolutionResult
+    {
+        $defaultNewsletter = $this->newsletterRepository->getDefaultNewsletterForSite($siteId);
+        if (!$defaultNewsletter) {
+            return new CampaignResolutionResult(
+                success: false,
+                error: 'No newsletter available for subscription'
+            );
+        }
+
+        return new CampaignResolutionResult(
+            success: true,
+            newsletterId: $defaultNewsletter->id
+        );
+    }
+
+    public function getCampaignForSignup(?string $campaignSlug, int $siteId): ?Model
     {
         if (!$campaignSlug) {
             return null;
@@ -87,11 +88,8 @@ class CampaignService
 
         $campaign = $this->campaignRepository->findBySlug($campaignSlug, $siteId);
 
-        if (!$campaign || !$campaign->isActive()) {
-            return null;
-        }
+        return ($campaign && $campaign->isValidForSignup()) ? $campaign : null;
 
-        return $campaign;
     }
 
     public function validateCampaign(Campaign $campaign): array
@@ -123,24 +121,60 @@ class CampaignService
     {
         $campaigns = $this->campaignRepository->getActiveCampaigns($siteId);
 
-        return $campaigns->map(function ($campaign) {
-            return [
-                'id' => $campaign->id,
-                'name' => $campaign->name,
-                'slug' => $campaign->slug,
-                'description' => $campaign->description,
-                'newsletter_id' => $campaign->newsletter_id,
-                'gates_premium_content' => $campaign->gates_premium_content,
-                'end_date' => $campaign->end_date?->format('Y-m-d H:i:s'),
-            ];
-        })->toArray();
+        return $campaigns->map(fn($campaign) => [
+            'id' => $campaign->id,
+            'name' => $campaign->name,
+            'slug' => $campaign->slug,
+            'description' => $campaign->description,
+            'newsletter_id' => $campaign->newsletter_id,
+            'gates_premium_content' => $campaign->gates_premium_content,
+            'end_date' => $campaign->end_date?->format('Y-m-d H:i:s'),
+        ])->toArray();
     }
 
-    public function trackCampaignSignup(int $campaignId): void
+    public function trackCampaignSignup(
+        int            $campaignId,
+        ?int           $userId = null,
+        ?string        $email = null,
+        ?SignupContext $context = null): array
     {
-        // This could be extended to track signups in a separate analytics table
-        // For now, the subscriber record itself tracks the campaign relationship
+        $campaign = $this->campaignRepository->find($campaignId);
+
+        if (!$campaign) {
+            return [
+                'success' => false
+            ];
+        }
+
+        $this->database->transaction(function () use (
+            $campaign,
+            $userId,
+            $email,
+            $context
+        ) {
+            // 1️⃣ Source of truth
+            $this->campaignSignupRepository->create([
+                'campaign_id' => $campaign->id,
+                'site_id' => $campaign->site_id,
+                'user_id' => $userId,
+                'email' => $email,
+                'ip_address' => $context->ip ?? null,
+                'user_agent' => $context->userAgent ?? null,
+                'referrer' => $context->referrer ?? null,
+            ]);
+
+            // 2️⃣ Fast read model
+            $this->campaignRepository->incrementSignupCount($campaign->id);
+        });
+
+        return [
+            'success' => true,
+            'campaign_id' => $campaign->id,
+            'user_id' => $userId,
+            'email' => $email,
+        ];
     }
+
 
     public function canAccessPremiumContent(?int $campaignId, int $siteId): bool
     {
@@ -155,31 +189,6 @@ class CampaignService
         }
 
         return $campaign->gatesPremiumContent() && $campaign->isActive();
-    }
-
-    public function pauseCampaign(int $campaignId, int $siteId): array
-    {
-        $campaign = $this->campaignRepository->find($campaignId);
-
-        if (!$campaign || $campaign->site_id !== $siteId) {
-            return [
-                'success' => false,
-                'error' => 'Campaign not found',
-                'code' => 404
-            ];
-        }
-
-        $campaign->pause();
-        $updated = $this->campaignRepository->update($campaignId, [
-            'status' => 'paused',
-            'is_active' => false
-        ]);
-
-        return [
-            'success' => true,
-            'campaign' => $updated,
-            'message' => 'Campaign paused successfully'
-        ];
     }
 
     public function canDeleteCampaign(int $campaignId): array
@@ -214,29 +223,48 @@ class CampaignService
         ];
     }
 
+    public function pauseCampaign(int $campaignId, int $siteId): array
+    {
+        return $this->updateCampaignStatus(
+            $campaignId,
+            $siteId,
+            CampaignStatus::PAUSED,
+            false
+        );
+    }
+
     public function resumeCampaign(int $campaignId, int $siteId): array
     {
-        $campaign = $this->campaignRepository->find($campaignId);
+        return $this->updateCampaignStatus(
+            $campaignId,
+            $siteId,
+            CampaignStatus::ACTIVE,
+            true
+        );
+    }
 
+    private function updateCampaignStatus(
+        int            $campaignId,
+        int            $siteId,
+        CampaignStatus $status,
+        bool           $isActive
+    ): array
+    {
+        $campaign = $this->campaignRepository->find($campaignId);
         if (!$campaign || $campaign->site_id !== $siteId) {
-            return [
-                'success' => false,
-                'error' => 'Campaign not found',
-                'code' => 404
-            ];
+            return ['success' => false, 'error' => 'Campaign not found', 'code' => 404];
         }
 
-        $campaign->resume();
+        // Update status in repository
         $updated = $this->campaignRepository->update($campaignId, [
-            'status' => 'active',
-            'is_active' => true
+            'status' => $status->value,
+            'is_active' => $isActive
         ]);
 
         return [
             'success' => true,
             'campaign' => $updated,
-            'message' => 'Campaign resumed successfully'
+            'message' => ucfirst($status->value) . ' campaign successfully'
         ];
     }
-
 }

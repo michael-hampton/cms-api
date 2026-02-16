@@ -85,7 +85,9 @@ class AuthorController extends Controller
                 return $this->errorResponse('Author not found', 404);
             }
 
-            $data = $author->toArray();
+            $counts = $author->getCounts();
+            $data = array_merge($counts, $author->toArray());
+
             if ($author->relationLoaded('pages')) {
                 $data['pages'] = $author->pages->toArray();
             }

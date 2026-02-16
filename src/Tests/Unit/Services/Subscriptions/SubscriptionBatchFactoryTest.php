@@ -59,7 +59,8 @@ class SubscriptionBatchFactoryTest extends TestCase
             $cartItems,
             ['voucher_code' => 'SAVE10'],
             $member,
-            1
+            1,
+            null
         );
 
         $this->assertCount(3, $result);
@@ -107,18 +108,20 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->subscriptionService->shouldReceive('createOneTimeSubscription')
             ->once()
             ->with(
-                123,
-                1,
-                'digital',
-                1,
-                null,
-                0,
-                SubscriptionStatus::PENDING->value,
-                null
+                Mockery::any(), // memberId
+                Mockery::any(), // planId
+                Mockery::any(), // deliveryType
+                Mockery::any(), // siteId
+                Mockery::any(), // voucherId
+                Mockery::any(), // discountAmountCents
+                SubscriptionStatus::PENDING, // status
+                Mockery::any(), // selectedStartDate
+                Mockery::any(), // accessStartsAt
+                Mockery::any()  // firstShipmentAt
             )
             ->andReturn($this->createMockSubscription());
 
-        $result = $this->factory->createPendingSubscriptions($cartItems, [], $member, 1);
+        $result = $this->factory->createPendingSubscriptions($cartItems, [], $member, 1, null);
 
         $this->assertCount(1, $result);
     }

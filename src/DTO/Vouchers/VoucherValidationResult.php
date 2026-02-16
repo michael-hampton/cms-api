@@ -9,12 +9,12 @@ class VoucherValidationResult
     public function __construct(
         public readonly bool     $valid,
         public readonly string   $message,
-        public readonly float    $discount,
-        public readonly float    $eligibleSubtotal,
-        public readonly array    $eligibleItems,
-        public readonly bool     $isStackable,
-        public readonly bool     $requiresOverrideDecision,
-        public readonly ?Voucher $voucher,
+        public readonly float    $discount = 0,
+        public readonly float    $eligibleSubtotal = 0,
+        public readonly array    $eligibleItems = [],
+        public readonly bool     $isStackable = false,
+        public readonly bool     $requiresOverrideDecision = false,
+        public readonly ?Voucher $voucher = null,
         public readonly ?float   $finalPrice = null
     )
     {

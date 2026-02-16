@@ -1765,22 +1765,34 @@ class QueryBuilder
         return $this;
     }
 
-    public function whereJsonContains(string $column, $value): self
+    public function whereJsonContains(string $column, $tags, string $boolean = 'AND'): self
     {
-        // Normalize value into JSON format
-        // Arrays become JSON arrays, scalars become JSON strings
-        $jsonValue = is_array($value)
-            ? json_encode($value)
-            : json_encode([$value]);
+        if (!is_array($tags)) {
+            $tags = [$tags];
+        }
 
-        $this->wheres[] = [
-            'type' => 'JsonContains',
-            'column' => $column,
-            'value' => $jsonValue,
-        ];
+        if (count($tags) > 1) {
+            $nested = new self($this->table, $this->relationManager, $this->database);
+            foreach ($tags as $tag) {
+                $nested->whereJsonContains($column, $tag, 'OR');
+            }
+            $this->wheres[] = [
+                'type' => 'Nested',
+                'query' => $nested,
+                'boolean' => $boolean,
+            ];
+        } else {
+            $this->wheres[] = [
+                'type' => 'JsonContains',
+                'column' => $column,
+                'value' => json_encode($tags[0]),
+                'boolean' => $boolean,
+            ];
+        }
 
         return $this;
     }
+
 
     public function selectRaw(string $expression): self
     {

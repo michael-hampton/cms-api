@@ -11,7 +11,7 @@ class SubscriptionPlanPricing extends Model
         'duration_months',
         'issue_count',
         'price',
-        'original_price',
+        'sale_price',
         'discount_percentage',
         'label',
         'period_description',
@@ -19,12 +19,14 @@ class SubscriptionPlanPricing extends Model
         'sort_order',
         'is_active',
         'digital_price',
+        'digital_sale_price'
     ];
 
     protected $casts = [
         'price' => 'decimal',
-        'original_price' => 'decimal',
+        'sale_price' => 'decimal',
         'digital_price' => 'decimal',
+        'digital_sale_price' => 'decimal',
         'discount_percentage' => 'integer',
         'duration_months' => 'integer',
         'issue_count' => 'integer',
@@ -48,7 +50,7 @@ class SubscriptionPlanPricing extends Model
 
     public function hasDiscount(): bool
     {
-        return $this->original_price && $this->original_price > $this->price;
+        return $this->sale_price && $this->sale_price < $this->price;
     }
 
     public function getActualDiscount(): float
@@ -57,7 +59,7 @@ class SubscriptionPlanPricing extends Model
             return 0;
         }
 
-        return $this->original_price - $this->price;
+        return $this->price - $this->sale_price;
     }
 
     public function getPricePerIssue(): float

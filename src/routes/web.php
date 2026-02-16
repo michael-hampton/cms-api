@@ -382,7 +382,7 @@ $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController
 $router->post('/{site}/default/newsletter/signup', NewsletterController::class, 'signup');
 
 $router->get('/{site}/subscriptions/onetime', [OneTimeSubscriptionsController::class, 'index']);
-$router->get('/subscriptions/onetime/{id}', [OneTimeSubscriptionsController::class, 'show']);
+$router->get('/{site}/subscriptions/onetime/{id}', [OneTimeSubscriptionsController::class, 'show']);
 
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/subscriptions/onetime/checkout', [OneTimeSubscriptionsController::class, 'checkout']);

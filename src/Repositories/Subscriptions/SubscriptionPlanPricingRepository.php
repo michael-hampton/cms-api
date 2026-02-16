@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
+use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Repository;
@@ -97,6 +98,20 @@ class SubscriptionPlanPricingRepository extends Repository
             perPage: $filters['per_page'] ?? 15,
             page: $filters['page'] ?? 1
         );
+    }
+
+    /**
+     * Get active pricing tiers for a plan (for querying/filtering)
+     *
+     * @param int $planId
+     * @return QueryBuilder
+     */
+    public function getActiveTiersForPlan(int $planId): QueryBuilder
+    {
+        return SubscriptionPlanPricing::query()
+            ->where('plan_id', $planId)
+            ->where('is_active', true)
+            ->orderBy('sort_order');
     }
 
     protected function getModelClass(): string

@@ -12,6 +12,7 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Vouchers\VoucherService;
 use Exception;
 
@@ -25,6 +26,7 @@ class SubscriptionCheckoutService
         private readonly PayPalPaymentProcessor     $paypalProcessor,
         private readonly VoucherService $voucherService,
         private readonly SubscriptionEligibilityService $eligibilityService,
+        private readonly SubscriptionPricingResolver $pricingResolver,
         private readonly Database                       $database,
 
     )
@@ -53,6 +55,7 @@ class SubscriptionCheckoutService
 
                 // Validate plan
                 $plan = $this->planRepository->find($data['subscription_plan_id']);
+
                 if (!$plan || !$plan->is_active) {
                     throw new Exception('Invalid subscription plan');
                 }
@@ -70,11 +73,20 @@ class SubscriptionCheckoutService
                     throw new Exception($eligibility['reason']);
                 }
 
+                $pricingData = [
+                    'variant' => $data['variant'] ?? 'digital',
+                    'pricing_tier_id' => $data['pricing_tier_id'] ?? null,
+                    'voucher_code' => $data['voucher_code'] ?? null
+                ];
+
+                die('mike1');
+
+                $resolvedPrice = $this->pricingResolver->resolve($plan, $pricingData, $memberId);
 
                 // Defaults
                 $voucherId = null;
                 $discountAmount = 0;
-                $finalPrice = $plan->price;
+                $finalPrice = $resolvedPrice->finalPrice;
 
                 // Handle voucher
                 if (!empty($data['voucher_code'])) {

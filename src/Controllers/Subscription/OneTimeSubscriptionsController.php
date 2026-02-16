@@ -3,30 +3,105 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Shopping\OneTimeSubscriptionService;
+use App\Services\Shopping\SubscriptionCatalogService;
 
 class OneTimeSubscriptionsController extends Controller
 {
     public function __construct(
         private readonly OneTimeSubscriptionService         $subscriptionService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly StripePaymentProcessor             $stripeProcessor
+        private readonly StripePaymentProcessor     $stripeProcessor,
+        private readonly SubscriptionCatalogService $catalogService
+
     )
     {
         parent::__construct();
     }
 
-    public function index()
+    /*public function index()
     {
         $siteId = SiteContext::getId();
         $plans = $this->subscriptionService->getOneTimePlansCatalog($siteId);
 
         return $this->view('subscriptions/onetime/index', [
             'plans' => $plans,
+            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
+        ]);
+    }*/
+
+    /**
+     * Shop page - shows all subscriptions across all sites with filters
+     */
+    public function index(Request $request)
+    {
+        $filters = [
+            'search' => $request->input('search'),
+            'site_id' => $request->input('site_id'),
+            'delivery_type' => $request->input('delivery_type'),
+            'price_min' => $request->input('price_min'),
+            'price_max' => $request->input('price_max'),
+            'sort' => $request->input('sort', SubscriptionSortOption::PRICE_LOW_TO_HIGH->value),
+            'per_page' => $request->input('per_page', 12),
+            'page' => $request->input('page', 1),
+            'tags' => $request->input('tags', []),
+            'categories' => $request->input('categories'),
+            'special_filter' => $request->input('special_filter'),
+        ];
+
+        $catalogData = $this->catalogService->getCatalog($filters);
+        $availableSites = $this->catalogService->getAvailableSites();
+        $priceRange = $this->catalogService->getPriceRange($filters['site_id'] ?? null);
+        $availableCategories = $this->catalogService->getAvailableCategories($filters['site_id'] ?? null);
+        $availableTags = $this->catalogService->getAvailableTags($filters['site_id'] ?? null);
+
+        $categoryMappings = [
+            ['name' => 'All', 'icon' => '🏠', 'color' => '#64748b'],
+            ['name' => 'Monthly', 'icon' => '📅', 'color' => '#3b82f6'],
+            ['name' => 'Digital Only', 'icon' => '📱', 'color' => '#8b5cf6'],
+            ['name' => 'Print Edition', 'icon' => '📰', 'color' => '#ef4444'],
+            ['name' => 'Best Value', 'icon' => '💰', 'color' => '#10b981'],
+            ['name' => 'Premium', 'icon' => '⭐', 'color' => '#f59e0b'],
+            ['name' => 'Annual', 'icon' => '📆', 'color' => '#06b6d4'],
+            ['name' => 'Music', 'icon' => '🎵', 'color' => '#8b5cf6'],
+            ['name' => 'Sport', 'icon' => '🏀', 'color' => '#f97316'],
+            ['name' => 'Technology', 'icon' => '💻', 'color' => '#3b82f6'],
+            ['name' => 'Fashion', 'icon' => '👗', 'color' => '#ec4899'],
+            ['name' => 'Home & Garden', 'icon' => '🏡', 'color' => '#10b981'],
+            ['name' => 'Food & Wine', 'icon' => '🍷', 'color' => '#ef4444'],
+            ['name' => 'Travel', 'icon' => '✈️', 'color' => '#f59e0b'],
+            ['name' => 'Equestrian', 'icon' => '🐎', 'color' => '#a78bfa'],
+            ['name' => 'Games', 'icon' => '🎮', 'color' => '#facc15'],
+            ['name' => 'Current Affairs', 'icon' => '🗞️', 'color' => '#64748b'],
+            ['name' => 'Space', 'icon' => '🚀', 'color' => '#0ea5e9'],
+        ];
+
+        $lookup = array_column($categoryMappings, null, 'name');
+
+        $merged = array_map(
+            fn($name) => $lookup[$name] ?? ['name' => $name, 'icon' => '❓', 'color' => '#000000'],
+            $availableCategories
+        );
+
+        return $this->view('subscriptions/onetime/index', [
+            'plans' => $catalogData['data'],
+            'pagination' => [
+                'current_page' => $catalogData['pagination']['current_page'],
+                'total_pages' => $catalogData['pagination']['last_page'],
+                'per_page' => $catalogData['pagination']['per_page'],
+                'total' => $catalogData['pagination']['total'],
+            ],
+            'filters' => $filters,
+            'available_sites' => $availableSites,
+            'available_categories' => $merged,
+            'available_tags' => $availableTags,
+            'price_range' => $priceRange,
+            'sort_options' => SubscriptionSortOption::cases(),
             'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
         ]);
     }
@@ -118,14 +193,32 @@ class OneTimeSubscriptionsController extends Controller
         ]);
     }
 
-    public function show(int $id)
+    /**
+     * Single plan detail/purchase page (old index.php functionality)
+     */
+    public function show(int $id, Request $request)
     {
-        $details = $this->subscriptionService->getSubscriptionSummary($id);
+        $plan = $this->subscriptionService->getPlanWithPricingTiers($id);
 
-        if (!$details) {
-            return $this->redirect('/');
+        if (!$plan || !$plan->is_active) {
+            return $this->redirect('/subscriptions');
         }
 
-        return $this->view('subscriptions/onetime/details', $details);
+        // If this is a post-purchase view with subscription ID
+        $subscriptionId = $request->input('subscription_id');
+        if ($subscriptionId) {
+            $subscriptionDetails = $this->subscriptionService->getSubscriptionSummary($subscriptionId);
+
+            return $this->view('subscriptions/onetime/details', array_merge([
+                'plan' => $plan,
+                'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
+            ], $subscriptionDetails));
+        }
+
+        // Regular plan view for purchase
+        return $this->view('subscriptions/onetime/show', [
+            'plan' => $plan,
+            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
+        ]);
     }
 }

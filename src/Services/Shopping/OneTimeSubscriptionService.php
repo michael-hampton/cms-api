@@ -5,6 +5,7 @@ namespace App\Services\Shopping;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Framework\Database\Database;
+use App\Models\Model;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -54,7 +55,8 @@ class OneTimeSubscriptionService
                         'issue_count' => $tier->issue_count,
                         'price' => $tier->price,
                         'digital_price' => $tier->digital_price,
-                        'original_price' => $tier->original_price,
+                        'digital_sale_price' => $tier->digital_sale_price,
+                        'sale_price' => $tier->sale_price,
                         'discount_percentage' => $tier->discount_percentage,
                         'label' => $tier->label,
                         'period_description' => $tier->period_description,
@@ -230,5 +232,10 @@ class OneTimeSubscriptionService
             'download_expires_at' => $subscription->download_expires_at?->format('Y-m-d H:i:s'),
             'payment_breakdown' => $breakdown,
         ];
+    }
+
+    public function getPlanWithPricingTiers(int $planId): ?Model
+    {
+        return $this->planRepository->findWithPricingTiers($planId);
     }
 }

@@ -127,4 +127,108 @@ class SubscriptionPlanRepository extends Repository
             //->lockForUpdate()
             ->first();
     }
+
+    /**
+     * Build base query for catalog with eager loading
+     */
+    public function buildCatalogQuery()
+    {
+        return SubscriptionPlan::with(['site', 'pricingTiers'])
+            ->where('is_active', true)
+            ->where('plan_type', 'onetime');
+    }
+
+    /**
+     * Get sites that have active one-time subscription plans
+     */
+    public function getSitesWithActivePlans(): Collection
+    {
+        return \App\Models\Site::whereHas('subscriptionPlans', function ($q) {
+            $q->where('is_active', true)
+                ->where('plan_type', 'onetime');
+        })
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get price range for active plans
+     */
+    public function getPriceRange(?int $siteId = null): array
+    {
+        $query = SubscriptionPlan::where('is_active', true)
+            ->where('plan_type', 'onetime');
+
+        if ($siteId) {
+            $query->where('site_id', $siteId);
+        }
+
+        $min = $query->min('price') ?? 0;
+        $max = $query->max('price') ?? 0;
+
+        return [
+            'min' => $min,
+            'max' => $max,
+        ];
+    }
+
+    /**
+     * Find plan with pricing tiers eager loaded
+     */
+    public function findWithPricingTiers(int $planId): ?SubscriptionPlan
+    {
+        return SubscriptionPlan::with(['pricingTiers'])
+            ->where('id', $planId)
+            ->first();
+    }
+
+    /**
+     * Get distinct categories from active plans (if you have categories)
+     */
+    public function getDistinctCategories(?int $siteId = null): array
+    {
+        $query = SubscriptionPlan::where('is_active', true)
+            ->where('plan_type', 'onetime')
+            ->whereNotNull('categories');
+
+        if ($siteId) {
+            $query->where('site_id', $siteId);
+        }
+
+        $plans = $query->get();
+        $allCategories = [];
+
+        foreach ($plans as $plan) {
+            if (is_array($plan->categories)) {
+                $allCategories = array_merge($allCategories, $plan->categories);
+            }
+        }
+
+        return array_values(array_unique($allCategories));
+    }
+
+    /**
+     * Get distinct tags from active plans (if you have tags JSON field)
+     */
+    public function getDistinctTags(?int $siteId = null): array
+    {
+        $query = SubscriptionPlan::where('is_active', true)
+            ->where('plan_type', 'onetime')
+            ->whereNotNull('tags');
+
+        if ($siteId) {
+            $query->where('site_id', $siteId);
+        }
+
+        $plans = $query->get();
+        $allTags = [];
+
+        foreach ($plans as $plan) {
+            if (is_array($plan->tags)) {
+                $allTags = array_merge($allTags, $plan->tags);
+            }
+        }
+
+        return array_values(array_unique($allTags));
+    }
 }

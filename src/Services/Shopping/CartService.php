@@ -267,7 +267,7 @@ class CartService
      * For one-time subscriptions: validates delivery type.
      * For recurring subscriptions: requires associated product.
      */
-    public function addSubscriptionToCart(int $subscriptionPlanId, string $deliveryType = 'print'): array
+    public function addSubscriptionToCart(int $subscriptionPlanId, string $deliveryType = 'print', array $data = []): array
     {
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
@@ -295,6 +295,8 @@ class CartService
 
             $price = $subscriptionPlan->price;
 
+            $options =
+
             // One-time subscriptions don't need a product
             $cartData = [
                 'session_id' => $sessionId,
@@ -304,9 +306,10 @@ class CartService
                 'price' => $price,
                 'subtotal' => $price,
                 'subscription_plan_id' => $subscriptionPlanId,
-                'options' => json_encode([
+                'options' => json_encode(array_merge([
                     'delivery_type' => $deliveryType,
-                ]),
+                    'pricing_tier_id' => $pricingTierId ?? null,
+                ], $data ?? [])),
                 'site_id' => $subscriptionPlan->site_id,
                 'merchant_id' => null,
                 'variant_id' => null,
