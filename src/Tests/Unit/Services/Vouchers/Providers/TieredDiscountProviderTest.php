@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Services\Vouchers\Providers;
 
 use App\Models\TieredPromotion;
 use App\Repositories\Offers\TieredPromotionRepository;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 use App\Services\Vouchers\Providers\TieredDiscountProvider;
 use Mockery;
 use PHPUnit\Framework\TestCase;

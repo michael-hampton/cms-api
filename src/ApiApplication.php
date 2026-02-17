@@ -32,6 +32,7 @@ use App\Framework\Routing\RouteLoader;
 use App\Listeners\BadgeEarnedListener;
 use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
+use App\Listeners\Members\SendAccountActivationEmailListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
 use App\Listeners\PointsAwardedListener;
 use App\Listeners\Products\TrackProductViewListener;
@@ -89,6 +90,11 @@ use App\Services\Shipping\DeliveryEstimatorInterface;
 use App\Services\Shipping\HolidayProviderInterface;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\UkHolidayProvider;
+use App\Services\Vouchers\DiscountProviderRegistry;
+use App\Services\Vouchers\Providers\OfferDiscountProvider;
+use App\Services\Vouchers\Providers\RewardDiscountProvider;
+use App\Services\Vouchers\Providers\TieredDiscountProvider;
+use App\Services\Vouchers\Providers\VoucherDiscountProvider;
 use Exception;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -116,6 +122,17 @@ class ApiApplication
         $this->container->bind(DeliveryEstimatorInterface::class, InternalBusinessDayEstimator::class);
         $this->container->bind(HolidayProviderInterface::class, UkHolidayProvider::class);
         $this->container->bind(SpamDetectionInterface::class, SimpleSpamDetector::class);
+
+        $this->container->singleton(DiscountProviderRegistry::class, function ($app) {
+            $registry = new DiscountProviderRegistry();
+
+            $registry->register($app->make(OfferDiscountProvider::class));
+            $registry->register($app->make(TieredDiscountProvider::class));
+            $registry->register($app->make(VoucherDiscountProvider::class));
+            $registry->register($app->make(RewardDiscountProvider::class));
+
+            return $registry;
+        });
 
 
         $this->container->bind(
@@ -303,6 +320,7 @@ class ApiApplication
         $eventDispatcher->listen(ProductViewedEvent::class, [TrackProductViewListener::class, 'handle']);
         $eventDispatcher->listen(RefundCreated::class, [LogRefundHistory::class, 'handle']);
         $eventDispatcher->listen(RefundCreated::class, [SendRefundNotification::class, 'handle']);
+        $eventDispatcher->listen(OrderCreatedEvent::class, [SendAccountActivationEmailListener::class, 'handle']);
 
 
 

@@ -109,16 +109,12 @@ class VoucherService
         float $orderValue,
         ?int  $userId = null,
         ?int  $productId = null
-    ): array
+    ): VoucherValidationResult
     {
         $voucher = $this->repository->findByCode($code);
 
         if (!$voucher) {
-            return [
-                'valid' => false,
-                'message' => 'Voucher not found',
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid('Voucher not found');
         }
 
         $context = $productId
@@ -127,14 +123,7 @@ class VoucherService
 
         $result = $this->validationService->validate($voucher, $context);
 
-        return [
-            'valid' => $result->valid,
-            'message' => $result->message,
-            'discount' => $result->discount,
-            'voucher_id' => $result->voucher?->id,
-            'voucher' => $result->voucher,
-            'is_stackable' => $result->isStackable
-        ];
+        return $result;
     }
 
     public function validateVoucherForCheckout(string $code, array $cartItems, ?int $userId = null): array
@@ -158,9 +147,11 @@ class VoucherService
     }
 
     public function validateVoucherForSubscription(
-        string $code,
-        int  $planId,
-        ?int $userId = null
+        string  $code,
+        int     $planId,
+        ?int    $userId = null,
+        ?int    $pricingTierId = null,
+        ?string $deliveryType = null
     ): VoucherValidationResult
     {
         $voucher = $this->repository->findByCode($code);
@@ -169,13 +160,36 @@ class VoucherService
             return VoucherValidationResult::invalid('Voucher not found');
         }
 
-        $plan = $this->subscriptionPlanRepository->find($planId);
+        $plan = $this->subscriptionPlanRepository->find($planId, ['pricingTiers']);
 
         if (!$plan) {
             return VoucherValidationResult::invalid('Plan not found');
         }
 
-        $context = VoucherValidationContext::forSubscription($planId, $plan->price, $userId);
+        $price = $plan->price;
+
+        if ($pricingTierId !== null) {
+
+            $pricingTier = $plan->pricingTiers->firstWhere('id', $pricingTierId);
+
+            if (!$pricingTier) {
+                return VoucherValidationResult::invalid('Invalid pricing tier');
+            }
+
+            if ($deliveryType === 'digital') {
+                $price = min(
+                    $pricingTier->digital_price,
+                    $pricingTier->digital_sale_price ?? $pricingTier->digital_price
+                );
+            } else {
+                $price = min(
+                    $pricingTier->price,
+                    $pricingTier->sale_price ?? $pricingTier->price
+                );
+            }
+        }
+
+        $context = VoucherValidationContext::forSubscription($planId, $price, $userId);
 
         return $this->validationService->validate($voucher, $context);
     }

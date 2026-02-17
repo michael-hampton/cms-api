@@ -48,6 +48,8 @@ class SubscriptionCheckoutService
     {
         try {
 
+            die('mike');
+
             $paymentProvider = $this->paymentMethodRepository->findByCode($data['payment_method']);
 
             // Step 1: Create subscription record (PENDING)
@@ -78,8 +80,6 @@ class SubscriptionCheckoutService
                     'pricing_tier_id' => $data['pricing_tier_id'] ?? null,
                     'voucher_code' => $data['voucher_code'] ?? null
                 ];
-
-                die('mike1');
 
                 $resolvedPrice = $this->pricingResolver->resolve($plan, $pricingData, $memberId);
 

@@ -318,13 +318,24 @@ class CartController extends Controller
 
         // Check if this is a subscription checkout
         if (!empty($data['subscription_plan_id'])) {
-            return $this->processSubscription($request);
+            $result = $this->processSubscription($request);
+
+            Session::forget('applied_voucher_code');
+            Session::forget('checkout_token'); // Clean up after successful checkout
+            Session::forget('pending_otp_email');
+            $statusCode = $result['success'] ? 200 : 400;
+            return $this->resourceResponse($result, $statusCode);
         }
 
         // Check if this is a multi-merchant checkout
         if (!empty($data['multi_merchant']) && $data['multi_merchant'] === true) {
             $result = $this->checkoutService->processMultiMerchantCheckout($data, $siteId);
             $statusCode = $result['success'] ? 200 : 400;
+
+            Session::forget('applied_voucher_code');
+            Session::forget('checkout_token'); // Clean up after successful checkout
+            Session::forget('pending_otp_email');
+
             return $this->resourceResponse($result, $statusCode);
         }
 

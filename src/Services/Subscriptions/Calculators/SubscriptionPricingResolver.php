@@ -103,7 +103,9 @@ class SubscriptionPricingResolver
             $voucherValidation = $this->voucherService->validateVoucherForSubscription(
                 $voucherCode,
                 $plan->id,
-                $memberId
+                $memberId,
+                $pricingTierId,
+                $variant
             );
 
             if ($voucherValidation->valid) {
@@ -123,7 +125,7 @@ class SubscriptionPricingResolver
                 salePrice: $salePrice,
                 currency: $plan->currency,
                 discountAmount: $discountAmount,
-                voucherId: $voucherId
+                voucherId: $voucherId,
             );
         }
 

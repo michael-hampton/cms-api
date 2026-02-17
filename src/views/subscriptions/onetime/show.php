@@ -538,7 +538,10 @@ foreach ($plan->pricingTiers as $tier) {
         <h2 class="section-title">Choose Your Subscription</h2>
 
         <div class="duration-options">
-            <?php foreach ($plan->pricingTiers as $index => $pricing): ?>
+            <?php foreach ($plan->pricingTiers as $index => $pricing):
+                $actualPrice = $pricing->sale_price && $pricing->sale_price < $pricing->price ? $pricing->sale_price : $pricing->price;
+                $originalPrice = $pricing->price;
+                ?>
                 <div class="duration-option" data-plan="<?= $plan->id ?>">
                     <input
                             type="radio"
@@ -548,16 +551,16 @@ foreach ($plan->pricingTiers as $tier) {
                             data-price="<?= $pricing->price ?>"
                             data-digital="<?= $pricing->digital_price ?? 0 ?>"
                             data-original-price="<?= $pricing->sale_price ?? $pricing->price ?>"
-                            data-original-digital="<?= $pricing->digital_sale_price ?? ($pricing->digital_price ?? 0) ?>"
+                            data-original-digital="<?= $pricing->digital_sale_price ?? $pricing->digitial_price ?>"
                             data-issues="<?= $pricing->issue_count ?>"
                             <?= $index === 0 ? 'checked' : '' ?>>
 
                     <div class="duration-header">
                         <span class="duration-label"><?= htmlspecialchars($pricing->label) ?></span>
                         <div>
-                            <span class="duration-price">£<?= number_format($pricing->price, 2) ?></span>
+                            <span class="duration-price">£<?= number_format($actualPrice, 2) ?></span>
                             <?php if ($pricing->hasDiscount()): ?>
-                                <span class="original-price">£<?= number_format($pricing->sale_price, 2) ?></span>
+                                <span class="original-price">£<?= number_format($originalPrice, 2) ?></span>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -770,24 +773,20 @@ foreach ($plan->pricingTiers as $tier) {
             const digitalPrice = parseFloat(radio.dataset.digital);
             const printPrice = parseFloat(radio.dataset.price);
             const digitalSalePrice = parseFloat(radio.dataset.originalDigital);
+            const originalSalePrice = parseFloat(radio.dataset.originalPrice);
 
             if (isDigital && digitalPrice > 0) {
-                priceElement.textContent = '£' + digitalPrice.toFixed(2);
+                priceElement.textContent = '£' + digitalSalePrice.toFixed(2);
                 // Update original price if it exists
-                if (originalPriceElement) {
-                    const originalDigital = parseFloat(radio.dataset.originalDigital || digitalPrice);
-                    if (originalDigital < digitalPrice) {
-                        originalPriceElement.textContent = '£' + originalDigital.toFixed(2);
-                    }
+                if (digitalSalePrice < digitalPrice) {
+                    originalPriceElement.textContent = '£' + digitalPrice.toFixed(2);
                 }
             } else {
-                priceElement.textContent = '£' + printPrice.toFixed(2);
+                priceElement.textContent = '£' + originalSalePrice.toFixed(2);
                 // Restore original price display
-                if (originalPriceElement) {
-                    const originalPrint = parseFloat(radio.dataset.originalPrice || printPrice);
-                    if (originalPrint < printPrice) {
-                        originalPriceElement.textContent = '£' + originalPrint.toFixed(2);
-                    }
+                const originalPrint = parseFloat(radio.dataset.originalPrice || printPrice);
+                if (originalPrint < printPrice) {
+                    originalPriceElement.textContent = '£' + printPrice.toFixed(2);
                 }
             }
         });

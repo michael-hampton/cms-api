@@ -5,7 +5,7 @@ namespace App\Services\Vouchers\Providers;
 
 use App\Services\Vouchers\Contracts\DiscountProvider;
 use App\Services\Vouchers\DiscountApplicationResult;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 
 class OfferDiscountProvider implements DiscountProvider
 {

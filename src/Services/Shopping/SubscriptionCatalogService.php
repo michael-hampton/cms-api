@@ -159,7 +159,7 @@ class SubscriptionCatalogService
         return $this->planRepository->getDistinctTags($siteId);
     }
 
-    private function getLowestPriceForPlan($plan): array
+    public function getLowestPriceForPlan($plan): array
     {
         $lowestPrint = null;
         $lowestDigital = null;

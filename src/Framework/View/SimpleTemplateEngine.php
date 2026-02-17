@@ -288,4 +288,22 @@ class SimpleTemplateEngine implements ViewEngineInterface
     {
         return __DIR__ . '/../public' . ($path ? '/' . ltrim($path, '/') : '');
     }
+
+
+    public function maskEmail(string $email): string
+    {
+        // Split into local part and domain
+        [$local, $domain] = explode('@', $email, 2);
+
+        if (strlen($local) <= 2) {
+            // For very short emails, just mask with a single *
+            $maskedLocal = substr($local, 0, 1) . '*';
+        } else {
+            // Show first and last char of local part, mask the rest
+            $maskedLocal = substr($local, 0, 1) . str_repeat('*', strlen($local) - 2) . substr($local, -1);
+        }
+
+        return $maskedLocal . '@' . $domain;
+    }
+
 }

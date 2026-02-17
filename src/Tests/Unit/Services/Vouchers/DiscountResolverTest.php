@@ -4,13 +4,22 @@ namespace App\Tests\Unit\Services\Vouchers;
 
 use App\Services\Vouchers\Contracts\DiscountProvider;
 use App\Services\Vouchers\DiscountApplicationResult;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
+use App\Services\Vouchers\DiscountProviderRegistry;
 use App\Services\Vouchers\DiscountResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class DiscountResolverTest extends TestCase
 {
+    private DiscountProviderRegistry $discountProviderRegistry;
+
+    public function setUp(): void
+    {
+        $this->discountProviderRegistry = new DiscountProviderRegistry();
+        parent::setUp();
+    }
+
     public function test_resolve_applies_providers_in_priority_order(): void
     {
         $provider1 = Mockery::mock(DiscountProvider::class);
@@ -39,7 +48,10 @@ class DiscountResolverTest extends TestCase
             )
         );
 
-        $resolver = new DiscountResolver([$provider1, $provider2]);
+        $this->discountProviderRegistry->register($provider1);
+        $this->discountProviderRegistry->register($provider2);
+
+        $resolver = new DiscountResolver($this->discountProviderRegistry);
 
         $context = new DiscountContext(
             items: [['id' => 1, 'price' => 100, 'quantity' => 1]],
@@ -64,7 +76,9 @@ class DiscountResolverTest extends TestCase
         $provider->shouldReceive('supports')->andReturn(false);
         $provider->shouldNotReceive('apply');
 
-        $resolver = new DiscountResolver([$provider]);
+        $this->discountProviderRegistry->register($provider);
+
+        $resolver = new DiscountResolver($this->discountProviderRegistry);
 
         $context = new DiscountContext(
             items: [],
@@ -109,7 +123,10 @@ class DiscountResolverTest extends TestCase
             )
         );
 
-        $resolver = new DiscountResolver([$provider1, $provider2]);
+        $this->discountProviderRegistry->register($provider1);
+        $this->discountProviderRegistry->register($provider2);
+
+        $resolver = new DiscountResolver($this->discountProviderRegistry);
 
         $context = new DiscountContext(
             items: [['id' => 1, 'price' => 100, 'quantity' => 1]],
@@ -156,7 +173,10 @@ class DiscountResolverTest extends TestCase
             )
         );
 
-        $resolver = new DiscountResolver([$provider1, $provider2]);
+        $this->discountProviderRegistry->register($provider1);
+        $this->discountProviderRegistry->register($provider2);
+
+        $resolver = new DiscountResolver($this->discountProviderRegistry);
 
         $context = new DiscountContext(
             items: [['id' => 1, 'price' => 100, 'quantity' => 1]],
@@ -188,7 +208,9 @@ class DiscountResolverTest extends TestCase
             )
         );
 
-        $resolver = new DiscountResolver([$provider]);
+        $this->discountProviderRegistry->register($provider);
+
+        $resolver = new DiscountResolver($this->discountProviderRegistry);
 
         $context = new DiscountContext(
             items: [['id' => 1, 'price' => 100, 'quantity' => 1]],
@@ -221,7 +243,9 @@ class DiscountResolverTest extends TestCase
             )
         );
 
-        $resolver = new DiscountResolver([$provider]);
+        $this->discountProviderRegistry->register($provider);
+
+        $resolver = new DiscountResolver($this->discountProviderRegistry);
 
         $context = new DiscountContext(
             items: [['id' => 1, 'price' => 100, 'quantity' => 1]],
@@ -241,6 +265,7 @@ class DiscountResolverTest extends TestCase
     protected function tearDown(): void
     {
         Mockery::close();
+        $this->discountProviderRegistry->clear();
         parent::tearDown();
     }
 }

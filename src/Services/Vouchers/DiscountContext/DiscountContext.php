@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Vouchers;
+namespace App\Services\Vouchers\DiscountContext;
 
 use App\Models\Member;
 
@@ -15,7 +15,9 @@ class DiscountContext
         public readonly ?Member $member,
         public readonly bool    $isSubscription = false,
         public readonly bool    $isFirstSubscriptionCycle = false,
-        public readonly ?int    $siteId = null
+        public readonly ?int   $siteId = null,
+        public ?RewardContext  $rewardContext = null,
+        public ?VoucherContext $voucherContext = null
     )
     {
     }

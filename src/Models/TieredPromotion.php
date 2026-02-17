@@ -4,6 +4,8 @@ namespace App\Models;
 
 class TieredPromotion extends Model
 {
+    protected $table = 'tiered_promotions';
+
     protected $fillable = [
         'name',
         'min_subtotal_cents',

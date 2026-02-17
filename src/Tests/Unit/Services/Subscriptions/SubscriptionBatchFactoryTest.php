@@ -105,19 +105,26 @@ class SubscriptionBatchFactoryTest extends TestCase
             ->once()
             ->andReturn($this->createMockPricing());
 
+        $pricing = new SubscriptionPricing(
+            20,
+            20,
+            20,
+            20,
+            20,
+            'digital'
+        );
+
         $this->subscriptionService->shouldReceive('createOneTimeSubscription')
             ->once()
             ->with(
-                Mockery::any(), // memberId
-                Mockery::any(), // planId
-                Mockery::any(), // deliveryType
-                Mockery::any(), // siteId
-                Mockery::any(), // voucherId
+                123, // memberId
+                1, // planId
+                'digital', // deliveryType
+                1, // siteId
+                null, // voucherId
                 Mockery::any(), // discountAmountCents
                 SubscriptionStatus::PENDING, // status
-                Mockery::any(), // selectedStartDate
-                Mockery::any(), // accessStartsAt
-                Mockery::any()  // firstShipmentAt
+                null, // selectedStartDate
             )
             ->andReturn($this->createMockSubscription());
 

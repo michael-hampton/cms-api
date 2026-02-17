@@ -2,6 +2,7 @@
 
 namespace App\Services\Shopping;
 
+use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Framework\Database\Database;
@@ -75,22 +76,21 @@ class OneTimeSubscriptionService
         string $deliveryType,
         int                 $siteId,
         ?int                $voucherId = null,
-        int                 $discountAmountCents = 0,
+        ?SubscriptionPricing $pricing = null,
         ?SubscriptionStatus $status = null,
         ?string $selectedStartDate = null,
-        ?string $accessStartsAt = null,
-        ?string $firstShipmentAt = null
     ): Subscription
     {
+
         return $this->database->transaction(function () use (
             $memberId,
             $planId,
             $deliveryType,
             $siteId,
             $voucherId,
-            $discountAmountCents,
             $status,
-            $selectedStartDate
+            $selectedStartDate,
+            $pricing
         ) {
             $plan = $this->planRepository->find($planId);
 
@@ -103,8 +103,8 @@ class OneTimeSubscriptionService
             $endDate = $this->dateCalculator->calculateEndDate($startDate, $billingPeriod);
 
             // Calculate pricing
-            $basePrice = Money::fromDecimal($plan->price, $plan->currency);
-            $discount = Money::fromCents($discountAmountCents, $plan->currency);
+            $basePrice = Money::fromCents($pricing->totalCents, $plan->currency);
+            $discount = Money::fromCents($pricing->discountCents, $plan->currency);
 
             $this->pricingCalculator->validateDiscount($basePrice, $discount);
             $finalPrice = $this->pricingCalculator->calculateFinalPrice($basePrice, $discount);
@@ -118,7 +118,7 @@ class OneTimeSubscriptionService
                 'start_date' => $startDate->format('Y-m-d H:i:s'),
                 'end_date' => $endDate->format('Y-m-d H:i:s'),
                 'price' => $finalPrice->toDecimal(),
-                'original_price' => $basePrice->toDecimal(),
+                'original_price' => $pricing->originalAmount ?: $plan->price,
                 'discount_amount' => $discount->toDecimal(),
                 'voucher_id' => $voucherId,
                 'currency' => $plan->currency,

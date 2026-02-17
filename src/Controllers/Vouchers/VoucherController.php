@@ -211,8 +211,8 @@ class VoucherController extends Controller
 
             $result = $this->voucherService->validateVoucher($code, $orderValue, $userId, $productId);
 
-            if ($result['valid'] === true) {
-                Session::put('applied_voucher_code', ['discount' => $result['discount'], 'voucher_id' => $result['voucher_id'], 'code' => $code]);
+            if ($result->valid === true) {
+                Session::put('applied_voucher_code', ['discount' => $result->discount, 'voucher_id' => $result->voucher->id, 'code' => $result->voucher->code]);
 
 //                $result = $this->voucherService->applyVoucher(
 //                    $result['voucher_id'],
@@ -222,7 +222,7 @@ class VoucherController extends Controller
 //                );
             }
 
-            return $this->jsonResponse($result);
+            return $this->jsonResponse($result->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

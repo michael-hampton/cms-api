@@ -57,11 +57,9 @@ class SubscriptionBatchFactory
                 deliveryType: $pricing->deliveryType,
                 siteId: $siteId,
                 voucherId: $pricing->voucherId,
-                discountAmountCents: $resolvedDiscounts ? $resolvedDiscounts->getTotalDiscountCents() / 100 : $pricing->getDiscount(),
+                pricing: $pricing,
                 status: SubscriptionStatus::PENDING,
-                selectedStartDate: $item['options']['start_date'] ?? null,
-                accessStartsAt: $item['estimated_delivery_to'],
-                firstShipmentAt: $item['estimated_delivery_to'] ?? null,
+                selectedStartDate: $item['options']['start_date'] ?? null
             );
 
             $subscriptions[] = [

@@ -12,7 +12,8 @@ use App\Services\Billing\Payments\PaymentIntentService;
 use App\Services\Shipping\DeliveryEstimatorInterface;
 use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
+use App\Services\Vouchers\DiscountContext\VoucherContext;
 use App\Services\Vouchers\DiscountResolver;
 use DateTimeImmutable;
 
@@ -25,7 +26,7 @@ class OneTimeSubscriptionCheckoutService
         private readonly PaymentIntentService     $paymentIntentService,
         private readonly CheckoutResponseBuilder  $responseBuilder,
         private readonly MemberAuthWrapper        $memberAuth,
-        private readonly Database         $database,
+        private readonly Database                 $database,
         private readonly DiscountResolver           $discountResolver,
         private readonly DeliveryEstimatorInterface $deliveryEstimator,
         private readonly FulfilmentResolver         $fulfilmentResolver,
@@ -72,7 +73,16 @@ class OneTimeSubscriptionCheckoutService
             member: $member,
             isSubscription: true,
             isFirstSubscriptionCycle: true,
-            siteId: $siteId
+            siteId: $siteId,
+            voucherContext: !empty($data['voucher_code']) ? new VoucherContext([
+                'voucher_code' => $data['voucher_code'],
+                'voucher_id' => $data['voucher_id'],
+                'applies_to' => 'subscription_first_cycle',
+                'subscription_plan_id' => $subscriptionItems[0]['subscription_plan_id'] ?? null,
+                'pricing_tier_id' => $subscriptionItems[0]['options']['pricing_tier_id'] ?? null,
+                'delivery_type' => $subscriptionItems[0]['options']['delivery_type'] ?? null,
+                'order_value' => $baseSubtotalCents
+            ]) : null
         );
 
         $resolvedDiscounts = $this->discountResolver->resolve($discountContext);

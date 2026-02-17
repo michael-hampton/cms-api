@@ -61,9 +61,17 @@ class Session
     /**
      * Remove a session value
      */
-    public static function forget(string $key): void
+    public static function forget(string|array $key): void
     {
         self::start();
+
+        if (is_array($key)) {
+            foreach ($key as $item) {
+                unset($_SESSION[$item]);
+            }
+            return;
+        }
+
         unset($_SESSION[$key]);
     }
 

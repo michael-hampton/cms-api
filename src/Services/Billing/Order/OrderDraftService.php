@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing\Order;
 
+use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Order;
@@ -39,7 +40,9 @@ class OrderDraftService
 
         // Build order items and calculate totals
         foreach ($subscriptionsWithPricing as $subData) {
+
             $subscription = $subData['subscription'];
+            /** @var SubscriptionPricing $pricing */
             $pricing = $subData['pricing'];
 
             $totalSubtotalCents += $pricing->subtotalCents;
@@ -100,12 +103,12 @@ class OrderDraftService
             }
         }
 
-        if (!empty($resolvedDiscounts)) {
-            $totalDiscountCents = $resolvedDiscounts->getTotalDiscountCents();
-            $totalCents = $resolvedDiscounts->finalSubtotalCents + $totalShippingCents + $totalTaxCents;
-        } else {
-            $totalCents = $totalSubtotalCents - $totalDiscountCents + $totalShippingCents + $totalTaxCents;
-        }
+        //if (!empty($resolvedDiscounts)) {
+        //  $totalDiscountCents = $resolvedDiscounts->getTotalDiscountCents();
+        // $totalCents = $resolvedDiscounts->finalSubtotalCents + $totalShippingCents + $totalTaxCents;
+        //} else {
+        $totalCents = $pricing->totalCents + $totalTaxCents;
+        //}
 
         // Prepare order data
         $orderData = [
@@ -138,7 +141,6 @@ class OrderDraftService
                 'multiple_subscriptions' => true
             ];
         }
-
 
         // Add shipping address if any subscription requires it
         $requiresShipping = $this->hasAnyPrintDelivery($subscriptionsWithPricing);

@@ -278,25 +278,29 @@ class CartService
             return ['success' => false, 'message' => 'Subscription plan not found or inactive'];
         }
 
+        // Validate delivery type
+        $deliveryType = $data['delivery_type'] ?? $deliveryType;
+        if (!in_array($deliveryType, $subscriptionPlan->getDeliveryOptions())) {
+            return ['success' => false, 'message' => 'Invalid delivery type'];
+        }
+
+        // Check if already in cart
+        $existingItem = $this->cartRepository->findBySubscriptionPlan($subscriptionPlanId, $userId, $sessionId);
+        if ($existingItem) {
+            return ['success' => false, 'message' => 'Subscription plan already in cart'];
+        }
+
+        // Determine pricing tier
+        $pricingTierId = $data['pricing_tier_id'] ?? null;
+        $pricingTier = $pricingTierId
+            ? $subscriptionPlan->pricingTiers->where('id', $pricingTierId)->first()
+            : null;
+
+        $price = $this->getPriceForSubscription($subscriptionPlan, $pricingTier, $deliveryType);
+
+
         // Check if one-time subscription
         if ($subscriptionPlan->isOneTime()) {
-            // Validate delivery type
-            $allowedDeliveryTypes = $subscriptionPlan->getDeliveryOptions();
-            if (!in_array($deliveryType, $allowedDeliveryTypes)) {
-                return ['success' => false, 'message' => 'Invalid delivery type'];
-            }
-
-            // Check if already in cart
-            $existingItem = $this->cartRepository->findBySubscriptionPlan($subscriptionPlanId, $userId, $sessionId);
-
-            if ($existingItem) {
-                return ['success' => false, 'message' => 'Subscription plan already in cart'];
-            }
-
-            $price = $subscriptionPlan->price;
-
-            $options =
-
             // One-time subscriptions don't need a product
             $cartData = [
                 'session_id' => $sessionId,
@@ -322,19 +326,9 @@ class CartService
 
         // Regular subscription - needs product
         $product = $subscriptionPlan->product;
-
         if (!$product || !$product->is_active) {
             return ['success' => false, 'message' => 'Associated product not found or inactive'];
         }
-
-        // Check if subscription already in cart
-        $existingItem = $this->cartRepository->findBySubscriptionPlan($subscriptionPlanId, $userId, $sessionId);
-
-        if ($existingItem) {
-            return ['success' => false, 'message' => 'Subscription already in cart'];
-        }
-
-        $price = $subscriptionPlan->price;
 
         $cartItemData = $this->itemFactory->fromSubscription(
             $sessionId,
@@ -349,6 +343,27 @@ class CartService
         $this->cartRepository->create($cartItemData->toArray());
 
         return ['success' => true, 'message' => 'Subscription added to cart'];
+    }
+
+    /**
+     * Determine the correct price for a subscription based on tier and delivery type.
+     */
+    private function getPriceForSubscription($subscriptionPlan, $pricingTier = null, string $deliveryType = 'print'): float
+    {
+        if (!$pricingTier) {
+            return $subscriptionPlan->price;
+        }
+
+        if ($deliveryType === 'digital') {
+            return $pricingTier->digital_sale_price && $pricingTier->digital_sale_price < $pricingTier->digital_price
+                ? $pricingTier->digital_sale_price
+                : $pricingTier->digital_price;
+        }
+
+        // Default to print/physical
+        return $pricingTier->sale_price && $pricingTier->sale_price < $pricingTier->price
+            ? $pricingTier->sale_price
+            : $pricingTier->price;
     }
 
     /**
@@ -572,7 +587,8 @@ class CartService
         );
 
         foreach ($items as $item) {
-            if (!empty($item->subscription_plan_id)) {
+
+            if ($item->subscription_plan_id) {
                 $options = is_string($item->options) ? json_decode($item->options, true) : $item->options;
 
                 if (($options['delivery_type'] ?? '') === 'digital') {

@@ -21,6 +21,7 @@ use App\Controllers\Front\WebPageController;
 use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
+use App\Controllers\Members\AccountActivationController;
 use App\Controllers\Members\GiftedArticlesController;
 use App\Controllers\Members\MemberActivityController;
 use App\Controllers\Members\MemberAddressController;
@@ -92,6 +93,9 @@ $router->get('{site}/product-offers/search', [OfferListController::class, 'searc
 $router->get('/{site}/bundles', [BundleListController::class, 'indexPage']);
 $router->get('/{site}/bundles/{bundleId}', [BundleListController::class, 'showPage']);
 $router->get('/{site}/bundles/search', [BundleListController::class, 'searchBundles']);
+
+$router->get('/{site}/account/activate/{token}', [AccountActivationController::class, 'showActivationForm']);
+$router->post('/{site}/account/activate/{token}', [AccountActivationController::class, 'activate']);
 
 
 // Block routes

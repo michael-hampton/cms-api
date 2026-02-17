@@ -535,7 +535,9 @@ class OrderDraftServiceTest extends TestCase
             ->with(
                 Mockery::on(function ($orderData) {
                     return $orderData['tax'] === 0
-                        && $orderData['total'] === 50;
+                        && $orderData['subtotal'] === 50
+                        && $orderData['payment_status'] === 'unpaid'
+                        && $orderData['total'] === 99.99;
                 }),
                 Mockery::type('array'),
                 1

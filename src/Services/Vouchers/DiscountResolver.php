@@ -2,15 +2,15 @@
 
 namespace App\Services\Vouchers;
 
-use App\Services\Vouchers\Contracts\DiscountProvider;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 
 class DiscountResolver
 {
     /**
-     * @param DiscountProvider[] $providers
+     * @param DiscountProviderRegistry $registry
      */
     public function __construct(
-        private readonly array $providers = []
+        private readonly DiscountProviderRegistry $registry
     )
     {
     }
@@ -18,8 +18,7 @@ class DiscountResolver
     public function resolve(DiscountContext $context): ResolvedDiscounts
     {
         // Sort providers by priority
-        $sortedProviders = $this->providers;
-        usort($sortedProviders, fn($a, $b) => $a->priority() <=> $b->priority());
+        $sortedProviders = $this->registry->sortedByPriority();
 
         $currentContext = $context;
         $offerDiscount = 0;
@@ -108,6 +107,7 @@ class DiscountResolver
 
             // Update context for next provider
             $newSubtotal = $currentContext->currentSubtotalCents - $result->discountAmountCents;
+
             $currentContext = $currentContext->withUpdatedSubtotal(
                 $newSubtotal,
                 $result->discountAmountCents

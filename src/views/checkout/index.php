@@ -1027,6 +1027,25 @@
                                      class="item-image">
                                 <div class="item-details">
                                     <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+
+                                    <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
+                                        <div class="variant-options"
+                                             style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
+                                            <?php
+                                            $variantParts = [];
+                                            foreach ($item['variant_options'] as $optionName => $optionValue) {
+                                                $variantParts[] = htmlspecialchars(ucfirst($optionName)) . ': <strong>' . htmlspecialchars($optionValue) . '</strong>';
+                                            }
+                                            echo implode(' • ', $variantParts);
+                                            ?>
+                                        </div>
+                                        <?php if (!empty($item['variant_sku'])): ?>
+                                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.125rem;">
+                                                SKU: <?= htmlspecialchars($item['variant_sku']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+
                                     <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
                                 </div>
                                 <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
@@ -1572,6 +1591,7 @@
 
         // Both flows now use Stripe
         if (isOneTimeSubscription) {
+            data.isOneTimeSubscription = true;
             await handleStripeCheckout(data);
         } else {
             await handleRegularCheckout(data);

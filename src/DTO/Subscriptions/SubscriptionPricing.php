@@ -11,8 +11,9 @@ final class SubscriptionPricing
         public readonly int    $taxCents,
         public readonly int    $totalCents,
         public readonly string $deliveryType,
-        public readonly ?int   $voucherId,
-        public readonly ?array $shippingAddressSnapshot
+        public readonly ?int   $voucherId = null,
+        public readonly ?array $shippingAddressSnapshot = [],
+        public readonly ?float $originalAmount = 0
     )
     {
     }

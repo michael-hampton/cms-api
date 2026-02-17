@@ -687,6 +687,23 @@
                                                class="item-name">
                                                 <?= htmlspecialchars($item['product_name']) ?>
                                             </a>
+                                            <!-- ADD VARIANT OPTIONS DISPLAY -->
+                                            <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
+                                                <div class="variant-options" style="margin-top: 0.5rem;">
+                                                    <?php foreach ($item['variant_options'] as $optionName => $optionValue): ?>
+                                                        <span class="variant-badge"
+                                                              style="display: inline-block; background: var(--bg-light); color: var(--text-secondary); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.875rem; margin-right: 0.5rem; border: 1px solid var(--border-color);">
+                                                            <?= htmlspecialchars(ucfirst($optionName)) ?>: <strong><?= htmlspecialchars($optionValue) ?></strong>
+                                                        </span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                                <?php if (!empty($item['variant_sku'])): ?>
+                                                    <div class="variant-sku"
+                                                         style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                                        SKU: <?= htmlspecialchars($item['variant_sku']) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                             <div class="item-price">
                                                 <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
                                             </div>
@@ -914,11 +931,37 @@
 
     function renderCart() {
         const itemsList = document.getElementById('cart-items-list');
-        itemsList.innerHTML = cartData.items.map(item => `
+        itemsList.innerHTML = cartData.items.map(item => {
+            // Build variant display HTML
+            let variantHtml = '';
+            if (item.variant_id && item.variant_options) {
+                const variantBadges = Object.entries(item.variant_options)
+                    .map(([key, value]) => `
+                    <span class="variant-badge" style="display: inline-block; background: var(--bg-light); color: var(--text-secondary); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.875rem; margin-right: 0.5rem; border: 1px solid var(--border-color);">
+                        ${key.charAt(0).toUpperCase() + key.slice(1)}: <strong>${value}</strong>
+                    </span>
+                `).join('');
+
+                const skuHtml = item.variant_sku ? `
+                <div class="variant-sku" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                    SKU: ${item.variant_sku}
+                </div>
+            ` : '';
+
+                variantHtml = `
+                <div class="variant-options" style="margin-top: 0.5rem;">
+                    ${variantBadges}
+                </div>
+                ${skuHtml}
+            `;
+            }
+
+            return `
             <div class="cart-item" data-item-id="${item.id}">
                 <img src="${item.product_image || '/images/placeholder.jpg'}" alt="${item.product_name}" class="item-image">
                 <div class="item-details">
                     <a href="/shop/details/${item.product_slug}" class="item-name">${item.product_name}</a>
+                    ${variantHtml}
                     <div class="item-price">
                         <span class="sale-price">${formatCurrency(item.price)}</span>
                     </div>
@@ -937,7 +980,8 @@
                     </button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         updateSummary();
         updateCartCount(cartData.count);

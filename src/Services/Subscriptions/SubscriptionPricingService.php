@@ -49,9 +49,11 @@ class SubscriptionPricingService
         // Resolve pricing using tier-aware resolver
         $resolvedPrice = $this->pricingResolver->resolve($plan, $resolverData, $member->id);
 
+
         // Convert final price to cents
         $subtotalCents = (int)round($resolvedPrice->finalPrice * 100);
         $discountCents = (int)round($resolvedPrice->discountAmount * 100);
+        $originalAmount = $resolvedPrice->salePrice < $resolvedPrice->basePrice ? $resolvedPrice->salePrice : $resolvedPrice->basePrice;
         $voucherId = $resolvedPrice->voucherId;
 
         $afterDiscountCents = $subtotalCents;
@@ -79,7 +81,8 @@ class SubscriptionPricingService
             totalCents: $totalCents,
             deliveryType: $deliveryType,
             voucherId: $voucherId,
-            shippingAddressSnapshot: $deliveryType === 'print' ? $this->captureShippingAddress($checkoutData) : null
+            shippingAddressSnapshot: $deliveryType === 'print' ? $this->captureShippingAddress($checkoutData) : null,
+            originalAmount: $originalAmount
         );
     }
 

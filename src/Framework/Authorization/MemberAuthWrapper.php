@@ -2,6 +2,8 @@
 
 namespace App\Framework\Authorization;
 
+use App\Models\Member;
+
 class MemberAuthWrapper
 {
 
@@ -23,5 +25,10 @@ class MemberAuthWrapper
     public function memberId()
     {
         return MemberAuth::id();
+    }
+
+    public function login(Member $member): void
+    {
+        MemberAuth::login($member);
     }
 }

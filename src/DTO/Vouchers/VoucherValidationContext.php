@@ -44,7 +44,7 @@ class VoucherValidationContext
             userId: $userId,
             orderValue: $planPrice,
             cartItems: [],
-            subscriptionPlanId: $planId
+            subscriptionPlanId: $planId,
         );
     }
 

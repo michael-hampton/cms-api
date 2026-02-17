@@ -7,6 +7,7 @@ use App\DTO\Vouchers\VoucherValidationResult;
 use App\Exceptions\Vouchers\VoucherNotDeletableException;
 use App\Framework\Database\Database;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Vouchers\VoucherRepository;
@@ -231,9 +232,9 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher not found', $result['message']);
-        $this->assertEquals(0, $result['discount']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Voucher not found', $result->message);
+        $this->assertEquals(0, $result->voucher->discount);
     }
 
     public function testValidateExpiredVoucher()
@@ -254,8 +255,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher has expired', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Voucher has expired', $result->message);
     }
 
     public function testValidateVoucherBelowMinimumOrder()
@@ -279,8 +280,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 30);
 
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Minimum order value', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('Minimum order value', $result->message);
     }
 
     public function testValidateVoucherSuccess()
@@ -311,10 +312,10 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, $orderValue);
 
-        $this->assertTrue($result['valid']);
-        $this->assertEquals('Voucher applied successfully', $result['message']);
-        $this->assertEquals($expectedDiscount, $result['discount']);
-        $this->assertEquals(1, $result['voucher_id']);
+        $this->assertTrue($result->valid);
+        $this->assertEquals('Voucher applied successfully', $result->message);
+        $this->assertEquals($expectedDiscount, $result->discount);
+        $this->assertEquals(1, $result->voucher->id);
     }
 
     public function testApplyVoucher()
@@ -367,8 +368,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100, $userId);
 
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('already used', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('already used', $result->message);
     }
 
     public function testUpdateExpiredVouchers()
@@ -469,7 +470,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->valid);
     }
 
     public function testValidateVoucherNotApplicableToProduct()
@@ -491,8 +492,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100, null, $productId);
 
-        $this->assertFalse($result['valid']);
-        $this->assertEquals('Voucher not applicable to this product', $result['message']);
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Voucher not applicable to this product', $result->message);
     }
 
     public function testCreateVoucherWithCategories()
@@ -676,7 +677,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->valid);
     }
 
     public function testValidateVoucherApplicableViaBrand()
@@ -703,7 +704,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, $orderValue, null, $productId);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->valid);
     }
 
     public function testApplyVoucherCreatesRedemption()
@@ -829,7 +830,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100, $userId);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->valid);
     }
 
     public function testValidateVoucherSkipsPerUserLimitWhenNoUserId()
@@ -857,7 +858,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100, null);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->valid);
     }
 
     public function testValidateVoucherSkipsPerUserLimitWhenNotSet()
@@ -886,7 +887,7 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucher($code, 100, $userId);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->valid);
     }
 
     public function testValidateVoucherForSubscriptionSuccess()
@@ -904,6 +905,11 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->id = 1;
         $voucher->status = 'active';
         $voucher->per_user_limit = null;
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->once()
+            ->with(1, ['pricingTiers'])
+            ->andReturn($plan);
 
         $voucher->shouldReceive('isValid')->andReturn(true);
         $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
@@ -1123,5 +1129,111 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertEquals(80.00, $result['eligible_subtotal']); // 50 + 30
         $this->assertCount(2, $result['eligible_items']);
         $this->assertEquals(8.00, $result['discount']);
+    }
+
+    public function testInvalidPlanReturnsInvalidResult()
+    {
+        $voucher = Mockery::mock(Voucher::class);
+
+        $this->repository
+            ->shouldReceive('findByCode')
+            ->once()
+            ->with('VALIDCODE')
+            ->andReturn($voucher);
+
+        $this->subscriptionPlanRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(999, ['pricingTiers'])
+            ->andReturn(null);
+
+        $result = $this->service->validateVoucherForSubscription('VALIDCODE', 999);
+
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Plan not found', $result->message);
+    }
+
+    public function testInvalidPricingTierReturnsInvalidResult()
+    {
+        $voucher = Mockery::mock(Voucher::class);
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $pricing = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
+        $plan->price = 50;
+        $plan->pricingTiers = collect([$pricing]);
+
+        $this->repository
+            ->shouldReceive('findByCode')->once()->andReturn($voucher);
+
+        $this->subscriptionPlanRepository
+            ->shouldReceive('find')->once()->andReturn($plan);
+
+        $result = $this->service->validateVoucherForSubscription('VALIDCODE', 1, null, 999);
+
+        $this->assertFalse($result->valid);
+        $this->assertEquals('Invalid pricing tier', $result->message);
+    }
+
+    public function testValidVoucherCallsValidationServiceWithCorrectPrice()
+    {
+        $voucher = Mockery::mock(Voucher::class);
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 100;
+
+        $tier = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->id = 10;
+        $tier->price = 120;
+        $tier->sale_price = 90;
+        $tier->digital_price = 80;
+        $tier->digital_sale_price = 70;
+
+        $plan->pricingTiers = collect([$tier]);
+
+        $this->repository
+            ->shouldReceive('findByCode')
+            ->once()
+            ->with('VALIDCODE')
+            ->andReturn($voucher);
+
+        $this->subscriptionPlanRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(1, ['pricingTiers'])
+            ->andReturn($plan);
+
+        $this->validationService
+            ->shouldReceive('validate')
+            ->once()
+            ->with($voucher, Mockery::any())
+            ->andReturn($result = Mockery::mock(VoucherValidationResult::class));
+
+        $returned = $this->service->validateVoucherForSubscription('VALIDCODE', 1, null, 10);
+
+        $this->assertSame($result, $returned);
+    }
+
+    public function testDigitalPricingTierPriceIsUsed()
+    {
+        $voucher = Mockery::mock(Voucher::class);
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 100;
+
+        $tier = new SubscriptionPlanPricing();
+        $tier->id = 10;
+        $tier->digital_price = 80;
+        $tier->digital_sale_price = 70;
+
+        $plan->pricingTiers = collect([$tier]);
+
+        $this->repository->shouldReceive('findByCode')->andReturn($voucher);
+        $this->subscriptionPlanRepository->shouldReceive('find')->andReturn($plan);
+
+        $this->validationService
+            ->shouldReceive('validate')
+            ->once()
+            ->with($voucher, Mockery::on(fn($context) => $context->orderValue == 70))
+            ->andReturn(Mockery::mock(VoucherValidationResult::class));
+
+        $this->service->validateVoucherForSubscription('CODE', 1, null, 10, 'digital');
+        $this->assertTrue(true);
     }
 }

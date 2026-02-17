@@ -30,7 +30,7 @@ use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\ShippingService;
 use App\Services\ValueObjects\Money;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 use App\Services\Vouchers\DiscountResolver;
 use App\Services\Vouchers\Providers\OfferDiscountProvider;
 use App\Services\Vouchers\Providers\RewardDiscountProvider;

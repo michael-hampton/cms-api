@@ -4,12 +4,13 @@ namespace App\Services\Vouchers\Providers;
 
 use App\Services\Vouchers\Contracts\DiscountProvider;
 use App\Services\Vouchers\DiscountApplicationResult;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
+use App\Services\Vouchers\VoucherService;
 
-class VoucherDiscountProvider implements DiscountProvider
+final class VoucherDiscountProvider implements DiscountProvider
 {
     public function __construct(
-        private readonly ?array $voucherData = null
+        private readonly VoucherService $voucherService
     )
     {
     }
@@ -19,116 +20,84 @@ class VoucherDiscountProvider implements DiscountProvider
         return 30; // After offers and tiered, before rewards
     }
 
+    public function supports(DiscountContext $context): bool
+    {
+        $voucherContext = $context->voucherContext;
+
+        if ($voucherContext === null || empty($voucherContext->voucherData['voucher_code'])) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function apply(DiscountContext $context): ?DiscountApplicationResult
     {
-        if (!$this->supports($context)) {
+        $voucherContext = $context->voucherContext;
+
+        if (!$voucherContext) {
             return null;
         }
 
-        $eligibleSubtotalCents = $this->calculateEligibleSubtotal($context);
+        // Validate voucher (again if needed; supports() could cache result if desired)
+        $validationResult = $voucherContext->voucherData['applies_to'] === 'subscription_first_cycle' ?
+            $this->voucherService->validateVoucherForSubscription(
+                $voucherContext->voucherData['voucher_code'],
+                $voucherContext->voucherData['subscription_plan_id'], null,
+                $voucherContext->voucherData['pricing_tier_id'] ?? null,
+                $voucherContext->voucherData['delivery_type'] ?? null
+            ) : $this->voucherService->validateVoucher($voucherContext->voucherData['voucher_code'], $voucherContext->voucherData['order_value']);
 
-        if ($eligibleSubtotalCents === 0) {
+        if (!$validationResult->valid || $validationResult->eligibleSubtotal === 0) {
             return null;
         }
 
-        $discountCents = $this->calculateDiscountCents($eligibleSubtotalCents);
+        $eligibleSubtotalCents = $validationResult->eligibleSubtotal;
+        $discountCents = $this->calculateDiscountCents($context, $eligibleSubtotalCents) ?: $validationResult->discount * 100;
 
-        // Apply max discount cap if set
-        if (isset($this->voucherData['max_discount'])) {
-            $maxDiscountCents = (int)round($this->voucherData['max_discount'] * 100);
-            $discountCents = min($discountCents, $maxDiscountCents);
+        if ($discountCents <= 0) {
+            return null;
         }
 
-        // Determine funding source
-        $fundingSource = 'platform'; // Default
-        if (!empty($this->voucherData['merchant_id'])) {
-            $fundingSource = 'merchant';
+        // Apply max discount cap if defined
+        $maxDiscount = $voucherContext->voucherData['max_discount'] ?? null;
+        if ($maxDiscount !== null) {
+            $discountCents = min($discountCents, (int)round($maxDiscount * 100));
         }
 
-        $affectedItemIds = array_map(
-            fn($item) => $item['id'] ?? $item['product_id'],
-            $this->voucherData['eligible_items'] ?? []
-        );
+        $fundingSource = !empty($voucherContext->voucherData['merchant_id']) ? 'merchant' : 'platform';
 
         return new DiscountApplicationResult(
             discountAmountCents: $discountCents,
-            affectedItemIds: $affectedItemIds,
-            stackable: $this->voucherData['is_stackable'] ?? false,
+            affectedItemIds: $validationResult->eligibleItems,
+            stackable: $voucherContext->voucherData['is_stackable'] ?? false,
             fundingSource: $fundingSource,
             type: 'voucher',
             metadata: [
-                'voucher_id' => $this->voucherData['voucher_id'] ?? null,
-                'voucher_code' => $this->voucherData['voucher_code'] ?? null,
-                'campaign_id' => $this->voucherData['campaign_id'] ?? null,
-                'merchant_id' => $this->voucherData['merchant_id'] ?? null,
-                'discount_type' => $this->voucherData['discount_type'] ?? 'percentage'
+                'voucher_id' => $voucherContext->voucherData['voucher_id'] ?? null,
+                'voucher_code' => $voucherContext->voucherData['voucher_code'] ?? null,
+                'campaign_id' => $voucherContext->voucherData['campaign_id'] ?? null,
+                'merchant_id' => $voucherContext->voucherData['merchant_id'] ?? null,
+                'discount_type' => $voucherContext->voucherData['discount_type'] ?? 'percentage',
             ]
         );
     }
 
-    public function supports(DiscountContext $context): bool
+    /**
+     * Calculate the discount in cents based on eligible subtotal and voucher type
+     */
+    private function calculateDiscountCents(DiscountContext $context, int $eligibleSubtotalCents): int
     {
-        if ($this->voucherData === null || empty($this->voucherData['valid'])) {
-            return false;
-        }
-
-        // Check subscription compatibility
-        if ($context->isSubscription) {
-            return $this->isApplicableToSubscription($context);
-        }
-
-        return true;
-    }
-
-    private function isApplicableToSubscription(DiscountContext $context): bool
-    {
-        // Check voucher applies_to field
-        $appliesTo = $this->voucherData['applies_to'] ?? 'one_time';
-
-        if ($appliesTo === 'one_time') {
-            return false;
-        }
-
-        if ($appliesTo === 'subscription_first_cycle' && !$context->isFirstSubscriptionCycle) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function calculateEligibleSubtotal(DiscountContext $context): int
-    {
-        $eligibleCents = 0;
-
-        $eligibleItemIds = array_map(
-            fn($item) => $item['id'] ?? $item['product_id'],
-            $this->voucherData['eligible_items'] ?? []
-        );
-
-        foreach ($context->items as $item) {
-            $itemId = $item['id'] ?? $item['product_id'];
-
-            if (in_array($itemId, $eligibleItemIds)) {
-                $priceCents = (int)round($item['price'] * 100);
-                $quantity = $item['quantity'] ?? 1;
-                $eligibleCents += $priceCents * $quantity;
-            }
-        }
-
-        return $eligibleCents;
-    }
-
-    private function calculateDiscountCents(int $eligibleSubtotalCents): int
-    {
-        $discountType = $this->voucherData['discount_type'] ?? 'percentage';
+        $voucherData = $context->voucherContext->voucherData;
+        $discountType = $voucherData['discount_type'] ?? 'percentage';
 
         if ($discountType === 'percentage') {
-            $percentage = $this->voucherData['discount'] ?? 0;
+            $percentage = $voucherData['discount'] ?? 0;
             return (int)round($eligibleSubtotalCents * ($percentage / 100));
-        } else {
-            // Fixed amount
-            $fixedAmountCents = (int)round($this->voucherData['discount'] * 100);
-            return min($fixedAmountCents, $eligibleSubtotalCents);
         }
+
+        // fixed amount discount
+        $fixedAmountCents = (int)round($voucherData['discount'] * 100);
+        return min($fixedAmountCents, $eligibleSubtotalCents);
     }
 }

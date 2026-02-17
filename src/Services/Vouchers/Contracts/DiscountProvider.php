@@ -3,7 +3,7 @@
 namespace App\Services\Vouchers\Contracts;
 
 use App\Services\Vouchers\DiscountApplicationResult;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 
 interface DiscountProvider
 {

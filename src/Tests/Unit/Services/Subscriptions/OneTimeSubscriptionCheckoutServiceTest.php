@@ -472,7 +472,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             totalCents: 2500,
             deliveryType: 'digital',
             voucherId: 99,
-            shippingAddressSnapshot: null
+            shippingAddressSnapshot: null,
+            originalAmount: 20
         );
 
         $subs = [[
@@ -622,7 +623,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             totalCents: 5500,
             deliveryType: $deliveryType,
             voucherId: null,
-            shippingAddressSnapshot: null
+            shippingAddressSnapshot: null,
+            originalAmount: 20
         );
     }
 

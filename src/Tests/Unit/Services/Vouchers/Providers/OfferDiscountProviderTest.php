@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Services\Vouchers\Providers;
 
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 use App\Services\Vouchers\Providers\OfferDiscountProvider;
 use PHPUnit\Framework\TestCase;
 

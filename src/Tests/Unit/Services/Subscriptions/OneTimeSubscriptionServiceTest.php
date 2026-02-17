@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\BillingPeriod;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Exceptions\Subscriptions\InvalidDeliveryTypeException;
@@ -159,13 +160,22 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $pricing = new SubscriptionPricing(
+            20,
+            20,
+            20,
+            20,
+            20,
+            'digital'
+        );
+
         $result = $this->service->createOneTimeSubscription(
             1, // member_id
             1, // plan_id
             'digital',
             1, // site_id
             null,
-            0
+            $pricing
         );
 
         $this->assertInstanceOf(Subscription::class, $result);
@@ -187,10 +197,19 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $pricing = new SubscriptionPricing(
+            20,
+            20,
+            20,
+            20,
+            20,
+            'digital'
+        );
+
         $this->expectException(InvalidSubscriptionPlanException::class);
         $this->expectExceptionMessage('Invalid one-time subscription plan');
 
-        $this->service->createOneTimeSubscription(1, 999, 'digital', 1, null, 0);
+        $this->service->createOneTimeSubscription(1, 999, 'digital', 1, null, $pricing);
     }
 
     public function testCreateOneTimeSubscriptionFailsWithInvalidDeliveryType(): void
@@ -215,7 +234,16 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->expectException(InvalidDeliveryTypeException::class);
         $this->expectExceptionMessage('Digital delivery not available');
 
-        $this->service->createOneTimeSubscription(1, 1, 'digital', 1, null, 0);
+        $pricing = new SubscriptionPricing(
+            20,
+            20,
+            20,
+            20,
+            20,
+            'digital'
+        );
+
+        $this->service->createOneTimeSubscription(1, 1, 'digital', 1, null, $pricing);
     }
 
     public function testCreateOneTimeSubscriptionWithDiscount(): void
@@ -248,17 +276,26 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $subscription = m::mock(Subscription::class)->makePartial();
         $this->subscriptionRepository->shouldReceive('create')
             ->with(m::on(function ($data) {
-                return abs($data['price'] - 89.99) < 0.01
-                    && abs($data['discount_amount'] - 10.00) < 0.01
-                    && abs($data['original_price'] - 99.99) < 0.01;
+                return $data['price'] == 89.99
+                    && $data['discount_amount'] == 10
+                    && $data['original_price'] == 99.99;
             }))
             ->andReturn($subscription);
 
         $subscription->shouldReceive('generateDownloadUrl')->once();
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
+        $pricing = new SubscriptionPricing(
+            20,
+            1000,
+            20,
+            20,
+            20,
+            'digital'
+        );
+
         $result = $this->service->createOneTimeSubscription(
-            1, 1, 'digital', 1, null, 1000 // 1000 cents = $10
+            1, 1, 'digital', 1, null, $pricing // 1000 cents = $10
         );
 
         $this->assertInstanceOf(Subscription::class, $result);
@@ -288,8 +325,17 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Discount amount cannot be negative');
 
+        $pricing = new SubscriptionPricing(
+            20,
+            20,
+            20,
+            20,
+            20,
+            'digital'
+        );
+
         $this->service->createOneTimeSubscription(
-            1, 1, 'digital', 1, null, -1000
+            1, 1, 'digital', 1, null, $pricing
         );
     }
 

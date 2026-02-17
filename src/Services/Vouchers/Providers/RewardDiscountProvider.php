@@ -5,12 +5,11 @@ namespace App\Services\Vouchers\Providers;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Vouchers\Contracts\DiscountProvider;
 use App\Services\Vouchers\DiscountApplicationResult;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
 
 class RewardDiscountProvider implements DiscountProvider
 {
     public function __construct(
-        private readonly ?int               $rewardId = null,
         private readonly ?RewardsRepository $rewardRepository = null
     )
     {
@@ -27,7 +26,7 @@ class RewardDiscountProvider implements DiscountProvider
             return null;
         }
 
-        $reward = $this->rewardRepository->find($this->rewardId);
+        $reward = $this->rewardRepository->find($context->rewardContext->rewardId);
 
         if (!$reward || !$reward->isPending() || $reward->isExpired()) {
             return null;
@@ -71,7 +70,7 @@ class RewardDiscountProvider implements DiscountProvider
             fundingSource: 'platform', // Platform funds rewards
             type: 'reward',
             metadata: [
-                'reward_id' => $this->rewardId,
+                'reward_id' => $context->rewardContext->rewardId,
                 'reward_definition_id' => $definition->id,
                 'reward_type' => $rewardType
             ]
@@ -80,7 +79,7 @@ class RewardDiscountProvider implements DiscountProvider
 
     public function supports(DiscountContext $context): bool
     {
-        if ($this->rewardId === null || $context->member === null) {
+        if (!$context->rewardContext?->rewardId || $context->member === null) {
             return false;
         }
 

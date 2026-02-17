@@ -30,7 +30,8 @@ class Member extends Model
         'timezone',
         'segment',
         'territory_id',
-        'anonymous'
+        'anonymous',
+        'password_set_at'
     ];
 
     protected $hidden = [
@@ -130,7 +131,7 @@ class Member extends Model
     public static function findByPasswordResetToken(string $token, int $siteId): ?self
     {
         return self::where('password_reset_token', $token)
-            ->where('site_id', $siteId)
+            //->where('site_id', $siteId)
             ->where('password_reset_expires_at', '>', date('Y-m-d H:i:s'))
             ->first();
     }

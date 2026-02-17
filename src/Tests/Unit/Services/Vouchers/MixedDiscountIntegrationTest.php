@@ -4,7 +4,8 @@ namespace App\Tests\Unit\Services\Vouchers;
 
 use App\Models\Member;
 use App\Repositories\Offers\TieredPromotionRepository;
-use App\Services\Vouchers\DiscountContext;
+use App\Services\Vouchers\DiscountContext\DiscountContext;
+use App\Services\Vouchers\DiscountProviderRegistry;
 use App\Services\Vouchers\DiscountResolver;
 use App\Services\Vouchers\Providers\OfferDiscountProvider;
 use App\Services\Vouchers\Providers\TieredDiscountProvider;
@@ -58,7 +59,10 @@ class MixedDiscountIntegrationTest extends TestCase
             new VoucherDiscountProvider($voucherData),
         ];
 
-        $resolver = new DiscountResolver($providers);
+        $discountProviderRegistry = new DiscountProviderRegistry();
+        $discountProviderRegistry->setProviders($providers);
+
+        $resolver = new DiscountResolver($discountProviderRegistry);
 
         $context = new DiscountContext(
             items: $items,
@@ -108,7 +112,10 @@ class MixedDiscountIntegrationTest extends TestCase
             new VoucherDiscountProvider($voucherData),
         ];
 
-        $resolver = new DiscountResolver($providers);
+        $discountProviderRegistry = new DiscountProviderRegistry();
+        $discountProviderRegistry->setProviders($providers);
+
+        $resolver = new DiscountResolver($discountProviderRegistry);
 
         $context = new DiscountContext(
             items: $items,
@@ -149,7 +156,10 @@ class MixedDiscountIntegrationTest extends TestCase
             new VoucherDiscountProvider($voucherData),
         ];
 
-        $resolver = new DiscountResolver($providers);
+        $discountProviderRegistry = new DiscountProviderRegistry();
+        $discountProviderRegistry->setProviders($providers);
+
+        $resolver = new DiscountResolver($discountProviderRegistry);
 
         $context = new DiscountContext(
             items: $items,

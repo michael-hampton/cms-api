@@ -215,7 +215,7 @@ class SubscriptionPricingResolverTest extends TestCase
         $this->assertEquals(29.99, $resolved->basePrice);
         $this->assertEquals(24.99, $resolved->finalPrice);
         $this->assertEquals(5.00, $resolved->discountAmount);
-        $this->assertEquals(10, $resolved->voucher->id);
+        $this->assertEquals(10, $resolved->voucherId);
         $this->assertTrue($resolved->hasVoucherDiscount());
     }
 
