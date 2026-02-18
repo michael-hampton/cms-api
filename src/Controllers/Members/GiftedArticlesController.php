@@ -5,7 +5,10 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Mail\MailManager;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Mail\GiftedArticleMail;
 use App\Models\Page;
 use App\Services\Members\ArticleGiftingService;
 
@@ -112,7 +115,22 @@ class GiftedArticlesController extends Controller
         if ($result['success']) {
             $shareLink = $this->giftingService->generateShareLink($result['gift']);
 
-            // TODO: Send email notification to recipient
+            $mail = new GiftedArticleMail(
+                $result['gift'],
+                $shareLink,
+                $recipientEmail,
+                $personalMessage
+            );
+
+            try {
+                MailManager::getInstance()->send($mail);
+            } catch (\Exception $e) {
+                Logger::error('Failed to send gift article email', [
+                    'gift_id' => $result['gift']->id,
+                    'recipient_email' => $recipientEmail,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return $this->jsonResponse([
                 'success' => true,

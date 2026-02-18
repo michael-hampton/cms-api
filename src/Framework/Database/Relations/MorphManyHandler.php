@@ -89,10 +89,6 @@ class MorphManyHandler extends RelationshipHandler
         $relatedInstance = new $relatedModel();
         $relatedQuery = new QueryBuilder($relatedInstance->getTable(), $this->eagerLoader, $this->database);
 
-        echo '<pre>';
-        print_r($relationData);
-        die('mike');
-
         $results = $relatedQuery
             ->where($relationData['morph_type'], get_class($model))
             ->where($relationData['morph_id'], $localKeyValue)

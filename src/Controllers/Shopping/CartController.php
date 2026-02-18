@@ -238,6 +238,7 @@ class CartController extends Controller
             'savedCards' => $savedCards,
             'tax' => $this->calculateTax($subtotal, $shipping),
             'hasPreOrders' => $this->detectPreOrders($items),
+            'member' => MemberAuth::check() ? MemberAuth::getMember() : null
         ];
 
         return $this->view('checkout/index', $cartData);
@@ -292,7 +293,6 @@ class CartController extends Controller
     {
         $data = $request->all();
         $siteId = SiteContext::getId();
-        $sessionId = Session::getId();
 
         // Check if member is authenticated
         $member = MemberAuth::getMember();

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InactiveSubscriptionException;
 use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
 use App\Exceptions\Subscriptions\PaymentFailedException;
@@ -1241,7 +1242,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->name = 'Premium';
         $upgradePlan->price = 39.99;
         $upgradePlan->features = [];
-        $upgradePlan->delivery_type = 'digital';
+        $upgradePlan->delivery_type = SubscriptionType::DIGITAL->value;
 
         $this->subscriptionRepository
             ->shouldReceive('find')
@@ -1343,7 +1344,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->name = 'Premium';
         $upgradePlan->price = 39.99;
         $upgradePlan->features = [];
-        $upgradePlan->delivery_type = 'digital';
+        $upgradePlan->delivery_type = SubscriptionType::DIGITAL->value;
         $upgradePlan->shouldReceive('getPremiumAccessGrants')->andReturn([
             ['type' => 'newsletter', 'identifier' => 'insider']
         ]);

@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use App\Enums\Subscriptions\IssueDeliveryStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
@@ -148,11 +149,11 @@ class SubscriptionPlan extends Model
         $options = [];
 
         if ($this->hasDigitalOption()) {
-            $options[] = 'digital';
+            $options[] = SubscriptionType::DIGITAL->value;
         }
 
         if ($this->hasPrintOption()) {
-            $options[] = 'print';
+            $options[] = SubscriptionType::PRINTED->value;
         }
 
         return $options;

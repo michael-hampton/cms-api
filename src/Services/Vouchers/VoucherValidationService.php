@@ -123,9 +123,6 @@ class VoucherValidationService
         // Calculate eligible subtotal
         $eligibleSubtotal = $context->forCart === true ? array_sum(array_column($eligibleItems, 'subtotal')) : $context->orderValue;
 
-        echo $eligibleSubtotal;
-        die;
-
         // Check minimum order value
         if ($voucher->minimum_order_value && $eligibleSubtotal < $voucher->minimum_order_value) {
             return VoucherValidationResult::invalid(

@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Newsletter;
 use App\Models\Subscription;
 use App\Repositories\Newsletters\NewsletterRepository;
@@ -31,18 +32,18 @@ class SubscriptionListingService
 
         $grouped = [
             'active' => [
-                'print' => [],
-                'digital' => [],
+                SubscriptionType::PRINTED->value => [],
+                SubscriptionType::DIGITAL->value => [],
             ],
             'expired' => [
-                'print' => [],
-                'digital' => [],
+                SubscriptionType::PRINTED->value => [],
+                SubscriptionType::DIGITAL->value => [],
             ],
         ];
 
         foreach ($subscriptions as $subscription) {
             $status = $subscription->isActive() ? 'active' : 'expired';
-            $type = $subscription->isPrint() ? 'print' : 'digital';
+            $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
 
             $grouped[$status][$type][] = $this->formatSubscriptionForListing($subscription);
         }
@@ -60,7 +61,7 @@ class SubscriptionListingService
         return [
             'id' => $subscription->id,
             'plan_name' => $subscription->plan_name,
-            'type' => $subscription->isPrint() ? 'print' : 'digital',
+            'type' => $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value,
             'status' => $subscription->status,
             'is_active' => $subscription->isActive(),
             'start_date' => $subscription->start_date,

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Vouchers;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -22,7 +23,7 @@ class VoucherControllerTest extends FunctionalTestCase
         Voucher::create([
             'code' => 'TEST10',
             'name' => 'Test Voucher 1',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'site_id' => $this->siteId
@@ -55,7 +56,7 @@ class VoucherControllerTest extends FunctionalTestCase
             'code' => 'NEWVOUCHER',
             'name' => 'New Test Voucher',
             'description' => 'A test voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 15,
             'minimum_order_value' => 50,
             'maximum_discount' => 100,
@@ -81,7 +82,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'lowercase',
             'name' => 'Test Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active'
         ];
@@ -115,7 +116,7 @@ class VoucherControllerTest extends FunctionalTestCase
         Voucher::create([
             'code' => 'DUPLICATE',
             'name' => 'First Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => $this->siteId
         ]);
@@ -124,7 +125,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'DUPLICATE',
             'name' => 'Second Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 15
         ];
 
@@ -141,7 +142,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'INVALID',
             'name' => 'Invalid Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 150, // Invalid: > 100
         ];
 
@@ -155,7 +156,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'DATETEST',
             'name' => 'Date Test',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'starts_at' => '2025-12-31',
             'expires_at' => '2025-01-01' // Before start date
@@ -171,7 +172,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucher = Voucher::create([
             'code' => 'SHOW123',
             'name' => 'Show Test',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => $this->siteId
         ]);
@@ -200,7 +201,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucher = Voucher::create([
             'code' => 'UPDATE123',
             'name' => 'Original Name',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => $this->siteId
         ]);
@@ -208,7 +209,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $updateData = [
             'code' => 'UPDATE123',
             'name' => 'Updated Name',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 15,
             'description' => 'Updated description'
         ];
@@ -228,7 +229,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $updateData = [
             'code' => 'TEST',
             'name' => 'Test',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10
         ];
 
@@ -242,7 +243,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucher = Voucher::create([
             'code' => 'DELETE123',
             'name' => 'Delete Test',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'usage_count' => 0,
             'site_id' => $this->siteId
@@ -459,7 +460,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'PRODUCTS10',
             'name' => 'Product Specific Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'product_ids' => [$product1->id, $product2->id]
@@ -547,7 +548,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'CATEGORY10',
             'name' => 'Category Specific Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'category_ids' => [$category1->id, $category2->id]
@@ -572,7 +573,7 @@ class VoucherControllerTest extends FunctionalTestCase
         $voucherData = [
             'code' => 'BRAND10',
             'name' => 'Brand Specific Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'brand_ids' => [$brand1->id, $brand2->id]

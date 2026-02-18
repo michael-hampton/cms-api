@@ -60,7 +60,7 @@ class FileUpload
         return $errors;
     }
 
-    public function store(string $directory = '', string $filename = null): ?string
+    public function store(string $directory = '', ?string $filename = null): ?string
     {
         $errors = $this->validate();
         if (!empty($errors)) {

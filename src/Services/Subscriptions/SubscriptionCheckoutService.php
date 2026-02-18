@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Model;
@@ -47,9 +48,6 @@ class SubscriptionCheckoutService
     public function processSubscriptionCheckout(int $memberId, array $data, int $siteId): array
     {
         try {
-
-            die('mike');
-
             $paymentProvider = $this->paymentMethodRepository->findByCode($data['payment_method']);
 
             // Step 1: Create subscription record (PENDING)
@@ -76,7 +74,7 @@ class SubscriptionCheckoutService
                 }
 
                 $pricingData = [
-                    'variant' => $data['variant'] ?? 'digital',
+                    'variant' => $data['variant'] ?? SubscriptionType::DIGITAL->value,
                     'pricing_tier_id' => $data['pricing_tier_id'] ?? null,
                     'voucher_code' => $data['voucher_code'] ?? null
                 ];

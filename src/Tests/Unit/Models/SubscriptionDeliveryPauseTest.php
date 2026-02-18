@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -35,7 +36,7 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
     }
 
@@ -89,7 +90,7 @@ class SubscriptionDeliveryPauseTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Newsletter;
 use App\Models\Subscription;
 use App\Models\SubscriptionPremiumAccess;
@@ -29,7 +30,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Print Monthly',
             'status' => 'active',
-            'delivery_type' => 'print',
+            'delivery_type' => SubscriptionType::PRINTED->value,
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
             'price' => 29.99,
@@ -42,7 +43,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Digital Monthly',
             'status' => 'active',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD'
@@ -54,7 +55,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Old Plan',
             'status' => 'expired',
-            'delivery_type' => 'print',
+            'delivery_type' => SubscriptionType::PRINTED->value,
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
             'price' => 25.00,
@@ -88,7 +89,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
             'status' => 'active',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 39.99,
             'currency' => 'USD'
@@ -122,7 +123,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Expired Plan',
             'status' => 'expired',
-            'delivery_type' => 'print',
+            'delivery_type' => SubscriptionType::PRINTED->value,
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
             'price' => 25.00,
@@ -143,7 +144,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Auto Renew Plan',
             'status' => 'active',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
             'auto_renew' => true,
@@ -167,7 +168,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
                 'site_id' => $this->siteId,
                 'plan_name' => 'Active ' . $i,
                 'status' => 'active',
-                'delivery_type' => 'digital',
+                'delivery_type' => SubscriptionType::DIGITAL->value,
                 'start_date' => date('Y-m-d H:i:s'),
                 'price' => 19.99,
                 'currency' => 'USD'
@@ -180,7 +181,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Expired',
             'status' => 'expired',
-            'delivery_type' => 'print',
+            'delivery_type' => SubscriptionType::PRINTED->value,
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
             'price' => 25.00,
@@ -204,7 +205,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Digital Plan',
             'status' => 'active',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD'
@@ -225,7 +226,7 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Premium Bundle',
             'status' => 'active',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 49.99,
             'currency' => 'USD'

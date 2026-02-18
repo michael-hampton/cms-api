@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -115,7 +116,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
@@ -148,7 +149,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
 
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
@@ -250,7 +251,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
     }
 }

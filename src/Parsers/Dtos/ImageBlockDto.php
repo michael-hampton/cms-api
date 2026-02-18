@@ -76,7 +76,7 @@ final class ImageBlockDto extends BaseBlockDto
             $data['endorsements'],
             self::validateEnum($data['context'], self::ALLOWED_CONTEXTS, 'default', 'context'),
             $data['image_id'],
-            self::shouldDisplayCredit($imageRights, $credit) || $data['should_display_credit'],
+            (self::shouldDisplayCredit($imageRights, $credit) || $data['should_display_credit'] ?? false) ?? false,
         );
     }
 

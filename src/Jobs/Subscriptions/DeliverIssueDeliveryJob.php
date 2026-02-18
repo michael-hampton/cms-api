@@ -2,11 +2,12 @@
 
 namespace App\Jobs\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
+use App\Mail\EmailDeliveryChannel;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
-use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
 use App\Services\Subscriptions\DeliveryService;
 
 class DeliverIssueDeliveryJob extends BaseJob
@@ -15,7 +16,8 @@ class DeliverIssueDeliveryJob extends BaseJob
     public function __construct(
         private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
         private readonly DeliveryService           $deliveryService,
-        private readonly Database                  $database
+        private readonly Database             $database,
+        private readonly EmailDeliveryChannel $emailDeliveryChannel
     )
     {
     }
@@ -46,7 +48,7 @@ class DeliverIssueDeliveryJob extends BaseJob
                     throw new \Exception('Missing subscription or issue delivery');
                 }
 
-                $this->deliveryService->registerChannel('digital', new EmailDeliveryChannel());
+                $this->deliveryService->registerChannel(SubscriptionType::DIGITAL->value, $this->emailDeliveryChannel);
 
                 $this->deliveryService->send($subscription, $issueDelivery);
                 $issuesDelivered->markAsDelivered();

@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Shopping\OneTimeSubscriptionService;
@@ -26,9 +27,9 @@ class SubscriptionBatchFactoryTest extends TestCase
         $member = $this->createMockMember();
 
         $cartItems = [
-            ['subscription_plan_id' => 1, 'options' => ['delivery_type' => 'digital']],
-            ['subscription_plan_id' => 2, 'options' => ['delivery_type' => 'digital']],
-            ['subscription_plan_id' => 3, 'options' => ['delivery_type' => 'print']]
+            ['subscription_plan_id' => 1, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]],
+            ['subscription_plan_id' => 2, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]],
+            ['subscription_plan_id' => 3, 'options' => ['delivery_type' => SubscriptionType::PRINTED->value]]
         ];
 
         $pricingWithVoucher = $this->createMockPricing(voucherId: 999);
@@ -81,7 +82,7 @@ class SubscriptionBatchFactoryTest extends TestCase
             shippingCents: 0,
             taxCents: 0,
             totalCents: 5000,
-            deliveryType: 'digital',
+            deliveryType: SubscriptionType::DIGITAL->value,
             voucherId: $voucherId,
             shippingAddressSnapshot: null
         );
@@ -98,39 +99,102 @@ class SubscriptionBatchFactoryTest extends TestCase
     {
         $member = $this->createMockMember();
         $cartItems = [
-            ['subscription_plan_id' => 1, 'options' => ['delivery_type' => 'digital']]
+            ['subscription_plan_id' => 1, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]]
         ];
+
+        $pricing = $this->createMockPricing();
 
         $this->pricingCalculator->shouldReceive('calculateForCartItem')
             ->once()
-            ->andReturn($this->createMockPricing());
-
-        $pricing = new SubscriptionPricing(
-            20,
-            20,
-            20,
-            20,
-            20,
-            'digital'
-        );
+            ->andReturn($pricing);
 
         $this->subscriptionService->shouldReceive('createOneTimeSubscription')
             ->once()
             ->with(
-                123, // memberId
-                1, // planId
-                'digital', // deliveryType
-                1, // siteId
-                null, // voucherId
-                Mockery::any(), // discountAmountCents
-                SubscriptionStatus::PENDING, // status
-                null, // selectedStartDate
+                123,
+                1,
+                SubscriptionType::DIGITAL->value,
+                1,
+                null,
+                $pricing,
+                SubscriptionStatus::PENDING,
+                null
+
             )
             ->andReturn($this->createMockSubscription());
 
         $result = $this->factory->createPendingSubscriptions($cartItems, [], $member, 1, null);
 
         $this->assertCount(1, $result);
+        $this->assertArrayHasKey('subscription', $result[0]);
+        $this->assertArrayHasKey('pricing', $result[0]);
+        $this->assertArrayHasKey('meta', $result[0]);
+    }
+
+    public function test_create_pending_subscriptions_populates_meta_from_cart_item(): void
+    {
+        $member = $this->createMockMember();
+        $cartItems = [[
+            'subscription_plan_id' => 1,
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
+            'is_pre_release' => true,
+            'release_date' => '2025-06-01',
+            'is_preorder' => false,
+            'next_issue_id' => 42,
+            'next_issue_number' => 7,
+            'next_issue_title' => 'Summer Edition',
+            'next_issue_on_sale_date' => '2025-05-15',
+            'availability_message' => 'Available now',
+            'estimated_dispatch' => '2025-04-01',
+            'estimated_delivery_from' => '2025-04-03',
+            'estimated_delivery_to' => '2025-04-05',
+            'estimated_delivery_formatted' => '3–5 Apr',
+            'expected_ship_date' => null,
+        ]];
+
+        $pricing = $this->createMockPricing();
+
+        $this->pricingCalculator->shouldReceive('calculateForCartItem')
+            ->once()
+            ->andReturn($pricing);
+
+        $this->subscriptionService->shouldReceive('createOneTimeSubscription')
+            ->once()
+            ->andReturn($this->createMockSubscription());
+
+        $result = $this->factory->createPendingSubscriptions($cartItems, [], $member, 1, null);
+
+        $meta = $result[0]['meta'];
+        $this->assertTrue($meta['is_pre_release']);
+        $this->assertEquals('2025-06-01', $meta['release_date']);
+        $this->assertEquals(42, $meta['next_issue_id']);
+        $this->assertEquals('Summer Edition', $meta['next_issue_title']);
+        $this->assertEquals('3–5 Apr', $meta['estimated_delivery_formatted']);
+    }
+
+    public function test_create_pending_subscriptions_defaults_meta_keys_to_null(): void
+    {
+        $member = $this->createMockMember();
+        $cartItems = [[
+            'subscription_plan_id' => 1,
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
+            // No meta fields provided
+        ]];
+
+        $this->pricingCalculator->shouldReceive('calculateForCartItem')
+            ->once()
+            ->andReturn($this->createMockPricing());
+
+        $this->subscriptionService->shouldReceive('createOneTimeSubscription')
+            ->once()
+            ->andReturn($this->createMockSubscription());
+
+        $result = $this->factory->createPendingSubscriptions($cartItems, [], $member, 1, null);
+
+        $meta = $result[0]['meta'];
+        $this->assertNull($meta['is_pre_release']);
+        $this->assertNull($meta['next_issue_id']);
+        $this->assertNull($meta['estimated_dispatch']);
     }
 
     protected function setUp(): void

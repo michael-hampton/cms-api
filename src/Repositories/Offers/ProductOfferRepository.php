@@ -261,9 +261,9 @@ class ProductOfferRepository extends Repository
         }
 
         // Minimum discount filter
-//        if (!empty($filters['min_discount'])) { //todo
-//            $query->where('discount_percentage', '>=', $filters['min_discount']);
-//        }
+        if (!empty($filters['min_discount'])) {
+            $query->where('discount_percentage', '>=', $filters['min_discount']);
+        }
 
         // Price range filter
         if (!empty($filters['min_price'])) {
@@ -323,6 +323,13 @@ class ProductOfferRepository extends Repository
             })
             ->orderBy('created_at', 'desc')
             ->get();
+    }
+
+    public function findByProductAndMerchant(int $productId, int $merchantId): ?ProductOffer
+    {
+        return ProductOffer::where('product_id', $productId)
+            ->where('merchant_id', $merchantId)
+            ->first();
     }
 
     protected function getModelClass(): string

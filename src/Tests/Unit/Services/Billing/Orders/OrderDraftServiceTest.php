@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Billing\Orders;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Order;
@@ -60,7 +61,7 @@ class OrderDraftServiceTest extends TestCase
                     shippingCents: 1000,
                     taxCents: 0,
                     totalCents: 5500,
-                    deliveryType: 'print',
+                    deliveryType: SubscriptionType::PRINTED->value,
                     voucherId: null,
                     shippingAddressSnapshot: [
                         'address_line_1' => '123 Main St',
@@ -131,7 +132,7 @@ class OrderDraftServiceTest extends TestCase
                     shippingCents: 0,
                     taxCents: 0,
                     totalCents: 0,
-                    deliveryType: 'digital',
+                    deliveryType: SubscriptionType::DIGITAL->value,
                     voucherId: 999,
                     shippingAddressSnapshot: null
                 )
@@ -180,7 +181,7 @@ class OrderDraftServiceTest extends TestCase
                     shippingCents: 0,
                     taxCents: 0,
                     totalCents: 5000,
-                    deliveryType: 'digital',
+                    deliveryType: SubscriptionType::DIGITAL->value,
                     voucherId: null,
                     shippingAddressSnapshot: null
                 )
@@ -193,7 +194,7 @@ class OrderDraftServiceTest extends TestCase
                     shippingCents: 1000,
                     taxCents: 0,
                     totalCents: 7000,
-                    deliveryType: 'print',
+                    deliveryType: SubscriptionType::PRINTED->value,
                     voucherId: null,
                     shippingAddressSnapshot: ['address_line_1' => '123 Main St']
                 )
@@ -238,7 +239,7 @@ class OrderDraftServiceTest extends TestCase
                     shippingCents: 1000,
                     taxCents: 0,
                     totalCents: 6000,
-                    deliveryType: 'print',
+                    deliveryType: SubscriptionType::PRINTED->value,
                     voucherId: null,
                     shippingAddressSnapshot: ['address_line_1' => '123 Main St']
                 )
@@ -340,7 +341,7 @@ class OrderDraftServiceTest extends TestCase
             shippingCents: 500,
             taxCents: 0,
             totalCents: 9999,
-            deliveryType: 'digital',
+            deliveryType: SubscriptionType::DIGITAL->value,
             voucherId: null,
             shippingAddressSnapshot: null
         );
@@ -429,7 +430,7 @@ class OrderDraftServiceTest extends TestCase
             shippingCents: 250,
             taxCents: 0,
             totalCents: 9999,
-            deliveryType: 'digital',
+            deliveryType: SubscriptionType::DIGITAL->value,
             voucherId: null,
             shippingAddressSnapshot: null
         );
@@ -440,7 +441,7 @@ class OrderDraftServiceTest extends TestCase
             shippingCents: 150,
             taxCents: 0,
             totalCents: 9999,
-            deliveryType: 'print',
+            deliveryType: SubscriptionType::PRINTED->value,
             voucherId: null,
             shippingAddressSnapshot: null
         );
@@ -506,7 +507,7 @@ class OrderDraftServiceTest extends TestCase
             shippingCents: 0,
             taxCents: 0,
             totalCents: 9999,
-            deliveryType: 'digital',
+            deliveryType: SubscriptionType::DIGITAL->value,
             voucherId: null,
             shippingAddressSnapshot: null
         );
@@ -569,7 +570,7 @@ class OrderDraftServiceTest extends TestCase
             shippingCents: 0,
             taxCents: 0,
             totalCents: 9999,
-            deliveryType: 'digital',
+            deliveryType: SubscriptionType::DIGITAL->value,
             voucherId: null,
             shippingAddressSnapshot: null
         );
@@ -642,6 +643,121 @@ class OrderDraftServiceTest extends TestCase
         $this->service->attachPaymentIntent($order, $paymentResult);
 
         $this->assertTrue(true); // If we get here without exceptions, test passes
+    }
+
+    public function test_create_pending_order_writes_resolved_discount_fields(): void
+    {
+        $member = $this->createMockMember();
+
+        $resolvedDiscounts = Mockery::mock(\App\Services\Vouchers\ResolvedDiscounts::class);
+        $resolvedDiscounts->rewardDiscountCents = 100;
+        $resolvedDiscounts->offerDiscountCents = 200;
+        $resolvedDiscounts->voucherDiscountCents = 300;
+        $resolvedDiscounts->tieredDiscountCents = 50;
+        $resolvedDiscounts->merchantFundedCents = 150;
+        $resolvedDiscounts->platformFundedCents = 75;
+
+        $subscriptionsWithPricing = [[
+            'subscription' => $this->createMockSubscription(),
+            'pricing' => new SubscriptionPricing(
+                subtotalCents: 5000,
+                discountCents: 650,
+                shippingCents: 0,
+                taxCents: 0,
+                totalCents: 4350,
+                deliveryType: SubscriptionType::DIGITAL->value,
+                voucherId: 1,
+                shippingAddressSnapshot: null
+            )
+        ]];
+
+        $this->setTaxCalculatorExpectations($member, 5000, 0);
+
+        $this->orderCreationService->shouldReceive('create')
+            ->once()
+            ->with(
+                Mockery::on(function ($data) {
+                    return $data['reward_discount'] === 1
+                        && $data['offer_discount'] === 2
+                        && $data['voucher_discount'] === 3
+                        && $data['tiered_discount'] === 0.5
+                        && $data['merchant_funded'] === 1.5
+                        && $data['platform_funded'] === 0.75;
+                }),
+                Mockery::any(),
+                1
+            )
+            ->andReturn($this->createMockOrder());
+
+        $order = $this->service->createPendingOrder(
+            $subscriptionsWithPricing,
+            $member,
+            1,
+            [],
+            $resolvedDiscounts
+        );
+
+        $this->assertInstanceOf(Order::class, $order);
+    }
+
+    public function test_create_pending_order_includes_meta_in_order_item_metadata(): void
+    {
+        $member = $this->createMockMember();
+
+        $subscription = $this->createMockSubscription();
+
+        $subscriptionsWithPricing = [[
+            'subscription' => $subscription,
+            'pricing' => new SubscriptionPricing(
+                subtotalCents: 5000,
+                discountCents: 0,
+                shippingCents: 0,
+                taxCents: 0,
+                totalCents: 5000,
+                deliveryType: SubscriptionType::DIGITAL->value,
+                voucherId: null,
+                shippingAddressSnapshot: null
+            ),
+            'meta' => [
+                'is_preorder' => true,
+                'expected_ship_date' => '2025-06-01',
+                'next_issue_id' => 42,
+                'next_issue_number' => 7,
+                'next_issue_title' => 'Summer Edition',
+                'next_issue_on_sale_date' => '2025-05-15',
+                'is_pre_release' => false,
+                'release_date' => null,
+                'availability_message' => 'Pre-order',
+                'estimated_dispatch' => '2025-05-28',
+                'estimated_delivery_from' => '2025-05-30',
+                'estimated_delivery_to' => '2025-06-01',
+                'estimated_delivery_formatted' => '30 May – 1 Jun',
+            ]
+        ]];
+
+        $this->setTaxCalculatorExpectations($member, 5000, 0);
+
+        $this->orderCreationService->shouldReceive('create')
+            ->once()
+            ->with(
+                Mockery::on(function ($data) {
+                    return $data['payment_status'] === 'unpaid';
+                }),
+                Mockery::on(function ($items) {
+                    $meta = $items[0]['metadata'];
+                    return $items[0]['preorder_enabled'] === true
+                        && $items[0]['expected_ship_date'] === '2025-06-01'
+                        && $meta['next_issue_id'] === 42
+                        && $meta['next_issue_title'] === 'Summer Edition'
+                        && $meta['subscription_id'] === 456;
+                }),
+                1
+            )
+            ->andReturn($this->createMockOrder());
+
+        $order = $this->service->createPendingOrder($subscriptionsWithPricing, $member, 1, []);
+
+        $this->assertInstanceOf(Order::class, $order);
     }
 
     private function setTaxCalculatorExpectations($member = null, float $subtotal = 5000, float $shipping = 1000)

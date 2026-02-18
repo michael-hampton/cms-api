@@ -2,6 +2,7 @@
 
 namespace App\Services\Vouchers\Providers;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Repositories\Offers\TieredPromotionRepository;
 use App\Services\Vouchers\Contracts\DiscountProvider;
 use App\Services\Vouchers\DiscountApplicationResult;
@@ -66,7 +67,7 @@ class TieredDiscountProvider implements DiscountProvider
 
     private function calculateDiscount(object $promotion, int $subtotalCents): int
     {
-        if ($promotion->discount_type === 'percentage') {
+        if ($promotion->discount_type === VoucherType::Percentage->value) {
             return (int)round($subtotalCents * ($promotion->value / 100));
         }
 

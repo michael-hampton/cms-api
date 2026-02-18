@@ -2,6 +2,7 @@
 
 namespace App\Factories;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Tests\Factories\Factory;
 use App\Framework\Tests\Factories\HasSiteId;
 use App\Models\Voucher;
@@ -32,7 +33,7 @@ class VoucherFactory extends Factory
     public function percentage(float $discount): static
     {
         return $this->state([
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'discount' => $discount,
         ]);
     }

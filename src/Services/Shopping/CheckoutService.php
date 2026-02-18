@@ -31,10 +31,8 @@ use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\ShippingService;
 use App\Services\ValueObjects\Money;
 use App\Services\Vouchers\DiscountContext\DiscountContext;
+use App\Services\Vouchers\DiscountContext\VoucherContext;
 use App\Services\Vouchers\DiscountResolver;
-use App\Services\Vouchers\Providers\OfferDiscountProvider;
-use App\Services\Vouchers\Providers\RewardDiscountProvider;
-use App\Services\Vouchers\Providers\VoucherDiscountProvider;
 use App\Services\Vouchers\ResolvedDiscounts;
 use App\Services\Vouchers\VoucherService;
 use DateTimeImmutable;
@@ -113,12 +111,10 @@ class CheckoutService
                     $member->id ?? null
                 );
 
-                if (!$voucherData['valid']) {
-                    $voucherData = null;
-                }
+                $voucherData = $voucherData->valid ? $voucherData->toArray() : null;
 
                 // SECURITY: Verify voucher_id wasn't tampered with
-                if (isset($data['voucher_id']) && $voucherData && $data['voucher_id'] != $voucherData['voucher_id']) {
+                if (isset($data['voucher_id']) && $voucherData && $data['voucher_id'] != $voucherData->voucher->id) {
                     $voucherData = null;
                 }
             }
@@ -285,34 +281,12 @@ class CheckoutService
             member: $member,
             isSubscription: false,
             isFirstSubscriptionCycle: false,
-            siteId: $siteId
+            siteId: $siteId,
+            voucherContext: !empty($voucherData) ? new VoucherContext($voucherData) : null
         );
 
-        // Build provider list
-        $providers = [
-            new OfferDiscountProvider(),
-            new VoucherDiscountProvider($voucherData)
-        ];
-
-        // Add reward provider if reward_id is present
-        if (!empty($requestData['reward_id']) && $member) {
-            $providers[] = new RewardDiscountProvider(
-                $requestData['reward_id'],
-                $this->rewardsRepository
-            );
-        }
-
-        // Create resolver with providers
-        $resolver = $this->discountResolver;
-        if (!empty($providers)) {
-            // We use the injected resolver if it's already configured or just use the providers
-            // For now, to keep it simple and testable, let's just use the injected one
-            // but in production it might need to be configured per call.
-            // Since DiscountResolver is usually a singleton or factory-created.
-        }
-
         // Resolve discounts
-        return $resolver->resolve($context);
+        return $this->discountResolver->resolve($context);
     }
 
     private function prepareOrderDataFromDiscounts(
@@ -427,8 +401,6 @@ class CheckoutService
         }
     }
 
-
-
     /**
      * Handle merchant funding for merchant-funded vouchers
      *
@@ -536,160 +508,6 @@ class CheckoutService
         return ['valid' => true];
     }
 
-//    public function calculateTotals($cartItems, $voucherData = null)
-//    {
-//        $subtotal = 0;
-//        $offerDiscount = 0;
-//        $voucherDiscount = 0;
-//        $baseSubtotal = 0;
-//
-//        // First pass: calculate base prices and offer discounts
-//        $itemsWithDiscounts = [];
-//
-//        // 1️⃣ First pass: calculate base prices and offer discounts
-//        foreach ($cartItems as $item) {
-//            $basePrice = $item['base_price'] ?? $item['price'];
-//            $salePrice = $item['price'];
-//            $quantity = $item['quantity'];
-//
-//            $itemBaseSubtotal = $basePrice * $quantity;
-//            $itemSubtotal = $salePrice * $quantity;
-//            $itemOfferDiscount = max(0, $itemBaseSubtotal - $itemSubtotal);
-//
-//            $baseSubtotal += $itemBaseSubtotal;
-//            $subtotal += $itemSubtotal;
-//            $offerDiscount += $itemOfferDiscount;
-//
-//            $itemsWithDiscounts[] = array_merge($item, [
-//                'base_subtotal' => $itemBaseSubtotal,
-//                'subtotal' => $itemSubtotal,
-//                'item_offer_discount' => $itemOfferDiscount
-//            ]);
-//        }
-//
-//        // 2️⃣ Apply voucher if provided
-//        $voucherEligibleItems = [];
-//
-//        if ($voucherData && $voucherData['valid']) {
-//            $potentialVoucherDiscount = $voucherData['discount'];
-//            $voucherEligibleItems = $voucherData['eligible_items'] ?? [];
-//            $isStackable = $voucherData['is_stackable'] ?? false;
-//            $requiresOverride = $voucherData['requires_override_decision'] ?? false;
-//
-//            if ($isStackable) {
-//                // Stackable voucher applies on top of offers
-//                $voucherDiscount = $potentialVoucherDiscount;
-//
-//            } elseif ($requiresOverride) {
-//                // Non-stackable: compare offer vs voucher for eligible items
-//                $eligibleItemIds = array_column($voucherEligibleItems, 'id');
-//                $offerDiscountForEligibleItems = 0;
-//
-//                foreach ($itemsWithDiscounts as $item) {
-//                    if (in_array($item['id'], $eligibleItemIds)) {
-//                        $offerDiscountForEligibleItems += $item['item_offer_discount'];
-//                    }
-//                }
-//
-//                if ($potentialVoucherDiscount > $offerDiscountForEligibleItems) {
-//                    // Voucher wins - remove offer discount only for eligible items
-//                    $voucherDiscount = $potentialVoucherDiscount;
-//                    $offerDiscount -= $offerDiscountForEligibleItems;
-//
-//                    // MISSING: Recalculate subtotal after resetting prices
-//                    $subtotal = 0; // Reset and recalculate
-//
-//                    foreach ($itemsWithDiscounts as &$item) {
-//                        if (in_array($item['id'], $eligibleItemIds)) {
-//                            $item['item_offer_discount'] = 0;
-//                            $item['price'] = $item['base_price'];
-//                            $item['subtotal'] = $item['base_subtotal'];
-//                        }
-//                        $subtotal += $item['subtotal']; // Recalculate from updated items
-//                    }
-//                    unset($item);
-//                } else {
-//                    // Offer wins - voucher ignored
-//                    $voucherDiscount = 0;
-//                    $voucherData = null;
-//                }
-//            } else {
-//                // Stackable without conflicts
-//                $voucherDiscount = $potentialVoucherDiscount;
-//            }
-//        }
-//
-//        return [
-//            'base_subtotal' => $baseSubtotal,
-//            'subtotal' => $subtotal, // Now recalculated
-//            'offer_discount' => $offerDiscount,
-//            'voucher_discount' => $voucherDiscount,
-//            'voucher_code' => $voucherData['voucher_code'] ?? null,
-//            'voucher_id' => $voucherData['voucher_id'] ?? null,
-//            'campaign_id' => $voucherData['campaign_id'] ?? null,
-//            'merchant_id' => $voucherData['merchant_id'] ?? null,
-//            'is_stackable' => $voucherData['is_stackable'] ?? null,
-//            'voucher_eligible_items' => $voucherData['eligible_items'] ?? [],
-//            'items_with_discounts' => $itemsWithDiscounts, // Use updated items
-//            'prices_adjusted' => !$isStackable && $requiresOverride // Flag for UI
-//        ];
-//
-//    }
-
-//    private function prepareOrderData($data, $totals, $cartItems, $siteId)
-//    {
-//        // Resolve currency once from CurrencyResolver
-//        $currency = $this->currencyResolver->resolve($siteId);
-//
-//        $orderData = [
-//            'user_id' => $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember()->id : null,
-//            'site_id' => $siteId,
-//            'first_name' => $data['first_name'],
-//            'last_name' => $data['last_name'],
-//            'email' => $data['email'],
-//            'phone' => $data['phone'],
-//            'subtotal' => $totals['subtotal'],
-//            'shipping' => $totals['shipping'],
-//            'tax' => $totals['tax'],
-//            'discount' => $totals['voucher_discount'] + $totals['offer_discount'],
-//            'total' => $totals['total'],
-//            'currency' => strtoupper($currency), // Use resolved currency consistently
-//            'payment_method' => $data['payment_method'] ?? 'card',
-//            'status' => 'pending',
-//            'payment_status' => 'pending',
-//            'metadata' => json_encode([
-//                'offer_discount' => $totals['offer_discount'],
-//                'voucher_discount' => $totals['voucher_discount'],
-//                'voucher_code' => $totals['voucher_code'],
-//                'voucher_id' => $totals['voucher_id'],
-//                'campaign_id' => $totals['campaign_id'],
-//                'is_stackable' => $totals['is_stackable']
-//            ])
-//        ];
-//
-//        // Handle shipping address
-//        if ($this->cartService->requiresShipping()) {
-//            if (isset($data['saved_address'])) {
-//                $orderData['shipping_address_id'] = $data['saved_address'];
-//            } else {
-//                $orderData['shipping_address'] = json_encode([
-//                    'address' => $data['address'],
-//                    'city' => $data['city'],
-//                    'state' => $data['state'] ?? '',
-//                    'postal_code' => $data['postal_code'],
-//                    'country' => $data['country']
-//                ]);
-//            }
-//        }
-//
-//        // Add voucher code if present
-//        if (!empty($totals['voucher_code'])) {
-//            $orderData['voucher_code'] = $totals['voucher_code'];
-//        }
-//
-//        return $orderData;
-//    }
-
     private function prepareOrderItems(array $cartItems): array
     {
         $items = [];
@@ -794,9 +612,10 @@ class CheckoutService
                     $member->id ?? null
                 );
 
-                if (!$voucherData['valid']) {
-                    $voucherData = null;
-                }
+                $voucherData = $voucherData->valid ? $voucherData->toArray() : null;
+
+                $voucherData['voucher_code'] = $data['voucher_code'];
+                $voucherData['order_value'] = $voucherData['eligible_subtotal'];
 
                 // SECURITY: Verify voucher_id wasn't tampered with
                 if (isset($data['voucher_id']) && $voucherData && $data['voucher_id'] != $voucherData['voucher_id']) {

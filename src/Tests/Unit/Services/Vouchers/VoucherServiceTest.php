@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Services\Vouchers;
 
 use App\DTO\Vouchers\VoucherValidationContext;
 use App\DTO\Vouchers\VoucherValidationResult;
+use App\Enums\Subscriptions\SubscriptionType;
+use App\Enums\Vouchers\VoucherType;
 use App\Exceptions\Vouchers\VoucherNotDeletableException;
 use App\Framework\Database\Database;
 use App\Models\SubscriptionPlan;
@@ -57,7 +59,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $data = [
             'code' => 'TEST10',
             'name' => 'Test Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => 1
         ];
@@ -390,7 +392,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $data = [
             'code' => 'TEST10',
             'name' => 'Test Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => 1,
             'product_ids' => [1, 2, 3]
@@ -501,7 +503,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $data = [
             'code' => 'TEST10',
             'name' => 'Test Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => 1,
             'category_ids' => [1, 2, 3]
@@ -535,7 +537,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $data = [
             'code' => 'TEST10',
             'name' => 'Test Voucher',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'site_id' => 1,
             'brand_ids' => [1, 2]
@@ -1125,10 +1127,10 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $result = $this->service->validateVoucherForCheckout($code, $cartItems);
 
-        $this->assertTrue($result['valid']);
-        $this->assertEquals(80.00, $result['eligible_subtotal']); // 50 + 30
-        $this->assertCount(2, $result['eligible_items']);
-        $this->assertEquals(8.00, $result['discount']);
+        $this->assertTrue($result->valid);
+        $this->assertEquals(80.00, $result->eligibleSubtotal); // 50 + 30
+        $this->assertCount(2, $result->eligibleItems);
+        $this->assertEquals(8.00, $result->discount);
     }
 
     public function testInvalidPlanReturnsInvalidResult()
@@ -1233,7 +1235,7 @@ class VoucherServiceTest extends FunctionalTestCase
             ->with($voucher, Mockery::on(fn($context) => $context->orderValue == 70))
             ->andReturn(Mockery::mock(VoucherValidationResult::class));
 
-        $this->service->validateVoucherForSubscription('CODE', 1, null, 10, 'digital');
+        $this->service->validateVoucherForSubscription('CODE', 1, null, 10, SubscriptionType::DIGITAL->value);
         $this->assertTrue(true);
     }
 }

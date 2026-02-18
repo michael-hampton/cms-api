@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
@@ -55,19 +56,19 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
-            variant: 'digital',
+            variant: SubscriptionType::DIGITAL->value,
             discountAmount: 0,
             voucherId: null
         );
 
         $this->pricingResolver->shouldReceive('resolve')
             ->once()
-            ->with($plan, ['variant' => 'digital', 'pricing_tier_id' => null, 'voucher_code' => null], 123)
+            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => null, 'voucher_code' => null], 123)
             ->andReturn($resolvedPrice);
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => 'digital']
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
@@ -75,7 +76,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $this->assertEquals(5000, $pricing->subtotalCents);
         $this->assertEquals(0, $pricing->discountCents);
         $this->assertEquals(0, $pricing->shippingCents);
-        $this->assertEquals('digital', $pricing->deliveryType);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $pricing->deliveryType);
         $this->assertNull($pricing->voucherId);
     }
 
@@ -108,7 +109,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
-            variant: 'print',
+            variant: SubscriptionType::PRINTED->value,
             discountAmount: 0,
             voucherId: null
         );
@@ -123,7 +124,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => 'print']
+            'options' => ['delivery_type' => SubscriptionType::PRINTED->value]
         ];
 
         // FIXED: Pass address data in checkout data
@@ -140,7 +141,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $this->assertEquals(5000, $pricing->subtotalCents);
         $this->assertEquals(1000, $pricing->shippingCents);
-        $this->assertEquals('print', $pricing->deliveryType);
+        $this->assertEquals(SubscriptionType::PRINTED->value, $pricing->deliveryType);
         $this->assertNotNull($pricing->shippingAddressSnapshot);
         $this->assertEquals('123 Main St', $pricing->shippingAddressSnapshot['address_line_1']);
         $this->assertEquals('Apt 4', $pricing->shippingAddressSnapshot['address_line_2']);
@@ -159,7 +160,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
-            variant: 'print',
+            variant: SubscriptionType::PRINTED->value,
             discountAmount: 0,
             voucherId: null
         );
@@ -174,7 +175,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => 'print']
+            'options' => ['delivery_type' => SubscriptionType::PRINTED->value]
         ];
 
         // No address in checkout data
@@ -201,7 +202,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
-            variant: 'digital',
+            variant: SubscriptionType::DIGITAL->value,
             discountAmount: 10.00,
             voucherId: 999
         );
@@ -209,12 +210,12 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $this->pricingResolver->shouldReceive('resolve')
             ->once()
-            ->with($plan, ['variant' => 'digital', 'pricing_tier_id' => null, 'voucher_code' => 'SAVE10'], 123)
+            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => null, 'voucher_code' => 'SAVE10'], 123)
             ->andReturn($resolvedPrice);
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => 'digital']
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, 'SAVE10', $member, []);
@@ -236,12 +237,12 @@ class SubscriptionPricingCalculatorTest extends TestCase
         // Resolver will throw on invalid voucher
         $this->pricingResolver->shouldReceive('resolve')
             ->once()
-            ->with($plan, ['variant' => 'digital', 'pricing_tier_id' => null, 'voucher_code' => 'INVALID'], 123)
+            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => null, 'voucher_code' => 'INVALID'], 123)
             ->andThrow(new \InvalidArgumentException('Voucher expired'));
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => 'digital']
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
         ];
 
         $this->expectException(\InvalidArgumentException::class);
@@ -263,7 +264,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 60.00,
             currency: 'USD',
-            variant: 'digital',
+            variant: SubscriptionType::DIGITAL->value,
             discountAmount: 0,
             voucherId: null
         );
@@ -275,7 +276,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $item = [
             'subscription_plan_id' => 1,
             'price' => 50.00, // Stale cart price (should be ignored)
-            'options' => ['delivery_type' => 'digital']
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
@@ -294,7 +295,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 999,
-            'options' => ['delivery_type' => 'digital']
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
         ];
 
         $this->calculator->calculateForCartItem($item, null, $this->createMockMember(), []);
@@ -312,7 +313,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 49.99,
             currency: 'USD',
-            variant: 'print',
+            variant: SubscriptionType::PRINTED->value,
             discountAmount: 0,
             voucherId: null
         );
@@ -327,7 +328,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => 'print']
+            'options' => ['delivery_type' => SubscriptionType::PRINTED->value]
         ];
 
         $checkoutData = ['address' => '123 Main St'];

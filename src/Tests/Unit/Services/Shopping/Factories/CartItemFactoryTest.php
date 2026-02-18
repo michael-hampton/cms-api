@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Shopping\Factories;
 
 use App\DTO\Cart\CartItemData;
 use App\Enums\CartItemType;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Product;
 use App\Services\Shopping\Factories\CartItemFactory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -161,7 +162,7 @@ class CartItemFactoryTest extends FunctionalTestCase
             1,
             19.99,
             333,
-            'digital'
+            SubscriptionType::DIGITAL->value
         );
 
         $this->assertInstanceOf(CartItemData::class, $result);
@@ -173,7 +174,7 @@ class CartItemFactoryTest extends FunctionalTestCase
 
         $this->assertIsArray($result->options);
         $this->assertEquals(CartItemType::SUBSCRIPTION->value, $result->options['type']);
-        $this->assertEquals('digital', $result->options['delivery_type']);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $result->options['delivery_type']);
     }
 
     public function testCartItemDataIsReadonly(): void

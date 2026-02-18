@@ -3,6 +3,7 @@
 namespace App\Services\Subscriptions\Validators;
 
 use App\Enums\Subscriptions\BillingPeriod;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InvalidDeliveryTypeException;
 use App\Exceptions\Subscriptions\InvalidSubscriptionPlanException;
 use App\Models\SubscriptionPlan;
@@ -23,11 +24,11 @@ class OneTimePlanValidator
 
     private function validateDeliveryType(SubscriptionPlan $plan, string $deliveryType): void
     {
-        if ($deliveryType === 'digital' && !$plan->hasDigitalOption()) {
+        if ($deliveryType === SubscriptionType::DIGITAL->value && !$plan->hasDigitalOption()) {
             throw new InvalidDeliveryTypeException('Digital delivery not available for this plan');
         }
 
-        if ($deliveryType === 'print' && !$plan->hasPrintOption()) {
+        if ($deliveryType === SubscriptionType::PRINTED->value && !$plan->hasPrintOption()) {
             throw new InvalidDeliveryTypeException('Print delivery not available for this plan');
         }
     }

@@ -2,6 +2,8 @@
 
 namespace App\DTO\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
+
 class ResolvedSubscriptionPrice
 {
     public function __construct(
@@ -23,7 +25,7 @@ class ResolvedSubscriptionPrice
     public static function fromPlanPrice(
         float  $planPrice,
         string $currency,
-        string $variant = 'print',
+        string $variant = SubscriptionType::PRINTED->value,
         float  $discountAmount = 0,
         ?int   $voucherId = null
     ): self

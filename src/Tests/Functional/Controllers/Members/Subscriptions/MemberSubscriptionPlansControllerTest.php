@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Subscription;
@@ -186,7 +187,7 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
         $voucher = \App\Models\Voucher::create([
             'code' => 'SUB10',
             'name' => '10% Off',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'site_id' => $this->siteId,
@@ -257,7 +258,7 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
         $voucher = \App\Models\Voucher::create([
             'code' => 'SUB20',
             'name' => '20% Off',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 20,
             'status' => 'active',
             'site_id' => $this->siteId,
@@ -330,7 +331,7 @@ class MemberSubscriptionPlansControllerTest extends FunctionalTestCase
         $voucher = \App\Models\Voucher::create([
             'code' => 'PRODUCT10',
             'name' => 'Product Discount',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'site_id' => $this->siteId,

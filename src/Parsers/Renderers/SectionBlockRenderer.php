@@ -18,11 +18,13 @@ class SectionBlockRenderer extends BaseBlockRenderer
             return '';
         }
 
+        $text = $this->escape($dto->navigationText) ?? $this->escape($dto->title);
+
         $level = $dto->getHeadingLevel();
-        $contextClass = $dto->context === 'sidebar' ? ' section-sidebar' : ''; //todo missing navigationText and excludeFromNav
+        $contextClass = $dto->context === 'sidebar' ? ' section-sidebar' : '';
 
         $html = "<div class=\"section-block section-level-{$level}{$contextClass}\">";
-        $html .= "<{$dto->headingType} class=\"section-title\">{$this->escape($dto->title)}</{$dto->headingType}>";
+        $html .= "<{$dto->headingType} class=\"section-title\">{$text}</{$dto->headingType}>";
         $html .= "</div>";
 
         return $html;

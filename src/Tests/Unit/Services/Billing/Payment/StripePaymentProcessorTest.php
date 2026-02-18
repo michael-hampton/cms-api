@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Billing\Payment;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Member;
 use App\Models\Order;
 use App\Models\Payment;
@@ -1187,7 +1188,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB10';
-        $voucher->type = 'percentage';
+        $voucher->type = VoucherType::Percentage->value;
         $voucher->value = 10;
         $voucher->stripe_coupon_id = null;
         $voucher->shouldReceive('appliesToSubscriptions')->andReturn(true);
@@ -1250,7 +1251,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $voucher->id = 1;
         $voucher->code = 'SUB10';
         $voucher->name = '10% Off';
-        $voucher->type = 'percentage';
+        $voucher->type = VoucherType::Percentage->value;
         $voucher->value = 10;
         $voucher->stripe_coupon_id = null;
         $voucher->duration_in_months = null;
@@ -1351,7 +1352,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $voucher->id = 1;
         $voucher->code = 'SUB10';
         $voucher->name = '10% Off';
-        $voucher->type = 'percentage';
+        $voucher->type = VoucherType::Percentage->value;
         $voucher->value = 10;
         $voucher->stripe_coupon_id = null;
         $voucher->duration_in_months = 3;

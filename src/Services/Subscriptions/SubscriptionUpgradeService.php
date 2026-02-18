@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InactiveSubscriptionException;
 use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
 use App\Exceptions\Subscriptions\PaymentFailedException;
@@ -178,7 +179,7 @@ class SubscriptionUpgradeService
                 'name' => $upgradePlan->name,
                 'price' => $upgradePlan->price,
                 'features' => $upgradePlan->features,
-                'includes_print' => in_array($upgradePlan->delivery_type, ['print', 'both']),
+                'includes_print' => in_array($upgradePlan->delivery_type, [SubscriptionType::PRINTED->value, 'both']),
                 'includes_digital' => true,
                 'includes_insider' => $upgradePlan->includes_insider,
             ],

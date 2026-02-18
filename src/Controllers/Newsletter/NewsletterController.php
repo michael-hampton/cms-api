@@ -218,17 +218,11 @@ class NewsletterController extends Controller
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            // Get all confirmed subscribers
-            $subscribers = $this->repository->where('site_id', $siteId)
-                ->where('confirmed', true)
-                ->get();
+            $result = $this->newsletterSendService->sendNewsletter($newsletter, $siteId, MemberAuth::getMember());
 
-            if ($subscribers->isEmpty()) {
-                return $this->errorResponse('No confirmed subscribers to send to', 400);
+            if (!$result['success']) {
+                return $this->errorResponse($result['error'], 400);
             }
-
-            // TODO: Implement actual newsletter sending logic
-            // This would typically involve queuing jobs to send emails
 
             // Update last_sent timestamp
             $this->newsletterRepository->update($id, [
@@ -509,6 +503,19 @@ class NewsletterController extends Controller
     {
         $formatted = [];
 
+        $member = MemberAuth::check() ? MemberAuth::getMember() : null;
+        $siteId = SiteContext::getId();
+
+        $subscribedIds = [];
+        if ($member !== null) {
+            // Resolve which newsletter IDs this member is subscribed to.
+            // Adjust the relation/method name to match your actual Member model.
+            $subscribedIds = $this->newsletterRepository
+                ->getNewslettersForMember($member)
+                ->pluck('id')
+                ->toArray();
+        }
+
         foreach ($newsletters as $newsletter) {
             $formatted[] = [
                 'id' => $newsletter->id,
@@ -516,7 +523,7 @@ class NewsletterController extends Controller
                 'description' => $newsletter->content ?? '',
                 'interval' => $newsletter->interval,
                 'frequency' => $this->getFrequencyLabel($newsletter->interval),
-                'is_subscribed' => false // TODO: Check actual subscription status
+                'is_subscribed' => in_array($newsletter->id, $subscribedIds, true),
             ];
         }
 

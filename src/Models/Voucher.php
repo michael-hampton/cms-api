@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Concerns\HasCloneHistory;
 use App\Models\Concerns\TracksCreator;
 
@@ -32,7 +33,8 @@ Voucher extends Model
         'subscription_plan_ids',
         'stripe_coupon_id',
         'duration_in_months',
-        'is_stackable'
+        'is_stackable',
+        'merchant_id'
     ];
 
     protected $casts = [
@@ -90,7 +92,7 @@ Voucher extends Model
 
         $discount = 0;
 
-        if ($this->type === 'percentage') {
+        if ($this->type === VoucherType::Percentage->value) {
             $discount = ($orderValue * $this->value) / 100;
         } else {
             $discount = $this->value;
@@ -216,7 +218,7 @@ Voucher extends Model
     {
         $discount = 0;
 
-        if ($this->type === 'percentage') {
+        if ($this->type === VoucherType::Percentage->value) {
             $discount = ($subscriptionPrice * $this->value) / 100;
         } else {
             $discount = $this->value;

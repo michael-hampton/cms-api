@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Shopping;
 
 use App\DTO\Checkout\DeliveryMethodConfig;
 use App\DTO\Checkout\EstimatedDelivery;
+use App\DTO\Vouchers\VoucherValidationResult;
 use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Orders\OrderStatus;
 use App\Framework\Authorization\MemberAuthWrapper;
@@ -397,15 +398,12 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->setPreorderExpectations();
 
         // Voucher validation
-        $voucherData = [
-            'valid' => true,
-            'voucher_id' => 100,
-            'discount_amount' => 20.00
-        ];
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 20);
+
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
             ->with('SAVE20', Mockery::any(), $member->id)
-            ->andReturn($voucherData);
+            ->andReturn($voucherValidationResult);
 
         // Discount resolution with voucher discount
         $discounts = $this->getResolvedDiscounts(0, 2000, 0, [
@@ -488,10 +486,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setPreorderExpectations();
 
+        $voucherValidationResult = new VoucherValidationResult(false, 'bad');
+
         // Voucher validation - returns invalid
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn(['valid' => false]);
+            ->andReturn($voucherValidationResult);
 
         // Discount resolution without voucher
         $discounts = $this->getResolvedDiscounts(0, 0, 0);
@@ -537,14 +537,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setPreorderExpectations();
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 20);
+
         // Voucher validation returns different ID
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 100, // Real ID is 100, not 999
-                'discount_amount' => 20.00
-            ]);
+            ->andReturn($voucherValidationResult);
 
         // Should proceed without voucher due to ID mismatch
         $discounts = $this->getResolvedDiscounts(0, 0, 0);
@@ -1072,15 +1070,11 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->setPreorderExpectations();
 
         // Voucher validation with merchant funding
-        $voucherData = [
-            'valid' => true,
-            'voucher_id' => 200,
-            'discount_amount' => 20.00,
-            'merchant_id' => 5
-        ];
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 20);
+
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn($voucherData);
+            ->andReturn($voucherValidationResult);
 
         // Discount resolution with merchant-funded voucher
         $discounts = $this->getResolvedDiscounts(0, 2000, 0, [
@@ -1273,15 +1267,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setPreorderExpectations();
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 8);
+
         // Voucher validation - stackable
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 100,
-                'discount_amount' => 8.00,
-                'is_stackable' => true
-            ]);
+            ->andReturn($voucherValidationResult);
 
         // Both offer and voucher discounts
         $discounts = $this->getResolvedDiscounts(2000, 800, 0, [
@@ -1338,15 +1329,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setPreorderExpectations();
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 50);
+
         // Non-stackable voucher with bigger discount
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 200,
-                'discount_amount' => 50.00,
-                'is_stackable' => false
-            ]);
+            ->andReturn($voucherValidationResult);
 
         // Voucher overrides offer discount
         $discounts = $this->getResolvedDiscounts(0, 5000, 0, [
@@ -1407,15 +1395,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->cartService->shouldReceive('requiresShipping')->twice()->andReturn(false);
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 8);
+
         // Voucher validation
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 100,
-                'discount_amount' => 8.00,
-                'is_stackable' => true
-            ]);
+            ->andReturn($voucherValidationResult);
 
         // All three discount types
         $discounts = $this->getResolvedDiscounts(2000, 800, 500, [
@@ -1514,14 +1499,11 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->cartService->shouldReceive('requiresShipping')->twice()->andReturn(false);
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 20);
+
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 100,
-                'discount_amount' => 20.00,
-                'campaign_id' => 5
-            ]);
+            ->andReturn($voucherValidationResult);
 
         $discounts = $this->getResolvedDiscounts(1000, 2000, 500, [
             'voucher' => [
@@ -1875,13 +1857,11 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->times(3)
             ->andReturn($member);
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 20);
+
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 100,
-                'discount_amount' => 20.00
-            ]);
+            ->andReturn($voucherValidationResult);
 
         $discounts = $this->getResolvedDiscounts(0, 2000, 0, [
             'voucher' => [
@@ -2297,15 +2277,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setupBasicCheckoutExpectations($cartItems, $member, $siteId);
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 35);
+
         // Non-stackable voucher with smaller discount (£35 < £60 offer)
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 100,
-                'discount_amount' => 35.00,
-                'is_stackable' => false
-            ]);
+            ->andReturn($voucherValidationResult);
 
         // Offer wins, voucher loses (offer discount kept, no voucher discount)
         $discounts = $this->getResolvedDiscounts(6000, 0, 0);
@@ -2348,15 +2325,12 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->setupBasicCheckoutExpectations($cartItems, $member, $siteId);
 
+        $voucherValidationResult = new VoucherValidationResult(true, 'good', 50);
+
         // Merchant-funded voucher with £50 discount
         $this->voucherService->shouldReceive('validateVoucherForCheckout')
             ->once()
-            ->andReturn([
-                'valid' => true,
-                'voucher_id' => 200,
-                'discount_amount' => 50.00,
-                'merchant_id' => 5 // Merchant-funded
-            ]);
+            ->andReturn($voucherValidationResult);
 
         $discounts = $this->getResolvedDiscounts(0, 5000, 0, [
             'voucher' => [
@@ -2498,5 +2472,210 @@ class CheckoutServiceTest extends FunctionalTestCase
         // - quantity_allocated = 0
 
         $this->assertTrue(true); // Placeholder - implement based on actual checkout flow
+    }
+
+    public function test_it_throws_when_product_not_found_during_availability_check(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $cartItems = [
+            ['product_id' => 99, 'product_name' => 'Ghost Product', 'quantity' => 1, 'price' => 50.00]
+        ];
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+
+        $this->productRepository->shouldReceive('lockForUpdate')
+            ->with(99)
+            ->once()
+            ->andReturn(null);
+
+        // Exception is caught by the outer try/catch and returns failure
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Failed to create order', $result['message']);
+    }
+
+    public function test_it_throws_when_product_unavailable_for_purchase(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $cartItems = [
+            ['product_id' => 1, 'product_name' => 'Unavailable Product', 'quantity' => 1, 'price' => 50.00]
+        ];
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy::class)->makePartial();
+        $policy->shouldReceive('canPurchase')->once()->andReturn(false);
+
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->name = 'Unavailable Product';
+        $product->shouldReceive('availabilityPolicy')->andReturn($policy);
+
+        $this->productRepository->shouldReceive('lockForUpdate')
+            ->with(1)
+            ->once()
+            ->andReturn($product);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Failed to create order', $result['message']);
+    }
+
+    public function test_it_throws_when_insufficient_stock_and_not_preorder(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $cartItems = [
+            ['product_id' => 1, 'product_name' => 'Low Stock Product', 'quantity' => 5, 'price' => 50.00]
+        ];
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy::class)->makePartial();
+        $policy->shouldReceive('canPurchase')->once()->andReturn(true);
+        $policy->shouldReceive('isPreOrder')->once()->andReturn(false);
+
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->name = 'Low Stock Product';
+        $product->shouldReceive('availabilityPolicy')->andReturn($policy);
+
+        $this->productRepository->shouldReceive('lockForUpdate')->with(1)->andReturn($product);
+
+        // Only 2 units of sellable stock, customer wants 5
+        $this->calculateSellableStockAction->shouldReceive('execute')
+            ->with($product)
+            ->once()
+            ->andReturn(2);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Failed to create order', $result['message']);
+    }
+
+    public function test_it_throws_when_preorder_has_no_expected_ship_date(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $cartItems = [
+            ['product_id' => 1, 'product_name' => 'Preorder Product', 'quantity' => 5, 'price' => 50.00]
+        ];
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy::class)->makePartial();
+        $policy->shouldReceive('canPurchase')->once()->andReturn(true);
+        $policy->shouldReceive('isPreOrder')->once()->andReturn(true);
+        $policy->shouldReceive('getExpectedShipDate')->once()->andReturn(null);
+
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->name = 'Preorder Product';
+        $product->shouldReceive('availabilityPolicy')->andReturn($policy);
+
+        $this->productRepository->shouldReceive('lockForUpdate')->with(1)->andReturn($product);
+        $this->calculateSellableStockAction->shouldReceive('execute')->andReturn(2); // less than 5
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Failed to create order', $result['message']);
+    }
+
+    public function test_it_validates_address_fields_required_when_shipping_needed_without_saved_address(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            // Missing: address, city, postal_code, country
+        ];
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(true);
+
+        $result = $this->service->processCheckout($data, 1);
+
+        $this->assertFalse($result['success']);
+        // Should fail on 'address' being missing
+        $this->assertStringContainsString('address', strtolower($result['message']));
+    }
+
+    public function test_it_skips_address_validation_when_saved_address_provided(): void
+    {
+        $data = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'phone' => '1234567890',
+            'saved_address' => 5, // Saved address ID - no address fields needed
+            'country' => 'GB',
+        ];
+        $siteId = 1;
+        $cartItems = $this->getCartItems();
+        $member = $this->getMember();
+        $order = $this->getOrder();
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(true);
+
+        $this->setupBasicCheckoutExpectations($cartItems, $member, $siteId);
+        $this->setEstimatedDeliveryExpectations();
+        $this->setPreorderExpectations();
+
+        $discounts = $this->getResolvedDiscounts(0, 0, 0);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
+        $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 0]);
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true,
+            'payment_intent_id' => 'pi_123',
+            'client_secret' => 'secret_123'
+        ]);
+        $this->orderCreationService->shouldReceive('create')
+            ->once()
+            ->with(
+                Mockery::on(fn($d) => $d['shipping_address_id'] === 5 && !isset($d['shipping_address'])),
+                Mockery::any(),
+                $siteId
+            )
+            ->andReturn($order);
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->processCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_it_confirms_payment_with_correct_order_status(): void
+    {
+        $paymentIntentId = 'pi_test_123';
+        $orderId = 1;
+
+        $this->stripeProcessor->shouldReceive('confirmPaymentIntent')
+            ->once()
+            ->andReturn(['success' => true, 'status' => 'succeeded']);
+
+        $order = $this->getOrder(['id' => $orderId]);
+        $this->orderManager->shouldReceive('find')->with($orderId)->once()->andReturn($order);
+
+        // Verify the exact status values passed
+        $this->orderManager->shouldReceive('updateOrderStatus')
+            ->once()
+            ->with(
+                $orderId,
+                \App\Enums\Orders\OrderStatus::COMPLETED->value,
+                \App\Enums\PaymentStatus::PAID->value
+            );
+
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->confirmRegularCheckoutPayment($paymentIntentId, $orderId);
+
+        $this->assertTrue($result['success']);
     }
 }

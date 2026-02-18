@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Shopping;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\CartItem;
 use App\Models\Product;
@@ -397,7 +398,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(99.99);
         $plan->shouldReceive('getAttribute')->with('site_id')->andReturn(1);
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital', 'print']);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value, SubscriptionType::PRINTED->value]);
 
         $this->productRepository->shouldReceive('find')->never();
 
@@ -411,7 +412,7 @@ class CartServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(new CartItem());
 
-        $result = $this->service->addSubscriptionToCart(1, 'digital');
+        $result = $this->service->addSubscriptionToCart(1, 'SubscriptionType::DIGITAL->value');
 
         $this->assertTrue($result['success']);
         $this->assertEquals('Subscription added to cart', $result['message']);
@@ -421,7 +422,7 @@ class CartServiceTest extends FunctionalTestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital']);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn(['SubscriptionType::DIGITAL->value']);
 
         $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
@@ -435,7 +436,7 @@ class CartServiceTest extends FunctionalTestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn(['digital']);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
 
         $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
@@ -444,7 +445,7 @@ class CartServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($existingItem);
 
-        $result = $this->service->addOneTimeSubscription(1, 'digital');
+        $result = $this->service->addOneTimeSubscription(1, SubscriptionType::DIGITAL->value);
 
         $this->assertFalse($result['success']);
         $this->assertEquals('Subscription plan already in cart', $result['message']);
@@ -857,4 +858,290 @@ class CartServiceTest extends FunctionalTestCase
         $this->assertEquals('Test', $result[0]['sku']);
     }
 
+    public function testUpdateQuantityBelowOneRemovesItem(): void
+    {
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+
+        $this->cartRepository->shouldReceive('findById')
+            ->once()
+            ->andReturn($cartItem);
+
+        $this->cartRepository->shouldReceive('delete')
+            ->once();
+
+        $result = $this->service->updateQuantity(1, 0);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Item removed from cart', $result['message']);
+    }
+
+    public function testUpdateQuantityFailsOnInsufficientStock(): void
+    {
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->stock_quantity = 2;
+
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->product = $product;
+        $cartItem->variant_id = null;
+        $cartItem->shouldReceive('getAttribute')->with('product')->andReturn($product);
+        $cartItem->shouldReceive('getAttribute')->with('variant_id')->andReturn(null);
+        $cartItem->shouldReceive('getAttribute')->with('variant')->andReturn(null);
+
+        $this->cartRepository->shouldReceive('findById')
+            ->once()
+            ->andReturn($cartItem);
+
+        $result = $this->service->updateQuantity(1, 10);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Cannot add more items. Stock limit reached.', $result['message']);
+    }
+
+    public function testAddSubscriptionToCartFailsWhenPlanNotFound(): void
+    {
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->with(999, ['pricingTiers'])
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->addSubscriptionToCart(999, 'digital');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Subscription plan not found or inactive', $result['message']);
+    }
+
+    public function testAddSubscriptionToCartForRegularSubscriptionWithInactiveProduct(): void
+    {
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->is_active = false;
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->shouldReceive('isOneTime')->andReturn(false);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
+        $plan->shouldReceive('getAttribute')->with('price')->andReturn(29.99);
+        $plan->product = $product;
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->with(1, ['pricingTiers'])
+            ->andReturn($plan);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->addSubscriptionToCart(1, SubscriptionType::DIGITAL->value);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Associated product not found or inactive', $result['message']);
+    }
+
+    public function testAddSubscriptionToCartForRegularSubscriptionSuccess(): void
+    {
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->id = 1;
+        $product->is_active = true;
+        $product->name = 'Magazine';
+        $product->slug = 'magazine';
+        $product->site_id = $this->siteId;
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->shouldReceive('isOneTime')->andReturn(false);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
+        $plan->shouldReceive('getAttribute')->with('price')->andReturn(29.99);
+        $plan->product = $product;
+        $plan->pricingTiers = collect([]);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->with(1, ['pricingTiers'])
+            ->andReturn($plan);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->once()
+            ->andReturn(null);
+
+        $this->cartRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(new CartItem());
+
+        $result = $this->service->addSubscriptionToCart(1, SubscriptionType::DIGITAL->value);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Subscription added to cart', $result['message']);
+    }
+
+    public function testGetPriceForSubscriptionUsesDigitalSalePriceWhenCheaper(): void
+    {
+        $pricingTier = Mockery::mock()->makePartial();
+        $pricingTier->digital_price = 20.00;
+        $pricingTier->digital_sale_price = 15.00; // cheaper
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->shouldReceive('isOneTime')->andReturn(true);
+        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
+        $plan->pricingTiers = collect([$pricingTier]);
+        $pricingTier->id = 99;
+        $plan->shouldReceive('getAttribute')->with('price')->andReturn(20.00);
+        $plan->site_id = 1;
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->with(1, ['pricingTiers'])
+            ->andReturn($plan);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')->andReturn(null);
+
+        $this->cartRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['price'] === 15.00;
+            }))
+            ->andReturn(new CartItem());
+
+        $result = $this->service->addSubscriptionToCart(1, SubscriptionType::DIGITAL->value, [
+            'pricing_tier_id' => 99
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testHasOnlyDigitalItemsReturnsTrueForDigitalSubscription(): void
+    {
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        $cartItem->options = json_encode(['delivery_type' => SubscriptionType::DIGITAL->value]);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
+
+        $this->assertTrue($this->service->hasOnlyDigitalItems());
+    }
+
+    public function testHasOnlyDigitalItemsReturnsFalseForPrintSubscription(): void
+    {
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        $cartItem->options = json_encode(['delivery_type' => SubscriptionType::PRINTED->value]);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
+
+        $this->assertFalse($this->service->hasOnlyDigitalItems());
+    }
+
+    public function testHasOnlyDigitalItemsReturnsTrueForEmptyCart(): void
+    {
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([]));
+
+        $this->assertTrue($this->service->hasOnlyDigitalItems());
+    }
+
+    public function testHasOnlyDigitalItemsReturnsFalseForPhysicalProduct(): void
+    {
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->is_digital = false;
+
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = null;
+        $cartItem->variant_id = null;
+        $cartItem->product = $product;
+        $cartItem->shouldReceive('getAttribute')->with('product')->andReturn($product);
+        $cartItem->shouldReceive('getAttribute')->with('subscription_plan_id')->andReturn(null);
+        $cartItem->shouldReceive('getAttribute')->with('variant_id')->andReturn(null);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
+
+        $this->assertFalse($this->service->hasOnlyDigitalItems());
+    }
+
+    public function testRequiresShippingReturnsTrueWhenPhysicalItemsPresent(): void
+    {
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        $cartItem->options = json_encode(['delivery_type' => SubscriptionType::PRINTED->value]);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
+
+        $this->assertTrue($this->service->requiresShipping());
+    }
+
+    public function testUpdateStartDateSuccessfully(): void
+    {
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->options = ['delivery_type' => 'digital'];
+
+        $this->cartRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($cartItem);
+
+        $this->cartRepository->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function ($data) {
+                return isset($data['options']['start_date'])
+                    && $data['options']['start_date'] === '2025-06-01';
+            }));
+
+        $result = $this->service->updateStartDate(1, '2025-06-01');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Start date updated', $result['message']);
+    }
+
+    public function testUpdateStartDateFailsWhenItemNotFound(): void
+    {
+        $this->cartRepository->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->updateStartDate(999, '2025-06-01');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Cart item not found', $result['message']);
+    }
+
+    public function testAddOfferToCartFailsWhenProductInactive(): void
+    {
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->is_active = false;
+
+        $offer = Mockery::mock(\App\Models\ProductOffer::class)->makePartial();
+        $offer->is_active = true;
+        $offer->product = $product;
+
+        $this->offerRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($offer);
+
+        $result = $this->service->addOfferToCart(1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Product not available', $result['message']);
+    }
+
+    public function testAddBundleToCartFailsWhenBundleNotFound(): void
+    {
+        $this->bundleRepository->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addBundleToCart(999);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Bundle not available', $result['message']);
+    }
 }

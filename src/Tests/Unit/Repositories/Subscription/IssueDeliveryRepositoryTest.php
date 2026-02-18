@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Repositories\Subscription;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -429,7 +430,7 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => $plan->price,
             'currency' => $plan->currency,
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services\Subscriptions\Calculators;
 
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
@@ -53,12 +54,12 @@ class SubscriptionPricingResolver
         int              $memberId
     ): ResolvedSubscriptionPrice
     {
-        $variant = $data['variant'] ?? 'print';
+        $variant = $data['variant'] ?? SubscriptionType::PRINTED->value;
         $pricingTierId = $data['pricing_tier_id'] ?? null;
         $voucherCode = $data['voucher_code'] ?? null;
 
         // Validate variant
-        if (!in_array($variant, ['print', 'digital'])) {
+        if (!in_array($variant, [SubscriptionType::PRINTED->value, SubscriptionType::DIGITAL->value])) {
             throw new \InvalidArgumentException("Invalid variant: {$variant}. Must be 'print' or 'digital'.");
         }
 
@@ -145,7 +146,7 @@ class SubscriptionPricingResolver
      */
     private function extractPricesFromTier(SubscriptionPlanPricing $tier, string $variant): array
     {
-        if ($variant === 'digital') {
+        if ($variant === SubscriptionType::DIGITAL->value) {
             $basePrice = $tier->digital_price ?? $tier->price;
             $salePrice = $tier->digital_sale_price;
         } else {

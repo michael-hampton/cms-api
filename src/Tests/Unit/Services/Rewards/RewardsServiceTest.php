@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Rewards;
 
 use App\Enums\Rewards\RewardType;
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Member;
@@ -545,7 +546,7 @@ class RewardsServiceTest extends FunctionalTestCase
         $reward->status = 'claimed';
         $reward->reward_data = [
             'discount_value' => 20,
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
         ];
 
         $reward->shouldReceive('isClaimed')

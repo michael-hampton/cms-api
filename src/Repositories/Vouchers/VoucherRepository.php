@@ -191,4 +191,11 @@ class VoucherRepository extends Repository
             ->orderBy('redeemed_at', 'desc')
             ->get();
     }
+
+    public function findByCodeAndMerchant(string $code, int $merchantId): ?Voucher
+    {
+        return Voucher::where('code', $code)
+            ->where('merchant_id', $merchantId)
+            ->first();
+    }
 }

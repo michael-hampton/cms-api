@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\CartItem;
 use App\Models\Product;
 use App\Models\User;
@@ -341,7 +342,7 @@ class CartItemModelTest extends FunctionalTestCase
         $options = [
             'size' => 'Large',
             'color' => 'Blue',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ];
 
         $product = $this->createProduct($options);
@@ -360,7 +361,7 @@ class CartItemModelTest extends FunctionalTestCase
         $this->assertIsArray($cartItem->options);
         $this->assertEquals('Large', $cartItem->options['size']);
         $this->assertEquals('Blue', $cartItem->options['color']);
-        $this->assertEquals('digital', $cartItem->options['delivery_type']);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $cartItem->options['delivery_type']);
     }
 
     public function testGetItemTypeReturnsProduct(): void

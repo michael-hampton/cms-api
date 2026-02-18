@@ -134,6 +134,13 @@ class NewsletterRepository extends Repository
         return $query->get();
     }
 
+    public function findBySlugAndSite(string $slug, int $siteId): ?Newsletter
+    {
+        return Newsletter::where('slug', $slug)
+            ->where('site_id', $siteId)
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return Newsletter::class;

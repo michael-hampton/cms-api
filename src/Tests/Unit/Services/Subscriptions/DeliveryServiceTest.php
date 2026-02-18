@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Services\Subscriptions\DeliveryChannelInterface;
 use App\Services\Subscriptions\DeliveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -19,9 +20,9 @@ class DeliveryServiceTest extends FunctionalTestCase
         $channel = Mockery::mock(DeliveryChannelInterface::class);
         $channel->shouldReceive('send')->once();
 
-        $service->registerChannel('digital', $channel);
+        $service->registerChannel(SubscriptionType::DIGITAL->value, $channel);
 
-        $subscription = $this->createSubscription(['delivery_type' => 'digital']);
+        $subscription = $this->createSubscription(['delivery_type' => SubscriptionType::DIGITAL->value]);
         $issueDelivery = $this->createIssueDelivery();
 
         $service->send($subscription, $issueDelivery);
@@ -36,7 +37,7 @@ class DeliveryServiceTest extends FunctionalTestCase
 
         $service = new DeliveryService();
 
-        $subscription = $this->createSubscription(['delivery_type' => 'digital']);
+        $subscription = $this->createSubscription(['delivery_type' => SubscriptionType::DIGITAL->value]);
         $issueDelivery = $this->createIssueDelivery();
 
         $service->send($subscription, $issueDelivery);

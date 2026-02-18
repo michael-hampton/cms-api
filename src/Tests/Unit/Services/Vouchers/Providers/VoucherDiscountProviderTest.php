@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Vouchers\Providers;
 
 use App\DTO\Vouchers\VoucherValidationResult;
+use App\Enums\Vouchers\VoucherType;
 use App\Services\Vouchers\DiscountContext\DiscountContext;
 use App\Services\Vouchers\DiscountContext\VoucherContext;
 use App\Services\Vouchers\Providers\VoucherDiscountProvider;
@@ -105,22 +106,22 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'TEST',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'applies_to' => 'one_time',
             'eligible_items' => [
                 ['id' => 1]
             ],
             'is_stackable' => true,
-            'order_value' => 10000
+            'order_value' => 1000
         ];
 
         $context = new DiscountContext(
             items: [
                 ['id' => 1, 'price' => 100, 'quantity' => 1]
             ],
-            baseSubtotalCents: 10000,
-            currentSubtotalCents: 10000,
+            baseSubtotalCents: 1000,
+            currentSubtotalCents: 1000,
             currentOfferDiscountCents: 0,
             appliedDiscounts: [],
             member: null,
@@ -129,15 +130,15 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000,
-            discount: 2000,
+            eligibleSubtotal: 1000,
+            discount: 20,
             eligibleItems: [1],
             message: 'test'
         );
 
         $this->voucherService
             ->shouldReceive('validateVoucher')
-            ->with('TEST', 10000)
+            ->with('TEST', 1000)
             ->andReturn($validationResult);
 
         $result = $provider->apply($context);
@@ -178,8 +179,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000,
-            discount: 1500,
+            eligibleSubtotal: 100,
+            discount: 15,
             eligibleItems: [1],
             message: 'fixed test'
         );
@@ -201,7 +202,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'MAXCAP',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 50, // 50%
             'applies_to' => 'one_time',
             'eligible_items' => [
@@ -249,7 +250,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'ELIGIBLE',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'applies_to' => 'one_time',
             'eligible_items' => [
@@ -274,8 +275,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000, // only item 1 is eligible
-            discount: 2000,
+            eligibleSubtotal: 100, // only item 1 is eligible
+            discount: 20,
             eligibleItems: [1],
             message: 'eligible items'
         );
@@ -297,7 +298,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'MERCHANT',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'applies_to' => 'one_time',
             'eligible_items' => [
@@ -322,8 +323,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000,
-            discount: 2000,
+            eligibleSubtotal: 100,
+            discount: 20,
             eligibleItems: [1],
             message: 'merchant funding'
         );
@@ -346,7 +347,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'PLATFORM',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'applies_to' => 'one_time',
             'eligible_items' => [
@@ -370,8 +371,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000,
-            discount: 2000,
+            eligibleSubtotal: 100,
+            discount: 20,
             eligibleItems: [1],
             message: 'platform funding'
         );
@@ -434,7 +435,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'TEST',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'applies_to' => 'one_time',
             'eligible_items' => [['id' => 1]],
@@ -453,8 +454,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: false,
-            eligibleSubtotal: 10000,
-            discount: 2000,
+            eligibleSubtotal: 100,
+            discount: 20,
             eligibleItems: [1],
             message: 'invalid'
         );
@@ -475,7 +476,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'SUBS_FIRST',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 50,
             'applies_to' => 'subscription_first_cycle',
             'eligible_items' => [
@@ -501,8 +502,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 20000,
-            discount: 10000, // expected discount for first cycle
+            eligibleSubtotal: 200,
+            discount: 100, // expected discount for first cycle
             eligibleItems: [1],
             message: 'subscription first cycle'
         );
@@ -544,8 +545,8 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000,
-            discount: 200,
+            eligibleSubtotal: 100,
+            discount: 20,
             eligibleItems: [1],
             message: 'ok'
         );
@@ -566,7 +567,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $voucherData = [
             'voucher_code' => 'ZERO',
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 0,
             'applies_to' => 'one_time',
             'eligible_items' => [
@@ -590,7 +591,7 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 10000,
+            eligibleSubtotal: 100,
             discount: 0, // zero discount
             eligibleItems: [1],
             message: 'no discount'

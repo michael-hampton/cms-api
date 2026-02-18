@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing\PaymentProviders;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Support\Logger;
 use App\Models\Payment;
 use App\Models\Subscription;
@@ -1210,7 +1211,7 @@ class StripePaymentProcessor
             ]
         ];
 
-        if ($voucher->type === 'percentage') {
+        if ($voucher->type === VoucherType::Percentage->value) {
             $couponData['percent_off'] = (int)$voucher->value;
         } else {
             $couponData['amount_off'] = (int)($voucher->value * 100); // Convert to cents
@@ -1225,7 +1226,7 @@ class StripePaymentProcessor
             $couponData['duration'] = 'once'; // Apply only to first payment
         }
 
-        if ($voucher->maximum_discount && $voucher->type === 'percentage') {
+        if ($voucher->maximum_discount && $voucher->type === VoucherType::Percentage->value) {
             $couponData['max_redemptions'] = 1; // Stripe doesn't support max discount per transaction
         }
 

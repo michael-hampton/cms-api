@@ -2,6 +2,7 @@
 
 namespace App\Services\Shopping;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Order;
 
 class CheckoutResponseBuilder
@@ -37,7 +38,7 @@ class CheckoutResponseBuilder
     private function hasAnyPrintDelivery(array $subscriptions): bool
     {
         foreach ($subscriptions as $subData) {
-            if ($subData['pricing']->deliveryType === 'print') {
+            if ($subData['pricing']->deliveryType === SubscriptionType::PRINTED->value) {
                 return true;
             }
         }

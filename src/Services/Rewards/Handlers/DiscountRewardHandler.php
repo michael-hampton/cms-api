@@ -2,6 +2,7 @@
 
 namespace App\Services\Rewards\Handlers;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Member;
 use App\Models\RewardDefinition;
 
@@ -12,7 +13,7 @@ class DiscountRewardHandler implements RewardTypeHandlerInterface
     public function handle(Member $member, RewardDefinition $definition, int $siteId): ?array
     {
         $rewardData = [
-            'discount_type' => $definition->reward_config['discount_type'] ?? 'percentage',
+            'discount_type' => $definition->reward_config['discount_type'] ?? VoucherType::Percentage->value,
             'discount_value' => $definition->reward_config['discount_value'] ?? 10
         ];
 

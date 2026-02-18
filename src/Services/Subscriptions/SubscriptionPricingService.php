@@ -3,6 +3,7 @@
 namespace App\Services\Subscriptions;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shipping\ShippingService;
@@ -37,7 +38,7 @@ class SubscriptionPricingService
             throw new \InvalidArgumentException('Invalid subscription plan');
         }
 
-        $deliveryType = $item['options']['delivery_type'] ?? 'digital';
+        $deliveryType = $item['options']['delivery_type'] ?? SubscriptionType::DIGITAL->value;
 
         // Build resolver data from cart item
         $resolverData = [
@@ -60,7 +61,7 @@ class SubscriptionPricingService
 
         // Calculate shipping for print delivery
         $shippingCents = 0;
-        if ($deliveryType === 'print') {
+        if ($deliveryType === SubscriptionType::PRINTED->value) {
             $shippingAmount = $this->shippingService->calculateShipping(
                 $afterDiscountCents / 100, // Convert back to dollars for legacy method
                 $checkoutData
@@ -81,7 +82,7 @@ class SubscriptionPricingService
             totalCents: $totalCents,
             deliveryType: $deliveryType,
             voucherId: $voucherId,
-            shippingAddressSnapshot: $deliveryType === 'print' ? $this->captureShippingAddress($checkoutData) : null,
+            shippingAddressSnapshot: $deliveryType === SubscriptionType::PRINTED->value ? $this->captureShippingAddress($checkoutData) : null,
             originalAmount: $originalAmount
         );
     }

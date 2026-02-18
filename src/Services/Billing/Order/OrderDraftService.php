@@ -3,6 +3,7 @@
 namespace App\Services\Billing\Order;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Order;
@@ -97,7 +98,7 @@ class OrderDraftService
             // Update item totals after tax distribution
             foreach ($orderItems as &$item) {
                 $item['total'] = $item['subtotal'] + $item['tax'] +
-                    ($item['metadata']['delivery_type'] === 'print'
+                    ($item['metadata']['delivery_type'] === SubscriptionType::PRINTED->value
                         ? ($item['total'] - $item['subtotal'])
                         : 0);
             }
@@ -159,7 +160,7 @@ class OrderDraftService
     private function hasAnyPrintDelivery(array $subscriptionsWithPricing): bool
     {
         foreach ($subscriptionsWithPricing as $subData) {
-            if ($subData['pricing']->deliveryType === 'print') {
+            if ($subData['pricing']->deliveryType === SubscriptionType::PRINTED->value) {
                 return true;
             }
         }

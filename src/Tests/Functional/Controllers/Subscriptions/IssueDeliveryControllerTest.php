@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -36,7 +37,7 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => $plan->price ?? 10.00,
             'currency' => $plan->currency ?? 'GBP',
-            'delivery_type' => 'print',
+            'delivery_type' => SubscriptionType::PRINTED->value,
             'type' => 'paid'
         ]);
 

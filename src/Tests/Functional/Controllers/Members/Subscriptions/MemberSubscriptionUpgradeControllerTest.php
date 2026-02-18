@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -462,7 +463,7 @@ class MemberSubscriptionUpgradeControllerTest extends FunctionalTestCase
             'price' => $this->currentPlan->price,
             'currency' => 'USD',
             'payment_subscription_id' => 'sub_test123',
-            'delivery_type' => 'print',
+            'delivery_type' => SubscriptionType::PRINTED->value,
             'includes_digital_access' => false,
         ]);
     }

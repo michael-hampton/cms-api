@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
 use App\DTO\Vouchers\VoucherValidationResult;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -390,11 +391,106 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
     private function setPricingResolverExpectations(SubscriptionPlan $plan, ?string $voucherCode = null)
     {
-        $result = new ResolvedSubscriptionPrice(1, 'digital', $plan->price, 0, $plan->price, 'GBP', 0, null);
+        $result = new ResolvedSubscriptionPrice(1, SubscriptionType::DIGITAL->value, $plan->price, 0, $plan->price, 'GBP', 0, null);
 
         $this->pricingResolver->shouldReceive('resolve')
             ->once()
-            ->with($plan, ['variant' => 'digital', 'pricing_tier_id' => NULL, 'voucher_code' => $voucherCode], 1)
+            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => NULL, 'voucher_code' => $voucherCode], 1)
             ->andReturn($result);
+    }
+
+    public function testGetSubscriptionPlanBySlugReturnsPlan(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class);
+
+        $this->planRepository->shouldReceive('findBySlug')
+            ->with('premium-monthly')
+            ->once()
+            ->andReturn($plan);
+
+        $result = $this->service->getSubscriptionPlanBySlug('premium-monthly');
+
+        $this->assertSame($plan, $result);
+    }
+
+    public function testGetSubscriptionPlanBySlugReturnsNullWhenNotFound(): void
+    {
+        $this->planRepository->shouldReceive('findBySlug')
+            ->with('nonexistent')
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->getSubscriptionPlanBySlug('nonexistent');
+
+        $this->assertNull($result);
+    }
+
+    public function testHasActiveSubscriptionReturnsFalseWhenNoSubscription(): void
+    {
+        $this->subscriptionRepository->shouldReceive('getActiveSubscriptionForMember')
+            ->with(1)
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->hasActiveSubscription(1, 1);
+
+        $this->assertFalse($result);
+    }
+
+    public function testHasActiveSubscriptionReturnsFalseWhenDifferentPlan(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->plan_id = 99; // Different plan
+
+        $this->subscriptionRepository->shouldReceive('getActiveSubscriptionForMember')
+            ->with(1)
+            ->once()
+            ->andReturn($subscription);
+
+        $result = $this->service->hasActiveSubscription(1, 1);
+
+        $this->assertFalse($result);
+    }
+
+    public function testProcessSubscriptionCheckoutMarksSubscriptionFailedOnPaymentFailure(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->is_active = true;
+        $plan->price = 29.99;
+        $plan->currency = 'USD';
+        $plan->billing_period = 'monthly';
+
+        $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
+        $paymentMethod->is_active = true;
+
+        $this->setPricingResolverExpectations($plan);
+        $this->setEligibilityServiceMock(true);
+
+        $this->planRepository->shouldReceive('find')->with(1)->once()->andReturn($plan);
+        $this->paymentMethodRepository->shouldReceive('findByCode')->with('stripe')->once()->andReturn($paymentMethod);
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->plan = $plan;
+        $subscription->voucher_id = null;
+
+        $this->subscriptionRepository->shouldReceive('create')->once()->andReturn($subscription);
+
+        // Payment fails
+        $this->stripeProcessor->shouldReceive('processSubscriptionPayment')
+            ->once()
+            ->andReturn(['success' => false, 'message' => 'Card declined']);
+
+        // Subscription must be marked failed
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(1, ['status' => 'failed']);
+
+        $data = ['subscription_plan_id' => 1, 'payment_method' => 'stripe'];
+        $result = $this->service->processSubscriptionCheckout(1, $data, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Card declined', $result['message']);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions\Calculators;
 
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
 use App\DTO\Vouchers\VoucherValidationResult;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Models\Voucher;
@@ -32,7 +33,7 @@ class SubscriptionPricingResolverTest extends TestCase
             ->once()
             ->andReturn(null);
 
-        $data = ['variant' => 'print'];
+        $data = ['variant' => SubscriptionType::PRINTED->value];
 
         $resolved = $this->resolver->resolve($plan, $data, 1);
 
@@ -40,7 +41,7 @@ class SubscriptionPricingResolverTest extends TestCase
         $this->assertNull($resolved->pricingTierId);
         $this->assertEquals(29.99, $resolved->basePrice);
         $this->assertEquals(29.99, $resolved->finalPrice);
-        $this->assertEquals('print', $resolved->variant);
+        $this->assertEquals(SubscriptionType::PRINTED->value, $resolved->variant);
         $this->assertEquals('USD', $resolved->currency);
         $this->assertEquals(0, $resolved->discountAmount);
     }
@@ -66,7 +67,7 @@ class SubscriptionPricingResolverTest extends TestCase
             ->once()
             ->andReturn($defaultTier);
 
-        $data = ['variant' => 'print'];
+        $data = ['variant' => SubscriptionType::PRINTED->value];
 
         $resolved = $this->resolver->resolve($plan, $data, 1);
 
@@ -96,7 +97,7 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = [
             'pricing_tier_id' => 7,
-            'variant' => 'print'
+            'variant' => SubscriptionType::PRINTED->value
         ];
 
         $resolved = $this->resolver->resolve($plan, $data, 1);
@@ -130,12 +131,12 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = [
             'pricing_tier_id' => 3,
-            'variant' => 'digital'
+            'variant' => SubscriptionType::DIGITAL->value
         ];
 
         $resolved = $this->resolver->resolve($plan, $data, 1);
 
-        $this->assertEquals('digital', $resolved->variant);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $resolved->variant);
         $this->assertEquals(49.99, $resolved->basePrice);
         $this->assertEquals(24.99, $resolved->salePrice);
         $this->assertEquals(24.99, $resolved->finalPrice);
@@ -163,12 +164,12 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = [
             'pricing_tier_id' => 3,
-            'variant' => 'digital'
+            'variant' => SubscriptionType::DIGITAL->value
         ];
 
         $resolved = $this->resolver->resolve($plan, $data, 1);
 
-        $this->assertEquals('digital', $resolved->variant);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $resolved->variant);
         $this->assertEquals(49.99, $resolved->basePrice); // Falls back to print price
         $this->assertNull($resolved->salePrice); // No digital sale price
     }
@@ -206,7 +207,7 @@ class SubscriptionPricingResolverTest extends TestCase
             ->andReturn($voucherValidation);
 
         $data = [
-            'variant' => 'print',
+            'variant' => SubscriptionType::PRINTED->value,
             'voucher_code' => 'SAVE5'
         ];
 
@@ -247,7 +248,7 @@ class SubscriptionPricingResolverTest extends TestCase
             ->andReturn($voucherValidation);
 
         $data = [
-            'variant' => 'print',
+            'variant' => SubscriptionType::PRINTED->value,
             'voucher_code' => 'EXPIRED'
         ];
 
@@ -286,7 +287,7 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = [
             'pricing_tier_id' => 5,
-            'variant' => 'print'
+            'variant' => SubscriptionType::PRINTED->value
         ];
 
         $this->expectException(\InvalidArgumentException::class);
@@ -312,7 +313,7 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = [
             'pricing_tier_id' => 5,
-            'variant' => 'print'
+            'variant' => SubscriptionType::PRINTED->value
         ];
 
         $this->expectException(\InvalidArgumentException::class);
@@ -357,7 +358,7 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = [
             'pricing_tier_id' => 7,
-            'variant' => 'print',
+            'variant' => SubscriptionType::PRINTED->value,
             'voucher_code' => 'SAVE10'
         ];
 
@@ -387,8 +388,8 @@ class SubscriptionPricingResolverTest extends TestCase
             ->andReturn(null);
 
         $items = [
-            ['plan' => $plan1, 'data' => ['variant' => 'print'], 'member_id' => 1],
-            ['plan' => $plan2, 'data' => ['variant' => 'digital'], 'member_id' => 1]
+            ['plan' => $plan1, 'data' => ['variant' => SubscriptionType::PRINTED->value], 'member_id' => 1],
+            ['plan' => $plan2, 'data' => ['variant' => SubscriptionType::DIGITAL->value], 'member_id' => 1]
         ];
 
         $results = $this->resolver->resolveBatch($items);

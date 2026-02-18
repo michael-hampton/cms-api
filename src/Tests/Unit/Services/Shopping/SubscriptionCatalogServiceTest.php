@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Shopping;
 
 use App\Enums\Subscriptions\SubscriptionSortOption;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shopping\SubscriptionCatalogService;
 use Mockery;
@@ -90,7 +91,7 @@ class SubscriptionCatalogServiceTest extends MockeryTestCase
      */
     public function test_apply_delivery_type_filter_digital()
     {
-        $filters = ['delivery_type' => 'digital'];
+        $filters = ['delivery_type' => SubscriptionType::DIGITAL->value];
 
         $this->repository->shouldReceive('buildCatalogQuery')->andReturn($this->queryMock);
 

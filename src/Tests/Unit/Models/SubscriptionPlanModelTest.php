@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Models;
 
 use App\Enums\Subscriptions\IssueDeliveryStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Models\SubscriptionPlan;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -175,7 +176,7 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $plan = SubscriptionPlan::create([
             'site_id' => $this->siteId,
             'name' => 'Digital Plan',
-            'slug' => 'digital',
+            'slug' => SubscriptionType::DIGITAL->value,
             'price' => 10.00,
             'currency' => 'USD',
             'billing_period' => 'monthly',
@@ -190,7 +191,7 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $plan = SubscriptionPlan::create([
             'site_id' => $this->siteId,
             'name' => 'Print Plan',
-            'slug' => 'print',
+            'slug' => SubscriptionType::PRINTED->value,
             'price' => 10.00,
             'currency' => 'USD',
             'billing_period' => 'monthly',
@@ -220,7 +221,7 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $plan = SubscriptionPlan::create([
             'site_id' => $this->siteId,
             'name' => 'Print Plan',
-            'slug' => 'print',
+            'slug' => SubscriptionType::PRINTED->value,
             'price' => 10.00,
             'currency' => 'USD',
             'billing_period' => 'monthly',
@@ -235,7 +236,7 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $plan = SubscriptionPlan::create([
             'site_id' => $this->siteId,
             'name' => 'Digital Only',
-            'slug' => 'digital',
+            'slug' => SubscriptionType::DIGITAL->value,
             'price' => 10.00,
             'currency' => 'USD',
             'billing_period' => 'monthly',
@@ -261,8 +262,8 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $options = $plan->getDeliveryOptions();
 
         $this->assertCount(2, $options);
-        $this->assertContains('digital', $options);
-        $this->assertContains('print', $options);
+        $this->assertContains(SubscriptionType::DIGITAL->value, $options);
+        $this->assertContains(SubscriptionType::PRINTED->value, $options);
     }
 
     public function test_get_delivery_options_returns_digital_only(): void
@@ -270,7 +271,7 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $plan = SubscriptionPlan::create([
             'site_id' => $this->siteId,
             'name' => 'Digital Plan',
-            'slug' => 'digital',
+            'slug' => SubscriptionType::DIGITAL->value,
             'price' => 10.00,
             'currency' => 'USD',
             'billing_period' => 'monthly',
@@ -281,8 +282,8 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $options = $plan->getDeliveryOptions();
 
         $this->assertCount(1, $options);
-        $this->assertContains('digital', $options);
-        $this->assertNotContains('print', $options);
+        $this->assertContains(SubscriptionType::DIGITAL->value, $options);
+        $this->assertNotContains(SubscriptionType::PRINTED->value, $options);
     }
 
     public function test_get_delivery_options_returns_print_only(): void
@@ -290,7 +291,7 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $plan = SubscriptionPlan::create([
             'site_id' => $this->siteId,
             'name' => 'Print Plan',
-            'slug' => 'print',
+            'slug' => SubscriptionType::PRINTED->value,
             'price' => 15.00,
             'currency' => 'USD',
             'billing_period' => 'monthly',
@@ -301,8 +302,8 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $options = $plan->getDeliveryOptions();
 
         $this->assertCount(1, $options);
-        $this->assertContains('print', $options);
-        $this->assertNotContains('digital', $options);
+        $this->assertContains(SubscriptionType::PRINTED->value, $options);
+        $this->assertNotContains(SubscriptionType::DIGITAL->value, $options);
     }
 
     public function test_get_delivery_options_returns_empty_when_none_available(): void

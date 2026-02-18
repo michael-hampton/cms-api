@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\BillingPeriod;
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InvalidDeliveryTypeException;
 use App\Exceptions\Subscriptions\InvalidSubscriptionPlanException;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
@@ -77,7 +78,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $oneTimePlan->billing_period = 'yearly';
         $oneTimePlan->features = ['Feature 1', 'Feature 2'];
         $oneTimePlan->shouldReceive('isOneTime')->andReturn(true);
-        $oneTimePlan->shouldReceive('getDeliveryOptions')->andReturn(['digital', 'print']);
+        $oneTimePlan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value, SubscriptionType::PRINTED->value]);
         $oneTimePlan->shouldReceive('hasDigitalOption')->andReturn(true);
         $oneTimePlan->shouldReceive('hasPrintOption')->andReturn(true);
 
@@ -112,7 +113,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->andReturn($plan);
 
         $this->validator->shouldReceive('validatePlanForSubscription')
-            ->with($plan, 'digital')
+            ->with($plan, SubscriptionType::DIGITAL->value)
             ->once();
 
         $this->validator->shouldReceive('validateBillingPeriod')
@@ -166,13 +167,13 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             20,
             20,
             20,
-            'digital'
+            SubscriptionType::DIGITAL->value
         );
 
         $result = $this->service->createOneTimeSubscription(
             1, // member_id
             1, // plan_id
-            'digital',
+            SubscriptionType::DIGITAL->value,
             1, // site_id
             null,
             $pricing
@@ -203,13 +204,13 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             20,
             20,
             20,
-            'digital'
+            SubscriptionType::DIGITAL->value
         );
 
         $this->expectException(InvalidSubscriptionPlanException::class);
         $this->expectExceptionMessage('Invalid one-time subscription plan');
 
-        $this->service->createOneTimeSubscription(1, 999, 'digital', 1, null, $pricing);
+        $this->service->createOneTimeSubscription(1, 999, SubscriptionType::DIGITAL->value, 1, null, $pricing);
     }
 
     public function testCreateOneTimeSubscriptionFailsWithInvalidDeliveryType(): void
@@ -222,7 +223,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->andReturn($plan);
 
         $this->validator->shouldReceive('validatePlanForSubscription')
-            ->with($plan, 'digital')
+            ->with($plan, SubscriptionType::DIGITAL->value)
             ->andThrow(new InvalidDeliveryTypeException('Digital delivery not available'));
 
         $this->databaseMock->shouldReceive('transaction')
@@ -240,10 +241,10 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             20,
             20,
             20,
-            'digital'
+            SubscriptionType::DIGITAL->value
         );
 
-        $this->service->createOneTimeSubscription(1, 1, 'digital', 1, null, $pricing);
+        $this->service->createOneTimeSubscription(1, 1, SubscriptionType::DIGITAL->value, 1, null, $pricing);
     }
 
     public function testCreateOneTimeSubscriptionWithDiscount(): void
@@ -291,11 +292,11 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             20,
             20,
             20,
-            'digital'
+            SubscriptionType::DIGITAL->value
         );
 
         $result = $this->service->createOneTimeSubscription(
-            1, 1, 'digital', 1, null, $pricing // 1000 cents = $10
+            1, 1, SubscriptionType::DIGITAL->value, 1, null, $pricing // 1000 cents = $10
         );
 
         $this->assertInstanceOf(Subscription::class, $result);
@@ -331,11 +332,11 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             20,
             20,
             20,
-            'digital'
+            SubscriptionType::DIGITAL->value
         );
 
         $this->service->createOneTimeSubscription(
-            1, 1, 'digital', 1, null, $pricing
+            1, 1, SubscriptionType::DIGITAL->value, 1, null, $pricing
         );
     }
 
@@ -417,7 +418,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $subscription->id = 1;
         $subscription->price = 99.99;
         $subscription->discount_amount = 10.00;
-        $subscription->delivery_type = 'print';
+        $subscription->delivery_type = SubscriptionType::PRINTED->value;
         $subscription->plan = null;
         $subscription->download_expires_at = null;
 

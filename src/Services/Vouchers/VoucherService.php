@@ -4,6 +4,7 @@ namespace App\Services\Vouchers;
 
 use App\DTO\Vouchers\VoucherValidationContext;
 use App\DTO\Vouchers\VoucherValidationResult;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Vouchers\VoucherNotDeletableException;
 use App\Exceptions\Vouchers\VoucherNotFoundException;
 use App\Framework\Database\Database;
@@ -126,24 +127,18 @@ class VoucherService
         return $result;
     }
 
-    public function validateVoucherForCheckout(string $code, array $cartItems, ?int $userId = null): array
+    public function validateVoucherForCheckout(string $code, array $cartItems, ?int $userId = null): VoucherValidationResult
     {
         $voucher = $this->repository->findByCode($code);
 
         if (!$voucher) {
-            return [
-                'valid' => false,
-                'message' => 'Voucher not found',
-                'discount' => 0
-            ];
+            return VoucherValidationResult::invalid('Voucher not found');
         }
 
         $hasOfferDiscount = $this->cartHasOfferDiscount($cartItems);
         $context = VoucherValidationContext::forCheckout($cartItems, $userId, $hasOfferDiscount);
 
-        $result = $this->validationService->validate($voucher, $context);
-
-        return $result->toArray();
+        return $this->validationService->validate($voucher, $context);
     }
 
     public function validateVoucherForSubscription(
@@ -176,7 +171,7 @@ class VoucherService
                 return VoucherValidationResult::invalid('Invalid pricing tier');
             }
 
-            if ($deliveryType === 'digital') {
+            if ($deliveryType === SubscriptionType::DIGITAL->value) {
                 $price = min(
                     $pricingTier->digital_price,
                     $pricingTier->digital_sale_price ?? $pricingTier->digital_price

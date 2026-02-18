@@ -209,7 +209,7 @@ class VoucherController extends Controller
                 ]);
             }
 
-            $result = $this->voucherService->validateVoucher($code, $orderValue, $userId, $productId);
+            $result = $this->voucherService->validateVoucherForCheckout($code, $this->cartService->getItems(), $userId);
 
             if ($result->valid === true) {
                 Session::put('applied_voucher_code', ['discount' => $result->discount, 'voucher_id' => $result->voucher->id, 'code' => $result->voucher->code]);

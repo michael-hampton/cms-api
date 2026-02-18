@@ -2,6 +2,8 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Enums\Subscriptions\SubscriptionType;
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Payment;
@@ -407,7 +409,7 @@ class SubscriptionModelTest extends FunctionalTestCase
         $voucher = Voucher::create([
             'code' => 'SUB10',
             'name' => 'Subscription Discount',
-            'type' => 'percentage',
+            'type' => VoucherType::Percentage->value,
             'value' => 10,
             'status' => 'active',
             'site_id' => $this->siteId,
@@ -572,7 +574,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 10.00,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $this->assertTrue($subscription->isDigital());
@@ -588,7 +590,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 15.00,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
 
         $this->assertFalse($subscription->isDigital());
@@ -604,7 +606,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 15.00,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
 
         $this->assertTrue($subscription->isPrint());
@@ -620,7 +622,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 10.00,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $this->assertFalse($subscription->isPrint());
@@ -636,7 +638,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 10.00,
             'currency' => 'USD',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'download_url' => 'https://example.com/download/file.pdf',
             'download_expires_at' => date('Y-m-d H:i:s', strtotime('+7 days'))
         ]);
@@ -654,7 +656,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 10.00,
             'currency' => 'USD',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'download_url' => 'https://example.com/download/file.pdf',
             'download_expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
         ]);
@@ -672,7 +674,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 10.00,
             'currency' => 'USD',
-            'delivery_type' => 'digital',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
             'download_url' => null,
             'download_expires_at' => date('Y-m-d H:i:s', strtotime('+7 days'))
         ]);
@@ -696,7 +698,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 10.00,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $subscription->generateDownloadUrl('https://example.com');
@@ -727,7 +729,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 15.00,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
 
         $subscription->generateDownloadUrl('https://example.com');
@@ -1035,7 +1037,7 @@ class SubscriptionModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
 
         $subscription->grantPremiumAccess('newsletter', 'insider');

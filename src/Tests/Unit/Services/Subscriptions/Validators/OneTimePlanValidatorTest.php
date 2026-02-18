@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Billing\Preorder\Validators;
 
 use App\Enums\Subscriptions\BillingPeriod;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InvalidDeliveryTypeException;
 use App\Exceptions\Subscriptions\InvalidSubscriptionPlanException;
 use App\Models\SubscriptionPlan;
@@ -20,7 +21,7 @@ class OneTimePlanValidatorTest extends TestCase
         $plan->shouldReceive('isOneTime')->andReturn(true);
         $plan->shouldReceive('hasDigitalOption')->andReturn(true);
 
-        $this->validator->validatePlanForSubscription($plan, 'digital');
+        $this->validator->validatePlanForSubscription($plan, SubscriptionType::DIGITAL->value);
 
         $this->assertTrue(true); // No exception thrown
     }
@@ -33,7 +34,7 @@ class OneTimePlanValidatorTest extends TestCase
         $this->expectException(InvalidSubscriptionPlanException::class);
         $this->expectExceptionMessage('Invalid one-time subscription plan');
 
-        $this->validator->validatePlanForSubscription($plan, 'digital');
+        $this->validator->validatePlanForSubscription($plan, SubscriptionType::DIGITAL->value);
     }
 
     public function testValidatePlanForSubscriptionThrowsForNullPlan(): void
@@ -53,7 +54,7 @@ class OneTimePlanValidatorTest extends TestCase
         $this->expectException(InvalidDeliveryTypeException::class);
         $this->expectExceptionMessage('Digital delivery not available for this plan');
 
-        $this->validator->validatePlanForSubscription($plan, 'digital');
+        $this->validator->validatePlanForSubscription($plan, SubscriptionType::DIGITAL->value);
     }
 
     public function testValidateDeliveryTypeThrowsForPrintWhenNotAvailable(): void
@@ -65,7 +66,7 @@ class OneTimePlanValidatorTest extends TestCase
         $this->expectException(InvalidDeliveryTypeException::class);
         $this->expectExceptionMessage('Print delivery not available for this plan');
 
-        $this->validator->validatePlanForSubscription($plan, 'print');
+        $this->validator->validatePlanForSubscription($plan, SubscriptionType::PRINTED->value);
     }
 
     public function testValidateBillingPeriodReturnsEnum(): void

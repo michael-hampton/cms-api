@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPremiumAccess;
@@ -190,7 +191,7 @@ class SubscriptionPremiumAccessModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
     }
 }

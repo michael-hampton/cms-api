@@ -2,6 +2,7 @@
 
 namespace App\Services\Shopping;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Cart\InsufficientStockException;
 use App\Framework\Database\Database;
 use App\Framework\Session\Session;
@@ -354,7 +355,7 @@ class CartService
             return $subscriptionPlan->price;
         }
 
-        if ($deliveryType === 'digital') {
+        if ($deliveryType === SubscriptionType::DIGITAL->value) {
             return $pricingTier->digital_sale_price && $pricingTier->digital_sale_price < $pricingTier->digital_price
                 ? $pricingTier->digital_sale_price
                 : $pricingTier->digital_price;
@@ -591,7 +592,7 @@ class CartService
             if ($item->subscription_plan_id) {
                 $options = is_string($item->options) ? json_decode($item->options, true) : $item->options;
 
-                if (($options['delivery_type'] ?? '') === 'digital') {
+                if (($options['delivery_type'] ?? '') === SubscriptionType::DIGITAL->value) {
                     continue;
                 }
 

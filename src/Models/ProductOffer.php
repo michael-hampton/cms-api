@@ -32,6 +32,7 @@ class ProductOffer extends Model
         'rejected_by',
         'voucher_id',
         'eligibility_rules',
+        'reward_definition_id'
     ];
 
     protected $casts = [

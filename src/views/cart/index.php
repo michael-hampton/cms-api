@@ -563,7 +563,9 @@
             <div class="spinner"></div>
             <p>Loading your cart...</p>
         </div>
-        <div id="empty-container" class="empty-cart" style="display: <?php echo empty($items) ? 'block' : 'none'; ?>;">
+        <div id="empty-container" class="empty-cart" style="display: <?php use App\Enums\Subscriptions\SubscriptionType;
+
+        echo empty($items) ? 'block' : 'none'; ?>;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <circle cx="9" cy="21" r="1"></circle>
                 <circle cx="20" cy="21" r="1"></circle>
@@ -624,7 +626,7 @@
                                         <!-- Subscription item -->
                                         <?php
                                         $options = $item['options'];
-                                        $deliveryType = $options['delivery_type'] ?? 'digital';
+                                        $deliveryType = $options['delivery_type'] ?? SubscriptionType::DIGITAL->value;
                                         $planName = $options['plan_name'] ?? 'Subscription';
                                         $planId = $item['subscription_plan_id'];
                                         ?>

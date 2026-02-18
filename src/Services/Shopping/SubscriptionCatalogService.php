@@ -3,6 +3,7 @@
 namespace App\Services\Shopping;
 
 use App\Enums\Subscriptions\SubscriptionSortOption;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 
@@ -95,12 +96,12 @@ class SubscriptionCatalogService
 
     private function applyDeliveryTypeFilter($query, string $deliveryType): mixed
     {
-        if ($deliveryType === 'digital') {
+        if ($deliveryType === SubscriptionType::DIGITAL->value) {
             return $query->whereNotNull('digital_download_url')
                 ->where('digital_download_url', '!=', '');
         }
 
-        if ($deliveryType === 'print') {
+        if ($deliveryType === SubscriptionType::PRINTED->value) {
             return $query->where('print_shipping_required', true);
         }
 
@@ -184,8 +185,8 @@ class SubscriptionCatalogService
         }
 
         return [
-            'print' => $lowestPrint,
-            'digital' => $lowestDigital,
+            SubscriptionType::PRINTED->value => $lowestPrint,
+            SubscriptionType::DIGITAL->value => $lowestDigital,
             'lowest' => min(array_filter([$lowestPrint, $lowestDigital]))
         ];
     }

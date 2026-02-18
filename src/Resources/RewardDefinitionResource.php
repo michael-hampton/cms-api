@@ -2,6 +2,7 @@
 
 namespace App\Resources;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Resource\JsonResource;
 
 class RewardDefinitionResource extends JsonResource
@@ -225,11 +226,11 @@ class RewardDefinitionResource extends JsonResource
                 break;
 
             case 'discount':
-                $formatted['discount_type'] = $config['discount_type'] ?? 'percentage';
+                $formatted['discount_type'] = $config['discount_type'] ?? VoucherType::Percentage->value;
                 $formatted['discount_value'] = $config['discount_value'] ?? 0;
                 $formatted['expiry_days'] = $config['expiry_days'] ?? 30;
 
-                if ($config['discount_type'] === 'percentage') {
+                if ($config['discount_type'] === VoucherType::Percentage->value) {
                     $formatted['display'] = ($config['discount_value'] ?? 0) . '% discount';
                 } else {
                     $formatted['display'] = '$' . ($config['discount_value'] ?? 0) . ' discount';

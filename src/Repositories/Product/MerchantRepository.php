@@ -346,5 +346,4 @@ class MerchantRepository extends Repository
         return MerchantTransaction::where('id', $transactionId)
                 ->update($data) > 0;
     }
-
 }

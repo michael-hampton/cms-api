@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Vouchers;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\Member;
 use App\Repositories\Offers\TieredPromotionRepository;
 use App\Services\Vouchers\DiscountContext\DiscountContext;
@@ -35,7 +36,7 @@ class MixedDiscountIntegrationTest extends TestCase
         $tieredPromotion->id = 1;
         $tieredPromotion->name = '10% off $80+';
         $tieredPromotion->min_subtotal_cents = 8000;
-        $tieredPromotion->discount_type = 'percentage';
+        $tieredPromotion->discount_type = VoucherType::Percentage->value;
         $tieredPromotion->value = 10;
         $tieredPromotion->stackable = true;
         $tieredPromotion->applies_to = 'one_time';
@@ -145,7 +146,7 @@ class MixedDiscountIntegrationTest extends TestCase
 
         $voucherData = [
             'valid' => true,
-            'discount_type' => 'percentage',
+            'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'is_stackable' => true,
             'applies_to' => 'subscription_first_cycle',

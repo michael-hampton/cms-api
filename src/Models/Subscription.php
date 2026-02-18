@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\DTO\Newsletters\NewsletterAccessResult;
 use App\Enums\Newsletters\PremiumAccessType;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\QueryBuilder;
 
 class Subscription extends Model
@@ -246,12 +247,12 @@ class Subscription extends Model
 
     public function isDigital(): bool
     {
-        return $this->delivery_type === 'digital';
+        return $this->delivery_type === SubscriptionType::DIGITAL->value;
     }
 
     public function isPrint(): bool
     {
-        return $this->delivery_type === 'print';
+        return $this->delivery_type === SubscriptionType::PRINTED->value;
     }
 
     public function hasValidDownload(): bool
@@ -692,7 +693,7 @@ class Subscription extends Model
         }
 
         // Phase 2: Access level matching
-        if ($newsletter->slug) { //todo need to check if we have a plan with preimum access
+        if ($newsletter->slug) {
 
             // Check direct premium access
             $hasDirectAccess = $this->hasPremiumAccess(

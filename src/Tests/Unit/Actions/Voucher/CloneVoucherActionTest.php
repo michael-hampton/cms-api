@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Actions\Voucher;
 
 use App\Actions\Voucher\CloneVoucher;
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Database\Database;
 use App\Models\Voucher;
 use App\Repositories\Vouchers\VoucherRepository;
@@ -123,7 +124,7 @@ class CloneVoucherActionTest extends FunctionalTestCase
         $originalVoucher->id = $voucherId;
         $originalVoucher->code = 'ORIGINAL';
         $originalVoucher->name = 'Original';
-        $originalVoucher->type = 'percentage';
+        $originalVoucher->type = VoucherType::Percentage->value;
         $originalVoucher->value = 10;
         $originalVoucher->site_id = 1;
 
@@ -178,7 +179,7 @@ class CloneVoucherActionTest extends FunctionalTestCase
         $originalVoucher->id = $voucherId;
         $originalVoucher->code = 'ORIGINAL';
         $originalVoucher->name = 'Original';
-        $originalVoucher->type = 'percentage';
+        $originalVoucher->type = VoucherType::Percentage->value;
         $originalVoucher->value = 10;
         $originalVoucher->site_id = 1;
 
@@ -230,7 +231,7 @@ class CloneVoucherActionTest extends FunctionalTestCase
         $originalVoucher->id = $voucherId;
         $originalVoucher->code = 'ORIGINAL';
         $originalVoucher->name = 'Original';
-        $originalVoucher->type = 'percentage';
+        $originalVoucher->type = VoucherType::Percentage->value;
         $originalVoucher->value = 10;
         $originalVoucher->site_id = 1;
 

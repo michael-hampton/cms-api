@@ -161,7 +161,7 @@ class OrderCreationService
             $data['merchant_id'] = $merchantId;
         }
 
-        if ($discountBreakdown !== null) {
+        if (!empty($discountBreakdown)) {
             $data['offer_discount'] = $discountBreakdown['offer_discount'] ?? 0;
             $data['tiered_discount'] = $discountBreakdown['tiered_discount'] ?? 0;
             $data['voucher_discount'] = $discountBreakdown['voucher_discount'] ?? 0;

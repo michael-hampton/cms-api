@@ -23,6 +23,8 @@ use App\Framework\Console\Commands\SeedCommand;
 use App\Framework\Database\Database;
 use App\Framework\Date;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\FileUpload\FileSystem;
+use App\Framework\FileUpload\FileSystemInterface;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Http\Router;
@@ -42,6 +44,8 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
+use App\Repositories\Product\ProductRepository;
+use App\Repositories\Product\ProductRepositoryInterface;
 use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
 use App\Services\Members\Comments\SimpleSpamDetector;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
@@ -122,6 +126,8 @@ class ApiApplication
         $this->container->bind(DeliveryEstimatorInterface::class, InternalBusinessDayEstimator::class);
         $this->container->bind(HolidayProviderInterface::class, UkHolidayProvider::class);
         $this->container->bind(SpamDetectionInterface::class, SimpleSpamDetector::class);
+        $this->container->bind(FileSystemInterface::class, FileSystem::class);
+        $this->container->bind(ProductRepositoryInterface::class, ProductRepository::class);
 
         $this->container->singleton(DiscountProviderRegistry::class, function ($app) {
             $registry = new DiscountProviderRegistry();

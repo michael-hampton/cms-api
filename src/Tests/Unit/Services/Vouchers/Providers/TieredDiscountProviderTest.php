@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Vouchers\Providers;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Models\TieredPromotion;
 use App\Repositories\Offers\TieredPromotionRepository;
 use App\Services\Vouchers\DiscountContext\DiscountContext;
@@ -73,7 +74,7 @@ class TieredDiscountProviderTest extends TestCase
         $promotion->id = 1;
         $promotion->name = 'Spend $100 Save 10%';
         $promotion->min_subtotal_cents = 10000;
-        $promotion->discount_type = 'percentage';
+        $promotion->discount_type = VoucherType::Percentage->value;
         $promotion->value = 10;
         $promotion->stackable = true;
         $promotion->applies_to = 'one_time';
@@ -140,14 +141,14 @@ class TieredDiscountProviderTest extends TestCase
         $lowTier = Mockery::mock(TieredPromotion::class)->makePartial();
         $lowTier->id = 1;
         $lowTier->min_subtotal_cents = 5000;
-        $lowTier->discount_type = 'percentage';
+        $lowTier->discount_type = VoucherType::Percentage->value;
         $lowTier->value = 5;
 
         $highTier = Mockery::mock(TieredPromotion::class)->makePartial();
         $highTier->id = 2;
         $highTier->name = 'High Tier';
         $highTier->min_subtotal_cents = 10000;
-        $highTier->discount_type = 'percentage';
+        $highTier->discount_type = VoucherType::Percentage->value;
         $highTier->value = 10;
         $highTier->stackable = true;
         $highTier->applies_to = 'one_time';
@@ -184,7 +185,7 @@ class TieredDiscountProviderTest extends TestCase
         $promotion->id = 1;
         $promotion->name = 'Tiered Promo';
         $promotion->min_subtotal_cents = 8000; // $80 threshold
-        $promotion->discount_type = 'percentage';
+        $promotion->discount_type = VoucherType::Percentage->value;
         $promotion->value = 10;
         $promotion->stackable = true;
         $promotion->applies_to = 'one_time';

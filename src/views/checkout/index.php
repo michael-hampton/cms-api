@@ -771,14 +771,16 @@
                                 <label class="form-label">
                                     First Name <span class="required">*</span>
                                 </label>
-                                <input type="text" name="first_name" class="form-input" required>
+                                <input type="text" name="first_name" class="form-input"
+                                       value="<?= $member?->first_name ?? '' ?>" required>
                                 <span class="form-error" id="error-first_name"></span>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">
                                     Last Name <span class="required">*</span>
                                 </label>
-                                <input type="text" name="last_name" class="form-input" required>
+                                <input type="text" name="last_name" class="form-input"
+                                       value="<?= $member?->last_name ?? '' ?>" required>
                                 <span class="form-error" id="error-last_name"></span>
                             </div>
                         </div>
@@ -787,7 +789,8 @@
                                 <label class="form-label">
                                     Email <span class="required">*</span>
                                 </label>
-                                <input type="email" name="email" class="form-input" required>
+                                <input type="email" name="email" class="form-input" value="<?= $member?->email ?? '' ?>"
+                                       required>
                                 <span class="form-error" id="error-email"></span>
                             </div>
                             <div class="form-group">
@@ -1716,6 +1719,7 @@
 
     async function handleRegularCheckout(data) {
         try {
+
             // First create the order and get payment intent
             const response = await fetch(`${API_BASE}/checkout/process`, {
                 method: 'POST',

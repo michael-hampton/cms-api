@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Models\Member;
 use App\Models\Subscription;
@@ -71,7 +72,7 @@ class MemberIssueDeliveriesControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
 
         $response = $this->getForSite("/member/subscriptions/{$otherSubscription->id}/deliveries");
@@ -89,7 +90,7 @@ class MemberIssueDeliveriesControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $response = $this->getForSite("/member/subscriptions/{$digitalSubscription->id}/issue-deliveries");
@@ -108,7 +109,7 @@ class MemberIssueDeliveriesControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 39.99,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $response = $this->getForSite("/member/subscriptions/{$bundleSubscription->id}/issue-deliveries");
@@ -126,7 +127,7 @@ class MemberIssueDeliveriesControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD',
-            'delivery_type' => 'digital'
+            'delivery_type' => SubscriptionType::DIGITAL->value
         ]);
 
         $this->getForSite("/member/subscriptions/{$digitalSubscription->id}/issue-deliveries");
@@ -150,7 +151,7 @@ class MemberIssueDeliveriesControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD',
-            'delivery_type' => 'print'
+            'delivery_type' => SubscriptionType::PRINTED->value
         ]);
     }
 }

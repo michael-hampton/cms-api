@@ -2,6 +2,7 @@
 
 namespace App\Requests;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
 use App\Repositories\Vouchers\VoucherRepository;
@@ -52,7 +53,7 @@ class UpdateVoucherRequest extends FormRequest
                 }
 
                 // Validate percentage type
-                if ($request->input('type') === 'percentage' && $request->input('value') > 100) {
+                if ($request->input('type') === VoucherType::Percentage->value && $request->input('value') > 100) {
                     throw new ValidationException('Percentage value cannot exceed 100');
                 }
 

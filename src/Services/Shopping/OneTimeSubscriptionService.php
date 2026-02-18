@@ -4,6 +4,7 @@ namespace App\Services\Shopping;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Framework\Database\Database;
 use App\Models\Model;
@@ -129,7 +130,7 @@ class OneTimeSubscriptionService
             $subscription = $this->subscriptionRepository->create($subscriptionData);
 
             // Generate download URL if digital
-            if ($deliveryType === 'digital') {
+            if ($deliveryType === SubscriptionType::DIGITAL->value) {
                 $subscription->generateDownloadUrl('');
             }
 
@@ -200,7 +201,7 @@ class OneTimeSubscriptionService
             $discountCents = (int)round(($subscription->discount_amount ?? 0) * 100);
 
             $shippingCents = 0;
-            if ($subscription->delivery_type === 'print') {
+            if ($subscription->delivery_type === SubscriptionType::PRINTED->value) {
                 $shippingCents = $subscription->price >= 100 ? 0 : 1000; // $10.00
             }
 

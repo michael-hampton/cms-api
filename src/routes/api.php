@@ -40,6 +40,7 @@ use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\Product\MerchantContactController;
 use App\Controllers\Product\MerchantController;
+use App\Controllers\Product\MerchantImportController;
 use App\Controllers\Product\MerchantProductFeedController;
 use App\Controllers\Product\ProductController;
 use App\Controllers\Product\ProductMatchingController;
@@ -447,6 +448,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/merchants/{merchantId}/notes', [MerchantController::class, 'createNote']);
         $router->get('/merchants/{id}/transactions', [MerchantController::class, 'getTransactions']);
 
+
         // merchant contacts
         $router->get('/merchant-contacts', MerchantContactController::class, 'index');
         $router->post('/merchant-contacts', MerchantContactController::class, 'store');
@@ -763,6 +765,7 @@ $router->get('/api/{site}/member/payment-methods', [MemberPaymentMethodsControll
 $router->put('/api/{site}/cart/{id}/update-start-date', [CartController::class, 'updateStartDate']);
 $router->post('/api/{site}/vouchers/remove-voucher', VoucherController::class, 'removeVoucher');
 
+$router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportController::class, 'import']);
 
 
 

@@ -29,11 +29,11 @@ class User extends Model
 
     public function verifyPassword(string $password)
     {
-        return true; //todo
+        return password_verify($password, $this->attributes['password'] ?? '');
     }
 
     public function isActive()
     {
-        return true; //todo
+        return $this->is_active;
     }
 }
