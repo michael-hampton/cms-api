@@ -179,6 +179,7 @@ if (!function_exists('config')) {
 
             $configFiles = [
                 'app' => 'config/app.php',
+                'boost' => 'config/boost.php',
                 'database' => 'config/database.php',
                 'routing' => 'config/routing.php',
                 'recommendations' => 'config/recommendations.php',

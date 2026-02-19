@@ -4,7 +4,9 @@
 namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
+use App\Enums\Boost\BoostContext;
 use App\Framework\Http\Request;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\Brand;
 use App\Models\Category;
@@ -15,6 +17,7 @@ use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
 use App\Repositories\ReviewRepository;
 use App\Search\SearchCriteria;
+use App\Services\Adverts\Boost\BoostRankingService;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\BuildProductCardService;
 use App\Services\Product\ProductService;
@@ -26,6 +29,8 @@ class ProductListController extends Controller
         private readonly ProductRepository $productRepository,
         private readonly ReviewRepository $reviewRepository,
         private readonly ProductViewRepository $productViewRepository,
+        private readonly BoostRankingService $boostRankingService,
+
     )
     {
         parent::__construct();
@@ -144,6 +149,19 @@ class ProductListController extends Controller
         $maxPrice = $request->input('max_price');
 
         $result = $this->productRepository->search($criteria);
+
+        $boostContext = $request->input('boost_context', BoostContext::Listing->value);
+
+        try {
+            $rankedData = $this->boostRankingService->applyRanking(
+                collect($result->getData()),
+                $boostContext
+            );
+            $result->setData($rankedData->all());
+        } catch (\Exception $e) {
+            // Non-critical — ranking failure must never break the product listing
+            Logger::error('Boost ranking failed in product search', ['error' => $e->getMessage()]);
+        }
 
         /**
          * Price range filtering

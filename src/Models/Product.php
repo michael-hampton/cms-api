@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Contracts\Boost\BoostableInterface;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\IsBoostable;
 use App\Models\Concerns\TracksCreator;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 use App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy;
 
-class Product extends Model
+class Product extends Model implements BoostableInterface
 {
-    use HasCloneHistory, TracksCreator;
+    use HasCloneHistory, TracksCreator, IsBoostable;
+
+    const BOOSTABLE_TYPE = 'product';
 
     protected $fillable = [
         'name',
@@ -244,5 +248,17 @@ class Product extends Model
     public function stockAlerts()
     {
         return $this->hasMany(ProductStockAlert::class);
+    }
+
+    public function isEligibleForBoost(): bool
+    {
+        return (bool)$this->is_active && $this->isInStock();
+    }
+
+    public function scopeBoostable($query)
+    {
+        return $query
+            ->where('is_active', true)
+            ->where('stock_quantity', '>', 0);
     }
 }

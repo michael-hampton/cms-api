@@ -2,10 +2,18 @@
 
 namespace App;
 
+use App\Contracts\ClockInterface;
 use App\Events\ArticleGifting\GiftClaimedEvent;
 use App\Events\ArticleGifting\GiftCreatedEvent;
 use App\Events\Badges\BadgeEarnedEvent;
 use App\Events\Badges\PointsAwardedEvent;
+use App\Events\Boost\BoostActivatedEvent;
+use App\Events\Boost\BoostCancelledEvent;
+use App\Events\Boost\BoostCreatedEvent;
+use App\Events\Boost\BoostExpiredEvent;
+use App\Events\Boost\BoostLimitBreachedEvent;
+use App\Events\Boost\BoostPausedEvent;
+use App\Events\Boost\BoostResumedEvent;
 use App\Events\DatabaseEventSubscriber;
 use App\Events\Orders\OrderCreatedEvent;
 use App\Events\Products\ProductViewedEvent;
@@ -32,6 +40,14 @@ use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Routing\RouteLoader;
 use App\Listeners\BadgeEarnedListener;
+use App\Listeners\Boost\HandleOrderConversionAttribution;
+use App\Listeners\Boost\SendBoostActivatedNotification;
+use App\Listeners\Boost\SendBoostCancelledNotification;
+use App\Listeners\Boost\SendBoostCreatedNotification;
+use App\Listeners\Boost\SendBoostExpiredNotification;
+use App\Listeners\Boost\SendBoostLimitBreachedNotification;
+use App\Listeners\Boost\SendBoostPausedNotification;
+use App\Listeners\Boost\SendBoostResumedNotification;
 use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
 use App\Listeners\Members\SendAccountActivationEmailListener;
@@ -94,6 +110,7 @@ use App\Services\Shipping\DeliveryEstimatorInterface;
 use App\Services\Shipping\HolidayProviderInterface;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\UkHolidayProvider;
+use App\Services\SystemClock;
 use App\Services\Vouchers\DiscountProviderRegistry;
 use App\Services\Vouchers\Providers\OfferDiscountProvider;
 use App\Services\Vouchers\Providers\RewardDiscountProvider;
@@ -128,6 +145,8 @@ class ApiApplication
         $this->container->bind(SpamDetectionInterface::class, SimpleSpamDetector::class);
         $this->container->bind(FileSystemInterface::class, FileSystem::class);
         $this->container->bind(ProductRepositoryInterface::class, ProductRepository::class);
+        $this->container->bind(ClockInterface::class, SystemClock::class);
+
 
         $this->container->singleton(DiscountProviderRegistry::class, function ($app) {
             $registry = new DiscountProviderRegistry();
@@ -327,6 +346,18 @@ class ApiApplication
         $eventDispatcher->listen(RefundCreated::class, [LogRefundHistory::class, 'handle']);
         $eventDispatcher->listen(RefundCreated::class, [SendRefundNotification::class, 'handle']);
         $eventDispatcher->listen(OrderCreatedEvent::class, [SendAccountActivationEmailListener::class, 'handle']);
+
+        $eventDispatcher->listen(BoostCreatedEvent::class, [SendBoostCreatedNotification::class, 'handle']);
+        $eventDispatcher->listen(BoostActivatedEvent::class, [SendBoostActivatedNotification::class, 'handle']);
+        $eventDispatcher->listen(BoostExpiredEvent::class, [SendBoostExpiredNotification::class, 'handle']);
+        $eventDispatcher->listen(BoostCancelledEvent::class, [SendBoostCancelledNotification::class, 'handle']);
+        $eventDispatcher->listen(BoostPausedEvent::class, [SendBoostPausedNotification::class, 'handle']);
+        $eventDispatcher->listen(BoostResumedEvent::class, [SendBoostResumedNotification::class, 'handle']);
+        $eventDispatcher->listen(BoostLimitBreachedEvent::class, [SendBoostLimitBreachedNotification::class, 'handle']);
+        $eventDispatcher->listen(OrderCreatedEvent::class, [HandleOrderConversionAttribution::class, 'handle']);
+
+
+
 
 
 

@@ -430,6 +430,7 @@ class QueryBuilder
                 $this->groups[] = $column;
             }
         }
+
         return $this;
     }
 

@@ -720,4 +720,22 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($items);
     }
 
+    public function flip(): static
+    {
+        $flipped = [];
+
+        foreach ($this->items as $key => $value) {
+            if (!is_int($value) && !is_string($value)) {
+                throw new \UnexpectedValueException(
+                    'Collection values must be int or string to flip.'
+                );
+            }
+
+            $flipped[$value] = $key;
+        }
+
+        return new static($flipped);
+    }
+
+
 }

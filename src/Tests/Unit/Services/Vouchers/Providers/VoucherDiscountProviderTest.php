@@ -591,10 +591,10 @@ class VoucherDiscountProviderTest extends TestCase
 
         $validationResult = new VoucherValidationResult(
             valid: true,
-            eligibleSubtotal: 100,
+            message: 'no discount',
             discount: 0, // zero discount
-            eligibleItems: [1],
-            message: 'no discount'
+            eligibleSubtotal: 100,
+            eligibleItems: [1]
         );
 
         $this->voucherService

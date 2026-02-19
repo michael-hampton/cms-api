@@ -154,7 +154,7 @@ abstract class Model
 
     protected function isFillable(string $key): bool
     {
-        $keywords = ['count', 'total', 'avg'];
+        $keywords = ['count', 'total', 'avg', 'units_sold'];
 
         if (collect($keywords)->contains(fn($keyword) => str_contains($key, $keyword))) {
             return true;
@@ -1487,6 +1487,28 @@ abstract class Model
     public function lockForUpdate()
     {
         return $this;
+    }
+
+    /**
+     * firstOrNew: returns the first record matching $conditions,
+     * or a new instance if none found.
+     */
+    public static function firstOrNew(array $conditions): static
+    {
+        // Make a temporary instance to access $table
+        $temp = new static();
+
+        $record = Database::table($temp->table)
+            ->where($conditions)
+            ->first(); // null if not found
+
+        if ($record) {
+            $obj = new static($record->toArray());
+            $obj->exists = true;
+            return $obj;
+        }
+
+        return new static($conditions);
     }
 
 }

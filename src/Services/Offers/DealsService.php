@@ -2,15 +2,22 @@
 
 namespace App\Services\Offers;
 
+use App\Enums\Boost\BoostContext;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Offers\DealsRepository;
 use App\Repositories\ReviewRepository;
+use App\Services\Adverts\Boost\BoostRankingService;
 
 class DealsService
 {
     private DealsRepository $repository;
 
-    public function __construct(private readonly ReviewRepository $reviewRepository, ?DealsRepository $repository = null)
+    public function __construct(
+        private readonly ReviewRepository    $reviewRepository,
+        private readonly BoostRankingService $boostRankingService,
+        ?DealsRepository                     $repository = null
+    )
     {
         $this->repository = $repository ?? new DealsRepository();
     }
@@ -197,6 +204,16 @@ class DealsService
         $siteId = $siteId ?? SiteContext::getId();
 
         $products = $this->repository->getFilteredProducts($siteId, $filters);
+
+        // ── Boost ranking ──────────────────────────────────────────────────
+        try {
+            $products['data'] = $this->boostRankingService->applyRanking(
+                $products['data'],
+                BoostContext::Deals->value
+            );
+        } catch (\Exception $e) {
+            Logger::error('Boost ranking failed in deals filter', ['error' => $e->getMessage()]);
+        }
 
         $productIds = array_unique(array_column($products['data']->toArray(), 'id'));
         $topReviews = $this->reviewRepository->getTopReview($productIds)->keyBy('product_id');

@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Contracts\Boost\BoostableInterface;
 use App\Framework\Database\QueryBuilder;
+use App\Models\Concerns\IsBoostable;
 use App\Models\Concerns\TracksCreator;
 
-class ProductOffer extends Model
+class ProductOffer extends Model implements BoostableInterface
 {
-    use TracksCreator;
+    use TracksCreator, IsBoostable;
+
+    const BOOSTABLE_TYPE = 'offer';
 
     protected $fillable = [
         'product_id',
@@ -131,5 +135,20 @@ class ProductOffer extends Model
     public function canBePublished(): bool
     {
         return $this->status === 'pending' && $this->isCurrentlyActive();
+    }
+
+    public function isEligibleForBoost(): bool
+    {
+        return $this->isCurrentlyActive();
+    }
+
+    public function scopeBoostable($query)
+    {
+        $now = now_datetime()->toDateTimeString();
+
+        return $query
+            ->where('is_active', true)
+            ->where('starts_at', '<=', $now)
+            ->where('ends_at', '>=', $now);
     }
 }

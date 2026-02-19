@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Imports;
+namespace App\Tests\Unit\Imports;
 
 use App\Framework\FileUpload\FileSystemInterface;
+use App\Imports\CsvParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use RuntimeException;

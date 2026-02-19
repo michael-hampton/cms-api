@@ -152,6 +152,11 @@ class Blueprint
         return $this->bigInteger($column)->unsigned();
     }
 
+    public function unsignedInteger(string $column): Column
+    {
+        return $this->integer($column)->unsigned();
+    }
+
     public function foreign(string $column): ForeignKeyDefinition
     {
         $foreign = new ForeignKeyDefinition($column, $this->table);
