@@ -429,3 +429,5 @@ $router->get('/merchant-portal/boost', [BoostController::class, 'boostPage']);
 $router->get('/api/merchants/{merchantId}/auto-boost/settings', [BoostController::class, 'getAutoBoostSettings']);
 $router->get('/api/merchants/{merchantId}/products/search', [BoostController::class, 'searchMerchantProducts']);
 $router->get('/api/merchants/{merchantId}/offers/search', [BoostController::class, 'searchMerchantOffers']);
+$router->get('/boosts/aggregate', [BoostController::class, 'aggregateStats']);
+$router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']);

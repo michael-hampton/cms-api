@@ -37,8 +37,6 @@ class GuestMemberService
             // Let the DB handle uniqueness via constraint
             return $this->memberRepository->createAnonymousMember($email, $siteId, $data);
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
             // Race condition caught by DB constraint
             throw new \RuntimeException('Email already exists');
         }

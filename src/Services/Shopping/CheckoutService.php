@@ -141,7 +141,7 @@ class CheckoutService
                 $member
             );
 
-            $taxCents = $taxData['tax_cents'];
+            $taxCents = $taxData->taxCents;
             $shippingCents = (int)round($shippingCost * 100);
 
             // Calculate final total (all in cents)
@@ -246,8 +246,6 @@ class CheckoutService
             });
 
         } catch (\Exception $e) {
-//            echo $e->getMessage();
-//            die;
             return [
                 'success' => false,
                 'message' => 'Failed to create order: ' . $e->getMessage()
@@ -650,7 +648,7 @@ class CheckoutService
                 $member
             );
 
-            $taxCents = $taxData['tax_cents'];
+            $taxCents = $taxData->taxCents;
             $totalCents = $discounts->finalSubtotalCents + $totalShippingCents + $taxCents;
 
             // Allocate payment across groups

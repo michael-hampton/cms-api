@@ -150,9 +150,41 @@
                 <line x1="10" y1="14" x2="21" y2="3"></line>
             </svg>
         </a>
-        ${merchants.length > 1 ? `<span class="merchant-count">+${merchants.length - 1} more</span>` : ''}
+            ${merchants.length > 1 ? `<span class="merchant-count" onclick="event.stopPropagation(); showAllMerchants(event, ${JSON.stringify(merchants).replace(/"/g, '&quot;')})">+${merchants.length - 1} more</span>` : ''}
     </div>`;
     }
+
+    function showAllMerchants(e, merchants) {
+        e.stopPropagation();
+        // Remove any existing popover
+        document.querySelectorAll('.merchant-popover').forEach(p => p.remove());
+
+        const popover = document.createElement('div');
+        popover.className = 'merchant-popover';
+        popover.style.cssText = 'position:absolute;z-index:100;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:180px;';
+        popover.innerHTML = merchants.map(m => {
+            const name = m.merchant?.name || m.name || 'Unknown';
+            const price = m.sale_price > 0 ? m.sale_price : m.price;
+            const url = m.url || '#';
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" 
+            style="display:flex;justify-content:space-between;padding:6px 8px;text-decoration:none;color:#1e293b;font-size:0.8125rem;border-radius:4px;"
+            onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+            <span>${escapeHtml(name)}</span>
+            <span style="font-weight:600;margin-left:12px;">$${formatPrice(price)}</span>
+        </a>`;
+        }).join('');
+
+        const target = e.currentTarget;
+        target.style.position = 'relative';
+        target.appendChild(popover);
+
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', () => popover.remove(), {once: true});
+        }, 0);
+    }
+
+    window.showAllMerchants = showAllMerchants;
 
     function renderTopReview(review) {
         if (!review) return '';
@@ -160,8 +192,7 @@
         console.log('review', review)
 
         return `
-        <button class="btn-show-review" onclick="toggleReview(this)">
-            <span>Top Review</span>
+        <button class="btn-show-review" onclick="event.stopPropagation(); toggleReview(this)">            <span>Top Review</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
@@ -331,15 +362,17 @@
 
         // Product card click to open modal
         elements.productsGrid.addEventListener('click', (e) => {
-            e.preventDefault();
-            const productCard = e.target.closest('.product-card');
-            alert('here')
+
+            // if(e.target.className === 'btn-add-to-cart' || e.target.className === 'btn-wishlist' || e.target.className === 'btn-share' || e.target.className === 'merchant-count') {
+            //    return
+            // }
 
             // Don't open modal if clicking action buttons
-            if (e.target.closest('.btn-compare, .btn-flip, .btn-wishlist, .btn-cart, .btn-show-review, .product-card-back')) {
+            if (e.target.closest('.btn-compare, .btn-flip, .btn-wishlist, .btn-add-to-cart, .btn-show-review, .btn-share, .product-card-back, .merchant-badge, .merchant-count')) {
                 return;
             }
 
+            const productCard = e.target.closest('.product-card');
             if (productCard) {
                 const productId = productCard.dataset.productId;
                 if (window.productModal) {
@@ -508,7 +541,8 @@
                     </svg>
                 </button>
                 
-                <button class="btn-share" onclick='openShareModal(${JSON.stringify({
+              <button class="btn-share" 
+    data-share='${escapeHtml(JSON.stringify({
             id: product.id,
             name: product.name,
             slug: product.slug,
@@ -516,15 +550,16 @@
             sale_price: product.sale_price,
             image: product.image,
             merchant_name: product.merchants && product.merchants.length > 0 ? product.merchants[0].name : null
-        })})' title="Share product">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="18" cy="5" r="3"></circle>
-                        <circle cx="6" cy="12" r="3"></circle>
-                        <circle cx="18" cy="19" r="3"></circle>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                    </svg>
-                </button>
+        }))}'
+    title="Share product">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+    </svg>
+</button>
                 
                 <a href="/${SITE}/shop/details/${product.slug}" class="product-image">
                     <img src="${product.image || '/images/placeholder.jpg'}" 
@@ -532,6 +567,7 @@
                     ${product.discount_percentage > 0 ? `
                         <span class="badge-sale">-${product.discount_percentage}%</span>
                     ` : ''}
+                    ${product.is_boosted ? `<span class="badge-sponsored">Sponsored</span>` : ''}
                 </a>
                 
                 <div class="product-content">
@@ -620,7 +656,10 @@
     function attachProductEventListeners() {
         // Add to cart buttons
         document.querySelectorAll('.btn-add-to-cart').forEach(btn => {
-            btn.addEventListener('click', handleAddToCart);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleAddToCart(e);
+            });
         });
 
         // Wishlist buttons
@@ -654,7 +693,27 @@
 
         // Add to cart from back
         document.querySelectorAll('.btn-add-cart-back').forEach(btn => {
-            btn.addEventListener('click', handleAddToCart);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleAddToCart(e);
+            });
+        });
+
+        document.querySelectorAll('.btn-share').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const data = JSON.parse(btn.dataset.share);
+                openShareModal(data);
+            });
+        });
+    }
+
+    function recordBoostClick(productId, context) {
+        fetch(`/api/${SITE}/boost/click`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({product_id: productId, context})
+        }).catch(() => {
         });
     }
 
@@ -684,6 +743,7 @@
                 showToast(data.message, 'success');
                 state.cartCount = data.count;
                 updateCartCount();
+                recordBoostClick(productId, 'listing');
             } else {
                 showToast(data.message, 'error');
             }

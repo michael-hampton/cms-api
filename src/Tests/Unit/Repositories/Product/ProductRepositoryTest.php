@@ -12,6 +12,7 @@ use App\Models\ProductVariant;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Search\SearchCriteria;
+use App\Services\Adverts\Boost\BoostRankingService;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
@@ -21,12 +22,14 @@ class ProductRepositoryTest extends RepositoryTestCase
 
     private ProductRepository $repository;
     private ProductSpecificationGroupRepository $specificationGroupRepository;
+    private BoostRankingService $boostRankingService;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->specificationGroupRepository = new ProductSpecificationGroupRepository();
-        $this->repository = new ProductRepository($this->specificationGroupRepository);;
+        $this->boostRankingService = app(BoostRankingService::class);
+        $this->repository = new ProductRepository($this->specificationGroupRepository, $this->boostRankingService);
     }
 
     public function test_it_can_search_products_with_relationships(): void

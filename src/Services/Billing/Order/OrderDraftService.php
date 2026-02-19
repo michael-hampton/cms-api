@@ -86,7 +86,7 @@ class OrderDraftService
             $member
         );
 
-        $totalTaxCents = $taxResult['tax_cents'];
+        $totalTaxCents = $taxResult->taxCents;
 
         // Distribute tax proportionally to items using TaxCalculatorService
         if ($totalTaxCents > 0) {

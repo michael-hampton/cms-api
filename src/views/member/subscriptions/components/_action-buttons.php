@@ -43,3 +43,19 @@ if ($activeSubscription && $activeSubscription->status === 'cancelled') {
         </button>
     <?php endif; ?>
 </div>
+
+<div class="info-row">
+    <span class="info-label">Auto-Renewal</span>
+    <span class="info-value">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <input type="checkbox"
+                   id="auto-renew-toggle"
+                   <?= $activeSubscription->auto_renew ? 'checked' : '' ?>
+                   onchange="updateAutoRenew(<?= $activeSubscription->id ?>, this.checked)"
+                   style="width:18px;height:18px;cursor:pointer;accent-color:#667eea;">
+            <span style="font-size:14px;color:#64748b;">
+                Automatically renew at end of billing period
+            </span>
+        </label>
+    </span>
+</div>

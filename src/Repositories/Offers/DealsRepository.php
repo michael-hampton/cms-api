@@ -54,7 +54,7 @@ class DealsRepository
             ->toArray();
     }
 
-    public function getFilteredProducts(int $siteId, array $filters): array
+    public function getFilteredProducts(int $siteId, array $filters, array $boostedIds = []): array
     {
         $page = (int)($filters['page'] ?? 1);
         $perPage = (int)($filters['per_page'] ?? 12);
@@ -166,6 +166,11 @@ class DealsRepository
             $query->orderByRaw("COALESCE(NULLIF(sale_price, 0), price) {$sortOrder}");
         } else {
             $query->orderBy($sortBy, $sortOrder);
+        }
+
+        if (!empty($boostedIds)) {
+            $ids = implode(',', array_map('intval', $boostedIds));
+            $query->orderByRaw("CASE WHEN id IN ({$ids}) THEN 0 ELSE 1 END");
         }
 
         // Get total count

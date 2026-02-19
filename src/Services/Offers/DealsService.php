@@ -5,8 +5,10 @@ namespace App\Services\Offers;
 use App\Enums\Boost\BoostContext;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Offers\DealsRepository;
 use App\Repositories\ReviewRepository;
+use App\Services\Adverts\Boost\BoostEventService;
 use App\Services\Adverts\Boost\BoostRankingService;
 
 class DealsService
@@ -16,6 +18,8 @@ class DealsService
     public function __construct(
         private readonly ReviewRepository    $reviewRepository,
         private readonly BoostRankingService $boostRankingService,
+        private readonly BoostRepository   $boostRepository,
+        private readonly BoostEventService $boostEventService,
         ?DealsRepository                     $repository = null
     )
     {
@@ -27,11 +31,9 @@ class DealsService
         $siteId = $siteId ?? SiteContext::getId();
         $today = date('Y-m-d');
 
-        // Get featured deals first
         $featuredDeals = $this->repository->getFeaturedDealsByDate($siteId, $today, $limit);
 
         if (empty($featuredDeals)) {
-            // Auto-generate deals based on discount rules
             return $this->generateDefaultDeals($limit, [], $siteId);
         }
 
@@ -52,7 +54,6 @@ class DealsService
             $product = $this->repository->findProductById($productData['id']);
 
             if ($product) {
-
                 $bestDeal = $this->getBestDealForProduct($product);
 
                 if ($bestDeal) {
@@ -61,7 +62,6 @@ class DealsService
             }
         }
 
-        // Sort by discount percentage
         usort($deals, fn($a, $b) => $b['discount_percentage'] <=> $a['discount_percentage']);
 
         return array_slice($deals, 0, $limit);
@@ -78,7 +78,6 @@ class DealsService
         $variantName = null;
         $merchantName = null;
 
-        // Check variants
         if ($product->variants) {
             foreach ($product->variants as $variant) {
                 if (!$variant->is_active) continue;
@@ -91,7 +90,6 @@ class DealsService
                     $variantName = $variant->name;
                 }
 
-                // Check merchant prices for this variant
                 if ($variant->merchants) {
                     foreach ($variant->merchants as $merchant) {
                         if (!$merchant->is_available) continue;
@@ -110,7 +108,6 @@ class DealsService
             }
         }
 
-        // Check direct merchant prices (no variant)
         if ($product->merchants) {
             foreach ($product->merchants as $merchant) {
                 if (!$merchant->is_available) continue;
@@ -174,16 +171,11 @@ class DealsService
         $siteId = $siteId ?? SiteContext::getId();
         $today = date('Y-m-d');
 
-        // Deactivate old featured deals
         $this->repository->deactivateOldFeaturedDeals($siteId, $today);
-
-        // Deactivate current day deals
         $this->repository->deactivateFeaturedDealsByDate($siteId, $today);
 
-        // Generate new deals
         $deals = $this->generateDefaultDeals(20, [], $siteId);
 
-        // Save as featured deals
         foreach ($deals as $index => $deal) {
             $this->repository->createFeaturedDeal([
                 'product_id' => $deal['product_id'],
@@ -203,9 +195,18 @@ class DealsService
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-        $products = $this->repository->getFilteredProducts($siteId, $filters);
+        // Fetch boosted IDs first and pass to repository so DB handles ordering
+        $boostedIds = [];
+        try {
+            $boostedIds = $this->boostRankingService->getActiveBoostedIds(BoostContext::Deals->value);
 
-        // ── Boost ranking ──────────────────────────────────────────────────
+        } catch (\Exception $e) {
+            Logger::error('Failed to fetch boosted IDs for deals', ['error' => $e->getMessage()]);
+        }
+
+        $products = $this->repository->getFilteredProducts($siteId, $filters, $boostedIds);
+
+        // ── Boost ranking ──────────────────────────────────────────────
         try {
             $products['data'] = $this->boostRankingService->applyRanking(
                 $products['data'],
@@ -216,11 +217,16 @@ class DealsService
         }
 
         $productIds = array_unique(array_column($products['data']->toArray(), 'id'));
+
+        // ── Record impressions for boosted products ────────────────────
+        $this->recordBoostImpressions($productIds, BoostContext::Deals->value);
+
         $topReviews = $this->reviewRepository->getTopReview($productIds)->keyBy('product_id');
 
-        $formattedProducts = $products['data']->map(function ($product) use ($topReviews) {
+        $formattedProducts = $products['data']->map(function ($product) use ($topReviews, $boostedIds) {
             $data = $this->formatProductForDeals($product);
             $data['top_review'] = $topReviews->get($data['product_id'])?->toArray() ?? [];
+            $data['is_boosted'] = in_array($product->id, $boostedIds);
             return $data;
         })->toArray();
 
@@ -231,12 +237,47 @@ class DealsService
         ];
     }
 
-    /**
-     * Format product data for deals display
-     */
+    private function recordBoostImpressions(array $productIds, string $context): void
+    {
+        if (empty($productIds)) {
+            return;
+        }
+
+        $sessionHash = md5(session_id() ?: uniqid('deals_', true));
+        $now = now();
+
+        // Create a ProductImpression record for every visible product
+        try {
+            \App\Models\ProductImpression::insert(
+                array_map(fn($id) => [
+                    'product_id' => $id,
+                    'context' => $context,
+                    'viewed_at' => $now,
+                ], $productIds)
+            );
+        } catch (\Exception $e) {
+            Logger::error('Failed to record product impressions in deals', ['error' => $e->getMessage()]);
+        }
+
+        // Additionally record a boost event for products that have an active boost
+        foreach ($productIds as $productId) {
+            try {
+                $boost = $this->boostRepository->findActiveForTarget('product', $productId);
+
+                if ($boost) {
+                    $this->boostEventService->recordImpression($boost->id, $sessionHash, ['context' => 'deals']);
+                }
+            } catch (\Exception $e) {
+                Logger::error('Failed to record boost impression in deals', [
+                    'product_id' => $productId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
     private function formatProductForDeals($product): array
     {
-        // Calculate discount percentage
         $discountPercentage = 0;
         $finalPrice = $product->price;
 
@@ -245,7 +286,6 @@ class DealsService
             $discountPercentage = round((($product->price - $product->sale_price) / $product->price) * 100);
         }
 
-        // Get main image
         $mainImage = null;
         if ($product->main_image_url) {
             $mainImage = $product->main_image_url;
@@ -255,7 +295,6 @@ class DealsService
             $mainImage = $product->image;
         }
 
-        // Calculate average rating
         $averageRating = 0;
         $reviewCount = 0;
         if ($product->approvedReviews && count($product->approvedReviews) > 0) {
@@ -266,7 +305,6 @@ class DealsService
                 : 0;
         }
 
-        // Get lowest merchant price if available
         $lowestMerchantPrice = null;
         if ($product->availableMerchants && $product->availableMerchants->count() > 0) {
             $merchantPrices = $product->availableMerchants->map(function ($merchant) {
@@ -276,7 +314,6 @@ class DealsService
             $lowestMerchantPrice = min($merchantPrices);
         }
 
-        // Check for variants with better prices
         $hasVariants = false;
         $lowestVariantPrice = null;
         if ($product->variants && $product->variants->count() > 0) {

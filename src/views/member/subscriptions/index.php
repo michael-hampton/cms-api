@@ -1166,6 +1166,27 @@ ${optionsHTML}
             }
         }
     }
+
+    async function updateAutoRenew(subscriptionId, enabled) {
+        try {
+            const response = await fetch(`/<?= SiteContext::slug() ?>/member/subscriptions/${subscriptionId}/auto-renew`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({auto_renew: enabled, consent_given: enabled})
+            });
+            const result = await response.json();
+            if (result.success) {
+                showNotification(enabled ? 'Auto-renewal enabled' : 'Auto-renewal disabled', 'success');
+            } else {
+                showNotification(result.message || 'Failed to update', 'error');
+                // Revert checkbox
+                document.getElementById('auto-renew-toggle').checked = !enabled;
+            }
+        } catch {
+            showNotification('An error occurred', 'error');
+            document.getElementById('auto-renew-toggle').checked = !enabled;
+        }
+    }
 </script>
 
 @include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])

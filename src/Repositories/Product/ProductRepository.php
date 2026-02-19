@@ -2,7 +2,9 @@
 
 namespace App\Repositories\Product;
 
+use App\Enums\Boost\BoostContext;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Logger;
 use App\Framework\Support\Str;
 use App\Models\Block;
 use App\Models\Merchant;
@@ -21,12 +23,16 @@ use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
 use App\Search\SearchEngine;
+use App\Services\Adverts\Boost\BoostRankingService;
 
 class ProductRepository extends Repository implements ProductRepositoryInterface
 {
     private SearchEngine $searchEngine;
 
-    public function __construct(private readonly ProductSpecificationGroupRepository $specificationGroupRepository)
+    public function __construct(
+        private readonly ProductSpecificationGroupRepository $specificationGroupRepository,
+        private readonly BoostRankingService                 $boostRankingService
+    )
     {
         parent::__construct();
         $config = SearchConfigurationFactory::create('product');
@@ -35,6 +41,13 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
+        $boostedIds = [];
+        try {
+            $boostedIds = $this->boostRankingService->getActiveBoostedIds(BoostContext::Listing->value);
+        } catch (\Exception $e) {
+            Logger::error('Failed to fetch boosted IDs for listing', ['error' => $e->getMessage()]);
+        }
+
         $query = Product::with([
             'activeVariants',
             'availableMerchants',
@@ -47,6 +60,12 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             'category',
             'approvedReviews'
         ]);
+
+        if (!empty($boostedIds)) {
+            $ids = implode(',', array_map('intval', $boostedIds));
+            $query->orderByRaw("CASE WHEN id IN ({$ids}) THEN 0 ELSE 1 END");
+        }
+
         return $this->searchEngine->search($query, $criteria);
     }
 

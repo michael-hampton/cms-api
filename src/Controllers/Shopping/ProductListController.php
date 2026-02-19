@@ -12,11 +12,14 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Product;
+use App\Models\ProductImpression;
+use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
 use App\Repositories\ReviewRepository;
 use App\Search\SearchCriteria;
+use App\Services\Adverts\Boost\BoostEventService;
 use App\Services\Adverts\Boost\BoostRankingService;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Product\BuildProductCardService;
@@ -30,7 +33,8 @@ class ProductListController extends Controller
         private readonly ReviewRepository $reviewRepository,
         private readonly ProductViewRepository $productViewRepository,
         private readonly BoostRankingService $boostRankingService,
-
+        private readonly BoostEventService $boostEventService,
+        private readonly BoostRepository   $boostRepository
     )
     {
         parent::__construct();
@@ -157,6 +161,30 @@ class ProductListController extends Controller
                 collect($result->getData()),
                 $boostContext
             );
+
+            $productIds = collect($result->getData())->pluck('id')->toArray();
+
+            foreach ($rankedData ?? collect([]) as $item) {
+                if (!empty($item['boost_id'])) {
+                    $sessionHash = hash('sha256', $request->ip() . $request->header('User-Agent'));
+                    $this->boostEventService->recordImpression(
+                        $item['boost_id'],
+                        $sessionHash,
+                        ['context' => $boostContext]
+                    );
+                }
+            }
+            // Also track product impressions
+            $now = now();
+
+            $rows = array_map(fn($id) => [
+                'product_id' => $id,
+                'context' => $boostContext,
+                'viewed_at' => $now,
+            ], $productIds);
+
+            ProductImpression::insert($rows);
+
             $result->setData($rankedData->all());
         } catch (\Exception $e) {
             // Non-critical — ranking failure must never break the product listing
@@ -181,12 +209,18 @@ class ProductListController extends Controller
         }
 
         $productIds = collect($result->getData())->pluck('id')->unique()->toArray();
+
         $topReviews = $this->reviewRepository->getTopReview($productIds)->keyBy('product_id');
+        $rankedIds = collect($result->getData())
+            ->filter(fn($item) => $item['is_boosted'] ?? false)
+            ->pluck('id')
+            ->flip()
+            ->toArray();
 
         /**
          * Enrich product data
          */
-        $formattedProducts = collect($result->toArray()['data'])->map(function ($product) use ($topReviews) {
+        $formattedProducts = collect($result->toArray()['data'])->map(function ($product) use ($topReviews, $rankedIds) {
 
             $reviews = $product['approvedReviews'] ?? [];
             $merchants = $product['availableMerchants'] ?? [];
@@ -208,6 +242,7 @@ class ProductListController extends Controller
                 'merchant_count' => count($merchants),
                 'top_review' => $topReviews->get($product['id'])->toArray(),
                 'lowest_merchant_price' => $lowestMerchantPrice,
+                'is_boosted' => isset($rankedIds[$product['id']]),
             ]);
         });
 
@@ -219,7 +254,6 @@ class ProductListController extends Controller
     public function getProductDetails(Request $request, $id)
     {
         try {
-
 
             // Prepare final response
             $productData = (new BuildProductCardService())->build($id);
@@ -258,6 +292,17 @@ class ProductListController extends Controller
             // Only track if not recently viewed (within last 60 minutes)
             if (!$userId || !$this->productViewRepository->hasRecentView($id, $userId, 60)) {
                 $this->productViewRepository->trackView($product, $userId, $sessionId, $ipAddress);
+            }
+
+            try {
+                $activeBoost = $this->boostRepository->findActiveForTarget('product', $product->id);
+
+                if ($activeBoost) {
+                    $sessionHash = hash('sha256', $request->ip() . $request->header('User-Agent'));
+                    $this->boostEventService->recordImpression($activeBoost->id, $sessionHash);
+                }
+            } catch (\Exception $e) {
+                Logger::error('Boost impression failed', ['error' => $e->getMessage()]);
             }
 
             // Load all necessary relationships

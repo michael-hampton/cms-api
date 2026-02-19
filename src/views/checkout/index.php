@@ -1957,7 +1957,8 @@
 
     function updateTotals() {
         const discount = appliedVoucher ? appliedVoucher.discount : 0;
-        const tax = (INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING) * 0.1;
+        const taxRate = <?= $tax_rate ?>;
+        const tax = (INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING) * taxRate;
         const total = INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING + tax;
 
         document.getElementById('subtotal').textContent = '$' + INITIAL_SUBTOTAL.toFixed(2);

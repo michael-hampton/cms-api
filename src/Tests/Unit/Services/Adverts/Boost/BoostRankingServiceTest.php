@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Adverts\Boost;
 
 use App\Models\Boost;
 use App\Models\BoostStat;
+use App\Models\Product;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Adverts\Boost\BoostStatRepository;
 use App\Services\Adverts\Boost\BoostRankingService;
@@ -67,7 +68,11 @@ class BoostRankingServiceTest extends FunctionalTestCase
 
     public function test_apply_ranking_puts_boosted_items_first(): void
     {
-        $boostedProduct = (object)['id' => 10, 'name' => 'Boosted'];
+        $boostedProduct = Mockery::mock(Product::class)
+            ->makePartial();
+        $boostedProduct->id = 10;
+        $boostedProduct->name = 'Boosted';
+
         $unboostedProduct = (object)['id' => 99, 'name' => 'Regular'];
 
         $boost = $this->makeBoost(1, 1.5, boostableId: 10);

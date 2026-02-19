@@ -21,10 +21,10 @@ class TaxCalculatorServiceTest extends TestCase
             '90210'
         );
 
-        $this->assertEquals(798, $result['tax_cents']); // 7.25% of $110
-        $this->assertEquals(0.0725, $result['tax_rate']);
-        $this->assertEquals('California', $result['tax_jurisdiction']);
-        $this->assertEquals(11000, $result['taxable_amount_cents']);
+        $this->assertEquals(798, $result->taxCents); // 7.25% of $110
+        $this->assertEquals(0.0725, $result->rate);
+        $this->assertEquals('California', $result->jurisdiction);
+        $this->assertEquals(11000, $result->taxableAmountCents);
     }
 
     public function testCalculateOrderTaxWithoutShipping(): void
@@ -37,8 +37,8 @@ class TaxCalculatorServiceTest extends TestCase
             null
         );
 
-        $this->assertEquals(600, $result['tax_cents']); // 6% of $100 (shipping not included)
-        $this->assertEquals(10000, $result['taxable_amount_cents']);
+        $this->assertEquals(600, $result->taxCents); // 6% of $100 (shipping not included)
+        $this->assertEquals(10000, $result->taxableAmountCents);
     }
 
     public function testCalculateOrderTaxWithNoRate(): void
@@ -51,9 +51,9 @@ class TaxCalculatorServiceTest extends TestCase
             null
         );
 
-        $this->assertEquals(0, $result['tax_cents']);
-        $this->assertEquals(0.00, $result['tax_rate']);
-        $this->assertNull($result['tax_jurisdiction']);
+        $this->assertEquals(0, $result->taxCents);
+        $this->assertEquals(0.00, $result->rate);
+        $this->assertNull($result->jurisdiction);
     }
 
     public function testCalculateOrderTaxWithTaxExemptMember(): void
@@ -70,9 +70,9 @@ class TaxCalculatorServiceTest extends TestCase
             $member
         );
 
-        $this->assertEquals(0, $result['tax_cents']);
-        $this->assertTrue($result['exempt']);
-        $this->assertEquals('California', $result['tax_jurisdiction']);
+        $this->assertEquals(0, $result->taxCents);
+        $this->assertTrue($result->exempt);
+        $this->assertEquals('California', $result->jurisdiction);
     }
 
     public function testCalculateOrderTaxFallsBackToCountryDefault(): void
@@ -86,9 +86,9 @@ class TaxCalculatorServiceTest extends TestCase
         );
 
         // Should use US DEFAULT rate (7%)
-        $this->assertEquals(770, $result['tax_cents']); // 7% of $110
-        $this->assertEquals(0.07, $result['tax_rate']);
-        $this->assertEquals('United States', $result['tax_jurisdiction']);
+        $this->assertEquals(770, $result->taxCents); // 7% of $110
+        $this->assertEquals(0.07, $result->rate);
+        $this->assertEquals('United States', $result->jurisdiction);
     }
 
     public function testCalculateOrderTaxCanadaHST(): void
@@ -101,9 +101,9 @@ class TaxCalculatorServiceTest extends TestCase
             null
         );
 
-        $this->assertEquals(1430, $result['tax_cents']); // 13% of $110
-        $this->assertEquals(0.13, $result['tax_rate']);
-        $this->assertEquals('Ontario (HST)', $result['tax_jurisdiction']);
+        $this->assertEquals(1430, $result->taxCents); // 13% of $110
+        $this->assertEquals(0.13, $result->rate);
+        $this->assertEquals('Ontario (HST)', $result->jurisdiction);
     }
 
     public function testCalculateOrderTaxUKVAT(): void
@@ -116,9 +116,9 @@ class TaxCalculatorServiceTest extends TestCase
             null
         );
 
-        $this->assertEquals(2200, $result['tax_cents']); // 20% of $110
-        $this->assertEquals(0.20, $result['tax_rate']);
-        $this->assertEquals('United Kingdom (VAT)', $result['tax_jurisdiction']);
+        $this->assertEquals(2200, $result->taxCents); // 20% of $110
+        $this->assertEquals(0.20, $result->rate);
+        $this->assertEquals('United Kingdom (VAT)', $result->jurisdiction);
     }
 
     public function testCalculateOrderTaxAustraliaGST(): void
@@ -131,9 +131,9 @@ class TaxCalculatorServiceTest extends TestCase
             null
         );
 
-        $this->assertEquals(1100, $result['tax_cents']); // 10% of $110
-        $this->assertEquals(0.10, $result['tax_rate']);
-        $this->assertEquals('Australia (GST)', $result['tax_jurisdiction']);
+        $this->assertEquals(1100, $result->taxCents); // 10% of $110
+        $this->assertEquals(0.10, $result->rate);
+        $this->assertEquals('Australia (GST)', $result->jurisdiction);
     }
 
     public function testDistributeTaxToItemsProportionally(): void
@@ -186,7 +186,7 @@ class TaxCalculatorServiceTest extends TestCase
 
         $result = $this->service->calculateCartTax($items, 'US', 'CA');
 
-        $this->assertEquals(638, $result['tax_cents']); // 7.25% of $88
+        $this->assertEquals(638, $result->taxCents); // 7.25% of $88
     }
 
     public function testCalculateCartTaxWithMissingCents(): void
@@ -199,7 +199,7 @@ class TaxCalculatorServiceTest extends TestCase
         $result = $this->service->calculateCartTax($items, 'US', 'TX');
 
         // Should handle missing fields gracefully
-        $this->assertIsInt($result['tax_cents']);
+        $this->assertIsFloat($result->taxCents);
     }
 
     public function testValidateTaxExemptionValid(): void
@@ -279,19 +279,19 @@ class TaxCalculatorServiceTest extends TestCase
     {
         $info = $this->service->getTaxRateInfo('US', 'CA');
 
-        $this->assertEquals(0.0725, $info['rate']);
-        $this->assertEquals(7.25, $info['rate_percentage']);
-        $this->assertEquals('California', $info['jurisdiction']);
-        $this->assertTrue($info['includes_shipping']);
+        $this->assertEquals(0.0725, $info->rate);
+        $this->assertEquals(7.25, $info->ratePercentage);
+        $this->assertEquals('California', $info->jurisdiction);
+        $this->assertTrue($info->includesShipping);
     }
 
     public function testGetTaxRateInfoWithDefault(): void
     {
         $info = $this->service->getTaxRateInfo('US', 'ZZ');
 
-        $this->assertEquals(0.07, $info['rate']);
-        $this->assertEquals(7.0, $info['rate_percentage']);
-        $this->assertEquals('United States', $info['jurisdiction']);
+        $this->assertEquals(0.07, $info->rate);
+        $this->assertEquals(7.0, $info->ratePercentage);
+        $this->assertEquals('United States', $info->jurisdiction);
     }
 
     public function testGetTaxRateInfoInvalidCountry(): void
@@ -316,8 +316,8 @@ class TaxCalculatorServiceTest extends TestCase
             $member
         );
 
-        $this->assertEquals(0, $result['tax_cents']);
-        $this->assertTrue($result['exempt']);
+        $this->assertEquals(0, $result->taxCents);
+        $this->assertTrue($result->exempt);
     }
 
     public function testIsTaxExemptForEducational(): void
@@ -335,8 +335,8 @@ class TaxCalculatorServiceTest extends TestCase
             $member
         );
 
-        $this->assertEquals(0, $result['tax_cents']);
-        $this->assertTrue($result['exempt']);
+        $this->assertEquals(0, $result->taxCents);
+        $this->assertTrue($result->exempt);
     }
 
     public function testMultipleEUCountries(): void
@@ -358,7 +358,7 @@ class TaxCalculatorServiceTest extends TestCase
                 null
             );
 
-            $this->assertEquals($expectedRate, $result['tax_rate']);
+            $this->assertEquals($expectedRate, $result->rate);
         }
     }
 

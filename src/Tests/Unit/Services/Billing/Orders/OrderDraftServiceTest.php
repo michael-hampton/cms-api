@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Billing\Orders;
 
+use App\DTO\Cart\TaxData;
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
@@ -370,11 +371,13 @@ class OrderDraftServiceTest extends TestCase
                 '90210',
                 $member
             )
-            ->andReturn([
-                'tax_cents' => 1050,
-                'tax_rate' => 0.10,
-                'tax_jurisdiction' => 'California'
-            ]);
+            ->andReturn(new TaxData(
+
+                taxCents: 1050,
+                rate: 0.10,
+                jurisdiction: 'California'
+
+            ));
 
         // Verify distributeTaxToItems is called
         $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
@@ -457,7 +460,7 @@ class OrderDraftServiceTest extends TestCase
 
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')
             ->once()
-            ->andReturn(['tax_cents' => 800]);
+            ->andReturn(new TaxData(rate: 0.1, taxCents: 800));
 
         // Verify tax distribution logic
         $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
@@ -523,10 +526,7 @@ class OrderDraftServiceTest extends TestCase
         // Tax calculator returns 0 for exempt member
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')
             ->once()
-            ->andReturn([
-                'tax_cents' => 0,
-                'exempt' => true
-            ]);
+            ->andReturn(new TaxData(rate: 0, taxCents: 0, exempt: true));
 
         // distributeTaxToItems should NOT be called when tax is 0
         $this->taxCalculatorService->shouldReceive('distributeTaxToItems')->never();
@@ -535,7 +535,7 @@ class OrderDraftServiceTest extends TestCase
             ->once()
             ->with(
                 Mockery::on(function ($orderData) {
-                    return $orderData['tax'] === 0
+                    return $orderData['tax'] == 0
                         && $orderData['subtotal'] === 50
                         && $orderData['payment_status'] === 'unpaid'
                         && $orderData['total'] === 99.99;
@@ -594,7 +594,7 @@ class OrderDraftServiceTest extends TestCase
                 null,
                 $member
             )
-            ->andReturn(['tax_cents' => 1000]);
+            ->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
 
         $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
             ->once()
@@ -772,11 +772,11 @@ class OrderDraftServiceTest extends TestCase
                 null,
                 Mockery::any()
             )
-            ->andReturn([
-                'tax_cents' => 1050,
-                'tax_rate' => 0.10,
-                'tax_jurisdiction' => 'California'
-            ]);
+            ->andReturn(new TaxData(
+                taxCents: 1050,
+                rate: 0.10,
+                jurisdiction: 'California'
+            ));
 
         // Verify distributeTaxToItems is called
         $this->taxCalculatorService->shouldReceive('distributeTaxToItems')

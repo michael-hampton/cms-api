@@ -2,8 +2,12 @@
 
 namespace App\Tests\Unit\Services\Offers;
 
+use App\Enums\Boost\BoostContext;
+use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Offers\DealsRepository;
 use App\Repositories\ReviewRepository;
+use App\Services\Adverts\Boost\BoostEventService;
+use App\Services\Adverts\Boost\BoostRankingService;
 use App\Services\Offers\DealsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -16,14 +20,38 @@ class DealsServiceTest extends FunctionalTestCase
     private DealsService $service;
     private $mockRepository;
     private $reviewRepository;
+    private $boostRankingService;
+    private $boostRepository;
+    private $boostEventService;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->mockRepository = m::mock(DealsRepository::class);
         $this->reviewRepository = m::mock(ReviewRepository::class);
-        $this->service = new DealsService($this->reviewRepository, $this->mockRepository);
+        $this->boostRankingService = m::mock(BoostRankingService::class);
+        $this->boostRepository = m::mock(BoostRepository::class);
+        $this->boostEventService = m::mock(BoostEventService::class);
+
+        // Default: no boosted products
+        $this->boostRankingService->shouldReceive('getActiveBoostedIds')
+            ->andReturn([])
+            ->byDefault();
+
+        // Default: no active boosts for impression recording
+        $this->boostRepository->shouldReceive('findActiveForTarget')
+            ->andReturnNull()
+            ->byDefault();
+
+        $this->service = new DealsService(
+            $this->reviewRepository,
+            $this->boostRankingService,
+            $this->boostRepository,
+            $this->boostEventService,
+            $this->mockRepository
+        );
     }
+
 
     protected function tearDown(): void
     {
@@ -226,11 +254,16 @@ class DealsServiceTest extends FunctionalTestCase
 
         $filters = ['max_price' => 25];
 
+        $this->boostRankingService->shouldReceive('getActiveBoostedIds')
+            ->once()
+            ->with(BoostContext::Deals->value)
+            ->andReturn([5, 10]);
+
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
                 return isset($arg['max_price']) && $arg['max_price'] === 25;
-            }))
+            }), [5, 10])
             ->andReturn([
                 'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
@@ -291,11 +324,16 @@ class DealsServiceTest extends FunctionalTestCase
 
         $filters = ['tab' => 'vouchers'];
 
+        $this->boostRankingService->shouldReceive('getActiveBoostedIds')
+            ->once()
+            ->with(BoostContext::Deals->value)
+            ->andReturn([5, 10]);
+
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
                 return isset($arg['tab']) && $arg['tab'] === 'vouchers';
-            }))
+            }), [5, 10])
             ->andReturn([
                 'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [
@@ -325,11 +363,16 @@ class DealsServiceTest extends FunctionalTestCase
         $product = \Mockery::mock(\App\Models\Product::class)->makePartial();
         $product->id = 1;
 
+        $this->boostRankingService->shouldReceive('getActiveBoostedIds')
+            ->once()
+            ->with(BoostContext::Deals->value)
+            ->andReturn([5, 10]);
+
         $this->mockRepository->shouldReceive('getFilteredProducts')
             ->once()
             ->with(1, m::on(function($arg) {
                 return isset($arg['category_ids']) && $arg['category_ids'] === [1780];
-            }))
+            }), [5, 10])
             ->andReturn([
                 'data' => new \App\Framework\Support\Collection([$product]),
                 'pagination' => [

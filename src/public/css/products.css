@@ -1711,6 +1711,7 @@ body.card-flipped {
     transition: all 0.25s ease;
     z-index: 5;
     color: #444;
+    padding: 0 !important;
 }
 
 .btn-share svg {
@@ -1903,5 +1904,20 @@ body.card-flipped {
 
 .btn-show-review.expanded svg {
     transform: rotate(180deg);
+}
+
+.badge-sponsored {
+    position: absolute;
+    top: 50px;
+    left: 8px;
+    background: rgba(108, 99, 255, 0.9);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    z-index: 2;
 }
 

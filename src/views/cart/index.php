@@ -510,6 +510,7 @@
     </style>
 </head>
 <body>
+
 <!-- Header -->
 <header class="site-header">
     <div class="container">
@@ -585,6 +586,9 @@
                     <h2>Cart Items (<span id="items-count"><?= count($items) ?></span>)</h2>
                     <button class="clear-cart-btn" onclick="clearCart()">Clear Cart</button>
                 </div>
+
+                <div id="alert-container"></div>
+
                 <div id="cart-items-list">
                     <?php
                     // Group items by merchant
@@ -749,86 +753,192 @@
 
             <div class="cart-summary">
                 <h3>Order Summary</h3>
-                <?php
-                $subtotal = $total;
-                $finalTotal = $subtotal + $tax;
 
-                $merchantTotals = [];
-                foreach ($itemsByMerchant as $merchantId => $merchantData) {
-                    $total = array_sum(array_column($merchantData['items'], 'subtotal'));
-                    $merchantTotals[$merchantId] = [
-                            'name' => $merchantData['name'],
-                            'total' => $total
-                    ];
-                }
-                ?>
-                <div class="summary-row">
-                    <span>Subtotal:</span>
-                    <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
-                </div>
-                <div class="summary-row">
-                    <span>Shipping:</span>
-                    <span id="shipping">£<?= $shipping ?></span>
-                </div>
-                <div class="summary-row">
-                    <span>Tax:</span>
-                    <span id="tax">$<?= number_format($tax, 2) ?></span>
-                </div>
+                <div id="order-items">
 
-                <?php foreach ($merchantTotals as $merchantTotal): ?>
-                    <div class="summary-row" style="font-size: 0.875rem; color: #64748b;">
-                        <span><?= htmlspecialchars($merchantTotal['name']) ?>:</span>
-                        <span>$<?= number_format($merchantTotal['total'], 2) ?></span>
-                    </div>
-                <?php endforeach; ?>
+                    <?php
+                    // Group items by merchant
+                    $itemsByMerchant = [];
 
-                <div class="summary-row total">
-                    <span>Total:</span>
-                    <span id="total">$<?= number_format($finalTotal, 2) ?></span>
-                </div>
+                    foreach ($items as $item) {
+                        $merchantId = $item['options']['merchant_id'] ?? 0;
+                        $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
 
-                <div class="voucher-section"
-                     style="margin: 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Have a voucher code?</h4>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="voucher-input" placeholder="Enter code"
-                               style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;">
-                        <button onclick="applyVoucher(<?= $total ?>)" class="btn btn-secondary"
-                                style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
-                        </button>
-                    </div>
-                    <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
-                    <div id="applied-voucher"
-                         style="display: none; margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong id="voucher-code-display" style="color: #065f46;"></strong>
-                                <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
-                                    Discount: <span id="voucher-discount-display"></span>
-                                </p>
+                        if (!isset($itemsByMerchant[$merchantId])) {
+                            $itemsByMerchant[$merchantId] = [
+                                    'name' => $merchantName,
+                                    'items' => [],
+                                    'subtotal' => 0
+                            ];
+                        }
+                        $itemsByMerchant[$merchantId]['items'][] = $item;
+                        $itemsByMerchant[$merchantId]['subtotal'] += $item['subtotal'];
+                    }
+                    ?>
+
+                    <?php foreach ($itemsByMerchant
+
+                                   as $merchantId => $merchantData): ?>
+                    <div class="merchant-group"
+                         style="margin-bottom: 1.5rem; padding-bottom: 1.5rem;">
+                        <div class="merchant-header" style="margin-bottom: 1rem;">
+                            <strong style="font-size: 0.875rem; color: var(--text-primary);">
+                                <?= htmlspecialchars($merchantData['name']) ?>
+                            </strong>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">
+                    (<?= count($merchantData['items']) ?> items)
+                </span>
+                        </div>
+
+                        <?php foreach ($items as $item): ?>
+                            <div class="summary-item">
+                                <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                     class="item-image">
+                                <div class="item-details">
+                                    <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+
+                                    <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
+                                        <div class="variant-options"
+                                             style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
+                                            <?php
+                                            $variantParts = [];
+                                            foreach ($item['variant_options'] as $optionName => $optionValue) {
+                                                $variantParts[] = htmlspecialchars(ucfirst($optionName)) . ': <strong>' . htmlspecialchars($optionValue) . '</strong>';
+                                            }
+                                            echo implode(' • ', $variantParts);
+                                            ?>
+                                        </div>
+                                        <?php if (!empty($item['variant_sku'])): ?>
+                                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.125rem;">
+                                                SKU: <?= htmlspecialchars($item['variant_sku']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+
+                                    <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
+                                </div>
+                                <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
+
+                                <?php if (!empty($item['options']['subscription_plan_id'])): ?>
+                                    <input type="hidden" name="plan_id"
+                                           value="<?= $item['options']['subscription_plan_id'] ?>">
+                                <?php endif; ?>
+                                <?php if (!empty($item['estimated_delivery'])): ?>
+                                    <div class="item-delivery"
+                                         style="font-size: 0.75rem; color: var(--success-color); margin-top: 0.25rem;">
+                                        📦 Delivery: <?= htmlspecialchars($item['estimated_delivery']) ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
-                            <button onclick="removeVoucher()"
-                                    style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                </svg>
+
+                        <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="voucher-section"
+                         style="margin: 1.5rem 0; padding: 1.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+                        <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Voucher Code</h4>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="voucher-input" placeholder="Enter code"
+                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;"
+                                   value="<?= htmlspecialchars($_SESSION['applied_voucher_code']['code'] ?? '') ?>">
+                            <button onclick="applyVoucher()" class="btn btn-secondary"
+                                    style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
                             </button>
                         </div>
+                        <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                        <div id="applied-voucher"
+                             style="<?= !empty($_SESSION['applied_voucher_code']) ? 'display: block;' : 'display: none;' ?> margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong id="voucher-code-display" style="color: #065f46;"></strong>
+                                    <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
+                                        Discount: <span
+                                                id="voucher-discount-display"><?= htmlspecialchars($_SESSION['applied_voucher_code']['discount'] ?? '') ?></span>
+                                    </p>
+                                </div>
+                                <button onclick="removeVoucher()"
+                                        style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
+                        <span>Discount:</span>
+                        <span id="discount-amount"><?= htmlspecialchars($_SESSION['applied_voucher_code']['discount'] ?? '') ?></span>
+                    </div>
+
+                    <?php
+                    $finalTotal = $subtotal + $tax + $shipping;
+
+                    if (!empty($_SESSION['applied_voucher_code'])) {
+                        $finalTotal -= $_SESSION['applied_voucher_code']['discount'];
+                    }
+
+                    ?>
+
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Shipping:</span>
+                        <span id="shipping"><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 0 ?></span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tax (10%):</span>
+                        <span id="tax">$<?= number_format($tax, 2) ?></span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total:</span>
+                        <span id="total" data-total="<?= $finalTotal ?>">$<?= number_format($finalTotal, 2) ?></span>
+                    </div>
+
+                    <?php if (!empty($hasPreOrders)): ?>
+                        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                            <div style="font-weight: 600; color: #92400e; margin-bottom: 0.75rem;">
+                                ⚠️ Pre-Order Items in Cart
+                            </div>
+                            <?php foreach ($hasPreOrders as $preOrder): ?>
+                                <div style="font-size: 0.875rem; color: #78350f; margin-bottom: 0.5rem;">
+                                    <strong><?= htmlspecialchars($preOrder['name']) ?></strong><br>
+                                    <?= htmlspecialchars($preOrder['message']) ?>
+                                    <?php if ($preOrder['ship_date']): ?>
+                                        <br>Ships: <?= htmlspecialchars($preOrder['ship_date']) ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+
+                            <label style="display: flex; align-items: start; gap: 0.75rem; cursor: pointer; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #fbbf24;">
+                                <input type="checkbox" id="accept-pre-order" name="accept_pre_order" required
+                                       style="margin-top: 0.25rem; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+                                <span style="flex: 1; font-size: 0.875rem; color: #92400e;">
+                I understand this order contains pre-order items and accept the delivery timelines shown above.
+            </span>
+                            </label>
+                        </div>
+                    <?php endif; ?>
+
+                    <button type="button" class="btn btn-primary" id="place-order-btn">
+                        Place Order
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='/cart'">
+                        Return to Cart
+                    </button>
+
+                    <div class="security-badge">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        <span>Secure SSL encrypted checkout</span>
                     </div>
                 </div>
-
-                <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
-                    <span>Discount:</span>
-                    <span id="discount-amount">-$0.00</span>
-                </div>
-
-                <button class="btn btn-primary" onclick="proceedToCheckout()">
-                    Proceed to Checkout
-                </button>
-                <button class="btn btn-secondary" onclick="window.location.href='/shop'">
-                    Continue Shopping
-                </button>
             </div>
         </div>
     </div>
@@ -845,12 +955,16 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    const SITE = 'test-mike';
+    const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
     const API_BASE = '/api/' + SITE;
     let cartData = null;
-    let appliedVoucher = null;
     let isOneTimeSubscription = false
     const subscriptionStartDates = {};
+    let appliedVoucher = <?= json_encode($_SESSION['applied_voucher_code'] ?? null) ?>;
+
+    const INITIAL_SUBTOTAL = parseFloat(document.getElementById('subtotal').textContent.replace('$', ''));
+    const INITIAL_SHIPPING = parseFloat(document.getElementById('shipping').textContent.replace('$', '') || '0');
+    const INITIAL_TAX = parseFloat(document.getElementById('tax').textContent.replace('$', ''));
 
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toast');
@@ -991,74 +1105,155 @@
     }
 
     function updateSummary() {
-        const subtotal = cartData.total;
-        const discount = appliedVoucher ? appliedVoucher.discount : 0;
+        const subtotal = cartData ? cartData.total : parseFloat(document.getElementById('subtotal').textContent.replace(/[^0-9.]/g, ''));
+        const discount = appliedVoucher ? parseFloat(appliedVoucher.discount) : 0;
         const tax = (subtotal - discount) * 0.1;
         const total = subtotal - discount + tax;
 
-        document.getElementById('subtotal').textContent = formatCurrency(subtotal);
+        document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
         if (appliedVoucher) {
-            document.getElementById('discount-amount').textContent = '-' + formatCurrency(discount);
+            document.getElementById('discount-row').style.display = 'flex';
+            document.getElementById('discount-amount').textContent = '-$' + discount.toFixed(2);
         }
-        document.getElementById('tax').textContent = formatCurrency(tax);
-        document.getElementById('total').textContent = formatCurrency(total);
+        document.getElementById('tax').textContent = '$' + tax.toFixed(2);
+        document.getElementById('total').textContent = '$' + total.toFixed(2);
     }
 
     async function applyVoucher() {
-        const code = document.getElementById('voucher-input').value.trim();
-        const messageEl = document.getElementById('voucher-message');
-
-        if (!code) {
-            messageEl.textContent = 'Please enter a voucher code';
-            messageEl.style.color = 'var(--danger-color)';
+        const voucherCode = document.getElementById('voucher-input').value.trim();
+        if (!voucherCode) {
+            showVoucherMessage('Please enter a voucher code', 'error');
             return;
         }
+
+        const totalElement = document.getElementById('total')
+        const totalAmount = totalElement.dataset.total;
+
+        // Detect if this is a subscription checkout
+        const isSubscription = window.location.search.includes('type=subscription') ||
+            document.querySelector('[name="plan_id"]');
+
+        const requestBody = {
+            code: voucherCode,
+            is_subscription: !!isSubscription,
+            order_value: parseFloat(totalAmount)
+        };
+
+        // Add plan_id if this is a subscription
+        if (isSubscription) {
+            const planIdInput = document.querySelector('[name="plan_id"]');
+            if (planIdInput) {
+                requestBody.plan_id = parseInt(planIdInput.value);
+            } else {
+                // Try to get from cart items
+                const cartItems = getCartItems(); // You'll need to implement this
+                if (cartItems.length > 0 && cartItems[0].subscription_plan_id) {
+                    requestBody.plan_id = cartItems[0].subscription_plan_id;
+                }
+            }
+        }
+
+        const messageEl = document.getElementById('voucher-message');
 
         try {
             const response = await fetch(`${API_BASE}/vouchers/validate`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    code: code,
-                    order_value: cartData.total
-                })
+                body: JSON.stringify(requestBody)
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.data.valid) {
+            console.log('result', result.data)
+
+            if (result.data.valid) {
                 appliedVoucher = {
-                    code: code,
-                    discount: data.data.discount,
-                    voucher_id: data.data.voucher_id
+                    code: voucherCode,
+                    discount: result.data.discount,
+                    voucher_id: result.data.voucher_id
                 };
 
-                document.getElementById('voucher-code-display').textContent = code;
-                document.getElementById('voucher-discount-display').textContent = formatCurrency(data.data.discount);
-                document.getElementById('applied-voucher').style.display = 'block';
+                displayAppliedVoucher();
                 document.getElementById('voucher-input').value = '';
-                document.getElementById('discount-row').style.display = 'flex';
-
                 messageEl.textContent = '';
-                updateSummary();
-                showToast('Voucher applied successfully!');
+                showAlert('Voucher applied successfully!', 'success');
             } else {
                 messageEl.textContent = data.data.message;
                 messageEl.style.color = 'var(--danger-color)';
             }
         } catch (error) {
-            console.error('Error applying voucher:', error);
-            messageEl.textContent = 'Failed to apply voucher';
-            messageEl.style.color = 'var(--danger-color)';
+            console.error('Error:', error);
+            showVoucherMessage('Error applying voucher', 'error');
         }
     }
 
-    function removeVoucher() {
-        appliedVoucher = null;
-        document.getElementById('applied-voucher').style.display = 'none';
-        document.getElementById('discount-row').style.display = 'none';
-        updateSummary();
-        showToast('Voucher removed');
+    function displayAppliedVoucher() {
+        if (appliedVoucher) {
+            document.getElementById('voucher-code-display').textContent = appliedVoucher.code;
+            document.getElementById('voucher-discount-display').textContent = '$' + appliedVoucher.discount.toFixed(2);
+            document.getElementById('applied-voucher').style.display = 'block';
+            document.getElementById('discount-row').style.display = 'flex';
+            document.getElementById('discount-amount').textContent = '-$' + appliedVoucher.discount.toFixed(2);
+            updateTotals();
+        }
+    }
+
+    function updateTotals() {
+        const discount = appliedVoucher ? appliedVoucher.discount : 0;
+        const taxRate = <?= $tax_rate ?>;
+        const tax = (INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING) * taxRate;
+        const total = INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING + tax;
+
+        document.getElementById('subtotal').textContent = '$' + INITIAL_SUBTOTAL.toFixed(2);
+        if (appliedVoucher) {
+            document.getElementById('discount-amount').textContent = '-$' + discount.toFixed(2);
+        }
+        document.getElementById('shipping').textContent = INITIAL_SHIPPING > 0 ? '$' + INITIAL_SHIPPING.toFixed(2) : 'Free';
+        document.getElementById('tax').textContent = '$' + tax.toFixed(2);
+        document.getElementById('total').textContent = '$' + total.toFixed(2);
+    }
+
+    function showVoucherMessage(message, type) {
+        const messageEl = document.getElementById('voucher-message');
+        messageEl.textContent = message;
+        messageEl.className = `sub-voucher-message ${type}`;
+    }
+
+    async function removeVoucher() {
+        try {
+            const response = await fetch(`${API_BASE}/vouchers/remove-voucher`, {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                appliedVoucher = null;
+                document.getElementById('applied-voucher').style.display = 'none';
+                document.getElementById('discount-row').style.display = 'none';
+                updateTotals();
+                showAlert('Voucher removed', 'success');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    function showAlert(message, type = 'success') {
+        const alertHtml = `
+            <div class="alert alert-${type}">
+                ${message}
+            </div>
+        `;
+        document.getElementById('alert-container').innerHTML = alertHtml;
+
+        // Scroll to top
+        window.scrollTo({top: 0, behavior: 'smooth'});
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            document.getElementById('alert-container').innerHTML = '';
+        }, 5000);
     }
 
     async function updateQuantity(itemId, quantity) {
@@ -1160,6 +1355,15 @@
     //loadCart();
     loadWishlistCount();
     checkCartForSubscription();
+
+    if (appliedVoucher) {
+        document.getElementById('voucher-code-display').textContent = appliedVoucher.code;
+        document.getElementById('voucher-discount-display').textContent = '$' + parseFloat(appliedVoucher.discount).toFixed(2);
+        document.getElementById('applied-voucher').style.display = 'block';
+        document.getElementById('discount-row').style.display = 'flex';
+        document.getElementById('discount-amount').textContent = '-$' + parseFloat(appliedVoucher.discount).toFixed(2);
+        updateSummary();
+    }
 
     function checkCartForSubscription() {
         const urlParams = new URLSearchParams(window.location.search);

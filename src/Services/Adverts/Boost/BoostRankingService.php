@@ -3,6 +3,7 @@
 namespace App\Services\Adverts\Boost;
 
 use App\Framework\Support\Collection;
+use App\Framework\Support\Logger;
 use App\Models\Boost;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Adverts\Boost\BoostStatRepository;
@@ -72,24 +73,75 @@ class BoostRankingService
     {
         $ranked = $this->getRankedBoosts($context);
 
-        $rankedIds = $ranked->pluck('boost')->map(fn($b) => $b->boostable_id)->flip()->toArray();
+        // Build lookup: [boostable_id => ['boost_id' => X, 'rank' => Y]]
+        $rankedLookup = $ranked
+            ->pluck('boost')
+            ->values()
+            ->mapWithKeys(function ($boost, $index) {
+                return [
+                    $boost->boostable_id => [
+                        'boost_id' => $boost->id,
+                        'rank' => $index,
+                    ]
+                ];
+            })
+            ->toArray();
 
-        $boosted = $items->filter(function ($item) use ($rankedIds, $idKey) {
-            $id = is_array($item) ? ($item[$idKey] ?? null) : ($item->{$idKey} ?? null);
-            return $id !== null && isset($rankedIds[$id]);
+        $items = $items->map(function ($item) use ($rankedLookup, $idKey) {
+
+            $id = is_array($item)
+                ? ($item[$idKey] ?? null)
+                : ($item->{$idKey} ?? null);
+
+            $isBoosted = $id !== null && isset($rankedLookup[$id]);
+
+            $boostId = $isBoosted
+                ? $rankedLookup[$id]['boost_id']
+                : null;
+
+            if (is_array($item)) {
+                $item['is_boosted'] = $isBoosted;
+                $item['boost_id'] = $boostId;
+            } else {
+                $item->is_oosted = $isBoosted;
+                $item->boost_id = $boostId;
+            }
+
+            return $item;
         });
 
-        $unboosted = $items->filter(function ($item) use ($rankedIds, $idKey) {
-            $id = is_array($item) ? ($item[$idKey] ?? null) : ($item->{$idKey} ?? null);
-            return $id === null || !isset($rankedIds[$id]);
-        });
+        $boosted = $items->filter(fn($item) => is_array($item)
+            ? ($item['is_boosted'] ?? false)
+            : ($item->is_boosted ?? false)
+        );
 
-        // Sort boosted subset by their rank position
-        $boosted = $boosted->sortBy(function ($item) use ($rankedIds, $idKey) {
-            $id = is_array($item) ? ($item[$idKey] ?? null) : ($item->{$idKey} ?? null);
-            return $id !== null ? $rankedIds[$id] : PHP_INT_MAX;
+        $unboosted = $items->reject(fn($item) => is_array($item)
+            ? ($item['is_boosted'] ?? false)
+            : ($item->is_boosted ?? false)
+        );
+
+        // Sort boosted by rank
+        $boosted = $boosted->sortBy(function ($item) use ($rankedLookup, $idKey) {
+            $id = is_array($item)
+                ? ($item[$idKey] ?? null)
+                : ($item->{$idKey} ?? null);
+
+            return $id !== null && isset($rankedLookup[$id])
+                ? $rankedLookup[$id]['rank']
+                : PHP_INT_MAX;
         })->values();
 
         return $boosted->merge($unboosted)->values();
+    }
+
+    public function getActiveBoostedIds(string $context): array
+    {
+        try {
+            $boosts = $this->boostRepository->getActiveBoostsForContext($context);
+            return $boosts->pluck('boostable_id')->toArray();
+        } catch (\Exception $e) {
+            Logger::error('Failed to fetch boosted IDs', ['error' => $e->getMessage()]);
+            return [];
+        }
     }
 }

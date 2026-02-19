@@ -282,6 +282,17 @@ $isLoggedIn = !empty($member);
                     </svg>
                     Complete Subscription
                 </button>
+
+                <div class="sub-form-group" style="margin-top: 16px;">
+                    <label class="sub-checkbox">
+                        <input type="checkbox" id="auto-renew-consent" name="auto_renew" checked>
+                        <span>
+                            I agree to automatic renewal. Your subscription will renew automatically at the end of each billing period.
+                            You can cancel at any time. By checking this box you consent to recurring charges per our
+                            <a href="/terms" target="_blank">Terms</a>.
+                        </span>
+                    </label>
+                </div>
             </form>
 
             <div class="sub-security">
@@ -1489,7 +1500,8 @@ $isLoggedIn = !empty($member);
             const requestBody = {
                 subscription_plan_id: selectedPlanId,
                 payment_method: 'stripe',
-                payment_method_id: paymentMethod.id
+                payment_method_id: paymentMethod.id,
+                auto_renew_consent: document.getElementById('auto-renew-consent').checked,
             };
 
             // Include voucher code if applied

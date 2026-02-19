@@ -92,7 +92,6 @@ class IssueDeliveryController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            die('here');
             return $this->resourceResponse([
                 'success' => false,
                 'message' => $e->getMessage()

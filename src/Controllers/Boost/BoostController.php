@@ -5,11 +5,13 @@ namespace App\Controllers\Boost;
 use App\Controllers\Controller;
 use App\Enums\Boost\AutoBoostGoal;
 use App\Enums\Boost\BoostableType;
+use App\Enums\Boost\BoostStatus;
 use App\Exceptions\Boost\BoostEligibilityException;
 use App\Exceptions\Boost\BoostNotFoundException;
 use App\Exceptions\Boost\BoostTransitionException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\Logger;
 use App\Models\Boost;
 use App\Models\BoostStat;
 use App\Models\Product;
@@ -22,7 +24,10 @@ use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Requests\Boost\CreateBoostRequest;
 use App\Resources\Boost\BoostResource;
+use App\Services\Adverts\Boost\BoostEventService;
+use App\Services\Adverts\Boost\BoostLimitEnforcer;
 use App\Services\Adverts\Boost\BoostService;
+use App\Services\Adverts\Boost\BoostStatAggregator;
 use App\Services\Adverts\Boost\BoostSuggestionService;
 
 class BoostController extends Controller
@@ -35,7 +40,10 @@ class BoostController extends Controller
         private readonly MerchantAutoBoostSettingRepository $autoBoostSettingRepository,
         private readonly BoostSuggestionService             $suggestionService,
         private readonly MerchantBoostStatRepository        $merchantBoostStatRepository,
-        private readonly BoostStatRepository                $boostStatRepository
+        private readonly BoostStatRepository $boostStatRepository,
+        private readonly BoostStatAggregator $boostStatAggregator,
+        private readonly BoostLimitEnforcer  $boostLimitEnforcer,
+        private readonly BoostEventService   $boostEventService
     )
     {
         parent::__construct();
@@ -413,5 +421,54 @@ class BoostController extends Controller
             ]);
 
         return JsonResponse::json(['data' => $offers]);
+    }
+
+    public function aggregateStats(): JsonResponse
+    {
+        // Only aggregate active boosts — paused boosts keep their last stats frozen.
+        $boosts = $this->boostRepository->getByStatus(BoostStatus::Active);
+
+        foreach ($boosts as $boost) {
+            try {
+                $this->boostStatAggregator->aggregate($boost->id);
+                $this->boostLimitEnforcer->enforce($boost->id);
+            } catch (\Exception $e) {
+                Logger::error('Failed to aggregate boost stats', [
+                    'boost_id' => $boost->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $this->jsonResponse(['success' => true]);
+    }
+
+    public function recordClick(Request $request): JsonResponse
+    {
+        $productId = (int)$request->input('product_id');
+
+        if (!$productId) {
+            return $this->jsonResponse(['success' => false, 'message' => 'product_id required'], 400);
+        }
+
+        try {
+            $boost = $this->boostRepository->findActiveForTarget('product', $productId);
+
+            if (!$boost) {
+                return $this->jsonResponse(['success' => true]); // not boosted, silently ignore
+            }
+
+            $sessionHash = md5(session_id() ?: $request->ip());
+
+            $this->boostEventService->recordClick(
+                $boost->id,
+                $sessionHash,
+                ['product_id' => $productId, 'context' => $request->input('context', 'unknown')]
+            );
+        } catch (\Exception $e) {
+            Logger::error('Failed to record boost click', ['error' => $e->getMessage(), 'product_id' => $productId]);
+        }
+
+        return $this->jsonResponse(['success' => true]);
     }
 }

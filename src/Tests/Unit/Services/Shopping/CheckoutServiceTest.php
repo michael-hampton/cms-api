@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Shopping;
 
+use App\DTO\Cart\TaxData;
 use App\DTO\Checkout\DeliveryMethodConfig;
 use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Vouchers\VoucherValidationResult;
@@ -222,7 +223,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         // Tax calculation
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')
             ->once()
-            ->andReturn(['tax_cents' => 2000]);
+            ->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         // Transaction wrapper
         $this->databaseMock->shouldReceive('transaction')
@@ -431,7 +432,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         // Tax calculation
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')
             ->once()
-            ->andReturn(['tax_cents' => 1600]);
+            ->andReturn(new TaxData(rate: 0.1, taxCents: 1600));
 
         // Transaction wrapper
         $this->databaseMock->shouldReceive('transaction')
@@ -502,7 +503,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         // Continue with normal flow
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
@@ -552,7 +553,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
@@ -587,7 +588,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -629,7 +630,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         // Transaction assertion
         $this->databaseMock->shouldReceive('transaction')
@@ -672,7 +673,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -706,7 +707,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -796,7 +797,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         // Tax calculation
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')
             ->once()
-            ->andReturn(['tax_cents' => 2000]);
+            ->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         // Payment allocation
         $allocations = [
@@ -947,7 +948,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
         $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00]);
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->allocationService->shouldReceive('allocate')->once()->andReturn([
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
         ]);
@@ -1014,7 +1015,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
         $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00]);
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->allocationService->shouldReceive('allocate')->once()->andReturn([
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
         ]);
@@ -1089,7 +1090,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1600]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1600));
         $this->databaseMock->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1135,7 +1136,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1181,7 +1182,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1900]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1900));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1227,7 +1228,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1600]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1600));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1288,7 +1289,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1440]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1440));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1350,7 +1351,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1421,7 +1422,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1390]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1390));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1458,14 +1459,14 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         // Assert amount is in cents (integer)
         $this->stripeProcessor->shouldReceive('createPaymentIntent')
             ->once()
             ->with(Mockery::on(function ($args) {
-                $this->assertIsInt($args['amount']);
+                $this->assertIsFloat($args['amount']);
                 $this->assertEquals(13000, $args['amount']); // 100.00 + 10.00 + 20.00 in cents
                 return true;
             }))
@@ -1517,7 +1518,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1650]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1650));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         // Assert metadata includes discount breakdown
@@ -1566,7 +1567,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
@@ -1607,7 +1608,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -1675,7 +1676,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $shippingPerGroup = ['merchant_1' => 5.00, 'merchant_2' => 5.00, 'merchant_3' => 5.00];
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn($shippingPerGroup);
 
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 3000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 3000));
 
         $allocations = [
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true],
@@ -1743,7 +1744,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
         $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00]);
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->allocationService->shouldReceive('allocate')->once()->andReturn([
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
         ]);
@@ -1794,7 +1795,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
         $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00, 'merchant_2' => 5.00]);
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->allocationService->shouldReceive('allocate')->once()->andReturn([
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true],
             'merchant_2' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
@@ -1879,7 +1880,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
         $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00, 'merchant_2' => 5.00]);
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1600]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1600));
         $this->allocationService->shouldReceive('allocate')->once()->andReturn([
             'merchant_1' => ['subtotal' => 40.00, 'shipping' => 5.00, 'tax' => 8.00, 'total' => 53.00, 'stripe_eligible' => true],
             'merchant_2' => ['subtotal' => 40.00, 'shipping' => 5.00, 'tax' => 8.00, 'total' => 53.00, 'stripe_eligible' => true]
@@ -1943,7 +1944,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         ];
         $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
         $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00, 'merchant_2' => 5.00]);
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->allocationService->shouldReceive('allocate')->once()->andReturn([
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true],
             'merchant_2' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => false]
@@ -2012,7 +2013,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn(15.00);
 
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2500]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2500));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -2144,7 +2145,7 @@ class CheckoutServiceTest extends FunctionalTestCase
                 '90210',
                 $member
             )
-            ->andReturn(['tax_cents' => 950]); // 9.5% tax rate
+            ->andReturn(new TaxData(rate: 0.1, taxCents: 950)); // 9.5% tax rate
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
@@ -2290,7 +2291,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 2800]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -2344,7 +2345,7 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(10.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 1000]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->databaseMock->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,
@@ -2628,7 +2629,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
         $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(['tax_cents' => 0]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 0));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
         $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
             'success' => true,

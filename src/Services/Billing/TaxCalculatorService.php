@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing;
 
+use App\DTO\Cart\TaxData;
 use App\Models\Member;
 
 class TaxCalculatorService
@@ -67,7 +68,7 @@ class TaxCalculatorService
         ?string $state = null,
         ?string $postalCode = null,
         ?Member $member = null
-    ): array
+    ): TaxData
     {
         $subtotalCents = 0;
         $shippingCents = 0;
@@ -97,26 +98,31 @@ class TaxCalculatorService
         ?string $state = null,
         ?string $postalCode = null,
         ?Member $member = null
-    ): array
+    ): TaxData
     {
         $taxRate = $this->getTaxRate($country, $state);
 
         if (!$taxRate) {
-            return [
-                'tax_cents' => 0,
-                'tax_rate' => 0.00,
-                'tax_jurisdiction' => null
-            ];
+            return new TaxData(
+                rate: 0,
+                ratePercentage: 0,
+                jurisdiction: $taxRate['jurisdiction'],
+                includesShipping: $taxRate['includes_shipping'] ?? false,
+                taxCents: 0,
+                exempt: true
+            );
         }
 
         // Check if member is tax exempt
         if ($member && $this->isTaxExempt($member)) {
-            return [
-                'tax_cents' => 0,
-                'tax_rate' => 0.00,
-                'tax_jurisdiction' => $taxRate['jurisdiction'],
-                'exempt' => true
-            ];
+            return new TaxData(
+                rate: 0,
+                ratePercentage: 0,
+                jurisdiction: $taxRate['jurisdiction'],
+                includesShipping: $taxRate['includes_shipping'],
+                taxCents: 0,
+                exempt: true
+            );
         }
 
         $taxableAmountCents = $this->calculateTaxableAmount(
@@ -127,12 +133,14 @@ class TaxCalculatorService
 
         $taxCents = (int)round($taxableAmountCents * $taxRate['rate']);
 
-        return [
-            'tax_cents' => $taxCents,
-            'tax_rate' => $taxRate['rate'],
-            'tax_jurisdiction' => $taxRate['jurisdiction'],
-            'taxable_amount_cents' => $taxableAmountCents
-        ];
+        return new TaxData(
+            rate: $taxRate['rate'],
+            ratePercentage: round($taxRate['rate'] * 100, 2),
+            jurisdiction: $taxRate['jurisdiction'],
+            includesShipping: $taxRate['includes_shipping'],
+            taxCents: $taxCents,
+            taxableAmountCents: $taxableAmountCents
+        );
     }
 
     /**
@@ -252,7 +260,7 @@ class TaxCalculatorService
     /**
      * Get tax rate details for display
      */
-    public function getTaxRateInfo(string $country, ?string $state = null): ?array
+    public function getTaxRateInfo(string $country, ?string $state = null): ?TaxData
     {
         $taxRate = $this->getTaxRate($country, $state);
 
@@ -260,12 +268,12 @@ class TaxCalculatorService
             return null;
         }
 
-        return [
-            'rate' => $taxRate['rate'],
-            'rate_percentage' => round($taxRate['rate'] * 100, 2),
-            'jurisdiction' => $taxRate['jurisdiction'],
-            'includes_shipping' => $taxRate['includes_shipping']
-        ];
+        return new TaxData(
+            rate: $taxRate['rate'],
+            ratePercentage: round($taxRate['rate'] * 100, 2),
+            jurisdiction: $taxRate['jurisdiction'],
+            includesShipping: $taxRate['includes_shipping']
+        );
     }
 
     /**

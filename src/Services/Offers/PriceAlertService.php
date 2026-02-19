@@ -4,17 +4,16 @@ namespace App\Services\Offers;
 
 use App\Repositories\Offers\PriceAlertRepository;
 use App\Repositories\Product\ProductRepository;
-use App\Repositories\Product\ProductSpecificationGroupRepository;
 
 class PriceAlertService
 {
     private PriceAlertRepository $repository;
-    private ProductRepository $productRepository;
 
-    public function __construct(?PriceAlertRepository $repository = null, ?ProductRepository $productRepository = null)
+    public function __construct(
+        ?PriceAlertRepository               $repository = null,
+        private readonly ?ProductRepository $productRepository = null)
     {
         $this->repository = $repository ?? new PriceAlertRepository();
-        $this->productRepository = $productRepository ?? new ProductRepository(new ProductSpecificationGroupRepository());
     }
 
     public function createAlert(array $data): array

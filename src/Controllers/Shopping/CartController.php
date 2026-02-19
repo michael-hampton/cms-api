@@ -86,13 +86,16 @@ class CartController extends Controller
             ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
             : 0.00;
 
+        $tax = $this->calculateTax($subtotal, $shipping);
+
         $cartData = [
             'items' => $items,
             'total' => $this->cartService->getTotal(),
             'count' => $this->cartService->getCount(),
             'requiresShipping' => $this->cartService->requiresShipping(),
             'shipping' => $shipping,
-            'tax' => $this->calculateTax($subtotal, $shipping),
+            'tax' => $tax->taxCents / 100,
+            'tax_rate' => $tax->rate,
             'subtotal' => $subtotal,
             'startOptions' => $startOptions
         ];
@@ -143,7 +146,7 @@ class CartController extends Controller
 
     private function calculateTax(float $subtotal, float $shipping)
     {
-        $taxResult = $this->taxCalculatorService->calculateOrderTax(
+        return $this->taxCalculatorService->calculateOrderTax(
             (int)round($subtotal * 100),
             (int)round($shipping * 100),
             'GB',
@@ -152,8 +155,6 @@ class CartController extends Controller
             MemberAuth::getMember()
         );
 
-        $taxCents = $taxResult['tax_cents']; // 1200
-        return $taxCents / 100;
     }
 
     public function index()
@@ -166,13 +167,16 @@ class CartController extends Controller
             ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
             : 0.00;
 
+        $tax = $this->calculateTax($subtotal, $shipping);
+
         return $this->resourceResponse([
             'items' => $this->cartService->getItems(),
             'total' => $this->cartService->getTotal(),
             'count' => $this->cartService->getCount(),
             'requiresShipping' => $this->cartService->requiresShipping(),
             'shipping' => $shipping,
-            'tax' => $this->calculateTax($subtotal, $shipping),
+            'tax' => $tax->taxCents / 100,
+            'tax_rate' => $tax->rate,
             'subtotal' => $subtotal
         ]);
     }
@@ -228,6 +232,8 @@ class CartController extends Controller
             ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
             : 0.00;
 
+        $tax = $this->calculateTax($subtotal, $shipping);
+
         $cartData = [
             'items' => $items,
             'total' => $this->cartService->getTotal(),
@@ -236,7 +242,8 @@ class CartController extends Controller
             'shipping' => $shipping,
             'subtotal' => $subtotal,
             'savedCards' => $savedCards,
-            'tax' => $this->calculateTax($subtotal, $shipping),
+            'tax' => $tax->taxCents / 100,
+            'tax_rate' => $tax->rate,
             'hasPreOrders' => $this->detectPreOrders($items),
             'member' => MemberAuth::check() ? MemberAuth::getMember() : null
         ];

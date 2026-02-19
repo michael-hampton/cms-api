@@ -1192,23 +1192,38 @@ class QueryBuilder
 
     public function insert(array $values): int
     {
-        $columns = array_keys($values);
+        // Detect bulk insert
+        $isBulk = isset($values[0]) && is_array($values[0]);
+
+        if (!$isBulk) {
+            $values = [$values];
+        }
+
+        $columns = array_keys($values[0]);
         $quotedColumns = array_map([$this, 'quoteColumn'], $columns);
 
         $placeholders = [];
         $bindings = [];
         $paramCounter = 0;
 
-        foreach ($values as $value) {
-            $paramKey = 'param_' . $paramCounter++;
-            $placeholders[] = ":{$paramKey}";
-            $bindings[$paramKey] = $value;
+        foreach ($values as $row) {
+            $rowPlaceholders = [];
+
+            foreach ($columns as $column) {
+                $paramKey = 'param_' . $paramCounter++;
+                $rowPlaceholders[] = ":{$paramKey}";
+                $bindings[$paramKey] = $row[$column];
+            }
+
+            $placeholders[] = "(" . implode(', ', $rowPlaceholders) . ")";
         }
 
         $sql = "INSERT INTO " . $this->quoteTable($this->table) .
-            " (" . implode(', ', $quotedColumns) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            " (" . implode(', ', $quotedColumns) . ") VALUES " .
+            implode(', ', $placeholders);
 
-        $stmt = $this->database->query($sql, $bindings);
+        $this->database->query($sql, $bindings);
+
         return $this->database->lastInsertId();
     }
 

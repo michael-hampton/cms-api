@@ -2011,9 +2011,17 @@ $boostStatuses = ['pending', 'active', 'paused', 'expired', 'cancelled'];
     }
 
     function quickBoostFromSuggestion(s) {
-        // Pre-fill the create form from suggestion data
         document.getElementById('f-type').value = s.boostable_type;
+
+        // Set hidden value
         document.getElementById('f-target').value = s.offer_id ?? s.product_id;
+
+        // Show the selected label UI
+        document.getElementById('f-target-selected-label').textContent =
+            `${s.product_name} (ID: ${s.offer_id ?? s.product_id})`;
+        document.getElementById('f-target-selected').style.display = 'flex';
+        document.getElementById('f-target-search').value = '';
+
         document.getElementById('f-context').value = s.suggested_context;
         document.getElementById('f-multiplier').value = s.suggested_multiplier;
 
@@ -2025,10 +2033,7 @@ $boostStatuses = ['pending', 'active', 'paused', 'expired', 'cancelled'];
         document.getElementById('f-ends').value = toLocal(end);
 
         updatePrice();
-
-        // Scroll to form
         document.querySelector('.sidebar').scrollTo({top: 0, behavior: 'smooth'});
-        document.getElementById('f-multiplier').focus();
     }
 
     // ── Auto Boost ────────────────────────────────────────────────
