@@ -16,6 +16,10 @@ trait IsBoostable
 
     public function isInStock(): bool
     {
+        if (!$this instanceof Stockable) {
+            return true;
+        }
+
         return (bool)($this->in_stock ?? ($this->stock_quantity > 0));
     }
 

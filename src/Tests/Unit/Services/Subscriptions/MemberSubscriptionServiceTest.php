@@ -6,9 +6,11 @@ use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
 use App\Models\Subscriber;
+use App\Models\Subscription;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -22,6 +24,30 @@ class MemberSubscriptionServiceTest extends FunctionalTestCase
     private $subscriberRepository;
     private $service;
     private $memberRepository;
+    private SubscriptionRepository $subscriptionRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->memberRepository = Mockery::mock(MemberRepository::class);
+        $this->preferenceRepository = Mockery::mock(MemberSubscriptionPreferenceRepository::class);
+        $this->subscriberRepository = Mockery::mock(SubscriberRepository::class);
+        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+
+        $this->service = new MemberSubscriptionService(
+            $this->memberRepository,
+            $this->preferenceRepository,
+            $this->subscriberRepository,
+            $this->subscriptionRepository
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_get_preferences_for_member_returns_preference(): void
     {
@@ -290,24 +316,107 @@ class MemberSubscriptionServiceTest extends FunctionalTestCase
         $this->assertInstanceOf(MemberSubscriptionPreference::class, $result);
     }
 
-    protected function setUp(): void
+    public function test_update_auto_renew_enables_successfully(): void
     {
-        parent::setUp();
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->member_id = 42;
+        $subscription->consent_given = false;
 
-        $this->memberRepository = Mockery::mock(MemberRepository::class);
-        $this->preferenceRepository = Mockery::mock(MemberSubscriptionPreferenceRepository::class);
-        $this->subscriberRepository = Mockery::mock(SubscriberRepository::class);
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
 
-        $this->service = new MemberSubscriptionService(
-            $this->memberRepository,
-            $this->preferenceRepository,
-            $this->subscriberRepository
-        );
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(1, ['auto_renew' => true, 'consent_given' => true]);
+
+        $result = $this->service->updateAutoRenew(1, 42, true, true);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['auto_renew']);
     }
 
-    protected function tearDown(): void
+    public function test_update_auto_renew_disables_successfully(): void
     {
-        Mockery::close();
-        parent::tearDown();
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->member_id = 42;
+        $subscription->consent_given = true;
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(1, ['auto_renew' => false, 'consent_given' => true]); // consent_given preserved
+
+        $result = $this->service->updateAutoRenew(1, 42, false, false);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['auto_renew']);
+    }
+
+    public function test_update_auto_renew_throws_when_subscription_not_found(): void
+    {
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(999)
+            ->andReturn(null);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Subscription not found');
+
+        $this->service->updateAutoRenew(999, 42, true, true);
+    }
+
+    public function test_update_auto_renew_throws_when_subscription_belongs_to_different_member(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->member_id = 99; // different member
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Subscription not found');
+
+        $this->service->updateAutoRenew(1, 42, true, true);
+    }
+
+    public function test_update_auto_renew_throws_when_enabling_without_consent(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->member_id = 42;
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository->shouldNotReceive('update');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Consent is required');
+
+        $this->service->updateAutoRenew(1, 42, true, false);
+    }
+
+    public function test_update_auto_renew_does_not_require_consent_when_disabling(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->member_id = 42;
+        $subscription->consent_given = true;
+
+        $this->subscriptionRepository->shouldReceive('find')->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('update')->once();
+
+        // consent_given = false is fine when disabling
+        $result = $this->service->updateAutoRenew(1, 42, false, false);
+
+        $this->assertTrue($result['success']);
     }
 }

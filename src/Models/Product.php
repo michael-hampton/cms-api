@@ -6,11 +6,12 @@ use App\Contracts\Boost\BoostableInterface;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
 use App\Models\Concerns\IsBoostable;
+use App\Models\Concerns\Stockable;
 use App\Models\Concerns\TracksCreator;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 use App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy;
 
-class Product extends Model implements BoostableInterface
+class Product extends Model implements BoostableInterface, Stockable
 {
     use HasCloneHistory, TracksCreator, IsBoostable;
 

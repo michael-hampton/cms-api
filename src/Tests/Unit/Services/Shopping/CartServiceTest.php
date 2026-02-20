@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Shopping;
 
+use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\CartItem;
@@ -9,18 +10,23 @@ use App\Models\Product;
 use App\Models\ProductOfferBundle;
 use App\Models\ProductOfferBundleItem;
 use App\Models\ProductVariant;
+use App\Models\SubscriptionBundle;
+use App\Models\SubscriptionBundleItem;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Offers\ProductOfferBundleRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Shopping\CartRepository;
+use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\Factories\CartItemFactory;
 use App\Services\Shopping\Resolvers\CartPriceResolver;
 use App\Services\Shopping\Resolvers\CartStockResolver;
+use App\Services\Subscriptions\Calculators\SubscriptionBundlePriceAllocator;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -40,6 +46,8 @@ class CartServiceTest extends FunctionalTestCase
     private CartPriceResolver $priceResolver;
     private CartItemFactory $itemFactory;
     private ShippingService $shippingService;
+    private SubscriptionBundleRepository $subscriptionBundleRepository;
+    private SubscriptionBundlePriceAllocator $subscriptionBundlePriceAllocator;
 
     protected function setUp(): void
     {
@@ -53,6 +61,8 @@ class CartServiceTest extends FunctionalTestCase
         $this->voucherService = Mockery::mock(VoucherService::class);
         $this->productVariantRepository = Mockery::mock(ProductVariantRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->subscriptionBundleRepository = Mockery::mock(SubscriptionBundleRepository::class);
+        $this->subscriptionBundlePriceAllocator = Mockery::mock(SubscriptionBundlePriceAllocator::class);
 
         // Real collaborators
         $this->stockResolver = new CartStockResolver();
@@ -72,7 +82,9 @@ class CartServiceTest extends FunctionalTestCase
             $this->stockResolver,
             $this->priceResolver,
             $this->itemFactory,
-            $this->shippingService
+            $this->shippingService,
+            $this->subscriptionBundleRepository,
+            $this->subscriptionBundlePriceAllocator
         );
 
         $_SESSION['cart_session_id'] = 'test_session_123';
@@ -412,7 +424,7 @@ class CartServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(new CartItem());
 
-        $result = $this->service->addSubscriptionToCart(1, 'SubscriptionType::DIGITAL->value');
+        $result = $this->service->addSubscriptionToCart(1, SubscriptionType::DIGITAL->value);
 
         $this->assertTrue($result['success']);
         $this->assertEquals('Subscription added to cart', $result['message']);
@@ -787,9 +799,9 @@ class CartServiceTest extends FunctionalTestCase
         $this->cartRepository->shouldReceive('create')
             ->once()
             ->with(Mockery::on(function ($data) use ($product, $variant) {
-                return $data['product_id'] === $product->id
-                    && $data['variant_id'] === $variant->id
-                    && $data['price'] === $product->price;
+                return $data['product_id'] == $product->id
+                    && $data['variant_id'] == $variant->id
+                    && $data['price'] == $variant->price;
             }))
             ->andReturn(new CartItem());
 
@@ -1143,5 +1155,507 @@ class CartServiceTest extends FunctionalTestCase
 
         $this->assertFalse($result['success']);
         $this->assertEquals('Bundle not available', $result['message']);
+    }
+
+    public function test_adds_each_bundle_plan_as_separate_cart_item(): void
+    {
+        [$bundle, $planA, $planB, $productA, $productB] = $this->makeBundle();
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->with($bundle->id)
+            ->once()
+            ->andReturn($bundle);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->twice()
+            ->andReturn(null);
+
+        $this->subscriptionBundlePriceAllocator->shouldReceive('allocate')
+            ->with($bundle)
+            ->once()
+            ->andReturn([
+                $planA->id => 30.00,
+                $planB->id => 20.00,
+            ]);
+
+        $this->cartRepository->shouldReceive('create')
+            ->twice()
+            ->andReturn(new CartItem());
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addSubscriptionBundleToCart($bundle->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Subscription bundle added to cart', $result['message']);
+        $this->assertCount(2, $result['cart_items']);
+        $this->assertEquals($bundle->id, $result['bundle_id']);
+    }
+
+    public function test_cart_item_carries_bundle_id_and_allocated_price(): void
+    {
+        [$bundle, $planA, $planB, $productA, $productB] = $this->makeBundle();
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($bundle);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->twice()
+            ->andReturn(null);
+
+        $this->subscriptionBundlePriceAllocator->shouldReceive('allocate')
+            ->once()
+            ->andReturn([
+                $planA->id => 36.00,
+                $planB->id => 24.00,
+            ]);
+
+        // Assert first item gets planA's allocated price and bundle_id in options
+        $this->cartRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) use ($bundle, $planA) {
+                $options = is_string($data['options'])
+                    ? json_decode($data['options'], true)
+                    : $data['options'];
+
+                return $data['price'] === 36.00
+                    && $data['subscription_plan_id'] === $planA->id
+                    && $options['bundle_id'] === $bundle->id
+                    && $options['type'] === CartItemType::SUBSCRIPTION_BUNDLE->value;
+            }))
+            ->andReturn(new CartItem());
+
+        // Second item
+        $this->cartRepository->shouldReceive('create')
+            ->once()
+            ->andReturn(new CartItem());
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addSubscriptionBundleToCart($bundle->id);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_uses_database_transaction(): void
+    {
+        [$bundle] = $this->makeBundle();
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($bundle);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->twice()
+            ->andReturn(null);
+
+        $this->subscriptionBundlePriceAllocator->shouldReceive('allocate')
+            ->once()
+            ->andReturn([$bundle->items->first()->subscription_plan_id => 30.00,
+                $bundle->items->last()->subscription_plan_id => 20.00]);
+
+        $this->cartRepository->shouldReceive('create')
+            ->twice()
+            ->andReturn(new CartItem());
+
+        // Assert transaction is used
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                $this->assertIsCallable($callback);
+                return $callback();
+            });
+
+        $this->service->addSubscriptionBundleToCart($bundle->id);
+    }
+
+    // -----------------------------------------------------------------------
+    // Guard: bundle not found / inactive
+    // -----------------------------------------------------------------------
+
+    public function test_fails_when_bundle_not_found(): void
+    {
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->with(999)
+            ->once()
+            ->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addSubscriptionBundleToCart(999);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Subscription bundle not available', $result['message']);
+    }
+
+    public function test_fails_when_bundle_is_inactive(): void
+    {
+        $bundle = Mockery::mock(SubscriptionBundle::class)->makePartial();
+        $bundle->id = 1;
+        $bundle->shouldReceive('isCurrentlyActive')->andReturn(false);
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($bundle);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addSubscriptionBundleToCart(1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Subscription bundle not available', $result['message']);
+    }
+
+    public function test_fails_when_bundle_has_no_items(): void
+    {
+        $bundle = Mockery::mock(SubscriptionBundle::class)->makePartial();
+        $bundle->id = 1;
+        $bundle->shouldReceive('isCurrentlyActive')->andReturn(true);
+        $bundle->items = collect([]);
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($bundle);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addSubscriptionBundleToCart(1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Subscription bundle has no plans', $result['message']);
+    }
+
+    // -----------------------------------------------------------------------
+    // Guard: duplicate plan already in cart
+    // -----------------------------------------------------------------------
+
+    public function test_fails_when_a_bundle_plan_is_already_in_cart(): void
+    {
+        [$bundle, $planA] = $this->makeBundle();
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($bundle);
+
+        // planA is already in the cart
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->with($planA->id, Mockery::any(), Mockery::any())
+            ->once()
+            ->andReturn(new CartItem());
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->addSubscriptionBundleToCart($bundle->id);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('already in your cart', $result['message']);
+    }
+
+    // -----------------------------------------------------------------------
+    // Rollback on runtime error
+    // -----------------------------------------------------------------------
+
+    public function test_transaction_rolls_back_when_plan_not_found(): void
+    {
+        [$bundle, $planA, $planB] = $this->makeBundle();
+
+        // Make planA unavailable
+        $bundle->items->first()->subscriptionPlan = null;
+
+        $this->subscriptionBundleRepository->shouldReceive('find')
+            ->once()
+            ->andReturn($bundle);
+
+        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
+            ->twice()
+            ->andReturn(null);
+
+        $this->subscriptionBundlePriceAllocator->shouldReceive('allocate')
+            ->once()
+            ->andReturn([$planA->id => 30.00, $planB->id => 20.00]);
+
+        $exceptionThrown = false;
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($cb) use (&$exceptionThrown) {
+                try {
+                    return $cb();
+                } catch (\RuntimeException $e) {
+                    $exceptionThrown = true;
+                    throw $e;
+                }
+            });
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->addSubscriptionBundleToCart($bundle->id);
+
+        $this->assertTrue($exceptionThrown, 'Exception should have triggered rollback');
+    }
+
+    // -----------------------------------------------------------------------
+    // Checkout compatibility: items appear as subscription items
+    // -----------------------------------------------------------------------
+
+    public function test_bundle_items_are_visible_to_getItems_as_subscription_items(): void
+    {
+        $product = new Product(['id' => 1, 'name' => 'Mag', 'slug' => 'mag', 'image' => null]);
+
+        $cartItem = new CartItem([
+            'id' => 10,
+            'product_id' => 1,
+            'subscription_plan_id' => 42,
+            'quantity' => 1,
+            'price' => 30.00,
+            'subtotal' => 30.00,
+            'options' => [
+                'type' => CartItemType::SUBSCRIPTION_BUNDLE->value,
+                'bundle_id' => 7,
+                'delivery_type' => 'digital',
+            ],
+        ]);
+        $cartItem->setRelation('product', $product);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
+
+        $items = $this->service->getItems();
+
+        $this->assertCount(1, $items);
+        // subscription_plan_id must be set so checkout service picks it up
+        $this->assertEquals(42, $items[0]['subscription_plan_id']);
+        $this->assertEquals(CartItemType::SUBSCRIPTION_BUNDLE->value, $items[0]['item_type']);
+        $this->assertEquals(7, $items[0]['options']['bundle_id'] ?? null);
+    }
+
+    public function test_contains_subscription_bundle_items_returns_true_when_bundle_item_present(): void
+    {
+        $cart = new CartItem([
+            'subscription_plan_id' => 1,
+            'options' => json_encode(['bundle_id' => 5, 'delivery_type' => 'digital']),
+        ]);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->andReturn(collect([$cart]));
+
+        $this->assertTrue($this->service->containsSubscriptionBundleItems());
+    }
+
+    public function test_contains_subscription_bundle_items_returns_false_when_no_bundle_items(): void
+    {
+        $cart = new CartItem([
+            'subscription_plan_id' => 1,
+            'options' => json_encode(['delivery_type' => 'digital']),
+        ]);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->andReturn(collect([$cart]));
+
+        $this->assertFalse($this->service->containsSubscriptionBundleItems());
+    }
+
+    public function test_contains_subscription_bundle_items_returns_false_for_empty_cart(): void
+    {
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->andReturn(collect([]));
+
+        $this->assertFalse($this->service->containsSubscriptionBundleItems());
+    }
+
+    public function test_contains_subscription_bundle_items_handles_array_options(): void
+    {
+        $cart = new CartItem([
+            'subscription_plan_id' => 1,
+            'options' => json_encode(['bundle_id' => 3, 'delivery_type' => 'print']),
+        ]);
+
+        // options already decoded (array, not JSON string)
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->andReturn(collect([$cart]));
+
+        $this->assertTrue($this->service->containsSubscriptionBundleItems());
+    }
+
+    public function test_contains_subscription_bundle_items_returns_true_when_mixed_cart_has_bundle(): void
+    {
+        $cart = new CartItem([
+            'subscription_plan_id' => 1,
+            'options' => json_encode(['delivery_type' => 'print']),
+        ]);
+
+        $cart2 = new CartItem([
+            'subscription_plan_id' => 1,
+            'options' => json_encode(['bundle_id' => 3, 'delivery_type' => 'print']),
+        ]);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->andReturn(collect([$cart, $cart2]));
+
+        $this->assertTrue($this->service->containsSubscriptionBundleItems());
+    }
+
+
+    /**
+     * Build a mock subscription bundle with two one-time plans.
+     *
+     * @return array [bundle, planA, planB, productA, productB]
+     */
+    private function makeBundle(): array
+    {
+        $productA = Mockery::mock(Product::class)->makePartial();
+        $productA->id = 10;
+        $productA->is_active = true;
+        $productA->site_id = 1;
+        $productA->name = 'Plan A Product';
+
+        $productB = Mockery::mock(Product::class)->makePartial();
+        $productB->id = 11;
+        $productB->is_active = true;
+        $productB->site_id = 1;
+        $productB->name = 'Plan B Product';
+
+        $planA = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $planA->id = 101;
+        $planA->name = 'Plan A';
+        $planA->price = 40.00;
+        $planA->site_id = 1;
+        $planA->shouldReceive('isOneTime')->andReturn(false);
+        $planA->shouldReceive('getDeliveryOptions')->andReturn(['digital', 'print']);
+        $planA->product = $productA;
+
+        $planB = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $planB->id = 102;
+        $planB->name = 'Plan B';
+        $planB->price = 30.00;
+        $planB->site_id = 1;
+        $planB->shouldReceive('isOneTime')->andReturn(false);
+        $planB->shouldReceive('getDeliveryOptions')->andReturn(['digital', 'print']);
+        $planB->product = $productB;
+
+        $itemA = Mockery::mock(SubscriptionBundleItem::class)->makePartial();
+        $itemA->subscription_plan_id = $planA->id;
+        $itemA->delivery_type = 'digital';
+        $itemA->quantity = 1;
+        $itemA->subscriptionPlan = $planA;
+
+        $itemB = Mockery::mock(SubscriptionBundleItem::class)->makePartial();
+        $itemB->subscription_plan_id = $planB->id;
+        $itemB->delivery_type = 'print';
+        $itemB->quantity = 1;
+        $itemB->subscriptionPlan = $planB;
+
+        $bundle = Mockery::mock(SubscriptionBundle::class)->makePartial();
+        $bundle->id = 7;
+        $bundle->bundle_price = 50.00;
+        $bundle->total_price = 70.00;
+        $bundle->shouldReceive('isCurrentlyActive')->andReturn(true);
+        $bundle->items = collect([$itemA, $itemB]);
+
+        return [$bundle, $planA, $planB, $productA, $productB];
+    }
+
+    public function test_get_price_for_subscription_returns_plan_price_when_no_tier(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 29.99;
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, null, 'print']);
+
+        $this->assertEquals(29.99, $price);
+    }
+
+    public function test_get_price_for_subscription_uses_digital_sale_price_when_lower(): void
+    {
+        $tier = new SubscriptionPlanPricing(['digital_price' => 20, 'digital_sale_price' => 15, 'price' => 30]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, $tier, 'digital']);
+
+        $this->assertEquals(15.00, $price);
+    }
+
+    public function test_get_price_for_subscription_ignores_digital_sale_price_when_not_lower(): void
+    {
+        $tier = new SubscriptionPlanPricing(['digital_price' => 20, 'digital_sale_price' => 25, 'price' => 30]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, $tier, 'digital']);
+
+        $this->assertEquals(20.00, $price);
+    }
+
+    public function test_get_price_for_subscription_falls_back_to_print_price_when_digital_price_null(): void
+    {
+        // BUG FIX: previously returned null here, causing downstream arithmetic errors
+        $tier = new SubscriptionPlanPricing(['digital_price' => null, 'digital_sale_price' => null, 'price' => 30]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, $tier, 'digital']);
+
+        $this->assertEquals(30.00, $price);
+        $this->assertIsFloat($price); // must never be null
+    }
+
+    public function test_get_price_for_subscription_uses_print_sale_price_when_lower(): void
+    {
+        $tier = new SubscriptionPlanPricing(['sale_price' => 24.99, 'price' => 30]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, $tier, 'print']);
+
+        $this->assertEquals(24.99, $price);
+    }
+
+    public function test_get_price_for_subscription_ignores_print_sale_price_when_not_lower(): void
+    {
+        $tier = new SubscriptionPlanPricing(['sale_price' => 35, 'price' => 30]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, $tier, 'print']);
+
+        $this->assertEquals(30.00, $price);
+    }
+
+    public function test_get_price_for_subscription_returns_float_not_null_for_digital_with_no_prices(): void
+    {
+        $tier = new SubscriptionPlanPricing(['digital_price' => null, 'digital_sale_price' => null, 'price' => 25]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+
+        $price = $this->callPrivate('getPriceForSubscription', [$plan, $tier, 'digital']);
+
+        $this->assertIsFloat($price);
+        $this->assertGreaterThan(0, $price);
+    }
+
+
+    // Helper — calls a private method via reflection (add to CartServiceTest base)
+    private function callPrivate(string $method, array $args): mixed
+    {
+        $ref = new \ReflectionMethod($this->service, $method);
+        $ref->setAccessible(true);
+        return $ref->invokeArgs($this->service, $args);
     }
 }

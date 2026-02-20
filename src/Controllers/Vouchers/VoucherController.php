@@ -178,6 +178,18 @@ class VoucherController extends Controller
                     return $this->errorResponse('Plan ID is required for subscription vouchers', 422);
                 }
 
+                // Vouchers cannot be applied to bundle purchases — the bundle price
+                // is already a pre-negotiated discount. Surface this clearly rather
+                // than silently ignoring the code at checkout time.
+                if ($this->cartService->containsSubscriptionBundleItems()) {
+                    return $this->jsonResponse([
+                        'valid' => false,
+                        'message' => 'Voucher codes cannot be applied to bundle purchases.',
+                        'discount' => 0,
+                    ]);
+                }
+
+
                 $result = $this->voucherService->validateVoucherForSubscription(
                     $code,
                     $planId,

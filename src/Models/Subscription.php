@@ -67,6 +67,8 @@ class Subscription extends Model
         'bundle_id',
         'access_starts_at',
         'first_shipment_at',
+        'account_number',
+        'is_linked'
     ];
 
     protected $casts = [
@@ -89,6 +91,7 @@ class Subscription extends Model
         'premium_access' => 'array',
         'access_starts_at' => 'datetime',
         'first_shipment_at' => 'datetime',
+        'is_linked' => 'boolean'
     ];
 
     public function member($relation = false)

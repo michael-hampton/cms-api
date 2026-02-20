@@ -527,6 +527,19 @@ class CartController extends Controller
         ]));
     }
 
+    public function addSubscriptionBundle(Request $request)
+    {
+        $bundleId = $request->input('bundle_id');
+
+        $result = $this->cartService->addSubscriptionBundleToCart($bundleId);
+
+        return $this->resourceResponse(array_merge($result, [
+            'count' => $this->cartService->getCount(),
+            'total' => $this->cartService->getTotal(),
+            'items' => $this->cartService->getItems(),
+        ]));
+    }
+
     public function addOffer(Request $request): JsonResponse
     {
         try {

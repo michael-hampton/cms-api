@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
+use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\SubscriptionPlan;
@@ -43,6 +44,10 @@ class SubscriptionPricingCalculatorTest extends TestCase
         );
     }
 
+    // -----------------------------------------------------------------------
+    // Existing tests — must all pass unchanged
+    // -----------------------------------------------------------------------
+
     public function test_calculate_digital_subscription_no_voucher(): void
     {
         $plan = $this->createMockPlan(50.00);
@@ -52,7 +57,6 @@ class SubscriptionPricingCalculatorTest extends TestCase
             ->with(1)
             ->andReturn($plan);
 
-        // Mock resolver to return plan price (no tier)
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
@@ -68,7 +72,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
@@ -80,32 +84,13 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $this->assertNull($pricing->voucherId);
     }
 
-
-    private function createMockPlan(float $price): SubscriptionPlan
-    {
-        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
-        $plan->id = 1;
-        $plan->price = $price;
-        return $plan;
-    }
-
-    private function createMockMember(): Member
-    {
-        $member = Mockery::mock(Member::class)->makePartial();
-        $member->id = 123;
-        return $member;
-    }
-
     public function test_calculate_print_subscription_with_shipping(): void
     {
         $plan = $this->createMockPlan(50.00);
         $member = $this->createMockMember();
 
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($plan);
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
-        // Mock resolver
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
@@ -114,9 +99,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
             voucherId: null
         );
 
-        $this->pricingResolver->shouldReceive('resolve')
-            ->once()
-            ->andReturn($resolvedPrice);
+        $this->pricingResolver->shouldReceive('resolve')->once()->andReturn($resolvedPrice);
 
         $this->shippingService->shouldReceive('calculateShipping')
             ->with(50.00, Mockery::any())
@@ -124,17 +107,16 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => SubscriptionType::PRINTED->value]
+            'options' => ['delivery_type' => SubscriptionType::PRINTED->value],
         ];
 
-        // FIXED: Pass address data in checkout data
         $checkoutData = [
             'address' => '123 Main St',
             'address2' => 'Apt 4',
             'city' => 'New York',
             'state' => 'NY',
             'postal_code' => '10001',
-            'country' => 'US'
+            'country' => 'US',
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, $checkoutData);
@@ -153,9 +135,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $plan = $this->createMockPlan(50.00);
         $member = $this->createMockMember();
 
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($plan);
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
@@ -165,9 +145,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
             voucherId: null
         );
 
-        $this->pricingResolver->shouldReceive('resolve')
-            ->once()
-            ->andReturn($resolvedPrice);
+        $this->pricingResolver->shouldReceive('resolve')->once()->andReturn($resolvedPrice);
 
         $this->shippingService->shouldReceive('calculateShipping')
             ->with(50.00, Mockery::any())
@@ -175,10 +153,9 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => SubscriptionType::PRINTED->value]
+            'options' => ['delivery_type' => SubscriptionType::PRINTED->value],
         ];
 
-        // No address in checkout data
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
 
         $this->assertEquals(5000, $pricing->subtotalCents);
@@ -191,14 +168,11 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $plan = $this->createMockPlan(50.00);
         $member = $this->createMockMember();
 
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($plan);
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->id = 999;
 
-        // Mock resolver with voucher applied
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
@@ -215,12 +189,12 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, 'SAVE10', $member, []);
 
-        $this->assertEquals(4000, $pricing->subtotalCents); // 50.00 - 10.00 discount
+        $this->assertEquals(4000, $pricing->subtotalCents);
         $this->assertEquals(1000, $pricing->discountCents);
         $this->assertEquals(999, $pricing->voucherId);
     }
@@ -230,11 +204,8 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $plan = $this->createMockPlan(50.00);
         $member = $this->createMockMember();
 
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($plan);
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
-        // Resolver will throw on invalid voucher
         $this->pricingResolver->shouldReceive('resolve')
             ->once()
             ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => null, 'voucher_code' => 'INVALID'], 123)
@@ -242,7 +213,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
         ];
 
         $this->expectException(\InvalidArgumentException::class);
@@ -253,14 +224,11 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
     public function test_calculate_uses_plan_price_not_cart_price(): void
     {
-        $plan = $this->createMockPlan(60.00); // Authoritative price
+        $plan = $this->createMockPlan(60.00);
         $member = $this->createMockMember();
 
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($plan);
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
-        // Resolver uses plan price
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 60.00,
             currency: 'USD',
@@ -269,19 +237,16 @@ class SubscriptionPricingCalculatorTest extends TestCase
             voucherId: null
         );
 
-        $this->pricingResolver->shouldReceive('resolve')
-            ->once()
-            ->andReturn($resolvedPrice);
+        $this->pricingResolver->shouldReceive('resolve')->once()->andReturn($resolvedPrice);
 
         $item = [
             'subscription_plan_id' => 1,
-            'price' => 50.00, // Stale cart price (should be ignored)
-            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
+            'price' => 50.00, // stale cart price — must be ignored
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
         ];
 
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
 
-        // Should use plan price (60.00), not cart price (50.00)
         $this->assertEquals(6000, $pricing->subtotalCents);
     }
 
@@ -289,13 +254,11 @@ class SubscriptionPricingCalculatorTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->planRepository->shouldReceive('find')
-            ->with(999)
-            ->andReturn(null);
+        $this->planRepository->shouldReceive('find')->with(999)->andReturn(null);
 
         $item = [
             'subscription_plan_id' => 999,
-            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
         ];
 
         $this->calculator->calculateForCartItem($item, null, $this->createMockMember(), []);
@@ -306,9 +269,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $plan = $this->createMockPlan(49.99);
         $member = $this->createMockMember();
 
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->andReturn($plan);
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 49.99,
@@ -318,9 +279,7 @@ class SubscriptionPricingCalculatorTest extends TestCase
             voucherId: null
         );
 
-        $this->pricingResolver->shouldReceive('resolve')
-            ->once()
-            ->andReturn($resolvedPrice);
+        $this->pricingResolver->shouldReceive('resolve')->once()->andReturn($resolvedPrice);
 
         $this->shippingService->shouldReceive('calculateShipping')
             ->with(49.99, Mockery::any())
@@ -328,17 +287,166 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $item = [
             'subscription_plan_id' => 1,
-            'options' => ['delivery_type' => SubscriptionType::PRINTED->value]
+            'options' => ['delivery_type' => SubscriptionType::PRINTED->value],
         ];
 
-        $checkoutData = ['address' => '123 Main St'];
+        $pricing = $this->calculator->calculateForCartItem($item, null, $member, ['address' => '123 Main St']);
+
+        $this->assertEquals(4999, $pricing->subtotalCents);
+        $this->assertEquals(999, $pricing->shippingCents);
+        $this->assertEquals(5998, $pricing->totalCents);
+    }
+
+    // -----------------------------------------------------------------------
+    // Bundle item tests
+    // -----------------------------------------------------------------------
+
+    public function test_bundle_item_uses_cart_price_directly_without_hitting_resolver(): void
+    {
+        // The resolver must NEVER be called for bundle items — the price is already set.
+        $this->pricingResolver->shouldNotReceive('resolve');
+        $this->planRepository->shouldNotReceive('find');
+
+        $member = $this->createMockMember();
+
+        $item = [
+            'subscription_plan_id' => 1,
+            'price' => 45.00,  // allocated price from SubscriptionBundlePriceAllocator
+            'options' => [
+                'type' => CartItemType::SUBSCRIPTION_BUNDLE->value,
+                'delivery_type' => SubscriptionType::DIGITAL->value,
+                'bundle_id' => 7,
+            ],
+        ];
+
+        $pricing = $this->calculator->calculateForCartItem($item, 'SAVE10', $member, []);
+
+        $this->assertEquals(4500, $pricing->subtotalCents);
+        $this->assertEquals(0, $pricing->discountCents);  // no voucher on bundle
+        $this->assertNull($pricing->voucherId);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $pricing->deliveryType);
+    }
+
+    public function test_bundle_item_detected_via_bundle_id_option_without_type(): void
+    {
+        // Some code paths may set bundle_id but not explicitly set the type enum.
+        $this->pricingResolver->shouldNotReceive('resolve');
+        $this->planRepository->shouldNotReceive('find');
+
+        $member = $this->createMockMember();
+
+        $item = [
+            'subscription_plan_id' => 2,
+            'price' => 30.00,
+            'options' => [
+                'bundle_id' => 7,  // presence alone is sufficient
+                'delivery_type' => SubscriptionType::DIGITAL->value,
+            ],
+        ];
+
+        $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
+
+        $this->assertEquals(3000, $pricing->subtotalCents);
+        $this->assertNull($pricing->voucherId);
+    }
+
+    public function test_bundle_item_print_delivery_still_calculates_shipping(): void
+    {
+        $this->pricingResolver->shouldNotReceive('resolve');
+
+        $this->shippingService->shouldReceive('calculateShipping')
+            ->with(45.00, Mockery::any())
+            ->once()
+            ->andReturn(5.00);
+
+        $member = $this->createMockMember();
+
+        $item = [
+            'subscription_plan_id' => 1,
+            'price' => 45.00,
+            'options' => [
+                'bundle_id' => 7,
+                'delivery_type' => SubscriptionType::PRINTED->value,
+            ],
+        ];
+
+        $checkoutData = [
+            'address' => '10 Downing St',
+            'city' => 'London',
+            'country' => 'GB',
+        ];
 
         $pricing = $this->calculator->calculateForCartItem($item, null, $member, $checkoutData);
 
-        // Verify proper rounding to cents
-        $this->assertEquals(4999, $pricing->subtotalCents); // 49.99 * 100
-        $this->assertEquals(999, $pricing->shippingCents);   // 9.99 * 100
-        $this->assertEquals(5998, $pricing->totalCents);     // 4999 + 999
+        $this->assertEquals(4500, $pricing->subtotalCents);
+        $this->assertEquals(500, $pricing->shippingCents);
+        $this->assertEquals(5000, $pricing->totalCents);
+        $this->assertEquals(SubscriptionType::PRINTED->value, $pricing->deliveryType);
+        $this->assertNotNull($pricing->shippingAddressSnapshot);
+    }
+
+    public function test_bundle_item_voucher_is_silently_ignored(): void
+    {
+        // A voucher code passed in must be dropped — no exception, no discount.
+        $this->pricingResolver->shouldNotReceive('resolve');
+
+        $member = $this->createMockMember();
+
+        $item = [
+            'subscription_plan_id' => 1,
+            'price' => 20.00,
+            'options' => [
+                'bundle_id' => 3,
+                'delivery_type' => SubscriptionType::DIGITAL->value,
+            ],
+        ];
+
+        $pricing = $this->calculator->calculateForCartItem($item, 'SAVE50', $member, []);
+
+        $this->assertEquals(2000, $pricing->subtotalCents);
+        $this->assertEquals(0, $pricing->discountCents);
+        $this->assertNull($pricing->voucherId);
+    }
+
+    public function test_bundle_item_digital_has_no_shipping_or_address_snapshot(): void
+    {
+        $this->shippingService->shouldNotReceive('calculateShipping');
+
+        $member = $this->createMockMember();
+
+        $item = [
+            'subscription_plan_id' => 1,
+            'price' => 25.00,
+            'options' => [
+                'bundle_id' => 5,
+                'delivery_type' => SubscriptionType::DIGITAL->value,
+            ],
+        ];
+
+        $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
+
+        $this->assertEquals(0, $pricing->shippingCents);
+        $this->assertNull($pricing->shippingAddressSnapshot);
+        $this->assertEquals(2500, $pricing->totalCents);
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private function createMockPlan(float $price): SubscriptionPlan
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->price = $price;
+        return $plan;
+    }
+
+    private function createMockMember(): Member
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 123;
+        return $member;
     }
 
     protected function tearDown(): void

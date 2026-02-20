@@ -2,6 +2,7 @@
 
 namespace App\Services\Shopping;
 
+use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Cart\InsufficientStockException;
 use App\Framework\Database\Database;
@@ -11,28 +12,32 @@ use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Shopping\CartRepository;
+use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\Factories\CartItemFactory;
 use App\Services\Shopping\Resolvers\CartPriceResolver;
 use App\Services\Shopping\Resolvers\CartStockResolver;
+use App\Services\Subscriptions\Calculators\SubscriptionBundlePriceAllocator;
 use App\Services\Vouchers\VoucherService;
 
 class CartService
 {
     public function __construct(
-        private readonly CartRepository           $cartRepository,
-        private readonly ProductRepository        $productRepository,
-        private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
-        private readonly ProductOfferRepository   $offerRepository,
-        private readonly ProductOfferBundleRepository $bundleRepository,
-        private readonly VoucherService           $voucherService,
-        private readonly ProductVariantRepository $productVariantRepository,
-        private readonly Database                 $database,
-        private readonly CartStockResolver        $stockResolver,
-        private readonly CartPriceResolver        $priceResolver,
-        private readonly CartItemFactory          $itemFactory,
-        private readonly ShippingService          $shippingService
+        private readonly CartRepository                   $cartRepository,
+        private readonly ProductRepository                $productRepository,
+        private readonly SubscriptionPlanRepository       $subscriptionPlanRepository,
+        private readonly ProductOfferRepository           $offerRepository,
+        private readonly ProductOfferBundleRepository     $bundleRepository,
+        private readonly VoucherService                   $voucherService,
+        private readonly ProductVariantRepository         $productVariantRepository,
+        private readonly Database                         $database,
+        private readonly CartStockResolver                $stockResolver,
+        private readonly CartPriceResolver                $priceResolver,
+        private readonly CartItemFactory                  $itemFactory,
+        private readonly ShippingService                  $shippingService,
+        private readonly SubscriptionBundleRepository     $subscriptionBundleRepository,
+        private readonly SubscriptionBundlePriceAllocator $bundlePriceAllocator,
     )
     {
     }
@@ -356,15 +361,17 @@ class CartService
         }
 
         if ($deliveryType === SubscriptionType::DIGITAL->value) {
-            return $pricingTier->digital_sale_price && $pricingTier->digital_sale_price < $pricingTier->digital_price
-                ? $pricingTier->digital_sale_price
-                : $pricingTier->digital_price;
+            $base = $pricingTier->digital_price ?? $pricingTier->price; // null-safe fallback to print price
+            $sale = $pricingTier->digital_sale_price ?? null;
+
+            return ($sale !== null && $sale < $base) ? (float)$sale : (float)$base;
         }
 
-        // Default to print/physical
-        return $pricingTier->sale_price && $pricingTier->sale_price < $pricingTier->price
-            ? $pricingTier->sale_price
-            : $pricingTier->price;
+        // Print / physical
+        $base = $pricingTier->price;
+        $sale = $pricingTier->sale_price ?? null;
+
+        return ($sale !== null && $sale < $base) ? (float)$sale : (float)$base;
     }
 
     /**
@@ -641,5 +648,149 @@ class CartService
     public function requiresShipping(): bool
     {
         return !$this->hasOnlyDigitalItems();
+    }
+
+    /**
+     * Add all plans in a subscription bundle to the cart as individual cart items.
+     *
+     * Each plan gets its own row with an allocated share of the bundle price.
+     * The bundle_id stored in options links the rows for UI grouping.
+     *
+     * Stripe does not need special handling: the items total to bundle_price naturally
+     * because the allocator guarantees the shares sum exactly to bundle_price.
+     *
+     * Fails atomically: if any plan cannot be added the whole transaction rolls back.
+     */
+    public function addSubscriptionBundleToCart(int $bundleId): array
+    {
+        return $this->database->transaction(function () use ($bundleId) {
+            $bundle = $this->subscriptionBundleRepository->find($bundleId);
+
+            if (!$bundle || !$bundle->isCurrentlyActive()) {
+                return ['success' => false, 'message' => 'Subscription bundle not available'];
+            }
+
+            if ($bundle->items->isEmpty()) {
+                return ['success' => false, 'message' => 'Subscription bundle has no plans'];
+            }
+
+            $sessionId = $this->getSessionId();
+            $userId = $this->getUserId();
+
+            // Check none of the bundle plans are already in the cart.
+            foreach ($bundle->items as $bundleItem) {
+                $planId = $bundleItem->subscription_plan_id;
+                $existing = $this->cartRepository->findBySubscriptionPlan($planId, $userId, $sessionId);
+
+                if ($existing) {
+                    return [
+                        'success' => false,
+                        'message' => 'One or more subscription plans in this bundle are already in your cart',
+                    ];
+                }
+            }
+
+            // Allocate bundle_price across plans proportionally.
+            $priceMap = $this->bundlePriceAllocator->allocate($bundle);
+
+            $cartItems = [];
+
+            foreach ($bundle->items as $bundleItem) {
+                $plan = $bundleItem->subscriptionPlan;
+
+                if (!$plan) {
+                    throw new \RuntimeException(
+                        "Subscription plan {$bundleItem->subscription_plan_id} not found in bundle {$bundleId}"
+                    );
+                }
+
+                $deliveryType = $bundleItem->delivery_type;
+
+//                if (!in_array($deliveryType, $plan->getDeliveryOptions(), true)) {
+//                    throw new \RuntimeException(
+//                        "Delivery type '{$deliveryType}' is not valid for plan '{$plan->name}'"
+//                    );
+//                }
+
+                $allocatedPrice = $priceMap[$plan->id];
+
+                // One-time plans don't have an associated product row.
+                if ($plan->isOneTime()) {
+                    $cartData = [
+                        'session_id' => $sessionId,
+                        'user_id' => $userId,
+                        'product_id' => null,
+                        'quantity' => $bundleItem->quantity,
+                        'price' => $allocatedPrice,
+                        'subtotal' => $allocatedPrice * $bundleItem->quantity,
+                        'subscription_plan_id' => $plan->id,
+                        'options' => json_encode([
+                            'type' => CartItemType::SUBSCRIPTION_BUNDLE->value,
+                            'delivery_type' => $deliveryType,
+                            'bundle_id' => $bundleId,
+                            'subscription_plan_id' => $plan->id,
+                        ]),
+                        'site_id' => $plan->site_id,
+                        'merchant_id' => null,
+                        'variant_id' => null,
+                    ];
+
+                    $cartItem = $this->cartRepository->create($cartData);
+                } else {
+                    $product = $plan->product;
+
+                    if (!$product || !$product->is_active) {
+                        throw new \RuntimeException(
+                            "Associated product for plan '{$plan->name}' is not available"
+                        );
+                    }
+
+                    $cartItemData = $this->itemFactory->fromSubscriptionBundleItem(
+                        $sessionId,
+                        $userId,
+                        $product,
+                        $bundleItem->quantity,
+                        $allocatedPrice,
+                        $plan->id,
+                        $deliveryType,
+                        $bundleId
+                    );
+
+                    $cartItem = $this->cartRepository->create($cartItemData->toArray());
+                }
+
+                $cartItems[] = $cartItem;
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Subscription bundle added to cart',
+                'cart_items' => $cartItems,
+                'bundle_id' => $bundleId,
+            ];
+        });
+    }
+
+    /**
+     * Returns true if the cart contains any subscription bundle items.
+     *
+     * Used to gate voucher application — vouchers cannot be stacked on top
+     * of bundle pricing, which is already a pre-negotiated discount.
+     */
+    public function containsSubscriptionBundleItems(): bool
+    {
+        $items = $this->getItems();
+
+        foreach ($items as $item) {
+            $options = is_string($item['options'] ?? null)
+                ? json_decode($item['options'], true)
+                : ($item['options'] ?? []);
+
+            if (isset($options['bundle_id'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

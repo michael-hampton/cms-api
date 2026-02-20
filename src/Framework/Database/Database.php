@@ -186,6 +186,14 @@ class Database
         }
     }
 
+    public function fetchOne(string $sql, array $params = []): ?array
+    {
+        $stmt = $this->query($sql, $params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
     public function insert(string $table, array $data): int
     {
         try {

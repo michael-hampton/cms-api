@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Shopping\OneTimeSubscriptionService;
@@ -16,24 +17,14 @@ class OneTimeSubscriptionsController extends Controller
     public function __construct(
         private readonly OneTimeSubscriptionService         $subscriptionService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly StripePaymentProcessor     $stripeProcessor,
-        private readonly SubscriptionCatalogService $catalogService
+        private readonly StripePaymentProcessor       $stripeProcessor,
+        private readonly SubscriptionCatalogService   $catalogService,
+        private readonly SubscriptionBundleRepository $bundleRepository
 
     )
     {
         parent::__construct();
     }
-
-    /*public function index()
-    {
-        $siteId = SiteContext::getId();
-        $plans = $this->subscriptionService->getOneTimePlansCatalog($siteId);
-
-        return $this->view('subscriptions/onetime/index', [
-            'plans' => $plans,
-            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
-        ]);
-    }*/
 
     /**
      * Shop page - shows all subscriptions across all sites with filters
@@ -54,11 +45,48 @@ class OneTimeSubscriptionsController extends Controller
             'special_filter' => $request->input('special_filter'),
         ];
 
+        $siteId = (int)$filters['site_id'] ?? null;
+
         $catalogData = $this->catalogService->getCatalog($filters);
+
+        // Handle AJAX filter requests
+        if ($request->header('X-Requested-With') === 'XMLHttpRequest' || $request->input('ajax')) {
+            return $this->jsonResponse([
+                'success' => true,
+                'plans' => $catalogData['data'],
+                'pagination' => [
+                    'current_page' => $catalogData['pagination']['current_page'],
+                    'total_pages' => $catalogData['pagination']['last_page'],
+                    'per_page' => $catalogData['pagination']['per_page'],
+                    'total' => $catalogData['pagination']['total'],
+                ],
+            ]);
+        }
+
         $availableSites = $this->catalogService->getAvailableSites();
-        $priceRange = $this->catalogService->getPriceRange($filters['site_id'] ?? null);
-        $availableCategories = $this->catalogService->getAvailableCategories($filters['site_id'] ?? null);
-        $availableTags = $this->catalogService->getAvailableTags($filters['site_id'] ?? null);
+        $priceRange = $this->catalogService->getPriceRange($siteId ?? null);
+        $availableCategories = $this->catalogService->getAvailableCategories($siteId ?? null);
+        $availableTags = $this->catalogService->getAvailableTags($siteId ?? null);
+
+        // Active bundles for the current site — shown in a dedicated section
+        // above the individual plans listing.
+        $bundles = $this->bundleRepository
+            ->getActiveBundles()
+            ->map(fn($bundle) => [
+                'id' => $bundle->id,
+                'name' => $bundle->name,
+                'slug' => $bundle->slug,
+                'description' => $bundle->description,
+                'bundle_price' => $bundle->bundle_price,
+                'total_price' => $bundle->total_price,
+                'savings_amount' => $bundle->getSavingsAmount(),
+                'discount_percentage' => $bundle->getDiscountPercentage(),
+                'plans' => $bundle->items->map(fn($item) => [
+                    'id' => $item->subscriptionPlan->id,
+                    'name' => $item->subscriptionPlan->name,
+                    'delivery_type' => $item->delivery_type,
+                ])->toArray(),
+            ])->toArray();
 
         $categoryMappings = [
             ['name' => 'All', 'icon' => '🏠', 'color' => '#64748b'],
@@ -102,7 +130,39 @@ class OneTimeSubscriptionsController extends Controller
             'available_tags' => $availableTags,
             'price_range' => $priceRange,
             'sort_options' => SubscriptionSortOption::cases(),
-            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
+            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key'),
+            'bundles' => $bundles
+        ]);
+    }
+
+    public function search(Request $request)
+    {
+        $filters = [
+            'search' => $request->input('search'),
+            'site_id' => $request->input('site_id'),
+            'delivery_type' => $request->input('delivery_type'),
+            'price_min' => $request->input('price_min'),
+            'price_max' => $request->input('price_max'),
+            'sort' => $request->input('sort', SubscriptionSortOption::PRICE_LOW_TO_HIGH->value),
+            'per_page' => $request->input('per_page', 12),
+            'page' => $request->input('page', 1),
+            'tags' => $request->input('tags', []),
+            'categories' => $request->input('categories'),
+            'special_filter' => $request->input('special_filter'),
+        ];
+
+        $catalogData = $this->catalogService->getCatalog($filters);
+
+        // Handle AJAX filter requests
+        return $this->jsonResponse([
+            'success' => true,
+            'plans' => $catalogData['data'],
+            'pagination' => [
+                'current_page' => $catalogData['pagination']['current_page'],
+                'total_pages' => $catalogData['pagination']['last_page'],
+                'per_page' => $catalogData['pagination']['per_page'],
+                'total' => $catalogData['pagination']['total'],
+            ],
         ]);
     }
 

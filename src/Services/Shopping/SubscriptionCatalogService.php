@@ -122,8 +122,8 @@ class SubscriptionCatalogService
                         ->whereRaw('sale_price < price');
                 })->orWhere(function ($sq) {
                     // OR has original price discount
-                    $sq->whereNotNull('original_price')
-                        ->whereRaw('original_price > price');
+                    $sq->whereNotNull('digital_sale_price')
+                        ->whereRaw('digital_sale_price < price');
                 });
             });
         }

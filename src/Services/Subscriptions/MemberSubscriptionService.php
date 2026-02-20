@@ -9,13 +9,15 @@ use App\Models\MemberSubscriptionPreference;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class MemberSubscriptionService
 {
     public function __construct(
         private readonly MemberRepository                       $memberRepository,
         private readonly MemberSubscriptionPreferenceRepository $preferenceRepository,
-        private readonly SubscriberRepository                   $subscriberRepository
+        private readonly SubscriberRepository   $subscriberRepository,
+        private readonly SubscriptionRepository $subscriptionRepository
     )
     {
     }
@@ -197,5 +199,44 @@ class MemberSubscriptionService
             'newsletter' => $member->getCommunicationPreference(CommunicationChannel::Newsletter->value, true),
             default => $member->wantsMarketingEmails(),
         };
+    }
+
+    /**
+     * Update the auto-renewal setting for a member's subscription.
+     *
+     * Auto-renewal is a member-facing preference that controls whether the
+     * subscription renews automatically at the end of the billing period.
+     * consent_given must be explicitly true when enabling to satisfy audit
+     * requirements — we record that the member actively opted in.
+     *
+     * This method only updates the DB record. If the subscription has a Stripe
+     * subscription attached, the caller is responsible for syncing Stripe separately
+     * (out of scope for the initial implementation — Stripe cancel_at_period_end
+     * can be wired in here later without changing the contract).
+     *
+     * @throws \InvalidArgumentException If the subscription does not belong to the member.
+     * @throws \RuntimeException         If consent is not given when enabling auto-renewal.
+     */
+    public function updateAutoRenew(int $subscriptionId, int $memberId, bool $autoRenew, bool $consentGiven): array
+    {
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $memberId) {
+            throw new \InvalidArgumentException('Subscription not found');
+        }
+
+        if ($autoRenew && !$consentGiven) {
+            throw new \RuntimeException('Consent is required to enable auto-renewal');
+        }
+
+        $this->subscriptionRepository->update($subscriptionId, [
+            'auto_renew' => $autoRenew,
+            'consent_given' => $autoRenew ? true : $subscription->consent_given,
+        ]);
+
+        return [
+            'success' => true,
+            'auto_renew' => $autoRenew,
+        ];
     }
 }

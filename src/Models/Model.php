@@ -1025,6 +1025,15 @@ abstract class Model
         return $model;
     }
 
+    public static function hydrateStatic(array $data): self
+    {
+        $model = new static($data);
+        $model->exists = true;
+        $model->original = $model->attributes;
+        $model->fireModelEvent('retrieved');
+        return $model;
+    }
+
     private function camelToSnake(string $input): string
     {
         return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $input));

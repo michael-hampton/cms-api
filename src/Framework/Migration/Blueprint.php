@@ -157,6 +157,11 @@ class Blueprint
         return $this->integer($column)->unsigned();
     }
 
+    public function unsignedSmallInteger(string $column): Column
+    {
+        return $this->smallInteger($column)->unsigned();
+    }
+
     public function foreign(string $column): ForeignKeyDefinition
     {
         $foreign = new ForeignKeyDefinition($column, $this->table);
@@ -216,6 +221,24 @@ class Blueprint
 
         $columnDefinitions = [];
         foreach ($this->columns as $column) {
+            $columnName = $column->getName();
+
+            if ($column->isUnique()) {
+                $this->indexes[] = [
+                    'type' => 'UNIQUE',
+                    'name' => 'unique_' . $columnName,
+                    'columns' => [$columnName],
+                ];
+            }
+
+            if ($column->isIndex()) {
+                $this->indexes[] = [
+                    'type' => 'INDEX',
+                    'name' => 'idx_' . $columnName,
+                    'columns' => [$columnName],
+                ];
+            }
+
             $columnDefinitions[] = "    " . $column->toSql();
         }
 

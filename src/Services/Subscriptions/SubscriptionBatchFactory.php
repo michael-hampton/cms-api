@@ -3,6 +3,7 @@
 namespace App\Services\Subscriptions;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
+use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Member;
 use App\Models\Subscription;
@@ -19,7 +20,13 @@ class SubscriptionBatchFactory
     }
 
     /**
-     * Create multiple pending subscriptions with calculated pricing
+     * Create multiple pending subscriptions with calculated pricing.
+     *
+     * Voucher logic:
+     *   - Bundle items carry a pre-allocated price and cannot be discounted further.
+     *     The voucher is never offered to them.
+     *   - For standard items the voucher is applied to the first eligible item only.
+     *     Once used it is not offered again (prevents multiple redemptions).
      *
      * @return array<array{subscription: Subscription, pricing: SubscriptionPricing}>
      */
@@ -36,8 +43,14 @@ class SubscriptionBatchFactory
         $voucherUsed = false;
 
         foreach ($cartItems as $item) {
-            // Only apply voucher to first subscription (prevent multiple applications)
-            $itemVoucherCode = (!$voucherUsed && $voucherCode) ? $voucherCode : null;
+            // Bundle items cannot receive a voucher — their price is already set
+            // by SubscriptionBundlePriceAllocator and voucher stacking is not supported.
+            $isBundleItem = $this->isBundleItem($item);
+
+            // Only offer the voucher to the first non-bundle item that has not yet used it
+            $itemVoucherCode = (!$isBundleItem && !$voucherUsed && $voucherCode)
+                ? $voucherCode
+                : null;
 
             $pricing = $this->pricingCalculator->calculateForCartItem(
                 $item,
@@ -65,11 +78,26 @@ class SubscriptionBatchFactory
             $subscriptions[] = [
                 'subscription' => $subscription,
                 'pricing' => $pricing,
-                'meta' => $this->mergeMetaData($item)
+                'meta' => $this->mergeMetaData($item),
             ];
         }
 
         return $subscriptions;
+    }
+
+    // -----------------------------------------------------------------------
+    // Private
+    // -----------------------------------------------------------------------
+
+    /**
+     * A cart item originates from a bundle when it carries a bundle_id in its options.
+     */
+    private function isBundleItem(array $item): bool
+    {
+        $options = $item['options'] ?? [];
+
+        return isset($options['bundle_id'])
+            || ($options['type'] ?? null) === CartItemType::SUBSCRIPTION_BUNDLE->value;
     }
 
     private function mergeMetaData(array $item): array
@@ -91,7 +119,7 @@ class SubscriptionBatchFactory
         ];
 
         return array_merge(
-            array_fill_keys($metaKeys, null), // default values
+            array_fill_keys($metaKeys, null),           // default values
             array_intersect_key($item, array_flip($metaKeys)) // override with actual $item values
         );
     }

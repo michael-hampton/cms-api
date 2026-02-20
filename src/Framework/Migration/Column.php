@@ -16,7 +16,8 @@ class Column
     private string $after;
     protected bool $useCurrent = false;
     protected bool $useCurrentOnUpdate = false;
-
+    private ?string $comment = null;
+    private bool $index = false;
     public function __construct(string $type, string $name, array $parameters = [])
     {
         $this->type = $type;
@@ -70,6 +71,23 @@ class Column
     {
         $this->unique = true;
         return $this;
+    }
+
+    public function isUnique(): bool
+    {
+        return $this->unique;
+    }
+
+    public function index(?string $name = null): self
+    {
+        $this->index = true;
+
+        return $this;
+    }
+
+    public function isIndex(): bool
+    {
+        return $this->index;
     }
 
     public function primary(): self
@@ -128,6 +146,11 @@ class Column
             $sql .= " AFTER `{$this->after}`";
         }
 
+        if ($this->comment !== null) {
+            $escaped = str_replace("'", "''", $this->comment);
+            $sql .= " COMMENT '{$escaped}'";
+        }
+
         return $sql;
     }
 
@@ -181,5 +204,16 @@ class Column
             default:
                 return strtoupper($this->type);
         }
+    }
+
+    public function comment(string $string): self
+    {
+        $this->comment = $string;
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
     }
 }

@@ -188,7 +188,7 @@ class BoostService
         }
 
         if ($boost->isCancelled()) {
-            return $boost;
+            throw new BoostTransitionException('boost is already cancelled');
         }
 
         return $this->database->transaction(function () use ($boost) {

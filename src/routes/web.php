@@ -15,7 +15,6 @@ use App\Controllers\Front\CommentController;
 use App\Controllers\Front\ContentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
-use App\Controllers\Front\RegionContentController;
 use App\Controllers\Front\ReviewPageController;
 use App\Controllers\Front\TagViewController;
 use App\Controllers\Front\WebPageController;
@@ -56,6 +55,8 @@ use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductDetailController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\Subscription\OneTimeSubscriptionsController;
+use App\Controllers\Subscription\SubscriptionDealsController;
+use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Framework\Middleware\RequireMemberAuth;
 
@@ -387,12 +388,19 @@ $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController
 $router->post('/{site}/default/newsletter/signup', NewsletterController::class, 'signup');
 
 $router->get('/{site}/subscriptions/onetime', [OneTimeSubscriptionsController::class, 'index']);
+$router->get('/subscriptions/onetime/search', [OneTimeSubscriptionsController::class, 'search']);
 $router->get('/{site}/subscriptions/onetime/{id}', [OneTimeSubscriptionsController::class, 'show']);
+$router->get('/subscriptions/onetime/deals', [SubscriptionDealsController::class, 'index']);
+$router->get('/subscriptions/onetime/deals/search', [SubscriptionDealsController::class, 'search']);
+$router->get('/{site}/subscriptions/link-subscription', [SubscriptionLinkStepController::class, 'showLinkStep']);
+$router->post('/member/onboarding/link-subscription', [SubscriptionLinkStepController::class, 'linkSubscription']);
 
+$router->post('/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/subscriptions/onetime/checkout', [OneTimeSubscriptionsController::class, 'checkout']);
 $router->post('/api/{site}/subscriptions/onetime/confirm-payment', [OneTimeSubscriptionsController::class, 'confirmPayment']);
 $router->post('/api/{site}/checkout/confirm-payment', [PaymentController::class, 'confirmPayment']);
+$router->post('/cart/add-bundle', [CartController::class, 'addSubscriptionBundle']);
 
 $router->get('/api/{site}/compare', [ProductComparisonController::class, 'compare']);
 $router->get('/{site}/compare', [ProductComparisonController::class, 'index']);
@@ -407,9 +415,9 @@ $router->get('/{site}/deals/{id}/modal', [DealsController::class, 'getProductMod
 //$router->get('{slug}', [ContentController::class, 'show'])
 //    ->middleware([CheckPageMemberAccess::class]);
 
-$router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
-    //->middleware([CheckPageMemberAccess::class])
-    ->where('regionSlug', 'asia-pacific|europe|americas');
+//$router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
+//    //->middleware([CheckPageMemberAccess::class])
+//    ->where('regionSlug', 'asia-pacific|europe|americas');
 
 // In your routes file — adjust to your router's API
 $router->get('/api/boosts', [BoostController::class, 'index']);

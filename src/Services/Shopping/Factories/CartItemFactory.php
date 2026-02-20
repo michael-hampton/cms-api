@@ -142,4 +142,45 @@ class CartItemFactory
             subscription_plan_id: $subscriptionPlanId,
         );
     }
+
+    /**
+     * Build a cart item DTO for a single plan within a subscription bundle.
+     *
+     * Each plan in the bundle produces its own cart row. The bundle_id is stored
+     * in options so the items can be grouped on the cart/checkout UI and so the
+     * checkout service can identify them as a bundle during order creation.
+     *
+     * The price passed here is the *allocated* share of the bundle_price for this
+     * plan (computed by SubscriptionBundlePriceAllocator), not the plan's list price.
+     */
+    public function fromSubscriptionBundleItem(
+        string  $sessionId,
+        ?int    $userId,
+        Product $product,
+        int     $quantity,
+        float   $allocatedPrice,
+        int     $subscriptionPlanId,
+        string  $deliveryType,
+        int     $bundleId
+    ): CartItemData
+    {
+        return new CartItemData(
+            session_id: $sessionId,
+            user_id: $userId,
+            product_id: $product->id,
+            quantity: $quantity,
+            price: $allocatedPrice,
+            subtotal: $allocatedPrice * $quantity,
+            options: [
+                'type' => CartItemType::SUBSCRIPTION_BUNDLE->value,
+                'delivery_type' => $deliveryType,
+                'bundle_id' => $bundleId,
+                'subscription_plan_id' => $subscriptionPlanId,
+            ],
+            site_id: $product->site_id,
+            merchant_id: null,
+            variant_id: null,
+            subscription_plan_id: $subscriptionPlanId,
+        );
+    }
 }

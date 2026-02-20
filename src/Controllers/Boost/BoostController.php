@@ -2,6 +2,7 @@
 
 namespace App\Controllers\Boost;
 
+use App\Contracts\Boost\BoostableInterface;
 use App\Controllers\Controller;
 use App\Enums\Boost\AutoBoostGoal;
 use App\Enums\Boost\BoostableType;
@@ -83,7 +84,7 @@ class BoostController extends Controller
             return JsonResponse::json(['error' => 'Boost not found.'], 404);
         }
 
-        return JsonResponse::json(['data' => new BoostResource($boost)]);
+        return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()]);
     }
 
     /**
@@ -110,7 +111,7 @@ class BoostController extends Controller
                 campaignOverride: $request->input('campaign_override'),
             );
 
-            return JsonResponse::json(['data' => new BoostResource($boost)], 201);
+            return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()], 201);
 
         } catch (BoostEligibilityException $e) {
             return JsonResponse::json(['error' => $e->getMessage()], 422);
@@ -119,9 +120,17 @@ class BoostController extends Controller
         }
     }
 
-    private function resolveTarget(string $boostableType, int $targetId): \App\Contracts\Boost\BoostableInterface
+    private function resolveTarget(string $boostableType, int $targetId): BoostableInterface
     {
-        $target = match (BoostableType::from($boostableType)) {
+        $enum = BoostableType::tryFrom($boostableType);
+
+        if (!$enum) {
+            throw new BoostEligibilityException(
+                "Invalid boostable type: {$boostableType}"
+            );
+        }
+
+        $target = match ($enum) {
             BoostableType::Product => $this->productRepository->find($targetId),
             BoostableType::Offer => $this->offerRepository->find($targetId),
         };
@@ -142,7 +151,7 @@ class BoostController extends Controller
     {
         try {
             $boost = $this->boostService->activateBoost($id);
-            return JsonResponse::json(['data' => new BoostResource($boost)]);
+            return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()]);
         } catch (BoostNotFoundException $e) {
             return JsonResponse::json(['error' => $e->getMessage()], 404);
         } catch (BoostTransitionException $e) {
@@ -157,7 +166,7 @@ class BoostController extends Controller
     {
         try {
             $boost = $this->boostService->expireBoost($id);
-            return JsonResponse::json(['data' => new BoostResource($boost)]);
+            return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()]);
         } catch (BoostNotFoundException $e) {
             return JsonResponse::json(['error' => $e->getMessage()], 404);
         }
@@ -170,7 +179,7 @@ class BoostController extends Controller
     {
         try {
             $boost = $this->boostService->cancelBoost($id);
-            return JsonResponse::json(['data' => new BoostResource($boost)]);
+            return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()]);
         } catch (BoostNotFoundException $e) {
             return JsonResponse::json(['error' => $e->getMessage()], 404);
         } catch (BoostTransitionException $e) {
@@ -185,7 +194,7 @@ class BoostController extends Controller
     {
         try {
             $boost = $this->boostService->pauseBoost($id);
-            return JsonResponse::json(['data' => new BoostResource($boost)]);
+            return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()]);
         } catch (BoostNotFoundException $e) {
             return JsonResponse::json(['error' => $e->getMessage()], 404);
         } catch (BoostTransitionException $e) {
@@ -200,7 +209,7 @@ class BoostController extends Controller
     {
         try {
             $boost = $this->boostService->resumeBoost($id);
-            return JsonResponse::json(['data' => new BoostResource($boost)]);
+            return JsonResponse::json(['data' => (new BoostResource($boost))->toArray()]);
         } catch (BoostNotFoundException $e) {
             return JsonResponse::json(['error' => $e->getMessage()], 404);
         } catch (BoostTransitionException $e) {
@@ -404,10 +413,10 @@ class BoostController extends Controller
             ->where('is_active', true)
             ->where('start_date', '<=', $now)
             ->where('end_date', '>=', $now)
-            ->where(fn($q) => $q->where('title', 'LIKE', "%{$query}%")
-                ->orWhereHas('product', fn($q2) => $q2->where('name', 'LIKE', "%{$query}%")
-                )
-            )
+//            ->where(fn($q) => $q->where('title', 'LIKE', "%{$query}%")
+//                ->orWhereHas('product', fn($q2) => $q2->where('name', 'LIKE', "%{$query}%")
+//                )
+//            )
             ->with(['product'])
             ->limit(15)
             ->get()

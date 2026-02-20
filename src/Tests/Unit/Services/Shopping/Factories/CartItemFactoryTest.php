@@ -233,6 +233,66 @@ class CartItemFactoryTest extends FunctionalTestCase
         $this->assertFalse($bundleDto->isSubscription());
     }
 
+    public function testFromSubscriptionBundleItemReturnsCartItemData(): void
+    {
+        $product = new Product([
+            'id' => 1,
+            'site_id' => 10,
+        ]);
+
+        $result = $this->factory->fromSubscriptionBundleItem(
+            'session123',
+            42,
+            $product,
+            1,
+            30.00, // allocated price
+            333,   // subscriptionPlanId
+            SubscriptionType::DIGITAL->value,
+            7      // bundleId
+        );
+
+        $this->assertInstanceOf(CartItemData::class, $result);
+        $this->assertEquals(30.00, $result->price);
+        $this->assertEquals(333, $result->subscription_plan_id);
+        $this->assertNull($result->merchant_id);
+        $this->assertNull($result->variant_id);
+
+        $this->assertIsArray($result->options);
+        $this->assertEquals(CartItemType::SUBSCRIPTION_BUNDLE->value, $result->options['type']);
+        $this->assertEquals(7, $result->options['bundle_id']);
+        $this->assertEquals(333, $result->options['subscription_plan_id']);
+        $this->assertEquals(SubscriptionType::DIGITAL->value, $result->options['delivery_type']);
+    }
+
+    public function testFromSubscriptionBundleItemToArraySerializesOptions(): void
+    {
+        $product = new Product(['id' => 1, 'site_id' => 10]);
+
+        $dto = $this->factory->fromSubscriptionBundleItem(
+            'session123', 42, $product, 1, 25.00, 55, 'print', 3
+        );
+        $array = $dto->toArray();
+
+        $this->assertIsString($array['options']);
+        $decoded = json_decode($array['options'], true);
+
+        $this->assertEquals(CartItemType::SUBSCRIPTION_BUNDLE->value, $decoded['type']);
+        $this->assertEquals(3, $decoded['bundle_id']);
+    }
+
+    public function testFromSubscriptionBundleItemHelperMethodReturnsCorrectType(): void
+    {
+        $product = new Product(['id' => 1, 'site_id' => 10]);
+
+        $dto = $this->factory->fromSubscriptionBundleItem(
+            'session123', 42, $product, 1, 25.00, 55, 'digital', 3
+        );
+
+        $this->assertFalse($dto->isOffer());
+        $this->assertFalse($dto->isBundle());
+        $this->assertTrue($dto->isSubscription()); // subscription_bundle IS a subscription
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

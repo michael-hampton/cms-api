@@ -652,4 +652,42 @@ class MemberSubscriptionsController extends Controller
 
         return $this->resourceResponse($status);
     }
+
+    public function autoRenew(Request $request, int $subscriptionId)
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::member();
+        $autoRenew = (bool)$request->input('auto_renew');
+        $consentGiven = (bool)$request->input('consent_given', false);
+
+        try {
+            $result = $this->subscriptionService->updateAutoRenew(
+                $subscriptionId,
+                $member->id,
+                $autoRenew,
+                $consentGiven
+            );
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => $autoRenew ? 'Auto-renewal enabled' : 'Auto-renewal disabled',
+                'auto_renew' => $result['auto_renew'],
+            ]);
+
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 404);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Logger::error('Failed to update auto-renewal', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to update auto-renewal'], 500);
+        }
+    }
 }

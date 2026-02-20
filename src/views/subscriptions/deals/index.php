@@ -1,6 +1,6 @@
 <?php
 /**
- * View: subscriptions/onetime/index.php
+ * View: subscriptions/deals/index.php
  */
 $selectedCategories = !empty($filters['categories'])
         ? (is_array($filters['categories']) ? $filters['categories'] : explode(',', $filters['categories']))
@@ -9,12 +9,41 @@ $selectedTags = !empty($filters['tags'])
         ? (is_array($filters['tags']) ? $filters['tags'] : explode(',', $filters['tags']))
         : [];
 ?>
+
+<?php
+/**
+ * View: subscriptions/deals/index.php
+ *
+ * Variables injected by SubscriptionDealsController::index():
+ *   $plans           – on_sale plans only, paginated
+ *   $bundles         – active SubscriptionBundle[] with savings data
+ *   $pagination
+ *   $filters
+ *   $available_sites
+ *   $available_categories
+ *   $available_tags
+ *   $price_range
+ *   $sort_options
+ *   $stripe_key
+ */
+
+// Biggest single saving across all bundles — used in hero
+$biggestSaving = 0;
+$biggestBundle = null;
+foreach ($bundles as $b) {
+    if ($b['savings_amount'] > $biggestSaving) {
+        $biggestSaving = $b['savings_amount'];
+        $biggestBundle = $b;
+    }
+}
+$totalDeals = count($plans) + count($bundles);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscriptions</title>
+    <title>Deals &amp; Bundles</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap"
           rel="stylesheet">
@@ -26,19 +55,26 @@ $selectedTags = !empty($filters['tags'])
         }
 
         :root {
-            --ink: #1a1a2e;
-            --ink-soft: #4a4a6a;
-            --ink-muted: #8888aa;
-            --surface: #f8f7f5;
-            --white: #ffffff;
-            --border: #e8e6e0;
+            --ink: #0d0d0d;
+            --ink-soft: #3d3d3d;
+            --ink-muted: #888;
+            --surface: #f5f3ef;
+            --white: #fff;
+            --border: #e0ddd7;
+            --fire: #ff3d00;
+            --fire-dark: #c62800;
+            --fire-glow: rgba(255, 61, 0, .12);
+            --gold: #f5a623;
+            --gold-light: rgba(245, 166, 35, .15);
+            --teal: #006d77;
+            --teal-light: #e3f4f4;
+            --ink-2: #1a1a2e;
             --border-soft: #f0eee8;
             --accent: #2d6a4f;
             --accent-light: #d8f3dc;
             --save: #e63946;
             --save-light: #fff0f1;
             --bundle: #1d3557;
-            --bundle-light: #e8f1f8;
             --radius: 12px;
             --radius-sm: 8px;
             --shadow-sm: 0 1px 3px rgba(0, 0, 0, .06);
@@ -57,63 +93,68 @@ $selectedTags = !empty($filters['tags'])
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ── Page header ─────────────────────────────────────────── */
-        .page-header {
-            background: var(--white);
-            border-bottom: 1px solid var(--border);
-            padding: 40px 0 32px;
+        /* ── Hero ─────────────────────────────────────────────────── */
+        .deals-hero {
+            background: linear-gradient(135deg, #1d3557 0%, #2d6a4f 100%);
+            color: #fff;
+            padding: 48px 0 40px;
         }
 
-        .page-header__inner {
+        .deals-hero__inner {
             max-width: 1280px;
             margin: 0 auto;
             padding: 0 24px;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: space-between;
             gap: 24px;
             flex-wrap: wrap;
         }
 
-        .page-header__title {
-            font-family: var(--font-display);
-            font-size: clamp(28px, 4vw, 42px);
-            line-height: 1.1;
-        }
-
-        .page-header__sub {
-            color: var(--ink-soft);
-            margin-top: 6px;
-            font-size: 15px;
-        }
-
-        .page-header__deals-link {
+        .deals-hero__eyebrow {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            background: var(--save);
-            color: #fff;
-            padding: 10px 20px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            background: rgba(255, 255, 255, .15);
+            padding: 4px 12px;
             border-radius: 100px;
-            font-size: 14px;
-            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .deals-hero__title {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 4vw, 44px);
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .deals-hero__sub {
+            font-size: 15px;
+            opacity: .8;
+        }
+
+        .deals-hero__back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: rgba(255, 255, 255, .75);
+            font-size: 13px;
             text-decoration: none;
             transition: var(--transition);
         }
 
-        .page-header__deals-link:hover {
-            background: #c1121f;
-            transform: translateY(-1px);
+        .deals-hero__back:hover {
+            color: #fff;
         }
 
-        .page-header__deals-link::before {
-            content: '🔥';
-        }
-
-        /* ── Layout ──────────────────────────────────────────────── */
+        /* ── Layout ───────────────────────────────────────────────── */
         .layout {
-            /*max-width: 1280px;*/
-            /*margin: 0 auto;*/
+            /*max-width: 1280px; */
+            /*margin: 0 auto; */
             padding: 32px 24px;
             display: grid;
             grid-template-columns: 280px 1fr;
@@ -131,7 +172,7 @@ $selectedTags = !empty($filters['tags'])
             }
         }
 
-        /* ── Sidebar ─────────────────────────────────────────────── */
+        /* ── Sidebar ──────────────────────────────────────────────── */
         .sidebar {
             background: var(--white);
             border: 1px solid var(--border);
@@ -170,8 +211,8 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .sidebar__search:focus-within {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-light);
+            border-color: var(--save);
+            box-shadow: 0 0 0 3px var(--save-light);
         }
 
         .sidebar__search input {
@@ -203,8 +244,8 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .filter-select:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-light);
+            border-color: var(--save);
+            box-shadow: 0 0 0 3px var(--save-light);
         }
 
         .price-range-row {
@@ -226,7 +267,7 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .price-range-row input:focus {
-            border-color: var(--accent);
+            border-color: var(--save);
         }
 
         .price-range-row span {
@@ -235,7 +276,6 @@ $selectedTags = !empty($filters['tags'])
             flex-shrink: 0;
         }
 
-        /* Category pills */
         .category-pill {
             display: flex;
             align-items: center;
@@ -273,7 +313,6 @@ $selectedTags = !empty($filters['tags'])
             flex-shrink: 0;
         }
 
-        /* Tag checkboxes */
         .tag-list {
             display: flex;
             flex-direction: column;
@@ -303,7 +342,7 @@ $selectedTags = !empty($filters['tags'])
             width: 15px;
             height: 15px;
             cursor: pointer;
-            accent-color: var(--accent);
+            accent-color: var(--save);
             flex-shrink: 0;
         }
 
@@ -315,7 +354,7 @@ $selectedTags = !empty($filters['tags'])
         .filter-btn {
             width: 100%;
             padding: 10px;
-            background: var(--ink);
+            background: var(--save);
             color: #fff;
             border: none;
             border-radius: var(--radius-sm);
@@ -327,7 +366,7 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .filter-btn:hover {
-            background: var(--accent);
+            background: #c1121f;
         }
 
         .filter-btn--clear {
@@ -342,7 +381,7 @@ $selectedTags = !empty($filters['tags'])
             color: var(--ink);
         }
 
-        /* Active filter chips */
+        /* Active chips */
         .active-chips {
             display: flex;
             flex-wrap: wrap;
@@ -354,7 +393,7 @@ $selectedTags = !empty($filters['tags'])
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            background: var(--ink);
+            background: var(--save);
             color: #fff;
             padding: 4px 10px;
             border-radius: 100px;
@@ -377,112 +416,12 @@ $selectedTags = !empty($filters['tags'])
             opacity: 1;
         }
 
-        /* ── Main ────────────────────────────────────────────────── */
+        /* ── Main ─────────────────────────────────────────────────── */
         .main {
             min-width: 0;
         }
 
-        /* ── Category carousel ───────────────────────────────────── */
-        .cat-carousel-wrap {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 28px;
-        }
-
-        .cat-carousel {
-            display: flex;
-            gap: 12px;
-            overflow-x: auto;
-            padding: 4px 0 12px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-
-        .cat-carousel::-webkit-scrollbar {
-            display: none;
-        }
-
-        .cat-tile {
-            flex: 0 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            padding: 14px 18px;
-            background: var(--white);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: var(--transition);
-            border: 2px solid var(--border);
-            min-width: 90px;
-        }
-
-        .cat-tile:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--shadow);
-            border-color: var(--ink-muted);
-        }
-
-        .cat-tile.selected {
-            border-color: var(--ink);
-            background: var(--surface);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .cat-tile__icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .cat-tile__name {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--ink-soft);
-            text-align: center;
-            white-space: nowrap;
-        }
-
-        .cat-tile.selected .cat-tile__name {
-            color: var(--ink);
-        }
-
-        .carousel-nav-btn {
-            flex-shrink: 0;
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            border: 1.5px solid var(--border);
-            background: var(--white);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: var(--transition);
-            color: var(--ink);
-        }
-
-        .carousel-nav-btn:hover {
-            border-color: var(--ink);
-            background: var(--ink);
-            color: #fff;
-        }
-
-        .carousel-nav-btn svg {
-            width: 16px;
-            height: 16px;
-            pointer-events: none;
-        }
-
-        /* ── Bundles carousel ────────────────────────────────────── */
+        /* ── Bundles carousel ────────────────────────────────────────── */
         .bundles-section {
             margin-bottom: 36px;
         }
@@ -509,7 +448,7 @@ $selectedTags = !empty($filters['tags'])
 
         .section-link {
             font-size: 13px;
-            color: var(--accent);
+            color: var(--save);
             text-decoration: none;
             font-weight: 500;
         }
@@ -540,8 +479,8 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .carousel-arrow:hover:not(:disabled) {
-            border-color: var(--bundle);
-            background: var(--bundle);
+            border-color: var(--save);
+            background: var(--save);
             color: #fff;
         }
 
@@ -568,7 +507,7 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .carousel-dot.active {
-            background: var(--bundle);
+            background: var(--save);
             width: 20px;
             border-radius: 3px;
         }
@@ -621,7 +560,7 @@ $selectedTags = !empty($filters['tags'])
 
         .carousel-progress__fill {
             height: 100%;
-            background: var(--bundle);
+            background: var(--save);
             border-radius: 1px;
             transition: width .45s cubic-bezier(.4, 0, .2, 1);
         }
@@ -757,7 +696,7 @@ $selectedTags = !empty($filters['tags'])
             background: rgba(255, 255, 255, .28);
         }
 
-        /* ── Toolbar ─────────────────────────────────────────────── */
+        /* Toolbar */
         .toolbar {
             display: flex;
             align-items: center;
@@ -774,12 +713,6 @@ $selectedTags = !empty($filters['tags'])
 
         .toolbar__count strong {
             color: var(--ink);
-        }
-
-        .toolbar__right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
         }
 
         .toolbar__sort {
@@ -802,10 +735,10 @@ $selectedTags = !empty($filters['tags'])
             cursor: pointer;
         }
 
-        /* ── Plans grid ──────────────────────────────────────────── */
+        /* Plans grid */
         .plans-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
             gap: 20px;
         }
 
@@ -821,12 +754,11 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .plan-card:hover {
-            border-color: var(--ink-muted);
+            border-color: var(--save);
             box-shadow: var(--shadow);
             transform: translateY(-2px);
         }
 
-        /* Badges */
         .plan-card__badge {
             position: absolute;
             top: 14px;
@@ -865,15 +797,6 @@ $selectedTags = !empty($filters['tags'])
             border-top: 4px solid #4c1d95;
         }
 
-        .plan-card__badge--featured {
-            background: #d97706;
-        }
-
-        .plan-card__badge--featured::after {
-            border-top: 4px solid #92400e;
-        }
-
-        /* Image area */
         .plan-card__image {
             width: 100%;
             height: 140px;
@@ -883,7 +806,7 @@ $selectedTags = !empty($filters['tags'])
             font-size: 48px;
             font-weight: 700;
             color: #fff;
-            background: linear-gradient(135deg, #1d3557 0%, #2d6a4f 100%);
+            background: linear-gradient(135deg, #1d3557 0%, #e63946 100%);
             flex-shrink: 0;
         }
 
@@ -911,7 +834,6 @@ $selectedTags = !empty($filters['tags'])
             margin-bottom: 8px;
         }
 
-        /* Category + tag pills on card */
         .plan-card__meta {
             display: flex;
             flex-wrap: wrap;
@@ -975,12 +897,8 @@ $selectedTags = !empty($filters['tags'])
         .plan-card__price {
             font-size: 24px;
             font-weight: 700;
-            color: var(--ink);
-            line-height: 1;
-        }
-
-        .plan-card__price--sale {
             color: var(--save);
+            line-height: 1;
         }
 
         .plan-card__price-was {
@@ -1012,7 +930,7 @@ $selectedTags = !empty($filters['tags'])
             display: block;
             width: 100%;
             padding: 11px;
-            background: var(--ink);
+            background: var(--save);
             color: #fff;
             border: none;
             border-radius: var(--radius-sm);
@@ -1026,18 +944,10 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .plan-card__btn:hover {
-            background: var(--accent);
-        }
-
-        .plan-card__btn--sale {
-            background: var(--save);
-        }
-
-        .plan-card__btn--sale:hover {
             background: #c1121f;
         }
 
-        /* ── Empty / loading ─────────────────────────────────────── */
+        /* Empty / loading */
         .empty-state {
             text-align: center;
             padding: 80px 24px;
@@ -1065,7 +975,7 @@ $selectedTags = !empty($filters['tags'])
             opacity: 0.45;
         }
 
-        /* ── Pagination ──────────────────────────────────────────── */
+        /* Pagination */
         .pagination {
             display: flex;
             justify-content: center;
@@ -1094,13 +1004,13 @@ $selectedTags = !empty($filters['tags'])
         }
 
         .pagination__btn:hover:not(.disabled):not(.active) {
-            border-color: var(--ink);
+            border-color: var(--save);
         }
 
         .pagination__btn.active {
-            background: var(--ink);
+            background: var(--save);
             color: #fff;
-            border-color: var(--ink);
+            border-color: var(--save);
         }
 
         .pagination__btn.disabled {
@@ -1115,32 +1025,434 @@ $selectedTags = !empty($filters['tags'])
             display: flex;
             align-items: center;
         }
+
+        /* ── Ticker tape ─────────────────────────────────────────── */
+        .ticker {
+            background: var(--fire);
+            color: #fff;
+            padding: 9px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .ticker__track {
+            display: flex;
+            gap: 0;
+            animation: ticker 28s linear infinite;
+            width: max-content;
+        }
+
+        .ticker__item {
+            white-space: nowrap;
+            font-family: var(--font-display);
+            font-size: 12px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            padding: 0 40px;
+        }
+
+        .ticker__item::before {
+            content: '★  ';
+        }
+
+        @keyframes ticker {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(-50%);
+            }
+        }
+
+        /* ── Hero ────────────────────────────────────────────────── */
+        .hero {
+            background: var(--ink);
+            color: #fff;
+            padding: 72px 24px 64px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Grid noise texture overlay */
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255, 255, 255, .03) 40px),
+            repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255, 255, 255, .03) 40px);
+            pointer-events: none;
+        }
+
+        /* Blurred fire orb */
+        .hero::after {
+            content: '';
+            position: absolute;
+            right: -100px;
+            top: -100px;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 61, 0, .35) 0%, transparent 70%);
+            pointer-events: none;
+            animation: pulse 6s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: .7;
+            }
+        }
+
+        .hero__inner {
+            max-width: 1280px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--fire);
+            color: #fff;
+            font-family: var(--font-display);
+            font-size: 11px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 100px;
+            margin-bottom: 24px;
+        }
+
+        .hero__eyebrow::before {
+            content: '🔥';
+            font-size: 14px;
+        }
+
+        .hero__title {
+            font-family: var(--font-display);
+            font-size: clamp(48px, 8vw, 96px);
+            line-height: .95;
+            letter-spacing: -.02em;
+            margin-bottom: 20px;
+        }
+
+        .hero__title em {
+            font-style: italic;
+            color: var(--gold);
+            -webkit-text-fill-color: transparent;
+            background: linear-gradient(135deg, var(--gold), #ffcd6b);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .hero__sub {
+            font-size: 18px;
+            color: rgba(255, 255, 255, .65);
+            max-width: 480px;
+            line-height: 1.6;
+            font-weight: 300;
+            margin-bottom: 40px;
+        }
+
+        .hero__stats {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .hero__stat-num {
+            font-family: var(--font-display);
+            font-size: 36px;
+            line-height: 1;
+            color: #fff;
+        }
+
+        .hero__stat-label {
+            font-size: 13px;
+            color: rgba(255, 255, 255, .5);
+            margin-top: 4px;
+        }
+
+        /* ── Biggest bundle spotlight ────────────────────────────── */
+        <?php if ($biggestBundle): ?>
+        .spotlight {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .spotlight__inner {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            min-height: 220px;
+        }
+
+        @media (max-width: 800px) {
+            .spotlight__inner {
+                grid-template-columns: 1fr;
+            }
+
+            .spotlight__visual {
+                display: none;
+            }
+        }
+
+        .spotlight__content {
+            padding: 40px 48px 40px 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .spotlight__label {
+            font-family: var(--font-display);
+            font-size: 11px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--fire);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .spotlight__label::before {
+            content: '';
+            display: block;
+            width: 20px;
+            height: 2px;
+            background: var(--fire);
+        }
+
+        .spotlight__name {
+            font-family: var(--font-display);
+            font-size: clamp(22px, 3vw, 32px);
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .spotlight__desc {
+            font-size: 14px;
+            color: var(--ink-soft);
+            max-width: 400px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .spotlight__pricing {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .spotlight__price {
+            font-family: var(--font-display);
+            font-size: 38px;
+            line-height: 1;
+            color: var(--ink);
+        }
+
+        .spotlight__was {
+            font-size: 16px;
+            color: var(--ink-muted);
+            text-decoration: line-through;
+        }
+
+        .spotlight__save-badge {
+            background: var(--fire-glow);
+            border: 1px solid var(--fire);
+            color: var(--fire);
+            font-family: var(--font-display);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .06em;
+            padding: 5px 12px;
+            border-radius: 100px;
+        }
+
+        .spotlight__cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--fire);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 100px;
+            font-family: var(--font-display);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-decoration: none;
+            transition: var(--transition);
+            margin-top: 20px;
+            align-self: flex-start;
+        }
+
+        .spotlight__cta:hover {
+            background: var(--fire-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--fire-glow);
+        }
+
+        .spotlight__visual {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .spotlight__visual::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 30% 70%, rgba(255, 61, 0, .2) 0%, transparent 60%),
+            radial-gradient(ellipse at 80% 20%, rgba(245, 166, 35, .15) 0%, transparent 50%);
+        }
+
+        .spotlight__visual-text {
+            position: relative;
+            text-align: center;
+            color: #fff;
+        }
+
+        .spotlight__visual-save {
+            font-family: var(--font-display);
+            font-size: 80px;
+            line-height: 1;
+            letter-spacing: -.03em;
+            color: var(--gold);
+            -webkit-text-fill-color: transparent;
+            background: linear-gradient(135deg, var(--gold), #ffcd6b);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .spotlight__visual-label {
+            font-size: 13px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            opacity: .7;
+            margin-top: 4px;
+            font-family: var(--font-display);
+        }
+
+        <?php endif; ?>
     </style>
 </head>
 <body>
 
-<header class="page-header">
-    <div class="page-header__inner">
+<!-- Ticker tape -->
+<div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+        <?php for ($i = 0; $i < 2; $i++): ?>
+            <span class="ticker__item">Limited time deals</span>
+            <span class="ticker__item">Bundle and save</span>
+            <span class="ticker__item">Exclusive subscriber savings</span>
+            <span class="ticker__item">More for less</span>
+            <span class="ticker__item">Deals ending soon</span>
+            <span class="ticker__item">Save up to <?= $biggestBundle ? $biggestBundle['discount_percentage'] : 30 ?>%</span>
+            <span class="ticker__item">Subscribe today</span>
+            <span class="ticker__item">Limited time deals</span>
+        <?php endfor; ?>
+    </div>
+</div>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero__inner">
+        <div class="hero__eyebrow">Live deals — updated daily</div>
+        <h1 class="hero__title">
+            Deals &amp;<br><em>Bundles</em>
+        </h1>
+        <p class="hero__sub">
+            The best prices on the publications you love — sale subscriptions and exclusive bundles in one place.
+        </p>
+        <div class="hero__stats">
+            <div>
+                <div class="hero__stat-num"><?= $totalDeals ?>+</div>
+                <div class="hero__stat-label">Live deals</div>
+            </div>
+            <?php if (!empty($bundles)): ?>
+                <div>
+                    <div class="hero__stat-num"><?= count($bundles) ?></div>
+                    <div class="hero__stat-label">Bundle<?= count($bundles) !== 1 ? 's' : '' ?> available</div>
+                </div>
+            <?php endif; ?>
+            <?php if ($biggestBundle): ?>
+                <div>
+                    <div class="hero__stat-num">£<?= number_format($biggestBundle['savings_amount'], 0) ?></div>
+                    <div class="hero__stat-label">Biggest saving</div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</section>
+
+<?php if ($biggestBundle): ?>
+    <!-- Spotlight — biggest bundle -->
+    <div class="spotlight">
+        <div class="spotlight__inner">
+            <div class="spotlight__content">
+                <div class="spotlight__label">Featured bundle</div>
+                <h2 class="spotlight__name"><?= htmlspecialchars($biggestBundle['name']) ?></h2>
+                <?php if ($biggestBundle['description']): ?>
+                    <p class="spotlight__desc"><?= htmlspecialchars($biggestBundle['description']) ?></p>
+                <?php endif; ?>
+                <div class="spotlight__pricing">
+                    <div class="spotlight__price">£<?= number_format($biggestBundle['bundle_price'], 2) ?></div>
+                    <div class="spotlight__was">£<?= number_format($biggestBundle['total_price'], 2) ?></div>
+                    <div class="spotlight__save-badge">SAVE <?= $biggestBundle['discount_percentage'] ?>%</div>
+                </div>
+                <a href="<?= url('/subscriptions/bundles/' . $biggestBundle['slug']) ?>" class="spotlight__cta">
+                    Get this bundle →
+                </a>
+            </div>
+            <div class="spotlight__visual">
+                <div class="spotlight__visual-text">
+                    <div class="spotlight__visual-save">-<?= $biggestBundle['discount_percentage'] ?>%</div>
+                    <div class="spotlight__visual-label">You save
+                        £<?= number_format($biggestBundle['savings_amount'], 2) ?></div>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<a href="<?= url('/subscriptions') ?>" class="back-link">← All subscriptions</a>
+
+<header class="deals-hero">
+    <div class="deals-hero__inner">
         <div>
-            <h1 class="page-header__title">Subscriptions</h1>
-            <p class="page-header__sub">
-                <?= number_format($pagination['total']) ?> publication<?= $pagination['total'] !== 1 ? 's' : '' ?>
-                available
+            <div class="deals-hero__eyebrow">🔥 Limited time</div>
+            <h1 class="deals-hero__title">Deals &amp; Bundles</h1>
+            <p class="deals-hero__sub" id="hero-sub">
+                <?= number_format($pagination['total']) ?> discounted
+                subscription<?= $pagination['total'] !== 1 ? 's' : '' ?> available right now
             </p>
         </div>
-        <a href="<?= url('/subscriptions/deals') ?>" class="page-header__deals-link">
-            View all deals &amp; bundles
-        </a>
+        <a href="<?= url('/subscriptions') ?>" class="deals-hero__back">← Back to all subscriptions</a>
     </div>
 </header>
 
 <div class="layout">
 
-    <!-- ── Sidebar ──────────────────────────────────────────────── -->
+    <!-- Sidebar -->
     <aside class="sidebar">
         <form id="filter-form">
 
-            <!-- Search -->
             <div class="sidebar__section">
                 <div class="sidebar__label">Search</div>
                 <label class="sidebar__search">
@@ -1153,25 +1465,10 @@ $selectedTags = !empty($filters['tags'])
                 </label>
             </div>
 
-            <!-- Special offers -->
-            <div class="sidebar__section">
-                <div class="sidebar__label">Special offers</div>
-                <select name="special_filter" class="filter-select" id="special_filter">
-                    <option value="">All subscriptions</option>
-                    <option value="on_sale" <?= ($filters['special_filter'] ?? '') === 'on_sale' ? 'selected' : '' ?>>On
-                        sale
-                    </option>
-                    <option value="limited_offer" <?= ($filters['special_filter'] ?? '') === 'limited_offer' ? 'selected' : '' ?>>
-                        Limited time offers
-                    </option>
-                </select>
-            </div>
-
-            <!-- Publication -->
             <?php if (!empty($available_sites)): ?>
                 <div class="sidebar__section">
                     <div class="sidebar__label">Publication</div>
-                    <select name="site_id" class="filter-select" id="site_id">
+                    <select name="site_id" class="filter-select">
                         <option value="">All publications</option>
                         <?php foreach ($available_sites as $site): ?>
                             <option value="<?= $site->id ?>" <?= ($filters['site_id'] ?? '') == $site->id ? 'selected' : '' ?>>
@@ -1182,10 +1479,9 @@ $selectedTags = !empty($filters['tags'])
                 </div>
             <?php endif; ?>
 
-            <!-- Delivery type -->
             <div class="sidebar__section">
                 <div class="sidebar__label">Delivery type</div>
-                <select name="delivery_type" class="filter-select" id="delivery_type">
+                <select name="delivery_type" class="filter-select">
                     <option value="">Print &amp; Digital</option>
                     <option value="digital" <?= ($filters['delivery_type'] ?? '') === 'digital' ? 'selected' : '' ?>>
                         Digital only
@@ -1196,7 +1492,6 @@ $selectedTags = !empty($filters['tags'])
                 </select>
             </div>
 
-            <!-- Categories -->
             <?php if (!empty($available_categories)): ?>
                 <div class="sidebar__section">
                     <div class="sidebar__label">Category</div>
@@ -1213,21 +1508,17 @@ $selectedTags = !empty($filters['tags'])
                 </div>
             <?php endif; ?>
 
-            <!-- Price range -->
             <div class="sidebar__section">
                 <div class="sidebar__label">Price range</div>
                 <div class="price-range-row">
-                    <input type="number" name="price_min" id="price_min"
-                           value="<?= htmlspecialchars($filters['price_min'] ?? '') ?>"
+                    <input type="number" name="price_min" value="<?= htmlspecialchars($filters['price_min'] ?? '') ?>"
                            placeholder="£<?= $price_range['min'] ?? 0 ?>" step="0.01" min="0">
                     <span>–</span>
-                    <input type="number" name="price_max" id="price_max"
-                           value="<?= htmlspecialchars($filters['price_max'] ?? '') ?>"
+                    <input type="number" name="price_max" value="<?= htmlspecialchars($filters['price_max'] ?? '') ?>"
                            placeholder="£<?= $price_range['max'] ?? 999 ?>" step="0.01" min="0">
                 </div>
             </div>
 
-            <!-- Tags -->
             <?php if (!empty($available_tags)): ?>
                 <div class="sidebar__section">
                     <div class="sidebar__label">Tags</div>
@@ -1249,49 +1540,17 @@ $selectedTags = !empty($filters['tags'])
         </form>
     </aside>
 
-    <!-- ── Main ─────────────────────────────────────────────────── -->
+    <!-- Main -->
     <main class="main">
 
-        <!-- Active filter chips -->
         <div class="active-chips" id="active-chips"></div>
 
-        <!-- Category carousel -->
-        <?php if (!empty($available_categories)): ?>
-            <div class="cat-carousel-wrap">
-                <button class="carousel-nav-btn" onclick="scrollCatCarousel('left')" aria-label="Previous">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                         stroke-linecap="round">
-                        <polyline points="15 18 9 12 15 6"/>
-                    </svg>
-                </button>
-                <div class="cat-carousel" id="cat-carousel">
-                    <?php foreach ($available_categories as $cat): ?>
-                        <div class="cat-tile <?= in_array($cat['name'], $selectedCategories) ? 'selected' : '' ?>"
-                             data-category="<?= htmlspecialchars($cat['name']) ?>"
-                             onclick="toggleCategory('<?= htmlspecialchars($cat['name']) ?>')">
-                            <div class="cat-tile__icon" style="background:<?= htmlspecialchars($cat['color']) ?>">
-                                <?= $cat['icon'] ?>
-                            </div>
-                            <div class="cat-tile__name"><?= htmlspecialchars($cat['name']) ?></div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-                <button class="carousel-nav-btn" onclick="scrollCatCarousel('right')" aria-label="Next">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                         stroke-linecap="round">
-                        <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                </button>
-            </div>
-        <?php endif; ?>
-
-        <!-- Bundles carousel -->
+        <!-- Bundles -->
         <?php if (!empty($bundles)): ?>
             <section class="bundles-section" data-carousel>
                 <div class="section-header">
                     <div class="section-header__left">
                         <h2 class="section-title">Bundle deals</h2>
-                        <a href="<?= url('/subscriptions/deals') ?>" class="section-link">See all →</a>
                     </div>
                     <div class="carousel-controls">
                         <button class="carousel-arrow" data-prev aria-label="Previous" disabled>
@@ -1322,9 +1581,9 @@ $selectedTags = !empty($filters['tags'])
                                     <div class="bundle-card__plans">
                                         <?php foreach ($bundle['plans'] as $plan): ?>
                                             <span class="bundle-card__plan-tag">
-                                                <?= $plan['delivery_type'] === 'digital' ? '📱' : '📰' ?>
-                                                <?= htmlspecialchars($plan['name']) ?>
-                                            </span>
+                                        <?= $plan['delivery_type'] === 'digital' ? '📱' : '📰' ?>
+                                        <?= htmlspecialchars($plan['name']) ?>
+                                    </span>
                                         <?php endforeach; ?>
                                     </div>
                                     <div class="bundle-card__pricing">
@@ -1354,19 +1613,17 @@ $selectedTags = !empty($filters['tags'])
         <div class="toolbar">
             <div class="toolbar__count" id="results-count">
                 Showing <strong><?= count($plans) ?></strong> of
-                <strong><?= number_format($pagination['total']) ?></strong> subscriptions
+                <strong><?= number_format($pagination['total']) ?></strong> deals
             </div>
-            <div class="toolbar__right">
-                <div class="toolbar__sort">
-                    <span>Sort:</span>
-                    <select id="sort-select">
-                        <?php foreach ($sort_options as $option): ?>
-                            <option value="<?= $option->value ?>" <?= ($filters['sort'] ?? '') === $option->value ? 'selected' : '' ?>>
-                                <?= $option->label() ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+            <div class="toolbar__sort">
+                <span>Sort:</span>
+                <select id="sort-select">
+                    <?php foreach ($sort_options as $option): ?>
+                        <option value="<?= $option->value ?>" <?= ($filters['sort'] ?? '') === $option->value ? 'selected' : '' ?>>
+                            <?= $option->label() ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
         </div>
 
@@ -1374,8 +1631,8 @@ $selectedTags = !empty($filters['tags'])
         <div id="plans-wrap">
             <?php if (empty($plans)): ?>
                 <div class="empty-state">
-                    <div class="empty-state__icon">📭</div>
-                    <div class="empty-state__title">No subscriptions found</div>
+                    <div class="empty-state__icon">🏷️</div>
+                    <div class="empty-state__title">No deals found</div>
                     <p>Try adjusting your filters to see more results.</p>
                 </div>
             <?php else: ?>
@@ -1394,18 +1651,15 @@ $selectedTags = !empty($filters['tags'])
                                 break;
                             }
                         }
-                        $isLimitedOffer = $plan->end_date && $plan->end_date->diffInDays(now()) <= 30;
                         $displayPrice = $hasSale ? $salePrice : ($plan->price ?? 0);
                         $letter = strtoupper(substr($plan->name, 0, 1));
                         $detailUrl = url('/subscriptions/' . $plan->id);
                         ?>
                         <article class="plan-card">
-                            <?php if ($plan->is_featured): ?>
-                                <div class="plan-card__badge plan-card__badge--featured">⭐ Featured</div>
-                            <?php elseif ($hasSale): ?>
+                            <?php if ($hasSale): ?>
                                 <div class="plan-card__badge plan-card__badge--sale">SAVE <?= $savingPct ?>%</div>
-                            <?php elseif ($isLimitedOffer): ?>
-                                <div class="plan-card__badge plan-card__badge--offer">Limited offer</div>
+                            <?php else: ?>
+                                <div class="plan-card__badge plan-card__badge--offer">On sale</div>
                             <?php endif; ?>
 
                             <div class="plan-card__image"><?= $letter ?></div>
@@ -1442,16 +1696,12 @@ $selectedTags = !empty($filters['tags'])
                                             <div class="plan-card__price-was">
                                                 £<?= number_format($originalPrice, 2) ?></div>
                                         <?php endif; ?>
-                                        <div class="plan-card__price <?= $hasSale ? 'plan-card__price--sale' : '' ?>">
-                                            £<?= number_format($displayPrice, 2) ?>
-                                        </div>
+                                        <div class="plan-card__price">£<?= number_format($displayPrice, 2) ?></div>
                                     </div>
                                     <div>
                                         <div class="plan-card__price-period">
                                             / <?= htmlspecialchars($plan->billing_period ?? 'month') ?></div>
-                                        <?php if ($hasSale): ?>
-                                            <div class="plan-card__price-note">🔥 Sale price</div>
-                                        <?php endif; ?>
+                                        <div class="plan-card__price-note">🔥 Sale price</div>
                                     </div>
                                 </div>
 
@@ -1515,74 +1765,59 @@ $selectedTags = !empty($filters['tags'])
     let currentSort = <?= json_encode($filters['sort'] ?? '') ?>;
     let isLoading = false;
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
     function escHtml(s) {
         if (!s) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function deliveryBadges(type) {
-        const badges = [];
-        if (type === 'digital' || type === 'both') badges.push('<span class="meta-pill meta-pill--digital">📱 Digital</span>');
-        if (type === 'print' || type === 'both') badges.push('<span class="meta-pill meta-pill--print">📰 Print</span>');
-        return badges.join('');
-    }
-
-    function renderBadge(plan) {
-        if (plan.is_featured) return `<div class="plan-card__badge plan-card__badge--featured">⭐ Featured</div>`;
-        if (plan.has_sale && plan.savings_pct) return `<div class="plan-card__badge plan-card__badge--sale">SAVE ${plan.savings_pct}%</div>`;
-        if (plan.is_limited_offer) return `<div class="plan-card__badge plan-card__badge--offer">Limited offer</div>`;
-        return '';
+        const b = [];
+        if (type === 'digital' || type === 'both') b.push('<span class="meta-pill meta-pill--digital">📱 Digital</span>');
+        if (type === 'print' || type === 'both') b.push('<span class="meta-pill meta-pill--print">📰 Print</span>');
+        return b.join('');
     }
 
     function renderPlanCard(plan) {
-        const letter = escHtml((plan.name || '?')[0].toUpperCase());
         const price = parseFloat(plan.has_sale ? plan.sale_price : plan.price) || 0;
         const wasLine = (plan.has_sale && plan.original_price)
             ? `<div class="plan-card__price-was">£${parseFloat(plan.original_price).toFixed(2)}</div>` : '';
-        const priceClass = plan.has_sale ? 'plan-card__price plan-card__price--sale' : 'plan-card__price';
-        const saleNote = plan.has_sale ? `<div class="plan-card__price-note">🔥 Sale price</div>` : '';
-        const btnClass = plan.has_sale ? 'plan-card__btn plan-card__btn--sale' : 'plan-card__btn';
-        const btnLabel = plan.has_sale ? '🔥 View deal' : 'View details';
-        const desc = plan.description ? `<p class="plan-card__desc">${escHtml(plan.description.substring(0, 110))}${plan.description.length > 110 ? '…' : ''}</p>` : '';
+        const badge = (plan.has_sale && plan.savings_pct)
+            ? `<div class="plan-card__badge plan-card__badge--sale">SAVE ${plan.savings_pct}%</div>`
+            : `<div class="plan-card__badge plan-card__badge--offer">On sale</div>`;
         const site = plan.site_name ? `<div class="plan-card__site">${escHtml(plan.site_name)}</div>` : '';
-
-        const catPills = (plan.categories || []).slice(0, 2).map(c =>
-            `<span class="meta-pill meta-pill--category">${escHtml(c.charAt(0).toUpperCase() + c.slice(1))}</span>`).join('');
-        const tagPills = (plan.tags || []).slice(0, 2).map(t =>
-            `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
+        const desc = plan.description ? `<p class="plan-card__desc">${escHtml(plan.description.substring(0, 110))}${plan.description.length > 110 ? '…' : ''}</p>` : '';
+        const catPills = (plan.categories || []).slice(0, 2).map(c => `<span class="meta-pill meta-pill--category">${escHtml(c.charAt(0).toUpperCase() + c.slice(1))}</span>`).join('');
+        const tagPills = (plan.tags || []).slice(0, 2).map(t => `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
 
         return `
     <article class="plan-card">
-        ${renderBadge(plan)}
-        <div class="plan-card__image">${letter}</div>
+        ${badge}
+        <div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>
         <div class="plan-card__body">
             ${site}
             <div class="plan-card__name">${escHtml(plan.name)}</div>
             <div class="plan-card__meta">
                 ${deliveryBadges(plan.delivery_type)}
-                ${catPills}
-                ${tagPills}
+                ${catPills}${tagPills}
             </div>
             ${desc}
             <div class="plan-card__pricing">
                 <div>
                     <div class="plan-card__from">from</div>
                     ${wasLine}
-                    <div class="${priceClass}">£${price.toFixed(2)}</div>
+                    <div class="plan-card__price">£${price.toFixed(2)}</div>
                 </div>
                 <div>
                     <div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>
-                    ${saleNote}
+                    <div class="plan-card__price-note">🔥 Sale price</div>
                 </div>
             </div>
-           <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px;">
     <a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a>
-    <button class="plan-card__btn"  data-delivery-type="${plan.delivery_type}"
+    <button class="plan-card__btn" data-delivery-type="${plan.delivery_type}"
             style="flex-shrink:0;width:auto;padding:11px 14px;background:var(--surface);color:var(--ink);border:1px solid var(--border);"
             title="Add to cart"
-            onclick="addToCart('plan', ${plan.id}, this)">🛒</button>
+<button onclick="addToCart('plan', plan.id, this)">
 </div>
         </div>
     </article>`;
@@ -1599,16 +1834,12 @@ $selectedTags = !empty($filters['tags'])
         for (let i = start; i <= end; i++) h += `<button class="pagination__btn ${i === cur ? 'active' : ''}" data-page="${i}">${i}</button>`;
         if (end < tot - 1) h += `<span class="pagination__ellipsis">…</span>`;
         if (end < tot) h += `<button class="pagination__btn" data-page="${tot}">${tot}</button>`;
-        h += `<button class="pagination__btn ${cur >= tot ? 'disabled' : ''}" data-page="${cur + 1}">→</button>`;
-        h += `</nav>`;
+        h += `<button class="pagination__btn ${cur >= tot ? 'disabled' : ''}" data-page="${cur + 1}">→</button></nav>`;
         return h;
     }
 
-    // ── Active chips ───────────────────────────────────────────────────────────
-
     function buildParams(page) {
-        const fd = new FormData(FORM);
-        const p = new URLSearchParams();
+        const fd = new FormData(FORM), p = new URLSearchParams();
         for (const [k, v] of fd.entries()) {
             if (!v || k === 'categories[]' || k === 'tags[]') continue;
             p.set(k, v);
@@ -1623,45 +1854,40 @@ $selectedTags = !empty($filters['tags'])
     function renderActiveChips() {
         const chips = [];
         const fd = new FormData(FORM);
-
         const labels = {
             search: 'Search',
             site_id: 'Publication',
             delivery_type: 'Delivery',
-            special_filter: 'Offers',
             price_min: 'Min £',
             price_max: 'Max £'
         };
         for (const [k, v] of fd.entries()) {
-            if (!v || !labels[k] || k === 'categories[]' || k === 'tags[]') continue;
+            if (!v || !labels[k]) continue;
             chips.push(`<div class="active-chip">${labels[k]}: ${escHtml(v)}<button onclick="removeChip('${k}')">×</button></div>`);
         }
         selectedCategories.forEach(c => chips.push(`<div class="active-chip">📂 ${escHtml(c)}<button onclick="removeCategory('${escHtml(c)}')">×</button></div>`));
         selectedTags.forEach(t => chips.push(`<div class="active-chip">🏷 ${escHtml(t.replace(/-/g, ' '))}<button onclick="removeTag('${escHtml(t)}')">×</button></div>`));
-
         document.getElementById('active-chips').innerHTML = chips.join('');
     }
 
-    window.removeChip = function (key) {
-        const el = FORM.querySelector(`[name="${key}"]`);
+    window.removeChip = k => {
+        const el = FORM.querySelector(`[name="${k}"]`);
         if (el) el.value = '';
-        fetchPlans(1);
+        fetchDeals(1);
     };
-    window.removeCategory = function (cat) {
-        selectedCategories.delete(cat);
+    window.removeCategory = c => {
+        selectedCategories.delete(c);
         syncCategoryUI();
-        fetchPlans(1);
+        fetchDeals(1);
     };
-    window.removeTag = function (tag) {
-        selectedTags.delete(tag);
-        const cb = FORM.querySelector(`input[name="tags[]"][value="${tag}"]`);
+    window.removeTag = t => {
+        selectedTags.delete(t);
+        const cb = FORM.querySelector(`input[name="tags[]"][value="${t}"]`);
         if (cb) cb.checked = false;
-        fetchPlans(1);
+        fetchDeals(1);
     };
 
-    // ── Fetch ──────────────────────────────────────────────────────────────────
-
-    async function fetchPlans(page = 1) {
+    async function fetchDeals(page = 1) {
         if (isLoading) return;
         isLoading = true;
         PLANS_WRAP.classList.add('is-loading');
@@ -1671,31 +1897,28 @@ $selectedTags = !empty($filters['tags'])
         renderActiveChips();
 
         try {
-            const res = await fetch('/subscriptions/onetime/search?' + params.toString(), {
-                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+            const res = await fetch('/subscriptions/onetime/deals/search?' + params.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
             });
             const data = await res.json();
             if (!data.success) return;
 
             const result = data.data
 
-            // Update count
             const countEl = document.getElementById('results-count');
-            if (countEl) countEl.innerHTML = `Showing <strong>${result.plans.length}</strong> of <strong>${result.pagination.total.toLocaleString()}</strong> subscriptions`;
+            if (countEl) countEl.innerHTML = `Showing <strong>${result.plans.length}</strong> of <strong>${result.pagination.total.toLocaleString()}</strong> deals`;
 
-            // Replace content
-            const oldGrid = PLANS_WRAP.querySelector('.plans-grid, .empty-state');
-            const oldPag = document.getElementById('pagination');
-            if (oldGrid) oldGrid.remove();
-            if (oldPag) oldPag.remove();
+            const heroSub = document.getElementById('hero-sub');
+            if (heroSub) heroSub.textContent = `${result.pagination.total.toLocaleString()} discounted subscription${result.pagination.total !== 1 ? 's' : ''} available right now`;
+
+            PLANS_WRAP.querySelector('.plans-grid,.empty-state')?.remove();
+            document.getElementById('pagination')?.remove();
 
             if (result.plans.length === 0) {
-                PLANS_WRAP.insertAdjacentHTML('afterbegin', `
-                <div class="empty-state">
-                    <div class="empty-state__icon">📭</div>
-                    <div class="empty-state__title">No subscriptions found</div>
-                    <p>Try adjusting your filters to see more results.</p>
-                </div>`);
+                PLANS_WRAP.insertAdjacentHTML('afterbegin', `<div class="empty-state"><div class="empty-state__icon">🏷️</div><div class="empty-state__title">No deals found</div><p>Try adjusting your filters.</p></div>`);
             } else {
                 PLANS_WRAP.insertAdjacentHTML('afterbegin', `<div class="plans-grid">${result.plans.map(renderPlanCard).join('')}</div>`);
                 PLANS_WRAP.insertAdjacentHTML('beforeend', renderPagination(result.pagination));
@@ -1713,52 +1936,45 @@ $selectedTags = !empty($filters['tags'])
         document.querySelectorAll('#pagination .pagination__btn:not(.disabled)').forEach(btn => {
             btn.addEventListener('click', () => {
                 const p = parseInt(btn.dataset.page);
-                if (p > 0) fetchPlans(p);
+                if (p > 0) fetchDeals(p);
             });
         });
     }
 
-    // ── Category / tag toggles ─────────────────────────────────────────────────
-
     window.toggleCategory = function (cat) {
         selectedCategories.has(cat) ? selectedCategories.delete(cat) : selectedCategories.add(cat);
         syncCategoryUI();
-        fetchPlans(1);
+        fetchDeals(1);
     };
 
     function syncCategoryUI() {
         document.querySelectorAll('[data-category]').forEach(el => {
-            el.classList.toggle('selected', selectedCategories.has(el.dataset.category));
             el.classList.toggle('active', selectedCategories.has(el.dataset.category));
         });
     }
 
-    // Tag checkboxes
     document.querySelectorAll('#tag-list input[type="checkbox"]').forEach(cb => {
         cb.addEventListener('change', () => {
             cb.checked ? selectedTags.add(cb.value) : selectedTags.delete(cb.value);
             cb.closest('.tag-item').classList.toggle('checked', cb.checked);
-            fetchPlans(1);
+            fetchDeals(1);
         });
     });
-
-    // ── Inputs / form ──────────────────────────────────────────────────────────
 
     let searchTimer;
     document.getElementById('search').addEventListener('input', () => {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => fetchPlans(1), 450);
+        searchTimer = setTimeout(() => fetchDeals(1), 450);
     });
-
-    FORM.querySelectorAll('select').forEach(s => s.addEventListener('change', () => fetchPlans(1)));
-    FORM.querySelectorAll('input[name="price_min"],input[name="price_max"]').forEach(i => i.addEventListener('change', () => fetchPlans(1)));
+    FORM.querySelectorAll('select').forEach(s => s.addEventListener('change', () => fetchDeals(1)));
+    FORM.querySelectorAll('input[name="price_min"],input[name="price_max"]').forEach(i => i.addEventListener('change', () => fetchDeals(1)));
     FORM.addEventListener('submit', e => {
         e.preventDefault();
-        fetchPlans(1);
+        fetchDeals(1);
     });
     SORT_SELECT.addEventListener('change', () => {
         currentSort = SORT_SELECT.value;
-        fetchPlans(1);
+        fetchDeals(1);
     });
 
     window.clearFilters = function () {
@@ -1771,76 +1987,10 @@ $selectedTags = !empty($filters['tags'])
         selectedCategories.clear();
         selectedTags.clear();
         syncCategoryUI();
-        fetchPlans(1);
+        fetchDeals(1);
     };
 
-    // ── Category carousel scroll ───────────────────────────────────────────────
-
-    window.scrollCatCarousel = function (dir) {
-        document.getElementById('cat-carousel').scrollBy({left: dir === 'left' ? -280 : 280, behavior: 'smooth'});
-    };
-
-    // ── Cart ───────────────────────────────────────────────────────
-    async function addToCart(type, id, btn, deliveryType) {
-        const original = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Adding…';
-        const url = type === 'plan' ? '/cart/subscription' : '/cart/add-bundle'
-
-        try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({
-                    type: type,
-                    bundle_id: id,
-                    plan_id: id,
-                    quantity: 1,
-                    delivery_type: btn.dataset.delivery_type
-                })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                btn.innerHTML = '✓ Added!';
-                btn.style.background = 'var(--accent)';
-
-                // Update cart count in header if you have one
-                const cartCount = document.querySelector('[data-cart-count]');
-                if (cartCount && data.cart_count != null) cartCount.textContent = data.cart_count;
-
-                setTimeout(() => {
-                    btn.innerHTML = original;
-                    btn.style.background = '';
-                    btn.disabled = false;
-                }, 2000);
-            } else {
-                btn.innerHTML = '✗ Failed';
-                btn.style.background = 'var(--save)';
-                setTimeout(() => {
-                    btn.innerHTML = original;
-                    btn.style.background = '';
-                    btn.disabled = false;
-                }, 2000);
-            }
-        } catch (e) {
-            console.error('Cart error', e);
-            btn.innerHTML = '✗ Error';
-            setTimeout(() => {
-                btn.innerHTML = original;
-                btn.style.background = '';
-                btn.disabled = false;
-            }, 2000);
-        }
-    }
-
-    // ── Init ───────────────────────────────────────────────────────────────────
-
-    syncCategoryUI();
-    renderActiveChips();
-    bindPagination();
-
-    // ── Bundle carousel ────────────────────────────────────────────────────────
+    // ── Bundle carousel ────────────────────────────────────────────
     document.querySelectorAll('[data-carousel]').forEach(section => {
         const track = section.querySelector('[data-track]');
         const viewport = section.querySelector('.carousel-viewport');
@@ -1866,6 +2016,7 @@ $selectedTags = !empty($filters['tags'])
             for (let i = 0; i <= maxIndex(); i++) {
                 const d = document.createElement('button');
                 d.className = 'carousel-dot' + (i === current ? ' active' : '');
+                d.setAttribute('aria-label', `Go to bundle ${i + 1}`);
                 d.addEventListener('click', () => goTo(i));
                 dotsEl.appendChild(d);
             }
@@ -1926,7 +2077,9 @@ $selectedTags = !empty($filters['tags'])
             if (!isDragging) return;
             isDragging = false;
             track.classList.remove('is-dragging');
-            if (dragDelta < -60) goTo(current + 1); else if (dragDelta > 60) goTo(current - 1); else updateUI();
+            if (dragDelta < -60) goTo(current + 1);
+            else if (dragDelta > 60) goTo(current - 1);
+            else updateUI();
             startAuto();
         }
 
@@ -1951,10 +2104,69 @@ $selectedTags = !empty($filters['tags'])
                 updateUI();
             }, 150);
         });
+
         buildDots();
         updateUI();
         startAuto();
     });
+
+    // ── Cart ───────────────────────────────────────────────────────
+    async function addToCart(type, id, btn, deliveryType) {
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Adding…';
+        const url = type === 'plan' ? '/cart/subscription' : '/cart/add-bundle'
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                body: JSON.stringify({
+                    type: type,
+                    bundle_id: id,
+                    plan_id: id,
+                    quantity: 1,
+                    delivery_type: btn.dataset.delivery_type
+                })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                btn.innerHTML = '✓ Added!';
+                btn.style.background = 'var(--accent)';
+
+                // Update cart count in header if you have one
+                const cartCount = document.querySelector('[data-cart-count]');
+                if (cartCount && data.cart_count != null) cartCount.textContent = data.cart_count;
+
+                setTimeout(() => {
+                    btn.innerHTML = original;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+            } else {
+                btn.innerHTML = '✗ Failed';
+                btn.style.background = 'var(--save)';
+                setTimeout(() => {
+                    btn.innerHTML = original;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+            }
+        } catch (e) {
+            console.error('Cart error', e);
+            btn.innerHTML = '✗ Error';
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.style.background = '';
+                btn.disabled = false;
+            }, 2000);
+        }
+    }
+
+    renderActiveChips();
+    syncCategoryUI();
+    bindPagination();
 </script>
 </body>
 </html>
