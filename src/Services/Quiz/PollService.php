@@ -2,13 +2,18 @@
 
 namespace App\Services\Quiz;
 
+use App\Exceptions\PollAlreadyVotedException;
+use App\Exceptions\PollNotAvailableException;
+use App\Exceptions\PollOptionInvalidException;
+use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Repositories\Quiz\PollRepository;
 
 class PollService
 {
     public function __construct(
-        private readonly PollRepository $pollRepository
+        private readonly PollRepository $pollRepository,
+        private readonly Database       $database
     )
     {
     }
@@ -48,30 +53,34 @@ class PollService
         })->toArray();
     }
 
+    /**
+     * @throws PollAlreadyVotedException
+     * @throws PollNotAvailableException
+     * @throws PollOptionInvalidException
+     */
     public function castVote(int $pollId, int $optionId, Member $member): array
     {
-        // Check already voted
         if ($this->pollRepository->getMemberVote($pollId, $member->id)) {
-            return ['success' => false, 'message' => 'Already voted'];
+            throw new PollAlreadyVotedException("Member {$member->id} has already voted on poll {$pollId}.");
         }
 
-        // Validate option belongs to poll
         $poll = $this->pollRepository->find($pollId);
+
         if (!$poll || !$poll->isActive()) {
-            return ['success' => false, 'message' => 'Poll not available'];
+            throw new PollNotAvailableException("Poll {$pollId} is not available.");
         }
 
-        $validOption = $poll->options->contains('id', $optionId);
-        if (!$validOption) {
-            return ['success' => false, 'message' => 'Invalid option'];
+        if (!$poll->options->contains('id', $optionId)) {
+            throw new PollOptionInvalidException("Option {$optionId} does not belong to poll {$pollId}.");
         }
 
-        $this->pollRepository->castVote($pollId, $optionId, $member->id);
+        return $this->database->transaction(function () use ($pollId, $optionId, $member) {
+            $this->pollRepository->castVote($pollId, $optionId, $member->id);
 
-        return [
-            'success' => true,
-            'results' => $this->pollRepository->getResults($pollId),
-            'total_votes' => $poll->totalVotes() + 1,
-        ];
+            return [
+                'results' => $this->pollRepository->getResults($pollId),
+                'total_votes' => $this->pollRepository->getTotalVotes($pollId),
+            ];
+        });
     }
 }

@@ -28,6 +28,7 @@ use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberConsent;
 use App\Models\MemberGiftAllowance;
+use App\Models\MemberPoint;
 use App\Models\MemberReward;
 use App\Models\Merchant;
 use App\Models\MerchantContact;

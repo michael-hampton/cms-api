@@ -7,10 +7,14 @@
     <meta name="description" content="<?= htmlspecialchars($category->description ?? "Browse {$category->name} content") ?>">
     @css('landing-page.css')
     @js('base.js')
+    @js('utility-bar.js')
+    @css('utility-bar.css')
+    @css('member-hub.css')
 </head>
-<body>
+<body data-member-logged-in="<?= \App\Framework\Authorization\MemberAuth::check() === true ? 'true' : 'false' ?>">
 
 @include('header', ['menu' => $menu, 'title' => $category->name])
+
 
 <!-- Header -->
 <header class="header">
@@ -107,10 +111,13 @@
 
 @include('components/newsletter-modal')
 @include('components/comment-modal')
+@include('components/member-hub')
 
 <?php if (isset($subscriptionModalData)): ?>
     @include('components/subscription-modal', ['subscriptionModalData' => $subscriptionModalData])
 <?php endif; ?>
+
+@js('member-hub.js')
 
 </body>
 </html>

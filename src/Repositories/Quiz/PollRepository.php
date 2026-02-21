@@ -37,7 +37,7 @@ class PollRepository extends Repository
             'poll_id' => $pollId,
             'poll_option_id' => $optionId,
             'member_id' => $memberId,
-            'voted_at' => now_datetime(),
+            'voted_at' => now(),
         ]);
     }
 

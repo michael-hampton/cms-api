@@ -111,10 +111,10 @@ class PageLike extends Model
         if ($existing) {
             $existing->delete();
             $count = static::where('page_id', $pageId)->where('action', $action)->count();
-            return ['active' => false, 'count' => $count];
+            return ['active' => false, 'count' => $count, 'liked' => false];
         }
 
-        static::create([
+        $result = static::create([
             'page_id' => $pageId,
             'member_id' => $memberId,
             'site_id' => $siteId,
@@ -123,7 +123,7 @@ class PageLike extends Model
         ]);
 
         $count = static::where('page_id', $pageId)->where('action', $action)->count();
-        return ['active' => true, 'count' => $count];
+        return ['active' => true, 'count' => $count, 'liked' => true, 'like' => $result];
     }
 
     public static function hasAction(int $pageId, int $memberId, int $siteId, string $action): bool

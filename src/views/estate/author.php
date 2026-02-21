@@ -10,9 +10,11 @@
     <?php endif; ?>
     @css('landing-page.css')
     @js('base.js')
-
+    @js('utility-bar.js')
+    @css('utility-bar.css')
+    @css('member-hub.css')
 </head>
-<body>
+<body data-member-logged-in="<?= \App\Framework\Authorization\MemberAuth::check() === true ? 'true' : 'false' ?>">
 
 @include('header', ['menu' => $menu, 'title' => $author->name])
 
@@ -257,6 +259,9 @@
 
 @include('components/newsletter-modal')
 @include('components/comment-modal')
+@include('components/member-hub')
+
+@js('member-hub.js')
 
 </body>
 </html>

@@ -22,6 +22,7 @@ const utilityBar = (() => {
         _wireAllBars();
         _bindGlobalClose();
         // Re-wire if new cards are injected (infinite scroll / load-more)
+        _hoistGuestPrompt();
         new MutationObserver(_wireAllBars)
             .observe(document.body, {childList: true, subtree: true});
     }
@@ -81,15 +82,27 @@ const utilityBar = (() => {
 
     // ── Save ────────────────────────────────────────────────────────────────
     function handleSave(btn) {
+        console.log(document.body.dataset)
         const isLoggedIn = document.body.dataset.memberLoggedIn === 'true';
+
+        alert(isLoggedIn)
 
         if (!isLoggedIn) {
             _updateGuestPromptPageId(btn.dataset.pageId);
-            showGuestSavePrompt();
+            showGuestSavePrompt(btn);
             return;
         }
 
+        alert('mike1')
+
         _toggleSaveAPI(btn);
+    }
+
+    function _hoistGuestPrompt() {
+        const prompt = document.getElementById('guestSavePrompt');
+        if (prompt && prompt.parentElement !== document.body) {
+            document.body.appendChild(prompt);
+        }
     }
 
     async function _toggleSaveAPI(btn) {
@@ -132,6 +145,7 @@ const utilityBar = (() => {
         }
     }
 
+
     // ── Like ─────────────────────────────────────────────────────────────────
     async function _toggleLike(btn) {
         const pageId = btn.dataset.pageId;
@@ -144,9 +158,8 @@ const utilityBar = (() => {
         _applyLikeState(btn, nowLiked, count, true);
 
         try {
-            const method = nowLiked ? 'POST' : 'DELETE';
-            const res = await fetch(`/api/pages/${pageId}/like`, {
-                method,
+            const res = await fetch(`/${SITE}/pages/like/${pageId}`, {
+                method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': _csrfToken(),
@@ -265,7 +278,13 @@ const utilityBar = (() => {
             window.MemberHub.open(tab ?? null);
             return;
         }
-        // Otherwise dispatch event for hub JS to pick up
+        // Try clicking the real hub trigger button (works even if MemberHub isn't loaded yet)
+        const hubTrigger = document.getElementById('mh-hub-trigger');
+        if (hubTrigger) {
+            hubTrigger.click();
+            return;
+        }
+        // Final fallback: dispatch event for hub JS to pick up
         document.dispatchEvent(new CustomEvent('memberHub:open', {
             detail: {tab: tab ?? null}
         }));
@@ -281,29 +300,34 @@ const utilityBar = (() => {
         const prompt = document.getElementById('guestSavePrompt');
         if (!prompt) return;
 
-        const promptWidth = 330;
-
         if (triggerEl) {
             const rect = triggerEl.getBoundingClientRect();
+            const promptWidth = 330;
+            const gap = 8;
 
-            let left = rect.left + rect.width / 2 - promptWidth / 2;
+            let left = rect.left;
             left = Math.max(8, Math.min(left, window.innerWidth - promptWidth - 8));
 
-            prompt.style.position = 'fixed';
-            prompt.style.width = promptWidth + 'px';
-            prompt.style.left = left + 'px';
-            prompt.style.transform = 'none';
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const promptHeight = 280;
+            let top;
 
-            if (rect.top > 300) {
-                prompt.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
-                prompt.style.top = '';
+            if (spaceBelow >= promptHeight + gap) {
+                top = rect.bottom + gap;
             } else {
-                prompt.style.top = (rect.bottom + 10) + 'px';
-                prompt.style.bottom = '';
+                top = rect.top - promptHeight - gap;
             }
+
+            top = Math.max(8, top);
+
+            prompt.style.left = left + 'px';
+            prompt.style.top = top + 'px';
+            prompt.style.bottom = '';
+            prompt.style.transform = 'none';
         }
 
         prompt.hidden = false;
+        prompt.style.visibility = 'visible';
         prompt.querySelector('input[type="email"]')?.focus();
     }
 
@@ -311,7 +335,11 @@ const utilityBar = (() => {
         const prompt = document.getElementById('guestSavePrompt');
         if (!prompt) return;
         prompt.hidden = true;
-        // Reset to form view
+        prompt.style.visibility = 'hidden';
+        prompt.style.top = '';
+        prompt.style.left = '';
+        prompt.style.transform = '';
+
         const form = document.getElementById('guestSaveForm');
         const success = document.getElementById('guestSaveSuccess');
         if (form) {

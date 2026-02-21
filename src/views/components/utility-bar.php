@@ -20,7 +20,7 @@ $showToolbar = $showToolbar ?? true;
 if (!$showToolbar) return;
 
 // ── Auth state ──────────────────────────────────────────────────────────────
-$isLoggedIn = class_exists('MemberAuth') && MemberAuth::check();
+$isLoggedIn = MemberAuth::check();
 $member = $isLoggedIn ? MemberAuth::getMember() : null;
 $unread = $isLoggedIn && method_exists($member, 'getUnreadCount') ? (int)$member->getUnreadCount() : 0;
 
@@ -41,17 +41,15 @@ $fullUrl = '/' . $siteSlug . htmlspecialchars($pageUrl);
 $isSaved = false;
 
 // [TODO-LIKES] Replace 0 / false with real values:
-// $likeCount = (int)($page->likes_count ?? 0);
-// $isLiked   = $isLoggedIn ? PageLikeRepository::isLikedBy($pageId, $member->id, $siteId) : false;
-$likeCount = (int)($page->likes_count ?? 0);
-$isLiked = false;
+$pageLikes = $page->likes;
+
+
+$isLiked = $isLoggedIn ? $pageLikes->where('member_id', MemberAuth::id())->count() : false;
+$likeCount = (int)($pageLikes->count() ?? 0);
 
 // Unique suffix so multiple bars on a listing page don't share IDs
 $uid = 'ub-' . ($pageId ?? uniqid());
 ?>
-
-    @js('utility-bar.js')
-    @css('utility-bar.css')
 
     <div class="utility-bar utility-bar--ribbon"
          id="<?= $uid ?>"

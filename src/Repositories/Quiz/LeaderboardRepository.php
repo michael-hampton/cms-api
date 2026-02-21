@@ -43,22 +43,29 @@ class LeaderboardRepository extends Repository
         $weekStart = LeaderboardEntry::currentWeekStart();
         $weekEnd = date('Y-m-d', strtotime($weekStart . ' +7 days'));
 
-        // Points leaderboard — sum MemberPoints awarded this week
-        $pointsData = MemberPoint::selectRaw('member_id, SUM(points) as score')
-            ->whereBetween('awarded_at', [$weekStart, $weekEnd])
-            ->groupBy('member_id')
+        // Points leaderboard — sum MemberPoints awarded this week, scoped to site
+        // via the member relationship: MemberPoint → members.site_id
+        $pointsData = MemberPoint::selectRaw('member_points.member_id, SUM(member_points.points) as total')
+            ->join('members', 'members.id', '=', 'member_points.member_id')
+            ->where('members.site_id', $siteId)
+            ->whereBetween('member_points.awarded_at', [$weekStart, $weekEnd])
+            ->groupBy('member_points.member_id')
             ->get();
 
         foreach ($pointsData as $row) {
             LeaderboardEntry::updateOrCreate(
-                ['site_id' => $siteId, 'member_id' => $row->member_id,
-                    'type' => 'points', 'week_start' => $weekStart],
-                ['score' => $row->score, 'period' => 'weekly']
+                [
+                    'site_id' => $siteId,
+                    'member_id' => $row->member_id,
+                    'type' => 'points',
+                    'week_start' => $weekStart,
+                ],
+                ['score' => $row->total, 'period' => 'weekly']
             );
         }
 
         // Activity leaderboard — count MemberActivity rows this week
-        $activityData = MemberActivity::selectRaw('member_id, COUNT(*) as score')
+        $activityData = MemberActivity::selectRaw('member_id, COUNT(*) as total')
             ->where('site_id', $siteId)
             ->whereBetween('activity_date', [$weekStart, $weekEnd])
             ->groupBy('member_id')
@@ -66,13 +73,19 @@ class LeaderboardRepository extends Repository
 
         foreach ($activityData as $row) {
             LeaderboardEntry::updateOrCreate(
-                ['site_id' => $siteId, 'member_id' => $row->member_id,
-                    'type' => 'activity', 'week_start' => $weekStart],
-                ['score' => $row->score, 'period' => 'weekly']
+                [
+                    'site_id' => $siteId,
+                    'member_id' => $row->member_id,
+                    'type' => 'activity',
+                    'week_start' => $weekStart,
+                ],
+                ['score' => $row->total, 'period' => 'weekly']
             );
         }
 
         // Assign ranks after scores are set
+        // NOTE: This issues N individual UPDATE calls — one per entry. For large
+        // leaderboards consider replacing with a single UPDATE ... JOIN or raw CASE WHEN.
         foreach (['points', 'activity'] as $type) {
             $entries = LeaderboardEntry::where('site_id', $siteId)
                 ->where('type', $type)

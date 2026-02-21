@@ -39,7 +39,7 @@ class QueryBuilder
         'min', 'max', 'join', 'inner', 'left', 'right', 'on', 'as',
         'and', 'or', 'not', 'null', 'is', 'in', 'between', 'like',
         'exists', 'case', 'when', 'then', 'else', 'end', 'union',
-        'all', 'any', 'some', 'having', 'desc', 'asc', 'value', 'type', 'interval'
+        'all', 'any', 'some', 'having', 'desc', 'asc', 'value', 'type', 'interval', 'rank'
     ];
 
 
