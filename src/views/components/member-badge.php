@@ -1,3 +1,41 @@
+<?php
+/**
+ * Member Badge — header component
+ *
+ * Renders the account CTA or logged-in profile section in the header.
+ *
+ * On ARTICLE pages  → the hub trigger pill lives inside the utility bar
+ *                     (rendered by member-hub.php). We do NOT add it here
+ *                     to avoid duplicate #mh-hub-trigger IDs.
+ *
+ * On ALL OTHER pages → the utility bar is absent, so we inject the hub
+ *                      trigger pill here so it's always reachable.
+ *
+ * The $isArticlePage flag is set by member-hub.php which runs first in the
+ * layout. If member-hub.php has not run yet, we default to false (safe —
+ * renders the trigger).
+ */
+
+// Pull the same auth state that member-hub.php already computed.
+// These vars are in scope because both partials are included in the
+// same layout template.
+$isLoggedIn = \App\Framework\Authorization\MemberAuth::check();
+$siteSlug = \App\Framework\Support\SiteContext::slug();
+$member = $isLoggedIn ? \App\Framework\Authorization\MemberAuth::getMember() : null;
+
+$memberFirstName = $member->first_name ?? $member->email ?? 'M';
+$memberLastName = $member->last_name ?? '';
+$memberDisplay = $member->displayName ?? trim("$memberFirstName $memberLastName");
+$memberInitial = strtoupper(substr($memberFirstName, 0, 1));
+$unreadCount = 0; // [TODO-ROUTES] match value from member-hub.php
+
+// Is the utility bar already present on this page?
+// member-hub.php sets $isArticlePage before this component is rendered.
+$isArticlePage = $isArticlePage ?? false;
+?>
+
+@css('member-hub.css')
+
 <style>
     .account-cta-button {
         display: inline-flex;
@@ -19,11 +57,10 @@
     .account-cta-button::before {
         content: '';
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
+        inset: 0;
+        background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0) 100%);
         opacity: 0;
         transition: opacity 0.3s ease;
     }
@@ -80,7 +117,7 @@
     .header-actions {
         display: flex;
         align-items: center;
-        gap: 1.5rem;
+        gap: 1rem;
     }
 
     .user-profile {
@@ -161,57 +198,82 @@
 
 @include('components/subscription-button')
 
-<?php if (!\App\Framework\Authorization\MemberAuth::check()): ?>
-    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/dashboard" class="account-cta-button">
+<?php if (!$isLoggedIn): ?>
 
-        <svg xmlns="http://www.w3.org/2000/svg"
-             viewBox="0 0 24 24"
-             fill="none"
-             stroke="currentColor"
-             stroke-width="2"
-             stroke-linecap="round"
-             stroke-linejoin="round">
-            <circle cx="12" cy="8" r="3.2"/>
-            <path d="M4.5 20c0-3.2 2.8-5.8 7.5-5.8s7.5 2.6 7.5 5.8"/>
-        </svg>
+    <?php /* ── Guest: show sign-in CTA ── */ ?>
+    <div class="header-actions">
 
-        <div class="account-cta-text">
-            <span class="account-cta-main">My Account</span>
-            <span class="account-cta-sub">Login or Sign Up</span>
-        </div>
-    </a>
+        <?php /* Hub trigger on non-article pages so guests can still
+               access Deals/Community without being on an article */ ?>
+        <?php if (!$isArticlePage): ?>
+            @include('components/member-hub-trigger', ['isLoggedIn' => \App\Framework\Authorization\MemberAuth::check()])
+        <?php endif; ?>
+
+        <a href="/<?= $siteSlug ?>/member/dashboard" class="account-cta-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="8" r="3.2"/>
+                <path d="M4.5 20c0-3.2 2.8-5.8 7.5-5.8s7.5 2.6 7.5 5.8"/>
+            </svg>
+            <div class="account-cta-text">
+                <span class="account-cta-main">My Account</span>
+                <span class="account-cta-sub">Login or Sign Up</span>
+            </div>
+        </a>
+    </div>
+
 <?php else: ?>
-    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/dashboard">
-        <div class="header-actions">
+
+    <?php /* ── Logged in: show profile strip ── */ ?>
+    <div class="header-actions">
+
+        <?php /* Hub trigger on non-article pages — on article pages the
+               utility bar provides it, so we skip it here to avoid
+               duplicate #mh-hub-trigger IDs in the DOM */ ?>
+        <?php if (!$isArticlePage): ?>
+            @include('components/member-hub-trigger', ['isLoggedIn' => \App\Framework\Authorization\MemberAuth::check()])
+        <?php endif; ?>
+
+        <a href="/<?= $siteSlug ?>/member/dashboard">
             <div class="user-profile">
                 <div class="user-avatar">
                     <?= strtoupper(substr($member->first_name ?? $member->email ?? 'M', 0, 1)) ?>
                 </div>
                 <div class="user-details">
-                    <span class="user-name"><?= htmlspecialchars($member->displayName ?? 'Member') ?></span>
+                    <span class="user-name">
+                        <?= htmlspecialchars($member->displayName ?? 'Member') ?>
+                    </span>
                     <span class="user-role">Member</span>
                 </div>
             </div>
+        </a>
 
-            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
+        <button class="mobile-menu-toggle"
+                onclick="toggleMobileMenu()"
+                aria-label="Toggle menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+        </button>
+
+        <form method="POST" action="/member/logout" style="display:inline">
+            <button type="submit" class="btn-logout">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
                 </svg>
+                <span>Logout</span>
             </button>
+        </form>
+    </div>
 
-            <form method="POST" action="/member/logout" style="display: inline;">
-                <button type="submit" class="btn-logout">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    <span>Logout</span>
-                </button>
-            </form>
-        </div>
-    </a>
 <?php endif; ?>
+
+@include('components/member-hub')
+
+@js('member-hub.js')
