@@ -29,6 +29,7 @@ use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberCommentsController;
 use App\Controllers\Members\MemberConsentController;
 use App\Controllers\Members\MemberDashboardController;
+use App\Controllers\Members\MemberHubApiController;
 use App\Controllers\Members\MemberInvoiceController;
 use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberOrdersController;
@@ -312,6 +313,22 @@ $router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController:
 $router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);;
 $router->delete('/{site}/member/payment-methods/{paymentMethodId}', [MemberPaymentMethodsController::class, 'destroy']);
 $router->post('/{site}/member/payment-methods/{id}/update', [MemberPaymentMethodsController::class, 'update']);
+
+// member hub
+$router->get('/{siteSlug}/member/subscriptions/data', [MemberHubApiController::class, 'subscriptions']);
+$router->get('/{siteSlug}/member/badges/data', [MemberHubApiController::class, 'badges']);
+$router->get('/{siteSlug}/member/notifications', [MemberHubApiController::class, 'notifications']);
+$router->post('/{siteSlug}/member/notifications/mark-read', [MemberHubApiController::class, 'markNotificationsRead']);
+$router->get('/{siteSlug}/member/hub/feed', [MemberHubApiController::class, 'feed']);
+$router->get('/{siteSlug}/member/hub/saved', [MemberHubApiController::class, 'saved']);
+$router->delete('/{siteSlug}/member/hub/saved/{pageId}', [MemberHubApiController::class, 'unsave']);
+$router->get('/{siteSlug}/member/hub/deals', [MemberHubApiController::class, 'deals']);
+$router->get('/{siteSlug}/member/hub/feed', [MemberHubApiController::class, 'feed']);
+$router->get('/{siteSlug}/member/hub/saved', [MemberHubApiController::class, 'saved']);
+$router->post('/{siteSlug}/member/hub/saved/toggle', [MemberHubApiController::class, 'toggleSave']);
+$router->get('/{siteSlug}/member/hub/deals', [MemberHubApiController::class, 'deals']);
+$router->get('/{siteSlug}/member/hub/community', [MemberHubApiController::class, 'community']);
+$router->post('/{siteSlug}/member/hub/polls/vote', [MemberHubApiController::class, 'castVote']);
 
 $router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
 

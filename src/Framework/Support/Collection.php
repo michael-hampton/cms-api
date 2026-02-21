@@ -737,5 +737,13 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($flipped);
     }
 
+    public function shuffle(): static
+    {
+        $items = $this->items;
+
+        shuffle($items);
+
+        return new static($items);
+    }
 
 }

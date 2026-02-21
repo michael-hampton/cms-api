@@ -1,7 +1,7 @@
 /* =============================================================================
-   utility-bar.css
-   Styles for both .utility-bar--sticky and .utility-bar--ribbon contexts.
-   BEM-ish naming, no framework dependencies.
+   utility-bar.css  — v2
+   Ribbon context only: sits inline inside .page-card
+   Light theme throughout — no dark backgrounds.
    ============================================================================= */
 
 /* ── Base bar ──────────────────────────────────────────────────────────────── */
@@ -9,8 +9,26 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    background: rgba(6, 10, 20, 0.97);
-    border-top: 1px solid rgba(15, 30, 56, 0.9);
+    background: transparent;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 6px 10px;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+/* ── Ribbon (inside page-card) context ────────────────────────────────────── */
+.utility-bar--ribbon {
+    position: static;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+    border-radius: 0 0 10px 10px;
+    padding: 5px 10px;
+    margin: 0;
 }
 
 /* ── Sticky (article page) context ────────────────────────────────────────── */
@@ -20,31 +38,21 @@
     left: 0;
     right: 0;
     z-index: 900;
-    padding: 8px 18px;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    max-width: 100%;
-}
-
-/* ── Ribbon (page-card) context ───────────────────────────────────────────── */
-.utility-bar--ribbon {
-    position: static;
-    border-top: none;
-    border-bottom: 1px solid var(--color-border, #e5e7eb);
-    padding: 6px 12px;
-    background: var(--color-surface, #fff);
-    backdrop-filter: none;
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+    padding: 6px 18px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ── Scroll progress bar (sticky only) ───────────────────────────────────── */
 .utility-bar-progress {
     position: fixed;
-    bottom: calc(var(--utility-bar-height, 56px) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--utility-bar-height, 52px) + env(safe-area-inset-bottom, 0px));
     left: 0;
     right: 0;
     height: 2px;
-    background: rgba(15, 30, 56, 0.5);
+    background: #e5e7eb;
     z-index: 901;
     pointer-events: none;
 }
@@ -63,21 +71,21 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    padding: 5px 6px;
+    gap: 2px;
+    padding: 4px 5px;
     border: none;
     background: transparent;
     cursor: pointer;
-    border-radius: 8px;
-    color: var(--utility-bar-color-default, #6b7280);
+    border-radius: 7px;
+    color: #6b7280;
     font-family: inherit;
     transition: color 0.15s, background 0.15s, transform 0.1s;
     position: relative;
 }
 
 .utility-bar__btn:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--utility-bar-color-hover, #9ca3af);
+    background: rgba(0, 0, 0, 0.04);
+    color: #374151;
 }
 
 .utility-bar__btn:active {
@@ -85,18 +93,8 @@
 }
 
 .utility-bar__btn:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: default;
-}
-
-/* Ribbon context: slightly lighter hover */
-.utility-bar--ribbon .utility-bar__btn {
-    color: var(--color-text-muted, #6b7280);
-}
-
-.utility-bar--ribbon .utility-bar__btn:hover {
-    background: rgba(0, 0, 0, 0.04);
-    color: var(--color-text, #111827);
 }
 
 /* ── Icon wrapper ─────────────────────────────────────────────────────────── */
@@ -105,15 +103,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 22px;
+    height: 22px;
 }
 
 /* ── Label ────────────────────────────────────────────────────────────────── */
 .utility-bar__label {
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 700;
     letter-spacing: 0.2px;
     line-height: 1;
     white-space: nowrap;
+    color: inherit;
 }
 
 /* ── Save button states ───────────────────────────────────────────────────── */
@@ -122,7 +123,7 @@
 }
 
 .utility-bar__btn--save.is-saved {
-    color: #3b82f6;
+    color: #2563eb;
 }
 
 .utility-bar__btn--save.is-saved .icon-save-outline {
@@ -131,23 +132,6 @@
 
 .utility-bar__btn--save.is-saved .icon-save-filled {
     display: block;
-}
-
-/* Guest dot — signals something to unlock */
-.utility-bar__guest-dot {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #f59e0b;
-    border: 1.5px solid #06080f;
-    pointer-events: none;
-}
-
-.utility-bar--ribbon .utility-bar__guest-dot {
-    border-color: #fff;
 }
 
 /* ── Like button states ───────────────────────────────────────────────────── */
@@ -167,38 +151,131 @@
     display: block;
 }
 
-/* ── Divider ──────────────────────────────────────────────────────────────── */
-.utility-bar__divider {
-    width: 1px;
-    height: 32px;
-    background: rgba(30, 58, 95, 0.7);
-    margin: 0 4px;
+/* Pop animation on toggle */
+@keyframes ub-pop {
+    0% {
+        transform: scale(1);
+    }
+    35% {
+        transform: scale(0.78);
+    }
+    75% {
+        transform: scale(1.15);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.utility-bar__btn--popping {
+    animation: ub-pop 0.28s ease forwards;
+}
+
+/* Guest dot — signals something to unlock */
+.utility-bar__guest-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #f59e0b;
+    border: 1.5px solid #f9fafb;
+    pointer-events: none;
+}
+
+/* ── Share button ─────────────────────────────────────────────────────────── */
+/* Share dropdown is HIDDEN by default; JS adds .is-open to show it */
+.utility-bar__btn--share {
+    position: relative;
+}
+
+.utility-bar__share-dropdown {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    min-width: 160px;
+    z-index: 200;
+    animation: ub-dropdown-in 0.18s ease;
+}
+
+.utility-bar__share-dropdown.is-open {
+    display: block;
+}
+
+@keyframes ub-dropdown-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.utility-bar__share-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.12s;
+    white-space: nowrap;
+}
+
+.utility-bar__share-option:hover {
+    background: #f3f4f6;
+}
+
+.utility-bar__share-option-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
 
-.utility-bar--ribbon .utility-bar__divider {
-    background: var(--color-border, #e5e7eb);
+/* ── Divider ──────────────────────────────────────────────────────────────── */
+.utility-bar__divider {
+    width: 1px;
+    height: 28px;
+    background: #e5e7eb;
+    margin: 0 3px;
+    flex-shrink: 0;
 }
 
-/* ── Hub pill — logged-in ─────────────────────────────────────────────────── */
+/* ── Hub pill ─────────────────────────────────────────────────────────────── */
 .utility-bar__hub-pill {
     flex: 0 0 auto;
-    flex-direction: row; /* override column default */
-    gap: 7px;
-    padding: 7px 13px;
-    border-radius: 10px;
-    font-size: 12px;
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 11px;
+    border-radius: 8px;
+    font-size: 11.5px;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .utility-bar__hub-pill--member {
-    background: rgba(37, 99, 235, 0.11);
-    border: 1px solid rgba(59, 130, 246, 0.22);
-    color: #3b82f6;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #2563eb;
 }
-
 .utility-bar__hub-pill--member:hover {
-    background: rgba(37, 99, 235, 0.2);
+    background: #dbeafe;
 }
 
 .utility-bar__hub-pill--guest {
@@ -206,32 +283,29 @@
     color: #fff;
     border: none;
 }
-
 .utility-bar__hub-pill--guest:hover {
-    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    opacity: 0.92;
 }
 
-/* Avatar initial */
 .utility-bar__avatar {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     background: linear-gradient(135deg, #2563eb, #7c3aed);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     color: #fff;
     flex-shrink: 0;
     line-height: 1;
 }
 
-/* Unread badge */
 .utility-bar__badge {
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
     border-radius: 8px;
     background: #ef4444;
     color: #fff;
@@ -243,24 +317,11 @@
     flex-shrink: 0;
 }
 
-/* ── Hub label ────────────────────────────────────────────────────────────── */
 .utility-bar__hub-label {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
     white-space: nowrap;
-    letter-spacing: 0;
-}
-
-/* ── Share dropdown — preserved from page-card.php behaviour ─────────────── */
-/*    The existing .share-dropdown and .share-option styles are expected to
-    already be in your global stylesheet. These rules only handle the
-    positioning override inside the sticky bar. */
-
-.utility-bar--sticky .utility-bar__btn--share .share-dropdown {
-    bottom: calc(100% + 8px);
-    top: auto;
-    left: 50%;
-    transform: translateX(-50%);
+    display: none;
 }
 
 /* ── Guest Save Prompt ────────────────────────────────────────────────────── */
@@ -291,11 +352,11 @@
 }
 
 .guest-save-prompt__inner {
-    background: #0a1628;
-    border: 1px solid #1e3a5f;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
     border-radius: 14px;
     padding: 18px 20px;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.13);
 }
 
 .guest-save-prompt__header {
@@ -309,13 +370,13 @@
 .guest-save-prompt__title {
     font-size: 14px;
     font-weight: 700;
-    color: #e2e8f0;
+    color: #111827;
     margin-bottom: 3px;
 }
 
 .guest-save-prompt__subtitle {
     font-size: 11px;
-    color: #475569;
+    color: #6b7280;
     line-height: 1.4;
 }
 
@@ -323,7 +384,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    color: #334155;
+    color: #9ca3af;
     padding: 2px;
     flex-shrink: 0;
     display: flex;
@@ -334,16 +395,16 @@
 }
 
 .guest-save-prompt__close:hover {
-    color: #64748b;
+    color: #374151;
 }
 
 .guest-save-prompt__input {
     width: 100%;
-    padding: 10px 13px;
-    border-radius: 8px;
-    border: 1px solid #1e3a5f;
-    background: #04080f;
-    color: #e2e8f0;
+    padding: 9px 12px;
+    border-radius: 7px;
+    border: 1px solid #d1d5db;
+    background: #f9fafb;
+    color: #111827;
     font-size: 13px;
     font-family: inherit;
     outline: none;
@@ -354,6 +415,7 @@
 
 .guest-save-prompt__input:focus {
     border-color: #3b82f6;
+    background: #fff;
 }
 
 .guest-save-prompt__consent {
@@ -363,14 +425,14 @@
     margin-bottom: 12px;
     cursor: pointer;
     font-size: 11px;
-    color: #475569;
+    color: #6b7280;
     line-height: 1.4;
 }
 
 .guest-save-prompt__consent input[type="checkbox"] {
     margin-top: 1px;
     flex-shrink: 0;
-    accent-color: #3b82f6;
+    accent-color: #2563eb;
 }
 
 .guest-save-prompt__submit {
@@ -388,11 +450,11 @@
 }
 
 .guest-save-prompt__submit:hover {
-    opacity: 0.92;
+    opacity: 0.9;
 }
 
 .guest-save-prompt__submit:disabled {
-    opacity: 0.6;
+    opacity: 0.55;
     cursor: default;
 }
 
@@ -400,11 +462,11 @@
     text-align: center;
     margin-top: 10px;
     font-size: 11px;
-    color: #334155;
+    color: #9ca3af;
 }
 
 .guest-save-prompt__signin a {
-    color: #3b82f6;
+    color: #2563eb;
     font-weight: 700;
     text-decoration: none;
 }
@@ -420,28 +482,24 @@
 }
 
 .guest-save-prompt__success-emoji {
-    font-size: 30px;
+    font-size: 28px;
     margin-bottom: 8px;
 }
 
 .guest-save-prompt__success-title {
     font-size: 14px;
     font-weight: 700;
-    color: #e2e8f0;
+    color: #111827;
     margin-bottom: 4px;
 }
 
 .guest-save-prompt__success-body {
     font-size: 11px;
-    color: #64748b;
+    color: #6b7280;
     line-height: 1.5;
 }
 
-/* ── Body padding so sticky bar doesn't obscure content ──────────────────── */
+/* ── Body padding for sticky bar ──────────────────────────────────────────── */
 body:has(.utility-bar--sticky) {
-    padding-bottom: calc(var(--utility-bar-height, 64px) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--utility-bar-height, 52px) + env(safe-area-inset-bottom, 0px));
 }
-
-/* ── Ribbon context overrides for guest prompt ────────────────────────────── */
-/* (prompt not shown in ribbon context — save goes to guest prompt which
-   only attaches in the sticky/article context) */

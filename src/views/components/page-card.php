@@ -90,7 +90,7 @@ $tags = $page->tags ?? [];
     <?php endif; ?>
 
     <?php if ($showToolbar && $canView): ?>
-        @include('components/utility-bar')
+        @include('components/utility-bar', ['page' => $page])
         <div class="page-card-actions-ribbon">
             <button class="action-btn" onclick="toggleShareDropdown(this)" title="Share">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">

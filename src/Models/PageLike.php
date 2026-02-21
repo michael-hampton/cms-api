@@ -97,4 +97,54 @@ class PageLike extends Model
 
         return $query->get();
     }
+
+    // Add these static methods to your existing PageLike model
+
+    public static function toggleAction(int $pageId, int $memberId, int $siteId, string $action = 'like'): array
+    {
+        $existing = static::where('page_id', $pageId)
+            ->where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->where('action', $action)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $count = static::where('page_id', $pageId)->where('action', $action)->count();
+            return ['active' => false, 'count' => $count];
+        }
+
+        static::create([
+            'page_id' => $pageId,
+            'member_id' => $memberId,
+            'site_id' => $siteId,
+            'action' => $action,
+            'liked_at' => now_datetime(),
+        ]);
+
+        $count = static::where('page_id', $pageId)->where('action', $action)->count();
+        return ['active' => true, 'count' => $count];
+    }
+
+    public static function hasAction(int $pageId, int $memberId, int $siteId, string $action): bool
+    {
+        return static::where('page_id', $pageId)
+            ->where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->where('action', $action)
+            ->exists();
+    }
+
+    public static function getMemberActionPages(int $memberId, int $siteId, string $action, ?int $limit = null)
+    {
+        $query = static::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->where('action', $action)
+            ->with(['page.categories'])
+            ->orderBy('liked_at', 'desc');
+
+        if ($limit) $query->limit($limit);
+
+        return $query->get();
+    }
 }

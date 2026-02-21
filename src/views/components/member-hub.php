@@ -142,6 +142,37 @@ $unreadCount = 0;
                 </svg>
                 Deals
             </button>
+
+            <button class="mh-tab" role="tab"
+                    data-tab="subscriptions" aria-selected="false" aria-controls="mh-pane-subscriptions">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2"/>
+                    <line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+                Subs
+            </button>
+
+            <button class="mh-tab" role="tab"
+                    data-tab="badges" aria-selected="false" aria-controls="mh-pane-badges">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="12" cy="8" r="6"/>
+                    <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+                </svg>
+                Badges
+            </button>
+
+            <button class="mh-tab" role="tab"
+                    data-tab="notifications" aria-selected="false" aria-controls="mh-pane-notifications">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                Alerts
+                <span class="mh-tab-badge" id="mh-notif-badge" style="display:none"></span>
+            </button>
         </div>
     </div>
 
@@ -298,6 +329,97 @@ $unreadCount = 0;
             </div>
         </div>
 
+        <?php if ($isLoggedIn): ?>
+
+            <?php /* ─── SUBSCRIPTIONS ─── */ ?>
+            <div id="mh-pane-subscriptions" class="mh-pane" role="tabpanel">
+                <div class="mh-pane-loading" id="mh-subscriptions-loading">
+                    <?php for ($i = 0; $i < 3; $i++): ?>
+                        <div class="mh-skeleton-row">
+                            <div class="mh-skel mh-skel--thumb"></div>
+                            <div class="mh-skel-lines">
+                                <div class="mh-skel mh-skel--line" style="width:70%"></div>
+                                <div class="mh-skel mh-skel--line" style="width:40%"></div>
+                            </div>
+                        </div>
+                    <?php endfor; ?>
+                </div>
+                <div id="mh-subscriptions-content" style="display:none">
+                    <div class="mh-pane-header">
+                        <span class="mh-section-label">Active Subscriptions</span>
+                        <a href="/<?= $siteSlug ?>/member/subscriptions" class="mh-text-btn">Manage →</a>
+                    </div>
+                    <div id="mh-subscriptions-list"></div>
+                    <div id="mh-subscriptions-empty" class="mh-empty-state" style="display:none">
+                        <div class="mh-empty-icon">📋</div>
+                        <div class="mh-empty-title">No active subscriptions</div>
+                        <div class="mh-empty-sub">Upgrade to unlock premium content</div>
+                        <a href="/<?= $siteSlug ?>/member/subscriptions" class="mh-btn-primary"
+                           style="margin-top:12px;display:inline-block">View Plans</a>
+                    </div>
+                </div>
+            </div>
+
+            <?php /* ─── BADGES / ACTIVITY ─── */ ?>
+            <div id="mh-pane-badges" class="mh-pane" role="tabpanel">
+                <div class="mh-pane-loading" id="mh-badges-loading">
+                    <?php for ($i = 0; $i < 3; $i++): ?>
+                        <div class="mh-skeleton-row">
+                            <div class="mh-skel mh-skel--circle"></div>
+                            <div class="mh-skel-lines">
+                                <div class="mh-skel mh-skel--line" style="width:60%"></div>
+                                <div class="mh-skel mh-skel--line" style="width:80%"></div>
+                            </div>
+                        </div>
+                    <?php endfor; ?>
+                </div>
+                <div id="mh-badges-content" style="display:none">
+                    <div class="mh-pane-header">
+                        <span class="mh-section-label">Your Badges</span>
+                        <a href="/<?= $siteSlug ?>/member/activity/badges" class="mh-text-btn">All →</a>
+                    </div>
+                    <div id="mh-badges-earned" style="padding:0 15px;display:flex;flex-wrap:wrap;gap:8px"></div>
+                    <div class="mh-pane-header" style="margin-top:14px">
+                        <span class="mh-section-label">Recent Activity</span>
+                    </div>
+                    <div id="mh-badges-activity"></div>
+                    <div id="mh-badges-empty" class="mh-empty-state" style="display:none">
+                        <div class="mh-empty-icon">🏆</div>
+                        <div class="mh-empty-title">No badges yet</div>
+                        <div class="mh-empty-sub">Read articles, comment and engage to earn your first badge</div>
+                    </div>
+                </div>
+            </div>
+
+            <?php /* ─── NOTIFICATIONS ─── */ ?>
+            <div id="mh-pane-notifications" class="mh-pane" role="tabpanel">
+                <div class="mh-pane-loading" id="mh-notifications-loading">
+                    <?php for ($i = 0; $i < 3; $i++): ?>
+                        <div class="mh-skeleton-row">
+                            <div class="mh-skel mh-skel--circle"></div>
+                            <div class="mh-skel-lines">
+                                <div class="mh-skel mh-skel--line" style="width:85%"></div>
+                                <div class="mh-skel mh-skel--line" style="width:50%"></div>
+                            </div>
+                        </div>
+                    <?php endfor; ?>
+                </div>
+                <div id="mh-notifications-content" style="display:none">
+                    <div class="mh-pane-header">
+                        <span class="mh-section-label">Notifications</span>
+                        <button class="mh-text-btn" id="mh-mark-notifs-read" style="display:none">Clear all</button>
+                    </div>
+                    <div id="mh-notifications-list"></div>
+                    <div id="mh-notifications-empty" class="mh-empty-state" style="display:none">
+                        <div class="mh-empty-icon">🔔</div>
+                        <div class="mh-empty-title">All caught up</div>
+                        <div class="mh-empty-sub">No new notifications</div>
+                    </div>
+                </div>
+            </div>
+
+        <?php endif; ?>
+
     </div>
 
     <?php if ($isLoggedIn): ?>
@@ -382,23 +504,25 @@ $unreadCount = 0;
         routes: {
             // GET  → [{id, page_id, title, url, category, read_time,
             //          saved_at_label, image_url}]
-            savesIndex: '/<?= $siteSlug ?>/member/saves',
+            savesIndex: '/<?= $siteSlug ?>/member/hub/saved',
+            saveToggle: '/<?= $siteSlug ?>/member/hub/saved/toggle',
             // POST → body: {page_id}  → 201 with saved item
             saveCreate: '/<?= $siteSlug ?>/member/saves',
             // DELETE → 204
-            saveDelete: '/<?= $siteSlug ?>/member/saves/{id}',
+            saveDelete: '/<?= $siteSlug ?>/member/hub/saved/{id}',
 
             // GET  → [{id, type, user, action, target, time, read}]
-            feedIndex: '/<?= $siteSlug ?>/member/feed',
+            feedIndex: '/<?= $siteSlug ?>/member/hub/feed',
             // POST → marks all read → {success: true}
             feedReadAll: '/<?= $siteSlug ?>/member/feed/read-all',
 
             // GET  → [{id, title, sale_price, original_price, discount,
             //          merchant, sponsored, tag, image_url}]
-            dealsIndex: '/<?= $siteSlug ?>/member/deals',
+            dealsIndex: '/<?= $siteSlug ?>/member/hub/deals',
 
             // GET  → [{id, type, title, votes?, entries?}]
-            communityIndex: '/<?= $siteSlug ?>/community/live',
+            communityIndex: '/<?= $siteSlug ?>/member/hub/community',
+            pollVote: '/<?= $siteSlug ?>/member/hub/polls/vote',
             // GET  → [{name, points}]
             leaderboard: '/<?= $siteSlug ?>/community/leaderboard',
 
@@ -408,6 +532,10 @@ $unreadCount = 0;
             // POST → {page_id, email, newsletter_consent}
             // Wire to NewsletterController@signup or a dedicated endpoint
             guestSave: '/<?= $siteSlug ?>/member/guest-save',
+            subscriptionsIndex: '/<?= $siteSlug ?>/member/subscriptions/data',
+            badgesIndex: '/<?= $siteSlug ?>/member/badges/data',
+            notificationsIndex: '/<?= $siteSlug ?>/member/notifications',
+            notificationsMarkRead: '/<?= $siteSlug ?>/member/notifications/mark-read',
         },
 
         csrf: document.querySelector('meta[name="csrf-token"]')?.content ?? '',

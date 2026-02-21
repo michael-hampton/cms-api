@@ -15,12 +15,12 @@ class PageLikeRepository extends Repository
 
     public function toggleLike(int $pageId, int $memberId, int $siteId): array
     {
-        return PageLike::toggle($pageId, $memberId, $siteId);
+        return PageLike::toggleAction($pageId, $memberId, $siteId, 'like');
     }
 
     public function isLikedBy(int $pageId, int $memberId, int $siteId): bool
     {
-        return PageLike::isLikedBy($pageId, $memberId, $siteId);
+        return PageLike::hasAction($pageId, $memberId, $siteId, 'like');
     }
 
     public function getLikeCount(int $pageId): int
@@ -49,5 +49,20 @@ class PageLikeRepository extends Repository
         }
 
         return $this->applySiteFilter($query->get());
+    }
+
+    public function toggleSave(int $pageId, int $memberId, int $siteId): array
+    {
+        return PageLike::toggleAction($pageId, $memberId, $siteId, 'save');
+    }
+
+    public function isSavedBy(int $pageId, int $memberId, int $siteId): bool
+    {
+        return PageLike::hasAction($pageId, $memberId, $siteId, 'save');
+    }
+
+    public function getMemberSavedPages(int $memberId, int $siteId, ?int $limit = null): Collection
+    {
+        return PageLike::getMemberActionPages($memberId, $siteId, 'save', $limit);
     }
 }
