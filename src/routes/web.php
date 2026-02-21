@@ -55,6 +55,7 @@ use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductDetailController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\Subscription\OneTimeSubscriptionsController;
+use App\Controllers\Subscription\ShopAccountController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
@@ -170,8 +171,7 @@ $router->get('/member/reset-password', [MemberAuthController::class, 'showResetP
     ->name('member.reset-password');
 
 
-
-$router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::class]], function($router) {
+$router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::class]], function ($router) {
     $router->post('/member/forgot-password', [MemberAuthController::class, 'sendPasswordResetEmail'])
         ->name('member.forgot-password.send');
 
@@ -194,7 +194,7 @@ $router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::clas
 });
 
 // Protected member routes
-$router->group(['middleware' => [RequireMemberAuth::class]], function($router) {
+$router->group(['middleware' => [RequireMemberAuth::class]], function ($router) {
     $router->get('/member/dashboard', [MemberAuthController::class, 'dashboard']);
 
     $router->get('/member/change-password', [MemberAuthController::class, 'showChangePasswordForm'])
@@ -245,7 +245,6 @@ $router->post('/api/{site}/checkout/verify-otp', [CartController::class, 'verify
 $router->get('/{site}/member/subscriptions/{subscriptionId}/upgrade', [MemberSubscriptionUpgradeController::class, 'index']);
 $router->post('/{site}/member/subscriptions/{subscriptionId}/upgrade', [MemberSubscriptionUpgradeController::class, 'upgrade']);
 $router->post('/{site}/member/subscriptions/{subscriptionId}/upgrade/preview', [MemberSubscriptionUpgradeController::class, 'preview']);
-
 
 
 $router->post('/{site}/member/subscriptions/{subscriptionId}/update-billing-date', [MemberSubscriptionsController::class, 'updateBillingDate']);
@@ -394,6 +393,22 @@ $router->get('/subscriptions/onetime/deals', [SubscriptionDealsController::class
 $router->get('/subscriptions/onetime/deals/search', [SubscriptionDealsController::class, 'search']);
 $router->get('/{site}/subscriptions/link-subscription', [SubscriptionLinkStepController::class, 'showLinkStep']);
 $router->post('/member/onboarding/link-subscription', [SubscriptionLinkStepController::class, 'linkSubscription']);
+
+
+$router->get('/{site}/subscriptions/onetime/account', [ShopAccountController::class, 'overview'])
+    ->name('account.overview');
+
+$router->get('/{site}/subscriptions/onetime/account/subscriptions', [ShopAccountController::class, 'subscriptions'])
+    ->name('account.subscriptions');
+
+$router->get('/{site}/subscriptions/onetime/account/orders', [ShopAccountController::class, 'orders'])
+    ->name('account.orders');
+
+$router->get('/{site}/subscriptions/onetime/account/orders/{id}', [ShopAccountController::class, 'orderDetail'])
+    ->name('account.order.detail');
+
+$router->get('/{site}/subscriptions/onetime/account/billing', [ShopAccountController::class, 'billing'])
+    ->name('account.billing');
 
 $router->post('/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);

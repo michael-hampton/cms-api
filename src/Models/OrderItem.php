@@ -49,6 +49,11 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id', 'id', $relation);
     }
 
+    public function subscription($relation = false)
+    {
+        return $this->belongsTo(Subscription::class, 'one_time_subscription_id', 'id', $relation);
+    }
+
     public function getFormattedTotalAttribute(): string
     {
         $order = $this->order;

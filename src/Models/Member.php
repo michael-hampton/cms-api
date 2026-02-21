@@ -436,4 +436,9 @@ class Member extends Model
     {
         $this->territory_id = $territoryId;
     }
+
+    public function getUnreadCount()
+    {
+        return 10;
+    }
 }

@@ -156,4 +156,47 @@ class OrderRepository extends Repository
             ]
         ];
     }
+
+    /**
+     * Database-level paginated order retrieval for a specific user.
+     *
+     * Uses LIMIT/OFFSET at the query layer so we never load the full order
+     * history into memory. This is the correct method for any user-facing
+     * paginated list — getByUser() should only be used for small bounded
+     * fetches (e.g. the overview "last 5 orders").
+     *
+     * @return array{data: Collection, pagination: array{total: int, per_page: int, current_page: int, total_pages: int}}
+     */
+    public function getByUserPaginated(int $userId, int $page = 1, int $perPage = 10): array
+    {
+        $page = max(1, $page);
+        $perPage = min(100, max(1, $perPage)); // Guard against absurd values
+
+        $base = Order::where('user_id', $userId);
+
+        $total = (clone $base)->count();
+
+        $orders = (clone $base)
+            ->with([
+                'items.product',
+                'shippingAddress',
+                'billingAddress',
+                'items.subscription'
+            ])
+            ->whereNotNull('one_time_subscription_id')
+            ->orderBy('created_at', 'desc')
+            ->limit($perPage)
+            ->offset(($page - 1) * $perPage)
+            ->get();
+
+        return [
+            'data' => $orders,
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'total_pages' => (int)ceil($total / $perPage),
+            ],
+        ];
+    }
 }

@@ -1,0 +1,447 @@
+/* =============================================================================
+   utility-bar.css
+   Styles for both .utility-bar--sticky and .utility-bar--ribbon contexts.
+   BEM-ish naming, no framework dependencies.
+   ============================================================================= */
+
+/* ── Base bar ──────────────────────────────────────────────────────────────── */
+.utility-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(6, 10, 20, 0.97);
+    border-top: 1px solid rgba(15, 30, 56, 0.9);
+}
+
+/* ── Sticky (article page) context ────────────────────────────────────────── */
+.utility-bar--sticky {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 900;
+    padding: 8px 18px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    max-width: 100%;
+}
+
+/* ── Ribbon (page-card) context ───────────────────────────────────────────── */
+.utility-bar--ribbon {
+    position: static;
+    border-top: none;
+    border-bottom: 1px solid var(--color-border, #e5e7eb);
+    padding: 6px 12px;
+    background: var(--color-surface, #fff);
+    backdrop-filter: none;
+}
+
+/* ── Scroll progress bar (sticky only) ───────────────────────────────────── */
+.utility-bar-progress {
+    position: fixed;
+    bottom: calc(var(--utility-bar-height, 56px) + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(15, 30, 56, 0.5);
+    z-index: 901;
+    pointer-events: none;
+}
+
+.utility-bar-progress__fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    transition: width 0.12s linear;
+    will-change: width;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.utility-bar__btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 5px 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 8px;
+    color: var(--utility-bar-color-default, #6b7280);
+    font-family: inherit;
+    transition: color 0.15s, background 0.15s, transform 0.1s;
+    position: relative;
+}
+
+.utility-bar__btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--utility-bar-color-hover, #9ca3af);
+}
+
+.utility-bar__btn:active {
+    transform: scale(0.9);
+}
+
+.utility-bar__btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Ribbon context: slightly lighter hover */
+.utility-bar--ribbon .utility-bar__btn {
+    color: var(--color-text-muted, #6b7280);
+}
+
+.utility-bar--ribbon .utility-bar__btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--color-text, #111827);
+}
+
+/* ── Icon wrapper ─────────────────────────────────────────────────────────── */
+.utility-bar__icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Label ────────────────────────────────────────────────────────────────── */
+.utility-bar__label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/* ── Save button states ───────────────────────────────────────────────────── */
+.utility-bar__btn--save .icon-save-filled {
+    display: none;
+}
+
+.utility-bar__btn--save.is-saved {
+    color: #3b82f6;
+}
+
+.utility-bar__btn--save.is-saved .icon-save-outline {
+    display: none;
+}
+
+.utility-bar__btn--save.is-saved .icon-save-filled {
+    display: block;
+}
+
+/* Guest dot — signals something to unlock */
+.utility-bar__guest-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f59e0b;
+    border: 1.5px solid #06080f;
+    pointer-events: none;
+}
+
+.utility-bar--ribbon .utility-bar__guest-dot {
+    border-color: #fff;
+}
+
+/* ── Like button states ───────────────────────────────────────────────────── */
+.utility-bar__btn--like .icon-like-filled {
+    display: none;
+}
+
+.utility-bar__btn--like.is-liked {
+    color: #ef4444;
+}
+
+.utility-bar__btn--like.is-liked .icon-like-outline {
+    display: none;
+}
+
+.utility-bar__btn--like.is-liked .icon-like-filled {
+    display: block;
+}
+
+/* ── Divider ──────────────────────────────────────────────────────────────── */
+.utility-bar__divider {
+    width: 1px;
+    height: 32px;
+    background: rgba(30, 58, 95, 0.7);
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+
+.utility-bar--ribbon .utility-bar__divider {
+    background: var(--color-border, #e5e7eb);
+}
+
+/* ── Hub pill — logged-in ─────────────────────────────────────────────────── */
+.utility-bar__hub-pill {
+    flex: 0 0 auto;
+    flex-direction: row; /* override column default */
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.utility-bar__hub-pill--member {
+    background: rgba(37, 99, 235, 0.11);
+    border: 1px solid rgba(59, 130, 246, 0.22);
+    color: #3b82f6;
+}
+
+.utility-bar__hub-pill--member:hover {
+    background: rgba(37, 99, 235, 0.2);
+}
+
+.utility-bar__hub-pill--guest {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: none;
+}
+
+.utility-bar__hub-pill--guest:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+}
+
+/* Avatar initial */
+.utility-bar__avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* Unread badge */
+.utility-bar__badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ── Hub label ────────────────────────────────────────────────────────────── */
+.utility-bar__hub-label {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0;
+}
+
+/* ── Share dropdown — preserved from page-card.php behaviour ─────────────── */
+/*    The existing .share-dropdown and .share-option styles are expected to
+    already be in your global stylesheet. These rules only handle the
+    positioning override inside the sticky bar. */
+
+.utility-bar--sticky .utility-bar__btn--share .share-dropdown {
+    bottom: calc(100% + 8px);
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* ── Guest Save Prompt ────────────────────────────────────────────────────── */
+.guest-save-prompt {
+    position: fixed;
+    bottom: calc(var(--utility-bar-height, 64px) + 8px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: 330px;
+    max-width: calc(100vw - 24px);
+    z-index: 910;
+    animation: guestPromptIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.guest-save-prompt[hidden] {
+    display: none;
+}
+
+@keyframes guestPromptIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.guest-save-prompt__inner {
+    background: #0a1628;
+    border: 1px solid #1e3a5f;
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.guest-save-prompt__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+    gap: 8px;
+}
+
+.guest-save-prompt__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 3px;
+}
+
+.guest-save-prompt__subtitle {
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.4;
+}
+
+.guest-save-prompt__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #334155;
+    padding: 2px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+
+.guest-save-prompt__close:hover {
+    color: #64748b;
+}
+
+.guest-save-prompt__input {
+    width: 100%;
+    padding: 10px 13px;
+    border-radius: 8px;
+    border: 1px solid #1e3a5f;
+    background: #04080f;
+    color: #e2e8f0;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    transition: border-color 0.15s;
+}
+
+.guest-save-prompt__input:focus {
+    border-color: #3b82f6;
+}
+
+.guest-save-prompt__consent {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.4;
+}
+
+.guest-save-prompt__consent input[type="checkbox"] {
+    margin-top: 1px;
+    flex-shrink: 0;
+    accent-color: #3b82f6;
+}
+
+.guest-save-prompt__submit {
+    width: 100%;
+    padding: 10px 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border: none;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.guest-save-prompt__submit:hover {
+    opacity: 0.92;
+}
+
+.guest-save-prompt__submit:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.guest-save-prompt__signin {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 11px;
+    color: #334155;
+}
+
+.guest-save-prompt__signin a {
+    color: #3b82f6;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+/* Success state */
+.guest-save-prompt__success {
+    text-align: center;
+    padding: 10px 0;
+}
+
+.guest-save-prompt__success[hidden] {
+    display: none;
+}
+
+.guest-save-prompt__success-emoji {
+    font-size: 30px;
+    margin-bottom: 8px;
+}
+
+.guest-save-prompt__success-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.guest-save-prompt__success-body {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+/* ── Body padding so sticky bar doesn't obscure content ──────────────────── */
+body:has(.utility-bar--sticky) {
+    padding-bottom: calc(var(--utility-bar-height, 64px) + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── Ribbon context overrides for guest prompt ────────────────────────────── */
+/* (prompt not shown in ribbon context — save goes to guest prompt which
+   only attaches in the sticky/article context) */
