@@ -118,4 +118,13 @@ class MenuRepository extends Repository
             ->where('is_active', true)
             ->get();
     }
+
+    public function findActiveHeaderMenu(int $siteId): ?Menu
+    {
+        return Menu::where('is_active', true)
+            ->where('site_id', $siteId)
+            ->where('menu_type', 'header')
+            ->with(['items'])
+            ->first();
+    }
 }

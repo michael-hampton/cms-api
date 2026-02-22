@@ -2,6 +2,8 @@
 
 namespace App\Repositories\Cms\Pages;
 
+use App\DTO\Pages\PageFilterDto;
+use App\Enums\Pages\PageFilterType;
 use App\Framework\Support\Collection;
 use App\Models\Author;
 use App\Models\Block;
@@ -912,6 +914,43 @@ class PageRepository extends Repository
                 'owner_id' => $sourcePage->owner_id
             ]);
         }
+    }
+
+    /**
+     * Return a paginated slice of pages for the given filter.
+     *
+     * @return array{data: \App\Framework\Support\Collection, pagination: array}
+     */
+    public function getPaginatedPages(PageFilterDto $filter): array
+    {
+        $query = Page::with(['authors', 'categories', 'tags'])
+            ->where('status', $filter->status);
+
+        // Primary filter — Brand aliases to Tag (same relationship, different route context)
+        match ($filter->filterType) {
+            PageFilterType::Author => $query->whereHas('authors', fn($q) => $q->where('authors.id', $filter->filterId)),
+            PageFilterType::Category => $query->whereHas('categories', fn($q) => $q->where('categories.id', $filter->filterId)),
+            PageFilterType::Tag,
+            PageFilterType::Brand => $query->whereHas('tags', fn($q) => $q->where('tags.id', $filter->filterId)),
+        };
+
+        // Optional secondary filters
+        if (!empty($filter->secondary['category'])) {
+            $query->whereHas('categories', fn($q) => $q->where('categories.id', $filter->secondary['category']));
+        }
+
+        if (!empty($filter->secondary['author'])) {
+            $query->whereHas('authors', fn($q) => $q->where('authors.id', $filter->secondary['author']));
+        }
+
+        // Sorting
+        match ($filter->sort) {
+            'oldest' => $query->orderBy('published_at', 'asc'),
+            'title' => $query->orderBy('title', 'asc'),
+            default => $query->orderBy('published_at', 'desc'),
+        };
+
+        return $query->paginate($filter->perPage, $filter->currentPage);
     }
 
     public function getBrief(int $pageId): Brief

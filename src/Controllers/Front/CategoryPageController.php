@@ -3,11 +3,15 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
+use App\DTO\Pages\PageFilterDto;
+use App\Enums\Pages\PageFilterType;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
-use App\Models\Page;
 use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\MenuRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Front\CategoryProductService;
@@ -17,6 +21,8 @@ class CategoryPageController extends Controller
 {
     public function __construct(
         private readonly CategoryRepository       $categoryRepository,
+        private readonly PageRepository         $pageRepository,
+        private readonly MenuRepository         $menuRepository,
         private readonly ArticleAccessService     $articleAccessService,
         private readonly SubscriptionModalService $subscriptionModalService,
         private readonly CategoryProductService $categoryProductService,
@@ -24,7 +30,7 @@ class CategoryPageController extends Controller
         parent::__construct();
     }
 
-    public function show(string $slug)
+    public function show(string $slug, Request $request)
     {
         $category = $this->categoryRepository->findBySlug($slug);
 
@@ -32,82 +38,39 @@ class CategoryPageController extends Controller
             return $this->notFound();
         }
 
-        $menu = Menu::where('is_active', true)
-            ->where('site_id', SiteContext::getId())
-            ->where('menu_type', 'header')
-            ->with(['items'])
-            ->first();
-
         $breadcrumb = $category->getBreadcrumb();
         $childCategories = $this->categoryRepository->getChildCategories($category->id);
 
         // Get products for this category (limit to 8 for display)
         $products = $this->categoryProductService->getCategoryProducts($category->id, 8);
-
         $offers = $this->categoryProductService->getCategoryOffers($category->id, 6);
-
         $stats = $this->categoryProductService->getCategoryStats($category->id);
-
         $newProducts = $this->categoryProductService->getNewProducts($category->id);
-
         $featuredProducts = $this->categoryProductService->getFeaturedProducts($category->id);
-
         $reviews = $this->categoryProductService->getCategoryReviews($category->id);
 
-        // Get current page from query string
-        $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $currentPage = !empty($request->input('page')) ? max(1, (int)$request->input('page')) : 1;
         $perPage = 12;
+        $sort = $request->input('sort') ?? 'latest';
+        $authorFilter = $request->input('author') ?? '';
 
-        // Get filter parameters
-        $sort = $_GET['sort'] ?? 'latest';
-        $authorFilter = $_GET['author'] ?? '';
+        $filter = PageFilterDto::make(
+            filterType: PageFilterType::Category,
+            filterId: $category->id,
+            sort: $sort,
+            status: 'Published',
+            currentPage: PageFilterDto::sanitisePage($_GET['page'] ?? 1),
+            secondary: $authorFilter ? ['author' => $authorFilter] : [],
+        );
 
-        // Build query
-        $query = Page::whereHas('categories', function ($query) use ($category) {
-            $query->where('categories.id', $category->id);
-        })
-            ->where('status', 'Published')
-            ->with(['tags', 'authors', 'categories']);
+        $paginationData = $this->pageRepository->getPaginatedPages($filter);
 
-        // Apply author filter
-        if ($authorFilter) {
-            $query->whereHas('authors', function ($q) use ($authorFilter) {
-                $q->where('authors.id', $authorFilter);
-            });
-        }
-
-        // Apply sorting
-        switch ($sort) {
-            case 'oldest':
-                $query->orderBy('published_at', 'asc');
-                break;
-            case 'title':
-                $query->orderBy('title', 'asc');
-                break;
-            case 'latest':
-            default:
-                $query->orderBy('published_at', 'desc');
-                break;
-        }
-
-        $paginationData = $query->paginate($perPage, $currentPage);
         $member = MemberAuth::getMember();
-
         $pages = $paginationData['data'];
 
         $pages->map(function ($page) use ($member) {
-            $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
-            $page->access = $accessInfo;
+            $page->access = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
         });
-
-        $pagination = [
-            'current_page' => $paginationData['pagination']['current_page'],
-            'per_page' => $paginationData['pagination']['per_page'],
-            'total' => $paginationData['pagination']['total'],
-            'last_page' => $paginationData['pagination']['last_page'],
-            'from' => $paginationData['pagination']['from'],
-            'to' => $paginationData['pagination']['to']
-        ];
 
         $siteId = SiteContext::getId();
         $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
@@ -115,7 +78,7 @@ class CategoryPageController extends Controller
         return $this->view('estate/category', [
             'category' => $category,
             'pages' => $pages,
-            'menu' => $menu,
+            'menu' => $this->menuRepository->findActiveHeaderMenu($siteId),
             'breadcrumb' => $breadcrumb,
             'products' => $products,
             'offers' => $offers,
@@ -124,7 +87,7 @@ class CategoryPageController extends Controller
             'childCategories' => $childCategories,
             'newProducts' => $newProducts,
             'featuredProducts' => $featuredProducts,
-            'pagination' => $pagination,
+            'pagination' => $paginationData['pagination'],
             'currentSort' => $sort,
             'menuRenderer' => new MenuRenderer(),
             'subscriptionModalData' => $modalData,

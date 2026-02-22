@@ -116,10 +116,10 @@ abstract class Repository
         return $model->delete();
     }
 
-    public function where(string $column, $operator, $value = null): QueryBuilder
+    public function where(string $column, $operator, $value = null, bool $applySiteFilter = true): QueryBuilder
     {
         $query = $this->model::where($column, $operator, $value);
-        return $this->applySiteFilter($query);
+        return $applySiteFilter ? $this->applySiteFilter($query) : $query;
     }
 
     public function paginate(int $perPage = 15, int $page = 1): array

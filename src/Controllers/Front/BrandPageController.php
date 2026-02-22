@@ -3,11 +3,14 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
+use App\DTO\Pages\PageFilterDto;
+use App\Enums\Pages\PageFilterType;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Models\Menu;
-use App\Models\Page;
-use App\Models\Tag;
+use App\Repositories\Cms\MenuRepository;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\TagRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Subscriptions\SubscriptionModalService;
@@ -15,6 +18,9 @@ use App\Services\Subscriptions\SubscriptionModalService;
 class BrandPageController extends Controller
 {
     public function __construct(
+        private readonly TagRepository  $tagRepository,
+        private readonly PageRepository $pageRepository,
+        private readonly MenuRepository $menuRepository,
         private readonly ArticleAccessService     $articleAccessService,
         private readonly SubscriptionModalService $subscriptionModalService,
     )
@@ -22,50 +28,33 @@ class BrandPageController extends Controller
         parent::__construct();
     }
 
-    public function show(string $slug)
+    public function show(string $slug, Request $request)
     {
-        // check if has corresponding page tag
-        $tag = Tag::with(['categories'])->where('slug', $slug)->first();
+        $tag = $this->tagRepository->findBySlug($slug);
 
         if (!$tag) {
             return $this->notFound();
         }
 
-        // Get current page from query string
-        $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-        $perPage = 12;
+        // Load categories relation needed by the view
+        $tag->load(['categories']);
 
-        // Get paginated pages for this tag
-        $paginationData = Page::whereHas('tags', function ($query) use ($tag) {
-            $query->where('tags.id', $tag->id);
-        })
-            ->where('status', 'Published')
-            ->with(['tags', 'authors', 'categories'])
-            ->orderBy('published_at', 'desc')
-            ->paginate($perPage, $currentPage);
+        $filter = PageFilterDto::make(
+            filterType: PageFilterType::Brand,
+            filterId: $tag->id,
+            sort: 'latest',
+            status: 'Published',
+            currentPage: PageFilterDto::sanitisePage($request->input('page') ?? 1),
+        );
+
+        $paginationData = $this->pageRepository->getPaginatedPages($filter);
 
         $pages = $paginationData['data'];
         $member = MemberAuth::getMember();
 
         $pages->map(function ($page) use ($member) {
-            $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
-            $page->access = $accessInfo;
+            $page->access = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
         });
-
-        $pagination = [
-            'current_page' => $paginationData['pagination']['current_page'],
-            'per_page' => $paginationData['pagination']['per_page'],
-            'total' => $paginationData['pagination']['total'],
-            'last_page' => $paginationData['pagination']['last_page'],
-            'from' => $paginationData['pagination']['from'],
-            'to' => $paginationData['pagination']['to']
-        ];
-
-        $menu = Menu::where('is_active', true)
-            ->where('site_id', SiteContext::getId())
-            ->where('menu_type', 'header')
-            ->with(['items'])
-            ->first();
 
         $siteId = SiteContext::getId();
         $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
@@ -73,8 +62,8 @@ class BrandPageController extends Controller
         return $this->view('brand.show', [
             'pages' => $pages,
             'tag' => $tag,
-            'pagination' => $pagination,
-            'menu' => $menu,
+            'pagination' => $paginationData['pagination'],
+            'menu' => $this->menuRepository->findActiveHeaderMenu($siteId),
             'menuRenderer' => new MenuRenderer(),
             'subscriptionModalData' => $modalData,
         ]);

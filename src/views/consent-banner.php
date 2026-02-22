@@ -465,7 +465,7 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
 
             async saveConsents(consentCodes) {
                 try {
-                    const response = await fetch(`/${this.siteName}/member/consent/accept-banner`, {
+                    const response = await fetch(`/${SITE}/member/consent/accept-banner`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

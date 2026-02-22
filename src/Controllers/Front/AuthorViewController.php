@@ -3,12 +3,15 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
+use App\DTO\Pages\PageFilterDto;
+use App\Enums\Pages\PageFilterType;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Models\Author;
-use App\Models\Menu;
-use App\Models\Page;
+use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\MenuRepository;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\Pages\ArticleAccessService;
@@ -18,6 +21,9 @@ use Exception;
 class AuthorViewController extends Controller
 {
     public function __construct(
+        private readonly AuthorRepository $authorRepository,
+        private readonly PageRepository   $pageRepository,
+        private readonly MenuRepository   $menuRepository,
         private readonly CategoryRepository       $categoryRepository,
         private readonly TagRepository            $tagRepository,
         private readonly ArticleAccessService     $articleAccessService,
@@ -27,81 +33,46 @@ class AuthorViewController extends Controller
         parent::__construct();
     }
 
-    public function show(string $slug)
+    public function show(string $slug, Request $request)
     {
         try {
 
-            $menu = Menu::where('is_active', true)
-                ->where('site_id', SiteContext::getId())
-                ->where('menu_type', 'header')
-                ->with(['items'])
-                ->first();
-
-            $author = Author::where('slug', $slug)->first();
+            $author = $this->authorRepository->findBySlug($slug);
 
             if (!$author) {
                 http_response_code(404);
-                include __DIR__ . '/../../views/404.php';
                 return;
             }
 
-            // Get current page from query string
-            $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-            $perPage = 12;
+            $sort = $request->input('sort') ?? 'latest';
+            $categoryFilter = $request->input('category') ?? '';
 
-            // Get filter parameters
-            $sort = $_GET['sort'] ?? 'latest';
-            $categoryFilter = $_GET['category'] ?? '';
+            $filter = PageFilterDto::make(
+                filterType: PageFilterType::Author,
+                filterId: $author->id,
+                sort: $sort,
+                status: 'published',
+                currentPage: PageFilterDto::sanitisePage($_GET['page'] ?? 1),
+                secondary: $categoryFilter ? ['category' => $categoryFilter] : [],
+            );
 
-            // Build query
-            $query = Page::whereHas('authors', function ($query) use ($author) {
-                $query->where('authors.id', $author->id);
-            })
-                ->where('status', 'published')
-                ->with(['authors', 'categories', 'tags']);
+            $paginationData = $this->pageRepository->getPaginatedPages($filter);
 
-            // Apply category filter
-            if ($categoryFilter) {
-                $query->whereHas('categories', function ($q) use ($categoryFilter) {
-                    $q->where('categories.id', $categoryFilter);
-                });
-            }
-
-            // Apply sorting
-            switch ($sort) {
-                case 'oldest':
-                    $query->orderBy('published_at', 'asc');
-                    break;
-                case 'title':
-                    $query->orderBy('title', 'asc');
-                    break;
-                case 'latest':
-                default:
-                    $query->orderBy('published_at', 'desc');
-                    break;
-            }
-
-            $paginationData = $query->paginate($perPage, $currentPage);
             $member = MemberAuth::getMember();
-
             $pages = $paginationData['data'];
 
-            // Enrich pages with access information
             $pages->map(function ($page) use ($member) {
-                $accessInfo = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
-                $page->access = $accessInfo;
+                $page->access = $this->articleAccessService->enrichPageWithAccessInfo($page, $member);
             });
 
-            $pagination = $paginationData['pagination'];
             $siteId = SiteContext::getId();
             $modalData = $this->subscriptionModalService->getModalData($member, $siteId);
 
-            // Render the author view
             return $this->view('estate/author', [
                 'author' => $author,
-                'menu' => $menu,
+                'menu' => $this->menuRepository->findActiveHeaderMenu($siteId),
                 'pages' => $pages,
-                'pagination' => $pagination,
+                'pagination' => $paginationData['pagination'],
                 'currentSort' => $sort,
                 'categories' => $this->categoryRepository->getActive(),
                 'tags' => $this->tagRepository->all(),
@@ -111,7 +82,7 @@ class AuthorViewController extends Controller
 
         } catch (Exception $e) {
             http_response_code(500);
-            echo "An error occurred: " . htmlspecialchars($e->getMessage());
+            echo 'An error occurred: ' . htmlspecialchars($e->getMessage());
         }
     }
 }
