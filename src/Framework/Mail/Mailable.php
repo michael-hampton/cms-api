@@ -300,12 +300,12 @@ abstract class Mailable
 
         // PANEL/CALLOUT - @panel(content)
         $panelBg = $this->theme ? $this->theme->getColor('card_background', '#f8f9fa') : '#f8f9fa';
-        $html = preg_replace('/@panel\((.+?)\)/',
+        $html = preg_replace('/@panel\((.+?)\)/s',
             '<div style="background:' . $panelBg . ';border-left:4px solid ' . $primaryColor . ';padding:15px;margin:15px 0;border-radius:4px;">$1</div>',
             $html);
 
         // PROMOTION BOX - @promotion(content)
-        $html = preg_replace('/@promotion\((.+?)\)/',
+        $html = preg_replace('/@promotion\((.+?)\)/s',
             '<div style="background:#fff3cd;border:2px solid ' . $warningColor . ';padding:15px;margin:15px 0;border-radius:6px;text-align:center;"><strong style="color:#856404;font-size:16px;">$1</strong></div>',
             $html);
 
@@ -342,7 +342,7 @@ abstract class Mailable
             $html);
 
         // PRICE - @price(amount)
-        $html = preg_replace('/@price\(([0-9.]+)\)/',
+        $html = preg_replace('/@price\(([0-9.,]+)\)/',
             '<span style="font-size:24px;font-weight:bold;color:' . $textColor . ';">$$$1</span>',
             $html);
 

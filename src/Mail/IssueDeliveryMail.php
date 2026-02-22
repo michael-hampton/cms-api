@@ -23,7 +23,7 @@ final class IssueDeliveryMail extends Mailable
     public function build(): self
     {
         $this->to($this->recipient)
-            ->subject($this->emailSubject);
+            ->subject($this->subject);
 
 // Store the pre-built HTML so render() returns it directly.
 // We bypass the markdown/view pipeline — content is already rendered.

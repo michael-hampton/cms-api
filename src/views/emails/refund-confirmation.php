@@ -8,7 +8,7 @@ Good news! Your refund has been processed successfully.
 
 ## Refund Details
 
-**Refund Amount:** @price(<?= number_format((float)$refund->amount ?? 0, 2) ?>)
+**Refund Amount:** $<?= number_format((float)$refund->amount ?? 0, 2) ?>
 **Original Order:** #<?= $order->order_number ?>
 **Refund Date:** <?= $refund->created_at->format('F j, Y') ?>
 **Refund ID:** #<?= $refund->id ?>

@@ -19,7 +19,7 @@ class RefundConfirmation extends Mailable
     public function build(): self
     {
         return $this->subject("Refund Processed - Order #{$this->order->order_number}")
-            ->view('emails.refund-confirmation')
+            ->markdown('emails.refund-confirmation')
             ->with([
                 'refund' => $this->refund,
                 'order' => $this->order,
