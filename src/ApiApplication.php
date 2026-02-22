@@ -18,6 +18,7 @@ use App\Events\DatabaseEventSubscriber;
 use App\Events\Orders\OrderCreatedEvent;
 use App\Events\Products\ProductViewedEvent;
 use App\Events\Refunds\RefundCreated;
+use App\Events\Rewards\MemberRewardApproved;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -56,6 +57,8 @@ use App\Listeners\PointsAwardedListener;
 use App\Listeners\Products\TrackProductViewListener;
 use App\Listeners\Refunds\LogRefundHistory;
 use App\Listeners\Refunds\SendRefundNotification;
+use App\Listeners\Rewards\ApproveProductLinkedRewardsListener;
+use App\Listeners\Rewards\NotifyMemberOnRewardApproval;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
@@ -355,6 +358,10 @@ class ApiApplication
         $eventDispatcher->listen(BoostResumedEvent::class, [SendBoostResumedNotification::class, 'handle']);
         $eventDispatcher->listen(BoostLimitBreachedEvent::class, [SendBoostLimitBreachedNotification::class, 'handle']);
         $eventDispatcher->listen(OrderCreatedEvent::class, [HandleOrderConversionAttribution::class, 'handle']);
+        $eventDispatcher->listen(OrderCreatedEvent::class, [ApproveProductLinkedRewardsListener::class, 'handle']);
+        $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
+
+
 
 
 

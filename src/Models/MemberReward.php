@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Rewards\RewardStatus;
 use App\Repositories\Rewards\RewardAuditLogRepository;
 
 class MemberReward extends Model
@@ -35,6 +36,10 @@ class MemberReward extends Model
         'deleted_at' => 'datetime'
     ];
 
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
+
     public function member($relation = false)
     {
         return $this->belongsTo(Member::class, 'member_id', 'id', $relation);
@@ -50,14 +55,64 @@ class MemberReward extends Model
         return $this->hasOne(RewardVoucherCode::class, 'member_reward_id', 'id', $relation);
     }
 
-    public function isClaimed(): bool
+    public function declinedBy($relation = false)
     {
-        return $this->status === 'claimed';
+        return $this->belongsTo(User::class, 'declined_by_admin_id', 'id', $relation);
     }
 
+    // -------------------------------------------------------------------------
+    // State queries
+    // -------------------------------------------------------------------------
+
+    public function isClaimed(): bool
+    {
+        return $this->status === RewardStatus::CLAIMED->value;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === RewardStatus::PENDING->value;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === RewardStatus::APPROVED->value;
+    }
+
+    /**
+     * A reward is claimable when it is either pending (criteria-based) or
+     * approved (product-linked, auto-approved on order completion).
+     */
+    public function isClaimable(): bool
+    {
+        return $this->isPending() || $this->isApproved();
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->status === RewardStatus::EXPIRED->value ||
+            ($this->expires_at && $this->expires_at < now_datetime());
+    }
+
+    public function isDeclined(): bool
+    {
+        return $this->status === RewardStatus::DECLINED->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // State transitions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Claim this reward.
+     *
+     * Accepts both 'pending' and 'approved' statuses so that product-linked
+     * rewards (which are auto-approved on order completion) can be claimed by
+     * the member without any further action from the system.
+     */
     public function claim(): bool
     {
-        if (!$this->isPending() || $this->isExpired()) {
+        if (!$this->isClaimable() || $this->isExpired()) {
             return false;
         }
 
@@ -65,19 +120,18 @@ class MemberReward extends Model
         $oldData = $this->toArray();
 
         $result = $this->update([
-            'status' => 'claimed',
-            'claimed_at' => now_datetime()->toDateTimeString()
+            'status' => RewardStatus::CLAIMED->value,
+            'claimed_at' => now_datetime()->toDateTimeString(),
         ]);
 
         if ($result) {
-            // Log the claim
             $auditRepo = app(RewardAuditLogRepository::class);
             $auditRepo->logAction(
                 memberRewardId: $this->id,
-                action: 'claimed',
+                action: RewardStatus::CLAIMED->value,
                 userId: null,
                 oldStatus: $oldStatus,
-                newStatus: 'claimed',
+                newStatus: RewardStatus::CLAIMED->value,
                 oldData: $oldData,
                 newData: $this->fresh()->toArray(),
                 rewardDefinitionId: $this->reward_definition_id
@@ -85,22 +139,6 @@ class MemberReward extends Model
         }
 
         return $result;
-    }
-
-    public function isPending(): bool
-    {
-        return $this->status === 'pending';
-    }
-
-    public function isExpired(): bool
-    {
-        return $this->status === 'expired' ||
-            ($this->expires_at && $this->expires_at < now_datetime());
-    }
-
-    public function isDeclined(): bool
-    {
-        return $this->status === 'declined';
     }
 
     public function decline(int $adminId, string $reason, ?string $notes = null): bool
@@ -109,34 +147,28 @@ class MemberReward extends Model
         $oldData = $this->toArray();
 
         $result = $this->update([
-            'status' => 'declined',
+            'status' => RewardStatus::DECLINED->value,
             'declined_by_admin_id' => $adminId,
             'declined_at' => now_datetime()->toDateTimeString(),
             'decline_reason' => $reason,
-            'admin_notes' => $notes
+            'admin_notes' => $notes,
         ]);
 
         if ($result) {
-            // Log the decline
             $auditRepo = app(RewardAuditLogRepository::class);
             $auditRepo->logAction(
                 memberRewardId: $this->id,
-                action: 'declined',
+                action: RewardStatus::DECLINED->value,
                 userId: $adminId,
                 oldStatus: $oldStatus,
-                newStatus: 'declined',
+                newStatus: RewardStatus::DECLINED->value,
                 oldData: $oldData,
                 newData: $this->fresh()->toArray(),
-                notes: "Reason: $reason" . ($notes ? " | Notes: $notes" : ""),
+                notes: "Reason: $reason" . ($notes ? " | Notes: $notes" : ''),
                 rewardDefinitionId: $this->reward_definition_id
             );
         }
 
         return $result;
-    }
-
-    public function declinedBy($relation = false)
-    {
-        return $this->belongsTo(User::class, 'declined_by_admin_id', 'id', $relation);
     }
 }

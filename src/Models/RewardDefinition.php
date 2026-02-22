@@ -29,9 +29,42 @@ class RewardDefinition extends Model
         'deleted_at' => 'datetime'
     ];
 
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
+
+    public function memberRewards($relation = false)
+    {
+        return $this->hasMany(MemberReward::class, 'reward_definition_id', 'id', $relation);
+    }
+
+    public function availableVouchers($relation = false)
+    {
+        return $this->hasMany(RewardVoucherCode::class, 'reward_definition_id', 'id', $relation)
+            ->where('is_used', false)
+            ->whereNull('assigned_to_member_id');
+    }
+
+    /**
+     * Products that trigger this reward definition when purchased.
+     * Pivot: product_reward_definitions (product_id, reward_definition_id)
+     */
+    public function products($relation = false)
+    {
+        return $this->belongsToMany(
+            Product::class,
+            'product_reward_definitions',
+            'reward_definition_id',
+            'product_id'
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Business logic
+    // -------------------------------------------------------------------------
+
     public function checkCriteria(Member $member): bool
     {
-
         if (!$this->criteria || !is_array($this->criteria)) {
             return false;
         }
@@ -51,81 +84,39 @@ class RewardDefinition extends Model
         $operator = $criterion['operator'] ?? '>=';
         $value = $criterion['value'] ?? 0;
 
-        $actualValue = $this->getCurrentValue($member, $type);
-
-        return $this->compareValues($actualValue, $operator, $value);
+        return $this->compareValues($this->getCurrentValue($member, $type), $operator, $value);
     }
 
     private function getCurrentValue(Member $member, string $type)
     {
-        switch ($type) {
-            case 'signup':
-                return 1; // Always true for signups
-
-            case 'badges_earned':
-                return $member->badges()->count();
-
-            case 'points_earned':
-                return $member->points()->sum('points');
-
-            case 'comments_count':
-                return $member->comments()->count();
-
-            case 'subscriptions_count':
-                return \App\Models\Subscription::where('member_id', $member->id)
-                    ->where('status', 'active')
-                    ->count();
-
-            case 'orders_completed':
-                return \App\Models\Order::where('user_id', $member->id)
-                    ->where('status', 'completed')
-                    ->count();
-
-            case 'member_days':
-                return now_datetime()->diffInDays($member->created_at);
-
-            case 'specific_badge':
-                $badgeSlug = $type['badge_slug'] ?? '';
-                return $member->badges()->where('slug', $badgeSlug)->exists() ? 1 : 0;
-
-            default:
-                return 0;
-        }
+        return match ($type) {
+            'signup' => 1,
+            'badges_earned' => $member->badges()->count(),
+            'points_earned' => $member->points()->sum('points'),
+            'comments_count' => $member->comments()->count(),
+            'subscriptions_count' => \App\Models\Subscription::where('member_id', $member->id)
+                ->where('status', 'active')->count(),
+            'orders_completed' => \App\Models\Order::where('user_id', $member->id)
+                ->where('status', 'completed')->count(),
+            'member_days' => now_datetime()->diffInDays($member->created_at),
+            'specific_badge' => $member->badges()->where('slug', $type['badge_slug'] ?? '')->exists() ? 1 : 0,
+            default => 0,
+        };
     }
 
     private function compareValues($actual, string $operator, $expected): bool
     {
-        switch ($operator) {
-            case '>=':
-                return $actual >= $expected;
-            case '>':
-                return $actual > $expected;
-            case '<=':
-                return $actual <= $expected;
-            case '<':
-                return $actual < $expected;
-            case '==':
-                return $actual == $expected;
-            case '!=':
-                return $actual != $expected;
-            default:
-                return false;
-        }
+        return match ($operator) {
+            '>=' => $actual >= $expected,
+            '>' => $actual > $expected,
+            '<=' => $actual <= $expected,
+            '<' => $actual < $expected,
+            '==' => $actual == $expected,
+            '!=' => $actual != $expected,
+            default => false,
+        };
     }
 
-    public function memberRewards($relation = false)
-    {
-        return $this->hasMany(MemberReward::class, 'reward_definition_id', 'id', $relation);
-    }
-
-    public function availableVouchers($relation = false)
-    {
-        return $this->hasMany(RewardVoucherCode::class, 'reward_definition_id', 'id', $relation)
-            ->where('is_used', false)
-            ->whereNull('assigned_to_member_id');
-    }
-
-    // Add this method to RewardsController or create a view helper
     public function formatCriterion(array $criterion): string
     {
         $type = $criterion['type'] ?? '';
@@ -141,15 +132,17 @@ class RewardDefinition extends Model
             default => ''
         };
 
+        $s = fn(int $n) => $n !== 1 ? 's' : '';
+
         return match ($type) {
-            'badges_earned' => "Earn {$operatorText} {$value} badge" . ($value != 1 ? 's' : ''),
+            'badges_earned' => "Earn {$operatorText} {$value} badge{$s($value)}",
             'points_earned' => "Earn {$operatorText} {$value} points",
-            'comments_count' => "Post {$operatorText} {$value} comment" . ($value != 1 ? 's' : ''),
-            'orders_completed' => "Complete {$operatorText} {$value} order" . ($value != 1 ? 's' : ''),
-            'member_days' => "Be a member for {$operatorText} {$value} day" . ($value != 1 ? 's' : ''),
-            'subscriptions_count' => "Have {$operatorText} {$value} active subscription" . ($value != 1 ? 's' : ''),
-            'signup' => "Sign up for an account",
-            default => "Complete required action"
+            'comments_count' => "Post {$operatorText} {$value} comment{$s($value)}",
+            'orders_completed' => "Complete {$operatorText} {$value} order{$s($value)}",
+            'member_days' => "Be a member for {$operatorText} {$value} day{$s($value)}",
+            'subscriptions_count' => "Have {$operatorText} {$value} active subscription{$s($value)}",
+            'signup' => 'Sign up for an account',
+            default => 'Complete required action',
         };
     }
 }

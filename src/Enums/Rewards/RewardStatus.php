@@ -8,4 +8,5 @@ enum RewardStatus: string
     case CLAIMED = 'claimed';
     case EXPIRED = 'expired';
     case DECLINED = 'declined';
+    case APPROVED = 'approved';
 }

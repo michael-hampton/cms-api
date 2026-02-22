@@ -319,6 +319,34 @@ abstract class Model
         return static::find($id, $relations);
     }
 
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function refresh(): static
+    {
+        if (!$this->exists) {
+            return $this;
+        }
+
+        $primaryKeyValue = $this->getAttribute($this->primaryKey);
+
+        $fresh = $this->database
+            ->table($this->getTable())
+            ->where($this->primaryKey, $primaryKeyValue)
+            ->first();
+
+        if (!$fresh) {
+            throw new \RuntimeException('Model not found during refresh.');
+        }
+
+        // Replace attributes
+        $this->attributes = (array)$fresh->getAttributes();
+
+        return $this;
+    }
+
     protected function performUpdate(): bool
     {
         $primaryKeyValue = $this->getAttribute($this->primaryKey);
