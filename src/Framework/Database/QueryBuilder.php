@@ -308,6 +308,24 @@ class QueryBuilder
         return $this;
     }
 
+    public function whereNot(string $column, $operator = null, $value = null, string $boolean = 'AND'): self
+    {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'NotBasic',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => $boolean,
+        ];
+
+        return $this;
+    }
+
     public function whereBetween(string $column, array $values): self
     {
         if (count($values) !== 2) {
@@ -1036,6 +1054,26 @@ class QueryBuilder
             case 'Nested':
                 [$subSql, $subBindings] = $this->compileWheres($where['query']->wheres, $paramCounter);
                 return ['(' . $subSql . ')', $subBindings];
+            case 'NotBasic':
+
+                $quotedColumn = $this->quoteColumn($where['column']);
+                $bindings = [];
+
+                if (is_null($where['value'])) {
+                    return ["{$quotedColumn} IS NOT NULL", $bindings];
+                }
+
+                $uniqueId = bin2hex(random_bytes(2));
+                $paramKey = "p_{$uniqueId}";
+
+                $bindings[$paramKey] = is_bool($where['value'])
+                    ? ($where['value'] ? 1 : 0)
+                    : $where['value'];
+
+                return [
+                    "NOT ({$quotedColumn} {$where['operator']} :{$paramKey})",
+                    $bindings
+                ];
             case 'Raw':
                 // For raw SQL, just return as-is with bindings
                 return [$where['sql'], $where['bindings'] ?? []];
@@ -1702,6 +1740,26 @@ class QueryBuilder
                                 $bindings[] = $bind;
                             }
                         }
+                    }
+                    break;
+
+                case 'NotBasic':
+                    $table = $query->getTable();
+                    $column = (strpos($where['column'], '.') === false)
+                        ? "{$table}.{$where['column']}"
+                        : $where['column'];
+
+                    $column = $this->quoteColumn($column);
+                    $value = $where['value'];
+
+                    if (is_null($value)) {
+                        $fragment = "{$column} IS NOT NULL";
+                    } else {
+                        $uniqueId = bin2hex(random_bytes(2));
+                        $paramName = "sub_" . $uniqueId . "_" . count($bindings);
+
+                        $fragment = "NOT ({$column} {$where['operator']} :{$paramName})";
+                        $bindings[$paramName] = is_bool($value) ? ($value ? 1 : 0) : $value;
                     }
                     break;
 

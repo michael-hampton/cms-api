@@ -912,7 +912,7 @@
         <nav class="account-nav__links">
             <?php $t = $active_tab ?? 'overview'; ?>
 
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account"
+            <a href="/press-stack/account"
                class="nav-link <?= $t === 'overview' ? 'active' : '' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="7" height="7"/>
@@ -923,7 +923,7 @@
                 Overview
             </a>
 
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/subscriptions"
+            <a href="/press-stack/account/subscriptions"
                class="nav-link <?= $t === 'subscriptions' ? 'active' : '' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
@@ -935,7 +935,7 @@
                 <?php endif; ?>
             </a>
 
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders"
+            <a href="/press-stack/account/orders"
                class="nav-link <?= $t === 'orders' ? 'active' : '' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
@@ -945,7 +945,7 @@
                 Orders
             </a>
 
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/billing"
+            <a href="/press-stack/account/billing"
                class="nav-link <?= $t === 'billing' ? 'active' : '' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="1" y="4" width="22" height="16" rx="2"/>

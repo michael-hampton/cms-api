@@ -78,14 +78,14 @@ class BoostEventService
      * Record a conversion for a boost. Not session-deduplicated —
      * a user can convert multiple times (repeat purchases).
      */
-    public function recordConversion(int $boostId, string $sessionHash, array $metadata = []): void
+    public function recordConversion(int $boostId, ?string $sessionHash, array $metadata = []): void
     {
         $this->findActiveBoost($boostId);
 
         $this->boostEventRepository->create([
             'boost_id' => $boostId,
             'type' => BoostEventType::Conversion->value,
-            'session_hash' => $sessionHash,
+            'session_hash' => $sessionHash ?? null,
             'occurred_at' => now_datetime()->toDateTimeString(),
             'metadata' => $metadata,
         ]);

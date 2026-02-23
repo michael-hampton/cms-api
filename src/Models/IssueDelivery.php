@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 use App\Services\Billing\Preorder\IssueAvailabilityPolicy;
@@ -27,7 +28,9 @@ class IssueDelivery extends Model
         'issue_code',
         'stock_quantity',
         'preorder_enabled',
-        'restock_date'
+        'restock_date',
+        'dispatched_at',
+        'dispatched_failed_at'
     ];
 
     protected $casts = [
@@ -131,6 +134,16 @@ class IssueDelivery extends Model
         return $this->status === IssueScheduleStatus::DRAFT->value;
     }
 
+    public function isDispatched(): bool
+    {
+        return $this->status === IssueDeliveryStatus::DISPATCHED->value;
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === IssueDeliveryStatus::FAILED->value;
+    }
+
     public function isCancelled(): bool
     {
         return $this->status === IssueScheduleStatus::CANCELLED->value;
@@ -152,5 +165,28 @@ class IssueDelivery extends Model
     public function availabilityPolicy(): AvailabilityPolicyInterface
     {
         return new IssueAvailabilityPolicy($this);
+    }
+
+    // =========================================================================
+    // Dispatch outcome recording
+    // =========================================================================
+
+    public function markDispatched(): void
+    {
+        $this->update([
+            'status' => IssueDeliveryStatus::DISPATCHED->value,
+            'dispatched_at' => now(),
+            'dispatch_failed_at' => null,
+            'dispatch_error' => null,
+        ]);
+    }
+
+    public function markDispatchFailed(string $error): void
+    {
+        $this->update([
+            'status' => IssueDeliveryStatus::FAILED->value,
+            'dispatch_failed_at' => now(),
+            'dispatch_error' => $error,
+        ]);
     }
 }

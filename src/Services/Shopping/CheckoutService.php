@@ -806,8 +806,6 @@ class CheckoutService
             });
 
         } catch (\Exception $e) {
-//            echo $e->getMessage();
-//            die;
             return [
                 'success' => false,
                 'message' => 'Checkout failed'

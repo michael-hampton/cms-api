@@ -39,9 +39,10 @@ class OrderRewardProcessor
      */
     public function processCompletedOrder(Order $order): void
     {
-        $memberId = $order->member_id;
 
-        if (!$order->member_id) {
+        $memberId = $order->user_id;
+
+        if (!$order->user_id) {
             return;
         }
 
@@ -81,7 +82,7 @@ class OrderRewardProcessor
             return [];
         }
 
-        return collect($order->items)
+        return $order->items
             ->pluck('product_id')
             ->filter()
             ->unique()

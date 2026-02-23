@@ -5,6 +5,8 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Models\SubscriptionWindow;
+use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Repositories\Subscriptions\SubscriptionWindowRepository;
 use App\Services\Subscriptions\IssueDeliveryEligibilityService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -14,6 +16,17 @@ class IssueDeliveryEligibilityServiceTest extends FunctionalTestCase
     use CreatesTestData;
 
     private IssueDeliveryEligibilityService $service;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Resolve real repository implementations from the container so the
+        // service tests exercise genuine DB behaviour.
+        $this->service = new IssueDeliveryEligibilityService(
+            app(SubscriptionRepository::class),
+            app(SubscriptionWindowRepository::class),
+        );
+    }
 
     public function test_is_subscription_eligible_returns_false_if_no_scheduled_date(): void
     {
@@ -200,11 +213,5 @@ class IssueDeliveryEligibilityServiceTest extends FunctionalTestCase
 
         $this->assertCount(1, $results);
         $this->assertEquals($sub1->id, $results->first()->id);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->service = new IssueDeliveryEligibilityService();
     }
 }

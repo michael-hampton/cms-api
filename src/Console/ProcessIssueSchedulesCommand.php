@@ -1,49 +1,47 @@
 <?php
 
-namespace App\Console\Commands\Subscriptions;
+namespace App\Console;
 
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\GenerateIssueDeliveriesJob;
-use App\Models\IssueDelivery;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
 
 class ProcessIssueSchedulesCommand
 {
     public function __construct(
-        private readonly GenerateIssueDeliveriesJob $generateJob
+        private readonly IssueDeliveryRepository $issueDeliveryRepository,
+        private readonly Logger                  $logger,
     )
     {
     }
 
     public function handle(): int
     {
-        $now = new \DateTime();
+        $schedules = $this->issueDeliveryRepository->findDueForDispatch(new \DateTime());
 
-        $schedules = IssueDelivery::where('status', 'active')
-            ->where(function ($query) use ($now) {
-                $query->where('on_sale_date', '<=', $now->format('Y-m-d H:i:s'))
-                    ->orWhere('estimated_delivery_date', '<=', $now->format('Y-m-d H:i:s'));
-            })
-            ->get();
-
-        $processedCount = 0;
+        $dispatched = 0;
+        $failed = 0;
 
         foreach ($schedules as $schedule) {
             try {
-                dispatch($this->generateJob->handle($schedule));
-                $processedCount++;
-            } catch (\Exception $e) {
-                Logger::error('Failed to process issue schedule', [
-                    'schedule_id' => $schedule->id,
+                dispatch(GenerateIssueDeliveriesJob::for(), $schedule);
+                $dispatched++;
+            } catch (\Throwable $e) {
+                $failed++;
+
+                $this->logger->error('Failed to dispatch GenerateIssueDeliveriesJob', [
+                    'issue_delivery_id' => $schedule->id,
                     'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        Logger::info('Issue schedules processed', [
-            'total_schedules' => $schedules->count(),
-            'processed' => $processedCount,
+        $this->logger->info('Issue schedules processed', [
+            'total' => count($schedules),
+            'dispatched' => $dispatched,
+            'failed' => $failed,
         ]);
 
-        return 0;
+        return $failed > 0 ? 1 : 0;
     }
 }

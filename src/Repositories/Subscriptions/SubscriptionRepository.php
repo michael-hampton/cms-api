@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Model;
@@ -297,5 +298,26 @@ class SubscriptionRepository extends Repository
         ]);
 
         return ($result[0]['count'] ?? 0) > 0;
+    }
+
+    /**
+     * Returns all active subscriptions for a given plan whose active window
+     * includes $scheduledDate.
+     *
+     * @return Collection<Subscription>
+     */
+    public function findActiveByPlanAndDate(int $planId, \DateTime $scheduledDate): Collection
+    {
+        return Subscription::where('plan_id', $planId)
+            ->where('status', SubscriptionStatus::ACTIVE->value)
+            ->where(function ($query) use ($scheduledDate) {
+                $query->where('start_date', '<=', $scheduledDate->format('Y-m-d H:i:s'))
+                    ->orWhereNull('start_date');
+            })
+            ->where(function ($query) use ($scheduledDate) {
+                $query->where('end_date', '>=', $scheduledDate->format('Y-m-d H:i:s'))
+                    ->orWhereNull('end_date');
+            })
+            ->get();
     }
 }

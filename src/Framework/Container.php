@@ -1,6 +1,7 @@
 <?php
 namespace App\Framework;
 
+use App\Framework\Database\Database;
 use Closure;
 use ReflectionClass;
 use ReflectionException;
@@ -288,15 +289,36 @@ class Container
 
     public function make(string $abstract)
     {
-        // If we have a binding, resolve it
-        if (isset($this->bindings[$abstract])) {
-            $concrete = $this->bindings[$abstract];
-            return is_callable($concrete)
-                ? $concrete($this)
-                : $this->build($concrete);
+        if ($abstract === Database::class) {
+            return Database::getInstance();
         }
 
-        // Otherwise, build it directly
+        if (isset($this->instances[$abstract])) {
+            return $this->instances[$abstract];
+        }
+
+        if (isset($this->bindings[$abstract])) {
+
+            $binding = $this->bindings[$abstract];
+            $concrete = $binding['concrete'];
+
+            $object = $concrete instanceof Closure
+                ? $concrete($this)
+                : $this->build($concrete);
+
+            if ($binding['shared'] ?? false) {
+                $this->instances[$abstract] = $object;
+            }
+
+            return $object;
+        }
+
         return $this->build($abstract);
+    }
+
+    public function has(string $abstract): bool
+    {
+        return isset($this->bindings[$abstract])
+            || isset($this->instances[$abstract]);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Listeners\Rewards;
 
-use App\Events\Orders\OrderCompletedEvent;
+use App\Events\Orders\OrderCreatedEvent;
 use App\Services\Rewards\OrderRewardProcessor;
 
 /**
@@ -27,7 +27,7 @@ class ApproveProductLinkedRewardsListener
     {
     }
 
-    public function handle(OrderCompletedEvent $event): void
+    public function handle(OrderCreatedEvent $event): void
     {
         $this->orderRewardProcessor->processCompletedOrder($event->order);
     }

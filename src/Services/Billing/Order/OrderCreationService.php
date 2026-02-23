@@ -122,6 +122,10 @@ class OrderCreationService
             // Log history
             $this->historyService->logCreated($order->id, $data, $data['user_id'] ?? null);
 
+            if ($_ENV['APP_ENV'] !== 'testing') {
+                event(new OrderCreatedEvent($order, $customerEmail ?? null));
+            }
+
             // NOTE: No email sent for merchant orders
             // Parent checkout orchestrator handles unified confirmation
 

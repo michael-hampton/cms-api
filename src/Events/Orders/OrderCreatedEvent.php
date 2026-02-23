@@ -11,5 +11,6 @@ class OrderCreatedEvent
         public readonly ?string $customerEmail = null
     )
     {
+
     }
 }

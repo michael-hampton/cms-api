@@ -26,7 +26,7 @@ class BoostEventRepository extends Repository
     public function hasEventWithinWindow(
         int            $boostId,
         BoostEventType $type,
-        string         $sessionHash,
+        ?string $sessionHash,
         int            $withinHours
     ): bool
     {
@@ -34,7 +34,8 @@ class BoostEventRepository extends Repository
 
         return BoostEvent::where('boost_id', $boostId)
             ->where('type', $type->value)
-            ->where('session_hash', $sessionHash)
+            ->when($sessionHash !== null, fn($q) => $q->where('session_hash', $sessionHash)
+            )
             ->where('occurred_at', '>=', $cutoff->format('Y-m-d H:i:s'))
             ->exists();
     }

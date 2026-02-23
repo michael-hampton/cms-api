@@ -259,7 +259,7 @@
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
                             <span class="badge badge--<?= htmlspecialchars($sub['status']) ?>"><?= htmlspecialchars(ucfirst($sub['status'])) ?></span>
-                            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/subscriptions"
+                            <a href="/press-stack/account/subscriptions"
                                class="btn btn--ghost btn--sm">Manage</a>
                         </div>
                     </div>

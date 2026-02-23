@@ -44,7 +44,7 @@ class HandleOrderConversionAttribution
         }
     }
 
-    private function attributeItem(object $item, string $sessionHash): void
+    private function attributeItem(object $item, ?string $sessionHash): void
     {
         $boost = $this->boostRepository->findActiveOrRecentForTarget('product', $item->product_id);
 

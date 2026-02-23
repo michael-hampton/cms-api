@@ -512,7 +512,7 @@ $selectedTags = !empty($filters['tags'])
                         $isLimitedOffer = $plan->end_date && $plan->end_date->diffInDays(now()) <= 30;
                         $displayPrice = $hasSale ? $salePrice : ($plan->price ?? 0);
                         $letter = strtoupper(substr($plan->name, 0, 1));
-                        $detailUrl = url('/subscriptions/' . $plan->id);
+                        $detailUrl = url('/press-stack/' . $plan->id);
                         ?>
                         <article class="plan-card">
                             <?php if ($plan->is_featured): ?>

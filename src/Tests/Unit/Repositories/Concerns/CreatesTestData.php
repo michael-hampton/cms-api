@@ -883,4 +883,46 @@ trait CreatesTestData
 
         return $member->fresh();
     }
+
+    private int $creationScheduleCounter = 0;
+    private int $sendScheduleCounter = 0;
+
+    protected function createNewsletterCreationSchedule(array $overrides = []): \App\Models\NewsletterCreationSchedule
+    {
+        $this->creationScheduleCounter++;
+
+        $defaults = [
+            'newsletter_id' => $overrides['newsletter_id'] ?? $this->createNewsletter()->id,
+            'site_id' => $this->siteId,
+            'frequency' => 'weekly',
+            'day_of_week' => 1,
+            'day_of_month' => null,
+            'time' => '12:00',
+            'status' => 'active',
+            'next_run_at' => (new \DateTime('+7 days'))->format('Y-m-d H:i:s'),
+            'last_run_at' => null,
+        ];
+
+        return \App\Models\NewsletterCreationSchedule::create(array_merge($defaults, $overrides));
+    }
+
+    protected function createNewsletterSendSchedule(array $overrides = []): \App\Models\NewsletterSendSchedule
+    {
+        $this->sendScheduleCounter++;
+
+        $defaults = [
+            'newsletter_id' => $overrides['newsletter_id'] ?? $this->createNewsletter()->id,
+            'site_id' => $this->siteId,
+            'creation_schedule_id' => null,
+            'frequency' => 'weekly',
+            'day_of_week' => 1,
+            'day_of_month' => null,
+            'time' => '14:30',
+            'status' => 'active',
+            'next_run_at' => (new \DateTime('+7 days'))->format('Y-m-d H:i:s'),
+            'last_run_at' => null,
+        ];
+
+        return \App\Models\NewsletterSendSchedule::create(array_merge($defaults, $overrides));
+    }
 }

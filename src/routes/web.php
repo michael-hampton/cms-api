@@ -12,6 +12,7 @@ use App\Controllers\Front\BrandPageController;
 use App\Controllers\Front\BuyingGuideController;
 use App\Controllers\Front\CategoryPageController;
 use App\Controllers\Front\CommentController;
+use App\Controllers\Front\CompetitionController;
 use App\Controllers\Front\ContentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
@@ -91,6 +92,10 @@ $router->delete('/pages/{id}', WebPageController::class, 'destroy');
 $router->get('/{site}/offers', [OfferListController::class, 'index']);
 $router->get('/{site}/offers/{offerId}', [OfferListController::class, 'show']);
 $router->get('{site}/product-offers/search', [OfferListController::class, 'search']);
+
+$router->get('{site}/competitions', [CompetitionController::class, 'index']);
+$router->post('/{site}/competitions/{id}/enter', [CompetitionController::class, 'enter']);
+$router->post('/{site}/competitions/{id}/notify', [CompetitionController::class, 'notify']);
 
 
 // Bundles Routes
@@ -403,28 +408,23 @@ $router->get('/api/{siteName}/product-list/{id}/details', [ProductListController
 
 $router->post('/{site}/default/newsletter/signup', NewsletterController::class, 'signup');
 
-$router->get('/{site}/subscriptions/onetime', [OneTimeSubscriptionsController::class, 'index']);
+// Press stack site
+$router->get('/press-stack', [OneTimeSubscriptionsController::class, 'index']);
 $router->get('/subscriptions/onetime/search', [OneTimeSubscriptionsController::class, 'search']);
-$router->get('/{site}/subscriptions/onetime/{id}', [OneTimeSubscriptionsController::class, 'show']);
-$router->get('/subscriptions/onetime/deals', [SubscriptionDealsController::class, 'index']);
+$router->get('/press-stack/{id}', [OneTimeSubscriptionsController::class, 'show']);
+$router->get('/press-stack/deals', [SubscriptionDealsController::class, 'index']);
 $router->get('/subscriptions/onetime/deals/search', [SubscriptionDealsController::class, 'search']);
 $router->get('/{site}/subscriptions/link-subscription', [SubscriptionLinkStepController::class, 'showLinkStep']);
 $router->post('/member/onboarding/link-subscription', [SubscriptionLinkStepController::class, 'linkSubscription']);
-
-
-$router->get('/{site}/subscriptions/onetime/account', [ShopAccountController::class, 'overview'])
+$router->get('press-stack/account', [ShopAccountController::class, 'overview'])
     ->name('account.overview');
-
-$router->get('/{site}/subscriptions/onetime/account/subscriptions', [ShopAccountController::class, 'subscriptions'])
+$router->get('/press-stack/account/subscriptions', [ShopAccountController::class, 'subscriptions'])
     ->name('account.subscriptions');
-
-$router->get('/{site}/subscriptions/onetime/account/orders', [ShopAccountController::class, 'orders'])
+$router->get('/press-stack/account/orders', [ShopAccountController::class, 'orders'])
     ->name('account.orders');
-
-$router->get('/{site}/subscriptions/onetime/account/orders/{id}', [ShopAccountController::class, 'orderDetail'])
+$router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 'orderDetail'])
     ->name('account.order.detail');
-
-$router->get('/{site}/subscriptions/onetime/account/billing', [ShopAccountController::class, 'billing'])
+$router->get('/press-stack/account/billing', [ShopAccountController::class, 'billing'])
     ->name('account.billing');
 
 $router->post('/cart/subscription', [CartController::class, 'addSubscription']);

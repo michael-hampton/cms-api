@@ -311,7 +311,7 @@
                             </td>
                             <td data-label="Actions">
                                 <div class="table-actions">
-                                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders/<?= $order->id ?>"
+                                    <a href="/press-stack/account/orders/<?= $order->id ?>"
                                        class="btn btn--ghost btn--sm">View</a>
                                     <?php if ($canCancel): ?>
                                         <button

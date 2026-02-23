@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Front;
 
 use App\Framework\Database\Database;
+use App\Framework\Support\Collection;
 use App\Models\Badge;
 use App\Models\Member;
 use App\Models\MemberActivity;
@@ -10,7 +11,6 @@ use App\Models\MemberBadge;
 use App\Models\MemberPoint;
 use App\Repositories\Members\BadgeRepository;
 use App\Services\Members\BadgeService;
-use App\Services\Rewards\RewardsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
@@ -116,6 +116,105 @@ class BadgeServiceTest extends FunctionalTestCase
         $result = $this->service->trackActivity($member, 'page_view', 'page', 1, [], 0);
 
         $this->assertInstanceOf(MemberActivity::class, $result);
+    }
+
+    public function test_track_activity_passes_correct_payload_to_repository(): void
+    {
+        $member = $this->makeMember(id: 5, siteId: 10);
+        $activity = $this->makeActivity(id: 1);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->badgeRepository
+            ->expects('createMemberActivity')
+            ->withArgs(function (array $data) {
+                return $data['member_id'] === 5
+                    && $data['site_id'] === 10
+                    && $data['activity_type'] === 'comment'
+                    && $data['entity_type'] === 'article'
+                    && $data['entity_id'] === 42
+                    && $data['points'] === 5;
+            })
+            ->andReturn($activity);
+
+        $this->badgeRepository->expects('createMemberPoint')->andReturn(new MemberPoint());
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([]));
+
+        $this->service->trackActivity($member, 'comment', 'article', 42, [], 5, 10);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_track_activity_does_not_award_points_when_zero(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $activity = $this->makeActivity(id: 1);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->badgeRepository->expects('createMemberActivity')->andReturn($activity);
+        $this->badgeRepository->shouldNotReceive('createMemberPoint');
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([]));
+
+        $this->service->trackActivity($member, 'page_view', points: 0);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_track_activity_uses_site_context_when_site_id_not_supplied(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->badgeRepository
+            ->expects('createMemberActivity')
+            ->withArgs(fn(array $d) => $d['site_id'] === 10)
+            ->andReturn($this->makeActivity(id: 1));
+
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([]));
+
+        $this->service->trackActivity($member, 'page_view', null, null, [], 0, 10);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_track_activity_uses_explicit_site_id_when_provided(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->badgeRepository
+            ->expects('createMemberActivity')
+            ->withArgs(fn(array $d) => $d['site_id'] === 99)
+            ->andReturn($this->makeActivity(id: 1));
+
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([]));
+
+        $this->service->trackActivity($member, 'page_view', siteId: 99);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_track_activity_triggers_badge_check(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $activity = $this->makeActivity(id: 1);
+        $badge = $this->makeBadge(id: 1, points: 0, criteriaPass: true);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->badgeRepository->expects('createMemberActivity')->andReturn($activity);
+        $this->badgeRepository->expects('getActiveBadgesForSite')->with(10)->andReturn(new Collection([$badge]));
+        $this->badgeRepository->expects('findMemberBadge')->with(1, 1)->andReturn(null);
+        $this->badgeRepository->expects('createMemberBadge')->once()->andReturn(new MemberBadge());
+
+        $this->service->trackActivity($member, 'page_view');
+
+        $this->assertTrue(true);
     }
 
     public function testAwardPointsCreatesPointRecord()
@@ -289,6 +388,91 @@ class BadgeServiceTest extends FunctionalTestCase
         $this->assertInstanceOf(MemberBadge::class, $result);
     }
 
+    public function test_check_and_award_badges_returns_empty_when_no_badges(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+
+        $this->badgeRepository
+            ->expects('getActiveBadgesForSite')
+            ->with(10)
+            ->andReturn(new Collection([]));
+
+        $result = $this->service->checkAndAwardBadges($member);
+
+        $this->assertSame([], $result);
+    }
+
+    public function test_check_and_award_badges_skips_already_earned_badges(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $badge = $this->makeBadge(id: 1, points: 0, criteriaPass: true);
+        $memberBadge = new MemberBadge();
+
+        $this->badgeRepository
+            ->expects('getActiveBadgesForSite')
+            ->andReturn(new Collection([$badge]));
+
+        $this->badgeRepository
+            ->expects('findMemberBadge')
+            ->with(1, 1)
+            ->andReturn($memberBadge);
+
+        $this->badgeRepository->shouldNotReceive('createMemberBadge');
+
+        $result = $this->service->checkAndAwardBadges($member);
+
+        $this->assertSame([], $result);
+    }
+
+    public function test_check_and_award_badges_skips_badge_when_criteria_not_met(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $badge = $this->makeBadge(id: 1, points: 0, criteriaPass: false);
+
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([$badge]));
+        $this->badgeRepository->expects('findMemberBadge')->andReturn(null);
+        $this->badgeRepository->shouldNotReceive('createMemberBadge');
+
+        $result = $this->service->checkAndAwardBadges($member);
+
+        $this->assertSame([], $result);
+    }
+
+    public function test_check_and_award_badges_awards_badge_when_criteria_met(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $badge = $this->makeBadge(id: 1, points: 0, criteriaPass: true);
+        $memberBadge = new MemberBadge();
+
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([$badge]));
+        $this->badgeRepository->expects('findMemberBadge')->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->badgeRepository->expects('createMemberBadge')->once()->andReturn($memberBadge);
+
+        $result = $this->service->checkAndAwardBadges($member);
+
+        $this->assertCount(1, $result);
+        $this->assertSame($memberBadge, $result[0]);
+    }
+
+    public function test_check_and_award_badges_awards_multiple_badges(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $badge1 = $this->makeBadge(id: 1, points: 0, criteriaPass: true);
+        $badge2 = $this->makeBadge(id: 2, points: 0, criteriaPass: true);
+
+        $this->badgeRepository->expects('getActiveBadgesForSite')->andReturn(new Collection([$badge1, $badge2]));
+        $this->badgeRepository->expects('findMemberBadge')->twice()->andReturn(null);
+
+        $this->databaseMock->shouldReceive('transaction')->twice()->andReturnUsing(fn(callable $cb) => $cb());
+        $this->badgeRepository->expects('createMemberBadge')->twice()->andReturn(new MemberBadge());
+
+        $result = $this->service->checkAndAwardBadges($member);
+
+        $this->assertCount(2, $result);
+    }
+
     public function testAwardBadgeDoesNotAwardPointsWhenBadgeHasZeroPoints()
     {
         $member = Mockery::mock(Member::class)->makePartial();
@@ -431,6 +615,42 @@ class BadgeServiceTest extends FunctionalTestCase
 
         $this->assertCount(5, $result['next_badges']);
     }
+
+    public function test_award_badge_grants_bonus_points_when_badge_has_points(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $badge = $this->makeBadge(id: 5, points: 100);
+        $memberBadge = new MemberBadge();
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->badgeRepository->expects('createMemberBadge')->andReturn($memberBadge);
+
+        $this->badgeRepository
+            ->expects('createMemberPoint')
+            ->withArgs(fn(array $d) => $d['points'] === 100 && $d['reference_type'] === 'badge')
+            ->once()
+            ->andReturn(new MemberPoint());
+
+        $this->service->awardBadge($member, $badge);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_award_badge_does_not_grant_points_when_badge_has_no_points(): void
+    {
+        $member = $this->makeMember(id: 1, siteId: 10);
+        $badge = $this->makeBadge(id: 5, points: 0);
+        $memberBadge = new MemberBadge();
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->badgeRepository->expects('createMemberBadge')->andReturn($memberBadge);
+        $this->badgeRepository->shouldNotReceive('createMemberPoint');
+
+        $this->service->awardBadge($member, $badge);
+
+        $this->assertTrue(true);
+    }
+
 
     public function testAwardBadgeSetsSessionFlag(): void
     {
@@ -820,6 +1040,71 @@ class BadgeServiceTest extends FunctionalTestCase
         $this->assertEquals(30, $progress['details'][0]['current']);
         $this->assertEquals(50, $progress['details'][0]['target']);
         $this->assertEquals(60, $progress['details'][0]['percentage']); // 30/50 = 60%
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function makeMember(int $id, int $siteId, int $totalPoints = 0): Member
+    {
+        $member = new Member();
+        $member->id = $id;
+        $member->site_id = $siteId;
+        $member->totalPoints = $totalPoints;
+        $member->activity_stats = [];
+        $member->created_at = new \DateTime('-10 days');
+        return $member;
+    }
+
+    private function makeActivity(int $id, ?string $date = null, int $points = 0): MemberActivity
+    {
+        $a = new MemberActivity();
+        $a->id = $id;
+        $a->activity_date = new \DateTime($date ?? 'today');
+        $a->points = $points;
+        return $a;
+    }
+
+    /**
+     * @param bool $criteriaPass — controls what badge->checkCriteria() returns
+     */
+    private function makeBadge(int $id, int $points, bool $criteriaPass = false): Badge
+    {
+        $badge = Mockery::mock(Badge::class)->makePartial();
+        $badge->id = $id;
+        $badge->name = "Badge #{$id}";
+        $badge->points = $points;
+        $badge->site_id = 10;
+        $badge->criteria = [];
+        $badge->allows('checkCriteria')->andReturn($criteriaPass);
+        $badge->allows('contains')->andReturn(false); // for Collection::contains checks
+        return $badge;
+    }
+
+    private function makeBadgeWithProgress(int $id, bool $criteriaPass, int $progressPct): Badge
+    {
+        return $this->makeBadge($id, 0, $criteriaPass);
+    }
+
+    private function makeBadgeWithCriteria(array $criteria): Badge
+    {
+        $badge = Mockery::mock(Badge::class)->makePartial();
+        $badge->id = 99;
+        $badge->name = 'Test Badge';
+        $badge->points = 0;
+        $badge->criteria = $criteria;
+        return $badge;
+    }
+
+    /**
+     * Minimal event listener hook — replace with your framework's event spy.
+     */
+    private function listenForEvent(string $eventClass, callable $callback): void
+    {
+        // If your framework exposes Event::listen() or similar, wire it here.
+        // This is a no-op stub so the tests don't fail if the event system
+        // isn't available in unit test context.
     }
 
 }

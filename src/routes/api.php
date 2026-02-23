@@ -35,6 +35,7 @@ use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\NewsletterController;
+use App\Controllers\Newsletter\NewsletterScheduleController;
 use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
@@ -637,6 +638,32 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
         $router->get('/newsletters/statistics', [NewsletterController::class, 'statistics']);
+
+        $router->get('/newsletters/{newsletterId}/schedules',
+            [NewsletterScheduleController::class, 'index']
+        );
+
+        // Creation schedule
+        $router->post('/newsletters/{newsletterId}/schedules/creation',
+            [NewsletterScheduleController::class, 'storeCreation']
+        );
+        $router->put('/newsletters/{newsletterId}/schedules/creation/{scheduleId}',
+            [NewsletterScheduleController::class, 'updateCreation']
+        );
+        $router->delete('/newsletters/{newsletterId}/schedules/creation/{scheduleId}',
+            [NewsletterScheduleController::class, 'destroyCreation']
+        );
+
+        // Send schedule
+        $router->post('/newsletters/{newsletterId}/schedules/send',
+            [NewsletterScheduleController::class, 'storeSend']
+        );
+        $router->put('/newsletters/{newsletterId}/schedules/send/{scheduleId}',
+            [NewsletterScheduleController::class, 'updateSend']
+        );
+        $router->delete('/newsletters/{newsletterId}/schedules/send/{scheduleId}',
+            [NewsletterScheduleController::class, 'destroySend']
+        );
 
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
         $router->get('/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);

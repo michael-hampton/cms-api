@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Framework\Database\Database;
+use App\Framework\Container;
 
 abstract class BaseJob
 {
@@ -13,6 +13,13 @@ abstract class BaseJob
 
     private static function resolve(string $class)
     {
+        $container = Container::getInstance();
+        // If container has binding or can resolve it, use it
+        if ($container->has($class)) {
+            return $container->make($class);
+        }
+
+        // Otherwise fallback to reflection (for unbound concretes)
         $reflection = new \ReflectionClass($class);
 
         if (!$reflection->isInstantiable()) {
@@ -41,13 +48,7 @@ abstract class BaseJob
                 );
             }
 
-            $typeName = $type->getName();
-
-            if ($typeName === Database::class) {
-                $dependencies[] = Database::getInstance();
-            } else {
-                $dependencies[] = static::resolve($typeName); // 🔥 recursive
-            }
+            $dependencies[] = self::resolve($type->getName());
         }
 
         return $reflection->newInstanceArgs($dependencies);

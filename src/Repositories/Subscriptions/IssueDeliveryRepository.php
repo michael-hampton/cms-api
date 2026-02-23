@@ -264,4 +264,20 @@ class IssueDeliveryRepository extends Repository
             ->count();
     }
 
+    /**
+     * Returns all active IssueDelivery records whose on_sale_date or
+     * estimated_delivery_date is on or before $now.
+     *
+     * @return Collection<IssueDelivery>
+     */
+    public function findDueForDispatch(\DateTime $now): Collection
+    {
+        return IssueDelivery::where('status', IssueScheduleStatus::ACTIVE->value)
+            ->where(function ($query) use ($now) {
+                $query->where('on_sale_date', '<=', $now->format('Y-m-d H:i:s'))
+                    ->orWhere('estimated_delivery_date', '<=', $now->format('Y-m-d H:i:s'));
+            })
+            ->get();
+    }
+
 }

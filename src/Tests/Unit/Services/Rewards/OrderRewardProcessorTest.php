@@ -99,7 +99,7 @@ class OrderRewardProcessorTest extends TestCase
         $item = Mockery::mock(OrderItem::class)->makePartial();
         $item->product_id = null;
 
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
 
         $this->productRewardRepository->shouldNotReceive('findPendingRewardsForProducts');
         $this->database->shouldNotReceive('transaction');
@@ -111,7 +111,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_returns_early_when_no_pending_rewards_found(): void
     {
         $item = $this->makeOrderItem(5);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
 
         $emptyCollection = new \App\Framework\Support\Collection([]);
 
@@ -179,7 +179,7 @@ class OrderRewardProcessorTest extends TestCase
     private function orderWithItems(array $items, array $orderAttributes = []): Order
     {
         $order = $this->makeOrder($orderAttributes);
-        $order->items = $items;
+        $order->items = collect($items);
 
         return $order;
     }
@@ -217,7 +217,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_includes_order_number_in_approval_notes(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item], 'order_number' => 'ORD-XYZ']);
+        $order = $this->makeOrder(['items' => collect([$item]), 'order_number' => 'ORD-XYZ']);
         $reward = $this->makeMemberReward(55);
 
         $this->productRewardRepository
@@ -247,7 +247,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_approves_multiple_rewards_in_single_transaction(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
         $reward1 = $this->makeMemberReward(10);
         $reward2 = $this->makeMemberReward(20);
 
@@ -269,7 +269,7 @@ class OrderRewardProcessorTest extends TestCase
         // Two items with the same product_id — repository must receive it once.
         $item1 = $this->makeOrderItem(7);
         $item2 = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item1, $item2]]);
+        $order = $this->makeOrder(['items' => collect([$item1, $item2])]);
 
         $this->productRewardRepository
             ->shouldReceive('findPendingRewardsForProducts')
@@ -286,7 +286,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_skips_silently_when_reward_was_already_approved_concurrently(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
         $reward = $this->makeMemberReward(55);
 
         $this->productRewardRepository
@@ -312,7 +312,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_catches_and_logs_exception_from_approve_without_propagating(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
         $reward = $this->makeMemberReward(55);
 
         $this->productRewardRepository
@@ -339,7 +339,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_continues_processing_remaining_rewards_after_one_approval_fails(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
         $reward1 = $this->makeMemberReward(10);
         $reward2 = $this->makeMemberReward(20);
 
@@ -375,7 +375,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_wraps_all_approvals_in_a_single_database_transaction(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
         $reward1 = $this->makeMemberReward(10);
         $reward2 = $this->makeMemberReward(20);
 
@@ -399,7 +399,7 @@ class OrderRewardProcessorTest extends TestCase
     public function test_no_transaction_is_opened_when_there_are_no_pending_rewards(): void
     {
         $item = $this->makeOrderItem(7);
-        $order = $this->makeOrder(['items' => [$item]]);
+        $order = $this->makeOrder(['items' => collect([$item])]);
 
         $this->productRewardRepository
             ->shouldReceive('findPendingRewardsForProducts')
