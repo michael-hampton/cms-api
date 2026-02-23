@@ -35,6 +35,7 @@ use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\NewsletterController;
+use App\Controllers\Newsletter\NewsletterLayoutController;
 use App\Controllers\Newsletter\NewsletterScheduleController;
 use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\ProductOfferBundleController;
@@ -794,5 +795,28 @@ $router->post('/api/{site}/vouchers/remove-voucher', VoucherController::class, '
 
 $router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportController::class, 'import']);
 
+$router->group(['prefix' => 'newsletter-layouts'], function ($router) {
+
+    // Layout CRUD
+    $router->get('/', [NewsletterLayoutController::class, 'index']);
+    $router->get('/system', [NewsletterLayoutController::class, 'systemLayouts']);
+    $router->post('/', [NewsletterLayoutController::class, 'store']);
+    $router->post('/{id}/clone', [NewsletterLayoutController::class, 'clone']);
+    $router->delete('/{id}', [NewsletterLayoutController::class, 'delete']);
+
+    // Layout Versions
+    $router->get('/{id}/versions', [NewsletterLayoutController::class, 'versions']);
+    $router->post('/{id}/versions', [NewsletterLayoutController::class, 'addVersion']);
+});
+
+$router->put(
+    'newsletter-layout-versions/{id}/state',
+    [NewsletterLayoutController::class, 'transitionState']
+);
+
+$router->post(
+    'newsletter-layouts/migration-report',
+    [NewsletterLayoutController::class, 'migrationReport']
+);
 
 
