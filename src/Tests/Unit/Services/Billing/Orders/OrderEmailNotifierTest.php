@@ -4,13 +4,12 @@ namespace App\Tests\Unit\Services\Billing\Orders;
 
 use App\Framework\Mail\MailManager;
 use App\Framework\Mail\PendingMail;
-use App\Mail\OrderConfirmation;
+use App\Mail\Orders\OrderConfirmation;
 use App\Models\Member;
 use App\Models\Order;
 use App\Services\Billing\Order\OrderEmailNotifier;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 
 class OrderEmailNotifierTest extends TestCase
 {

@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Mail;
 
-use App\Mail\OfferEndingSoon;
+use App\Mail\Offers\OfferEndingSoon;
 use App\Models\Member;
 use App\Models\Product;
 use App\Models\ProductOffer;

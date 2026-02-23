@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Mail;
 
 use App\Framework\Mail\ArrayMailer;
-use App\Mail\OrderConfirmation;
+use App\Mail\Orders\OrderConfirmation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;

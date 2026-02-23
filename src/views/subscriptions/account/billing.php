@@ -5,31 +5,28 @@
  * Variables from ShopAccountController::billing():
  *   $member     – authenticated member
  *   $active_tab – 'billing'
- *
- * Payment method cards are read from Stripe directly in JS via Stripe Elements
- * or a dedicated API endpoint. Mutations (add/remove) are handled by separate
- * endpoints not covered in this read-only controller.
  */
 ?>
 <style>
+    /* ── Billing layout ──────────────────────────────────────────── */
     .billing-grid {
         display: flex;
         flex-direction: column;
         gap: 20px;
     }
 
-    /* ── Payment method card ──────────────────────────────────────── */
+    /* ── Payment method cards ────────────────────────────────────── */
     .pm-list {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
     }
 
     .pm-card {
         display: flex;
         align-items: center;
         gap: 16px;
-        padding: 16px 18px;
+        padding: 15px 18px;
         border: 1.5px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--white);
@@ -38,6 +35,7 @@
 
     .pm-card.is-default {
         border-color: var(--ink);
+        box-shadow: var(--shadow-xs);
     }
 
     .pm-card:hover {
@@ -45,15 +43,15 @@
     }
 
     .pm-card__network {
-        width: 48px;
+        width: 50px;
         height: 32px;
-        border-radius: 4px;
-        background: var(--surface);
+        border-radius: 5px;
+        background: var(--paper-dark);
         border: 1px solid var(--border);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 18px;
+        font-size: 17px;
         flex-shrink: 0;
     }
 
@@ -75,15 +73,16 @@
     }
 
     .pm-card__default-badge {
-        font-size: 10px;
+        font-size: 9.5px;
         font-weight: 700;
-        letter-spacing: .07em;
+        letter-spacing: .08em;
         text-transform: uppercase;
-        background: var(--accent-light);
-        color: var(--accent);
-        padding: 2px 8px;
+        background: var(--gold-light);
+        color: var(--gold);
+        padding: 3px 9px;
         border-radius: 100px;
         flex-shrink: 0;
+        border: 1px solid rgba(184, 134, 11, .2);
     }
 
     .pm-card__actions {
@@ -98,7 +97,7 @@
         align-items: center;
         justify-content: center;
         gap: 10px;
-        padding: 16px 18px;
+        padding: 15px 18px;
         border: 1.5px dashed var(--border);
         border-radius: var(--radius-sm);
         background: none;
@@ -109,14 +108,13 @@
         transition: var(--transition);
         width: 100%;
     }
-
     .add-card-btn:hover {
         border-color: var(--ink);
         color: var(--ink);
-        background: var(--surface);
+        background: var(--paper);
     }
 
-    /* ── Add card modal ───────────────────────────────────────────── */
+    /* ── Add card modal ──────────────────────────────────────────── */
     .stripe-field-wrapper {
         border: 1.5px solid var(--border);
         border-radius: var(--radius-sm);
@@ -131,15 +129,14 @@
     }
 
     .stripe-field-label {
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: .07em;
+        letter-spacing: .09em;
         color: var(--ink-muted);
-        margin-bottom: 8px;
+        margin-bottom: 10px;
     }
 
-    /* Security note */
     .security-note {
         display: flex;
         align-items: center;
@@ -155,22 +152,22 @@
         flex-shrink: 0;
     }
 
-    /* Billing address section */
+    /* Form fields (billing address block) */
     .form-field {
         margin-bottom: 14px;
     }
-
     .form-field label {
         display: block;
-        font-size: 12px;
+        font-size: 10.5px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: .07em;
+        letter-spacing: .09em;
         color: var(--ink-muted);
         margin-bottom: 6px;
     }
 
-    .form-field input, .form-field select {
+    .form-field input,
+    .form-field select {
         width: 100%;
         padding: 10px 12px;
         border: 1.5px solid var(--border);
@@ -183,7 +180,8 @@
         transition: var(--transition);
     }
 
-    .form-field input:focus, .form-field select:focus {
+    .form-field input:focus,
+    .form-field select:focus {
         border-color: var(--ink);
     }
 
@@ -196,7 +194,7 @@
     /* Empty payment state */
     .no-payment-state {
         text-align: center;
-        padding: 40px 24px;
+        padding: 44px 24px;
     }
 
     .no-payment-state__icon {
@@ -218,17 +216,14 @@
     }
 </style>
 
-<?php
-$page_title = 'Billing';
-?>
+<?php $page_title = 'Billing'; ?>
 
 @include('subscriptions/account/_layout')
 
-
-<!-- Page content slot -->
 <main class="page-content">
 
     <div class="page-heading">
+        <div class="page-heading__eyebrow">Account</div>
         <h1 class="page-heading__title">Billing</h1>
         <p class="page-heading__sub">Manage your payment methods and billing details</p>
     </div>
@@ -242,7 +237,6 @@ $page_title = 'Billing';
                 <button class="btn btn--ghost btn--sm" onclick="openAddCardModal()">+ Add card</button>
             </div>
             <div class="card__body" id="payment-methods-body">
-                <!-- Populated by JS from your payment API endpoint -->
                 <div class="no-payment-state" id="pm-loading-state">
                     <div class="no-payment-state__icon">💳</div>
                     <div class="no-payment-state__title">Loading payment methods…</div>
@@ -251,31 +245,31 @@ $page_title = 'Billing';
             </div>
         </div>
 
-        <!-- Billing address (informational — mutations via account settings) -->
+        <!-- Billing address -->
         <div class="card">
             <div class="card__header">
                 <span class="card__title">Billing Address</span>
             </div>
             <div class="card__body" id="billing-address-body">
-                <div style="font-size:14px; color:var(--ink-muted);">
-                    Loading billing address…
-                </div>
+                <div style="font-size:14px; color:var(--ink-muted);">Loading billing address…</div>
             </div>
         </div>
 
         <!-- Security note -->
-        <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 18px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--ink-muted); line-height:1.6;">
+        <div style="display:flex; align-items:flex-start; gap:12px; padding:15px 18px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--ink-muted); line-height:1.65; box-shadow:var(--shadow-xs);">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                 style="width:18px;height:18px;flex-shrink:0;margin-top:1px;">
+                 style="width:18px;height:18px;flex-shrink:0;margin-top:1px;color:var(--green);">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
             <span>
-            Your payment information is encrypted and stored securely via Stripe. We never store your card number directly.
-        </span>
+                Your payment information is encrypted and stored securely via Stripe.
+                PressStack never stores your card number directly.
+            </span>
         </div>
     </div>
 
-    <!-- ── Add card modal ───────────────────────────────────────────────── -->
+
+    <!-- ── Add card modal ────────────────────────────────────────────── -->
     <div class="modal-overlay" id="add-card-modal" role="dialog" aria-modal="true">
         <div class="modal">
             <div class="modal__header">
@@ -285,8 +279,7 @@ $page_title = 'Billing';
             <div class="modal__body">
                 <div class="stripe-field-label">Card details</div>
                 <div class="stripe-field-wrapper" id="stripe-card-element">
-                    <!-- Stripe Elements mounts here -->
-                    <div style="height:20px; background:var(--surface); border-radius:3px; display:flex; align-items:center; padding:0 4px;">
+                    <div style="height:20px; display:flex; align-items:center;">
                         <span style="font-size:13px; color:var(--ink-muted);">Card number, expiry, CVC</span>
                     </div>
                 </div>
@@ -312,7 +305,7 @@ $page_title = 'Billing';
         </div>
     </div>
 
-    <!-- Remove card confirmation -->
+    <!-- ── Remove card confirmation ──────────────────────────────────── -->
     <div class="modal-overlay" id="remove-card-modal" role="dialog" aria-modal="true">
         <div class="modal">
             <div class="modal__header">
@@ -322,7 +315,7 @@ $page_title = 'Billing';
                 </button>
             </div>
             <div class="modal__body">
-                <p style="font-size:14px; color:var(--ink-soft);">
+                <p style="font-size:14px; color:var(--ink-soft); line-height:1.65;">
                     Are you sure you want to remove this card? This action cannot be undone.
                     Any active subscriptions using this card will need to be updated.
                 </p>
@@ -336,8 +329,9 @@ $page_title = 'Billing';
             </div>
         </div>
     </div>
-</main>
 
+</main>
+</div><!-- /.shell -->
 </body>
 </html>
 
@@ -345,7 +339,6 @@ $page_title = 'Billing';
 <script>
     let removeCardId = null;
 
-    /* ── Load payment methods from your API ────────────────────── */
     async function loadPaymentMethods() {
         try {
             const res = await fetch('/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/payment-methods', {
@@ -397,18 +390,19 @@ $page_title = 'Billing';
                     </div>`;
             });
             html += `<button class="add-card-btn" onclick="openAddCardModal()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
                         Add new card
                      </button>`;
             html += '</div>';
             body.innerHTML = html;
         }
 
-        // Billing address
         if (billingAddress) {
-            const addrEl = document.getElementById('billing-address-body');
-            addrEl.innerHTML = `
-                <div style="font-size:14px; color:var(--ink-soft); line-height:1.8;">
+            document.getElementById('billing-address-body').innerHTML = `
+                <div style="font-size:14px; color:var(--ink-soft); line-height:1.9;">
                     <strong style="color:var(--ink);">${billingAddress.name ?? ''}</strong><br>
                     ${billingAddress.line1 ?? ''}<br>
                     ${billingAddress.line2 ? billingAddress.line2 + '<br>' : ''}
@@ -420,7 +414,6 @@ $page_title = 'Billing';
 
     function openAddCardModal() {
         document.getElementById('add-card-modal').classList.add('open');
-        // In production: mount Stripe Elements here
     }
 
     function closeAddCardModal() {
@@ -428,7 +421,6 @@ $page_title = 'Billing';
     }
 
     async function submitAddCard() {
-        // In production: call stripe.createPaymentMethod() then POST to /account/billing/add-card
         alert('Card addition will be wired up to Stripe Elements. Implement stripe.confirmCardSetup() here.');
     }
 
@@ -478,18 +470,14 @@ $page_title = 'Billing';
         }
     }
 
-    // Modal backdrop
     ['add-card-modal', 'remove-card-modal'].forEach(id => {
         document.getElementById(id).addEventListener('click', function (e) {
             if (e.target === this) this.classList.remove('open');
         });
     });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-        }
+        if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
     });
 
-    // Load on mount
     loadPaymentMethods();
 </script>

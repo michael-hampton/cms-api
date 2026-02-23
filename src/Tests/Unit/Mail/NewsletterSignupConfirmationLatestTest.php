@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Mail;
 
-use App\Mail\NewsletterSignupConfirmationWithTracking;
+use App\Mail\Newsletters\NewsletterSignupConfirmationWithTracking;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class NewsletterSignupConfirmationLatestTest extends FunctionalTestCase

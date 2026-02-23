@@ -6,17 +6,12 @@ use App\Framework\Database\Database;
 use App\Framework\Mail\MailManager;
 use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Collection;
-use App\Framework\Support\Logger;
-use App\Framework\Support\SiteContext;
-use App\Mail\OrderConfirmation;
 use App\Models\Model;
 use App\Models\Order;
-use App\Models\Payment;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\MemberRepository;
-use Exception;
 
 class OrderService
 {

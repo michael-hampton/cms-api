@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Mail;
+namespace App\Mail\Newsletters;
 
 use App\Framework\Mail\Mailable;
 

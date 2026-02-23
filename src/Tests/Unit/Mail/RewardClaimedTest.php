@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Mail;
 
-use App\Mail\RewardClaimed;
+use App\Mail\Rewards\RewardClaimed;
 use App\Models\Member;
 use App\Models\MemberReward;
 use App\Models\RewardDefinition;

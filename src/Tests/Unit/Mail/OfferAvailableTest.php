@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Mail;
 
-use App\Mail\OfferAvailable;
+use App\Mail\Offers\OfferAvailable;
 use App\Models\Member;
 use App\Models\Product;
 use App\Models\ProductOffer;

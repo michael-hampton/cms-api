@@ -8,7 +8,7 @@ use App\Framework\Http\Request;
 use App\Framework\Mail\MailManager;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
-use App\Mail\NewsletterSignupConfirmationWithTracking;
+use App\Mail\Newsletters\NewsletterSignupConfirmationWithTracking;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Newsletter\NewsletterAccessService;

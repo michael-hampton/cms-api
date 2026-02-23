@@ -10,7 +10,7 @@
  */
 ?>
 <style>
-    /* ── Orders table / list ─────────────────────────────────────── */
+    /* ── Orders table ────────────────────────────────────────────── */
     .orders-table {
         width: 100%;
         border-collapse: collapse;
@@ -18,9 +18,9 @@
 
     .orders-table th {
         text-align: left;
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 600;
-        letter-spacing: .08em;
+        letter-spacing: .09em;
         text-transform: uppercase;
         color: var(--ink-muted);
         padding: 0 16px 12px;
@@ -28,7 +28,7 @@
     }
 
     .orders-table td {
-        padding: 16px 16px;
+        padding: 15px 16px;
         border-bottom: 1px solid var(--border-soft);
         vertical-align: middle;
         font-size: 14px;
@@ -38,8 +38,12 @@
         border-bottom: none;
     }
 
-    .orders-table tr:hover td {
-        background: var(--surface);
+    .orders-table tbody tr {
+        transition: background var(--transition);
+    }
+
+    .orders-table tbody tr:hover td {
+        background: var(--paper);
     }
 
     .order-num-link {
@@ -50,8 +54,7 @@
     }
 
     .order-num-link:hover {
-        color: var(--ink-soft);
-        text-decoration: underline;
+        color: var(--gold);
     }
 
     .order-items-summary {
@@ -63,6 +66,7 @@
     .order-amount {
         font-family: var(--font-display);
         font-size: 16px;
+        color: var(--ink);
     }
 
     .table-actions {
@@ -77,7 +81,8 @@
             display: none;
         }
 
-        .orders-table, .orders-table tbody, .orders-table tr, .orders-table td {
+        .orders-table, .orders-table tbody,
+        .orders-table tr, .orders-table td {
             display: block;
             width: 100%;
         }
@@ -86,7 +91,7 @@
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             overflow: hidden;
         }
 
@@ -111,11 +116,11 @@
         }
     }
 
-    /* Pagination */
+    /* ── Pagination ──────────────────────────────────────────────── */
     .pagination {
         display: flex;
         justify-content: center;
-        gap: 6px;
+        gap: 5px;
         margin-top: 28px;
         flex-wrap: wrap;
     }
@@ -140,6 +145,7 @@
 
     .pag-btn:hover:not(.active):not(.disabled) {
         border-color: var(--ink);
+        background: var(--paper);
     }
 
     .pag-btn.active {
@@ -154,7 +160,7 @@
         pointer-events: none;
     }
 
-    /* ── Order cancel modal ───────────────────────────────────────── */
+    /* ── Order cancel modal ──────────────────────────────────────── */
     .oc-step {
         display: none;
     }
@@ -164,7 +170,7 @@
     }
 
     .oc-order-summary {
-        background: var(--surface);
+        background: var(--paper);
         border: 1px solid var(--border-soft);
         border-radius: var(--radius-sm);
         padding: 14px 16px;
@@ -210,7 +216,7 @@
 
     .oc-reason-radio.selected {
         border-color: var(--ink);
-        background: var(--surface);
+        background: var(--paper);
         color: var(--ink);
         font-weight: 500;
     }
@@ -228,23 +234,20 @@
         border-radius: var(--radius-sm);
         padding: 14px 16px;
         font-size: 13px;
-        color: #1e40af;
+        color: var(--blue);
         margin: 14px 0;
         line-height: 1.6;
     }
 </style>
 
-<?php
-$page_title = 'Orders';
-?>
+<?php $page_title = 'Orders'; ?>
 
 @include('subscriptions/account/_layout')
 
-
-<!-- Page content slot -->
 <main class="page-content">
 
     <div class="page-heading">
+        <div class="page-heading__eyebrow">Account</div>
         <h1 class="page-heading__title">Order History</h1>
         <p class="page-heading__sub"><?= number_format($pagination['total']) ?> total
             order<?= $pagination['total'] !== 1 ? 's' : '' ?></p>
@@ -257,7 +260,8 @@ $page_title = 'Orders';
                     <div class="empty-state__icon">🛍️</div>
                     <div class="empty-state__title">No orders yet</div>
                     <div class="empty-state__sub">Your purchase history will appear here.</div>
-                    <a href="/subscriptions" class="btn btn--primary">Start shopping</a>
+                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions" class="btn btn--primary">Start
+                        shopping</a>
                 </div>
             </div>
         <?php else: ?>
@@ -280,13 +284,13 @@ $page_title = 'Orders';
                         ?>
                         <tr>
                             <td data-label="Order">
-                                <a href="/account/orders/<?= $order->id ?>" class="order-num-link">
+                                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders/<?= $order->id ?>"
+                                   class="order-num-link">
                                     #<?= htmlspecialchars($order->order_number ?? $order->id) ?>
                                 </a>
                                 <?php if ($itemCount > 0): ?>
-                                    <div class="order-items-summary">
-                                        <?= $itemCount ?> item<?= $itemCount !== 1 ? 's' : '' ?>
-                                    </div>
+                                    <div class="order-items-summary"><?= $itemCount ?>
+                                        item<?= $itemCount !== 1 ? 's' : '' ?></div>
                                 <?php endif; ?>
                             </td>
                             <td data-label="Date" style="color:var(--ink-muted);">
@@ -316,9 +320,7 @@ $page_title = 'Orders';
                                                 <?= (int)$order->id ?>,
                                                 <?= json_encode('#' . ($order->order_number ?? $order->id)) ?>,
                                                 <?= json_encode(number_format($order->total ?? 0, 2)) ?>
-                                                        )"
-                                        >
-                                            Cancel
+                                                        )">Cancel
                                         </button>
                                     <?php endif; ?>
                                 </div>
@@ -331,7 +333,7 @@ $page_title = 'Orders';
 
             <!-- Pagination -->
             <?php if ($pagination['total_pages'] > 1): ?>
-                <div style="padding:0 16px;">
+                <div style="padding:0 16px 20px;">
                     <nav class="pagination">
                         <a href="?page=<?= max(1, $pagination['current_page'] - 1) ?>"
                            class="pag-btn <?= $pagination['current_page'] <= 1 ? 'disabled' : '' ?>">←</a>
@@ -347,23 +349,22 @@ $page_title = 'Orders';
         <?php endif; ?>
     </div>
 
-    <!-- ── Order Cancellation Modal (3-step) ────────────────────────────── -->
+
+    <!-- ── Order cancellation modal (3-step) ─────────────────────────── -->
     <div class="modal-overlay" id="order-cancel-modal" role="dialog" aria-modal="true">
         <div class="modal">
             <div class="modal__header">
                 <div>
                     <h2 class="modal__title">Cancel Order</h2>
-                    <div id="oc-step-indicator" style="margin-top:8px;"></div>
+                    <div id="oc-step-indicator" style="margin-top:10px;"></div>
                 </div>
                 <button class="modal__close" onclick="closeOrderCancelModal()" aria-label="Close">×</button>
             </div>
-            <div class="modal__body">
 
-                <!-- Step 1: Confirmation + refund info -->
+            <div class="modal__body">
+                <!-- Step 1 -->
                 <div class="oc-step active" id="oc-step-1">
-                    <div class="oc-order-summary" id="oc-order-summary">
-                        <!-- Populated by JS -->
-                    </div>
+                    <div class="oc-order-summary" id="oc-order-summary"></div>
                     <div class="refund-notice">
                         <strong>Refund information:</strong> If eligible, your refund will be returned to your original
                         payment method within 5–10 business days.
@@ -373,7 +374,7 @@ $page_title = 'Orders';
                     </p>
                 </div>
 
-                <!-- Step 2: Reason -->
+                <!-- Step 2 -->
                 <div class="oc-step" id="oc-step-2">
                     <p style="font-size:14px; color:var(--ink-soft); margin-bottom:4px;">Why are you cancelling?</p>
                     <div class="oc-reason-list">
@@ -393,25 +394,26 @@ $page_title = 'Orders';
                     </div>
                 </div>
 
-                <!-- Step 3: Success / confirmation -->
+                <!-- Step 3 -->
                 <div class="oc-step" id="oc-step-3">
-                    <div style="text-align:center; padding:16px 0;">
-                        <div style="font-size:48px; margin-bottom:12px;">✅</div>
-                        <p style="font-family:var(--font-display); font-size:20px; margin-bottom:8px;">Order
+                    <div style="text-align:center; padding:20px 0;">
+                        <div style="font-size:48px; margin-bottom:14px;">✅</div>
+                        <p style="font-family:var(--font-display); font-size:22px; margin-bottom:8px;">Order
                             Cancelled</p>
-                        <p style="font-size:14px; color:var(--ink-muted);">
-                            Your order has been cancelled. If a refund applies, it will appear on your payment method
-                            within 5–10 business days.
+                        <p style="font-size:14px; color:var(--ink-muted); line-height:1.6;">
+                            Your order has been cancelled. If a refund applies, it will appear
+                            on your payment method within 5–10 business days.
                         </p>
                     </div>
                 </div>
             </div>
+
             <div class="modal__footer" id="oc-modal-footer"></div>
         </div>
     </div>
-    </div>
-</main>
 
+</main>
+</div><!-- /.shell -->
 </body>
 </html>
 
@@ -444,13 +446,11 @@ $page_title = 'Orders';
 
     function closeOrderCancelModal() {
         document.getElementById('order-cancel-modal').classList.remove('open');
-        // Reload if we completed the cancellation (step 3)
         if (ocStep === 3) window.location.reload();
         ocOrderId = null;
     }
 
     function renderOcModal() {
-        // Steps
         let html = '<div class="steps">';
         OC_STEPS.forEach((s, i) => {
             const n = i + 1;
@@ -469,14 +469,13 @@ $page_title = 'Orders';
         if (ocStep === 1) {
             footer.innerHTML = `
                 <button class="btn btn--ghost" onclick="closeOrderCancelModal()">Keep Order</button>
-                <button class="btn btn--danger"  onclick="advanceOcStep()">Continue</button>`;
+                <button class="btn btn--danger" onclick="advanceOcStep()">Continue</button>`;
         } else if (ocStep === 2) {
             footer.innerHTML = `
                 <button class="btn btn--ghost" onclick="retreatOcStep()">Back</button>
                 <button class="btn btn--danger" onclick="submitOrderCancellation()" id="oc-confirm-btn">Confirm Cancel</button>`;
         } else {
-            footer.innerHTML = `
-                <button class="btn btn--primary" onclick="closeOrderCancelModal()">Close</button>`;
+            footer.innerHTML = `<button class="btn btn--primary" onclick="closeOrderCancelModal()">Close</button>`;
         }
     }
 

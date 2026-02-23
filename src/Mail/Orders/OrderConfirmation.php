@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Mail;
+namespace App\Mail\Orders;
 
 use App\Framework\Mail\Mailable;
 use App\Models\Order;

@@ -10,7 +10,7 @@ use App\Framework\Mail\MailManager;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
-use App\Mail\NewsletterSignupConfirmationWithTracking;
+use App\Mail\Newsletters\NewsletterSignupConfirmationWithTracking;
 use App\Models\Member;
 use App\Models\MemberRole;
 use App\Models\Newsletter;

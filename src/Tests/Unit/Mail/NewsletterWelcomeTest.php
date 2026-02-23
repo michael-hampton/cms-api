@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Mail;
 
-use App\Mail\NewsletterWelcome;
+use App\Mail\Newsletters\NewsletterWelcome;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class NewsletterWelcomeTest extends FunctionalTestCase

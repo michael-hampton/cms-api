@@ -2,10 +2,9 @@
 
 namespace App\Services\Billing\Order;
 
-use App\Events\Orders\OrderCreatedEvent;
 use App\Framework\Mail\MailManager;
 use App\Framework\Support\Logger;
-use App\Mail\OrderConfirmation;
+use App\Mail\Orders\OrderConfirmation;
 use App\Models\Order;
 
 class OrderEmailNotifier
