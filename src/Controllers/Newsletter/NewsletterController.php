@@ -102,7 +102,8 @@ class NewsletterController extends Controller
                 'max_pages' => $request->input('max_pages', 10),
                 'sort_by' => $request->input('sort_by', 'published_at'),
                 'sort_order' => $request->input('sort_order', 'desc'),
-                'template' => $request->input('template', 'default')
+                'template' => $request->input('template', 'default'),
+                'layout_id' => $request->input('layout_id')
             ];
 
             $newsletter = $this->newsletterRepository->create($data);
@@ -161,7 +162,8 @@ class NewsletterController extends Controller
                 'max_pages' => $request->input('max_pages'),
                 'sort_by' => $request->input('sort_by'),
                 'sort_order' => $request->input('sort_order'),
-                'template' => $request->input('template')
+                'template' => $request->input('template'),
+                'layout_id' => $request->input('layout_id')
             ], fn($value) => $value !== null);
 
             $updated = $this->newsletterRepository->update($id, $data);

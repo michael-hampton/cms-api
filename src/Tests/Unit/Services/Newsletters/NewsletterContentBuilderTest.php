@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Newsletters;
 
 use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
+use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Services\Newsletter\NewsletterContentBuilder;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use Mockery;
@@ -14,6 +15,7 @@ class NewsletterContentBuilderTest extends TestCase
     private NewsletterContentBuilder $builder;
     private $mockPageBuilderService;
     private NewsletterBrandingRepository $newsletterBrandingRepository;
+    private readonly NewsletterLayoutRepository $newsletterLayoutRepository;
 
     protected function setUp(): void
     {
@@ -21,7 +23,12 @@ class NewsletterContentBuilderTest extends TestCase
 
         $this->mockPageBuilderService = Mockery::mock(NewsletterPageBuilderService::class);
         $this->newsletterBrandingRepository = Mockery::mock(NewsletterBrandingRepository::class);
-        $this->builder = new NewsletterContentBuilder($this->mockPageBuilderService, $this->newsletterBrandingRepository);
+        $this->newsletterLayoutRepository = Mockery::mock(NewsletterLayoutRepository::class);
+        $this->builder = new NewsletterContentBuilder(
+            $this->mockPageBuilderService,
+            $this->newsletterBrandingRepository,
+            $this->newsletterLayoutRepository
+        );
     }
 
     protected function tearDown(): void
@@ -59,7 +66,7 @@ class NewsletterContentBuilderTest extends TestCase
 
         $this->mockPageBuilderService->shouldReceive('buildNewsletterHtml')
             ->once()
-            ->with($newsletter, $mockPages, null, null, false, null, 1, null)
+            ->with($newsletter, $mockPages, null, null, false, null, 1, null, null)
             ->andReturn('<p>Automated content</p>{{UNSUBSCRIBE_LINK}}');
 
         $result = $this->builder->build($newsletter, $siteId, false);
@@ -283,7 +290,7 @@ class NewsletterContentBuilderTest extends TestCase
             ->andReturn($mockPages);
 
         $this->mockPageBuilderService->shouldReceive('buildNewsletterHtml')
-            ->with($newsletter, $mockPages, null, null, true, null, 1, null)
+            ->with($newsletter, $mockPages, null, null, true, null, 1, null, null)
             ->andReturn('<p>Preview content</p>');
 
         $result = $this->builder->build($newsletter, $siteId, true);

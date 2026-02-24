@@ -23,8 +23,9 @@ class NewsletterLayoutController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $siteId = (int)$request->input('site_id') ?? SiteContext::getId();
+            $siteId = (int)$request->input('site_id') ?: SiteContext::getId();
             $layouts = $this->layoutService->getAllLayouts($siteId);
+
             return $this->resourceResponse(['layouts' => $layouts->toArray()]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -44,13 +45,14 @@ class NewsletterLayoutController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+
             $layout = $this->layoutService->createLayout(
                 name: $request->input('name'),
                 slug: $request->input('slug'),
                 layoutDefinition: $request->input('layout_definition', []),
                 isSystemLayout: false,
                 createdBy: $request->input('created_by'),
-                siteId: (int)$request->input('site_id') ?? SiteContext::getId(),  // ← NEW
+                siteId: (int)$request->input('site_id') ?: SiteContext::getId(),  // ← NEW
             );
 
             return $this->jsonResponse(['layout' => $layout->toArray()], 201);

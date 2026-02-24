@@ -8,6 +8,7 @@ use App\Framework\Support\Str;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Models\NewsletterBrandingConfiguration;
+use App\Models\NewsletterLayoutVersion;
 use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Cms\Pages\PageRepository;
@@ -61,9 +62,32 @@ class NewsletterPageBuilderService
         bool       $includeBlocks = false,
         ?int       $sendId = null,
         ?int                             $siteId = null,
-        ?NewsletterBrandingConfiguration $branding = null
+        ?NewsletterBrandingConfiguration $branding = null,
+        ?NewsletterLayoutVersion         $layoutVersion = null
     ): string
     {
+        if ($layoutVersion !== null) {
+            $slots = $layoutVersion->slots();
+            $hasSlotBlocks = false;
+            foreach ($slots as $slot) {
+                if (!empty($slot['blocks'])) {
+                    $hasSlotBlocks = true;
+                    break;
+                }
+            }
+
+            if ($hasSlotBlocks) {
+                return $this->buildNewsletterHtmlFromLayoutSlots(
+                    $newsletter,
+                    $layoutVersion,
+                    $member,
+                    $unsubscribeToken,
+                    $siteId,
+                    $branding
+                );
+            }
+        }
+
         $pageHtml = $this->buildPages(
             $newsletter,
             $pages,
@@ -959,6 +983,73 @@ class NewsletterPageBuilderService
         }
 
         return $result;
+    }
+
+    public function renderSlotBlocks(
+        array                   $slotBlocks,
+        NewsletterRenderContext $context
+    ): string
+    {
+        $html = [];
+        foreach ($slotBlocks as $blockArray) {
+            // Normalise: slot blocks are stored as {type, data} — wrap to match renderBlock expectation
+            $normalised = [
+                'type' => $blockArray['type'] ?? 'text',
+                'data' => $blockArray['data'] ?? $blockArray,
+            ];
+            $rendered = $this->renderBlock($normalised, $context);
+            if ($rendered->wasRendered) {
+                $html[] = $rendered->html;
+            }
+        }
+        return implode("\n", $html);
+    }
+
+    /**
+     * Build newsletter HTML using layout slot content.
+     * Renders each slot's blocks using the block renderer registry,
+     * then wraps in the standard template.
+     */
+    public function buildNewsletterHtmlFromLayoutSlots(
+        Newsletter                       $newsletter,
+        NewsletterLayoutVersion          $layoutVersion,
+        ?Member                          $member = null,
+        ?string                          $unsubscribeToken = null,
+        ?int                             $siteId = null,
+        ?NewsletterBrandingConfiguration $branding = null
+    ): string
+    {
+        $context = new NewsletterRenderContext(
+            siteId: $siteId,
+            newsletter: $newsletter,
+            member: $member,
+            sendId: null,
+            includeTracking: false
+        );
+
+        $slots = $layoutVersion->slots();
+        $html = [];
+
+        foreach ($slots as $slot) {
+            $slotKey = $slot['key'] ?? null;
+            $blocks = $slot['blocks'] ?? [];
+
+            if (!$slotKey || empty($blocks)) {
+                continue;
+            }
+
+            $html[] = sprintf(
+                '<div class="nl-slot nl-slot--%s" data-slot="%s">',
+                htmlspecialchars($slotKey),
+                htmlspecialchars($slotKey)
+            );
+            $html[] = $this->renderSlotBlocks($blocks, $context);
+            $html[] = '</div>';
+        }
+
+        $slotHtml = implode("\n", $html);
+
+        return $this->buildTemplate($newsletter, $slotHtml, $siteId, $branding);
     }
 
     private function buildTrackingUrl(int $pageId, string $slug, ?int $sendId, bool $includeTracking): string

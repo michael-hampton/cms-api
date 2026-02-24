@@ -2871,4 +2871,246 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->assertStringContainsString('#abcdef', $html);
     }
 
+    public function test_render_slot_blocks_renders_text_block(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Slot Test',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $context = new \App\Services\Newsletter\DTOs\NewsletterRenderContext(
+            siteId: $this->siteId,
+            newsletter: $newsletter,
+            member: null,
+            sendId: null,
+            includeTracking: false
+        );
+
+        $slotBlocks = [
+            ['type' => 'text', 'data' => ['paragraphs' => ['Hello from a slot.']]],
+        ];
+
+        $html = $this->service->renderSlotBlocks($slotBlocks, $context);
+
+        $this->assertStringContainsString('Hello from a slot.', $html);
+        $this->assertStringContainsString('<p', $html);
+    }
+
+    public function test_render_slot_blocks_renders_heading_block(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Slot Heading Test',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $context = new \App\Services\Newsletter\DTOs\NewsletterRenderContext(
+            siteId: $this->siteId,
+            newsletter: $newsletter,
+            member: null,
+            sendId: null,
+            includeTracking: false
+        );
+
+        $slotBlocks = [
+            ['type' => 'heading', 'data' => ['text' => 'Slot Heading', 'level' => 2]],
+        ];
+
+        $html = $this->service->renderSlotBlocks($slotBlocks, $context);
+
+        $this->assertStringContainsString('Slot Heading', $html);
+        $this->assertStringContainsString('<h2', $html);
+    }
+
+    public function test_render_slot_blocks_skips_empty_slots(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Empty Slot Test',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+        ]);
+
+        $context = new \App\Services\Newsletter\DTOs\NewsletterRenderContext(
+            siteId: $this->siteId,
+            newsletter: $newsletter,
+            member: null,
+            sendId: null,
+            includeTracking: false
+        );
+
+        $html = $this->service->renderSlotBlocks([], $context);
+
+        $this->assertSame('', $html);
+    }
+
+    public function test_build_newsletter_html_from_layout_slots_renders_slot_html(): void
+    {
+        // Arrange: mock a layout version with slot blocks
+        $newsletter = Newsletter::create([
+            'title' => 'Layout Slot Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+            'template' => 'default',
+        ]);
+
+        $layoutVersion = $this->createMock(\App\Models\NewsletterLayoutVersion::class);
+        $layoutVersion->method('slots')->willReturn([
+            [
+                'key' => 'header_slot',
+                'label' => 'Header',
+                'required' => true,
+                'blocks' => [
+                    ['type' => 'heading', 'data' => ['text' => 'Welcome to Our Newsletter', 'level' => 1]],
+                    ['type' => 'text', 'data' => ['paragraphs' => ['Thanks for subscribing.']]],
+                ],
+            ],
+            [
+                'key' => 'cta_slot',
+                'label' => 'Call To Action',
+                'required' => false,
+                'blocks' => [
+                    ['type' => 'cta', 'data' => ['text' => 'Read More', 'url' => 'https://example.com']],
+                ],
+            ],
+        ]);
+
+        // Act
+        $html = $this->service->buildNewsletterHtmlFromLayoutSlots(
+            $newsletter,
+            $layoutVersion,
+            null,
+            null,
+            $this->siteId
+        );
+
+        // Assert
+        $this->assertStringContainsString('Welcome to Our Newsletter', $html);
+        $this->assertStringContainsString('Thanks for subscribing.', $html);
+        $this->assertStringContainsString('Read More', $html);
+        $this->assertStringContainsString('nl-slot--header_slot', $html);
+        $this->assertStringContainsString('nl-slot--cta_slot', $html);
+        $this->assertStringContainsString('<!DOCTYPE html>', $html);
+    }
+
+    public function test_build_newsletter_html_falls_back_to_page_rendering_when_no_layout_version(): void
+    {
+        $page = Page::create([
+            'title' => 'Fallback Page',
+            'slug' => 'fallback-page',
+            'status' => 'published',
+            'meta_description' => 'Fallback description',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Fallback Newsletter',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $pages = collect([$page]);
+
+        // No layout version passed — should use standard page rendering
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, null, null
+        );
+
+        $this->assertStringContainsString('Fallback Page', $html);
+        $this->assertStringContainsString('Fallback description', $html);
+    }
+
+    public function test_build_newsletter_html_uses_layout_slots_when_version_provided(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Slot Priority Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => 'test',
+            'template' => 'default',
+        ]);
+
+        $layoutVersion = $this->createMock(\App\Models\NewsletterLayoutVersion::class);
+        $layoutVersion->method('slots')->willReturn([
+            [
+                'key' => 'main',
+                'label' => 'Main Content',
+                'blocks' => [
+                    ['type' => 'text', 'data' => ['paragraphs' => ['Slot content takes priority.']]],
+                ],
+            ],
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter,
+            collect([]),
+            null,
+            null,
+            false,
+            null,
+            $this->siteId,
+            null,
+            $layoutVersion
+        );
+
+        $this->assertStringContainsString('Slot content takes priority.', $html);
+        $this->assertStringContainsString('nl-slot--main', $html);
+    }
+
+    public function test_build_newsletter_html_falls_back_to_pages_when_layout_slots_are_empty(): void
+    {
+        $page = Page::create([
+            'title' => 'Page When Empty Slots',
+            'slug' => 'page-empty-slots',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Empty Slot Newsletter',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        // Layout version exists but its slots have no blocks
+        $layoutVersion = $this->createMock(\App\Models\NewsletterLayoutVersion::class);
+        $layoutVersion->method('slots')->willReturn([
+            ['key' => 'empty_slot', 'label' => 'Empty', 'blocks' => []],
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter,
+            collect([$page]),
+            null,
+            null,
+            false,
+            null,
+            $this->siteId,
+            null,
+            $layoutVersion
+        );
+
+        // Should fall back to page content since all slots are empty
+        $this->assertStringContainsString('Page When Empty Slots', $html);
+        $this->assertStringNotContainsString('nl-slot--', $html);
+    }
 }

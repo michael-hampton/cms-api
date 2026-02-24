@@ -11,6 +11,7 @@ use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
+use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
@@ -32,7 +33,8 @@ class NewsletterWebController extends Controller
         private readonly NewsletterSendRepository         $sendRepository,
         private readonly NewsletterSendPageViewRepository $sendPageViewRepository,
         private readonly PageRepository                   $pageRepository,
-        private readonly NewsletterBrandingRepository $newsletterBrandingRepository
+        private readonly NewsletterBrandingRepository $newsletterBrandingRepository,
+        private readonly NewsletterLayoutRepository   $newsletterLayoutRepository
     )
     {
         parent::__construct();
@@ -222,6 +224,7 @@ class NewsletterWebController extends Controller
         }
 
         $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
+        $versions = $newsletter->layout_id ? $this->newsletterLayoutRepository->versionHistory($newsletter->layout_id) : null;
 
         // Build HTML content without tracking
         $html = $this->pageBuilderService->buildNewsletterHtml(
@@ -232,7 +235,8 @@ class NewsletterWebController extends Controller
             true,
             null, // No tracking for archive/preview views
             $siteId,
-            $branding
+            $branding,
+            $versions?->last() ?? null
         );
 
         $html = urldecode($html);

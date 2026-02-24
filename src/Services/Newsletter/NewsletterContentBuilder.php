@@ -6,6 +6,7 @@ use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
+use App\Repositories\Newsletters\NewsletterLayoutRepository;
 
 class NewsletterContentBuilder
 {
@@ -13,7 +14,8 @@ class NewsletterContentBuilder
 
     public function __construct(
         private readonly NewsletterPageBuilderService $pageBuilderService,
-        private readonly NewsletterBrandingRepository $newsletterBrandingRepository
+        private readonly NewsletterBrandingRepository $newsletterBrandingRepository,
+        private readonly NewsletterLayoutRepository   $newsletterLayoutRepository
     )
     {
     }
@@ -43,6 +45,8 @@ class NewsletterContentBuilder
 
             $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
 
+            $versions = $newsletter->layout_id ? $this->newsletterLayoutRepository->versionHistory($newsletter->layout_id) : null;
+
             // Build HTML with placeholder
             $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
                 $newsletter,
@@ -52,7 +56,8 @@ class NewsletterContentBuilder
                 $isPreview,
                 null,
                 $siteId,
-                $branding
+                $branding,
+                $versions?->last()
             );
         } else {
             $blocks = $this->parseNewsletterContent($newsletter->content);

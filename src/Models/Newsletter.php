@@ -34,6 +34,7 @@ class Newsletter extends Model
         'has_time_window',
         'bundle_id',
         'requires_bundle',
+        'layout_id'
     ];
 
     protected $casts = [
