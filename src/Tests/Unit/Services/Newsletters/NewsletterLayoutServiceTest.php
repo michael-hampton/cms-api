@@ -3,15 +3,12 @@
 namespace App\Tests\Unit\Services\Newsletters;
 
 use App\Enums\Newsletters\LayoutVersionState;
-use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\NewsletterLayout;
-use App\Models\NewsletterLayoutVersion;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Services\Newsletter\LayoutRendererService;
 use App\Services\Newsletter\NewsletterLayoutService;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
-use Mockery;
 
 class NewsletterLayoutServiceTest extends RepositoryTestCase
 {
@@ -57,10 +54,10 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_rejects_duplicate_slug(): void
     {
-        $this->service->createLayout('Layout A', 'my-slug', []);
+        $this->service->createLayout('Layout A', 'my-slug', [], false, null, $this->siteId);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->service->createLayout('Layout B', 'my-slug', []);
+        $this->service->createLayout('Layout B', 'my-slug', [], false, null, $this->siteId);
     }
 
     // ─── Version Transitions ──────────────────────────────────────────────────
@@ -124,7 +121,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
             ['slots' => [['key' => 'content', 'required' => true]]]
         );
 
-        $clone = $this->service->cloneLayout($original->id, 'Clone', 'clone-layout', 1);
+        $clone = $this->service->cloneLayout($original->id, 'Clone', 'clone-layout', 1, $this->siteId);
 
         $this->assertEquals('clone-layout', $clone->slug);
         $this->assertFalse($clone->is_system_layout);
@@ -137,11 +134,11 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_clone_rejects_duplicate_slug(): void
     {
-        $original = $this->service->createLayout('Original', 'original-2', []);
-        $this->service->createLayout('Taken', 'taken-slug', []);
+        $original = $this->service->createLayout('Original', 'original-2', [], false, null, $this->siteId);
+        $this->service->createLayout('Taken', 'taken-slug', [], false, null, $this->siteId);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->service->cloneLayout($original->id, 'New Clone', 'taken-slug', 1);
+        $this->service->cloneLayout($original->id, 'New Clone', 'taken-slug', 1, $this->siteId);
     }
 
     // ─── Deletion ─────────────────────────────────────────────────────────────
@@ -223,5 +220,63 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->service->transitionVersionState(99999, LayoutVersionState::Validated);
+    }
+
+    public function test_user_layout_requires_site_id(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->createLayout(
+            name: 'User Layout',
+            slug: 'user-layout-no-site',
+            layoutDefinition: [],
+            isSystemLayout: false,
+            createdBy: 1,
+            siteId: null
+        );
+    }
+
+    public function test_system_layout_cannot_have_site_id(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->createLayout(
+            name: 'System Layout',
+            slug: 'system-layout-with-site',
+            layoutDefinition: [],
+            isSystemLayout: true,
+            createdBy: null,
+            siteId: $this->siteId
+        );
+    }
+
+    public function test_system_layout_allows_null_site_id(): void
+    {
+        $layout = $this->service->createLayout(
+            name: 'System Layout',
+            slug: 'system-layout-valid',
+            layoutDefinition: [],
+            isSystemLayout: true,
+            createdBy: null,
+            siteId: null
+        );
+
+        $this->assertTrue($layout->is_system_layout);
+        $this->assertNull($layout->site_id);
+    }
+
+    public function test_user_layout_with_site_is_created(): void
+    {
+        $layout = $this->service->createLayout(
+            name: 'User Layout',
+            slug: 'user-layout-valid',
+            layoutDefinition: [],
+            isSystemLayout: false,
+            createdBy: 1,
+            siteId: $this->siteId
+        );
+
+        $this->assertFalse($layout->is_system_layout);
+        $this->assertEquals($this->siteId, $layout->site_id);
     }
 }

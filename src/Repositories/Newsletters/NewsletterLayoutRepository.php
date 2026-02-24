@@ -21,25 +21,44 @@ class NewsletterLayoutRepository extends Repository
         return NewsletterLayout::where('slug', $slug)->first();
     }
 
+    public function findBySlugForSite(string $slug, ?int $siteId): ?NewsletterLayout
+    {
+        return NewsletterLayout::where('slug', $slug)
+            ->when(
+                $siteId === null,
+                fn($query) => $query->whereNull('site_id'),
+                fn($query) => $query->where('site_id', $siteId)
+            )
+            ->first();
+    }
+
     public function allSystemLayouts(): Collection
     {
-        return NewsletterLayout::where('is_system_layout', true)
+        return NewsletterLayout::whereNull('site_id')
+            ->where('is_system_layout', true)
             ->orderBy('name', 'asc')
             ->get();
     }
 
-    public function allUserLayouts(): Collection
+    public function allUserLayouts(int $siteId): Collection
     {
-        return NewsletterLayout::where('is_system_layout', false)
+        return NewsletterLayout::where('site_id', $siteId)
+            ->where('is_system_layout', false)
             ->orderBy('created_at', 'desc')
             ->get();
     }
 
-    public function allPublishedLayouts(): Collection
+    public function allPublishedLayouts(int $siteId): Collection
     {
-        return NewsletterLayout::all()->filter(function (NewsletterLayout $layout) {
-            return $layout->latestPublishedVersion() !== null;
-        })->values();
+        $systemLayouts = $this->allSystemLayouts()->filter(
+            fn(NewsletterLayout $l) => $l->latestPublishedVersion() !== null
+        );
+
+        $siteLayouts = $this->allUserLayouts($siteId)->filter(
+            fn(NewsletterLayout $l) => $l->latestPublishedVersion() !== null
+        );
+
+        return $systemLayouts->merge($siteLayouts)->values();
     }
 
     public function createVersion(
@@ -100,12 +119,13 @@ class NewsletterLayoutRepository extends Repository
             ->get();
     }
 
-    public function cloneLayout(int $sourceLayoutId, string $newName, string $newSlug, int $createdBy): NewsletterLayout
+    public function cloneLayout(int $sourceLayoutId, string $newName, string $newSlug, int $createdBy, int $siteId): NewsletterLayout
     {
         $source = NewsletterLayout::findOrFail($sourceLayoutId);
         $latestVersion = $source->latestPublishedVersion() ?? $source->latestVersion();
 
         $clone = NewsletterLayout::create([
+            'site_id' => $siteId,   // ← NEW
             'name' => $newName,
             'slug' => $newSlug,
             'layout_definition_json' => $source->layout_definition_json,

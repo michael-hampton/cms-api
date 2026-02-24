@@ -5,8 +5,6 @@ namespace App\Services\Newsletter;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Newsletter;
-use App\Models\NewsletterBrandingConfiguration;
-use App\Models\NewsletterLayoutVersion;
 use App\Models\NewsletterSnapshot;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Repositories\Newsletters\NewsletterSnapshotRepository;
@@ -32,7 +30,10 @@ class NewsletterSnapshotService
      * Create a snapshot for a newsletter after rendering.
      * Captures branding and layout version at this exact point in time.
      */
-    public function createSnapshot(Newsletter $newsletter, string $renderedHtml): NewsletterSnapshot
+    public function createSnapshot(
+        Newsletter $newsletter,
+        string     $renderedHtml
+    ): NewsletterSnapshot
     {
         return $this->database->transaction(function () use ($newsletter, $renderedHtml) {
             $branding = $this->brandingRepository->findByNewsletterId($newsletter->id);
@@ -47,11 +48,13 @@ class NewsletterSnapshotService
                 );
             }
 
-            // ✅ Store BASE html — do NOT apply branding here
+            // Store the already-branded HTML as-is.
+            // branding_snapshot_json is kept as an audit trail and for
+            // re-rendering via renderFromSnapshot() on the view-in-browser path.
             return $this->snapshotRepository->createSnapshot(
                 newsletterId: $newsletter->id,
-                htmlSnapshot: $renderedHtml,          // ← base only
-                brandingSnapshot: $brandingSnapshot,       // ← frozen separately
+                htmlSnapshot: $renderedHtml,
+                brandingSnapshot: $brandingSnapshot,
                 layoutVersionId: $layoutVersion?->id,
                 brandingVersionId: isset($brandingVersion) ? $brandingVersion->id : null,
             );

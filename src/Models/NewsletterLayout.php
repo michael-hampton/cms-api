@@ -13,6 +13,7 @@ use App\Enums\Newsletters\LayoutVersionState;
  * @property int|null $created_by
  * @property string $created_at
  * @property string $updated_at
+ * @property int|null $site_id      null for system layouts (global)
  */
 class NewsletterLayout extends Model
 {
@@ -24,6 +25,7 @@ class NewsletterLayout extends Model
         'layout_definition_json',
         'is_system_layout',
         'created_by',
+        'site_id'
     ];
 
     protected $casts = [
@@ -56,5 +58,10 @@ class NewsletterLayout extends Model
     public function isDeletable(): bool
     {
         return !$this->is_system_layout;
+    }
+
+    public function isOwnedBySite(int $siteId): bool
+    {
+        return $this->site_id === $siteId;
     }
 }

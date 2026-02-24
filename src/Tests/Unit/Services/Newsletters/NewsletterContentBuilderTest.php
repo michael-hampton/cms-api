@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Newsletters;
 
 use App\Models\Newsletter;
+use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Services\Newsletter\NewsletterContentBuilder;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use Mockery;
@@ -12,13 +13,15 @@ class NewsletterContentBuilderTest extends TestCase
 {
     private NewsletterContentBuilder $builder;
     private $mockPageBuilderService;
+    private NewsletterBrandingRepository $newsletterBrandingRepository;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->mockPageBuilderService = Mockery::mock(NewsletterPageBuilderService::class);
-        $this->builder = new NewsletterContentBuilder($this->mockPageBuilderService);
+        $this->newsletterBrandingRepository = Mockery::mock(NewsletterBrandingRepository::class);
+        $this->builder = new NewsletterContentBuilder($this->mockPageBuilderService, $this->newsletterBrandingRepository);
     }
 
     protected function tearDown(): void
@@ -31,6 +34,8 @@ class NewsletterContentBuilderTest extends TestCase
     {
         $newsletter = $this->createMockNewsletter(true);
         $siteId = 1;
+
+        $this->setNewsletterBrandingExpectations();
 
         $mockPages = collect([
             (object)[
@@ -54,7 +59,7 @@ class NewsletterContentBuilderTest extends TestCase
 
         $this->mockPageBuilderService->shouldReceive('buildNewsletterHtml')
             ->once()
-            ->with($newsletter, $mockPages, null, null, false, null, 1)
+            ->with($newsletter, $mockPages, null, null, false, null, 1, null)
             ->andReturn('<p>Automated content</p>{{UNSUBSCRIBE_LINK}}');
 
         $result = $this->builder->build($newsletter, $siteId, false);
@@ -247,6 +252,8 @@ class NewsletterContentBuilderTest extends TestCase
             (object)['id' => 1, 'title' => 'Page', 'subtitle' => '', 'slug' => 'page']
         ]);
 
+        $this->setNewsletterBrandingExpectations();
+
         $this->mockPageBuilderService->shouldReceive('getPagesForNewsletter')
             ->andReturn($mockPages);
 
@@ -269,12 +276,14 @@ class NewsletterContentBuilderTest extends TestCase
             (object)['id' => 1, 'title' => 'Page', 'subtitle' => '', 'slug' => 'page']
         ]);
 
+        $this->setNewsletterBrandingExpectations();
+
         $this->mockPageBuilderService->shouldReceive('getPagesForNewsletter')
             ->with($newsletter, $siteId)
             ->andReturn($mockPages);
 
         $this->mockPageBuilderService->shouldReceive('buildNewsletterHtml')
-            ->with($newsletter, $mockPages, null, null, true, null, 1)
+            ->with($newsletter, $mockPages, null, null, true, null, 1, null)
             ->andReturn('<p>Preview content</p>');
 
         $result = $this->builder->build($newsletter, $siteId, true);
@@ -289,5 +298,10 @@ class NewsletterContentBuilderTest extends TestCase
         $newsletter->content = '[]';
         $newsletter->shouldReceive('isAutomated')->andReturn($isAutomated);
         return $newsletter;
+    }
+
+    private function setNewsletterBrandingExpectations()
+    {
+        $this->newsletterBrandingRepository->shouldReceive('findByNewsletterId')->andReturn(null);
     }
 }

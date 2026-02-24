@@ -181,6 +181,18 @@ class Blueprint
         }
     }
 
+    public function dropUnique($columns): void
+    {
+        $columns = is_array($columns) ? $columns : [$columns];
+
+        foreach ($columns as $column) {
+            $this->commands[] = [
+                'type' => 'dropUnique',
+                'column' => $column,
+            ];
+        }
+    }
+
     // Indexes
     public function index($columns, ?string $name = null): void
     {
@@ -275,6 +287,13 @@ class Blueprint
         return $sql;
     }
 
+    private function createIndexName(string $type, array $columns): string
+    {
+        print_r($columns);
+
+        return strtolower($type . '_' . implode('_', $columns));
+    }
+
     public function toAlterSql(): array
     {
         $statements = [];
@@ -283,6 +302,13 @@ class Blueprint
         foreach ($this->commands ?? [] as $command) {
             if ($command['type'] === 'dropColumn') {
                 $statements[] = "ALTER TABLE `{$this->table}` DROP COLUMN `{$command['column']}`";
+            }
+
+            if ($command['type'] === 'dropUnique') {
+                $indexName = $command['index']
+                    ?? $this->createIndexName('unique', (array)$command['column']);
+
+                $statements[] = "ALTER TABLE `{$this->table}` DROP INDEX `{$indexName}`";
             }
         }
 

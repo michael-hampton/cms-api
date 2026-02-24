@@ -7,11 +7,13 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\Str;
 use App\Models\Member;
 use App\Models\Newsletter;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Adverts\PromotionInjector;
+use App\Services\Newsletter\Branding\CssSanitizer;
 use App\Services\Newsletter\Contracts\EmailBlockRenderer;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
@@ -33,6 +35,7 @@ class NewsletterPageBuilderService
         private readonly BlockDataFactory     $blockDataFactory,
         private readonly Logger               $logger,
         private readonly NewsletterRepository $newsletterRepository,
+        private readonly CssSanitizer $cssSanitizer,
         EmailBlockRendererRegistry            $rendererRegistry,
     )
     {
@@ -57,12 +60,22 @@ class NewsletterPageBuilderService
         ?string    $unsubscribeToken = null,
         bool       $includeBlocks = false,
         ?int       $sendId = null,
-        ?int $siteId = null
+        ?int                             $siteId = null,
+        ?NewsletterBrandingConfiguration $branding = null
     ): string
     {
-        $pageHtml = $this->buildPages($newsletter, $pages, $member, $unsubscribeToken, $includeBlocks, $sendId, $siteId);
+        $pageHtml = $this->buildPages(
+            $newsletter,
+            $pages,
+            $member,
+            $unsubscribeToken,
+            $includeBlocks,
+            $sendId,
+            $siteId,
+            $branding  // ← pass through
+        );
 
-        return $this->buildTemplate($newsletter, $pageHtml, $siteId);
+        return $this->buildTemplate($newsletter, $pageHtml, $siteId, $branding);  // ← pass through
     }
 
     private function buildPages(
@@ -72,8 +85,9 @@ class NewsletterPageBuilderService
         ?string    $unsubscribeToken = null,
         bool       $includeBlocks = false,
         ?int       $sendId = null,
-        ?int       $siteId = null
-    )
+        ?int                             $siteId = null,
+        ?NewsletterBrandingConfiguration $branding = null
+    ): string
     {
         $template = $newsletter->template ?? 'default';
 
@@ -86,14 +100,19 @@ class NewsletterPageBuilderService
         );
 
         return match ($template) {
-            'digest' => $this->buildDigestTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks),
-            'featured' => $this->buildFeaturedTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks),
-            'simple' => $this->buildSimpleTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks),
-            default => $this->buildDefaultTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks),
+            'digest' => $this->buildDigestTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks, $branding),
+            'featured' => $this->buildFeaturedTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks, $branding),
+            'simple' => $this->buildSimpleTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks, $branding),
+            default => $this->buildDefaultTemplate($newsletter, $pages, $context, $unsubscribeToken, $includeBlocks, $branding),
         };
     }
 
-    private function buildTemplate(Newsletter $newsletter, string $blockHtml, ?int $siteId = null)
+    private function buildTemplate(
+        Newsletter                       $newsletter,
+        string                           $blockHtml,
+        ?int                             $siteId = null,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
+    ): string
     {
         if (!$siteId) {
             return '';
@@ -101,48 +120,87 @@ class NewsletterPageBuilderService
 
         $site = Site::findOrFail($siteId);
 
-        $logoUrl = $site->getLogoUrl();
+        // Branding logo takes priority over site logo
+        $logoUrl = $branding?->logo_url ?? $site->getLogoUrl();
+
+        // Branding footer takes priority over default copyright line
+        $footerText = $branding?->footer_text
+            ?? ('&copy; ' . date('Y') . ' ' . htmlspecialchars($site->name) . '. All rights reserved.');
+
+        // Sanitize and scope custom CSS if present
+        $customCssTag = '';
+        if ($branding?->custom_css) {
+            $sanitized = $this->cssSanitizer->sanitizeAndScope(
+                $branding->custom_css,
+                $newsletter->id
+            );
+            if (!empty(trim($sanitized))) {
+                $customCssTag = "<style>\n{$sanitized}\n</style>\n";
+            }
+        }
+
+        // Scope wrapper ID — enables custom CSS targeting
+        $scopeId = 'newsletter-' . $newsletter->id;
 
         $html = '<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>' . Str::sanitize($newsletter->title) . '</title>
-    </head>
-    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-            <tr>
-                <td align="center" style="padding: 20px 0;">
-                    <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff;">
-                        <!-- Logo Header -->
-                        <tr>
-                            <td align="center" style="padding: 30px 20px; background-color: #ffffff; border-bottom: 2px solid #e0e0e0;">
-                                <img src="' . Str::sanitize($logoUrl) . '" alt="' . Str::sanitize($site->name) . '" style="max-width: 200px; height: auto;">
-                            </td>
-                        </tr>
-                        
-                        <!-- Newsletter Content -->
-                        <tr>
-                            <td style="padding: 20px;">
-                                ' . $blockHtml . '
-                            </td>
-                        </tr>
-                        
-                        <!-- Footer -->
-                        <tr>
-                            <td style="padding: 20px; background-color: #f8f8f8; text-align: center; font-size: 12px; color: #666;">
-                                <p>&copy; ' . date('Y') . ' ' . htmlspecialchars($site->name) . '. All rights reserved.</p>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </body>
-    </html>';
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>' . Str::sanitize($newsletter->title) . '</title>
+    ' . $customCssTag . '
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<div id="' . $scopeId . '">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff;">
+                    <!-- Logo Header -->
+                    <tr>
+                        <td align="center" style="padding: 30px 20px; background-color: #ffffff; border-bottom: 2px solid #e0e0e0;">
+                            ' . $this->buildLogoHtml($logoUrl, $site->name) . '
+                        </td>
+                    </tr>
+
+                    <!-- Newsletter Content -->
+                    <tr>
+                        <td style="padding: 20px;">
+                            ' . $blockHtml . '
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px; background-color: #f8f8f8; text-align: center; font-size: 12px; color: #666;">
+                            <p>' . $footerText . '</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>
+</body>
+</html>';
 
         return $html;
+    }
+
+    private function buildLogoHtml(?string $logoUrl, string $siteName): string
+    {
+        if ($logoUrl) {
+            return sprintf(
+                '<img src="%s" alt="%s" style="max-width: 200px; height: auto;">',
+                Str::sanitize($logoUrl),
+                htmlspecialchars($siteName)
+            );
+        }
+
+        return sprintf(
+            '<div style="font-size: 24px; font-weight: bold; color: #1a202c;">%s</div>',
+            htmlspecialchars($siteName)
+        );
     }
 
     /**
@@ -232,22 +290,24 @@ class NewsletterPageBuilderService
         Collection              $pages,
         NewsletterRenderContext $context,
         ?string                 $unsubscribeToken,
-        bool                    $includeBlocks
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
     ): string
     {
         $html = [];
 
+        $primaryColor = $branding?->theme_json['primary_color'] ?? '#007bff';
+
         $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #f5f5f5;">';
 
-        // Compact header
-        $html[] = '<div style="background: #ffffff; padding: 30px 20px; border-bottom: 3px solid #007bff;">';
+        // Compact header — border accent uses branding primary colour
+        $html[] = '<div style="background: #ffffff; padding: 30px 20px; border-bottom: 3px solid ' . htmlspecialchars($primaryColor) . ';">';
         $html[] = '<h1 style="color: #333; margin: 0 0 5px 0; font-size: 24px;">' . htmlspecialchars($newsletter->title) . '</h1>';
         $html[] = '<p style="color: #666; font-size: 13px; margin: 0;">' . date('l, F j, Y') . ' • ' . $pages->count() . ' articles</p>';
         $html[] = '</div>';
 
         $html[] = '<div style="background: #ffffff; padding: 20px;">';
 
-        // GET PROMOTIONS ONCE at the newsletter level
         $promotionBlocks = $this->injector->getBlocksForSurface(
             'newsletter_issue',
             $newsletter->id,
@@ -256,7 +316,6 @@ class NewsletterPageBuilderService
             'newsletter'
         );
 
-        // Merge pages and promotions
         $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks);
 
         foreach ($allContent as $index => $item) {
@@ -265,37 +324,38 @@ class NewsletterPageBuilderService
             }
 
             if (isset($item['is_promotion']) && $item['is_promotion']) {
-                // Render promotion block
                 $rendered = $this->renderBlock($item, $context);
                 if ($rendered->wasRendered) {
                     $html[] = $rendered->html;
                 }
             } else {
-                // Render page item WITH blocks if requested
-                $html[] = $this->renderDigestItem($item, $context, $includeBlocks);
+                $html[] = $this->renderDigestItem($item, $context, $includeBlocks, $branding);
             }
         }
 
         $html[] = '</div>';
-        $html[] = $this->renderFooter($unsubscribeToken);
+        $html[] = $this->renderFooter($unsubscribeToken, $branding);
         $html[] = '</div>';
 
         return implode("\n", $html);
     }
 
-    private function renderDigestItem(array $page, NewsletterRenderContext $context, bool $includeBlocks): string
+    private function renderDigestItem(
+        array                            $page,
+        NewsletterRenderContext          $context,
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
+    ): string
     {
         $pageId = $page['id'];
         $title = $page['title'];
         $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $context->sendId, $context->includeTracking);
+        $primaryColor = $branding?->theme_json['primary_color'] ?? '#007bff';
 
         $html = [];
-
-        // Compact, scannable format
         $html[] = '<div style="margin-bottom: 20px; display: table; width: 100%;">';
 
-        // Small thumbnail on left
         $listingImageId = $page['listing_image_id'] ?? null;
         $heroImageId = $page['hero_image_id'] ?? null;
 
@@ -310,25 +370,22 @@ class NewsletterPageBuilderService
 
         $html[] = '<div style="display: table-cell; vertical-align: top;">';
 
-        // Categories
         if (!empty($page['categories'])) {
             $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
-            $html[] = '<div style="color: #007bff; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">' . implode(', ', $categoryNames) . '</div>';
+            $html[] = '<div style="color: ' . htmlspecialchars($primaryColor) . '; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">' . implode(', ', $categoryNames) . '</div>';
         }
 
         if (!empty($page['tags'])) {
-            $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['tags']);
-            $html[] = '<div style="color: #007bff; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">' . implode(', ', $categoryNames) . '</div>';
+            $tagNames = array_map(fn($tag) => htmlspecialchars($tag['name']), $page['tags']);
+            $html[] = '<div style="color: ' . htmlspecialchars($primaryColor) . '; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">' . implode(', ', $tagNames) . '</div>';
         }
 
-        // Compact title
         $html[] = '<h3 style="margin: 0 0 6px 0; font-size: 16px; line-height: 1.4;">';
         $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-weight: 600;">';
         $html[] = htmlspecialchars($title);
         $html[] = '</a>';
         $html[] = '</h3>';
 
-        // Meta info
         $metaInfo = [];
         if (!empty($page['authors'])) {
             $metaInfo[] = 'By ' . htmlspecialchars($page['authors'][0]['name']);
@@ -341,7 +398,6 @@ class NewsletterPageBuilderService
             $html[] = '<div style="color: #999; font-size: 12px; margin-bottom: 6px;">' . implode(' • ', $metaInfo) . '</div>';
         }
 
-        // Render blocks if requested
         if ($includeBlocks) {
             $pageBlocks = $page['blocks'] ?? [];
             if (!empty($pageBlocks)) {
@@ -354,7 +410,6 @@ class NewsletterPageBuilderService
             }
         }
 
-        // Brief description
         $metaDescription = $page['meta_description'] ?? null;
         if ($metaDescription && !$includeBlocks) {
             $html[] = '<p style="color: #666; font-size: 13px; margin: 0; line-height: 1.5;">';
@@ -373,26 +428,24 @@ class NewsletterPageBuilderService
         Collection              $pages,
         NewsletterRenderContext $context,
         ?string                 $unsubscribeToken,
-        bool                    $includeBlocks
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
     ): string
     {
         $html = [];
 
         $html[] = '<div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #000000;">';
 
-        // First page as dramatic hero (no promotions in hero)
         $featuredPage = $pages->first();
         if ($featuredPage) {
             $html[] = $this->renderHeroPage($featuredPage, $context);
             $pages = $pages->slice(1);
         }
 
-        // Secondary articles with promotions
         if ($pages->count() > 0) {
             $html[] = '<div style="background: #ffffff; padding: 40px 20px;">';
             $html[] = '<h2 style="color: #333; margin: 0 0 30px 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #000; padding-bottom: 10px;">Also in this issue</h2>';
 
-            // GET PROMOTIONS ONCE at the newsletter level
             $promotionBlocks = $this->injector->getBlocksForSurface(
                 'newsletter_issue',
                 $newsletter->id,
@@ -401,26 +454,23 @@ class NewsletterPageBuilderService
                 'newsletter'
             );
 
-            // Merge pages and promotions
             $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks);
 
             foreach ($allContent as $item) {
                 if (isset($item['is_promotion']) && $item['is_promotion']) {
-                    // Render promotion block
                     $rendered = $this->renderBlock($item, $context);
                     if ($rendered->wasRendered) {
                         $html[] = $rendered->html;
                     }
                 } else {
-                    // Render page card WITH blocks if requested
-                    $html[] = $this->renderCompactCard($item, $context, $includeBlocks);
+                    $html[] = $this->renderCompactCard($item, $context, $includeBlocks, $branding);
                 }
             }
 
             $html[] = '</div>';
         }
 
-        $html[] = $this->renderFooter($unsubscribeToken);
+        $html[] = $this->renderFooter($unsubscribeToken, $branding);
         $html[] = '</div>';
 
         return implode("\n", $html);
@@ -531,25 +581,30 @@ class NewsletterPageBuilderService
     }
 
 
-    private function renderCompactCard(array $page, NewsletterRenderContext $context, bool $includeBlocks): string
+    private function renderCompactCard(
+        array                            $page,
+        NewsletterRenderContext          $context,
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
+    ): string
     {
         $pageId = $page['id'];
         $title = $page['title'];
         $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $context->sendId, $context->includeTracking);
+        $primaryColor = $branding?->theme_json['primary_color'] ?? '#007bff';
 
         $html = [];
         $html[] = '<div style="margin-bottom: 25px; padding-bottom: 25px; border-bottom: 2px solid #f0f0f0;">';
 
-        // Meta bar
         $metaItems = [];
         if (!empty($page['categories'])) {
             $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
-            $metaItems[] = '<span style="color: #007bff; font-size: 11px; text-transform: uppercase;">' . implode(', ', $categoryNames) . '</span>';
+            $metaItems[] = '<span style="color: ' . htmlspecialchars($primaryColor) . '; font-size: 11px; text-transform: uppercase;">' . implode(', ', $categoryNames) . '</span>';
         }
         if (!empty($page['tags'])) {
             $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
-            $metaItems[] = '<span style="color: #007bff; font-size: 11px; text-transform: uppercase;">' . implode(', ', $categoryNames) . '</span>';
+            $metaItems[] = '<span style="color: ' . htmlspecialchars($primaryColor) . '; font-size: 11px; text-transform: uppercase;">' . implode(', ', $categoryNames) . '</span>';
         }
         if (!empty($page['authors'])) {
             $metaItems[] = '<span style="color: #999; font-size: 11px;">By ' . htmlspecialchars($page['authors'][0]['name']) . '</span>';
@@ -597,20 +652,19 @@ class NewsletterPageBuilderService
         Collection              $pages,
         NewsletterRenderContext $context,
         ?string                 $unsubscribeToken,
-        bool                    $includeBlocks
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
     ): string
     {
         $html = [];
 
         $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: Georgia, serif; background: #ffffff; padding: 40px 20px;">';
 
-        // Minimal header
         $html[] = '<div style="text-align: center; border-bottom: 1px solid #000; padding-bottom: 20px; margin-bottom: 30px;">';
         $html[] = '<h1 style="font-size: 32px; font-weight: 400; margin: 0; color: #000;">' . htmlspecialchars($newsletter->title) . '</h1>';
         $html[] = '<p style="font-size: 12px; color: #666; margin: 10px 0 0 0; text-transform: uppercase; letter-spacing: 2px;">' . date('F j, Y') . '</p>';
         $html[] = '</div>';
 
-        // GET PROMOTIONS ONCE at the newsletter level
         $promotionBlocks = $this->injector->getBlocksForSurface(
             'newsletter_issue',
             $newsletter->id,
@@ -619,13 +673,11 @@ class NewsletterPageBuilderService
             'newsletter'
         );
 
-        // Merge pages and promotions
         $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks);
 
         $html[] = '<div style="line-height: 1.8;">';
         foreach ($allContent as $item) {
             if (isset($item['is_promotion']) && $item['is_promotion']) {
-                // Render promotion block
                 $rendered = $this->renderBlock($item, $context);
                 if ($rendered->wasRendered) {
                     $html[] = '<div style="margin-bottom: 25px;">';
@@ -633,7 +685,6 @@ class NewsletterPageBuilderService
                     $html[] = '</div>';
                 }
             } else {
-                // Render simple page item
                 $pageId = $item['id'];
                 $title = $item['title'];
                 $slug = $item['slug'];
@@ -655,7 +706,7 @@ class NewsletterPageBuilderService
         }
         $html[] = '</div>';
 
-        $html[] = $this->renderFooter($unsubscribeToken);
+        $html[] = $this->renderFooter($unsubscribeToken, $branding);
         $html[] = '</div>';
 
         return implode("\n", $html);
@@ -666,23 +717,27 @@ class NewsletterPageBuilderService
         Collection              $pages,
         NewsletterRenderContext $context,
         ?string                 $unsubscribeToken,
-        bool                    $includeBlocks
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
     ): string
     {
         $html = [];
 
+        $primaryColor = $branding?->theme_json['primary_color'] ?? '#667eea';
+        $secondaryColor = $branding?->theme_json['secondary_color'] ?? '#764ba2';
+        $textColor = $branding?->theme_json['text_color'] ?? '#ffffff';
+
         $html[] = '<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #ffffff;">';
 
-        // Hero header section
-        $html[] = '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">';
-        $html[] = '<h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">' . htmlspecialchars($newsletter->title) . '</h1>';
-        $html[] = '<p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">' . date('F j, Y') . '</p>';
+        // Hero header — uses branding theme colours
+        $html[] = '<div style="background: linear-gradient(135deg, ' . htmlspecialchars($primaryColor) . ' 0%, ' . htmlspecialchars($secondaryColor) . ' 100%); padding: 40px 30px; text-align: center;">';
+        $html[] = '<h1 style="color: ' . htmlspecialchars($textColor) . '; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">' . htmlspecialchars($newsletter->title) . '</h1>';
+        $html[] = '<p style="color: ' . htmlspecialchars($textColor) . '; opacity: 0.9; margin: 10px 0 0 0; font-size: 14px;">' . date('F j, Y') . '</p>';
         $html[] = '</div>';
 
         // Content container
         $html[] = '<div style="padding: 30px 20px;">';
 
-        // GET PROMOTIONS ONCE at the newsletter level
         $promotionBlocks = $this->injector->getBlocksForSurface(
             'newsletter_issue',
             $newsletter->id,
@@ -691,37 +746,40 @@ class NewsletterPageBuilderService
             'newsletter'
         );
 
-        // Merge pages and promotions
         $allContent = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks);
 
         foreach ($allContent as $item) {
             if (isset($item['is_promotion']) && $item['is_promotion']) {
-                // Render promotion block
                 $rendered = $this->renderBlock($item, $context);
                 if ($rendered->wasRendered) {
                     $html[] = $rendered->html;
                 }
             } else {
-                // Render page card WITH blocks if requested
-                $html[] = $this->renderPageCard($item, $context, $includeBlocks);
+                $html[] = $this->renderPageCard($item, $context, $includeBlocks, $branding);
             }
         }
 
         $html[] = '</div>';
-
-        // Footer
-        $html[] = $this->renderFooter($unsubscribeToken);
+        $html[] = $this->renderFooter($unsubscribeToken, $branding);
         $html[] = '</div>';
 
         return implode("\n", $html);
     }
 
-    private function renderPageCard(array $page, NewsletterRenderContext $context, bool $includeBlocks): string
+    private function renderPageCard(
+        array                            $page,
+        NewsletterRenderContext          $context,
+        bool                             $includeBlocks,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
+    ): string
     {
         $pageId = $page['id'];
         $title = $page['title'];
         $slug = $page['slug'];
         $url = $this->buildTrackingUrl($pageId, $slug, $context->sendId, $context->includeTracking);
+
+        $primaryColor = $branding?->theme_json['primary_color'] ?? '#667eea';
+        $ctaColor = $branding?->theme_json['primary_color'] ?? '#007bff';
 
         $html = [];
         $html[] = '<div style="background: #ffffff; margin-bottom: 30px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">';
@@ -737,14 +795,13 @@ class NewsletterPageBuilderService
         }
 
         $html[] = '<div style="padding: 25px;">';
-
-        // Category/Meta bar
         $html[] = '<div style="margin-bottom: 12px;">';
+
         $metaItems = [];
 
         if (!empty($page['categories'])) {
             $categoryNames = array_map(fn($cat) => htmlspecialchars($cat['name']), $page['categories']);
-            $metaItems[] = '<span style="color: #667eea; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">' . implode(', ', $categoryNames) . '</span>';
+            $metaItems[] = '<span style="color: ' . htmlspecialchars($primaryColor) . '; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">' . implode(', ', $categoryNames) . '</span>';
         }
 
         if (isset($page['published_at'])) {
@@ -759,16 +816,15 @@ class NewsletterPageBuilderService
         if (!empty($metaItems)) {
             $html[] = implode('<span style="color: #999; font-size: 12px; margin: 0 8px;">•</span>', $metaItems);
         }
+
         $html[] = '</div>';
 
-        // Title
         $html[] = '<h2 style="margin: 0 0 12px 0; line-height: 1.3;">';
         $html[] = '<a href="' . $url . '" style="color: #1a1a1a; text-decoration: none; font-size: 22px; font-weight: 700;">';
         $html[] = htmlspecialchars($title);
         $html[] = '</a>';
         $html[] = '</h2>';
 
-        // Tags
         if (!empty($page['tags'])) {
             $html[] = '<div style="margin-bottom: 15px;">';
             foreach (array_slice($page['tags'], 0, 3) as $tag) {
@@ -804,7 +860,7 @@ class NewsletterPageBuilderService
             }
         }
 
-        $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px;">Read More</a>';
+        $html[] = '<a href="' . $url . '" style="display: inline-block; padding: 10px 20px; background-color: ' . htmlspecialchars($ctaColor) . '; color: white; text-decoration: none; border-radius: 4px;">Read More</a>';
 
         $html[] = '</div>';
         $html[] = '</div>';
@@ -812,16 +868,25 @@ class NewsletterPageBuilderService
         return implode("\n", $html);
     }
 
-    private function renderFooter(?string $unsubscribeToken = null): string
+    private function renderFooter(
+        ?string                          $unsubscribeToken = null,
+        ?NewsletterBrandingConfiguration $branding = null  // ← NEW
+    ): string
     {
         $html = [];
         $html[] = '<div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999; font-size: 12px;">';
-        $html[] = '<p>You received this email because you are subscribed to our newsletter.</p>';
+
+        // Branding footer text replaces the default received-this-email line
+        if ($branding?->footer_text) {
+            $html[] = '<p>' . nl2br(htmlspecialchars($branding->footer_text)) . '</p>';
+        } else {
+            $html[] = '<p>You received this email because you are subscribed to our newsletter.</p>';
+        }
 
         if ($unsubscribeToken) {
             $unsubscribeUrl = url("/member/subscriptions/unsubscribe/{$unsubscribeToken}");
-            $html[] = '<p><a href="' . $unsubscribeUrl . '" style="color: #999;">Unsubscribe</a> | ';
             $manageUrl = url("/member/subscriptions/manage/{$unsubscribeToken}");
+            $html[] = '<p><a href="' . $unsubscribeUrl . '" style="color: #999;">Unsubscribe</a> | ';
             $html[] = '<a href="' . $manageUrl . '" style="color: #999;">Manage Preferences</a></p>';
         }
 

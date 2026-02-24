@@ -8,8 +8,8 @@ use App\Models\NewsletterBrandingConfiguration;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Repositories\Newsletters\NewsletterSnapshotRepository;
-use App\Services\Newsletter\BrandingRendererService;
 use App\Services\Newsletter\Branding\CssSanitizer;
+use App\Services\Newsletter\BrandingRendererService;
 use App\Services\Newsletter\LayoutRendererService;
 use App\Services\Newsletter\NewsletterSnapshotService;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -73,12 +73,17 @@ class NewsletterSnapshotServiceTest extends RepositoryTestCase
             'custom_css' => null,
         ]);
 
-        $html = '<html><head></head><body><p>Content</p></body></html>';
+        // HTML arrives pre-branded from PageBuilderService
+        $html = '<html><head></head><body><p>Content already branded</p></body></html>';
         $snapshot = $this->service->createSnapshot($newsletter, $html);
 
+        // branding_snapshot_json stored as audit record
         $this->assertNotNull($snapshot->branding_snapshot_json);
         $this->assertEquals('https://example.com/logo.png', $snapshot->branding_snapshot_json['logo_url']);
         $this->assertEquals('My Header', $snapshot->branding_snapshot_json['header_text']);
+
+        // HTML stored verbatim — this service does not modify it
+        $this->assertStringContainsString('Content already branded', $snapshot->layout_html_snapshot);
     }
 
     public function test_snapshot_creates_branding_version(): void
@@ -140,7 +145,6 @@ class NewsletterSnapshotServiceTest extends RepositoryTestCase
     {
         $newsletter = $this->makeNewsletter();
 
-        // Create branding at snapshot time
         NewsletterBrandingConfiguration::create([
             'newsletter_id' => $newsletter->id,
             'logo_url' => 'https://example.com/logo-v1.png',
@@ -150,19 +154,20 @@ class NewsletterSnapshotServiceTest extends RepositoryTestCase
             'custom_css' => null,
         ]);
 
+        // Base HTML — footer_text will be injected by BrandingRendererService
+        // when renderFromSnapshot() re-composes from frozen snapshot data
         $html = '<html><head></head><body><p>Content</p></body></html>';
         $snapshot = $this->service->createSnapshot($newsletter, $html);
 
-        // Now change live branding (simulates a post-publish edit)
+        // Mutate live branding after snapshot was taken
         NewsletterBrandingConfiguration::where('newsletter_id', $newsletter->id)->update([
             'logo_url' => 'https://example.com/logo-v2.png',
-            'footer_text' => 'Updated footer — should not appear in render',
+            'footer_text' => 'Updated footer — must not appear',
         ]);
 
-        // Render uses the frozen snapshot, not live branding
+        // renderFromSnapshot re-applies the frozen branding_snapshot_json
         $rendered = $this->service->renderFromSnapshot($snapshot->id);
 
-        // Branding snapshot was frozen at v1 — footer is present from snapshot data
         $this->assertStringContainsString('Original footer', $rendered);
         $this->assertStringNotContainsString('Updated footer', $rendered);
     }
@@ -177,5 +182,21 @@ class NewsletterSnapshotServiceTest extends RepositoryTestCase
         $snapshots = $this->service->getAllSnapshotsForNewsletter($newsletter->id);
 
         $this->assertCount(2, $snapshots);
+    }
+
+    public function test_render_from_latest_snapshot_returns_stored_html_verbatim(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        // Simulate pre-branded HTML arriving from PageBuilderService
+        $prebrandedHtml = '<html><body><img src="https://example.com/logo.png"><p>Rendered content</p></body></html>';
+
+        $this->service->createSnapshot($newsletter, $prebrandedHtml);
+
+        $rendered = $this->service->renderFromLatestSnapshot($newsletter->id);
+
+        $this->assertNotNull($rendered);
+        // Returned exactly as stored — no second pass
+        $this->assertEquals($prebrandedHtml, $rendered);
     }
 }

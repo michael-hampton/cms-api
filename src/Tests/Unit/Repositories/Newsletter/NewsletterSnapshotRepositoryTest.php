@@ -1,0 +1,156 @@
+<?php
+
+namespace App\Tests\Unit\Repositories\Newsletter;
+
+use App\Models\Model;
+use App\Models\Newsletter;
+use App\Models\NewsletterSnapshot;
+use App\Repositories\Newsletters\NewsletterSnapshotRepository;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
+
+class NewsletterSnapshotRepositoryTest extends FunctionalTestCase
+{
+    private NewsletterSnapshotRepository $repository;
+
+    public function test_creates_snapshot_with_required_fields(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $snapshot = $this->repository->createSnapshot(
+            newsletterId: $newsletter->id,
+            htmlSnapshot: '<html><body>Hello</body></html>',
+            brandingSnapshot: null,
+            layoutVersionId: null,
+            brandingVersionId: null,
+        );
+
+        $this->assertInstanceOf(NewsletterSnapshot::class, $snapshot);
+        $this->assertEquals($newsletter->id, $snapshot->newsletter_id);
+        $this->assertStringContainsString('Hello', $snapshot->layout_html_snapshot);
+        $this->assertDatabaseHas('newsletter_snapshots', ['id' => $snapshot->id]);
+    }
+
+    private function makeNewsletter(): Model
+    {
+        return Newsletter::create([
+            'title' => 'Snapshot Test Newsletter',
+            'content_type' => 'manual',
+            'interval' => 'weekly',
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'Test'
+        ]);
+    }
+
+    // ─── createSnapshot ───────────────────────────────────────────────────────
+
+    public function test_creates_snapshot_with_branding_snapshot_json(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $branding = ['logo_url' => 'https://example.com/logo.png', 'footer_text' => 'Footer'];
+
+        $snapshot = $this->repository->createSnapshot(
+            newsletterId: $newsletter->id,
+            htmlSnapshot: '<html><body>Content</body></html>',
+            brandingSnapshot: $branding,
+            layoutVersionId: null,
+            brandingVersionId: null,
+        );
+
+        $this->assertNotNull($snapshot->branding_snapshot_json);
+        $this->assertEquals('https://example.com/logo.png', $snapshot->branding_snapshot_json['logo_url']);
+    }
+
+    public function test_returns_most_recent_snapshot_for_newsletter(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->repository->createSnapshot($newsletter->id, '<html>v1</html>', null, null, null);
+        $this->repository->createSnapshot($newsletter->id, '<html>v2</html>', null, null, null);
+        $latest = $this->repository->createSnapshot($newsletter->id, '<html>v3</html>', null, null, null);
+
+        $result = $this->repository->latestForNewsletter($newsletter->id);
+
+        $this->assertEquals($latest->id, $result->id);
+        $this->assertStringContainsString('v3', $result->layout_html_snapshot);
+    }
+
+    // ─── latestForNewsletter ──────────────────────────────────────────────────
+
+    public function test_returns_null_when_no_snapshots_exist(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $result = $this->repository->latestForNewsletter($newsletter->id);
+
+        $this->assertNull($result);
+    }
+
+    public function test_returns_all_snapshots_in_descending_order(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->repository->createSnapshot($newsletter->id, '<html>v1</html>', null, null, null);
+        $this->repository->createSnapshot($newsletter->id, '<html>v2</html>', null, null, null);
+        $this->repository->createSnapshot($newsletter->id, '<html>v3</html>', null, null, null);
+
+        $all = $this->repository->allForNewsletter($newsletter->id);
+
+        $this->assertCount(3, $all);
+    }
+
+    // ─── allForNewsletter ─────────────────────────────────────────────────────
+
+    public function test_attaches_view_token_to_snapshot(): void
+    {
+        $newsletter = $this->makeNewsletter();
+        $snapshot = $this->repository->createSnapshot($newsletter->id, '<html>Content</html>', null, null, null);
+
+        $token = bin2hex(random_bytes(16));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+72 hours'));
+
+        $result = $this->repository->attachViewToken($snapshot->id, $token, $expiresAt);
+
+        $this->assertTrue($result);
+        $this->assertEquals($token, $snapshot->fresh()->view_token);
+    }
+
+    // ─── attachViewToken ──────────────────────────────────────────────────────
+
+    public function test_attach_view_token_returns_false_for_missing_snapshot(): void
+    {
+        $result = $this->repository->attachViewToken(99999, 'token', date('Y-m-d H:i:s'));
+        $this->assertFalse($result);
+    }
+
+    public function test_finds_snapshot_by_view_token(): void
+    {
+        $newsletter = $this->makeNewsletter();
+        $snapshot = $this->repository->createSnapshot($newsletter->id, '<html>Token Test</html>', null, null, null);
+
+        $token = bin2hex(random_bytes(16));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+72 hours'));
+
+        $this->repository->attachViewToken($snapshot->id, $token, $expiresAt);
+
+        $found = $this->repository->findByToken($token);
+
+        $this->assertNotNull($found);
+        $this->assertEquals($snapshot->id, $found->id);
+    }
+
+    // ─── findByToken ──────────────────────────────────────────────────────────
+
+    public function test_returns_null_for_unknown_token(): void
+    {
+        $found = $this->repository->findByToken('nonexistent-token-xyz');
+        $this->assertNull($found);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repository = app(NewsletterSnapshotRepository::class);
+    }
+}

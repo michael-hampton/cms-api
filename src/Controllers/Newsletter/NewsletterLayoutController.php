@@ -7,6 +7,7 @@ use App\Enums\Newsletter\LayoutVersionState;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
+use App\Framework\Support\SiteContext;
 use App\Services\Newsletter\NewsletterLayoutService;
 
 class NewsletterLayoutController extends Controller
@@ -19,10 +20,11 @@ class NewsletterLayoutController extends Controller
         parent::__construct();
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $layouts = $this->layoutService->getAllLayouts();
+            $siteId = (int)$request->input('site_id') ?? SiteContext::getId();
+            $layouts = $this->layoutService->getAllLayouts($siteId);
             return $this->resourceResponse(['layouts' => $layouts->toArray()]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -48,6 +50,7 @@ class NewsletterLayoutController extends Controller
                 layoutDefinition: $request->input('layout_definition', []),
                 isSystemLayout: false,
                 createdBy: $request->input('created_by'),
+                siteId: (int)$request->input('site_id') ?? SiteContext::getId(),  // ← NEW
             );
 
             return $this->jsonResponse(['layout' => $layout->toArray()], 201);
@@ -67,6 +70,7 @@ class NewsletterLayoutController extends Controller
                 newName: $request->input('name'),
                 newSlug: $request->input('slug'),
                 clonedBy: $request->input('cloned_by'),
+                siteId: (int)$request->input('site_id') ?? SiteContext::getId(),  // ← NEW
             );
 
             return $this->jsonResponse(['layout' => $cloned->toArray()], 201);

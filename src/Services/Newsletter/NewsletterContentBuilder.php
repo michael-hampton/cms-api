@@ -5,13 +5,15 @@ namespace App\Services\Newsletter;
 use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Newsletter;
+use App\Repositories\Newsletters\NewsletterBrandingRepository;
 
 class NewsletterContentBuilder
 {
     private const UNSUBSCRIBE_PLACEHOLDER = '{{UNSUBSCRIBE_LINK}}';
 
     public function __construct(
-        private readonly NewsletterPageBuilderService $pageBuilderService
+        private readonly NewsletterPageBuilderService $pageBuilderService,
+        private readonly NewsletterBrandingRepository $newsletterBrandingRepository
     )
     {
     }
@@ -39,6 +41,8 @@ class NewsletterContentBuilder
                 'slug' => $p->slug,
             ])->toArray();
 
+            $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
+
             // Build HTML with placeholder
             $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
                 $newsletter,
@@ -47,7 +51,8 @@ class NewsletterContentBuilder
                 null,
                 $isPreview,
                 null,
-                $siteId
+                $siteId,
+                $branding
             );
         } else {
             $blocks = $this->parseNewsletterContent($newsletter->content);

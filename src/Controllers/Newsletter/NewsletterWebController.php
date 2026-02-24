@@ -10,6 +10,7 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
@@ -31,6 +32,7 @@ class NewsletterWebController extends Controller
         private readonly NewsletterSendRepository         $sendRepository,
         private readonly NewsletterSendPageViewRepository $sendPageViewRepository,
         private readonly PageRepository                   $pageRepository,
+        private readonly NewsletterBrandingRepository $newsletterBrandingRepository
     )
     {
         parent::__construct();
@@ -125,6 +127,8 @@ class NewsletterWebController extends Controller
             );
         }
 
+        $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
+
         // Build HTML content without tracking (live view, not email)
         $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
@@ -133,7 +137,8 @@ class NewsletterWebController extends Controller
             $token,
             true,
             null, // No sendId = no tracking
-            $siteId
+            $siteId,
+            $branding
         );
 
         return $this->view('newsletters/show', [
@@ -216,6 +221,8 @@ class NewsletterWebController extends Controller
             );
         }
 
+        $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
+
         // Build HTML content without tracking
         $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
@@ -224,7 +231,8 @@ class NewsletterWebController extends Controller
             $token,
             true,
             null, // No tracking for archive/preview views
-            $siteId
+            $siteId,
+            $branding
         );
 
         $html = urldecode($html);

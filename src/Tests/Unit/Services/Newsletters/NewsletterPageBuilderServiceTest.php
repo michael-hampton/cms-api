@@ -7,6 +7,7 @@ use App\Models\Author;
 use App\Models\Block;
 use App\Models\Category;
 use App\Models\Newsletter;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Models\Page;
 use App\Models\PageAuthor;
 use App\Models\PageCategory;
@@ -24,6 +25,7 @@ use App\Services\Adverts\DealVisibilityResolver;
 use App\Services\Adverts\OfferVisibilityResolver;
 use App\Services\Adverts\PromotionInjector;
 use App\Services\Adverts\RewardVisibilityResolver;
+use App\Services\Newsletter\Branding\CssSanitizer;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
 use App\Services\Newsletter\Renderers\BannerBlockRenderer;
@@ -68,6 +70,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
     private Logger $logger;
     private TrackingUrlBuilder $trackingUrlBuilder;
     private $newsletterRepository;
+    private CssSanitizer $cssSanitizer;
 
     protected function setUp(): void
     {
@@ -84,6 +87,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $offerEligibilityService = app(OfferVisibilityResolver::class);
         $rewardEligibilityService = app(RewardVisibilityResolver::class);
         $this->newsletterRepository = app(NewsletterRepository::class);
+        $this->cssSanitizer = app(CssSanitizer::class);
 
         // Create tracking services
         $dealTrackingService = app(DealTrackingService::class);
@@ -145,6 +149,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             $blockDataFactory,
             $this->logger,
             $this->newsletterRepository,
+            $this->cssSanitizer,
             new DefaultEmailBlockRendererRegistry($renderers)
         );
     }
@@ -2314,6 +2319,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => false,
+            'original_price' => 0
         ]);
 
         $page = Page::create([
@@ -2392,6 +2398,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'original_price' => 0
         ]);
 
         $page = Page::create([
@@ -2527,6 +2534,341 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         // Assert
         $this->assertStringContainsString('https://example.com/priority-logo.png', $html);
         $this->assertStringNotContainsString('/images/logo.png', $html);
+    }
+
+    public function test_default_template_uses_branding_primary_colour_in_header(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Branded Newsletter',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null;
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = null;
+        $branding->theme_json = [
+            'primary_color' => '#ff0000',
+            'secondary_color' => '#cc0000',
+            'text_color' => '#ffffff',
+        ];
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        $this->assertStringContainsString('#ff0000', $html);
+        $this->assertStringContainsString('#cc0000', $html);
+        // Original hardcoded purple should not appear
+        $this->assertStringNotContainsString('#667eea', $html);
+        $this->assertStringNotContainsString('#764ba2', $html);
+    }
+
+    public function test_digest_template_uses_branding_primary_colour_in_border(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Digest Branded',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'digest',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null;
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = null;
+        $branding->theme_json = ['primary_color' => '#123456'];
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        $this->assertStringContainsString('#123456', $html);
+        $this->assertStringNotContainsString('#007bff', $html);
+    }
+
+    public function test_buildTemplate_uses_branding_logo_over_site_logo(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Logo Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = 'https://example.com/brand-logo.png';
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = null;
+        $branding->theme_json = null;
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        $this->assertStringContainsString('https://example.com/brand-logo.png', $html);
+    }
+
+    public function test_buildTemplate_uses_site_logo_when_no_branding_logo(): void
+    {
+        $site = Site::create([
+            'name' => 'Test Site',
+            'logo' => 'https://example.com/site-logo.png',
+        ]);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Site Logo Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $site->id,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null; // no branding logo
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = null;
+        $branding->theme_json = null;
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $site->id, $branding
+        );
+
+        $this->assertStringContainsString('https://example.com/site-logo.png', $html);
+    }
+
+    public function test_renderFooter_uses_branding_footer_text(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Footer Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null;
+        $branding->header_text = null;
+        $branding->footer_text = 'Custom footer from branding config.';
+        $branding->custom_css = null;
+        $branding->theme_json = null;
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        $this->assertStringContainsString('Custom footer from branding config.', $html);
+        $this->assertStringNotContainsString('You received this email because you are subscribed', $html);
+    }
+
+    public function test_renderFooter_uses_default_text_when_no_branding_footer(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Footer Default Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $pages = collect([]);
+
+        // No branding passed at all
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, null
+        );
+
+        $this->assertStringContainsString('You received this email because you are subscribed', $html);
+    }
+
+    public function test_custom_css_is_injected_and_scoped_into_head(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'CSS Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null;
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = '.article-title { color: red; font-size: 18px; }';
+        $branding->theme_json = null;
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        // CSS should be in the head
+        $this->assertStringContainsString('<style>', $html);
+        $this->assertStringContainsString('color', $html);
+        // Should be scoped to the newsletter ID wrapper
+        $this->assertStringContainsString('#newsletter-' . $newsletter->id, $html);
+    }
+
+    public function test_custom_css_strips_dangerous_properties(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'CSS Security Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null;
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = '.title { color: red; animation: spin 1s; }';
+        $branding->theme_json = null;
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        $this->assertStringContainsString('color', $html);
+        $this->assertStringNotContainsString('animation', $html);
+    }
+
+    public function test_scope_wrapper_id_is_present_in_output(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Scope Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $pages = collect([]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, null
+        );
+
+        $this->assertStringContainsString('id="newsletter-' . $newsletter->id . '"', $html);
+    }
+
+    public function test_no_branding_passed_falls_back_to_defaults_without_error(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'No Branding Test',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'digest',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $pages = collect([]);
+
+        // Should not throw — all branding fields have hardcoded fallbacks
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, null
+        );
+
+        $this->assertNotEmpty($html);
+        $this->assertStringContainsString('No Branding Test', $html);
+    }
+
+    public function test_featured_template_passes_branding_to_compact_cards(): void
+    {
+        $page = Page::create([
+            'title' => 'Featured Page',
+            'slug' => 'featured-page-brand',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        $category = $this->createCategory();
+        $this->attachCategoryToPage($page, $category);
+        $page->load(['categories']);
+
+        $secondPage = Page::create([
+            'title' => 'Secondary Page',
+            'slug' => 'secondary-page-brand',
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+        ]);
+
+        $category = $this->createCategory();
+        $this->attachCategoryToPage($secondPage, $category);
+        $secondPage->load(['categories']);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Featured Branded',
+            'content_type' => Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'featured',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $branding = new NewsletterBrandingConfiguration();
+        $branding->logo_url = null;
+        $branding->header_text = null;
+        $branding->footer_text = null;
+        $branding->custom_css = null;
+        $branding->theme_json = ['primary_color' => '#abcdef'];
+
+        $pages = collect([$page, $secondPage]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, $pages, null, null, false, null, $this->siteId, $branding
+        );
+
+        // Branding colour should appear in compact card category labels
+        $this->assertStringContainsString('#abcdef', $html);
     }
 
 }

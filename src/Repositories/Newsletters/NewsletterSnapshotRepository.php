@@ -44,7 +44,7 @@ class NewsletterSnapshotRepository extends Repository
     public function latestForNewsletter(int $newsletterId): ?NewsletterSnapshot
     {
         return NewsletterSnapshot::where('newsletter_id', $newsletterId)
-            ->orderBy('created_at', 'desc')
+            ->orderByDesc('id')
             ->first();
     }
 

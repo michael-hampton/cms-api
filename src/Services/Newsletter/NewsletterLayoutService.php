@@ -34,15 +34,29 @@ class NewsletterLayoutService
         string $slug,
         array  $layoutDefinition,
         bool   $isSystemLayout = false,
-        ?int   $createdBy = null
+        ?int $createdBy = null,
+        ?int $siteId = null   // ← NEW — null for system layouts
     ): NewsletterLayout
     {
-        return $this->database->transaction(function () use ($name, $slug, $layoutDefinition, $isSystemLayout, $createdBy) {
-            if ($this->layoutRepository->findBySlug($slug)) {
+        if (!$isSystemLayout && $siteId === null) {
+            throw new \InvalidArgumentException('User layouts must belong to a site.');
+        }
+
+        if ($isSystemLayout && $siteId !== null) {
+            throw new \InvalidArgumentException('System layouts cannot belong to a site.');
+        }
+
+        return $this->database->transaction(function () use ($name, $slug, $layoutDefinition, $isSystemLayout, $createdBy, $siteId) {
+            // System layouts: slug must be globally unique (site_id = null)
+            // User layouts: slug must be unique within the site
+            $slugSiteId = $isSystemLayout ? null : $siteId;
+
+            if ($this->layoutRepository->findBySlugForSite($slug, $slugSiteId)) {
                 throw new \InvalidArgumentException("Layout slug '{$slug}' is already in use.");
             }
 
             $layout = NewsletterLayout::create([
+                'site_id' => $slugSiteId,
                 'name' => $name,
                 'slug' => $slug,
                 'layout_definition_json' => $layoutDefinition,
@@ -131,14 +145,14 @@ class NewsletterLayoutService
      * Clone an existing layout into a new user-owned layout.
      * Cloned version starts as Draft.
      */
-    public function cloneLayout(int $sourceLayoutId, string $newName, string $newSlug, int $clonedBy): NewsletterLayout
+    public function cloneLayout(int $sourceLayoutId, string $newName, string $newSlug, int $clonedBy, int $siteId): NewsletterLayout
     {
-        return $this->database->transaction(function () use ($sourceLayoutId, $newName, $newSlug, $clonedBy) {
-            if ($this->layoutRepository->findBySlug($newSlug)) {
+        return $this->database->transaction(function () use ($sourceLayoutId, $newName, $newSlug, $clonedBy, $siteId) {
+            if ($this->layoutRepository->findBySlugForSite($newSlug, $siteId)) {
                 throw new \InvalidArgumentException("Layout slug '{$newSlug}' is already taken.");
             }
 
-            return $this->layoutRepository->cloneLayout($sourceLayoutId, $newName, $newSlug, $clonedBy);
+            return $this->layoutRepository->cloneLayout($sourceLayoutId, $newName, $newSlug, $clonedBy, $siteId);
         });
     }
 
@@ -163,9 +177,9 @@ class NewsletterLayoutService
         });
     }
 
-    public function getAllLayouts(): Collection
+    public function getAllLayouts(int $siteId): Collection
     {
-        return $this->layoutRepository->allPublishedLayouts();
+        return $this->layoutRepository->allPublishedLayouts($siteId);
     }
 
     public function getSystemLayouts(): Collection
