@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Repositories\Concerns;
 
+use App\Enums\Gifts\GiftType;
 use App\Framework\Tests\Factories\HasFactories;
 use App\Framework\Tests\Factories\RelationshipFactory;
 use App\Models\Address;
@@ -21,6 +22,7 @@ use App\Models\ConsentWithdrawalRequest;
 use App\Models\CustomFieldDefinition;
 use App\Models\EmailTheme;
 use App\Models\GiftedArticle;
+use App\Models\GiftPromotion;
 use App\Models\Image;
 use App\Models\IssueDelivery;
 use App\Models\Member;
@@ -924,5 +926,17 @@ trait CreatesTestData
         ];
 
         return \App\Models\NewsletterSendSchedule::create(array_merge($defaults, $overrides));
+    }
+
+    protected function createPromotion(array $overrides = [])
+    {
+        $product = $overrides['product_id'] ?? $this->createProduct()->id;
+        return GiftPromotion::create([
+            'gift_type' => GiftType::PRODUCT->value,
+            'active' => true,
+            'merchant_id' => null,
+            'gift_product_id' => $product,
+            'gift_subscription_plan_id' => null
+        ]);
     }
 }

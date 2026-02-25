@@ -14,6 +14,8 @@ enum CartItemType: string
     case BUNDLE = 'bundle';
     case SUBSCRIPTION = 'subscription';
     case SUBSCRIPTION_BUNDLE = 'subscription_bundle';
+    case FREE_GIFT = 'free_gift';
+
 
     /**
      * Get all valid type strings for validation.

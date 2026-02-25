@@ -112,6 +112,7 @@ class CartService
         $product = $this->productRepository->find($productId, ['availableMerchants', 'variants']);
 
         if (!$product || !$product->is_active) {
+            die('a');
             return ['success' => false, 'message' => 'Product not found or inactive'];
         }
 
@@ -142,6 +143,7 @@ class CartService
         try {
             $this->stockResolver->assertCanAdd($product, $variant, $quantity);
         } catch (InsufficientStockException $e) {
+            echo $e->getMessage();
             return ['success' => false, 'message' => $e->getUserMessage()];
         }
 
@@ -232,7 +234,50 @@ class CartService
 
         $this->cartRepository->delete($cartItemId);
 
+        // Recalculate promotional gifts after cart mutation
+        $this->recalculateGiftItems();
+
         return ['success' => true, 'message' => 'Item removed from cart'];
+    }
+
+    private function recalculateGiftItems(): void
+    {
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+
+        foreach ($items as $item) {
+            $options = is_string($item->options)
+                ? json_decode($item->options, true)
+                : ($item->options ?? []);
+
+            // Remove gift rows if they are no longer eligible
+            if (($options['type'] ?? '') === CartItemType::FREE_GIFT->value) {
+
+                if (!$this->isGiftStillEligible($items)) {
+                    $this->cartRepository->delete($item->id);
+                }
+            }
+        }
+    }
+
+    private function isGiftStillEligible($cartItems): bool
+    {
+        // Example rule:
+        // At least one paid item must exist
+
+        foreach ($cartItems as $item) {
+            $options = is_string($item->options)
+                ? json_decode($item->options, true)
+                : ($item->options ?? []);
+
+            if (($options['type'] ?? '') !== CartItemType::FREE_GIFT->value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function clear(): void
@@ -402,13 +447,17 @@ class CartService
         $userId = $this->getUserId();
 
         // Check if product already in cart
-        $existingItem = $this->cartRepository->findItemByProduct($product->id, $userId, $sessionId);
+        $existingItems = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
 
-        if ($existingItem) {
-            return ['success' => false, 'message' => 'Product already in cart'];
+        foreach ($existingItems as $existingItem) {
+            if ($existingItem->product_id === $product->id) {
+                return ['success' => false, 'message' => 'Product already in cart'];
+            }
         }
 
-        $price = $offer->sale_price ?? $product->price;
+        $price = ($offer->sale_price && $offer->sale_price > 0)
+            ? $offer->sale_price
+            : $product->price;
         $merchantId = $offer->merchant?->id;
 
         $cartItemData = $this->itemFactory->fromOffer(

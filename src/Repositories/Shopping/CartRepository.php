@@ -9,6 +9,11 @@ use App\Repositories\Repository;
 
 class CartRepository extends Repository
 {
+    public function updateQuantity(mixed $cartItemId, int $quantity)
+    {
+        //todo
+    }
+
     protected function getModelClass(): string
     {
         return CartItem::class;

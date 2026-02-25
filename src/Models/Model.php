@@ -595,6 +595,26 @@ abstract class Model
         return $model;
     }
 
+    public static function createMany(array $records): array
+    {
+        if (empty($records)) {
+            return [];
+        }
+
+        return Database::runTransaction(function () use ($records) {
+
+            $models = [];
+
+            foreach ($records as $record) {
+                $models[] = static::create($record);
+            }
+
+            return $models;
+        });
+    }
+
+
+
     public static function all(): Collection
     {
         $instance = new static();

@@ -3113,4 +3113,177 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         $this->assertStringContainsString('Page When Empty Slots', $html);
         $this->assertStringNotContainsString('nl-slot--', $html);
     }
+
+    public function test_buildTemplate_injects_view_in_browser_placeholder_in_header(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'VIB Test Newsletter',
+            'content_type' => \App\Models\Newsletter::CONTENT_TYPE_AUTO_PAGES,
+            'template' => 'default',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, collect([]), null, null, false, null, $this->siteId
+        );
+
+        $this->assertStringContainsString(
+            NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER,
+            $html,
+            'The view-in-browser placeholder must be present in the rendered HTML'
+        );
+    }
+
+    public function test_placeholder_appears_before_logo_header(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'VIB Position Test',
+            'template' => 'default',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, collect([]), null, null, false, null, $this->siteId
+        );
+
+        $placeholderPos = strpos($html, NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER);
+        $logoHeaderPos = strpos($html, 'Logo Header');
+
+        $this->assertNotFalse($placeholderPos);
+        $this->assertNotFalse($logoHeaderPos);
+        $this->assertLessThan(
+            $logoHeaderPos,
+            $placeholderPos,
+            'View-in-browser banner must appear before the logo header'
+        );
+    }
+
+    public function test_digest_template_injects_view_in_browser_placeholder(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'Digest VIB',
+            'template' => 'digest',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, collect([]), null, null, false, null, $this->siteId
+        );
+
+        $this->assertStringContainsString(
+            NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER,
+            $html
+        );
+    }
+
+    public function test_featured_template_injects_view_in_browser_placeholder(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'Featured VIB',
+            'template' => 'featured',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, collect([]), null, null, false, null, $this->siteId
+        );
+
+        $this->assertStringContainsString(
+            NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER,
+            $html
+        );
+    }
+
+    public function test_simple_template_injects_view_in_browser_placeholder(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'Simple VIB',
+            'template' => 'simple',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, collect([]), null, null, false, null, $this->siteId
+        );
+
+        $this->assertStringContainsString(
+            NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER,
+            $html
+        );
+    }
+
+    public function test_layout_slot_template_injects_view_in_browser_placeholder(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'Slot VIB',
+            'template' => 'default',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $layoutVersion = $this->createMock(\App\Models\NewsletterLayoutVersion::class);
+        $layoutVersion->method('slots')->willReturn([
+            [
+                'key' => 'main',
+                'blocks' => [
+                    ['type' => 'text', 'data' => ['paragraphs' => ['Slot content.']]],
+                ],
+            ],
+        ]);
+
+        $html = $this->service->buildNewsletterHtmlFromLayoutSlots(
+            $newsletter, $layoutVersion, null, null, $this->siteId
+        );
+
+        $this->assertStringContainsString(
+            NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER,
+            $html
+        );
+    }
+
+    public function test_view_in_browser_banner_contains_link_text(): void
+    {
+        $newsletter = \App\Models\Newsletter::create([
+            'title' => 'VIB Link Text',
+            'template' => 'default',
+            'interval' => \App\Models\Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $this->siteId,
+            'content' => 'test',
+        ]);
+
+        $html = $this->service->buildNewsletterHtml(
+            $newsletter, collect([]), null, null, false, null, $this->siteId
+        );
+
+        $this->assertStringContainsString('View it in your browser', $html);
+        $this->assertStringContainsString('Having trouble viewing this email', $html);
+    }
+
+    public function test_placeholder_constant_is_consistent(): void
+    {
+        // Ensures the constant used in the service matches what tests assert against.
+        $this->assertEquals(
+            '{{VIEW_IN_BROWSER_URL}}',
+            NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER
+        );
+    }
+
 }

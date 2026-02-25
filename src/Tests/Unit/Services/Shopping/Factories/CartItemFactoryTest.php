@@ -6,8 +6,11 @@ use App\DTO\Cart\CartItemData;
 use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Product;
+use App\Models\SubscriptionPlan;
 use App\Services\Shopping\Factories\CartItemFactory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Mockery;
+use Mockery\MockInterface;
 
 class CartItemFactoryTest extends FunctionalTestCase
 {
@@ -291,6 +294,214 @@ class CartItemFactoryTest extends FunctionalTestCase
         $this->assertFalse($dto->isOffer());
         $this->assertFalse($dto->isBundle());
         $this->assertTrue($dto->isSubscription()); // subscription_bundle IS a subscription
+    }
+
+    // -------------------------------------------------------------------------
+    // fromGiftProduct
+    // -------------------------------------------------------------------------
+
+    public function test_from_gift_product_price_and_subtotal_are_always_zero(): void
+    {
+        $product = $this->makeProduct();
+
+        $result = $this->factory->fromGiftProduct(
+            sessionId: 'session',
+            userId: null,
+            product: $product,
+            quantity: 3,
+        );
+
+        $this->assertEquals(0.0, $result->price);
+        $this->assertEquals(0.0, $result->subtotal);
+    }
+
+    public function test_from_gift_product_quantity_greater_than_one_subtotal_remains_zero(): void
+    {
+        $product = $this->makeProduct();
+
+        $result = $this->factory->fromGiftProduct(
+            sessionId: 'session',
+            userId: null,
+            product: $product,
+            quantity: 5,
+        );
+
+        $this->assertEquals(5, $result->quantity);
+        $this->assertEquals(0.0, $result->subtotal);
+    }
+
+    public function test_from_gift_product_merchant_id_is_always_null(): void
+    {
+        $product = $this->makeProduct();
+
+        $result = $this->factory->fromGiftProduct(
+            sessionId: 'session',
+            userId: null,
+            product: $product,
+            quantity: 1,
+        );
+
+        $this->assertNull($result->merchant_id);
+    }
+
+    public function test_from_gift_product_uses_product_id_and_site_id_from_model(): void
+    {
+        $product = $this->makeProduct(id: 77, siteId: 9);
+
+        $result = $this->factory->fromGiftProduct(
+            sessionId: 'session',
+            userId: null,
+            product: $product,
+            quantity: 1,
+        );
+
+        $this->assertEquals(77, $result->product_id);
+        $this->assertEquals(9, $result->site_id);
+    }
+
+    public function test_from_gift_product_variant_id_defaults_to_null(): void
+    {
+        $product = $this->makeProduct();
+
+        $result = $this->factory->fromGiftProduct(
+            sessionId: 'session',
+            userId: null,
+            product: $product,
+            quantity: 1,
+        );
+
+        $this->assertNull($result->variant_id);
+    }
+
+    // -------------------------------------------------------------------------
+    // fromGiftSubscription
+    // -------------------------------------------------------------------------
+
+    public function test_from_gift_subscription_price_and_subtotal_are_always_zero(): void
+    {
+        $plan = $this->makePlan();
+
+        $result = $this->factory->fromGiftSubscription(
+            sessionId: 'session',
+            userId: null,
+            plan: $plan,
+            quantity: 1,
+        );
+
+        $this->assertEquals(0.0, $result->price);
+        $this->assertEquals(0.0, $result->subtotal);
+    }
+
+    public function test_from_gift_subscription_product_id_is_null(): void
+    {
+        $plan = $this->makePlan();
+
+        $result = $this->factory->fromGiftSubscription(
+            sessionId: 'session',
+            userId: null,
+            plan: $plan,
+            quantity: 1,
+        );
+
+        $this->assertNull($result->product_id,
+            'Gift subscription has no associated Product — product_id must be null'
+        );
+    }
+
+    public function test_from_gift_subscription_uses_site_id_from_plan(): void
+    {
+        $plan = $this->makePlan(id: 12, siteId: 7);
+
+        $result = $this->factory->fromGiftSubscription(
+            sessionId: 'session',
+            userId: null,
+            plan: $plan,
+            quantity: 1,
+        );
+
+        $this->assertEquals(7, $result->site_id);
+    }
+
+    public function test_from_gift_subscription_stores_plan_id_as_subscription_plan_id(): void
+    {
+        $plan = $this->makePlan(id: 12, siteId: 1);
+
+        $result = $this->factory->fromGiftSubscription(
+            sessionId: 'session',
+            userId: null,
+            plan: $plan,
+            quantity: 1,
+        );
+
+        $this->assertEquals(12, $result->subscription_plan_id);
+    }
+
+    public function test_from_gift_subscription_merchant_id_and_variant_id_are_null(): void
+    {
+        $plan = $this->makePlan();
+
+        $result = $this->factory->fromGiftSubscription(
+            sessionId: 'session',
+            userId: null,
+            plan: $plan,
+            quantity: 1,
+        );
+
+        $this->assertNull($result->merchant_id);
+        $this->assertNull($result->variant_id);
+    }
+
+    public function test_from_gift_subscription_quantity_stored_correctly(): void
+    {
+        $plan = $this->makePlan();
+
+        $result = $this->factory->fromGiftSubscription(
+            sessionId: 'session',
+            userId: null,
+            plan: $plan,
+            quantity: 2,
+        );
+
+        $this->assertEquals(2, $result->quantity);
+        $this->assertEquals(0.0, $result->subtotal);
+    }
+
+    // -------------------------------------------------------------------------
+    // Cross-cutting: gift methods never set merchant_id at row level
+    // -------------------------------------------------------------------------
+
+    public function test_gift_product_and_subscription_both_have_null_merchant_id(): void
+    {
+        $product = $this->makeProduct();
+        $plan = $this->makePlan();
+
+        $giftProduct = $this->factory->fromGiftProduct('s', null, $product, 1, []);
+        $giftSub = $this->factory->fromGiftSubscription('s', null, $plan, 1, []);
+
+        $this->assertNull($giftProduct->merchant_id);
+        $this->assertNull($giftSub->merchant_id);
+    }
+
+    // -------------------------------------------------------------------------
+    // Factories
+    // -------------------------------------------------------------------------
+
+    private function makeProduct(int $id = 1, int $siteId = 1): Product|MockInterface
+    {
+        $product = Mockery::mock(Product::class)->makePartial();
+        $product->id = $id;
+        $product->site_id = $siteId;
+
+        return $product;
+    }
+
+    private function makePlan(int $id = 1, int $siteId = 1): SubscriptionPlan|MockInterface
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = $id;
+        $plan->site_id = $siteId;
+
+        return $plan;
     }
 
     protected function setUp(): void

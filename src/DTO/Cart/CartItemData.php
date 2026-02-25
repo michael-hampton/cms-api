@@ -17,7 +17,7 @@ readonly class CartItemData
     public function __construct(
         public string $session_id,
         public ?int   $user_id,
-        public int    $product_id,
+        public ?int $product_id,
         public int    $quantity,
         public float  $price,
         public float  $subtotal,

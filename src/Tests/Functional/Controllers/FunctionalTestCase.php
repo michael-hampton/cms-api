@@ -723,6 +723,12 @@ abstract class FunctionalTestCase extends TestCase
         return (int)$stmt->fetch()['count'];
     }
 
+    protected function assertDatabaseCount(string $string, int $int)
+    {
+        $count = $this->countRecords($string);
+        $this->assertEquals($int, $count);
+    }
+
     protected function createFile(string $filePath)
     {
         $filePath = getcwd() . '/' . $filePath;

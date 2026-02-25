@@ -185,11 +185,26 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
         foreach ($this->items as $item) {
 
-            // Determine group key
             if ($key instanceof \Closure) {
                 $groupKey = $key($item);
             } else {
-                $groupKey = is_array($item) ? $item[$key] : $item->{$key};
+
+                $groupKey = null;
+
+                if (is_array($item)) {
+                    $groupKey = $item[$key] ?? $item[$this->snakeToCamel($key)] ?? null;
+                }
+
+                if (is_object($item)) {
+                    $groupKey =
+                        $item->{$key}
+                        ?? $item->{$this->snakeToCamel($key)}
+                        ?? null;
+                }
+            }
+
+            if ($groupKey === null) {
+                continue;
             }
 
             if (!isset($groups[$groupKey])) {
@@ -200,6 +215,11 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         }
 
         return new static($groups);
+    }
+
+    private function snakeToCamel(string $value): string
+    {
+        return lcfirst(str_replace('_', '', ucwords($value, '_')));
     }
 
     public function sortBy(string|callable $key, int $options = SORT_REGULAR, bool $descending = false): self

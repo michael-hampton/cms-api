@@ -526,6 +526,17 @@ class Database
         }
     }
 
+    public static function runTransaction(callable $callback)
+    {
+        $instance = static::getInstance();
+
+        if (!$instance) {
+            throw new \RuntimeException('Database instance not initialized');
+        }
+
+        return $instance->transaction($callback);
+    }
+
     /**
      * Begin a fluent query against a database table.
      *
