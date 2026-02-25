@@ -833,6 +833,7 @@ trait CreatesTestData
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 0
         ], $attributes));
     }
 

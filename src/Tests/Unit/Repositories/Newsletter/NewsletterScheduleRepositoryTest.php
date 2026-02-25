@@ -16,6 +16,14 @@ class NewsletterScheduleRepositoryTest extends RepositoryTestCase
     private NewsletterCreationScheduleRepository $creationRepo;
     private NewsletterSendScheduleRepository $sendRepo;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->creationRepo = new NewsletterCreationScheduleRepository();
+        $this->sendRepo = new NewsletterSendScheduleRepository();
+    }
+
     public function test_find_by_newsletter_id_returns_active_schedule(): void
     {
         $newsletter = $this->createNewsletter();
@@ -250,11 +258,54 @@ class NewsletterScheduleRepositoryTest extends RepositoryTestCase
         $this->assertNull($refreshed->creation_schedule_id);
     }
 
-    protected function setUp(): void
+    public function test_get_due_schedules_returns_active_schedule_with_past_next_run_at(): void
     {
-        parent::setUp();
+        $newsletter = $this->createNewsletter();
+        $schedule = $this->createNewsletterSendSchedule([
+            'newsletter_id' => $newsletter->id,
+            'status' => 'active',
+            'next_run_at' => now_datetime()->subMinutes(1)->format('Y-m-d H:i:s'),
+        ]);
 
-        $this->creationRepo = new NewsletterCreationScheduleRepository();
-        $this->sendRepo = new NewsletterSendScheduleRepository();
+        $results = $this->sendRepo->getDueSchedules();
+
+        $this->assertTrue($results->contains('id', $schedule->id));
+    }
+
+    public function test_get_due_schedules_excludes_paused_and_future(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $this->createNewsletterSendSchedule([
+            'newsletter_id' => $newsletter->id,
+            'status' => 'paused',
+            'next_run_at' => now_datetime()->subMinutes(1)->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->createNewsletterSendSchedule([
+            'newsletter_id' => $newsletter->id,
+            'status' => 'active',
+            'next_run_at' => now_datetime()->addHours(1)->format('Y-m-d H:i:s'),
+        ]);
+
+        $results = $this->sendRepo->getDueSchedules();
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_get_due_schedules_filters_by_site_id(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $this->createNewsletterSendSchedule([
+            'newsletter_id' => $newsletter->id,
+            'site_id' => 999,
+            'status' => 'active',
+            'next_run_at' => now_datetime()->subMinutes(1)->format('Y-m-d H:i:s'),
+        ]);
+
+        $results = $this->sendRepo->getDueSchedules($this->siteId);
+
+        $this->assertCount(0, $results);
     }
 }

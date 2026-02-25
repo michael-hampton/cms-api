@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Repositories\Newsletter;
 
 use App\Models\Model;
 use App\Models\Newsletter;
+use App\Models\NewsletterSend;
+use App\Models\NewsletterSendRecipient;
 use App\Models\NewsletterSnapshot;
 use App\Repositories\Newsletters\NewsletterSnapshotRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -146,6 +148,78 @@ class NewsletterSnapshotRepositoryTest extends FunctionalTestCase
     {
         $found = $this->repository->findByToken('nonexistent-token-xyz');
         $this->assertNull($found);
+    }
+
+    public function test_records_view_in_browser_click_for_recipient(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => '{}'
+        ]);
+
+        $send = NewsletterSend::create([
+            'newsletter_id' => $newsletter->id,
+            'sent_at' => now_datetime(),
+            'recipient_count' => 0,
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'pending_count' => 0,
+            'content_snapshot' => []
+        ]);
+
+        $newsletter = $this->makeNewsletter();
+        $snapshot = $this->repository->createSnapshot($newsletter->id, '<html>Content</html>', null, null, null);
+
+        // You'll need a helper or factory for recipients — adjust to your test setup
+        $recipient = NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'pending@example.com',
+            'status' => NewsletterSendRecipient::STATUS_PENDING
+        ]);
+
+        $this->repository->recordViewInBrowserClick($snapshot->id, $recipient->id);
+
+        $this->assertDatabaseHas('newsletter_snapshot_views', [
+            'newsletter_snapshot_id' => $snapshot->id,
+            'newsletter_recipient_id' => $recipient->id,
+        ]);
+    }
+
+    public function test_record_view_in_browser_click_is_idempotent(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => '{}'
+        ]);
+
+        $send = NewsletterSend::create([
+            'newsletter_id' => $newsletter->id,
+            'sent_at' => now_datetime(),
+            'recipient_count' => 0,
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'pending_count' => 0,
+            'content_snapshot' => []
+        ]);
+        $snapshot = $this->repository->createSnapshot($newsletter->id, '<html>Content</html>', null, null, null);
+
+        $recipient = NewsletterSendRecipient::create([
+            'newsletter_send_id' => $send->id,
+            'email' => 'pending@example.com',
+            'status' => NewsletterSendRecipient::STATUS_PENDING
+        ]);
+
+        // Calling twice must not throw
+        $this->repository->recordViewInBrowserClick($snapshot->id, $recipient->id);
+        $this->repository->recordViewInBrowserClick($snapshot->id, $recipient->id);
+
+        $this->assertDatabaseCount('newsletter_snapshot_views', 1);
     }
 
     protected function setUp(): void

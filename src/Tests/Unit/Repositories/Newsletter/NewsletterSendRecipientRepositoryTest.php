@@ -16,6 +16,32 @@ class NewsletterSendRecipientRepositoryTest extends FunctionalTestCase
     private NewsletterSendRepository $newsletterSendRepository;
     private Model $send;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->newsletterSendRepository = new NewsletterSendRepository();
+        $this->repository = new NewsletterSendRecipientRepository($this->newsletterSendRepository);
+
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'site_id' => $this->siteId,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => '{}'
+        ]);
+
+        $this->send = NewsletterSend::create([
+            'newsletter_id' => $newsletter->id,
+            'sent_at' => now_datetime(),
+            'recipient_count' => 0,
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'pending_count' => 0,
+            'content_snapshot' => []
+        ]);
+    }
+
     public function testCreateRecipients(): void
     {
         $emails = ['test1@example.com', 'test2@example.com', 'test3@example.com'];
@@ -149,31 +175,5 @@ class NewsletterSendRecipientRepositoryTest extends FunctionalTestCase
         $this->assertEquals(1, $send->sent_count);
         $this->assertEquals(1, $send->failed_count);
         $this->assertEquals(0, $send->pending_count);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->newsletterSendRepository = new NewsletterSendRepository();
-        $this->repository = new NewsletterSendRecipientRepository($this->newsletterSendRepository);
-
-        $newsletter = Newsletter::create([
-            'title' => 'Test Newsletter',
-            'site_id' => $this->siteId,
-            'active' => true,
-            'interval' => 'weekly',
-            'content' => '{}'
-        ]);
-
-        $this->send = NewsletterSend::create([
-            'newsletter_id' => $newsletter->id,
-            'sent_at' => now_datetime(),
-            'recipient_count' => 0,
-            'sent_count' => 0,
-            'failed_count' => 0,
-            'pending_count' => 0,
-            'content_snapshot' => []
-        ]);
     }
 }

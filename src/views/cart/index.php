@@ -624,7 +624,12 @@
                                     <?= count($merchantData['items']) ?> item(s)
                                 </p>
                             </div>
-                            <?php foreach ($items as $item): ?>
+                            <?php foreach ($items as $item):
+                                $isFreeGift = ($item['options']['type'] ?? '') === 'free_gift'
+                                        || ($item['options']['is_gift'] ?? false) === true
+                                        || (float)($item['price'] ?? 0) === 0.0;
+
+                                ?>
                                 <div class="cart-item" data-item-id="<?= $item['id'] ?>">
                                     <?php if (!empty($item['subscription_plan_id'])): ?>
                                         <!-- Subscription item -->
@@ -635,10 +640,29 @@
                                         $planId = $item['subscription_plan_id'];
                                         ?>
                                         <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
-                                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
-                                                 stroke="currentColor">
-                                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                            </svg>
+                                            <?php if ($isFreeGift): ?>
+                                                <div style="position: relative;">
+                                                    <span style="
+                                                        position: absolute; top: -0.5rem; left: -0.5rem;
+                                                        background: #10b981; color: white; font-size: 0.7rem;
+                                                        font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 1rem;
+                                                        letter-spacing: 0.05em; text-transform: uppercase; z-index: 1;
+                                                    ">🎁 Free Gift</span>
+                                                    <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
+                                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                                             stroke="#10b981">
+                                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            <?php else: ?>
+                                                <div style="width: 120px; height: 120px; border-radius: 0.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-light);">
+                                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor">
+                                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                                    </svg>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="item-details">
                                             <div class="item-name"><?= htmlspecialchars($planName) ?></div>
@@ -649,12 +673,23 @@
                                                 <?php endif; ?>
                                             </div>
                                             <div class="item-price">
-                                                <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
+                                                <?php if ($isFreeGift): ?>
+                                                    <span style="color: #10b981; font-weight: 700; font-size: 1rem;">FREE</span>
+                                                    <span style="display: inline-block; background: #d1fae5; color: #065f46; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 0.375rem; border: 1px solid #6ee7b7; margin-left: 0.5rem;">Complimentary</span>
+                                                <?php else: ?>
+                                                    <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
 
                                         <div class="item-actions">
-                                            <div class="item-subtotal">$<?= number_format($item['subtotal'], 2) ?></div>
+                                            <div class="item-subtotal">
+                                                <?php if ($isFreeGift): ?>
+                                                    <span style="color: #10b981; font-weight: 700;">FREE</span>
+                                                <?php else: ?>
+                                                    $<?= number_format($item['subtotal'], 2) ?>
+                                                <?php endif; ?>
+                                            </div>
                                             <button class="remove-btn" onclick="removeItem(<?= $item['id'] ?>)">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                                      stroke="currentColor">
@@ -685,14 +720,50 @@
                                             <?php endif; ?>
                                         </div>
                                     <?php else: ?>
-                                        <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
-                                             alt="<?= htmlspecialchars($item['product_name']) ?>"
-                                             class="item-image">
+                                        <?php if ($isFreeGift): ?>
+                                            <div style="position: relative;">
+                                                <span style="
+                                                    position: absolute;
+                                                    top: -0.5rem;
+                                                    left: -0.5rem;
+                                                    background: #10b981;
+                                                    color: white;
+                                                    font-size: 0.7rem;
+                                                    font-weight: 700;
+                                                    padding: 0.2rem 0.6rem;
+                                                    border-radius: 1rem;
+                                                    letter-spacing: 0.05em;
+                                                    text-transform: uppercase;
+                                                    z-index: 1;
+                                                ">🎁 Free Gift</span>
+                                                <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                                     class="item-image"
+                                                     style="border: 2px solid #10b981;">
+                                            </div>
+                                        <?php else: ?>
+                                            <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                                 alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                                 class="item-image">
+                                        <?php endif; ?>
                                         <div class="item-details">
                                             <a href="/shop/details/<?= htmlspecialchars($item['product_slug']) ?>"
                                                class="item-name">
                                                 <?= htmlspecialchars($item['product_name']) ?>
                                             </a>
+                                            <?php if ($isFreeGift): ?>
+                                                <span style="
+                                                    display: inline-block;
+                                                    background: #d1fae5;
+                                                    color: #065f46;
+                                                    font-size: 0.75rem;
+                                                    font-weight: 600;
+                                                    padding: 0.2rem 0.6rem;
+                                                    border-radius: 0.375rem;
+                                                    border: 1px solid #6ee7b7;
+                                                    margin-top: 0.25rem;
+                                                ">Complimentary — No charge</span>
+                                            <?php endif; ?>
                                             <!-- ADD VARIANT OPTIONS DISPLAY -->
                                             <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
                                                 <div class="variant-options" style="margin-top: 0.5rem;">
@@ -711,7 +782,11 @@
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                             <div class="item-price">
-                                                <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
+                                                <?php if ($isFreeGift): ?>
+                                                    <span style="color: #10b981; font-weight: 700; font-size: 1rem;">FREE</span>
+                                                <?php else: ?>
+                                                    <span class="sale-price">$<?= number_format($item['price'], 2) ?></span>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="quantity-controls">
                                                 <button class="qty-btn"
@@ -735,7 +810,12 @@
                                         </div>
                                         <div class="item-actions">
                                             <div class="item-subtotal">
-                                                $<?= number_format($item['subtotal'], 2) ?></div>
+                                                <?php if ($isFreeGift): ?>
+                                                    <span style="color: #10b981; font-weight: 700;">FREE</span>
+                                                <?php else: ?>
+                                                    $<?= number_format($item['subtotal'], 2) ?>
+                                                <?php endif; ?>
+                                            </div>
                                             <button class="remove-btn" onclick="removeItem(<?= $item['id'] ?>)">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                                      stroke="currentColor">

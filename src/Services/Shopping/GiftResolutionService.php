@@ -79,7 +79,6 @@ class GiftResolutionService
         $candidates = $this->collector->collect($cartContext);
         $giftLabels = $this->fetchGiftLabels($candidates);
         $giftLines = $this->strategy->resolve($candidates, $giftLabels);
-
         return $this->syncCartGifts($giftLines, $sessionId, $userId);
     }
 
@@ -115,6 +114,7 @@ class GiftResolutionService
     ): CartContext
     {
         $rawItems = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+
         $lineItems = [];
         $cartTotal = 0.0;
         $itemCount = 0;

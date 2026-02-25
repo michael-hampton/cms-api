@@ -20,6 +20,7 @@ class NewsletterSendRecipientRepository extends Repository
             $recipients[] = $this->create([
                 'newsletter_send_id' => $sendId,
                 'email' => $email,
+                'view_token' => bin2hex(random_bytes(16)),
                 'status' => NewsletterSendRecipient::STATUS_PENDING,
                 'attempts' => 0
             ]);
@@ -87,6 +88,11 @@ class NewsletterSendRecipientRepository extends Repository
             'bounced' => $stats[NewsletterSendRecipient::STATUS_BOUNCED]['count'] ?? 0,
             'avg_attempts' => $stats[NewsletterSendRecipient::STATUS_SENT]['avg_attempts'] ?? 0,
         ];
+    }
+
+    public function findByViewToken(string $token): ?NewsletterSendRecipient
+    {
+        return NewsletterSendRecipient::where('view_token', $token)->first();
     }
 
     protected function getModelClass(): string

@@ -186,12 +186,16 @@ class Database
         }
     }
 
-    public function fetchOne(string $sql, array $params = []): ?array
+    public function fetchOne(
+        string $sql,
+        array  $params = [],
+        int    $fetchMode = PDO::FETCH_ASSOC
+    ): ?array
     {
         $stmt = $this->query($sql, $params);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch($fetchMode);
 
-        return $row ?: null;
+        return $row !== false ? $row : null;
     }
 
     public function insert(string $table, array $data): int
@@ -548,5 +552,64 @@ class Database
         $eagerLoader = Container::getInstance()->resolve(EagerLoader::class);
 
         return new QueryBuilder($table, $eagerLoader, self::getInstance());
+    }
+
+    public function prepare(string $sql): PDOStatement
+    {
+        try {
+            return $this->connection->prepare($sql);
+        } catch (Exception $e) {
+            Logger::error('Failed to prepare statement', [
+                'sql' => $sql,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    public function execute(PDOStatement $stmt, array $params = []): PDOStatement
+    {
+        try {
+            $start = microtime(true);
+
+            $stmt->execute($params);
+
+            $executionTime = round((microtime(true) - $start) * 1000, 2);
+
+            $this->logQuery(
+                $stmt->queryString,
+                $params,
+                $executionTime
+            );
+
+            return $stmt;
+
+        } catch (Exception $e) {
+            Logger::error('Statement execution failed', [
+                'sql' => $stmt->queryString,
+                'params' => $params,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    public function fetch(
+        string $sql,
+        array  $params = [],
+        int    $fetchMode = PDO::FETCH_ASSOC
+    ): array
+    {
+        $stmt = $this->query($sql, $params);
+        return $stmt->fetchAll($fetchMode);
+    }
+
+    public function cursor(string $sql, array $params = []): \Generator
+    {
+        $stmt = $this->query($sql, $params);
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            yield $row;
+        }
     }
 }

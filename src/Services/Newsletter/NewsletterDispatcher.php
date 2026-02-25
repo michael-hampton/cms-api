@@ -79,7 +79,8 @@ class NewsletterDispatcher
                         $recipientModel->email,
                         $unsubscribeToken,
                         $sendRecord->id,
-                        $newsletter->isAutomated()
+                        $newsletter->isAutomated(),
+                        $recipientModel->view_token,
                     );
 
                     // Build subject
@@ -158,9 +159,25 @@ class NewsletterDispatcher
         string  $email,
         ?string $unsubscribeToken,
         int     $sendId,
-        bool    $isAutomated
+        bool    $isAutomated,
+        ?string $recipientToken = null,
     ): string
     {
+        // Replace the per-snapshot view-in-browser placeholder with the
+        // per-recipient URL: /newsletter/view/{snapshotToken}?r={recipientToken}
+        $html = preg_replace_callback(
+            '/\{\{VIEW_IN_BROWSER_URL:([a-f0-9]+)\}\}/',
+            function (array $matches) use ($recipientToken): string {
+                $snapshotToken = $matches[1];
+                $url = url("/newsletter/view/{$snapshotToken}");
+                if ($recipientToken) {
+                    $url .= '?r=' . urlencode($recipientToken);
+                }
+                return $url;
+            },
+            $html
+        );
+
         if ($isAutomated) {
             // Replace tracking placeholders
             $emailHash = hash('sha256', $email);

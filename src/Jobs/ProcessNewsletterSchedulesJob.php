@@ -2,6 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Framework\Queue\Dispatchable;
+use App\Framework\Queue\InteractsWithQueue;
+use App\Framework\Queue\Queueable;
+use App\Framework\Queue\SerializesModels;
+use App\Framework\Queue\ShouldBeUnique;
+use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
 use App\Services\Newsletter\NewsletterSendScheduleRunner;
 
@@ -32,12 +38,6 @@ class ProcessNewsletterSchedulesJob implements ShouldQueue, ShouldBeUnique
      * advanced schedules.
      */
     public int $tries = 1;
-
-    /**
-     * Number of seconds the job may run before timing out.
-     * Set generously to accommodate large recipient lists.
-     */
-    public int $timeout = 300;
 
     public function __construct(
         private readonly ?int $siteId = null,

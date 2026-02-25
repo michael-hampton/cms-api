@@ -1900,4 +1900,42 @@ class QueryBuilder
         throw new BadMethodCallException("Method {$method} does not exist.");
     }
 
+    public function insertOrIgnore(array $values): int
+    {
+        if (empty($values)) {
+            return 0;
+        }
+
+        // Support both single row and bulk insert
+        $isMulti = is_array(reset($values));
+
+        if (!$isMulti) {
+            $values = [$values];
+        }
+
+        $columns = array_keys($values[0]);
+
+        $placeholders = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
+
+        $sql = sprintf(
+            'INSERT IGNORE INTO %s (%s) VALUES %s',
+            $this->table,
+            implode(', ', $columns),
+            implode(', ', array_fill(0, count($values), $placeholders))
+        );
+
+        $bindings = [];
+
+        foreach ($values as $row) {
+            foreach ($columns as $column) {
+                $bindings[] = $row[$column] ?? null;
+            }
+        }
+
+        $statement = $this->database->prepare($sql);
+        $statement->execute($bindings);
+
+        return $statement->rowCount(); // returns inserted rows (ignored rows not counted)
+    }
+
 }

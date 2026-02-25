@@ -25,6 +25,7 @@ use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\CartPersistenceService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
+use App\Services\Shopping\GiftResolutionService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
 use DateTimeImmutable;
 use Exception;
@@ -48,6 +49,7 @@ class CartController extends Controller
         private readonly OTPRepository           $OTPRepository,
         private readonly CheckoutIdentityService $identityService,
         private readonly CartPersistenceService  $cartPersistence,
+        private GiftResolutionService $giftResolutionService
 
     )
     {
@@ -56,6 +58,8 @@ class CartController extends Controller
 
     public function page()
     {
+        $this->giftResolutionService->resolveAndSync($this->cartService->getSessionId(), MemberAuth::id());
+
         $items = $this->cartService->getItems();
         $subtotal = collect($items)->sum('subtotal');
         $startOptions = $this->calculateStartOptions($items);

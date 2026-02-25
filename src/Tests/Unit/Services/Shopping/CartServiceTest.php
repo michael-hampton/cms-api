@@ -332,6 +332,10 @@ class CartServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($cartItem);
 
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
+
         $this->cartRepository->shouldReceive('delete')
             ->once()
             ->with(1);
@@ -623,9 +627,9 @@ class CartServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($offer);
 
-        $this->cartRepository->shouldReceive('findItemByProduct')
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->once()
-            ->andReturn(null);
+            ->andReturn(collect());
 
         $this->cartRepository->shouldReceive('create')
             ->once()
@@ -660,16 +664,17 @@ class CartServiceTest extends FunctionalTestCase
         $product = $this->createProduct();
         $offer = $this->createProductOffer($product->id);
 
-        $existingCartItem = Mockery::mock(CartItem::class);
+        $existingCartItem = Mockery::mock(CartItem::class)->makePartial();
+        $existingCartItem->product_id = $product->id;
 
         $this->offerRepository->shouldReceive('find')
             ->with($offer->id)
             ->once()
             ->andReturn($offer);
 
-        $this->cartRepository->shouldReceive('findItemByProduct')
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->once()
-            ->andReturn($existingCartItem);
+            ->andReturn(collect([$existingCartItem]));
 
         $result = $this->service->addOfferToCart($offer->id);
 
@@ -877,6 +882,10 @@ class CartServiceTest extends FunctionalTestCase
         $this->cartRepository->shouldReceive('findById')
             ->once()
             ->andReturn($cartItem);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')
+            ->once()
+            ->andReturn(collect([$cartItem]));
 
         $this->cartRepository->shouldReceive('delete')
             ->once();

@@ -3,7 +3,7 @@
 namespace App\Services\Newsletter;
 
 use App\Framework\Database\Database;
-use App\Models\NewsletterSendRecipient;
+use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Newsletters\NewsletterSnapshotRepository;
 
 /**
@@ -33,6 +33,7 @@ class NewsletterViewInBrowserService
     public function __construct(
         private readonly NewsletterViewTokenService   $viewTokenService,
         private readonly NewsletterSnapshotRepository $snapshotRepository,
+        private readonly NewsletterSendRecipientRepository $recipientRepository,
         private readonly Database                     $database,
     )
     {
@@ -63,7 +64,7 @@ class NewsletterViewInBrowserService
             return;
         }
 
-        $recipient = NewsletterSendRecipient::where('token', $recipientToken)->first();
+        $recipient = $this->recipientRepository->findByViewToken($recipientToken);
 
         if (!$recipient) {
             return;

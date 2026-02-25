@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Newsletters;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\NewsletterSnapshot;
@@ -66,5 +67,16 @@ class NewsletterSnapshotRepository extends Repository
         $snapshot->view_token = $token;
         $snapshot->view_token_expires_at = $expiresAt;
         return $snapshot->save();
+    }
+
+    public function recordViewInBrowserClick(int $snapshotId, int $recipientId): void
+    {
+        // Use an insert-or-ignore pattern so duplicate clicks don't throw.
+        // If you have a dedicated tracking table, insert there instead.
+        Database::table('newsletter_snapshot_views')->insertOrIgnore([
+            'newsletter_snapshot_id' => $snapshotId,
+            'newsletter_recipient_id' => $recipientId,
+            'viewed_at' => now_datetime()->toDateTimeString(),
+        ]);
     }
 }

@@ -15,10 +15,13 @@ use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
+use App\Repositories\Newsletters\NewsletterSnapshotRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Newsletter\NewsletterArchiveService;
 use App\Services\Newsletter\NewsletterPageBuilderService;
+use App\Services\Newsletter\NewsletterViewInBrowserService;
+use App\Services\Newsletter\NewsletterViewTokenService;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
@@ -34,7 +37,10 @@ class NewsletterWebController extends Controller
         private readonly NewsletterSendPageViewRepository $sendPageViewRepository,
         private readonly PageRepository                   $pageRepository,
         private readonly NewsletterBrandingRepository $newsletterBrandingRepository,
-        private readonly NewsletterLayoutRepository   $newsletterLayoutRepository
+        private readonly NewsletterLayoutRepository     $newsletterLayoutRepository,
+        private readonly NewsletterSnapshotRepository   $newsletterSnapshotRepository,
+        private NewsletterViewTokenService              $newsletterViewTokenService,
+        private readonly NewsletterViewInBrowserService $newsletterViewInBrowserService
     )
     {
         parent::__construct();
@@ -241,6 +247,26 @@ class NewsletterWebController extends Controller
 
         $html = urldecode($html);
 
+        // 1. Persist a snapshot of the rendered HTML so "view in browser" can
+        //    serve it later.  The snapshot is created here — inside the
+        //    transaction — so that if anything fails the snapshot is rolled
+        //    back with the rest of the send record.
+        $snapshot = $this->newsletterSnapshotRepository->createSnapshot(
+            newsletterId: $newsletter->id,
+            htmlSnapshot: $html,
+            brandingSnapshot: null,
+            layoutVersionId: null,
+            brandingVersionId: null,
+        );
+
+        // 2. Generate a single view token for this snapshot.  The token is the
+        //    same for all recipients; the per-recipient `r=` query-string
+        //    parameter (added at dispatch time) provides attribution.
+        $snapshotViewToken = $this->newsletterViewTokenService->generateTokenForSnapshot($snapshot->id);
+
+        $viewOnlineUrl = $this->newsletterViewInBrowserService->buildViewUrl($snapshotViewToken, uniqid());
+
+        $html = str_replace('{{VIEW_IN_BROWSER_URL}}', $viewOnlineUrl, $html);
         $html = str_replace('{{SEND_ID}}', '', $html);
         $html = str_replace('{{TRACKING_EMAIL}}', '', $html);
         $html = preg_replace(
@@ -258,6 +284,33 @@ class NewsletterWebController extends Controller
             'send_id' => $sendId,
             'send_date' => $asOfDate,
             'is_archive_view' => false
+        ]);
+    }
+
+    public function viewOnline(string $snapshotToken, Request $request): mixed
+    {
+        $recipientToken = $request->query('r');
+
+        $snapshot = $this->newsletterViewTokenService->resolveSnapshot($snapshotToken);
+
+        if (!$snapshot) {
+            return $this->redirectResponse('', 404);
+        }
+
+        // Non-critical — catch and continue; the user still sees the newsletter
+        if ($recipientToken) {
+            try {
+                $this->newsletterViewInBrowserService->recordView($snapshotToken, $recipientToken);
+            } catch (\Throwable $e) {
+                Logger::error('Failed to record view-in-browser click', [
+                    'snapshot_token' => $snapshotToken,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $this->view('newsletters/view-online', [
+            'html' => $snapshot->layout_html_snapshot,
         ]);
     }
 

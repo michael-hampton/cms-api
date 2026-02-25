@@ -27,9 +27,12 @@ if (!function_exists('member_auth')) {
 }
 
 if (!function_exists('url')) {
-    function url(string $path): ?string
+    function url(string $path): string
     {
-        return $path;
+        $base = rtrim(config('app.url'), '/');
+        $path = ltrim($path, '/');
+
+        return $base . '/' . $path;
     }
 }
 

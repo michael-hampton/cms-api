@@ -100,6 +100,7 @@ use App\Services\Newsletter\Renderers\SchemaBlockRenderer;
 use App\Services\Newsletter\Renderers\SectionBlockRenderer;
 use App\Services\Newsletter\Renderers\ServicesBlockRenderer;
 use App\Services\Newsletter\Renderers\StaticDealBlockRenderer;
+use App\Services\Newsletter\Renderers\StatsBlockRenderer;
 use App\Services\Newsletter\Renderers\TableBlockRenderer;
 use App\Services\Newsletter\Renderers\TeamBlockRenderer;
 use App\Services\Newsletter\Renderers\TeaserBlockRenderer;
@@ -170,15 +171,19 @@ class ApiApplication
                     new AwardBlockRenderer(),
                     new BannerBlockRenderer(),
                     new BuyingGuideBlockRenderer(),
+                    new CardBlockRenderer(),
                     new ContactFormBlockRenderer(),
                     new CtaBlockRenderer(),
                     app(DealOfferRenderer::class),
                     new DividerBlockRenderer(),
+                    new GalleryBlockRenderer(),
                     new HeadingBlockRenderer(),
                     new HeroBlockRenderer(),
                     new ImageBlockRenderer(),
                     new InfoBlockRenderer(),
                     new ListBlockRenderer(),
+                    new MapLocationBlockRenderer(),
+                    new NewsFeedBlockRenderer(),
                     new NoteBlockRenderer(),
                     app(OfferblockRenderer::class),
                     new PersonBlockRenderer(),
@@ -188,21 +193,19 @@ class ApiApplication
                     app(RewardBlockRenderer::class),
                     new SchemaBlockRenderer(),
                     new SectionBlockRenderer(),
+                    new ServicesBlockRenderer(),
                     new StaticDealBlockRenderer(),
                     new TableBlockRenderer(),
+                    new TeamBlockRenderer(),
+                    new TeaserBlockRenderer(),
                     new TestimonialBlockRenderer(),
                     new TextBlockRenderer(),
                     new PagelinksBlockRenderer(),
                     new ServicesBlockRenderer(),
-                    new NewsFeedBlockRenderer(),
-                    new CardBlockRenderer(),
                     new CardGroupBlockRenderer(new CardBlockRenderer()),
-                    new TeaserBlockRenderer(),
-                    new TeamBlockRenderer(),
-                    new GalleryBlockRenderer(),
                     new EventBlockRenderer(),
-                    new MapLocationBlockRenderer(),
                     new PagegridBlockRenderer(),
+                    new StatsBlockRenderer()
                 ]);
             }
         );

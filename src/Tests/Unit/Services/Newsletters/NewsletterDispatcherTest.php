@@ -15,7 +15,6 @@ use App\Services\Members\EmailService;
 use App\Services\Newsletter\NewsletterDispatcher;
 use Mockery;
 use PHPUnit\Framework\TestCase;
-use function PHPUnit\Framework\assertEquals;
 
 class NewsletterDispatcherTest extends TestCase
 {
@@ -397,6 +396,44 @@ class NewsletterDispatcherTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertEquals(1, $result['sent']);
+    }
+
+    public function testDispatchReplacesViewInBrowserPlaceholderPerRecipient(): void
+    {
+        $sendRecord = $this->createMockSendRecord();
+        $newsletter = $this->createMockNewsletter(false);
+        $siteId = 1;
+        $snapshotToken = 'abc123def456';
+
+        $recipient = $this->createMockRecipient(1, 'user@example.com');
+        $recipient->view_token = 'recipienttoken99';
+
+        $this->mockPreferenceRepository->shouldReceive('findByEmails')->andReturn(collect([]));
+        $this->mockSubscriberRepository->shouldReceive('findByEmails')->andReturn(collect([]));
+        $this->mockRecipientRepository->shouldReceive('find')->with(1)->andReturn($recipient);
+
+        $this->mockEmailService->shouldReceive('send')
+            ->once()
+            ->with(
+                'user@example.com',
+                'Test Newsletter',
+                Mockery::on(function (string $html) {
+                    return str_contains($html, '/newsletter/view/abc123def456?r=recipienttoken99');
+                })
+            );
+
+        $recipient->shouldReceive('markAsSent')->once();
+        $this->mockRecipientRepository->shouldReceive('updateSendCounts')->once();
+
+        $this->dispatcher->dispatch(
+            $sendRecord,
+            [$recipient],
+            $newsletter,
+            $siteId,
+            '<a href="{{VIEW_IN_BROWSER_URL:' . $snapshotToken . '}}">View online</a>{{UNSUBSCRIBE_LINK}}',
+            false
+        );
+        $this->assertTrue(true);
     }
 
     private function createMockSendRecord(): NewsletterSend

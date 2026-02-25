@@ -53,4 +53,23 @@ class Cache
 
         return $value;
     }
+
+    public static function add(string $key, $value, int $seconds): bool
+    {
+        // If key exists and not expired → fail
+        if (isset(self::$cache[$key])) {
+            $item = self::$cache[$key];
+
+            if (time() <= $item['expires']) {
+                return false;
+            }
+        }
+
+        self::$cache[$key] = [
+            'value' => $value,
+            'expires' => time() + $seconds
+        ];
+
+        return true;
+    }
 }

@@ -55,9 +55,9 @@ class GiftChecklistServiceTest extends RepositoryTestCase
         $gifts = $this->service->getGiftsInCart();
         $this->assertCount(1, $gifts);
 
-        $cartItem = $gifts[0];
+        $cartItem = $gifts->first();
 
-        $options = is_string($cartItem['options']) ? json_decode($cartItem['options'], true) : (array)$cartItem['options'];
+        $options = is_string($cartItem->options) ? json_decode($cartItem->options, true) : (array)$cartItem->options;
 
         $this->assertEquals(0.0, (float)$cartItem->price);
         $this->assertEquals(CartItemType::FREE_GIFT->value, $options['type']);
@@ -118,9 +118,10 @@ class GiftChecklistServiceTest extends RepositoryTestCase
         $this->assertTrue($result['success']);
 
         $gifts = $this->service->getGiftsInCart();
-        $options = is_string($gifts[0]['options']) ? json_decode($gifts[0]['options'], true) : (array)$gifts[0]['options'];
+        $gift = $gifts->first();
+        $options = is_string($gift->options) ? json_decode($gift->options, true) : (array)$gift->options;
 
-        $this->assertEquals(0.0, (float)$gifts[0]->price);
+        $this->assertEquals(0.0, (float)$gift->price);
         $this->assertEquals(CartItemType::FREE_GIFT->value, $options['type']);
         $this->assertTrue($options['is_gift']);
         $this->assertEquals($plan->id, $options['subscription_plan_id']);
@@ -166,7 +167,7 @@ class GiftChecklistServiceTest extends RepositoryTestCase
 
         $this->assertCount(2, $gifts);
 
-        $result = $this->service->removeGift($gifts[0]['id']);
+        $result = $this->service->removeGift($gifts->first()->id);
 
         $this->assertTrue($result['success']);
         $this->assertCount(1, $this->service->getGiftsInCart());
@@ -203,7 +204,7 @@ class GiftChecklistServiceTest extends RepositoryTestCase
 
     public function test_get_gifts_returns_empty_array_when_no_gifts(): void
     {
-        $this->assertSame([], $this->service->getGiftsInCart());
+        $this->assertEmpty($this->service->getGiftsInCart());
     }
 
     public function test_get_gifts_only_returns_gift_items_not_regular_products(): void
@@ -216,9 +217,10 @@ class GiftChecklistServiceTest extends RepositoryTestCase
         $this->service->addGift(new GiftChecklistItem(label: 'Free Gift', productId: $giftProduct->id));
 
         $gifts = $this->service->getGiftsInCart();
+        $gift = $gifts->first();
 
         $this->assertCount(1, $gifts);
-        $options = is_string($gifts[0]['options']) ? json_decode($gifts[0]['options'], true) : (array)$gifts[0]['options'];
+        $options = is_string($gift->options) ? json_decode($gift->options, true) : (array)$gift->options;
         $this->assertEquals($giftProduct->id, $options['product_id']);
     }
 

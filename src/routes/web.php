@@ -376,6 +376,9 @@ $router->post('/{site}/member/single-access/complete', [SingleContentAccessContr
 $router->get('/{site}/newsletters/track-view', [NewsletterWebController::class, 'trackPageView']);
 $router->get('/{site}/newsletters/{newsletterId}/sends/{sendId}/analytics', [NewsletterWebController::class, 'sendAnalytics']);
 
+//newsletter view online
+$router->get('/newsletter/view/{snapshotToken}', [NewsletterWebController::class, 'viewOnline']);
+
 
 //faqs
 $router->get('{site}/faqs', [FaqController::class, 'subscriptions']);

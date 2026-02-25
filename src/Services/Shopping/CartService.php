@@ -42,7 +42,7 @@ class CartService
     {
     }
 
-    protected function getSessionId(): string
+    public function getSessionId(): string
     {
         if (empty(Session::get('cart_session_id'))) {
             Session::put('cart_session_id', uniqid('cart_', true));
@@ -112,7 +112,6 @@ class CartService
         $product = $this->productRepository->find($productId, ['availableMerchants', 'variants']);
 
         if (!$product || !$product->is_active) {
-            die('a');
             return ['success' => false, 'message' => 'Product not found or inactive'];
         }
 
@@ -143,7 +142,6 @@ class CartService
         try {
             $this->stockResolver->assertCanAdd($product, $variant, $quantity);
         } catch (InsufficientStockException $e) {
-            echo $e->getMessage();
             return ['success' => false, 'message' => $e->getUserMessage()];
         }
 

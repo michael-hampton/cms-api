@@ -5,6 +5,7 @@ namespace App\Services\Shopping;
 use App\DTO\Cart\GiftChecklistItem;
 use App\Enums\CartItemType;
 use App\Framework\Session\Session;
+use App\Framework\Support\Collection;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -106,7 +107,7 @@ class GiftChecklistService
      * Returns all FREE_GIFT cart rows for the current session / user, each
      * carrying the full metadata needed to reconstruct the gift on the order.
      */
-    public function getGiftsInCart(): array
+    public function getGiftsInCart(): Collection
     {
         $sessionId = $this->resolveSessionId();
         $userId = $this->resolveUserId();
@@ -119,7 +120,7 @@ class GiftChecklistService
                 : (array)($item->options ?? []);
 
             return ($options['type'] ?? '') === CartItemType::FREE_GIFT->value;
-        })->values()->toArray();
+        })->values();
     }
 
     // -------------------------------------------------------------------------
