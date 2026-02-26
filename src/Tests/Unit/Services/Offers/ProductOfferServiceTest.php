@@ -364,6 +364,7 @@ class ProductOfferServiceTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'original_price' => 100.00
         ]);
 
         $this->repository->shouldReceive('all')
@@ -392,6 +393,7 @@ class ProductOfferServiceTest extends FunctionalTestCase
                 'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
                 'is_active' => true,
                 'status' => 'published',
+                'original_price' => 100.00
             ]);
 
             $offers->push($offer->load(['product']));

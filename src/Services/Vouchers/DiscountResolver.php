@@ -50,17 +50,8 @@ class DiscountResolver
                 $tieredDiscount = 0;
                 $voucherDiscount = 0;
                 $rewardDiscount = 0;
-                $currentContext = new DiscountContext(
-                    items: $context->items,
-                    baseSubtotalCents: $context->baseSubtotalCents,
-                    currentSubtotalCents: $context->baseSubtotalCents,
-                    currentOfferDiscountCents: 0,
-                    appliedDiscounts: [],
-                    member: $context->member,
-                    isSubscription: $context->isSubscription,
-                    isFirstSubscriptionCycle: $context->isFirstSubscriptionCycle,
-                    siteId: $context->siteId
-                );
+
+                $currentContext = $context->resetForNonStackable();
             }
 
             // Track discount by type

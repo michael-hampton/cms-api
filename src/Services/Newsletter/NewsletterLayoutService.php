@@ -68,7 +68,7 @@ class NewsletterLayoutService
                 $layout->id,
                 $layoutDefinition,
                 1,
-                LayoutVersionState::Published->value
+                LayoutVersionState::Draft->value
             );
 
             return $layout;

@@ -68,8 +68,6 @@ class SendAccountActivationEmailListener
         try {
             $token = $this->activationService->generateActivationToken($member);
 
-            echo $token;
-
             $this->mailer->to($member->email)->send(
                 new AccountActivationMail($member, $token, $order)
             );

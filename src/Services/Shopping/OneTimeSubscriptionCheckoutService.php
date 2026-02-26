@@ -3,6 +3,7 @@
 namespace App\Services\Shopping;
 
 use App\DTO\Checkout\DeliveryMethodConfig;
+use App\Enums\CartItemType;
 use App\Enums\Orders\OrderLineStatus;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
@@ -30,7 +31,9 @@ class OneTimeSubscriptionCheckoutService
         private readonly DiscountResolver           $discountResolver,
         private readonly DeliveryEstimatorInterface $deliveryEstimator,
         private readonly FulfilmentResolver         $fulfilmentResolver,
-        private readonly SubscriptionPlanRepository $subscriptionPlanRepository
+        private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
+        private readonly CheckoutEligibilityService $eligibilityService,
+
     )
     {
     }
@@ -61,11 +64,29 @@ class OneTimeSubscriptionCheckoutService
 
         $member = $this->memberAuth->getMember();
 
+        $eligibility = $this->eligibilityService->validate($member, $subscriptionItems);
+        $subscriptionItems = $eligibility->valid;
+
+        if (empty($subscriptionItems)) {
+            return [
+                'success' => false,
+                'message' => 'All items were invalid and removed from the cart.'
+            ];
+        }
+
         // 2.5 RESOLVE DISCOUNTS (ADD THIS SECTION)
         $baseSubtotalCents = $this->calculateBaseSubtotalCents($subscriptionItems);
 
+        $paidItems = array_filter($subscriptionItems, fn($item) => ($item['options']['type'] ?? '') !== \App\Enums\CartItemType::FREE_GIFT->value
+            && ($item['base_price'] ?? $item['price'] ?? 0) > 0
+        );
+
+        $freeGiftItems = array_filter($subscriptionItems, fn($item) => ($item['options']['type'] ?? '') === \App\Enums\CartItemType::FREE_GIFT->value
+            || ($item['base_price'] ?? $item['price'] ?? 0) <= 0
+        );
+
         $discountContext = new DiscountContext(
-            items: $subscriptionItems,
+            items: $paidItems,
             baseSubtotalCents: $baseSubtotalCents,
             currentSubtotalCents: $baseSubtotalCents,
             currentOfferDiscountCents: 0,
@@ -98,13 +119,23 @@ class OneTimeSubscriptionCheckoutService
                 $resolvedDiscounts  // PASS DISCOUNTS
             );
 
+            $allFreeGifts = !empty($subscriptionItems) && array_reduce(
+                    $subscriptionItems,
+                    fn($carry, $item) => $carry && (
+                            ($item['options']['type'] ?? '') === \App\Enums\CartItemType::FREE_GIFT->value
+                            || ($item['base_price'] ?? $item['price'] ?? 0) <= 0
+                        ),
+                    true
+                );
+
             // Create order in pending status
             $order = $this->orderDraftService->createPendingOrder(
                 $subscriptions,
                 $member,
                 $siteId,
                 $data,
-                $resolvedDiscounts  // PASS DISCOUNTS
+                $resolvedDiscounts,
+                $allFreeGifts
             );
 
             return [$order, $subscriptions];
@@ -145,7 +176,8 @@ class OneTimeSubscriptionCheckoutService
         return $this->responseBuilder->buildCheckoutResponse(
             $order,
             $subscriptions,
-            $paymentResult
+            $paymentResult,
+            empty($eligibility->valid) ?? false
         );
     }
 
@@ -154,6 +186,9 @@ class OneTimeSubscriptionCheckoutService
         $totalCents = 0;
 
         foreach ($items as $item) {
+            if (($item['options']['type'] ?? '') === CartItemType::FREE_GIFT->value) {
+                continue;
+            }
             $priceCents = (int)round(($item['base_price'] ?? $item['price']) * 100);
             $quantity = $item['quantity'] ?? 1;
             $totalCents += $priceCents * $quantity;

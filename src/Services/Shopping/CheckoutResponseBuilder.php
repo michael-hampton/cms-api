@@ -10,7 +10,8 @@ class CheckoutResponseBuilder
     public function buildCheckoutResponse(
         Order $order,
         array $subscriptions,
-        array $paymentResult
+        array $paymentResult,
+        bool  $hasRemovedItems = false
     ): array
     {
         $subscriptionIds = array_map(fn($s) => $s['subscription']->id, $subscriptions);
@@ -22,6 +23,7 @@ class CheckoutResponseBuilder
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'requires_shipping' => $this->hasAnyPrintDelivery($subscriptions),
+            'has_removed_items' => $hasRemovedItems,
         ];
 
         // Add subscription data based on count

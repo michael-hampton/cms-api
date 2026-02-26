@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\DTO\Newsletters\NewsletterAccessResult;
 use App\Enums\Newsletters\PremiumAccessType;
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\QueryBuilder;
 
 class Subscription extends Model
 {
+    public const ACTIVE_STATUSES = [SubscriptionStatus::ACTIVE->value, SubscriptionStatus::TRIALING->value, SubscriptionStatus::GRACE_PERIOD->value];
     protected static function boot()
     {
         parent::boot();
@@ -105,7 +107,7 @@ class Subscription extends Model
         // 1. Status is 'active'
         // 2. AND (no end_date OR end_date is in the future)
         // 3. AND (no start_date OR start_date is in the past or today)
-        if ($this->status !== 'active') {
+        if ($this->status !== SubscriptionStatus::ACTIVE->value) {
             return false;
         }
 
@@ -127,18 +129,18 @@ class Subscription extends Model
 
     public function isCancelled(): bool
     {
-        return $this->status === 'cancelled';
+        return $this->status === SubscriptionStatus::CANCELLED->value;
     }
 
     public function isExpired(): bool
     {
-        return $this->status === 'expired' ||
+        return $this->status === SubscriptionStatus::EXPIRED->value ||
             ($this->end_date !== null && $this->end_date <= new \DateTime());
     }
 
     public function scopeActive(QueryBuilder $query): QueryBuilder
     {
-        return $query->where('status', 'active');
+        return $query->where('status', SubscriptionStatus::ACTIVE->value);
     }
 
     public function scopeByMember(QueryBuilder $query, int $memberId): QueryBuilder
@@ -190,7 +192,7 @@ class Subscription extends Model
 
     public function isDueForRenewal(): bool
     {
-        if (!$this->auto_renew || $this->status !== 'active') {
+        if (!$this->auto_renew || $this->status !== SubscriptionStatus::ACTIVE->value) {
             return false;
         }
 

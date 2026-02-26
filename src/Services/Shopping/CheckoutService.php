@@ -3,6 +3,7 @@
 namespace App\Services\Shopping;
 
 use App\DTO\Checkout\DeliveryMethodConfig;
+use App\Enums\CartItemType;
 use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
@@ -41,34 +42,34 @@ use Exception;
 class CheckoutService
 {
     public function __construct(
-        private readonly CartService             $cartService,
-        private readonly OrderCreationService    $orderCreationService,
-        private readonly VoucherService          $voucherService,
-        private readonly ShippingService         $shippingService,
-        private readonly MemberAuthWrapper       $memberAuthWrapper,
-        private readonly OrderCalculationService $calculationService,
-        private readonly StripePaymentProcessor   $stripeProcessor,
-        private readonly CheckoutSplittingService $splittingService,
-        private readonly PaymentAllocationService $allocationService,
-        private readonly MerchantShippingService  $merchantShippingService,
-        private readonly ShipmentRepository       $shipmentRepository,
-        private readonly CurrencyResolver        $currencyResolver,
-        private readonly Database                $database,
-        private readonly OrderManager            $orderService,
-        private readonly TaxCalculatorService    $taxCalculatorService,
-        private readonly MerchantRepository      $merchantRepository,
-        private readonly DiscountResolver        $discountResolver,
-        private readonly RewardsRepository       $rewardsRepository,
+        private readonly CartService                $cartService,
+        private readonly OrderCreationService       $orderCreationService,
+        private readonly VoucherService             $voucherService,
+        private readonly ShippingService            $shippingService,
+        private readonly MemberAuthWrapper          $memberAuthWrapper,
+        private readonly OrderCalculationService    $calculationService,
+        private readonly StripePaymentProcessor     $stripeProcessor,
+        private readonly CheckoutSplittingService   $splittingService,
+        private readonly PaymentAllocationService   $allocationService,
+        private readonly MerchantShippingService    $merchantShippingService,
+        private readonly ShipmentRepository         $shipmentRepository,
+        private readonly CurrencyResolver           $currencyResolver,
+        private readonly Database                   $database,
+        private readonly OrderManager               $orderService,
+        private readonly TaxCalculatorService       $taxCalculatorService,
+        private readonly MerchantRepository         $merchantRepository,
+        private readonly DiscountResolver           $discountResolver,
+        private readonly RewardsRepository          $rewardsRepository,
         private readonly InternalBusinessDayEstimator $deliveryEstimator,
         private readonly FulfilmentResolver           $fulfilmentResolver,
         private readonly ProductRepository            $productRepository,
         private readonly ResolveAvailabilityAction    $resolveAvailabilityAction,
         private readonly CalculateSellableStockAction $calculateSellableStockAction,
-        private readonly ProductVariantRepository     $productVariantRepository
+        private readonly ProductVariantRepository   $productVariantRepository,
+        private readonly CheckoutEligibilityService $eligibilityService,
     )
     {
     }
-
 
     public function processCheckout(array $data, int $siteId): array
     {
@@ -101,6 +102,19 @@ class CheckoutService
             $cartItems = $this->attachDeliveryEstimates($cartItems);
 
             $member = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember() : null;
+
+            if ($member) {
+                $eligibility = $this->eligibilityService->validate($member, $cartItems);
+                $cartItems = $eligibility->valid;
+
+                if (empty($cartItems)) {
+                    return [
+                        'success' => false,
+                        'message' => 'All items were invalid and removed from the cart.'
+                    ];
+                }
+            }
+
 
             // CRITICAL FIX #7: Voucher validation - ONLY use voucher_code
             $voucherData = null;
@@ -156,7 +170,8 @@ class CheckoutService
                 $totalCents,
                 $siteId,
                 $currency,
-                $member
+                $member,
+                $eligibility
             ) {
                 // Prepare order data
                 // Prepare order data
@@ -228,6 +243,7 @@ class CheckoutService
 
                 return [
                     'success' => true,
+                    'has_removed_items' => !$eligibility?->isEmpty() ?? false,
                     'message' => 'Order placed successfully',
                     'client_secret' => $paymentIntent['client_secret'],
                     'payment_intent_id' => $paymentIntent['payment_intent_id'],
@@ -264,6 +280,11 @@ class CheckoutService
         // Calculate base subtotal in cents
         $baseSubtotalCents = 0;
         foreach ($cartItems as $item) {
+
+            if (($item['options']['type'] ?? '') === CartItemType::FREE_GIFT->value) {
+                continue;
+            }
+
             $basePriceCents = (int)round(($item['base_price'] ?? $item['price']) * 100);
             $quantity = $item['quantity'] ?? 1;
             $baseSubtotalCents += $basePriceCents * $quantity;
@@ -601,6 +622,16 @@ class CheckoutService
 
             $member = $this->memberAuthWrapper->check() ? $this->memberAuthWrapper->getMember() : null;
 
+            $eligibility = $this->eligibilityService->validate($member, $cartItems);
+            $cartItems = $eligibility->valid;
+
+            if (empty($cartItems)) {
+                return [
+                    'success' => false,
+                    'message' => 'All items were invalid and removed from the cart.'
+                ];
+            }
+
             // SECURITY FIX: Validate voucher by code only
             $voucherData = null;
             if (!empty($data['voucher_code'])) {
@@ -707,7 +738,8 @@ class CheckoutService
                 $totalCents,
                 $currency,
                 $member,
-                $cartItems
+                $cartItems,
+                $eligibility
             ) {
                 $checkoutId = 'chk-' . uniqid('', true);
                 $orderNumbers = [];
@@ -724,6 +756,23 @@ class CheckoutService
                         (int)round($allocations[$key]['total'] * 100),
                         $siteId
                     );
+
+                    $allFreeGifts = !empty($group['items']) && array_reduce(
+                            $group['items'],
+                            fn($carry, $item) => $carry && (($item['options']['type'] ?? '') === \App\Enums\CartItemType::FREE_GIFT->value || ($item['price'] ?? 0) <= 0),
+                            true
+                        );
+
+                    if ($allFreeGifts) {
+                        $orderData['subtotal'] = 0;
+                        $orderData['total'] = 0;
+                        $orderData['shipping'] = 0;
+                        $orderData['tax'] = 0;
+                        $orderData['discount'] = 0;
+                        $orderData['offer_discount'] = 0;
+                        $orderData['voucher_discount'] = 0;
+                        $orderData['reward_discount'] = 0;
+                    }
 
                     $orderData['checkout_id'] = $checkoutId;
                     $orderData['currency'] = strtoupper($currency);
@@ -794,6 +843,7 @@ class CheckoutService
 
                 return [
                     'success' => true,
+                    'has_removed_items' => !$eligibility->isEmpty(),
                     'message' => 'Multi-merchant checkout completed',
                     'checkout_id' => $checkoutId,
                     'order_numbers' => $orderNumbers,

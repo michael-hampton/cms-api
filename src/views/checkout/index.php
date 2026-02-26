@@ -1703,10 +1703,10 @@
             if (result.success) {
                 // Handle redirect for single or multiple subscriptions
                 if (Array.isArray(subscriptionId) && subscriptionId.length > 1) {
-                    window.location.href = `/subscriptions/onetime/multiple?ids=${subscriptionId.join(',')}`;
+                    window.location.href = `/press-stack/multiple?ids=${subscriptionId.join(',')}`;
                 } else {
                     const singleId = Array.isArray(subscriptionId) ? subscriptionId[0] : subscriptionId;
-                    window.location.href = `/subscriptions/onetime/${singleId}`;
+                    window.location.href = `/press-stack/${singleId}`;
                 }
             } else {
                 showAlert(result.message || 'Payment confirmation failed', 'error');

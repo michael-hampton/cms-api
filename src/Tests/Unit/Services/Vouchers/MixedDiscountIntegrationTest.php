@@ -6,16 +6,21 @@ use App\Enums\Vouchers\VoucherType;
 use App\Models\Member;
 use App\Repositories\Offers\TieredPromotionRepository;
 use App\Services\Vouchers\DiscountContext\DiscountContext;
+use App\Services\Vouchers\DiscountContext\VoucherContext;
 use App\Services\Vouchers\DiscountProviderRegistry;
 use App\Services\Vouchers\DiscountResolver;
 use App\Services\Vouchers\Providers\OfferDiscountProvider;
 use App\Services\Vouchers\Providers\TieredDiscountProvider;
 use App\Services\Vouchers\Providers\VoucherDiscountProvider;
+use App\Services\Vouchers\VoucherService;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
-class MixedDiscountIntegrationTest extends TestCase
+class MixedDiscountIntegrationTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function test_offer_then_tiered_then_voucher_stack_correctly(): void
     {
         $member = Mockery::mock(Member::class)->makePartial();
@@ -45,25 +50,29 @@ class MixedDiscountIntegrationTest extends TestCase
         $tieredRepo->shouldReceive('findApplicablePromotion')
             ->andReturn($tieredPromotion);
 
-        // Voucher: $5 off
-        $voucherData = [
-            'valid' => true,
-            'discount_type' => 'fixed',
-            'discount' => 5,
-            'is_stackable' => true,
-            'eligible_items' => [['id' => 1]]
-        ];
 
         $providers = [
             new OfferDiscountProvider(),
             new TieredDiscountProvider($tieredRepo),
-            new VoucherDiscountProvider($voucherData),
+            new VoucherDiscountProvider(app(VoucherService::class)),
         ];
 
         $discountProviderRegistry = new DiscountProviderRegistry();
         $discountProviderRegistry->setProviders($providers);
 
         $resolver = new DiscountResolver($discountProviderRegistry);
+
+        $voucher = $this->createVoucher(['value' => 5]);
+
+        $voucherData = [
+            'valid' => true,
+            'discount_type' => 'fixed',
+            'discount' => 5,
+            'is_stackable' => true,
+            'eligible_items' => [['id' => 1]],
+            'voucher_code' => $voucher->code,
+            'order_value' => 500
+        ];
 
         $context = new DiscountContext(
             items: $items,
@@ -73,7 +82,10 @@ class MixedDiscountIntegrationTest extends TestCase
             appliedDiscounts: [],
             member: $member,
             isSubscription: false,
-            siteId: 1
+            siteId: 1,
+            voucherContext: new VoucherContext(
+                voucherData: $voucherData
+            ),
         );
 
         $result = $resolver->resolve($context);
@@ -100,17 +112,21 @@ class MixedDiscountIntegrationTest extends TestCase
             ['id' => 1, 'price' => 80, 'base_price' => 100, 'quantity' => 1]
         ];
 
+        $voucher = $this->createVoucher(['value' => 30]);
+
         $voucherData = [
             'valid' => true,
             'discount_type' => 'fixed',
             'discount' => 30,
             'is_stackable' => false,
-            'eligible_items' => [['id' => 1]]
+            'eligible_items' => [['id' => 1]],
+            'voucher_code' => $voucher->code,
+            'order_value' => 2000
         ];
 
         $providers = [
             new OfferDiscountProvider(),
-            new VoucherDiscountProvider($voucherData),
+            new VoucherDiscountProvider(app(VoucherService::class)),
         ];
 
         $discountProviderRegistry = new DiscountProviderRegistry();
@@ -124,7 +140,10 @@ class MixedDiscountIntegrationTest extends TestCase
             currentSubtotalCents: 10000,
             currentOfferDiscountCents: 0,
             appliedDiscounts: [],
-            member: null
+            member: null,
+            voucherContext: new VoucherContext(
+                voucherData: $voucherData
+            ),
         );
 
         $result = $resolver->resolve($context);
@@ -144,17 +163,24 @@ class MixedDiscountIntegrationTest extends TestCase
             ['id' => 1, 'price' => 50, 'subscription_plan_id' => 1, 'quantity' => 1]
         ];
 
+        $voucher = $this->createVoucher(['value' => 10, 'applies_to_subscriptions' => true]);
+
+        $plan = $this->createSubscriptionPlan();
+
         $voucherData = [
             'valid' => true,
             'discount_type' => VoucherType::Percentage->value,
             'discount' => 20,
             'is_stackable' => true,
             'applies_to' => 'subscription_first_cycle',
-            'eligible_items' => [['id' => 1]]
+            'eligible_items' => [['id' => 1]],
+            'voucher_code' => $voucher->code,
+            'order_value' => 1000,
+            'subscription_plan_id' => $plan->id,
         ];
 
         $providers = [
-            new VoucherDiscountProvider($voucherData),
+            new VoucherDiscountProvider(app(VoucherService::class)),
         ];
 
         $discountProviderRegistry = new DiscountProviderRegistry();
@@ -171,7 +197,8 @@ class MixedDiscountIntegrationTest extends TestCase
             member: $member,
             isSubscription: true,
             isFirstSubscriptionCycle: true,
-            siteId: 1
+            siteId: 1,
+            voucherContext: new VoucherContext(voucherData: $voucherData)
         );
 
         $result = $resolver->resolve($context);

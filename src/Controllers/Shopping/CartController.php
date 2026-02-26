@@ -26,30 +26,30 @@ use App\Services\Shopping\CartPersistenceService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
 use App\Services\Shopping\GiftResolutionService;
-use App\Services\Subscriptions\SubscriptionCheckoutService;
+use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use DateTimeImmutable;
 use Exception;
 
 class CartController extends Controller
 {
     public function __construct(
-        private readonly CartService                  $cartService,
-        private readonly OrderService                 $orderService,
-        private readonly CheckoutService              $checkoutService,
-        private readonly SubscriptionCheckoutService  $subscriptionCheckoutService,
-        private readonly OrderRepository              $orderRepository,
-        private readonly ShippingService              $shippingService,
-        private readonly SavedPaymentMethodService    $savedPaymentMethodService,
-        private readonly TaxCalculatorService         $taxCalculatorService,
-        private readonly IssueDeliveryRepository      $issueDeliveryRepository,
-        private readonly ProductRepository            $productRepository,
-        private readonly FulfilmentResolver           $fulfilmentResolver,
-        private readonly InternalBusinessDayEstimator $businessDayEstimator,
-        private readonly SubscriptionPlanRepository   $subscriptionPlanRepository,
-        private readonly OTPRepository           $OTPRepository,
-        private readonly CheckoutIdentityService $identityService,
-        private readonly CartPersistenceService  $cartPersistence,
-        private GiftResolutionService $giftResolutionService
+        private readonly CartService                        $cartService,
+        private readonly OrderService                       $orderService,
+        private readonly CheckoutService                    $checkoutService,
+        private readonly OneTimeSubscriptionCheckoutService $subscriptionCheckoutService,
+        private readonly OrderRepository                    $orderRepository,
+        private readonly ShippingService                    $shippingService,
+        private readonly SavedPaymentMethodService          $savedPaymentMethodService,
+        private readonly TaxCalculatorService               $taxCalculatorService,
+        private readonly IssueDeliveryRepository            $issueDeliveryRepository,
+        private readonly ProductRepository                  $productRepository,
+        private readonly FulfilmentResolver                 $fulfilmentResolver,
+        private readonly InternalBusinessDayEstimator       $businessDayEstimator,
+        private readonly SubscriptionPlanRepository         $subscriptionPlanRepository,
+        private readonly OTPRepository                      $OTPRepository,
+        private readonly CheckoutIdentityService            $identityService,
+        private readonly CartPersistenceService             $cartPersistence,
+        private GiftResolutionService                       $giftResolutionService
 
     )
     {
@@ -197,7 +197,7 @@ class CartController extends Controller
 
         if ($planId || $planSlug) {
             if ($planSlug) {
-                $plan = $this->subscriptionCheckoutService->getSubscriptionPlanBySlug($planSlug);
+                $plan = $this->subscriptionPlanRepository->findBySlug($planSlug);
                 $planId = $plan?->id;
             }
 
@@ -327,8 +327,16 @@ class CartController extends Controller
             return $this->errorResponse('Authentication required', 401);
         }
 
+        $items = $this->cartService->getItems();
+        if (!$items) {
+            return $this->errorResponse('No items in cart', 400);
+        }
+
+        $subscriptionItems = array_filter($items, fn($item) => !empty($item['subscription_plan_id']));
+        $productItems = array_filter($items, fn($item) => empty($item['subscription_plan_id']));
+
         // Check if this is a subscription checkout
-        if (!empty($data['subscription_plan_id'])) {
+        if (!empty($subscriptionItems)) {
             $result = $this->processSubscription($request);
 
             Session::forget('applied_voucher_code');
@@ -336,6 +344,10 @@ class CartController extends Controller
             Session::forget('pending_otp_email');
             $statusCode = $result['success'] ? 200 : 400;
             return $this->resourceResponse($result, $statusCode);
+        }
+
+        if (empty($productItems)) {
+            return $this->errorResponse('No product items in cart', 400);
         }
 
         // Check if this is a multi-merchant checkout
@@ -476,28 +488,27 @@ class CartController extends Controller
         ]);
     }
 
-    private function processSubscription(Request $request)
+    private function processSubscription(Request $request): array
     {
         if (!MemberAuth::check()) {
-            return $this->jsonResponse([
+            return [
                 'success' => false,
                 'message' => 'Authentication required'
-            ], 401);
+            ];
         }
 
         $data = $request->all();
         $member = MemberAuth::member();
         $siteId = SiteContext::getId();
 
-        $result = $this->subscriptionCheckoutService->processSubscriptionCheckout(
-            $member->id,
+        $result = $this->subscriptionCheckoutService->processCheckout(
             $data,
             $siteId
         );
 
         Session::forget('applied_voucher_code');
 
-        return $this->jsonResponse($result, $result['success'] ? 200 : 400);
+        return $result;
     }
 
     public function addSubscription(Request $request)

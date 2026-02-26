@@ -27,7 +27,6 @@ class GiftPromotionRepository extends Repository
         bool  $includeFirstTimeBuyer = false,
     ): Collection
     {
-
         $query = GiftPromotion::query()
             ->active()
             ->with(['triggers'])

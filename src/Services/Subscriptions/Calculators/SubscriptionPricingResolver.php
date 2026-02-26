@@ -64,10 +64,6 @@ class SubscriptionPricingResolver
         }
 
         // Step 1: Resolve base pricing (tier or fallback to plan)
-        $pricingTier = null;
-        $basePrice = null;
-        $salePrice = null;
-
         if ($pricingTierId) {
             // Use specific pricing tier
             $pricingTier = $this->pricingRepository->find($pricingTierId);
@@ -84,6 +80,7 @@ class SubscriptionPricingResolver
             [$basePrice, $salePrice] = $this->extractPricesFromTier($pricingTier, $variant);
 
         } else {
+
             // Fallback: try to get default pricing tier
             $pricingTier = $this->pricingRepository->getDefaultForPlan($plan->id);
 

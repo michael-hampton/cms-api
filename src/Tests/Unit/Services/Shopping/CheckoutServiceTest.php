@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Shopping;
 
 use App\DTO\Cart\TaxData;
 use App\DTO\Checkout\DeliveryMethodConfig;
+use App\DTO\Checkout\EligibilityResult;
 use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Vouchers\VoucherValidationResult;
 use App\Enums\Orders\OrderLineStatus;
@@ -36,6 +37,7 @@ use App\Services\Shipping\FulfilmentTypeInterface;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\CartService;
+use App\Services\Shopping\CheckoutEligibilityService;
 use App\Services\Shopping\CheckoutService;
 use App\Services\Shopping\MerchantShippingService;
 use App\Services\Vouchers\DiscountResolver;
@@ -76,6 +78,8 @@ class CheckoutServiceTest extends FunctionalTestCase
     private ResolveAvailabilityAction $resolveAvailabilityAction;
     private CalculateSellableStockAction $calculateSellableStockAction;
     private ProductVariantRepository $productVariantRepository;
+    private CheckoutEligibilityService|MockInterface $eligibilityService;
+
 
     protected function setUp(): void
     {
@@ -105,6 +109,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->resolveAvailabilityAction = Mockery::mock(ResolveAvailabilityAction::class);
         $this->calculateSellableStockAction = Mockery::mock(CalculateSellableStockAction::class);
         $this->productVariantRepository = Mockery::mock(ProductVariantRepository::class);
+        $this->eligibilityService = Mockery::mock(CheckoutEligibilityService::class);
 
         $this->service = new CheckoutService(
             $this->cartService,
@@ -130,8 +135,14 @@ class CheckoutServiceTest extends FunctionalTestCase
             $this->productRepository,
             $this->resolveAvailabilityAction,
             $this->calculateSellableStockAction,
-            $this->productVariantRepository
+            $this->productVariantRepository,
+            $this->eligibilityService
         );
+
+        $this->eligibilityService->shouldReceive('validate')
+            ->andReturnUsing(function ($member, array $cartItems) {
+                return new EligibilityResult(valid: $cartItems, removed: []);
+            })->byDefault();
     }
 
     protected function tearDown(): void
@@ -316,7 +327,7 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn($product);
 
         $this->fulfilmentResolver->shouldReceive('resolve')
-            ->once()
+            ->atLeast()->once()
             ->andReturn(Mockery::mock(FulfilmentTypeInterface::class));
 
         $today = new \DateTimeImmutable();
@@ -324,7 +335,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $estimatedDelivery = new EstimatedDelivery(false, $today, $today, $today);
 
         $this->businessDayEstimator->shouldReceive('estimate')
-            ->once()
+            ->atLeast()->once()
             ->andReturn($estimatedDelivery);
     }
 
@@ -338,18 +349,18 @@ class CheckoutServiceTest extends FunctionalTestCase
         $product->shouldReceive('availabilityPolicy')
             ->andReturn($policy);
 
-        $policy->shouldReceive('canPurchase')->once()->andReturn(true);
+        $policy->shouldReceive('canPurchase')->atLeast()->once()->andReturn(true);
 
         $this->productRepository->shouldReceive('lockForUpdate')
-            ->once()
+            ->atLeast()->once()
             ->andReturn($product);
 
         $this->calculateSellableStockAction->shouldReceive('execute')
-            ->once()
+            ->atLeast()->once()
             ->andReturn(100);
 
         $this->resolveAvailabilityAction->shouldReceive('execute')
-            ->once()
+            ->atLeast()->once()
             ->andReturn([
                 'status' => OrderLineStatus::READY_TO_SHIP->value,
                 'is_preorder' => false,
@@ -2678,5 +2689,374 @@ class CheckoutServiceTest extends FunctionalTestCase
         $result = $this->service->confirmRegularCheckoutPayment($paymentIntentId, $orderId);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function test_eligibility_service_removes_duplicate_subscription_and_proceeds(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $siteId = 1;
+        $member = $this->getMember();
+        $order = $this->getOrder();
+
+        $validItem = ['id' => 2, 'product_id' => 100, 'quantity' => 1, 'price' => 50.00, 'name' => 'Book'];
+        $removedItem = ['id' => 1, 'subscription_plan_id' => 10, 'quantity' => 1, 'price' => 9.99, 'name' => 'Sub'];
+
+        $this->cartService->shouldReceive('requiresShipping')->twice()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([$removedItem, $validItem]);
+
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(true);
+        $this->memberAuthWrapper->shouldReceive('getMember')->twice()->andReturn($member);
+
+        // Eligibility strips the subscription item, leaves the physical product
+        $this->eligibilityService->shouldReceive('validate')
+            ->once()
+            ->with($member, Mockery::type('array'))
+            ->andReturn(new EligibilityResult(valid: [$validItem], removed: [$removedItem]));
+
+        $this->setEstimatedDeliveryExpectations();
+        $this->setPreorderExpectations();
+
+        $discounts = $this->getResolvedDiscounts(0, 0, 0);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
+        $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 500));
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true,
+            'payment_intent_id' => 'pi_123',
+            'client_secret' => 'secret_123',
+        ]);
+        $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->processCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_eligibility_service_returns_error_when_all_items_removed(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $siteId = 1;
+        $member = $this->getMember();
+
+        $subscriptionItem = ['id' => 1, 'subscription_plan_id' => 10, 'quantity' => 1, 'price' => 9.99];
+
+        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([$subscriptionItem]);
+
+        $this->memberAuthWrapper->shouldReceive('check')->once()->andReturn(true);
+        $this->memberAuthWrapper->shouldReceive('getMember')->once()->andReturn($member);
+
+        // All items stripped — nothing left to purchase
+        $this->eligibilityService->shouldReceive('validate')
+            ->once()
+            ->andReturn(new EligibilityResult(valid: [], removed: [$subscriptionItem]));
+
+        $result = $this->service->processCheckout($data, $siteId);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('All items were invalid and removed from the cart.', $result['message']);
+    }
+
+    public function test_eligibility_service_not_called_for_guest_checkout(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $siteId = 1;
+        $order = $this->getOrder();
+
+        $cartItems = $this->getCartItems();
+
+        $this->cartService->shouldReceive('requiresShipping')->twice()->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+
+        // Guest — check returns false, getMember never called
+        $this->memberAuthWrapper->shouldReceive('check')->twice()->andReturn(false);
+
+        // Eligibility must NOT run for guests
+        $this->eligibilityService->shouldNotReceive('validate');
+
+        $this->setEstimatedDeliveryExpectations();
+        $this->setPreorderExpectations();
+
+        $discounts = $this->getResolvedDiscounts(0, 0, 0);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
+        $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 500));
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true,
+            'payment_intent_id' => 'pi_123',
+            'client_secret' => 'secret_123',
+        ]);
+        $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->processCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_it_zeroes_totals_for_free_gift_only_merchant_group(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $siteId = 1;
+        $cartItems = $this->getCartItems();
+        $member = $this->getMember();
+
+        $this->cartService->shouldReceive('requiresShipping')->times(3)->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->memberAuthWrapper->shouldReceive('check')->times(3)->andReturn(true);
+        $this->memberAuthWrapper->shouldReceive('getMember')->times(3)->andReturn($member);
+
+        $discounts = $this->getResolvedDiscounts(0, 0, 0);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
+
+        $this->setEstimatedDeliveryExpectations();
+        $this->setPreorderExpectations();
+
+        // One normal group, one free gift group
+        $groups = [
+            'merchant_1' => [
+                'merchant_id' => 1,
+                'stripe_group_key' => 'acct_123',
+                'items' => [['product_id' => 1, 'quantity' => 1, 'price' => 50.00]]
+            ],
+            'merchant_2' => [
+                'merchant_id' => 2,
+                'stripe_group_key' => 'acct_456',
+                'items' => [['product_id' => 2, 'quantity' => 1, 'price' => 0.00, 'options' => ['type' => \App\Enums\CartItemType::FREE_GIFT->value]]]
+            ]
+        ];
+        $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
+        $this->merchantShippingService->shouldReceive('calculatePerGroup')->once()->andReturn(['merchant_1' => 5.00, 'merchant_2' => 0.00]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
+        $this->allocationService->shouldReceive('allocate')->once()->andReturn([
+            'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true],
+            'merchant_2' => ['subtotal' => 0.00, 'shipping' => 0.00, 'tax' => 0.00, 'total' => 0.00, 'stripe_eligible' => true]
+        ]);
+        $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
+        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->twice()->andReturn([
+            'success' => true, 'payment_intent_id' => 'pi_123', 'client_secret' => 'secret_123'
+        ]);
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
+        $order1 = $this->getOrder(['order_number' => 'ORD-001']);
+        $order2 = $this->getOrder(['order_number' => 'ORD-002']);
+
+        // Assert free gift group order has zeroed totals
+        $this->orderCreationService->shouldReceive('createMerchantOrder')
+            ->once()
+            ->with(Mockery::on(fn($d) => $d['total'] == 65 || $d['subtotal'] > 0), Mockery::any(), $siteId, Mockery::any())
+            ->andReturn($order1);
+
+        $this->orderCreationService->shouldReceive('createMerchantOrder')
+            ->once()
+            ->with(Mockery::on(fn($d) => $d['total'] == 0 && $d['subtotal'] == 0 && $d['shipping'] == 0), Mockery::any(), $siteId, Mockery::any())
+            ->andReturn($order2);
+
+        $this->shipmentRepository->shouldReceive('create')->twice();
+        $this->merchantShippingService->shouldReceive('isConsolidationEnabled')->twice()->andReturn(false);
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+    }
+
+    /**
+     * PROVES THE BUG: In a multi-merchant cart where one merchant's group contains
+     * only a free gift, that group's order incorrectly receives the checkout-level
+     * baseSubtotalCents (e.g. £50 from the other merchant) as its subtotal.
+     *
+     * The existing single-item price<=0 patch also leaves tax non-zero.
+     * This test will FAIL before the fix and PASS after.
+     */
+    public function test_multi_merchant_free_gift_group_gets_zero_subtotal_not_checkout_level_subtotal(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $siteId = 1;
+        $member = $this->getMember();
+
+        $cartItems = [
+            ['id' => 1, 'product_id' => 100, 'quantity' => 1, 'price' => 50.00, 'name' => 'Paid Product'],
+            ['id' => 2, 'product_id' => 200, 'quantity' => 1, 'price' => 0.00, 'name' => 'Free Gift',
+                'options' => ['type' => \App\Enums\CartItemType::FREE_GIFT->value]],
+        ];
+
+        $product = Mockery::mock(Product::class);
+
+        $this->productRepository->shouldReceive('find')
+            ->with(200)
+            ->andReturn($product);
+
+        $this->cartService->shouldReceive('requiresShipping')->times(3)->andReturn(false);
+        $this->cartService->shouldReceive('getItems')->once()->andReturn($cartItems);
+        $this->memberAuthWrapper->shouldReceive('check')->times(3)->andReturn(true);
+        $this->memberAuthWrapper->shouldReceive('getMember')->times(3)->andReturn($member);
+
+        $this->setEstimatedDeliveryExpectations();
+        $this->setPreorderExpectations();
+
+        // Discounts: baseSubtotalCents=5000 (free gift excluded), finalSubtotalCents=5000
+        $discounts = Mockery::mock(ResolvedDiscounts::class);
+        $discounts->baseSubtotalCents = 5000;  // £50 — only the paid item
+        $discounts->finalSubtotalCents = 5000;
+        $discounts->offerDiscountCents = 0;
+        $discounts->voucherDiscountCents = 0;
+        $discounts->rewardDiscountCents = 0;
+        $discounts->merchantFundedCents = 0;
+        $discounts->platformFundedCents = 0;
+        $discounts->tieredDiscountCents = 0;
+        $discounts->metadata = [];
+        $discounts->shouldReceive('getTotalDiscountCents')->andReturn(0);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
+
+        $groups = [
+            'merchant_paid' => [
+                'merchant_id' => 1,
+                'stripe_group_key' => 'acct_123',
+                'items' => [['product_id' => 100, 'quantity' => 1, 'price' => 50.00, 'subtotal' => 50.00,
+                    'is_preorder' => false, 'expected_ship_date' => null]],
+            ],
+            'merchant_gift' => [
+                'merchant_id' => 2,
+                'stripe_group_key' => 'acct_456',
+                'items' => [['product_id' => 200, 'quantity' => 1, 'price' => 0.00, 'subtotal' => 0.00,
+                    'options' => ['type' => \App\Enums\CartItemType::FREE_GIFT->value],
+                    'is_preorder' => false, 'expected_ship_date' => null]],
+            ],
+        ];
+
+        $this->splittingService->shouldReceive('splitByMerchant')->once()->andReturn($groups);
+        $this->merchantShippingService->shouldReceive('calculatePerGroup')
+            ->once()->andReturn(['merchant_paid' => 5.00, 'merchant_gift' => 0.00]);
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
+            ->once()->andReturn(new TaxData(rate: 0.2, taxCents: 1000));
+        $this->allocationService->shouldReceive('allocate')->once()->andReturn([
+            'merchant_paid' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true],
+            'merchant_gift' => ['subtotal' => 0.00, 'shipping' => 0.00, 'tax' => 0.00, 'total' => 0.00, 'stripe_eligible' => true],
+        ]);
+        $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
+        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->twice()->andReturn([
+            'success' => true, 'payment_intent_id' => 'pi_123', 'client_secret' => 'secret_123'
+        ]);
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
+        $paidOrder = $this->getOrder(['id' => 1, 'order_number' => 'ORD-001']);
+        $giftOrder = $this->getOrder(['id' => 2, 'order_number' => 'ORD-002']);
+
+        // The paid merchant order should have correct subtotal of £50
+        $this->orderCreationService->shouldReceive('createMerchantOrder')
+            ->once()
+            ->with(
+                Mockery::on(fn($d) => $d['subtotal'] == 50.00),
+                Mockery::any(), $siteId, 1
+            )
+            ->andReturn($paidOrder);
+
+        // THE CRITICAL ASSERTION: the free gift order must have subtotal=0, total=0, tax=0, shipping=0
+        // BEFORE the fix this fails because $discounts->baseSubtotalCents (5000) bleeds into subtotal
+        $this->orderCreationService->shouldReceive('createMerchantOrder')
+            ->once()
+            ->with(
+                Mockery::on(function ($d) {
+                    return $d['subtotal'] == 0.00
+                        && $d['total'] == 0.00
+                        && $d['shipping'] == 0.00
+                        && $d['tax'] == 0.00;
+                }),
+                Mockery::any(), $siteId, 2
+            )
+            ->andReturn($giftOrder);
+
+        $this->shipmentRepository->shouldReceive('create')->twice();
+        $this->merchantShippingService->shouldReceive('isConsolidationEnabled')->twice()->andReturn(false);
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->processMultiMerchantCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+    }
+
+    /**
+     * PROVES single-checkout is fine: a mixed cart with one paid item and one
+     * free gift produces a correct order total that excludes the free gift from
+     * the subtotal but still creates a £0 line item for it.
+     *
+     * This test should PASS both before and after the fix (no bug in single checkout).
+     */
+    public function test_single_checkout_mixed_cart_free_gift_does_not_inflate_subtotal(): void
+    {
+        $data = $this->getValidCheckoutData();
+        $siteId = 1;
+        $member = $this->getMember();
+
+        $cartItems = [
+            ['id' => 1, 'product_id' => 100, 'quantity' => 1, 'price' => 50.00, 'name' => 'Paid Product'],
+            ['id' => 2, 'product_id' => 200, 'quantity' => 1, 'price' => 0.00, 'name' => 'Free Gift',
+                'options' => ['type' => \App\Enums\CartItemType::FREE_GIFT->value]],
+        ];
+
+        $this->productRepository->shouldReceive('find')
+            ->with(200)
+            ->andReturn($product);
+
+        $this->cartService->shouldReceive('requiresShipping')->twice()->andReturn(false);
+        $this->setupBasicCheckoutExpectations($cartItems, $member, $siteId);
+        $this->setEstimatedDeliveryExpectations();
+        $this->setPreorderExpectations();
+
+        // resolveDiscounts excludes free gift: baseSubtotalCents=5000
+        $discounts = Mockery::mock(ResolvedDiscounts::class);
+        $discounts->baseSubtotalCents = 5000;
+        $discounts->finalSubtotalCents = 5000;
+        $discounts->offerDiscountCents = 0;
+        $discounts->voucherDiscountCents = 0;
+        $discounts->rewardDiscountCents = 0;
+        $discounts->merchantFundedCents = 0;
+        $discounts->platformFundedCents = 0;
+        $discounts->tieredDiscountCents = 0;
+        $discounts->metadata = [];
+        $discounts->shouldReceive('getTotalDiscountCents')->andReturn(0);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($discounts);
+
+        $this->shippingService->shouldReceive('calculateShipping')->once()->andReturn(0.00);
+        $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
+        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
+            ->once()->andReturn(new TaxData(rate: 0.2, taxCents: 1000));
+
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
+            'success' => true, 'payment_intent_id' => 'pi_123', 'client_secret' => 'secret_123'
+        ]);
+
+        $order = $this->getOrder();
+
+        // Order subtotal should be £50 (paid item only), total £60 (£50 + £10 tax)
+        $this->orderCreationService->shouldReceive('create')
+            ->once()
+            ->with(
+                Mockery::on(function ($d) {
+                    return $d['subtotal'] == 50.00  // free gift excluded
+                        && $d['total'] == 60.00;    // subtotal + tax
+                }),
+                // Two line items: paid at £50 and free gift at £0
+                Mockery::on(fn($items) => count($items) === 2
+                    && $items[1]['subtotal'] == 0.00
+                    && $items[1]['price'] == 0.00
+                ),
+                $siteId
+            )
+            ->andReturn($order);
+
+        $this->cartService->shouldReceive('clear')->once();
+
+        $result = $this->service->processCheckout($data, $siteId);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(60.00, $result['total']); // £50 + £10 tax, free gift not in total
     }
 }

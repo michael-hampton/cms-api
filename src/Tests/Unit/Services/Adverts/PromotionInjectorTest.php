@@ -21,6 +21,7 @@ class PromotionInjectorTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'original_price' => 100
         ]);
 
         $blocks = $this->injector->getBlocksForSurface(
@@ -93,6 +94,7 @@ class PromotionInjectorTest extends FunctionalTestCase
                 'start_date' => date('Y-m-d H:i:s'),
                 'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
                 'is_active' => true,
+                'original_price' => 100
             ]);
         }
 
@@ -223,6 +225,7 @@ class PromotionInjectorTest extends FunctionalTestCase
             'is_active' => false,
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'original_price' => 100
         ]);
 
         // Claimed reward

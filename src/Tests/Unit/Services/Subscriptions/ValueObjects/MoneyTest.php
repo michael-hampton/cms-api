@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Billing\Preorder\ValueObjects;
+namespace App\Tests\Unit\Services\Subscriptions\ValueObjects;
 
 use App\Services\ValueObjects\Money;
 use InvalidArgumentException;
@@ -107,7 +107,7 @@ class MoneyTest extends TestCase
         $eur = Money::fromDecimal(100.00, 'EUR');
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cannot subtract EUR from USD');
+        $this->expectExceptionMessage('Cannot operate on different currencies: USD vs EUR');
 
         $usd->subtract($eur);
     }

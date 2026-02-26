@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Tests\Unit\Services\Subscriptions;
+namespace App\Tests\Unit\Services\Shopping;
 
+use App\DTO\Checkout\EligibilityResult;
 use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\SubscriptionType;
@@ -20,6 +21,7 @@ use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Shipping\FulfilmentTypeInterface;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shopping\CartService;
+use App\Services\Shopping\CheckoutEligibilityService;
 use App\Services\Shopping\CheckoutResponseBuilder;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
@@ -27,6 +29,7 @@ use App\Services\Vouchers\DiscountResolver;
 use App\Services\Vouchers\ResolvedDiscounts;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 
 class OneTimeSubscriptionCheckoutServiceTest extends TestCase
@@ -45,6 +48,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     private InternalBusinessDayEstimator $businessDayEstimator;
     private FulfilmentResolver $fulfilmentResolver;
     private SubscriptionPlanRepository $subscriptionPlanRepository;
+    private CheckoutEligibilityService|MockInterface $eligibilityService;
 
     protected function setUp(): void
     {
@@ -61,6 +65,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->businessDayEstimator = Mockery::mock(InternalBusinessDayEstimator::class);
         $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
         $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->eligibilityService = Mockery::mock(CheckoutEligibilityService::class);
 
         $this->service = new OneTimeSubscriptionCheckoutService(
             $this->cartService,
@@ -74,7 +79,13 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             $this->businessDayEstimator,
             $this->fulfilmentResolver,
             $this->subscriptionPlanRepository,
+            $this->eligibilityService
         );
+
+        $this->eligibilityService->shouldReceive('validate')
+            ->andReturnUsing(function ($member, array $cartItems) {
+                return new EligibilityResult(valid: $cartItems, removed: []);
+            })->byDefault();
     }
 
     public function test_process_checkout_fails_when_not_authenticated(): void
@@ -458,7 +469,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setDeliveryEstimateExpectations();
 
         $this->cartService->shouldReceive('getItems')->once()->andReturn([
-            ['subscription_plan_id' => 1]
+            ['subscription_plan_id' => 1, 'price' => 22]
         ]);
 
         $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
@@ -501,6 +512,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 $siteId,                             // 3rd: int $siteId
                 Mockery::subset($inputData),          // 4th: array $data (contains voucher)
                 Mockery::any(),
+                false
             )
             ->andReturn($order);
 
@@ -512,7 +524,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
-            ->with($order, $subs, $paymentResult)
+            ->with($order, $subs, $paymentResult, false)
             ->andReturn(['success' => true, 'order_id' => 789]);
 
         $result = $this->service->processCheckout($inputData, $siteId);
@@ -836,7 +848,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 $member,
                 1,
                 [],
-                $resolvedDiscounts
+                $resolvedDiscounts,
+                false
             )
             ->andReturn($order);
 
@@ -1166,7 +1179,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
-            ->with($order, $subscriptions, $paymentResult)
+            ->with($order, $subscriptions, $paymentResult, false)
             ->andReturn($expectedResponse);
 
         $result = $this->service->processCheckout([], 1);
@@ -1447,4 +1460,84 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->assertTrue($result['success']);
     }
 
+    public function test_eligibility_service_removes_duplicate_subscription_and_continues(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setDeliveryEstimateExpectations();
+        $this->setResolvedDiscountExpectations();
+
+        $kept = ['subscription_plan_id' => 1, 'price' => 50.00, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]];
+        $removed = ['subscription_plan_id' => 2, 'price' => 30.00, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]];
+
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn([$kept, $removed]);
+
+        // Eligibility strips plan 2 — member already has it
+        $this->eligibilityService->shouldReceive('validate')
+            ->once()
+            ->with($member, Mockery::any())
+            ->andReturn(new EligibilityResult(valid: [$kept], removed: [$removed]));
+
+        $order = $this->createMockOrder();
+        $subscription = $this->createMockSubscription();
+        $subs = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
+
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
+        $this->setupSuccessfulPayment();
+        $this->setupCartClear();
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_zeroes_totals_when_all_items_are_free_gifts(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setDeliveryEstimateExpectations();
+        $this->setResolvedDiscountExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            [
+                'subscription_plan_id' => 1,
+                'price' => 0.00,
+                'base_price' => 0.00,
+                'quantity' => 1,
+                'options' => ['type' => \App\Enums\CartItemType::FREE_GIFT->value]
+            ]
+        ]);
+
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
+        $order = $this->createMockOrder();
+        $subscription = $this->createMockSubscription();
+        $subs = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
+
+        // Verify isFreeOrder=true is passed through — createPendingOrder receives true as 6th arg
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->once()
+            ->with(
+                $subs,
+                $member,
+                1,
+                Mockery::any(),
+                Mockery::any(),
+                true  // isFreeOrder flag
+            )
+            ->andReturn($order);
+
+        $this->setupSuccessfulPayment();
+        $this->setupCartClear();
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
 }

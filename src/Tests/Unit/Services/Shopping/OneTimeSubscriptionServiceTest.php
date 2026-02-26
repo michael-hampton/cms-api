@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Subscriptions;
+namespace App\Tests\Unit\Services\Shopping;
 
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\Subscriptions\BillingPeriod;

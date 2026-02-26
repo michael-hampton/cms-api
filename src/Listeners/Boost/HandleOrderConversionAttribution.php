@@ -46,7 +46,18 @@ class HandleOrderConversionAttribution
 
     private function attributeItem(object $item, ?string $sessionHash): void
     {
-        $boost = $this->boostRepository->findActiveOrRecentForTarget('product', $item->product_id);
+        // Support both product and subscription plan targets
+        if (!empty($item->product_id)) {
+            $targetType = 'product';
+            $targetId = $item->product_id;
+        } elseif (!empty($item->subscription_plan_id)) {
+            $targetType = 'subscription_plan';
+            $targetId = $item->subscription_plan_id;
+        } else {
+            return;
+        }
+
+        $boost = $this->boostRepository->findActiveOrRecentForTarget($targetType, $targetId);
 
         if (!$boost) {
             return;

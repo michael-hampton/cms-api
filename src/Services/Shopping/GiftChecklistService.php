@@ -217,6 +217,6 @@ class GiftChecklistService
      */
     private function resolveUserId(): ?int
     {
-        return Session::get('user_id');
+        return Session::get('member_id');
     }
 }

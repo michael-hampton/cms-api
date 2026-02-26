@@ -52,7 +52,7 @@ class CartService
 
     private function getUserId(): ?int
     {
-        return Session::get('user_id');
+        return Session::get('member_id');
     }
 
     public function getItems(): array
@@ -329,7 +329,8 @@ class CartService
 
         // Validate delivery type
         $deliveryType = $data['delivery_type'] ?? $deliveryType;
-        if (!in_array($deliveryType, $subscriptionPlan->getDeliveryOptions())) {
+
+        if (!in_array($deliveryType, $subscriptionPlan->getDeliveryOptions())) { //todo
             return ['success' => false, 'message' => 'Invalid delivery type'];
         }
 

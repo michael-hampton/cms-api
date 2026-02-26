@@ -202,7 +202,7 @@ class SubscriptionPricingResolverTest extends TestCase
         );
 
         $this->voucherService->shouldReceive('validateVoucherForSubscription')
-            ->with('SAVE5', 1, 1)
+            ->with('SAVE5', 1, 1, null, SubscriptionType::PRINTED->value)
             ->once()
             ->andReturn($voucherValidation);
 
@@ -243,7 +243,7 @@ class SubscriptionPricingResolverTest extends TestCase
         );
 
         $this->voucherService->shouldReceive('validateVoucherForSubscription')
-            ->with('EXPIRED', 1, 1)
+            ->with('EXPIRED', 1, 1, null, SubscriptionType::PRINTED->value)
             ->once()
             ->andReturn($voucherValidation);
 

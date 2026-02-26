@@ -4,6 +4,7 @@ namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionSortOption;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
@@ -53,7 +54,13 @@ class OneTimeSubscriptionsController extends Controller
         if ($request->header('X-Requested-With') === 'XMLHttpRequest' || $request->input('ajax')) {
             return $this->jsonResponse([
                 'success' => true,
-                'plans' => $catalogData['data'],
+                'plans' => $catalogData['data']->map(function ($plan) {
+                    $plan->delivery_type = !empty($plan->digital_download_url)
+                        ? SubscriptionType::DIGITAL->value
+                        : SubscriptionType::PRINTED->value;
+
+                    return $plan;
+                }),
                 'pagination' => [
                     'current_page' => $catalogData['pagination']['current_page'],
                     'total_pages' => $catalogData['pagination']['last_page'],
@@ -117,7 +124,13 @@ class OneTimeSubscriptionsController extends Controller
         );
 
         return $this->view('subscriptions/onetime/index', [
-            'plans' => $catalogData['data'],
+            'plans' => $catalogData['data']->map(function ($plan) {
+                $plan->delivery_type = !empty($plan->digital_download_url)
+                    ? SubscriptionType::DIGITAL->value
+                    : SubscriptionType::PRINTED->value;
+
+                return $plan;
+            }),
             'pagination' => [
                 'current_page' => $catalogData['pagination']['current_page'],
                 'total_pages' => $catalogData['pagination']['last_page'],

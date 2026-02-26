@@ -47,6 +47,7 @@ class DealTrackingRecorderTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forNewsletter(123, $member);
@@ -70,6 +71,7 @@ class DealTrackingRecorderTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forWeb(456, $member);

@@ -641,7 +641,7 @@ class CompetitionServiceTest extends FunctionalTestCase
 
         $progress = $this->service->getEntryProgress($competition, $member);
 
-        $this->assertSame(50, $progress['percentage']);
+        $this->assertSame(51, $progress['percentage']);
     }
 
     protected function setUp(): void

@@ -27,6 +27,7 @@ class DeliverIssueDeliveryJob extends BaseJob
         $issuesDelivered = $this->issuesDeliveredRepository->find($issuesDeliveredId);
 
         if (!$issuesDelivered) {
+            die('a');
             $this->logger->error('IssuesDelivered not found', ['id' => $issuesDeliveredId]);
             return;
         }

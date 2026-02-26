@@ -171,9 +171,7 @@ class DealVisibilityResolverTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = new ProductRepository(
-            app(\App\Repositories\Product\ProductSpecificationGroupRepository::class)
-        );
+        $this->repository = app(ProductRepository::class);
         $ruleFactory = new EligibilityRuleFactory(new MemberSegmentChecker());
         $this->resolver = new DealVisibilityResolver($this->repository, $ruleFactory);
     }

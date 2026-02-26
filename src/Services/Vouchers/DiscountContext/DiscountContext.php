@@ -33,7 +33,9 @@ class DiscountContext
             member: $this->member,
             isSubscription: $this->isSubscription,
             isFirstSubscriptionCycle: $this->isFirstSubscriptionCycle,
-            siteId: $this->siteId
+            siteId: $this->siteId,
+            rewardContext: $this->rewardContext,
+            voucherContext: $this->voucherContext,
         );
     }
 
@@ -51,7 +53,26 @@ class DiscountContext
             member: $this->member,
             isSubscription: $this->isSubscription,
             isFirstSubscriptionCycle: $this->isFirstSubscriptionCycle,
-            siteId: $this->siteId
+            siteId: $this->siteId,
+            rewardContext: $this->rewardContext,
+            voucherContext: $this->voucherContext,
+        );
+    }
+
+    public function resetForNonStackable(): self
+    {
+        return new self(
+            items: $this->items,
+            baseSubtotalCents: $this->baseSubtotalCents,
+            currentSubtotalCents: $this->baseSubtotalCents,
+            currentOfferDiscountCents: 0,
+            appliedDiscounts: [],
+            member: $this->member,
+            isSubscription: $this->isSubscription,
+            isFirstSubscriptionCycle: $this->isFirstSubscriptionCycle,
+            siteId: $this->siteId,
+            rewardContext: $this->rewardContext,
+            voucherContext: $this->voucherContext,
         );
     }
 }

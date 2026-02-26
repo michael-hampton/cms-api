@@ -449,7 +449,7 @@ $selectedTags = !empty($filters['tags'])
                                                 £<?= number_format($bundle['bundle_price'], 2) ?></div>
                                         </div>
                                         <button class="bundle-card__cta"
-                                                data-delivery_type=""
+                                                data-delivery_type="<?= $bundle['delivery_type'] ?? 'print' ?>"
                                                 onclick="event.preventDefault(); addToCart('bundle', <?= $bundle['id'] ?>, this)">
                                             Add to cart
                                         </button>
@@ -666,6 +666,8 @@ $selectedTags = !empty($filters['tags'])
         const tagPills = (plan.tags || []).slice(0, 2).map(t =>
             `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
         const cartDt = escHtml(plan.delivery_type || 'digital');
+
+        alert(cartDt)
 
         return `
         <article class="plan-card">

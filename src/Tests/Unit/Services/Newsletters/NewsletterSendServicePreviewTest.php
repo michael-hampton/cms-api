@@ -10,6 +10,7 @@ use App\Repositories\Members\MemberRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
+use App\Repositories\Newsletters\NewsletterSnapshotRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Cms\Pages\BlockParserService;
@@ -19,7 +20,7 @@ use App\Services\Newsletter\NewsletterDispatcher;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Services\Newsletter\NewsletterRecipientResolver;
 use App\Services\Newsletter\NewsletterSendService;
-use App\Services\Subscriptions\MemberSubscriptionService;
+use App\Services\Newsletter\NewsletterViewTokenService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 
@@ -39,6 +40,8 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
     private $mockRecipientResolver;
     private $mockDispatcher;
     private $mockDatabase;
+    private NewsletterSnapshotRepository $mockSnapshotRepository;
+    private NewsletterViewTokenService $mockViewTokenService;
 
     protected function setUp(): void
     {
@@ -57,6 +60,8 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
         $this->mockRecipientResolver = Mockery::mock(NewsletterRecipientResolver::class);
         $this->mockDispatcher = Mockery::mock(NewsletterDispatcher::class);
         $this->mockDatabase = Mockery::mock(Database::class);
+        $this->mockSnapshotRepository = Mockery::mock(NewsletterSnapshotRepository::class);
+        $this->mockViewTokenService = Mockery::mock(NewsletterViewTokenService::class);
 
         $this->service = new NewsletterSendService(
             $this->mockParser,
@@ -71,7 +76,9 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
             $this->mockContentBuilder,
             $this->mockRecipientResolver,
             $this->mockDispatcher,
-            $this->mockDatabase
+            $this->mockDatabase,
+            $this->mockSnapshotRepository,
+            $this->mockViewTokenService
         );
     }
 

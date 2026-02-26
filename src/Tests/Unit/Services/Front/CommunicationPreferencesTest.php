@@ -6,6 +6,7 @@ use App\Models\Member;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
@@ -16,6 +17,30 @@ class CommunicationPreferencesTest extends FunctionalTestCase
     private $preferenceRepository;
     private $subscriberRepository;
     private MemberSubscriptionService $service;
+    private SubscriptionRepository $subscriptionRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->memberRepository = m::mock(MemberRepository::class);
+        $this->preferenceRepository = m::mock(MemberSubscriptionPreferenceRepository::class);
+        $this->subscriberRepository = m::mock(SubscriberRepository::class);
+        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
+
+        $this->service = new MemberSubscriptionService(
+            $this->memberRepository,
+            $this->preferenceRepository,
+            $this->subscriberRepository,
+            $this->subscriptionRepository
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        m::close();
+        parent::tearDown();
+    }
 
     public function test_member_can_update_communication_preferences(): void
     {
@@ -103,26 +128,5 @@ class CommunicationPreferencesTest extends FunctionalTestCase
         $result = $this->service->shouldReceiveMarketingEmail($member, 'third_party');
 
         $this->assertFalse($result);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->memberRepository = m::mock(MemberRepository::class);
-        $this->preferenceRepository = m::mock(MemberSubscriptionPreferenceRepository::class);
-        $this->subscriberRepository = m::mock(SubscriberRepository::class);
-
-        $this->service = new MemberSubscriptionService(
-            $this->memberRepository,
-            $this->preferenceRepository,
-            $this->subscriberRepository
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        m::close();
-        parent::tearDown();
     }
 }

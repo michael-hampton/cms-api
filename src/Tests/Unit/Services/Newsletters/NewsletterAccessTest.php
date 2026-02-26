@@ -82,6 +82,8 @@ class NewsletterAccessTest extends FunctionalTestCase
             'description' => 'Test bundle',
             'newsletter_slugs' => $newsletterSlugs,
             'is_active' => $isActive,
+            'bundle_price' => 100,
+            'total_price' => 100,
         ]);
     }
 

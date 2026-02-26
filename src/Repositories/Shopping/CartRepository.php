@@ -11,7 +11,13 @@ class CartRepository extends Repository
 {
     public function updateQuantity(mixed $cartItemId, int $quantity)
     {
-        //todo
+        $item = $this->model->query()->where('id', $cartItemId)->first();
+
+        if (!$item) {
+            return false;
+        }
+
+        return $item->update(['quantity' => $quantity]);
     }
 
     protected function getModelClass(): string

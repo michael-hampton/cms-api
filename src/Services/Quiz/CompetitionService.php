@@ -75,9 +75,11 @@ class CompetitionService
 
         foreach ($criteria as $criterion) {
             $result = $this->evaluateCriterion($criterion, $member);
+
             if ($result['met']) {
                 $metCount++;
             }
+
             $details[] = $result;
         }
 
@@ -85,7 +87,11 @@ class CompetitionService
             'unlocked' => $totalCount === 0 || $metCount === $totalCount,
             'met' => $metCount,
             'total' => $totalCount,
-            'percentage' => $totalCount > 0 ? (int)round(($metCount / $totalCount) * 100) : 100,
+            'percentage' => $totalCount > 0
+                ? (int)round(
+                    array_sum(array_column($details, 'percentage')) / $totalCount
+                )
+                : 100,
             'details' => $details,
         ];
     }
@@ -133,6 +139,7 @@ class CompetitionService
             // ---- badge_count: member must have earned at least N badges ----
             case 'badge_count':
                 $current = $this->badgeRepository->getEarnedBadges($member)->count();
+
                 $met = $current >= $target;
 
                 return [

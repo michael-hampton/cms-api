@@ -76,6 +76,7 @@ class BoostRankingService
         // Build lookup: [boostable_id => ['boost_id' => X, 'rank' => Y]]
         $rankedLookup = $ranked
             ->pluck('boost')
+            ->filter()
             ->values()
             ->mapWithKeys(function ($boost, $index) {
                 return [
@@ -87,51 +88,37 @@ class BoostRankingService
             })
             ->toArray();
 
+        // Assign ranking metadata to items
         $items = $items->map(function ($item) use ($rankedLookup, $idKey) {
 
             $id = is_array($item)
                 ? ($item[$idKey] ?? null)
                 : ($item->{$idKey} ?? null);
 
-            $isBoosted = $id !== null && isset($rankedLookup[$id]);
+            $rank = ($id !== null && isset($rankedLookup[$id]))
+                ? $rankedLookup[$id]['rank']
+                : PHP_INT_MAX;
 
-            $boostId = $isBoosted
+            $isBoosted = $rank !== PHP_INT_MAX;
+            $boostId = ($id !== null && isset($rankedLookup[$id]))
                 ? $rankedLookup[$id]['boost_id']
                 : null;
 
             if (is_array($item)) {
+                $item['rank'] = $rank;
                 $item['is_boosted'] = $isBoosted;
                 $item['boost_id'] = $boostId;
             } else {
-                $item->is_oosted = $isBoosted;
+                $item->rank = $rank;
+                $item->is_boosted = $isBoosted;
                 $item->boost_id = $boostId;
             }
 
             return $item;
         });
 
-        $boosted = $items->filter(fn($item) => is_array($item)
-            ? ($item['is_boosted'] ?? false)
-            : ($item->is_boosted ?? false)
-        );
-
-        $unboosted = $items->reject(fn($item) => is_array($item)
-            ? ($item['is_boosted'] ?? false)
-            : ($item->is_boosted ?? false)
-        );
-
-        // Sort boosted by rank
-        $boosted = $boosted->sortBy(function ($item) use ($rankedLookup, $idKey) {
-            $id = is_array($item)
-                ? ($item[$idKey] ?? null)
-                : ($item->{$idKey} ?? null);
-
-            return $id !== null && isset($rankedLookup[$id])
-                ? $rankedLookup[$id]['rank']
-                : PHP_INT_MAX;
-        })->values();
-
-        return $boosted->merge($unboosted)->values();
+        // Sort everything once by rank (boosted first, then unboosted)
+        return $items->sortBy('rank')->values();
     }
 
     public function getActiveBoostedIds(string $context): array

@@ -315,8 +315,10 @@ class BoostServiceTest extends FunctionalTestCase
         $this->boostRepository->shouldReceive('find')->andReturn($boost);
         $this->boostRepository->shouldNotReceive('update');
 
+        $this->expectException(BoostTransitionException::class);
+        $this->expectExceptionMessage('boost is already cancelled');
+
         $result = $this->service->cancelBoost(1);
-        $this->assertEquals(BoostStatus::Cancelled->value, $result->status);
     }
 
     public function test_throws_when_boost_not_found_on_cancel(): void

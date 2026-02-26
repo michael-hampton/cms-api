@@ -49,6 +49,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => false,
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forNewsletter(1, null);
@@ -67,6 +68,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forNewsletter(1, null);
@@ -85,6 +87,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forNewsletter(1, null);
@@ -104,6 +107,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'eligibility_rules' => ['require_paid' => true],
+            'original_price' => 100.00,
         ]);
 
         // Free member
@@ -149,6 +153,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'eligibility_rules' => ['require_paid' => true],
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forNewsletter(1, $paidMember->fresh());
@@ -167,6 +172,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $inactiveOffer = ProductOffer::create([
@@ -175,6 +181,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => false,
+            'original_price' => 100.00,
         ]);
 
         $context = RenderContext::forNewsletter(1, null);

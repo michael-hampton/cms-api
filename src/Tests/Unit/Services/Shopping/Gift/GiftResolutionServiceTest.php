@@ -66,7 +66,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->cartRepository->shouldReceive('findBySessionOrUser')->once()->andReturn(collect());
         $this->collector->shouldReceive('collect')->once()->with(Mockery::type(CartContext::class))->andReturn([]);
         $this->strategy->shouldReceive('resolve')->once()->with([], [])->andReturn([]);
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->once()->andReturn([]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->once()->andReturn(collect());
 
         $result = $this->service->resolveAndSync('session-abc', 1);
 
@@ -89,7 +89,7 @@ class GiftResolutionServiceTest extends TestCase
             ->andReturn([]);
 
         $this->strategy->shouldReceive('resolve')->andReturn([]);
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect());
 
         $this->service->resolveAndSync('session-abc', 1, null, isFirstOrder: true);
         $this->assertTrue(true);
@@ -108,7 +108,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->strategy->shouldReceive('resolve')->andReturn([$giftLine]);
         $this->productRepository->shouldReceive('findByIds')->andReturn(collect());
         $this->subscriptionPlanRepository->shouldReceive('findByIds')->andReturn(collect());
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect());
 
         $this->giftChecklistService->shouldReceive('addGift')
             ->once()
@@ -133,7 +133,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->cartRepository->shouldReceive('findBySessionOrUser')->andReturn(collect());
         $this->collector->shouldReceive('collect')->andReturn([]);
         $this->strategy->shouldReceive('resolve')->andReturn([]); // nothing desired
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([$staleCartGift]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect([$staleCartGift]));
 
         $this->giftChecklistService->shouldReceive('removeGift')
             ->once()
@@ -155,7 +155,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->cartRepository->shouldReceive('findBySessionOrUser')->andReturn(collect());
         $this->collector->shouldReceive('collect')->andReturn([]);
         $this->strategy->shouldReceive('resolve')->andReturn([]);
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([$existingGift]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect([$existingGift]));
 
         $this->giftChecklistService->shouldReceive('removeGift')->once()->with(50);
 
@@ -179,7 +179,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->strategy->shouldReceive('resolve')->andReturn([$desiredLine]);
         $this->productRepository->shouldReceive('findByIds')->andReturn(collect());
         $this->subscriptionPlanRepository->shouldReceive('findByIds')->andReturn(collect());
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([$existingGift]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect([$existingGift]));
 
         // Should NOT add or remove — only update
         $this->giftChecklistService->shouldNotReceive('addGift');
@@ -207,7 +207,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->strategy->shouldReceive('resolve')->andReturn([$desiredLine]);
         $this->productRepository->shouldReceive('findByIds')->andReturn(collect());
         $this->subscriptionPlanRepository->shouldReceive('findByIds')->andReturn(collect());
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([$existingGift]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect([$existingGift]));
 
         $this->cartRepository->shouldNotReceive('updateQuantity');
         $this->giftChecklistService->shouldNotReceive('addGift');
@@ -231,7 +231,7 @@ class GiftResolutionServiceTest extends TestCase
         $this->strategy->shouldReceive('resolve')->andReturn([$desiredLine]);
         $this->productRepository->shouldReceive('findByIds')->andReturn(collect());
         $this->subscriptionPlanRepository->shouldReceive('findByIds')->andReturn(collect());
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([$existingGift]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect([$existingGift]));
 
         $this->cartRepository->shouldReceive('updateQuantity')->once()->with(55, 1);
 
@@ -306,7 +306,7 @@ class GiftResolutionServiceTest extends TestCase
             ->with([$candidate], ['product:42' => 'Free Mug'])
             ->andReturn([$giftLine]);
 
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect());
         $this->giftChecklistService->shouldReceive('addGift')->once();
 
         $this->service->resolveAndSync('session-abc', 1);
@@ -353,7 +353,7 @@ class GiftResolutionServiceTest extends TestCase
             ->andReturn([]);
 
         $this->strategy->shouldReceive('resolve')->andReturn([]);
-        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn([]);
+        $this->giftChecklistService->shouldReceive('getGiftsInCart')->andReturn(collect());
 
         $this->service->resolveAndSync('session-abc', 1);
         $this->assertTrue(true);

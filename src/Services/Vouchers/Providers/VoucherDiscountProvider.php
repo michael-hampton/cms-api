@@ -24,7 +24,6 @@ final class VoucherDiscountProvider implements DiscountProvider
     public function supports(DiscountContext $context): bool
     {
         $voucherContext = $context->voucherContext;
-
         if ($voucherContext === null || empty($voucherContext->voucherData['voucher_code'])) {
             return false;
         }

@@ -18,7 +18,6 @@ class IssuesDelivered extends Model
     ];
 
     protected $casts = [
-        'status' => 'integer',
         'attempts' => 'integer',
         'delivered_at' => 'datetime',
         'created_at' => 'datetime',

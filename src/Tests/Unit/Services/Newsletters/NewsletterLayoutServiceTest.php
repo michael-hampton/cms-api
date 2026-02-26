@@ -41,6 +41,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
             name: 'Test Layout',
             slug: 'test-layout',
             layoutDefinition: ['slots' => [['key' => 'content', 'required' => true]]],
+            siteId: $this->siteId
         );
 
         $this->assertInstanceOf(NewsletterLayout::class, $layout);
@@ -64,7 +65,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_transitions_draft_to_validated(): void
     {
-        $layout = $this->service->createLayout('Layout', 'layout-v', []);
+        $layout = $this->service->createLayout('Layout', 'layout-v', [], false, null, $this->siteId);
         $version = $layout->latestVersion();
 
         $updated = $this->service->transitionVersionState(
@@ -77,7 +78,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_transitions_validated_to_published_and_emits_event(): void
     {
-        $layout = $this->service->createLayout('Layout', 'layout-pub', []);
+        $layout = $this->service->createLayout('Layout', 'layout-pub', [], false, null, $this->siteId);
         $version = $layout->latestVersion();
 
         $this->service->transitionVersionState($version->id, LayoutVersionState::Validated);
@@ -89,7 +90,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_rejects_invalid_state_transition(): void
     {
-        $layout = $this->service->createLayout('Layout', 'layout-bad', []);
+        $layout = $this->service->createLayout('Layout', 'layout-bad', [], false, null, $this->siteId);
         $version = $layout->latestVersion();
 
         $this->expectException(\RuntimeException::class);
@@ -100,7 +101,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_rejects_deprecated_to_any_state(): void
     {
-        $layout = $this->service->createLayout('Layout', 'layout-dep', []);
+        $layout = $this->service->createLayout('Layout', 'layout-dep', [], false, null, $this->siteId);
         $version = $layout->latestVersion();
 
         $this->service->transitionVersionState($version->id, LayoutVersionState::Validated);
@@ -118,7 +119,10 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
         $original = $this->service->createLayout(
             'Original',
             'original-layout',
-            ['slots' => [['key' => 'content', 'required' => true]]]
+            ['slots' => [['key' => 'content', 'required' => true]]],
+            false,
+            null,
+            $this->siteId
         );
 
         $clone = $this->service->cloneLayout($original->id, 'Clone', 'clone-layout', 1, $this->siteId);
@@ -145,7 +149,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_deletes_user_layout(): void
     {
-        $layout = $this->service->createLayout('Deletable', 'deletable-layout', []);
+        $layout = $this->service->createLayout('Deletable', 'deletable-layout', [], false, null, $this->siteId);
 
         $this->service->deleteLayout($layout->id);
 
@@ -173,8 +177,11 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
             'slots' => [
                 ['key' => 'header', 'required' => true],
                 ['key' => 'content', 'required' => true],
-            ]
-        ]);
+            ]],
+            false,
+            null,
+            $this->siteId
+        );
 
         $v1 = $layout->latestVersion();
 
@@ -201,7 +208,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
     public function test_version_numbers_are_sequential(): void
     {
-        $layout = $this->service->createLayout('Sequential', 'sequential-layout', []);
+        $layout = $this->service->createLayout('Sequential', 'sequential-layout', [], false, null, $this->siteId);
 
         $v2 = $this->service->addLayoutVersion($layout->id, ['slots' => []]);
         $v3 = $this->service->addLayoutVersion($layout->id, ['slots' => []]);

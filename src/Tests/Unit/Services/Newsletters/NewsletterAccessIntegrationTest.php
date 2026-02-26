@@ -124,6 +124,8 @@ class NewsletterAccessIntegrationTest extends FunctionalTestCase
             'slug' => 'premium',
             'newsletter_slugs' => ['insider', 'tech-weekly'],
             'is_active' => true,
+            'bundle_price' => 100,
+            'total_price' => 100,
         ]);
 
         // Newsletter requiring bundle

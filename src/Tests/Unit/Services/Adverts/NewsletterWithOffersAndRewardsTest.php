@@ -76,6 +76,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => false,
+            'original_price' => 100.00,
         ]);
 
         $page = Page::create([
@@ -203,6 +204,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $page = Page::create([
@@ -451,6 +453,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'original_price' => 100.00,
         ]);
 
         $page = Page::create([
@@ -552,6 +555,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'is_active' => true,
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'original_price' => 100.00,
         ]);
 
         $newsletter = Newsletter::create([

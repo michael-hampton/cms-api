@@ -79,6 +79,7 @@ class GiftResolutionService
         $candidates = $this->collector->collect($cartContext);
         $giftLabels = $this->fetchGiftLabels($candidates);
         $giftLines = $this->strategy->resolve($candidates, $giftLabels);
+
         return $this->syncCartGifts($giftLines, $sessionId, $userId);
     }
 

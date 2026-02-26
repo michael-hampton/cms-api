@@ -24,7 +24,7 @@ class CartPersistenceTest extends FunctionalTestCase
         $sessionId = 'session-123';
         $siteId = 1;
 
-        Session::put('cart', [
+        Session::put('cart_items', [
             ['product_id' => 1, 'quantity' => 2],
             ['product_id' => 2, 'quantity' => 1],
         ]);

@@ -320,4 +320,17 @@ class SubscriptionRepository extends Repository
             })
             ->get();
     }
+
+    public function getActivePlanIds(int $userId, array $planIds, ?int $siteId = null): array
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        return Subscription::where('member_id', $userId)
+            ->where('site_id', $siteId)
+            ->whereIn('plan_id', $planIds)
+            ->whereIn('status', Subscription::ACTIVE_STATUSES)
+            ->get()
+            ->pluck('plan_id')
+            ->all();
+    }
 }

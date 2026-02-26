@@ -9,6 +9,7 @@ use App\Exceptions\Subscriptions\PlanNotFoundException;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionEligibilityService;
@@ -327,6 +328,9 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
 
         $subscription = Mockery::mock(Subscription::class);
 
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+
         $this->planRepository->shouldReceive('find')
             ->with($planId)
             ->once()
@@ -335,7 +339,8 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $voucherValidationResult = new VoucherValidationResult(
             valid: true,
             discount: 2.99,
-            voucherId: 1
+            message: 'Voucher applied successfully',
+            voucher: $voucher
         );
 
         $this->voucherServiceMock->shouldReceive('validateVoucherForSubscription')
@@ -344,9 +349,9 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('createSubscription')
             ->with($memberId, $planId, $siteId, Mockery::on(function ($data) {
-                return $data['voucher_id'] === 1
-                    && abs($data['discount_amount'] - 2.99) < 0.01
-                    && abs($data['original_price'] - 29.99) < 0.01;
+                return $data['voucher_id'] == 1
+                    && $data['discount_amount'] === 2.99
+                    && $data['original_price'] === 29.99;
             }))
             ->once()
             ->andReturn($subscription);
@@ -374,7 +379,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $voucherValidationResult = new VoucherValidationResult(
             valid: false,
             discount: 0,
-            voucherId: null,
+            voucher: null,
             message: 'Voucher not found'
         );
 
@@ -390,6 +395,8 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
     public function testSubscribeMemberToPlanWithVoucherCapsDiscountAtPrice(): void
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
         $plan->id = 1;
         $plan->price = 29.99;
         $plan->is_active = true;
@@ -399,7 +406,8 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $voucherValidationResult = new VoucherValidationResult(
             valid: true,
             discount: 50.00, // More than price
-            voucherId: 1
+            voucher: $voucher,
+            message: 'Discount capped at plan price'
         );
 
         $this->voucherServiceMock->shouldReceive('validateVoucherForSubscription')

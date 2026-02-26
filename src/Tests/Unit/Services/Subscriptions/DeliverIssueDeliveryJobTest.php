@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Enums\Subscriptions\IssueDeliveredStatus;
 use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssuesDelivered;
@@ -29,12 +30,14 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $deliveryService->shouldReceive('send')->once();
         app()->instance(DeliveryService::class, $deliveryService);
 
+        $deliveryService->shouldReceive('registerChannel');
+
         $job = app(DeliverIssueDeliveryJob::class);
         $job->handle($issuesDelivered->id);
 
-        $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
+        $issuesDelivered->refresh();
 
-        $this->assertEquals(IssueDeliveryStatus::DELIVERED->value, $issuesDelivered->status);
+        $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);
         $this->assertNotNull($issuesDelivered->delivered_at);
     }
 
@@ -50,6 +53,9 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         ]);
 
         $deliveryService = Mockery::mock(DeliveryService::class);
+
+        $deliveryService->shouldReceive('registerChannel');
+
         $deliveryService->shouldReceive('send')
             ->andThrow(new \Exception('Delivery failed'));
         app()->instance(DeliveryService::class, $deliveryService);
@@ -74,13 +80,14 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $issueDelivery = $this->createIssueDelivery();
         $subscription = $this->createSubscription();
         $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveryStatus::DELIVERED->value,
+            'status' => IssueDeliveredStatus::DELIVERED->value,
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'delivered_at' => (new \DateTime())->format('Y-m-d H:i:s'),
         ]);
 
         $deliveryService = Mockery::mock(DeliveryService::class);
+        $deliveryService->shouldReceive('registerChannel');
         $deliveryService->shouldNotReceive('send');
         app()->instance(DeliveryService::class, $deliveryService);
 
@@ -88,6 +95,6 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $job->handle($issuesDelivered->id);
 
         $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
-        $this->assertEquals(IssueDeliveryStatus::DELIVERED->value, $issuesDelivered->status);
+        $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);
     }
 }

@@ -31,7 +31,8 @@ class OrderDraftService
         Member             $member,
         int                $siteId,
         array              $checkoutData,
-        ?ResolvedDiscounts $resolvedDiscounts = null
+        ?ResolvedDiscounts $resolvedDiscounts = null,
+        bool               $isFreeOrder = false
     ): Order
     {
         $orderItems = [];
@@ -130,6 +131,18 @@ class OrderDraftService
             'merchant_funded' => $resolvedDiscounts->merchantFundedCents / 100,
             'platform_funded' => $resolvedDiscounts->platformFundedCents / 100,
         ];
+
+        if ($isFreeOrder) {
+            $orderData['subtotal'] = 0;
+            $orderData['shipping'] = 0;
+            $orderData['tax'] = 0;
+            $orderData['total'] = 0;
+            $orderData['discount'] = 0;
+            $orderData['offer_discount'] = 0;
+            $orderData['voucher_discount'] = 0;
+            $orderData['reward_discount'] = 0;
+            $orderData['tiered_discount'] = 0;
+        }
 
         // Add subscription IDs to order
         $subscriptionIds = array_map(fn($s) => $s['subscription']->id, $subscriptionsWithPricing);

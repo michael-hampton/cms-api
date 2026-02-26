@@ -55,7 +55,7 @@ class ResolvedSubscriptionPrice
         ?int   $voucherId = null
     ): self
     {
-        $effectivePrice = $salePrice ?? $basePrice;
+        $effectivePrice = $salePrice > 0 ? $salePrice : $basePrice;
 
         return new self(
             pricingTierId: $pricingTierId,

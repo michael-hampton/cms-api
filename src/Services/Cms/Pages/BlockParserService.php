@@ -17,7 +17,6 @@ use App\Parsers\BlockRegistry;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Product\ProductRepository;
-use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Services\Cms\PersonService;
 use App\Services\Product\ProductMatchingService;
 use Exception;
@@ -160,7 +159,7 @@ class BlockParserService
             return $parsedData;
         }
 
-        $matchingService = new ProductMatchingService(new ProductRepository(new ProductSpecificationGroupRepository()));
+        $matchingService = new ProductMatchingService(app(ProductRepository::class));
         $matches = $matchingService->findMatches($productName, $brand, SiteContext::getId());
 
         // If we have a high confidence match (>85%), use it
@@ -179,7 +178,7 @@ class BlockParserService
      */
     private function createProductFromBlock(array $blockData, string $type = 'product'): int
     {
-        $productRepository = new \App\Repositories\Product\ProductRepository(new ProductSpecificationGroupRepository());
+        $productRepository = app(ProductRepository::class);
 
         $brand = $blockData['brand'] ?? null;
         $price = $blockData['price'] ?? 0;
