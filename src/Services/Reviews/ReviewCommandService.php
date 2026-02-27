@@ -6,34 +6,49 @@ use App\DTO\Reviews\CreateReviewDTO;
 use App\DTO\Reviews\ReviewResult;
 use App\DTO\Reviews\UpdateReviewDTO;
 use App\Framework\Database\Database;
-use App\Models\Review;
+use App\Models\SubscriptionPlan;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\ReviewRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 
 class ReviewCommandService
 {
     public function __construct(
-        private readonly Database                 $database,
-        private readonly ReviewRepository         $reviewRepository,
-        private readonly ProductRepository        $productRepository,
-        private readonly ReviewPolicy             $reviewPolicy,
-        private readonly VerifiedPurchaseResolver $verifiedPurchaseResolver
+        private readonly Database                   $database,
+        private readonly ReviewRepository           $reviewRepository,
+        private readonly ProductRepository          $productRepository,
+        private readonly SubscriptionPlanRepository $planRepository,
+        private readonly ReviewPolicy               $reviewPolicy,
+        private readonly VerifiedPurchaseResolver   $verifiedPurchaseResolver
     )
     {
     }
 
     public function createReview(CreateReviewDTO $dto, int $currentUserId): ReviewResult
     {
-        if (!$this->reviewPolicy->canCreate($currentUserId, $dto->productId)) {
+        if (!$this->reviewPolicy->canCreate($currentUserId, $dto->reviewableId())) {
             return ReviewResult::failure('You must be logged in to submit a review');
         }
 
-        $product = $this->productRepository->find($dto->productId);
-        if (!$product) {
-            return ReviewResult::failure('Product not found');
+        // Resolve the reviewable entity (product or plan)
+        [$entity, $error] = $this->resolveReviewableEntity($dto);
+        if ($error !== null) {
+            return ReviewResult::failure($error);
         }
 
-        if ($this->reviewRepository->hasUserReviewedProduct($dto->productId, $dto->userId)) {
+        // Duplicate review guard — polymorphic
+        if ($this->reviewRepository->hasUserReviewedReviewable(
+            $dto->reviewableType(),
+            $dto->reviewableId(),
+            $dto->userId
+        )) {
+            return ReviewResult::failure('You have already reviewed this');
+        }
+
+        // Legacy product_id guard (ensures existing data integrity)
+        if ($dto->productId !== null
+            && $this->reviewRepository->hasUserReviewedProduct($dto->productId, $dto->userId)
+        ) {
             return ReviewResult::failure('You have already reviewed this product');
         }
 
@@ -41,13 +56,14 @@ class ReviewCommandService
             return ReviewResult::failure('Rating must be between 1 and 5');
         }
 
-        $isVerifiedPurchase = $this->verifiedPurchaseResolver->isVerified(
-            $dto->userId,
-            $dto->productId
-        );
+        $isVerifiedPurchase = $this->resolveVerifiedPurchase($dto);
 
-        $review = $this->database->transaction(function () use ($dto, $product, $isVerifiedPurchase) {
+        $review = $this->database->transaction(function () use ($dto, $entity, $isVerifiedPurchase) {
             return $this->reviewRepository->create([
+                // Polymorphic columns (canonical)
+                'reviewable_type' => $dto->reviewableType(),
+                'reviewable_id' => $dto->reviewableId(),
+                // Legacy column — populated for product reviews only
                 'product_id' => $dto->productId,
                 'user_id' => $dto->userId,
                 'rating' => $dto->rating,
@@ -57,7 +73,7 @@ class ReviewCommandService
                 'is_approved' => true,
                 'helpful_count' => 0,
                 'unhelpful_count' => 0,
-                'site_id' => $product->site_id
+                'site_id' => $entity->site_id,
             ]);
         });
 
@@ -106,5 +122,40 @@ class ReviewCommandService
         });
 
         return ReviewResult::success('Review deleted successfully');
+    }
+
+    // ─── Private helpers ──────────────────────────────────────────────────
+
+    /**
+     * Returns [entity, null] on success, [null, errorMessage] on failure.
+     */
+    private function resolveReviewableEntity(CreateReviewDTO $dto): array
+    {
+        if ($dto->isForPlan()) {
+            $plan = $this->planRepository->find($dto->planId);
+            if (!$plan) {
+                return [null, 'Subscription plan not found'];
+            }
+            return [$plan, null];
+        }
+
+        $product = $this->productRepository->find($dto->productId);
+        if (!$product) {
+            return [null, 'Product not found'];
+        }
+        return [$product, null];
+    }
+
+    private function resolveVerifiedPurchase(CreateReviewDTO $dto): bool
+    {
+        // Verified purchase only applies to products for now
+        if ($dto->isForPlan()) {
+            return false;
+        }
+
+        return $this->verifiedPurchaseResolver->isVerified(
+            $dto->userId,
+            $dto->productId
+        );
     }
 }

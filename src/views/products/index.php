@@ -287,6 +287,7 @@
 </script>
 
 @include('components/share-modal')
+@include('components/footer')
 
 <script>
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'

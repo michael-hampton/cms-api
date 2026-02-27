@@ -9,7 +9,12 @@ use App\Enums\Gifts\GiftType;
 use App\Framework\Support\Collection;
 use App\Models\GiftPromotion;
 use App\Models\GiftPromotionTrigger;
+use App\Models\PromotionIssueExclusion;
 use App\Repositories\Repository;
+use App\Search\Configurations\GiftPromotionSearchConfiguration;
+use App\Search\PaginatedResult;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class GiftPromotionRepository extends Repository
 {
@@ -242,6 +247,38 @@ class GiftPromotionRepository extends Repository
                 );
             }
         }
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $engine = new SearchEngine(new GiftPromotionSearchConfiguration());
+
+        return $engine->search(GiftPromotion::with(['triggers']), $criteria);
+    }
+
+    /**
+     * Replace all issue exclusions for a promotion.
+     * Caller is responsible for the transaction boundary.
+     */
+    public function syncExclusions(GiftPromotion $promotion, array $issueDeliveryIds): void
+    {
+        PromotionIssueExclusion::where('promotion_id', $promotion->id)->delete();
+
+        foreach ($issueDeliveryIds as $issueDeliveryId) {
+            PromotionIssueExclusion::create([
+                'promotion_id' => $promotion->id,
+                'issue_delivery_id' => (int)$issueDeliveryId,
+                'created_at' => now(),
+            ]);
+        }
+    }
+
+    public function getExcludedIssueIds(int $promotionId): array
+    {
+        return PromotionIssueExclusion::where('promotion_id', $promotionId)
+            ->get()
+            ->pluck('issue_delivery_id')
+            ->toArray();
     }
 
     protected function getModelClass(): string

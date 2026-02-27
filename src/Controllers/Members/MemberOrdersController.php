@@ -21,7 +21,7 @@ class MemberOrdersController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $orders = $this->orderRepository->getByUser($member->id);
 
         return $this->view('member/orders/index', [

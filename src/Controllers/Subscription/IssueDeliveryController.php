@@ -4,10 +4,15 @@ namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Resources\IssueDeliveryResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Subscriptions\IssueDeliveryService;
+use Exception;
 
 class IssueDeliveryController extends Controller
 {
@@ -19,35 +24,18 @@ class IssueDeliveryController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request)
+    public function index(Request $request, string $siteName): JsonResponse
     {
-        $siteId = SiteContext::getId();
+        try {
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $result = $this->issueDeliveryRepository->search($criteria);
 
-        $filters = [
-            'status' => $request->input('status'),
-            'product_id' => $request->input('product_id'),
-            'promotion_id' => $request->input('promotion_id'),
-            'from_date' => $request->input('from_date'),
-            'to_date' => $request->input('to_date'),
-            'search' => $request->input('search')
-        ];
+            $collection = new PaginatedResourceCollection($result, IssueDeliveryResource::class);
 
-        $result = $this->issueDeliveryRepository->searchSchedulesPaginated($siteId, $filters);
-
-        return $this->resourceResponse([
-            'data' => collect($result->getData())->map(fn($schedule) => [
-                ...$schedule,
-                'on_sale_date' => $schedule['on_sale_date']?->format('Y-m-d'),
-                'estimated_delivery_date' => $schedule['estimated_delivery_date']?->format('Y-m-d'),
-            ]),
-            'pagination' => [
-                'total' => $result->getTotal(),
-                'page' => $result->getPage(),
-                'per_page' => $result->getPerPage(),
-                'total_pages' => $result->getTotalPages(),
-                'has_more' => $result->hasMore()
-            ]
-        ]);
+            return $this->resourceResponse($collection->toArray());
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 
     public function show(int $id)

@@ -182,6 +182,7 @@ if (!function_exists('config')) {
 
             $configFiles = [
                 'app' => 'config/app.php',
+                'legal' => 'config/legal.php',
                 'boost' => 'config/boost.php',
                 'database' => 'config/database.php',
                 'routing' => 'config/routing.php',
@@ -607,6 +608,15 @@ if (!function_exists('event')) {
     }
 }
 
+
+if (!function_exists('tap')) {
+    function tap(mixed $value, callable $callback): mixed
+    {
+        $callback($value);
+
+        return $value;
+    }
+}
 
 
 

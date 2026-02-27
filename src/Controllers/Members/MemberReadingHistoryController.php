@@ -21,7 +21,7 @@ class MemberReadingHistoryController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
         $recentlyViewed = $this->pageViewRepository->getRecentlyViewedPages($member->id, 50);

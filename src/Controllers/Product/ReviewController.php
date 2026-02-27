@@ -24,6 +24,20 @@ class ReviewController extends Controller
         return $this->resourceResponse($data);
     }
 
+    public function storePlanReview(Request $request, int $planId)
+    {
+        $data = [
+            'rating' => $request->input('rating'),
+            'title' => $request->input('title'),
+            'comment' => $request->input('comment'),
+        ];
+
+        $result = $this->reviewService->createPlanReview($planId, $data);
+
+        $statusCode = $result->success ? 200 : 400;
+        return $this->resourceResponse($result->toArray(), $statusCode);
+    }
+
     public function store(Request $request, int $productId)
     {
         $data = [

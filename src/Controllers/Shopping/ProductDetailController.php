@@ -27,7 +27,8 @@ class ProductDetailController extends Controller
         private readonly WishlistService $wishlistService,
         private readonly ProductRepository     $productRepository,
         private readonly ProductViewRepository $productViewRepository,
-        private readonly ProductSchemaService  $productSchemaService
+        private readonly ProductSchemaService $productSchemaService,
+        private readonly ReviewService        $reviewService
     ) {
         parent::__construct();
     }
@@ -61,10 +62,9 @@ class ProductDetailController extends Controller
         $isInWishlist = $this->wishlistService->isInWishlist($user, $product);
 
         // Get review data
-        $reviewService = app(ReviewService::class);
-        $reviewData = $reviewService->getProductReviews($product->id, 1, 5); // First 5 reviews
-        $reviewStats = $reviewService->getReviewStatistics($product->id);
-        $canReview = $reviewService->canUserReview($product->id);
+        $reviewData = $this->reviewService->getProductReviews($product->id, 1, 5); // First 5 reviews
+        $reviewStats = $this->reviewService->getReviewStatistics($product->id);
+        $canReview = $this->reviewService->canUserReview($product->id);
 
         $merchantsArray = array_map(function($m) use ($product) {
             $variant = null;

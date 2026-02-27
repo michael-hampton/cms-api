@@ -27,7 +27,7 @@ class MemberAddressController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $addresses = $this->addressRepository->getAddressesForMember($member->id);
 
         return $this->view('member/addresses/index', [

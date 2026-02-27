@@ -7,7 +7,9 @@ use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\BriefSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\EmailThemeSearchConfiguration;
+use App\Search\Configurations\GiftPromotionSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
+use App\Search\Configurations\IssueDeliverySearchConfiguration;
 use App\Search\Configurations\MerchantSearchConfiguration;
 use App\Search\Configurations\NewsletterSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
@@ -53,6 +55,8 @@ class SearchConfigurationFactory
         'product_offer' => ProductOfferSearchConfiguration::class,
         'newsletters' => NewsletterSearchConfiguration::class,
         'product_offer_bundle' => ProductOfferBundleSearchConfiguration::class,
+        'gift_promotion' => GiftPromotionSearchConfiguration::class,
+        'issue_delivery' => IssueDeliverySearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

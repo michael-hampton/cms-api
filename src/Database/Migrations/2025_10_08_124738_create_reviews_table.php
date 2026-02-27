@@ -9,7 +9,7 @@ class CreateReviewsTable extends Migration
     {
         Schema::create('reviews', function ($table) {
             $table->id();
-            $table->foreignId('product_id');
+            $table->foreignId('product_id')->nullable();
             $table->foreignId('user_id')->nullable();
             $table->tinyInteger('rating')->unsigned(); // 1-5
             $table->string('title', 200)->nullable();

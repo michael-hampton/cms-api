@@ -5,10 +5,12 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Shopping\SubscriptionCatalogService;
@@ -20,8 +22,8 @@ class OneTimeSubscriptionsController extends Controller
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
         private readonly StripePaymentProcessor       $stripeProcessor,
         private readonly SubscriptionCatalogService   $catalogService,
-        private readonly SubscriptionBundleRepository $bundleRepository
-
+        private readonly SubscriptionBundleRepository $bundleRepository,
+        private readonly ReviewService                $reviewService
     )
     {
         parent::__construct();
@@ -279,6 +281,7 @@ class OneTimeSubscriptionsController extends Controller
 
         // If this is a post-purchase view with subscription ID
         $subscriptionId = $request->input('subscription_id');
+
         if ($subscriptionId) {
             $subscriptionDetails = $this->subscriptionService->getSubscriptionSummary($subscriptionId);
 
@@ -288,9 +291,17 @@ class OneTimeSubscriptionsController extends Controller
             ], $subscriptionDetails));
         }
 
+        $reviewData = $this->reviewService->getPlanReviews($id, 1, 5); // First 5 reviews
+        $reviewStats = $this->reviewService->getPlanReviewSummary($id);
+        $canReview = $this->reviewService->canUserReviewPlan($id);
+
         // Regular plan view for purchase
         return $this->view('subscriptions/onetime/show', [
             'plan' => $plan,
+            'reviewData' => $reviewData,
+            'reviewStats' => $reviewStats,
+            'canReview' => $canReview,
+            'isAuthenticated' => MemberAuth::check(),
             'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
         ]);
     }

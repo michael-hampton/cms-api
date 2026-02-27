@@ -174,8 +174,8 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertTrue($responseData['success']);
-        $this->assertCount(1, $responseData['data']);
-        $this->assertEquals('January Issue', $responseData['data'][0]['issue_title']);
+        $this->assertCount(1, $responseData['items']);
+        $this->assertEquals('January Issue', $responseData['items'][0]['issue_title']);
     }
 
     protected function setUp(): void

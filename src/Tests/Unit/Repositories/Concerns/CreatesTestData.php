@@ -23,6 +23,7 @@ use App\Models\CustomFieldDefinition;
 use App\Models\EmailTheme;
 use App\Models\GiftedArticle;
 use App\Models\GiftPromotion;
+use App\Models\GiftPromotionTrigger;
 use App\Models\Image;
 use App\Models\IssueDelivery;
 use App\Models\Member;
@@ -65,6 +66,7 @@ use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
 use App\Models\ProductView;
 use App\Models\ProductVoucher;
+use App\Models\PromotionIssueExclusion;
 use App\Models\RegionSet;
 use App\Models\RewardDefinition;
 use App\Models\Subscriber;
@@ -623,13 +625,20 @@ trait CreatesTestData
         ], $attributes));
     }
 
-    protected function createIssueDelivery(array $attributes = [])
+    protected function createIssueDelivery(array $overrides = [])
     {
         $plan = $attributes['subscription_plan'] ?? $this->createSubscriptionPlan();
         return IssueDelivery::create(array_merge([
+            'site_id' => $this->siteId,
+            'subscription_id' => null,
             'subscription_plan_id' => $plan->id,
-            'on_sale_date' => now_datetime()->addDays(7),
-        ], $attributes));
+            'issue_number' => rand(100, 999),
+            'issue_title' => 'Test Issue ' . uniqid(),
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+37 days')),
+            'status' => 'active',
+            'cut_off_date' => date('Y-m-d', strtotime('+25 days')),
+        ], $overrides));
     }
 
     protected function createSubscriptionPlan(array $attributes = []): Model
@@ -938,6 +947,48 @@ trait CreatesTestData
             'merchant_id' => null,
             'gift_product_id' => $product,
             'gift_subscription_plan_id' => null
+        ]);
+    }
+
+    // ─── Gift Promotion ──────────────────────────────────────────────────────────
+
+    protected function createGiftPromotion(array $overrides = []): Model
+    {
+        return GiftPromotion::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Promotion ' . uniqid(),
+            'type' => 'gift',
+            'gift_type' => 'subscription',
+            'website' => 'standalone',
+            'is_active' => true,
+            'start_date' => null,
+            'end_date' => null,
+        ], $overrides));
+    }
+
+    protected function createGiftPromotionWithTriggers(array $promotionOverrides = [], array $triggers = []): GiftPromotion
+    {
+        $promotion = $this->createGiftPromotion($promotionOverrides);
+
+        foreach ($triggers as $trigger) {
+            GiftPromotionTrigger::create(array_merge([
+                'promotion_id' => $promotion->id,
+                'type' => 'subscription_plan',
+                'operator' => '=',
+                'reference_id' => null,
+                'value' => '1',
+            ], $trigger));
+        }
+
+        return $promotion;
+    }
+
+    protected function createPromotionIssueExclusion(GiftPromotion $promotion, IssueDelivery $issue): Model
+    {
+        return PromotionIssueExclusion::create([
+            'promotion_id' => $promotion->id,
+            'issue_delivery_id' => $issue->id,
+            'created_at' => now(),
         ]);
     }
 }

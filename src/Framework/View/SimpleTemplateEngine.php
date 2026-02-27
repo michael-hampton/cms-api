@@ -92,26 +92,25 @@ class SimpleTemplateEngine implements ViewEngineInterface
 
     private function compileTemplate(string $template, array $data): string
     {
-        // Extract variables
         extract($data, EXTR_OVERWRITE);
 
-        // Compile template syntax
-        $template = $this->compileJsonDirective($template);
-        $template = $this->compilePrintStatements($template);
-        $template = $this->compileConditionals($template);
-        $template = $this->compileLoops($template);
-        $template = $this->compileIncludes($template, $data);
-        $template = $this->compileAssets($template);
+        // Collect sections and resolve @extends first
+        $template = $this->compileSections($template);
+        $template = $this->compileExtends($template, $data);
 
-        $template = str_replace('@csrf', '<?php echo csrf_field(); ?>', $template);
-        $template = preg_replace('/@method\([\'"](.+?)[\'"]\)/', '<?php echo method_field(\'$1\'); ?>', $template);
+        // If no @extends, compile the template directly
+        // (compileExtends handles compilation internally when a layout is found)
+        if ($this->parentTemplate === null) {
+            $template = $this->compileJsonDirective($template);
+            $template = $this->compilePrintStatements($template);
+            $template = $this->compileConditionals($template);
+            $template = $this->compileLoops($template);
+            $template = $this->compileIncludes($template, $data);
+            $template = $this->compileAssets($template);
+            $template = str_replace('@csrf', '<?php echo csrf_field(); ?>', $template);
+            $template = preg_replace('/@method\([\'"](.+?)[\'"]\)/', '<?php echo method_field(\'$1\'); ?>', $template);
+        }
 
-
-        // Handle sections and layouts
-        $template = $this->compileSections($template);         // Collect sections
-        $template = $this->compileExtends($template, $data);   // Apply parent layout
-
-        // Execute PHP code
         ob_start();
         eval('?>' . $template);
         return ob_get_clean();
@@ -242,18 +241,57 @@ class SimpleTemplateEngine implements ViewEngineInterface
 
     private function compileSections(string $template): string
     {
-        return preg_replace_callback('/@section\s*\(\s*[\'"](.*?)[\'"]\s*\)(.*?)@endsection/s', function ($matches) {
-            $this->sections[$matches[1]] = $matches[2]; // store raw content
-            return ''; // remove from child template
-        }, $template);
+
+        // Inline: @section('name', expression)
+        $template = preg_replace_callback(
+            '/@section\s*\(\s*[\'"](.*?)[\'"]\s*,\s*((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*)\s*\)[ \t]*\n?/',
+            function ($matches) {
+                $name = $matches[1];
+                $value = trim($matches[2]);
+
+                if (preg_match('/^[\'"](.*)[\'"]\s*$/s', $value, $stringMatch)) {
+                    $inner = $stringMatch[1];
+                    $inner = stripslashes($inner); // <-- here
+                    $inner = $this->compilePrintStatements($inner);
+                    $this->sections[$name] = $inner;
+                } else {
+                    $this->sections[$name] = '<?php echo ' . $value . '; ?>';
+                }
+
+                return '';
+            },
+            $template
+        );
+
+        // Block: @section('name') ... @endsection
+        return preg_replace_callback(
+            '/@section\s*\(\s*[\'"](.*?)[\'"]\s*\)(.*?)@endsection/s',
+            function ($matches) {
+                $this->sections[$matches[1]] = $matches[2];
+                return '';
+            },
+            $template
+        );
     }
 
     private function compileYields(string $template): string
     {
-        return preg_replace_callback('/@yield\s*\(\s*[\'"](.*?)[\'"]\s*\)/', function ($matches) {
-            $name = $matches[1];
-            return $this->sections[$name] ?? '';
-        }, $template);
+        return preg_replace_callback(
+            '/@yield\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*((?:[^()]*|\((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*\))*))?\s*\)/',
+            function ($matches) {
+                $name = $matches[1];
+                if (isset($this->sections[$name])) {
+                    return $this->sections[$name];
+                }
+                if (!empty($matches[2])) {
+                    ob_start();
+                    eval('?><?php echo ' . trim($matches[2]) . '; ?>');
+                    return ob_get_clean();
+                }
+                return '';
+            },
+            $template
+        );
     }
 
     private function compileExtends(string $template, array $data): string
@@ -262,17 +300,44 @@ class SimpleTemplateEngine implements ViewEngineInterface
             $this->parentTemplate = $matches[1];
             $template = preg_replace('/@extends\s*\(\s*[\'"](.*?)[\'"]\s*\)/', '', $template);
 
-            $parentFile = __DIR__ . '/views/' . $this->parentTemplate . '.php';
-            if (file_exists($parentFile)) {
+            $parentFile = $this->findTemplate($this->parentTemplate);
+
+            if ($parentFile) {
                 $parentContent = file_get_contents($parentFile);
 
-                // Replace yields with sections collected from child
-                $parentContent = preg_replace_callback('/@yield\s*\(\s*[\'"](.*?)[\'"]\s*\)/', function ($m) {
-                    return $this->sections[$m[1]] ?? '';
-                }, $parentContent);
+                // Inject sections into @yield slots
+                $parentContent = preg_replace_callback(
+                    '/@yield\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*))?\s*\)/',
+                    function ($m) {
+                        if (isset($this->sections[$m[1]])) {
+                            return $this->sections[$m[1]];
+                        }
+                        if (!empty($m[2])) {
+                            ob_start();
+                            eval('?><?php echo ' . trim($m[2]) . '; ?>');
+                            return ob_get_clean();
+                        }
+                        return '';
+                    },
+                    $parentContent
+                );
 
-                // Recursively process parent layout (if it has its own @extends)
-                return $this->compileExtends($parentContent, $data);
+                // Handle nested @extends (layouts that extend layouts)
+                if (preg_match('/@extends/', $parentContent)) {
+                    return $this->compileExtends($parentContent, $data);
+                }
+
+                // NOW compile the fully-assembled layout through the whole pipeline
+                $parentContent = $this->compileJsonDirective($parentContent);
+                $parentContent = $this->compilePrintStatements($parentContent);
+                $parentContent = $this->compileConditionals($parentContent);
+                $parentContent = $this->compileLoops($parentContent);
+                $parentContent = $this->compileIncludes($parentContent, $data);
+                $parentContent = $this->compileAssets($parentContent);
+                $parentContent = str_replace('@csrf', '<?php echo csrf_field(); ?>', $parentContent);
+                $parentContent = preg_replace('/@method\([\'"](.+?)[\'"]\)/', '<?php echo method_field(\'$1\'); ?>', $parentContent);
+
+                return $parentContent;
             }
         }
 

@@ -35,7 +35,9 @@ class SearchCriteriaParser
         'start_date',
         'member_id',
         'reward_definition_id',
-        'date_from'
+        'date_from',
+        'active',
+        'name'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

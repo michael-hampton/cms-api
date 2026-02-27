@@ -7,11 +7,20 @@ use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
 use App\Repositories\Repository;
+use App\Search\Configurations\IssueDeliverySearchConfiguration;
 use App\Search\PaginatedResult;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 use InvalidArgumentException;
 
 class IssueDeliveryRepository extends Repository
 {
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $engine = new SearchEngine(new IssueDeliverySearchConfiguration());
+
+        return $engine->search(IssueDelivery::query(), $criteria);
+    }
     /**
      * Get upcoming deliveries for a subscription
      */

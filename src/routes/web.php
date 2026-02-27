@@ -20,6 +20,7 @@ use App\Controllers\Front\ReviewPageController;
 use App\Controllers\Front\TagViewController;
 use App\Controllers\Front\WebPageController;
 use App\Controllers\Front\WishlistController;
+use App\Controllers\Legal\LegalController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
 use App\Controllers\Members\AccountActivationController;
@@ -474,3 +475,17 @@ $router->get('/api/merchants/{merchantId}/products/search', [BoostController::cl
 $router->get('/api/merchants/{merchantId}/offers/search', [BoostController::class, 'searchMerchantOffers']);
 $router->get('/boosts/aggregate', [BoostController::class, 'aggregateStats']);
 $router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']);
+
+//legal
+$router->group(['prefix' => 'legal'], function ($router) {
+
+    $router->get('/privacy-policy', [LegalController::class, 'privacyPolicy'])->name('privacy');
+    $router->get('/cookie-policy', [LegalController::class, 'cookiePolicy'])->name('cookies');
+    $router->get('/returns-policy', [LegalController::class, 'returnsPolicy'])->name('returns');
+    $router->get('/cancellation-rights', [LegalController::class, 'cancellationRights'])->name('cancellation');
+    $router->get('/reviews-policy', [LegalController::class, 'reviewsPolicy'])->name('reviews');
+    $router->get('/data-subject-rights', [LegalController::class, 'dataSubjectRights'])->name('data-rights');
+    $router->get('/data-retention', [LegalController::class, 'dataRetention'])->name('data-retention');
+
+});
+

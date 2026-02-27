@@ -16,14 +16,15 @@ class ReviewService
         private readonly ReviewCommandService $commandService,
         private readonly ReviewQueryService   $queryService,
         private readonly ReviewVoteService    $voteService,
-        private readonly MemberAuthWrapper $authService
+        private readonly MemberAuthWrapper $authService,
     ) {}
+
+    // ─── Product reviews (backwards compatible) ────────────────────────────
 
     public function getProductReviews(int $productId, int $page = 1, int $perPage = 10): array
     {
         $reviews = $this->queryService->getPaginatedProductReviews($productId, $page, $perPage);
         $summary = $this->queryService->getReviewSummary($productId);
-
         return array_merge($reviews, $summary->toArray());
     }
 
@@ -45,6 +46,45 @@ class ReviewService
         return $this->commandService->createReview($dto, $userId);
     }
 
+    // ─── Plan reviews ──────────────────────────────────────────────────────
+
+    public function getPlanReviews(int $planId, int $page = 1, int $perPage = 10): array
+    {
+        $reviews = $this->queryService->getPaginatedPlanReviews($planId, $page, $perPage);
+        $summary = $this->queryService->getPlanReviewSummary($planId);
+        return array_merge($reviews, $summary->toArray());
+    }
+
+    public function createPlanReview(int $planId, array $data, ?int $siteId = null): ReviewResult
+    {
+        $userId = $this->authService->memberId();
+        $siteId = $siteId ?? SiteContext::getId();
+
+        if (!$userId) {
+            throw new Exception('You must be logged in to submit a review');
+        }
+
+        $dto = CreateReviewDTO::fromArray(
+            array_merge($data, ['plan_id' => $planId]),
+            $userId,
+            $siteId
+        );
+
+        return $this->commandService->createReview($dto, $userId);
+    }
+
+    public function canUserReviewPlan(int $planId): array
+    {
+        return $this->queryService->canUserReviewPlan($planId, $this->authService->memberId());
+    }
+
+    public function getPlanReviewSummary(int $planId): array
+    {
+        return $this->queryService->getPlanReviewSummary($planId)->toArray();
+    }
+
+    // ─── Shared methods ────────────────────────────────────────────────────
+
     public function updateReview(int $reviewId, array $data): array
     {
         $userId = $this->authService->memberId();
@@ -55,7 +95,6 @@ class ReviewService
 
         $dto = UpdateReviewDTO::fromArray($data);
         $result = $this->commandService->updateReview($reviewId, $dto, $userId);
-
         return $result->toArray();
     }
 
@@ -68,7 +107,6 @@ class ReviewService
         }
 
         $result = $this->commandService->deleteReview($reviewId, $userId);
-
         return $result->toArray();
     }
 
@@ -81,7 +119,6 @@ class ReviewService
         );
 
         $result = $this->voteService->markReviewHelpful($reviewId, $isHelpful, $context);
-
         return $result->toArray();
     }
 
@@ -94,6 +131,8 @@ class ReviewService
     {
         return $this->queryService->canUserReview($productId, $this->authService->memberId());
     }
+
+    // ─── Private ──────────────────────────────────────────────────────────
 
     private function getSessionId(): string
     {

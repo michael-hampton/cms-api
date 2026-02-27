@@ -54,6 +54,7 @@ use App\Controllers\Rewards\RewardDefinitionsAdminController;
 use App\Controllers\Rewards\RewardsAdminController;
 use App\Controllers\Shopping\AddressController;
 use App\Controllers\Shopping\CartController;
+use App\Controllers\Shopping\GiftPromotionController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\SiteController;
 use App\Controllers\Subscription\IssueDeliveryController;
@@ -730,6 +731,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             'newsletter-layouts/migration-report',
             [NewsletterLayoutController::class, 'migrationReport']
         );
+
+        // Gift Promotions
+        $router->get('/gift-promotions', [GiftPromotionController::class, 'index']);
+        $router->post('/gift-promotions', [GiftPromotionController::class, 'store']);
+        $router->put('/gift-promotions/{id}', [GiftPromotionController::class, 'update']);
+        $router->post('/gift-promotions/{id}/toggle-active', [GiftPromotionController::class, 'toggleActive']);
+        $router->get('/gift-promotions/{id}/exclusions', [GiftPromotionController::class, 'exclusions']);
+
+
     });
 
     $router->post('/sites', [SiteController::class, 'create']);
@@ -788,7 +798,8 @@ $router->get('/api/{site}/product-list/search', [ProductListController::class, '
 
 //reviews
 $router->get('/api/{site}/products/{productId}/reviews', ReviewController::class, 'index');
-$router->post('/api/{site}/products/{productId}/reviews', ReviewController::class, 'store');
+$router->post('/api/{site}/products/{productId}/reviews', [ReviewController::class, 'store']);
+$router->post('/api/{site}/plans/{planId}/reviews', [ReviewController::class, 'storePlanReview']);
 $router->put('/api/{site}/reviews/{reviewId}', ReviewController::class, 'update');
 $router->delete('/api/{site}/reviews/{reviewId}', ReviewController::class, 'destroy');
 $router->post('/api/{site}/reviews/{reviewId}/helpful', ReviewController::class, 'markHelpful');

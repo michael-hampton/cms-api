@@ -489,7 +489,6 @@ $unreadCount = 0;
    JS CONFIG — must appear before member-hub.js loads
    ══════════════════════════════════════════════════════════ */ ?>
 <script>
-    alert('here5')
     window.MH = {
         isLoggedIn: <?= $isLoggedIn ? 'true' : 'false' ?>,
         isArticlePage: <?= $isArticlePage ? 'true' : 'false' ?>,

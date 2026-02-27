@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Review;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\ReviewRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Reviews\ReviewCommandService;
 use App\Services\Reviews\ReviewPolicy;
 use App\Services\Reviews\VerifiedPurchaseResolver;
@@ -20,6 +21,7 @@ class ReviewCommandServiceTest extends TestCase
     private $database;
     private $reviewRepository;
     private $productRepository;
+    private $planRepository;
     private $reviewPolicy;
     private $verifiedPurchaseResolver;
     private ReviewCommandService $service;
@@ -31,6 +33,7 @@ class ReviewCommandServiceTest extends TestCase
         $this->database = Mockery::mock(Database::class);
         $this->reviewRepository = Mockery::mock(ReviewRepository::class);
         $this->productRepository = Mockery::mock(ProductRepository::class);
+        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->reviewPolicy = Mockery::mock(ReviewPolicy::class);
         $this->verifiedPurchaseResolver = Mockery::mock(VerifiedPurchaseResolver::class);
 
@@ -38,6 +41,7 @@ class ReviewCommandServiceTest extends TestCase
             $this->database,
             $this->reviewRepository,
             $this->productRepository,
+            $this->planRepository,
             $this->reviewPolicy,
             $this->verifiedPurchaseResolver
         );
@@ -49,52 +53,49 @@ class ReviewCommandServiceTest extends TestCase
         parent::tearDown();
     }
 
+    // ─── Helpers ──────────────────────────────────────────────────────────
+
+    private function productDto(array $overrides = []): CreateReviewDTO
+    {
+        return new CreateReviewDTO(
+            productId: $overrides['productId'] ?? 1,
+            planId: null,
+            userId: $overrides['userId'] ?? 123,
+            rating: $overrides['rating'] ?? 5,
+            title: $overrides['title'] ?? 'Great!',
+            comment: $overrides['comment'] ?? 'Loved it',
+            siteId: $overrides['siteId'] ?? 1,
+        );
+    }
+
+    private function planDto(array $overrides = []): CreateReviewDTO
+    {
+        return new CreateReviewDTO(
+            productId: null,
+            planId: $overrides['planId'] ?? 10,
+            userId: $overrides['userId'] ?? 123,
+            rating: $overrides['rating'] ?? 5,
+            title: $overrides['title'] ?? 'Great plan!',
+            comment: $overrides['comment'] ?? 'Worth every penny',
+            siteId: $overrides['siteId'] ?? 1,
+        );
+    }
+
     public function testCreateReviewSuccess()
     {
-        $dto = new CreateReviewDTO(
-            productId: 1,
-            userId: 123,
-            rating: 5,
-            title: 'Great!',
-            comment: 'Loved it',
-            siteId: 1
-        );
-
+        $dto = $this->productDto();
         $product = Mockery::mock(Product::class)->makePartial();
         $product->site_id = 1;
-
         $review = Mockery::mock(Review::class)->makePartial();
         $review->id = 1;
 
-        $this->reviewPolicy->shouldReceive('canCreate')
-            ->once()
-            ->with(123, 1)
-            ->andReturn(true);
-
-        $this->productRepository->shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($product);
-
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')
-            ->once()
-            ->with(1, 123)
-            ->andReturn(false);
-
-        $this->verifiedPurchaseResolver->shouldReceive('isVerified')
-            ->once()
-            ->with(123, 1)
-            ->andReturn(false);
-
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) use ($review) {
-                return $callback();
-            });
-
-        $this->reviewRepository->shouldReceive('create')
-            ->once()
-            ->andReturn($review);
+        $this->reviewPolicy->shouldReceive('canCreate')->once()->with(123, 1)->andReturn(true);
+        $this->productRepository->shouldReceive('find')->once()->with(1)->andReturn($product);
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')->once()->andReturn(false);
+        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->with(1, 123)->andReturn(false);
+        $this->verifiedPurchaseResolver->shouldReceive('isVerified')->once()->with(123, 1)->andReturn(false);
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($c) => $c());
+        $this->reviewRepository->shouldReceive('create')->once()->andReturn($review);
 
         $result = $this->service->createReview($dto, 123);
 
@@ -105,19 +106,8 @@ class ReviewCommandServiceTest extends TestCase
 
     public function testCreateReviewFailsWhenUserCannotCreate()
     {
-        $dto = new CreateReviewDTO(
-            productId: 1,
-            userId: 123,
-            rating: 5,
-            title: 'Great!',
-            comment: 'Loved it',
-            siteId: 1
-        );
-
-        $this->reviewPolicy->shouldReceive('canCreate')
-            ->once()
-            ->with(123, 1)
-            ->andReturn(false);
+        $dto = $this->productDto();
+        $this->reviewPolicy->shouldReceive('canCreate')->once()->with(123, 1)->andReturn(false);
 
         $result = $this->service->createReview($dto, 123);
 
@@ -127,23 +117,9 @@ class ReviewCommandServiceTest extends TestCase
 
     public function testCreateReviewFailsWhenProductNotFound()
     {
-        $dto = new CreateReviewDTO(
-            productId: 999,
-            userId: 123,
-            rating: 5,
-            title: 'Great!',
-            comment: 'Loved it',
-            siteId: 1
-        );
-
-        $this->reviewPolicy->shouldReceive('canCreate')
-            ->once()
-            ->andReturn(true);
-
-        $this->productRepository->shouldReceive('find')
-            ->once()
-            ->with(999)
-            ->andReturn(null);
+        $dto = $this->productDto(['productId' => 999]);
+        $this->reviewPolicy->shouldReceive('canCreate')->once()->andReturn(true);
+        $this->productRepository->shouldReceive('find')->once()->with(999)->andReturn(null);
 
         $result = $this->service->createReview($dto, 123);
 
@@ -151,25 +127,15 @@ class ReviewCommandServiceTest extends TestCase
         $this->assertEquals('Product not found', $result->message);
     }
 
-    public function testCreateReviewFailsWhenAlreadyReviewed()
+    public function testCreateReviewFailsWhenAlreadyReviewedViaLegacyCheck()
     {
-        $dto = new CreateReviewDTO(
-            productId: 1,
-            userId: 123,
-            rating: 5,
-            title: 'Great!',
-            comment: 'Loved it',
-            siteId: 1
-        );
-
+        $dto = $this->productDto();
         $product = Mockery::mock(Product::class)->makePartial();
 
         $this->reviewPolicy->shouldReceive('canCreate')->once()->andReturn(true);
         $this->productRepository->shouldReceive('find')->once()->andReturn($product);
-        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')
-            ->once()
-            ->with(1, 123)
-            ->andReturn(true);
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')->once()->andReturn(false);
+        $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->with(1, 123)->andReturn(true);
 
         $result = $this->service->createReview($dto, 123);
 
@@ -177,21 +143,29 @@ class ReviewCommandServiceTest extends TestCase
         $this->assertEquals('You have already reviewed this product', $result->message);
     }
 
-    public function testCreateReviewFailsWhenRatingInvalid()
+    public function testCreateReviewFailsWhenAlreadyReviewedViaPolymorphicCheck()
     {
-        $dto = new CreateReviewDTO(
-            productId: 1,
-            userId: 123,
-            rating: 6,
-            title: 'Great!',
-            comment: 'Loved it',
-            siteId: 1
-        );
-
+        $dto = $this->productDto();
         $product = Mockery::mock(Product::class)->makePartial();
 
         $this->reviewPolicy->shouldReceive('canCreate')->once()->andReturn(true);
         $this->productRepository->shouldReceive('find')->once()->andReturn($product);
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')->once()->andReturn(true);
+
+        $result = $this->service->createReview($dto, 123);
+
+        $this->assertFalse($result->success);
+        $this->assertEquals('You have already reviewed this', $result->message);
+    }
+
+    public function testCreateReviewFailsWhenRatingInvalid()
+    {
+        $dto = $this->productDto(['rating' => 6]);
+        $product = Mockery::mock(Product::class)->makePartial();
+
+        $this->reviewPolicy->shouldReceive('canCreate')->once()->andReturn(true);
+        $this->productRepository->shouldReceive('find')->once()->andReturn($product);
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')->once()->andReturn(false);
         $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->andReturn(false);
 
         $result = $this->service->createReview($dto, 123);
@@ -200,76 +174,43 @@ class ReviewCommandServiceTest extends TestCase
         $this->assertEquals('Rating must be between 1 and 5', $result->message);
     }
 
+
     public function testCreateReviewWithVerifiedPurchase()
     {
-        $dto = new CreateReviewDTO(
-            productId: 1,
-            userId: 123,
-            rating: 5,
-            title: 'Great!',
-            comment: 'Loved it',
-            siteId: 1
-        );
-
+        $dto = $this->productDto();
         $product = Mockery::mock(Product::class)->makePartial();
         $product->site_id = 1;
         $review = Mockery::mock(Review::class)->makePartial();
 
         $this->reviewPolicy->shouldReceive('canCreate')->once()->andReturn(true);
         $this->productRepository->shouldReceive('find')->once()->andReturn($product);
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')->once()->andReturn(false);
         $this->reviewRepository->shouldReceive('hasUserReviewedProduct')->once()->andReturn(false);
-        $this->verifiedPurchaseResolver->shouldReceive('isVerified')
-            ->once()
-            ->with(123, 1)
-            ->andReturn(true);
-
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) {
-            return $callback();
-        });
-
+        $this->verifiedPurchaseResolver->shouldReceive('isVerified')->once()->with(123, 1)->andReturn(true);
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($c) => $c());
         $this->reviewRepository->shouldReceive('create')
             ->once()
-            ->with(Mockery::on(function ($arg) {
-                return $arg['is_verified_purchase'] === true;
-            }))
+            ->with(Mockery::on(fn($arg) => $arg['is_verified_purchase'] === true))
             ->andReturn($review);
 
         $result = $this->service->createReview($dto, 123);
-
         $this->assertTrue($result->success);
     }
 
     public function testUpdateReviewSuccess()
     {
         $dto = new UpdateReviewDTO(rating: 4, comment: 'Updated');
-
         $review = Mockery::mock(Review::class)->makePartial();
         $review->id = 1;
         $review->user_id = 123;
 
-        $this->reviewRepository->shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($review);
-
-        $this->reviewPolicy->shouldReceive('canEdit')
-            ->once()
-            ->with($review, 123)
-            ->andReturn(true);
-
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
+        $this->reviewRepository->shouldReceive('find')->once()->with(1)->andReturn($review);
+        $this->reviewPolicy->shouldReceive('canEdit')->once()->with($review, 123)->andReturn(true);
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($c) => $c());
         $this->reviewRepository->shouldReceive('update')
-            ->once()
-            ->with(1, ['rating' => 4, 'comment' => 'Updated'])
-            ->andReturn($review);
+            ->once()->with(1, ['rating' => 4, 'comment' => 'Updated'])->andReturn($review);
 
         $result = $this->service->updateReview(1, $dto, 123);
-
         $this->assertTrue($result->success);
         $this->assertEquals('Review updated successfully', $result->message);
     }
@@ -277,14 +218,9 @@ class ReviewCommandServiceTest extends TestCase
     public function testUpdateReviewFailsWhenNotFound()
     {
         $dto = new UpdateReviewDTO(rating: 4);
-
-        $this->reviewRepository->shouldReceive('find')
-            ->once()
-            ->with(999)
-            ->andReturn(null);
+        $this->reviewRepository->shouldReceive('find')->once()->with(999)->andReturn(null);
 
         $result = $this->service->updateReview(999, $dto, 123);
-
         $this->assertFalse($result->success);
         $this->assertEquals('Review not found', $result->message);
     }
@@ -292,18 +228,13 @@ class ReviewCommandServiceTest extends TestCase
     public function testUpdateReviewFailsWhenNotOwner()
     {
         $dto = new UpdateReviewDTO(rating: 4);
-
         $review = Mockery::mock(Review::class)->makePartial();
         $review->user_id = 123;
 
         $this->reviewRepository->shouldReceive('find')->once()->andReturn($review);
-        $this->reviewPolicy->shouldReceive('canEdit')
-            ->once()
-            ->with($review, 456)
-            ->andReturn(false);
+        $this->reviewPolicy->shouldReceive('canEdit')->once()->with($review, 456)->andReturn(false);
 
         $result = $this->service->updateReview(1, $dto, 456);
-
         $this->assertFalse($result->success);
         $this->assertEquals('You can only edit your own reviews', $result->message);
     }

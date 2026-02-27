@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Reviews;
 
+use App\Models\SubscriptionPlan;
 use App\Repositories\ReviewRepository;
 use App\Services\Reviews\ReviewQueryService;
 use Mockery;
@@ -41,17 +42,13 @@ class ReviewQueryServiceTest extends TestCase
         $mockReview->shouldReceive('getAttribute')->with('helpful_count')->andReturn(5);
         $mockReview->shouldReceive('getAttribute')->with('unhelpful_count')->andReturn(1);
         $mockReview->shouldReceive('getAttribute')->with('formatted_date')->andReturn('Yesterday');
-        $mockReview->shouldReceive('getAttribute')->with('created_at')->andReturn('2024-01-01');
+        $mockReview->shouldReceive('getAttribute')->with('created_at')->andReturn(now_datetime());
 
         $collection = collect([$mockReview]);
 
         $this->reviewRepository->shouldReceive('findByProduct')
-            ->once()
-            ->with(1, 1, 10)
-            ->andReturn([
-                'data' => $collection,
-                'pagination' => ['total' => 1, 'current_page' => 1]
-            ]);
+            ->once()->with(1, 1, 10)
+            ->andReturn(['data' => $collection, 'pagination' => ['total' => 1, 'current_page' => 1]]);
 
         $result = $this->service->getPaginatedProductReviews(1, 1, 10);
 
@@ -64,47 +61,31 @@ class ReviewQueryServiceTest extends TestCase
 
     public function testGetPaginatedProductReviewsWithMultiple()
     {
-        $review1 = Mockery::mock(\App\Models\Review::class);
-        $review1->shouldAllowMockingProtectedMethods();
-        $review1->shouldReceive('relationLoaded')->andReturn(false);
-        $review1->shouldReceive('hasGetMutator')->andReturn(false);
-        $review1->shouldReceive('getAttribute')->with('id')->andReturn(1);
-        $review1->shouldReceive('getAttribute')->with('rating')->andReturn(5);
-        $review1->shouldReceive('getAttribute')->with('title')->andReturn('Great');
-        $review1->shouldReceive('getAttribute')->with('comment')->andReturn('Loved it');
-        $review1->shouldReceive('getAttribute')->with('author_name')->andReturn('John');
-        $review1->shouldReceive('getAttribute')->with('is_verified_purchase')->andReturn(true);
-        $review1->shouldReceive('getAttribute')->with('helpful_count')->andReturn(5);
-        $review1->shouldReceive('getAttribute')->with('unhelpful_count')->andReturn(1);
-        $review1->shouldReceive('getAttribute')->with('formatted_date')->andReturn('Yesterday');
-        $review1->shouldReceive('getAttribute')->with('created_at')->andReturn('2024-01-01');
+        $makeReview = fn(int $id, int $rating, string $title) => tap(
+            Mockery::mock(\App\Models\Review::class),
+            function ($m) use ($id, $rating, $title) {
+                $m->shouldAllowMockingProtectedMethods();
+                $m->shouldReceive('relationLoaded')->andReturn(false);
+                $m->shouldReceive('hasGetMutator')->andReturn(false);
+                $m->shouldReceive('getAttribute')->with('id')->andReturn($id);
+                $m->shouldReceive('getAttribute')->with('rating')->andReturn($rating);
+                $m->shouldReceive('getAttribute')->with('title')->andReturn($title);
+                $m->shouldReceive('getAttribute')->with('comment')->andReturn('Nice');
+                $m->shouldReceive('getAttribute')->with('author_name')->andReturn('User');
+                $m->shouldReceive('getAttribute')->with('is_verified_purchase')->andReturn(false);
+                $m->shouldReceive('getAttribute')->with('helpful_count')->andReturn(0);
+                $m->shouldReceive('getAttribute')->with('unhelpful_count')->andReturn(0);
+                $m->shouldReceive('getAttribute')->with('formatted_date')->andReturn('Today');
+                $m->shouldReceive('getAttribute')->with('created_at')->andReturn(now_datetime());
+            }
+        );
 
-        $review2 = Mockery::mock(\App\Models\Review::class);
-        $review2->shouldAllowMockingProtectedMethods();
-        $review2->shouldReceive('relationLoaded')->andReturn(false);
-        $review2->shouldReceive('hasGetMutator')->andReturn(false);
-        $review2->shouldReceive('getAttribute')->with('id')->andReturn(2);
-        $review2->shouldReceive('getAttribute')->with('rating')->andReturn(4);
-        $review2->shouldReceive('getAttribute')->with('title')->andReturn('Good');
-        $review2->shouldReceive('getAttribute')->with('comment')->andReturn('Nice');
-        $review2->shouldReceive('getAttribute')->with('author_name')->andReturn('Jane');
-        $review2->shouldReceive('getAttribute')->with('is_verified_purchase')->andReturn(false);
-        $review2->shouldReceive('getAttribute')->with('helpful_count')->andReturn(3);
-        $review2->shouldReceive('getAttribute')->with('unhelpful_count')->andReturn(0);
-        $review2->shouldReceive('getAttribute')->with('formatted_date')->andReturn('2 days ago');
-        $review2->shouldReceive('getAttribute')->with('created_at')->andReturn('2024-01-02');
-
-        $collection = collect([$review1, $review2]);
+        $collection = collect([$makeReview(1, 5, 'Great'), $makeReview(2, 4, 'Good')]);
 
         $this->reviewRepository->shouldReceive('findByProduct')
-            ->once()
-            ->andReturn([
-                'data' => $collection,
-                'pagination' => ['total' => 2]
-            ]);
+            ->once()->andReturn(['data' => $collection, 'pagination' => ['total' => 2]]);
 
         $result = $this->service->getPaginatedProductReviews(1);
-
         $this->assertCount(2, $result['reviews']);
     }
 
@@ -199,4 +180,127 @@ class ReviewQueryServiceTest extends TestCase
         $this->assertTrue($result['can_review']);
         $this->assertNull($result['reason']);
     }
+
+    public function testGetPaginatedPlanReviews()
+    {
+        $mockReview = Mockery::mock(\App\Models\Review::class);
+        $mockReview->shouldAllowMockingProtectedMethods();
+        $mockReview->shouldReceive('relationLoaded')->andReturn(false);
+        $mockReview->shouldReceive('hasGetMutator')->andReturn(false);
+        $mockReview->shouldReceive('getAttribute')->with('id')->andReturn(1);
+        $mockReview->shouldReceive('getAttribute')->with('rating')->andReturn(5);
+        $mockReview->shouldReceive('getAttribute')->with('title')->andReturn('Great plan');
+        $mockReview->shouldReceive('getAttribute')->with('comment')->andReturn('Worth it');
+        $mockReview->shouldReceive('getAttribute')->with('author_name')->andReturn('Jane Doe');
+        $mockReview->shouldReceive('getAttribute')->with('is_verified_purchase')->andReturn(false);
+        $mockReview->shouldReceive('getAttribute')->with('helpful_count')->andReturn(2);
+        $mockReview->shouldReceive('getAttribute')->with('unhelpful_count')->andReturn(0);
+        $mockReview->shouldReceive('getAttribute')->with('formatted_date')->andReturn('Today');
+        $mockReview->shouldReceive('getAttribute')->with('created_at')->andReturn(now_datetime());
+
+        $collection = collect([$mockReview]);
+
+        $this->reviewRepository->shouldReceive('findByReviewable')
+            ->once()
+            ->with(SubscriptionPlan::class, 10, 1, 10)
+            ->andReturn(['data' => $collection, 'pagination' => ['total' => 1, 'current_page' => 1]]);
+
+        $result = $this->service->getPaginatedPlanReviews(10, 1, 10);
+
+        $this->assertArrayHasKey('reviews', $result);
+        $this->assertCount(1, $result['reviews']);
+        $this->assertEquals('Great plan', $result['reviews'][0]['title']);
+    }
+
+    public function testGetPlanReviewSummary()
+    {
+        $this->reviewRepository->shouldReceive('getAverageRatingForReviewable')
+            ->once()->with(SubscriptionPlan::class, 10)->andReturn(4.8);
+        $this->reviewRepository->shouldReceive('getTotalReviewCountForReviewable')
+            ->once()->with(SubscriptionPlan::class, 10)->andReturn(50);
+        $this->reviewRepository->shouldReceive('getRatingBreakdownForReviewable')
+            ->once()->with(SubscriptionPlan::class, 10)
+            ->andReturn([5 => 40, 4 => 5, 3 => 3, 2 => 1, 1 => 1]);
+
+        $result = $this->service->getPlanReviewSummary(10);
+
+        $this->assertEquals(4.8, $result->averageRating);
+        $this->assertEquals(50, $result->totalReviews);
+        $this->assertEquals(80.0, $result->ratingPercentages[5]);
+        $this->assertEquals(10.0, $result->ratingPercentages[4]);
+    }
+
+    public function testGetPlanReviewSummaryWithNoReviews()
+    {
+        $this->reviewRepository->shouldReceive('getAverageRatingForReviewable')
+            ->once()->andReturn(0.0);
+        $this->reviewRepository->shouldReceive('getTotalReviewCountForReviewable')
+            ->once()->andReturn(0);
+        $this->reviewRepository->shouldReceive('getRatingBreakdownForReviewable')
+            ->once()->andReturn([5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0]);
+
+        $result = $this->service->getPlanReviewSummary(10);
+
+        $this->assertEquals(0.0, $result->averageRating);
+        $this->assertEquals(0, $result->totalReviews);
+        foreach ([5, 4, 3, 2, 1] as $r) {
+            $this->assertEquals(0.0, $result->ratingPercentages[$r]);
+        }
+    }
+
+    public function testCanUserReviewPlanWhenNotLoggedIn()
+    {
+        $result = $this->service->canUserReviewPlan(10, null);
+        $this->assertFalse($result['can_review']);
+        $this->assertEquals('You must be logged in to submit a review', $result['reason']);
+    }
+
+    public function testCanUserReviewPlanWhenAlreadyReviewed()
+    {
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')
+            ->once()
+            ->with(SubscriptionPlan::class, 10, 123)
+            ->andReturn(true);
+
+        $result = $this->service->canUserReviewPlan(10, 123);
+        $this->assertFalse($result['can_review']);
+        $this->assertEquals('You have already reviewed this plan', $result['reason']);
+    }
+
+    public function testCanUserReviewPlanWhenAllowed()
+    {
+        $this->reviewRepository->shouldReceive('hasUserReviewedReviewable')
+            ->once()
+            ->with(SubscriptionPlan::class, 10, 123)
+            ->andReturn(false);
+
+        $result = $this->service->canUserReviewPlan(10, 123);
+        $this->assertTrue($result['can_review']);
+        $this->assertNull($result['reason']);
+    }
+
+    public function testPlanAndProductQueryMethodsAreIndependent()
+    {
+        // Product summary should call product-scoped repository methods
+        $this->reviewRepository->shouldReceive('getAverageRating')->once()->with(1)->andReturn(3.0);
+        $this->reviewRepository->shouldReceive('getTotalReviewCount')->once()->with(1)->andReturn(5);
+        $this->reviewRepository->shouldReceive('getRatingBreakdown')->once()->with(1)
+            ->andReturn([5 => 1, 4 => 1, 3 => 1, 2 => 1, 1 => 1]);
+
+        // Plan summary should call polymorphic repository methods
+        $this->reviewRepository->shouldReceive('getAverageRatingForReviewable')
+            ->once()->with(SubscriptionPlan::class, 10)->andReturn(5.0);
+        $this->reviewRepository->shouldReceive('getTotalReviewCountForReviewable')
+            ->once()->with(SubscriptionPlan::class, 10)->andReturn(2);
+        $this->reviewRepository->shouldReceive('getRatingBreakdownForReviewable')
+            ->once()->with(SubscriptionPlan::class, 10)
+            ->andReturn([5 => 2, 4 => 0, 3 => 0, 2 => 0, 1 => 0]);
+
+        $productSummary = $this->service->getReviewSummary(1);
+        $planSummary = $this->service->getPlanReviewSummary(10);
+
+        $this->assertEquals(3.0, $productSummary->averageRating);
+        $this->assertEquals(5.0, $planSummary->averageRating);
+    }
+
 }
