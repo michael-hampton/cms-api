@@ -15,14 +15,15 @@ class NewsletterContentBuilder
     public function __construct(
         private readonly NewsletterPageBuilderService $pageBuilderService,
         private readonly NewsletterBrandingRepository $newsletterBrandingRepository,
-        private readonly NewsletterLayoutRepository   $newsletterLayoutRepository
+        private readonly NewsletterLayoutRepository $newsletterLayoutRepository,
+        private readonly NewsletterContentResolver  $contentResolver
     )
     {
     }
 
     public function build(Newsletter $newsletter, int $siteId, bool $isPreview, ?Member $member = null): array
     {
-        $pages = [];
+        /*$pages = [];
         $baseHtml = '';
 
         if ($newsletter->isAutomated()) {
@@ -73,7 +74,62 @@ class NewsletterContentBuilder
             'success' => true,
             'html' => $baseHtml,
             'pages' => $pages
-        ];
+        ];*/
+        $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
+        $layoutVersion = $newsletter->layout_id
+            ? $this->newsletterLayoutRepository->versionHistory($newsletter->layout_id)?->last()
+            : null;
+
+        try {
+            $baseHtml = $this->contentResolver->resolve(
+                newsletter: $newsletter,
+                siteId: $siteId,
+                member: $member,
+                unsubscribeToken: null,
+                isPreview: $isPreview,
+                sendId: null,
+                branding: $branding,
+                layoutVersion: $layoutVersion,
+            );
+
+            // Ensure unsubscribe placeholder exists
+            if (!str_contains($baseHtml, self::UNSUBSCRIBE_PLACEHOLDER)) {
+                $baseHtml .= "\n" . self::UNSUBSCRIBE_PLACEHOLDER;
+            }
+
+            return [
+                'success' => true,
+                'html' => $baseHtml,
+                'pages' => $this->getPagesForNewsletter($newsletter, $siteId)
+            ];
+        } catch (\DomainException $e) {
+            // Auto-pages newsletters with no matching pages — preserve existing error contract
+            return [
+                'success' => false,
+                'newsletter_id' => $newsletter->id,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    private function getPagesForNewsletter(Newsletter $newsletter, int $siteId)
+    {
+        $pagesCollection = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
+
+        if ($pagesCollection->isEmpty()) {
+            return [
+                'success' => false,
+                'newsletter_id' => $newsletter->id,
+                'error' => 'No pages match newsletter criteria'
+            ];
+        }
+
+        return $pagesCollection->map(fn($p) => [
+            'id' => $p->id,
+            'title' => $p->title,
+            'subtitle' => $p->subtitle,
+            'slug' => $p->slug,
+        ])->toArray();
     }
 
     private function parseNewsletterContent(string $content): array

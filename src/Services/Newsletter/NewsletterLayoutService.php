@@ -2,6 +2,7 @@
 
 namespace App\Services\Newsletter;
 
+use App\DTO\Newsletters\Layout\LayoutRegionValueObject;
 use App\Enums\Newsletters\LayoutVersionState;
 use App\Events\Newsletters\NewsletterLayoutPublished;
 use App\Framework\Database\Database;
@@ -21,7 +22,8 @@ class NewsletterLayoutService
         private readonly NewsletterLayoutRepository $layoutRepository,
         private readonly LayoutRendererService      $layoutRenderer,
         private readonly Logger                     $logger,
-        private readonly Database                   $database
+        private readonly Database              $database,
+        private readonly LayoutRegionValidator $regionValidator,
     )
     {
     }
@@ -64,6 +66,12 @@ class NewsletterLayoutService
                 'created_by' => $createdBy,
             ]);
 
+            if (($layoutDefinition['schema_version'] ?? 1) >= 2) {
+                $this->regionValidator->validate(
+                    LayoutRegionValueObject::fromArray($layoutDefinition)
+                );
+            }
+
             $this->layoutRepository->createVersion(
                 $layout->id,
                 $layoutDefinition,
@@ -93,6 +101,12 @@ class NewsletterLayoutService
             }
 
             $nextVersion = $this->layoutRepository->nextVersionNumber($layoutId);
+
+            if (($layoutDefinition['schema_version'] ?? 1) >= 2) {
+                $this->regionValidator->validate(
+                    LayoutRegionValueObject::fromArray($layoutDefinition)
+                );
+            }
 
             return $this->layoutRepository->createVersion(
                 $layoutId,

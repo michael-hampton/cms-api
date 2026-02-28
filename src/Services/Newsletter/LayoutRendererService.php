@@ -2,6 +2,7 @@
 
 namespace App\Services\Newsletter;
 
+use App\DTO\Newsletters\Layout\LayoutRegionValueObject;
 use App\Models\Newsletter;
 use App\Models\NewsletterLayout;
 use App\Models\NewsletterLayoutVersion;
@@ -115,5 +116,16 @@ class LayoutRendererService
                 );
             }
         }
+    }
+
+    public function resolveRegions(NewsletterLayoutVersion $version): ?LayoutRegionValueObject
+    {
+        $definition = $version->definition ?? [];
+
+        if (($definition['schema_version'] ?? 1) < 2) {
+            return null;
+        }
+
+        return LayoutRegionValueObject::fromArray($definition);
     }
 }

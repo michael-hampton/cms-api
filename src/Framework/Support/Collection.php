@@ -766,4 +766,37 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($items);
     }
 
+    public function duplicates(): static
+    {
+        $seen = [];
+        $duplicates = [];
+
+        foreach ($this->items as $item) {
+            $key = serialize($item);
+
+            if (isset($seen[$key])) {
+                $duplicates[] = $item;
+            } else {
+                $seen[$key] = true;
+            }
+        }
+
+        return new static($duplicates);
+    }
+
+    public function implode(string $glue, ?string $key = null): string
+    {
+        if ($key !== null) {
+            return implode(
+                $glue,
+                array_map(
+                    fn($item) => is_array($item) ? ($item[$key] ?? '') : ($item->$key ?? ''),
+                    $this->items
+                )
+            );
+        }
+
+        return implode($glue, $this->items);
+    }
+
 }

@@ -6,6 +6,7 @@ use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Services\Newsletter\NewsletterContentBuilder;
+use App\Services\Newsletter\NewsletterContentResolver;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -16,6 +17,7 @@ class NewsletterContentBuilderTest extends TestCase
     private $mockPageBuilderService;
     private NewsletterBrandingRepository $newsletterBrandingRepository;
     private readonly NewsletterLayoutRepository $newsletterLayoutRepository;
+    private NewsletterContentResolver $newsletterContentResolver;
 
     protected function setUp(): void
     {
@@ -24,10 +26,13 @@ class NewsletterContentBuilderTest extends TestCase
         $this->mockPageBuilderService = Mockery::mock(NewsletterPageBuilderService::class);
         $this->newsletterBrandingRepository = Mockery::mock(NewsletterBrandingRepository::class);
         $this->newsletterLayoutRepository = Mockery::mock(NewsletterLayoutRepository::class);
+        $this->newsletterContentResolver = Mockery::mock(NewsletterContentResolver::class);
+
         $this->builder = new NewsletterContentBuilder(
             $this->mockPageBuilderService,
             $this->newsletterBrandingRepository,
-            $this->newsletterLayoutRepository
+            $this->newsletterLayoutRepository,
+            $this->newsletterContentResolver
         );
     }
 
@@ -81,6 +86,8 @@ class NewsletterContentBuilderTest extends TestCase
     {
         $newsletter = $this->createMockNewsletter(true);
         $siteId = 1;
+
+        $this->setNewsletterBrandingExpectations();
 
         $this->mockPageBuilderService->shouldReceive('getPagesForNewsletter')
             ->once()
@@ -307,8 +314,14 @@ class NewsletterContentBuilderTest extends TestCase
         return $newsletter;
     }
 
-    private function setNewsletterBrandingExpectations()
+    private function setNewsletterBrandingExpectations(): void
     {
-        $this->newsletterBrandingRepository->shouldReceive('findByNewsletterId')->andReturn(null);
+        $this->newsletterBrandingRepository
+            ->shouldReceive('findByNewsletterId')
+            ->andReturn(null);
+
+        $this->newsletterLayoutRepository
+            ->shouldReceive('versionHistory')
+            ->andReturn(null);   // builder does $versions?->last() so null is fine
     }
 }

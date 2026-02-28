@@ -72,12 +72,11 @@ class NewsletterContentResolver
             return '';
         }
 
-        // Wrap blocks in the center slot structure expected by the page builder
-        $centerSlotVersion = $this->buildImplicitLayoutVersion($blocks, $layoutVersion);
+        $slotPayload = $this->buildCenterSlotPayload($blocks, $layoutVersion);
 
         return $this->pageBuilderService->buildNewsletterHtmlFromLayoutSlots(
             $newsletter,
-            $centerSlotVersion,
+            $slotPayload,
             $member,
             $unsubscribeToken,
             $siteId,
@@ -125,6 +124,8 @@ class NewsletterContentResolver
     {
         $pages = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
 
+        // Empty collection is valid — page builder returns empty HTML
+        // Empty-pages guard lives in NewsletterContentBuilder, not here
         return $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
             $pages,
@@ -153,21 +154,91 @@ class NewsletterContentResolver
             return '';
         }
 
-        // Render legacy content as a single text block — backwards compatible
         $legacyBlock = [
             'type' => 'text',
             'data' => ['paragraphs' => [nl2br(htmlspecialchars($text))]],
         ];
 
-        $centerSlotVersion = $this->buildImplicitLayoutVersion([$legacyBlock], $layoutVersion);
+        $slotPayload = $this->buildCenterSlotPayload([$legacyBlock], $layoutVersion);
 
         return $this->pageBuilderService->buildNewsletterHtmlFromLayoutSlots(
             $newsletter,
-            $centerSlotVersion,
+            $slotPayload,
             $member,
             $unsubscribeToken,
             $siteId,
             $branding,
         );
     }
+
+    /**
+     * Build a slot payload for buildNewsletterHtmlFromLayoutSlots.
+     *
+     * For v2 region layouts: returns all region slots in order, with the center
+     * region's single implicit content slot populated with newsletter blocks.
+     * Non-center region slots pass through unchanged (their blocks come from
+     * the layout definition — e.g. a top banner slot).
+     *
+     * For v1 / no layout: returns a single implicit content slot.
+     */
+    private function buildCenterSlotPayload(
+        array                    $blocks,
+        ?NewsletterLayoutVersion $layoutVersion,
+    ): array
+    {
+        // No layout assigned — single implicit slot, existing behaviour
+        if ($layoutVersion === null) {
+            return [
+                'slots' => [
+                    ['key' => 'content', 'label' => 'Content', 'required' => true, 'blocks' => $blocks],
+                ],
+            ];
+        }
+
+        $definition = $layoutVersion->definition ?? [];
+        $schemaVersion = (int)($definition['schema_version'] ?? 1);
+
+        // v1 layout — existing slot-based behaviour
+        if ($schemaVersion < 2) {
+            return [
+                'slots' => [
+                    ['key' => 'content', 'label' => 'Content', 'required' => true, 'blocks' => $blocks],
+                ],
+            ];
+        }
+
+        // v2 region layout — flatten regions in order, inject content into center
+        $regions = collect($definition['regions'] ?? [])
+            ->sortBy('order')
+            ->values();
+
+        $slots = [];
+
+        foreach ($regions as $region) {
+            $regionId = $region['id'];
+
+            if ($regionId === 'center') {
+                // Newsletter content always lives in a single implicit center slot
+                $slots[] = [
+                    'key' => 'center_content',
+                    'label' => 'Center Content',
+                    'required' => true,
+                    'blocks' => $blocks,
+                ];
+            } else {
+                // Pass through any slots the designer added to top/bottom regions
+                foreach ($region['slots'] ?? [] as $slot) {
+                    $slots[] = [
+                        'key' => $slot['name'] ?? ($regionId . '_slot'),
+                        'label' => $slot['name'] ?? $regionId,
+                        'required' => false,
+                        'blocks' => $slot['blocks'] ?? [],
+                    ];
+                }
+            }
+        }
+
+        return ['slots' => $slots];
+    }
+
 }
