@@ -3,6 +3,7 @@
 namespace App\Controllers\Newsletter;
 
 use App\Controllers\Controller;
+use App\DTO\Newsletters\NewsletterContentDTO;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -23,6 +24,7 @@ use App\Search\SearchCriteriaParser;
 use App\Search\SearchEngine;
 use App\Services\Cms\CampaignService;
 use App\Services\EmailVerificationService;
+use App\Services\Newsletter\NewsletterContentService;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\NewsletterSignupService;
 use App\Services\Newsletter\NewsletterStatisticsService;
@@ -40,7 +42,8 @@ class NewsletterController extends Controller
         private readonly CampaignService         $campaignService,
         private readonly NewsletterSendService             $newsletterSendService,
         private readonly NewsletterSendRecipientRepository $newsletterSendRecipientRepository,
-        private readonly NewsletterStatisticsService       $newsletterService
+        private readonly NewsletterStatisticsService $newsletterService,
+        private readonly NewsletterContentService    $contentService,
     )
     {
         parent::__construct();
@@ -113,6 +116,9 @@ class NewsletterController extends Controller
                 $newsletter->setAsDefault();
             }
 
+            $contentDto = NewsletterContentDTO::fromRequest($request->all());
+            $this->contentService->saveContent($newsletter->id, $contentDto);
+
             return $this->jsonResponse([
                 'newsletter' => $newsletter->fresh()->toArray()
             ], 201);
@@ -173,6 +179,9 @@ class NewsletterController extends Controller
                 $updated->setAsDefault();
                 $updated = $updated->fresh();
             }
+
+            $contentDto = NewsletterContentDTO::fromRequest($request->all());
+            $this->contentService->saveContent($newsletter->id, $contentDto);
 
             return $this->successResponse('Newsletter updated successfully', [
                 'newsletter' => $updated->toArray()

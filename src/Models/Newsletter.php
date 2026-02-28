@@ -34,7 +34,9 @@ class Newsletter extends Model
         'has_time_window',
         'bundle_id',
         'requires_bundle',
-        'layout_id'
+        'layout_id',
+        'content_blocks',
+        'legacy_content',
     ];
 
     protected $casts = [
@@ -52,6 +54,7 @@ class Newsletter extends Model
         'access_window_end' => 'datetime',
         'has_time_window' => 'boolean',
         'requires_bundle' => 'boolean',
+        'content_blocks' => 'array',
     ];
 
     const INTERVAL_DAILY = 'daily';
@@ -60,6 +63,7 @@ class Newsletter extends Model
 
     const CONTENT_TYPE_MANUAL = 'manual';
     const CONTENT_TYPE_AUTO_PAGES = 'auto_pages';
+    const CONTENT_TYPE_CUSTOM_BLOCKS = 'custom_blocks';
 
     public function sends()
     {
@@ -226,5 +230,21 @@ class Newsletter extends Model
         }
 
         return SubscriptionBundle::find($this->bundle_id);
+    }
+
+    public function hasBlockContent(): bool
+    {
+        return !empty($this->content_blocks);
+    }
+
+    public function isLegacyContent(): bool
+    {
+        return $this->content_type === self::CONTENT_TYPE_MANUAL
+            && empty($this->content_blocks);
+    }
+
+    public function getBlocks(): array
+    {
+        return $this->content_blocks ?? [];
     }
 }

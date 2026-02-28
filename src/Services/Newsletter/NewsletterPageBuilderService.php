@@ -161,7 +161,7 @@ class NewsletterPageBuilderService
 
     public function buildNewsletterHtmlFromLayoutSlots(
         Newsletter                       $newsletter,
-        NewsletterLayoutVersion          $layoutVersion,
+        NewsletterLayoutVersion|array $layoutVersion,
         ?Member                          $member = null,
         ?string                          $unsubscribeToken = null,
         ?int                             $siteId = null,
@@ -176,7 +176,9 @@ class NewsletterPageBuilderService
             includeTracking: false
         );
 
-        $slots = $layoutVersion->slots();
+        $slots = $layoutVersion instanceof NewsletterLayoutVersion
+            ? $layoutVersion->slots()
+            : $layoutVersion['slots'];
         $html = [];
 
         foreach ($slots as $slot) {
