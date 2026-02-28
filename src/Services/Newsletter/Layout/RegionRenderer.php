@@ -4,6 +4,7 @@ namespace App\Services\Newsletter\Layout;
 
 use App\DTO\Newsletters\Layout\RegionDTO;
 use App\DTO\Newsletters\Layout\SlotDTO;
+use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 
 /**
  * Renders a single region to HTML.
@@ -18,7 +19,7 @@ class RegionRenderer
     {
     }
 
-    public function render(RegionDTO $region, array $context = []): string
+    public function render(RegionDTO $region, ?NewsletterRenderContext $context = null): string
     {
         if ($region->isEmpty()) {
             return '';

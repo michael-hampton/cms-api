@@ -585,6 +585,8 @@ class NewsletterController extends Controller
             return $this->successResponse('Preview sent successfully', $result);
 
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             Logger::error('Failed to send newsletter preview', [
                 'id' => $id,
                 'error' => $e->getMessage()

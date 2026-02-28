@@ -10,6 +10,12 @@ class LayoutRegionValidatorTest extends TestCase
 {
     private LayoutRegionValidator $validator;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->validator = new LayoutRegionValidator();
+    }
+
     public function test_valid_layout_passes(): void
     {
         $this->validator->validate($this->makeValid());
@@ -118,9 +124,98 @@ class LayoutRegionValidatorTest extends TestCase
         $this->assertTrue(true);
     }
 
-    protected function setUp(): void
+    public function test_passes_valid_layout_with_center_region(): void
     {
-        parent::setUp();
-        $this->validator = new LayoutRegionValidator();
+        $layout = LayoutRegionValueObject::fromArray($this->validThreeRegionLayout());
+
+        // Must not throw.
+        $this->validator->validate($layout);
+        $this->assertTrue(true);
+    }
+
+    public function test_throws_when_region_ids_are_not_unique(): void
+    {
+        $data = $this->validThreeRegionLayout();
+        $data['regions'][2]['id'] = 'top'; // Duplicate of regions[0]
+
+        $layout = LayoutRegionValueObject::fromArray($data);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/unique/i');
+        $this->validator->validate($layout);
+    }
+
+    public function test_throws_when_order_values_are_not_unique(): void
+    {
+        $data = $this->validThreeRegionLayout();
+        $data['regions'][1]['order'] = 1; // Duplicate of regions[0]
+
+        $layout = LayoutRegionValueObject::fromArray($data);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/unique/i');
+        $this->validator->validate($layout);
+    }
+
+    public function test_throws_when_order_values_are_not_sequential(): void
+    {
+        $data = $this->validThreeRegionLayout();
+        $data['regions'][2]['order'] = 5; // Gap: 1, 2, 5 is not sequential
+
+        $layout = LayoutRegionValueObject::fromArray($data);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/sequential/i');
+        $this->validator->validate($layout);
+    }
+
+    public function test_throws_when_order_does_not_start_from_one(): void
+    {
+        $data = $this->validThreeRegionLayout();
+        $data['regions'][0]['order'] = 2;
+        $data['regions'][1]['order'] = 3;
+        $data['regions'][2]['order'] = 4;
+
+        $layout = LayoutRegionValueObject::fromArray($data);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/sequential/i');
+        $this->validator->validate($layout);
+    }
+
+    public function test_passes_with_center_region_only(): void
+    {
+        $layout = LayoutRegionValueObject::fromArray([
+            'schema_version' => 2,
+            'regions' => [
+                ['id' => 'center', 'name' => 'Content Region', 'order' => 1, 'slots' => []],
+            ],
+        ]);
+
+        $this->validator->validate($layout);
+        $this->assertTrue(true);
+    }
+
+    public function test_default_layout_passes_validation(): void
+    {
+        $layout = LayoutRegionValueObject::default();
+
+        $this->validator->validate($layout);
+        $this->assertTrue(true);
+    }
+
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function validThreeRegionLayout(): array
+    {
+        return [
+            'schema_version' => 2,
+            'regions' => [
+                ['id' => 'top', 'name' => 'Top Region', 'order' => 1, 'slots' => []],
+                ['id' => 'center', 'name' => 'Content Region', 'order' => 2, 'slots' => []],
+                ['id' => 'bottom', 'name' => 'Footer Region', 'order' => 3, 'slots' => []],
+            ],
+        ];
     }
 }

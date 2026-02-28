@@ -2,12 +2,12 @@
 
 namespace App\DTO\Newsletters\Layout;
 
-final class SlotDTO
+class SlotDTO
 {
     public function __construct(
-        public readonly string $name,
-        public readonly array  $blocks,
-        public readonly array  $allowedBlockTypes,
+        public string $name,
+        public array  $blocks,
+        public array  $allowedBlockTypes,
     )
     {
     }

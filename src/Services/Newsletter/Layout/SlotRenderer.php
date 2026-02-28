@@ -3,7 +3,9 @@
 namespace App\Services\Newsletter\Layout;
 
 use App\DTO\Newsletters\Layout\SlotDTO;
+use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
+use App\Services\Newsletter\Services\BlockDataFactory;
 
 /**
  * Renders a single slot's blocks to HTML.
@@ -14,37 +16,75 @@ class SlotRenderer
 {
     public function __construct(
         private readonly EmailBlockRendererRegistry $blockRegistry,
+        private readonly BlockDataFactory $blockDataFactory
     )
     {
     }
 
-    public function render(SlotDTO $slot, array $context = []): string
+    public function render(SlotDTO $slot, ?NewsletterRenderContext $context = null): string
     {
         if ($slot->isEmpty()) {
             return '';
         }
 
-        $blocksHtml = collect($slot->blocks)
-            ->map(function (array $block) use ($context) {
-                $type = $block['type'] ?? null;
+        $htmlBlocks = [];
 
-                if (!$type || !$this->blockRegistry->has($type)) {
-                    return '';
-                }
+        foreach ($slot->blocks as $block) {
+            $result = $this->renderBlock($block, $context);
 
-                return $this->blockRegistry->render($type, $block['data'] ?? $block, $context);
-            })
-            ->filter(fn(string $html) => $html !== '')
-            ->implode("\n");
+            if (!empty($result['success']) && !empty($result['html'])) {
+                $htmlBlocks[] = $result['html'];
+            }
+        }
 
-        if (empty(trim($blocksHtml))) {
+        $htmlBlocks = array_filter(
+            $htmlBlocks,
+            fn($html) => trim($html) !== ''
+        );
+
+        if (empty($htmlBlocks)) {
             return '';
         }
 
         return sprintf(
             '<div class="layout-slot" data-slot="%s">%s</div>',
             htmlspecialchars($slot->name, ENT_QUOTES),
-            $blocksHtml,
+            implode("\n", $htmlBlocks)
         );
+    }
+
+    public function renderBlock(array $block, ?NewsletterRenderContext $context): array
+    {
+        try {
+            $type = $block['type'] ?? null;
+
+            if ($type === null) {
+                throw new \Exception('Missing block type');
+            }
+
+            $blockData = $this->blockDataFactory->create(
+                $type,
+                $block['data'] ?? []
+            );
+
+            $renderedBlock = $this->blockRegistry->render(
+                $type,
+                $blockData,
+                $context
+            );
+
+            return [
+                'success' => true,
+                'html' => $renderedBlock->html,
+            ];
+
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'html' => '',
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ];
+        }
     }
 }

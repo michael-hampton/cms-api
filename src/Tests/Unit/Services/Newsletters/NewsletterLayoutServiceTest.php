@@ -6,6 +6,7 @@ use App\Enums\Newsletters\LayoutVersionState;
 use App\Framework\Support\Logger;
 use App\Models\NewsletterLayout;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
+use App\Services\Newsletter\Layout\LayoutRegionValidator;
 use App\Services\Newsletter\LayoutRendererService;
 use App\Services\Newsletter\NewsletterLayoutService;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -16,6 +17,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
     private NewsletterLayoutRepository $layoutRepository;
     private LayoutRendererService $layoutRenderer;
     private Logger $logger;
+    private LayoutRegionValidator $regionValidator;
 
     protected function setUp(): void
     {
@@ -24,12 +26,14 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
         $this->layoutRepository = app(NewsletterLayoutRepository::class);
         $this->layoutRenderer = app(LayoutRendererService::class);
         $this->logger = app(Logger::class);
+        $this->regionValidator = app(LayoutRegionValidator::class);
 
         $this->service = new NewsletterLayoutService(
             $this->layoutRepository,
             $this->layoutRenderer,
             $this->logger,
-            $this->database
+            $this->database,
+            $this->regionValidator
         );
     }
 

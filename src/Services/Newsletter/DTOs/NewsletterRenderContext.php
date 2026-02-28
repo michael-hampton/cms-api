@@ -32,4 +32,15 @@ class NewsletterRenderContext
             now_datetime()
         );
     }
+
+    public static function fromArray(array $context): self
+    {
+        return new self(
+            siteId: $context['site_id'],
+            newsletter: $context['newsletter'],
+            member: $context['member'],
+            sendId: $context['send_id'],
+            includeTracking: $context['include_tracking']
+        );
+    }
 }

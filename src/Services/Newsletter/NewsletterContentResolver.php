@@ -2,31 +2,37 @@
 
 namespace App\Services\Newsletter;
 
+use App\DTO\Newsletters\Layout\LayoutRegionValueObject;
 use App\Enums\Newsletters\ContentSourceType;
 use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Models\NewsletterBrandingConfiguration;
 use App\Models\NewsletterLayoutVersion;
+use App\Services\Newsletter\DTOs\NewsletterRenderContext;
+use App\Services\Newsletter\Layout\LayoutRenderPipeline;
 
 /**
  * Decides how a newsletter's content should be rendered.
  * Single responsibility: content source resolution and dispatch.
- * Does not build HTML — delegates to NewsletterPageBuilderService.
+ *
+ * Rendering contract:
+ *   v2 region layout  → LayoutRenderPipeline (RegionRenderer → SlotRenderer → BlockRendererRegistry)
+ *                       wrapped in the outer email chrome via buildTemplate()
+ *   v1 / no layout    → NewsletterPageBuilderService existing paths (unchanged)
+ *
+ * This class never assembles HTML directly.
  */
 class NewsletterContentResolver
 {
     public function __construct(
         private readonly NewsletterPageBuilderService $pageBuilderService,
+        private readonly LayoutRenderPipeline $renderPipeline,
         private readonly Logger                       $logger,
     )
     {
     }
 
-    /**
-     * Resolve and render newsletter content to HTML.
-     * Handles all three content source types with backwards compatibility.
-     */
     public function resolve(
         Newsletter                       $newsletter,
         int                              $siteId,
@@ -36,6 +42,7 @@ class NewsletterContentResolver
         ?int                             $sendId = null,
         ?NewsletterBrandingConfiguration $branding = null,
         ?NewsletterLayoutVersion         $layoutVersion = null,
+        bool $forceV2 = false
     ): string
     {
         $contentType = ContentSourceType::tryFrom($newsletter->content_type ?? '')
@@ -43,16 +50,20 @@ class NewsletterContentResolver
 
         return match ($contentType) {
             ContentSourceType::CustomBlocks => $this->resolveCustomBlocks(
-                $newsletter, $siteId, $member, $unsubscribeToken, $branding, $layoutVersion
+                $newsletter, $siteId, $member, $unsubscribeToken, $branding, $layoutVersion, $sendId, $forceV2
             ),
             ContentSourceType::AutoPages => $this->resolveAutoPages(
-                $newsletter, $siteId, $member, $unsubscribeToken, $isPreview, $sendId, $branding, $layoutVersion
+                $newsletter, $siteId, $member, $unsubscribeToken, $isPreview, $sendId, $branding, $layoutVersion, $forceV2
             ),
             ContentSourceType::Manual => $this->resolveLegacy(
-                $newsletter, $siteId, $member, $unsubscribeToken, $branding, $layoutVersion
+                $newsletter, $siteId, $member, $unsubscribeToken, $branding, $layoutVersion,
             ),
         };
     }
+
+    // -------------------------------------------------------------------------
+    // Content source handlers
+    // -------------------------------------------------------------------------
 
     private function resolveCustomBlocks(
         Newsletter                       $newsletter,
@@ -61,54 +72,22 @@ class NewsletterContentResolver
         ?string                          $unsubscribeToken,
         ?NewsletterBrandingConfiguration $branding,
         ?NewsletterLayoutVersion         $layoutVersion,
+        ?int $sendId = null,
+        bool $forceV2 = false
     ): string
     {
         $blocks = $newsletter->getBlocks();
 
         if (empty($blocks)) {
-            $this->logger->warning('Custom blocks newsletter has no blocks', [
+            Logger::warning('Custom blocks newsletter has no blocks', [
                 'newsletter_id' => $newsletter->id,
             ]);
             return '';
         }
 
-        $slotPayload = $this->buildCenterSlotPayload($blocks, $layoutVersion);
-
-        return $this->pageBuilderService->buildNewsletterHtmlFromLayoutSlots(
-            $newsletter,
-            $slotPayload,
-            $member,
-            $unsubscribeToken,
-            $siteId,
-            $branding,
+        return $this->renderWithBlocks(
+            $blocks, $newsletter, $siteId, $member, $unsubscribeToken, $sendId, $branding, $layoutVersion, $forceV2
         );
-    }
-
-    /**
-     * Wraps blocks in a NewsletterLayoutVersion-compatible object so the
-     * existing rendering pipeline can consume them without modification.
-     *
-     * If a real layout version is provided and has a center region, blocks
-     * are injected there. Otherwise a single implicit slot is used.
-     */
-    private function buildImplicitLayoutVersion(
-        array                    $blocks,
-        ?NewsletterLayoutVersion $layoutVersion,
-    ): array
-    {
-        $slots = [
-            [
-                'key' => 'content',
-                'label' => 'Content',
-                'required' => true,
-                'blocks' => $blocks,
-            ]
-        ];
-
-        // Anonymously extend — avoids coupling to Eloquent model instantiation
-        return [
-            'slots' => $slots
-        ];
     }
 
     private function resolveAutoPages(
@@ -120,12 +99,23 @@ class NewsletterContentResolver
         ?int                             $sendId,
         ?NewsletterBrandingConfiguration $branding,
         ?NewsletterLayoutVersion         $layoutVersion,
+        bool $forceV2 = false
     ): string
     {
         $pages = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
 
-        // Empty collection is valid — page builder returns empty HTML
-        // Empty-pages guard lives in NewsletterContentBuilder, not here
+        // v2 layout — convert pages to blocks and render through the region pipeline.
+        if ($layoutVersion !== null && ($this->isV2Layout($layoutVersion) || $forceV2)) {
+            $blocks = $this->pageBuilderService->convertPagesToBlocks(
+                $pages, $newsletter, $siteId, $member, $sendId,
+            );
+
+            return $this->renderWithBlocks(
+                $blocks, $newsletter, $siteId, $member, $unsubscribeToken, $sendId, $branding, $layoutVersion, $forceV2
+            );
+        }
+
+        // v1 / no layout — existing page template path, unchanged.
         return $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
             $pages,
@@ -159,7 +149,45 @@ class NewsletterContentResolver
             'data' => ['paragraphs' => [nl2br(htmlspecialchars($text))]],
         ];
 
-        $slotPayload = $this->buildCenterSlotPayload([$legacyBlock], $layoutVersion);
+        return $this->renderWithBlocks(
+            [$legacyBlock], $newsletter, $siteId, $member, $unsubscribeToken, null, $branding, $layoutVersion,
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Core dispatch
+    // -------------------------------------------------------------------------
+
+    /**
+     * Route to the correct rendering path based on layout version.
+     *
+     * v2 layout → LayoutRenderPipeline + buildTemplate() for outer chrome
+     * v1 / none → buildNewsletterHtmlFromLayoutSlots() (implicit single-slot path)
+     */
+    private function renderWithBlocks(
+        array                            $blocks,
+        Newsletter                       $newsletter,
+        int                              $siteId,
+        ?Member                          $member,
+        ?string                          $unsubscribeToken,
+        ?int                             $sendId,
+        ?NewsletterBrandingConfiguration $branding,
+        ?NewsletterLayoutVersion         $layoutVersion,
+        bool                             $forceV2 = false
+    ): string
+    {
+        if ($layoutVersion !== null && ($this->isV2Layout($layoutVersion) || $forceV2)) {
+            return $this->renderViaRegionPipeline(
+                $blocks, $newsletter, $siteId, $member, $unsubscribeToken, $sendId, $branding, $layoutVersion,
+            );
+        }
+
+        // v1 / no layout — implicit single content slot, existing path.
+        $slotPayload = [
+            'slots' => [
+                ['key' => 'content', 'label' => 'Content', 'required' => true, 'blocks' => $blocks],
+            ],
+        ];
 
         return $this->pageBuilderService->buildNewsletterHtmlFromLayoutSlots(
             $newsletter,
@@ -172,73 +200,62 @@ class NewsletterContentResolver
     }
 
     /**
-     * Build a slot payload for buildNewsletterHtmlFromLayoutSlots.
+     * Inject blocks into the center region, render all regions through the
+     * pipeline, then wrap in the outer email chrome.
      *
-     * For v2 region layouts: returns all region slots in order, with the center
-     * region's single implicit content slot populated with newsletter blocks.
-     * Non-center region slots pass through unchanged (their blocks come from
-     * the layout definition — e.g. a top banner slot).
+     * Non-center regions (top, bottom) render with whatever slots and blocks
+     * the designer configured — they pass through LayoutRegionValueObject
+     * unchanged.
      *
-     * For v1 / no layout: returns a single implicit content slot.
+     * Tracking context is hydrated here so region/slot renderers receive a
+     * fully-populated context without depending on the layout layer.
      */
-    private function buildCenterSlotPayload(
-        array                    $blocks,
-        ?NewsletterLayoutVersion $layoutVersion,
-    ): array
+    private function renderViaRegionPipeline(
+        array                            $blocks,
+        Newsletter                       $newsletter,
+        int                              $siteId,
+        ?Member                          $member,
+        ?string                          $unsubscribeToken,
+        ?int                             $sendId,
+        ?NewsletterBrandingConfiguration $branding,
+        NewsletterLayoutVersion          $layoutVersion,
+    ): string
     {
-        // No layout assigned — single implicit slot, existing behaviour
-        if ($layoutVersion === null) {
-            return [
-                'slots' => [
-                    ['key' => 'content', 'label' => 'Content', 'required' => true, 'blocks' => $blocks],
-                ],
-            ];
-        }
 
-        $definition = $layoutVersion->definition ?? [];
-        $schemaVersion = (int)($definition['schema_version'] ?? 1);
+        $layout = LayoutRegionValueObject::fromArray($layoutVersion->layout_definition_json ?? []);
 
-        // v1 layout — existing slot-based behaviour
-        if ($schemaVersion < 2) {
-            return [
-                'slots' => [
-                    ['key' => 'content', 'label' => 'Content', 'required' => true, 'blocks' => $blocks],
-                ],
-            ];
-        }
+        // Inject newsletter content into the center region as a single implicit slot.
+        $layout = $layout->withCenterSlots([
+            ['name' => 'center_content', 'blocks' => $blocks],
+        ]);
 
-        // v2 region layout — flatten regions in order, inject content into center
-        $regions = collect($definition['regions'] ?? [])
-            ->sortBy('order')
-            ->values();
+        $context = new NewsletterRenderContext(
+            siteId: $siteId,
+            newsletter: $newsletter,
+            member: $member,
+            sendId: $sendId,
+            includeTracking: $sendId !== null,
+        );
 
-        $slots = [];
+        $bodyHtml = $this->renderPipeline->renderBody($layout, $context);
 
-        foreach ($regions as $region) {
-            $regionId = $region['id'];
-
-            if ($regionId === 'center') {
-                // Newsletter content always lives in a single implicit center slot
-                $slots[] = [
-                    'key' => 'center_content',
-                    'label' => 'Center Content',
-                    'required' => true,
-                    'blocks' => $blocks,
-                ];
-            } else {
-                // Pass through any slots the designer added to top/bottom regions
-                foreach ($region['slots'] ?? [] as $slot) {
-                    $slots[] = [
-                        'key' => $slot['name'] ?? ($regionId . '_slot'),
-                        'label' => $slot['name'] ?? $regionId,
-                        'required' => false,
-                        'blocks' => $slot['blocks'] ?? [],
-                    ];
-                }
-            }
-        }
-
-        return ['slots' => $slots];
+        // Outer email chrome (doctype, logo header, footer) is the page builder's
+        // responsibility — not the region pipeline's.
+        return $this->pageBuilderService->buildTemplate(
+            $newsletter,
+            $bodyHtml,
+            $siteId,
+            $branding,
+            $unsubscribeToken,
+        );
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function isV2Layout(NewsletterLayoutVersion $version): bool
+    {
+        return ((int)($version->layout_definition_json['schema_version'] ?? 1)) >= 2;
+    }
 }

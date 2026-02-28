@@ -73,7 +73,7 @@ class NewsletterSendService
             ];
         }
 
-        $contentResult = $this->contentBuilder->build($newsletter, $siteId, false, $member);
+        $contentResult = $this->contentBuilder->build($newsletter, $siteId, false, $member, true);
         if (!$contentResult['success']) {
             return $contentResult;
         }
@@ -181,10 +181,12 @@ class NewsletterSendService
             return ['success' => false, 'error' => 'Maximum ' . self::PREVIEW_RECIPIENT_LIMIT . ' preview recipients allowed'];
         }
 
-        $contentResult = $this->contentBuilder->build($newsletter, $siteId, true, $member);
+        $contentResult = $this->contentBuilder->build($newsletter, $siteId, true, $member, true);
         if (!$contentResult['success']) {
             return $contentResult;
         }
+
+        echo $contentResult['html'];
 
         return $this->database->transaction(function () use ($newsletter, $previewEmails, $contentResult, $siteId) {
             $sendRecord = $this->createPreviewSendRecord($newsletter, $previewEmails, $contentResult);

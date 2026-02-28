@@ -4,9 +4,9 @@ namespace App\Services\Newsletter\DTOs;
 
 class RenderedBlock
 {
-    private function __construct(
-        public readonly string $html,
-        public readonly bool   $wasRendered
+    public function __construct(
+        public string $html,
+        public bool   $wasRendered
     )
     {
     }

@@ -21,7 +21,7 @@ class NewsletterContentBuilder
     {
     }
 
-    public function build(Newsletter $newsletter, int $siteId, bool $isPreview, ?Member $member = null): array
+    public function build(Newsletter $newsletter, int $siteId, bool $isPreview, ?Member $member = null, bool $forceV2 = false): array
     {
         /*$pages = [];
         $baseHtml = '';
@@ -90,6 +90,7 @@ class NewsletterContentBuilder
                 sendId: null,
                 branding: $branding,
                 layoutVersion: $layoutVersion,
+                forceV2: $forceV2
             );
 
             // Ensure unsubscribe placeholder exists

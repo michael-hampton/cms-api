@@ -11,6 +11,7 @@ use App\Framework\Support\Logger;
 use App\Models\NewsletterLayout;
 use App\Models\NewsletterLayoutVersion;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
+use App\Services\Newsletter\Layout\LayoutRegionValidator;
 
 /**
  * Orchestrates layout lifecycle: creation, versioning, state transitions, cloning.

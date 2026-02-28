@@ -3,9 +3,12 @@
 namespace App\Tests\Unit\Services\Newsletters\Layout;
 
 use App\DTO\Newsletters\Layout\RegionDTO;
+use App\Services\Newsletter\DTOs\BlockData\TextBlockData;
+use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Layout\RegionRenderer;
 use App\Services\Newsletter\Layout\SlotRenderer;
 use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
+use App\Services\Newsletter\Services\BlockDataFactory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -13,6 +16,23 @@ class RegionRendererTest extends TestCase
 {
     private RegionRenderer $renderer;
     private $mockRegistry;
+    private $blockDataFactory;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mockRegistry = Mockery::mock(EmailBlockRendererRegistry::class);
+        $this->blockDataFactory = Mockery::mock(BlockDataFactory::class);
+        $slotRenderer = new SlotRenderer($this->mockRegistry, $this->blockDataFactory);
+        $this->renderer = new RegionRenderer($slotRenderer);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_empty_region_renders_empty_string(): void
     {
@@ -28,7 +48,11 @@ class RegionRendererTest extends TestCase
     public function test_region_wraps_output_with_correct_data_attribute(): void
     {
         $this->mockRegistry->shouldReceive('has')->with('text')->andReturn(true);
-        $this->mockRegistry->shouldReceive('render')->andReturn('<p>Hello</p>');
+        $this->mockRegistry->shouldReceive('render')->andReturn(
+            new RenderedBlock('<p>Hello</p>', true)
+        );
+
+        $this->setBlockDataFactoryExpectation(['paragraphs' => ['Hello']]);
 
         $region = RegionDTO::fromArray([
             'id' => 'top',
@@ -50,14 +74,18 @@ class RegionRendererTest extends TestCase
     {
         // Ordering is tested at the VO level; here we just confirm render() uses region id
         $this->mockRegistry->shouldReceive('has')->andReturn(true);
-        $this->mockRegistry->shouldReceive('render')->andReturn('<p>Bottom content</p>');
+        $this->mockRegistry->shouldReceive('render')->andReturn(
+            new RenderedBlock('<p>Bottom content</p>', true)
+        );
+
+        $this->setBlockDataFactoryExpectation(['paragraphs' => ['Hello']]);
 
         $region = RegionDTO::fromArray([
             'id' => 'bottom',
             'name' => 'Bottom',
             'order' => 3,
             'slots' => [
-                ['name' => 'footer', 'blocks' => [['type' => 'text', 'data' => []]]],
+                ['name' => 'footer', 'blocks' => [['type' => 'text', 'data' => ['paragraphs' => ['Hello']]]]],
             ],
         ]);
 
@@ -69,6 +97,10 @@ class RegionRendererTest extends TestCase
     public function test_slot_with_unknown_block_type_renders_empty(): void
     {
         $this->mockRegistry->shouldReceive('has')->with('unknown_type')->andReturn(false);
+
+        $this->blockDataFactory->expects('create')->andReturn(null);
+
+        $this->setBlockDataFactoryExpectation([], 'unknown_type');
 
         $region = RegionDTO::fromArray([
             'id' => 'top',
@@ -84,18 +116,10 @@ class RegionRendererTest extends TestCase
         $this->assertSame('', $html);
     }
 
-    protected function setUp(): void
+    private function setBlockDataFactoryExpectation(array $data, string $type = 'text'): void
     {
-        parent::setUp();
-
-        $this->mockRegistry = Mockery::mock(EmailBlockRendererRegistry::class);
-        $slotRenderer = new SlotRenderer($this->mockRegistry);
-        $this->renderer = new RegionRenderer($slotRenderer);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
+        $this->blockDataFactory->shouldReceive('create')
+            ->with($type, $data)
+            ->andReturn(TextBlockData::fromArray($data));
     }
 }

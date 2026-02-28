@@ -799,4 +799,35 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return implode($glue, $this->items);
     }
 
+    public function flatMap(callable $callback): self
+    {
+        $results = [];
+
+        foreach ($this->items as $key => $value) {
+            $mapped = $callback($value, $key);
+
+            if ($mapped === null) {
+                continue;
+            }
+
+            // Allow returning either:
+            // - arrays
+            // - Collection instances
+            // - single values wrapped in arrays
+            if ($mapped instanceof self) {
+                $mapped = $mapped->all();
+            }
+
+            if (is_array($mapped)) {
+                foreach ($mapped as $item) {
+                    $results[] = $item;
+                }
+            } else {
+                $results[] = $mapped;
+            }
+        }
+
+        return new self($results);
+    }
+
 }

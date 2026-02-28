@@ -50,6 +50,67 @@ class NewsletterPageBuilderService
         $this->renderers = $rendererRegistry->all();
     }
 
+    /**
+     * Convert a Collection of page arrays/objects into the flat block array
+     * expected by the v2 region rendering pipeline.
+     *
+     * Each page becomes a 'page_card' block whose data mirrors the fields the
+     * existing template variants already consume, so the PageCardBlockRenderer
+     * (or whichever renderer handles 'page_card') needs no changes.
+     *
+     * Promotion blocks are interleaved exactly as in the existing template
+     * variants (mergeContentAndPromotions), keeping consistent injection logic.
+     *
+     * Only called by NewsletterContentResolver for v2 auto-pages newsletters.
+     *
+     * @return array<int, array{type: string, data: array}>
+     */
+    public function convertPagesToBlocks(
+        Collection $pages,
+        Newsletter $newsletter,
+        int        $siteId,
+        ?Member    $member = null,
+        ?int       $sendId = null,
+    ): array
+    {
+        if ($pages->isEmpty()) {
+            return [];
+        }
+
+        $context = new NewsletterRenderContext(
+            siteId: $siteId,
+            newsletter: $newsletter,
+            member: $member,
+            sendId: $sendId,
+            includeTracking: $sendId !== null,
+        );
+
+        $promotionBlocks = $this->injector->getBlocksForSurface(
+            'newsletter_issue',
+            $newsletter->id,
+            $context->member,
+            $context->siteId,
+            'newsletter',
+        );
+
+        $merged = $this->mergeContentAndPromotions($pages->toArray(), $promotionBlocks);
+
+        return collect($merged)
+            ->flatMap(function (array $item) {
+
+                if (!empty($item['is_promotion'])) {
+                    return [[
+                        'type' => $item['type'] ?? 'banner',
+                        'data' => $item['data'] ?? $item,
+                    ]];
+                }
+
+                return $item['blocks'] ?? [];
+            })
+            ->values()
+            ->all();
+    }
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -71,6 +132,8 @@ class NewsletterPageBuilderService
         ?NewsletterLayoutVersion         $layoutVersion = null
     ): string
     {
+        // v1 layout slot-detection path.
+        // v2 layouts are intercepted by NewsletterContentResolver before this point.
         if ($layoutVersion !== null) {
             $slots = $layoutVersion->slots();
             $hasSlotBlocks = false;
@@ -243,7 +306,7 @@ class NewsletterPageBuilderService
      * the logo header.  The placeholder {{VIEW_IN_BROWSER_URL}} is replaced by
      * NewsletterDispatcher with a per-recipient tracked URL at dispatch time.
      */
-    private function buildTemplate(
+    public function buildTemplate(
         Newsletter                       $newsletter,
         string                           $blockHtml,
         ?int                             $siteId = null,
@@ -273,8 +336,6 @@ class NewsletterPageBuilderService
         }
 
         $scopeId = 'newsletter-' . $newsletter->id;
-
-        // View-in-browser banner — placeholder is resolved per-recipient at dispatch time.
         $viewInBrowserBanner = $this->buildViewInBrowserBanner();
 
         $html = '<!DOCTYPE html>
