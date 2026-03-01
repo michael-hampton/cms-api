@@ -6,6 +6,7 @@ use App\Framework\Mail\ArrayMailer;
 use App\Framework\Mail\MailManager;
 use App\Framework\Support\Config;
 use App\Models\Newsletter;
+use App\Models\NewsletterIssue;
 use App\Models\Site;
 use App\Models\Subscriber;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -684,6 +685,271 @@ class NewsletterControllerTest extends FunctionalTestCase
         $this->assertEquals(2, $data['data']['count']);
         $this->assertCount(2, $data['data']['subscribers']);
     }
+
+    public function test_create_issue_returns_201_with_draft_issue(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/issues", [
+            'subject' => 'April Edition',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals('April Edition', $data['issue']['subject']);
+        $this->assertEquals('draft', $data['issue']['status']);
+        $this->assertEquals($newsletter->id, $data['issue']['newsletter_id']);
+    }
+
+    public function test_create_issue_defaults_subject_to_newsletter_title(): void
+    {
+        $newsletter = $this->createNewsletter([
+            'title' => 'Weekly Digest',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/issues", []);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Weekly Digest', $data['issue']['subject']);
+    }
+
+    public function test_create_issue_accepts_valid_content_blocks(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $blocks = [
+            ['type' => 'heading', 'data' => ['text' => 'Hello World', 'level' => 1]],
+            ['type' => 'text', 'data' => ['content' => 'Body copy here.']],
+        ];
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/issues", [
+            'content_blocks' => $blocks,
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(2, $data['issue']['content_blocks']);
+    }
+
+    public function test_create_issue_returns_422_for_unknown_block_type(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/issues", [
+            'content_blocks' => [
+                ['type' => 'not-a-real-block', 'data' => []],
+            ],
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_create_issue_accepts_scheduled_at(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/issues", [
+            'scheduled_at' => '2026-06-01T09:00:00',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotNull($data['issue']['scheduled_at']);
+    }
+
+    public function test_create_issue_returns_404_for_nonexistent_newsletter(): void
+    {
+        $response = $this->postForSite('/api/newsletters/99999/issues', [
+            'subject' => 'Orphan Issue',
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function test_create_issue_returns_404_for_newsletter_from_different_site(): void
+    {
+        $otherSite = Site::create(['name' => 'Other', 'slug' => 'other']);
+        $newsletter = Newsletter::create([
+            'title' => 'Foreign Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $otherSite->id,
+        ]);
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/issues", [
+            'subject' => 'Sneaky Issue',
+        ]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function test_create_issue_persists_to_database(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+
+        $this->postForSite("/api/newsletters/{$newsletter->id}/issues", [
+            'subject' => 'DB Persist Test',
+        ]);
+
+        $issue = NewsletterIssue::where('newsletter_id', $newsletter->id)
+            ->where('subject', 'DB Persist Test')
+            ->first();
+
+        $this->assertNotNull($issue);
+        $this->assertEquals('draft', $issue->status);
+        $this->assertEquals($this->siteId, $issue->site_id);
+    }
+
+    public function test_send_issue_returns_200_with_send_summary(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $issue = $this->createNewsletterIssue($newsletter, ['status' => 'draft']);
+
+        $this->createConfirmedSubscriber('reader@example.com');
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($issue->id, $data['data']['issue_id']);
+        $this->assertEquals($newsletter->id, $data['data']['newsletter_id']);
+        $this->assertArrayHasKey('send_id', $data['data']);
+        $this->assertArrayHasKey('sent_to', $data['data']);
+    }
+
+    public function test_send_issue_transitions_issue_to_sent_in_database(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $issue = $this->createNewsletterIssue($newsletter, ['status' => 'draft']);
+
+        $this->createConfirmedSubscriber('reader2@example.com');
+
+        $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $refreshed = NewsletterIssue::find($issue->id);
+        $this->assertEquals('sent', $refreshed->status);
+        $this->assertNotNull($refreshed->sent_at);
+        $this->assertNotNull($refreshed->send_id);
+    }
+
+    public function test_send_issue_returns_409_when_issue_already_sent(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $issue = $this->createNewsletterIssue($newsletter, [
+            'status' => 'sent',
+            'sent_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $this->assertEquals(409, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_send_issue_returns_404_for_nonexistent_newsletter(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $issue = $this->createNewsletterIssue($newsletter, ['status' => 'draft']);
+
+        $response = $this->postForSite(
+            "/api/newsletters/99999/issues/{$issue->id}/send"
+        );
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function test_send_issue_returns_404_for_issue_on_different_site(): void
+    {
+        $otherSite = Site::create(['name' => 'Other', 'slug' => 'other-send']);
+        $newsletter = Newsletter::create([
+            'title' => 'Foreign',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'site_id' => $otherSite->id,
+        ]);
+        $issue = NewsletterIssue::create([
+            'newsletter_id' => $newsletter->id,
+            'site_id' => $otherSite->id,
+            'subject' => 'Foreign Issue',
+            'status' => 'draft',
+        ]);
+
+        // Request is scoped to $this->siteId, so neither the newsletter nor issue
+        // should be accessible
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function test_send_issue_returns_400_when_no_eligible_recipients(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $issue = $this->createNewsletterIssue($newsletter, ['status' => 'draft']);
+
+        // No subscribers created — send should fail gracefully
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_send_ready_issue_succeeds_same_as_draft(): void
+    {
+        $newsletter = $this->createNewsletter(['site_id' => $this->siteId]);
+        $issue = $this->createNewsletterIssue($newsletter, ['status' => 'ready']);
+
+        $this->createConfirmedSubscriber('ready-reader@example.com');
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+
+    private function createNewsletterIssue(Newsletter $newsletter, array $attributes = []): NewsletterIssue
+    {
+        return NewsletterIssue::create(array_merge([
+            'newsletter_id' => $newsletter->id,
+            'site_id' => $this->siteId,
+            'subject' => 'Test Issue',
+            'status' => 'draft',
+        ], $attributes));
+    }
+
+    private function createConfirmedSubscriber(string $email): void
+    {
+        \App\Models\Subscriber::create([
+            'email' => $email,
+            'confirmed' => true,
+            'site_id' => $this->siteId,
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'unsubscribe_token' => bin2hex(random_bytes(16)),
+        ]);
+    }
+
 
     protected function setUp(): void
     {

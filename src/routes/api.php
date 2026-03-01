@@ -641,6 +641,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
         $router->get('/newsletters/statistics', [NewsletterController::class, 'statistics']);
+        $router->post('/newsletters/{id}/issues', [NewsletterController::class, 'createIssue']);
+        $router->post('/newsletters/{id}/issues/{issueId}/send', [NewsletterController::class, 'sendIssue']);
 
         $router->get('/newsletters/{newsletterId}/schedules',
             [NewsletterScheduleController::class, 'index']

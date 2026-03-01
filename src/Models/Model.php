@@ -152,6 +152,15 @@ abstract class Model
         return $this;
     }
 
+    public function forceFill(array $attributes): self
+    {
+        foreach ($attributes as $key => $value) {
+            $this->setAttribute($key, $value);
+        }
+
+        return $this;
+    }
+
     protected function isFillable(string $key): bool
     {
         $keywords = ['count', 'total', 'avg', 'units_sold'];

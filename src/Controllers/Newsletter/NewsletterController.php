@@ -676,7 +676,7 @@ class NewsletterController extends Controller
                 'scheduled_at' => $request->input('scheduled_at'),
             ]);
 
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'success' => true,
                 'issue' => $issue->toArray(),
             ], 201);

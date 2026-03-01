@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Newsletters\NewsletterIssueStatus;
+
 /**
  * Represents a newsletter issue — a content draft that can be reviewed,
  * edited, and eventually sent to recipients.

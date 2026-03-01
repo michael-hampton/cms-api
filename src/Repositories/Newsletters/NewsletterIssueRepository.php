@@ -29,7 +29,7 @@ class NewsletterIssueRepository
     {
         return NewsletterIssue::where('newsletter_id', $newsletterId)
             ->where('site_id', $siteId)
-            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->get();
     }
 
