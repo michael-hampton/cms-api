@@ -3,6 +3,7 @@
 namespace App\Services\Newsletter;
 
 use App\DTO\Newsletters\Layout\LayoutRegionValueObject;
+use App\DTO\Newsletters\NewsletterResolveResult;
 use App\Enums\Newsletters\ContentSourceType;
 use App\Framework\Support\Logger;
 use App\Models\Member;
@@ -22,6 +23,9 @@ use App\Services\Newsletter\Layout\LayoutRenderPipeline;
  *   v1 / no layout    → NewsletterPageBuilderService existing paths (unchanged)
  *
  * This class never assembles HTML directly.
+ *
+ * Returns a NewsletterResolveResult carrying both the rendered HTML and any
+ * pages already fetched internally, so callers never duplicate the DB query.
  */
 class NewsletterContentResolver
 {
@@ -43,7 +47,7 @@ class NewsletterContentResolver
         ?NewsletterBrandingConfiguration $branding = null,
         ?NewsletterLayoutVersion         $layoutVersion = null,
         bool $forceV2 = false
-    ): string
+    ): NewsletterResolveResult
     {
         $contentType = ContentSourceType::tryFrom($newsletter->content_type ?? '')
             ?? ContentSourceType::Manual;
@@ -74,7 +78,7 @@ class NewsletterContentResolver
         ?NewsletterLayoutVersion         $layoutVersion,
         ?int $sendId = null,
         bool $forceV2 = false
-    ): string
+    ): NewsletterResolveResult
     {
         $blocks = $newsletter->getBlocks();
 
@@ -82,12 +86,14 @@ class NewsletterContentResolver
             Logger::warning('Custom blocks newsletter has no blocks', [
                 'newsletter_id' => $newsletter->id,
             ]);
-            return '';
+            return NewsletterResolveResult::withoutPages('');
         }
 
-        return $this->renderWithBlocks(
+        $html = $this->renderWithBlocks(
             $blocks, $newsletter, $siteId, $member, $unsubscribeToken, $sendId, $branding, $layoutVersion, $forceV2
         );
+
+        return NewsletterResolveResult::withoutPages($html);
     }
 
     private function resolveAutoPages(
@@ -100,25 +106,34 @@ class NewsletterContentResolver
         ?NewsletterBrandingConfiguration $branding,
         ?NewsletterLayoutVersion         $layoutVersion,
         bool $forceV2 = false
-    ): string
+    ): NewsletterResolveResult
     {
-        $pages = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
+        $pagesCollection = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
+
+        $mappedPages = $pagesCollection->map(fn($p) => [
+            'id' => $p->id,
+            'title' => $p->title,
+            'subtitle' => $p->subtitle,
+            'slug' => $p->slug,
+        ])->toArray();
 
         // v2 layout — convert pages to blocks and render through the region pipeline.
         if ($layoutVersion !== null && ($this->isV2Layout($layoutVersion) || $forceV2)) {
             $blocks = $this->pageBuilderService->convertPagesToBlocks(
-                $pages, $newsletter, $siteId, $member, $sendId,
+                $pagesCollection, $newsletter, $siteId, $member, $sendId,
             );
 
-            return $this->renderWithBlocks(
+            $html = $this->renderWithBlocks(
                 $blocks, $newsletter, $siteId, $member, $unsubscribeToken, $sendId, $branding, $layoutVersion, $forceV2
             );
+
+            return NewsletterResolveResult::withPages($html, $mappedPages);
         }
 
         // v1 / no layout — existing page template path, unchanged.
-        return $this->pageBuilderService->buildNewsletterHtml(
+        $html = $this->pageBuilderService->buildNewsletterHtml(
             $newsletter,
-            $pages,
+            $pagesCollection,
             $member,
             $unsubscribeToken,
             $isPreview,
@@ -127,6 +142,8 @@ class NewsletterContentResolver
             $branding,
             $layoutVersion,
         );
+
+        return NewsletterResolveResult::withPages($html, $mappedPages);
     }
 
     private function resolveLegacy(
@@ -136,12 +153,12 @@ class NewsletterContentResolver
         ?string                          $unsubscribeToken,
         ?NewsletterBrandingConfiguration $branding,
         ?NewsletterLayoutVersion         $layoutVersion,
-    ): string
+    ): NewsletterResolveResult
     {
         $text = $newsletter->legacy_content ?? $newsletter->content ?? '';
 
         if (empty(trim($text))) {
-            return '';
+            return NewsletterResolveResult::withoutPages('');
         }
 
         $legacyBlock = [
@@ -149,9 +166,11 @@ class NewsletterContentResolver
             'data' => ['paragraphs' => [nl2br(htmlspecialchars($text))]],
         ];
 
-        return $this->renderWithBlocks(
+        $html = $this->renderWithBlocks(
             [$legacyBlock], $newsletter, $siteId, $member, $unsubscribeToken, null, $branding, $layoutVersion,
         );
+
+        return NewsletterResolveResult::withoutPages($html);
     }
 
     // -------------------------------------------------------------------------
@@ -221,7 +240,6 @@ class NewsletterContentResolver
         NewsletterLayoutVersion          $layoutVersion,
     ): string
     {
-
         $layout = LayoutRegionValueObject::fromArray($layoutVersion->layout_definition_json ?? []);
 
         // Inject newsletter content into the center region as a single implicit slot.

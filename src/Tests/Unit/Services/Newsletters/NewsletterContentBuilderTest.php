@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Newsletters;
 
+use App\DTO\Newsletters\NewsletterResolveResult;
 use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
@@ -13,11 +14,12 @@ use PHPUnit\Framework\TestCase;
 
 class NewsletterContentBuilderTest extends TestCase
 {
+    private $pageBuilderService;
+    private $brandingRepository;
+    private $layoutRepository;
+    private $contentResolver;
+
     private NewsletterContentBuilder $builder;
-    private $mockPageBuilderService;
-    private NewsletterBrandingRepository $newsletterBrandingRepository;
-    private readonly NewsletterLayoutRepository $newsletterLayoutRepository;
-    private NewsletterContentResolver $newsletterContentResolver;
 
     protected function setUp(): void
     {
@@ -32,18 +34,20 @@ class NewsletterContentBuilderTest extends TestCase
         $this->brandingRepository
             ->shouldReceive('findByNewsletterId')
             ->zeroOrMoreTimes()
-            ->andReturn(null);
+            ->andReturn(null)
+            ->byDefault();
 
         $this->layoutRepository
             ->shouldReceive('versionHistory')
             ->zeroOrMoreTimes()
-            ->andReturn(collect());
+            ->andReturn(collect())
+            ->byDefault();
 
         $this->builder = new NewsletterContentBuilder(
             $this->pageBuilderService,
             $this->brandingRepository,
             $this->layoutRepository,
-            $this->contentResolver
+            $this->contentResolver,
         );
     }
 
@@ -53,95 +57,160 @@ class NewsletterContentBuilderTest extends TestCase
         parent::tearDown();
     }
 
-    private function createMockNewsletter(bool $isAutomated): Newsletter
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function makeNewsletter(): Newsletter
     {
         $newsletter = Mockery::mock(Newsletter::class)->makePartial();
         $newsletter->id = 1;
         $newsletter->layout_id = null;
         $newsletter->content = '[]';
-
-        $newsletter->shouldReceive('isAutomated')->andReturn($isAutomated);
-
         return $newsletter;
     }
 
-    private function stubResolver(string $html = '<p>Resolved Content</p>{{UNSUBSCRIBE_LINK}}'): void
+    private function stubResolverWithPages(string $html, array $pages): void
     {
         $this->contentResolver
             ->shouldReceive('resolve')
             ->zeroOrMoreTimes()
-            ->andReturn($html);
+            ->andReturn(NewsletterResolveResult::withPages($html, $pages));
     }
 
-    private function stubPages(array $pages = []): void
+    private function stubResolverWithoutPages(string $html): void
     {
-        $this->pageBuilderService
-            ->shouldReceive('getPagesForNewsletter')
+        $this->contentResolver
+            ->shouldReceive('resolve')
             ->zeroOrMoreTimes()
-            ->andReturn(collect($pages));
+            ->andReturn(NewsletterResolveResult::withoutPages($html));
     }
 
-    public function testBuildAutomatedNewsletterSuccessfully()
-    {
-        $newsletter = $this->createMockNewsletter(true);
-        $siteId = 1;
+    // -------------------------------------------------------------------------
+    // AutoPages (resolver returns pages)
+    // -------------------------------------------------------------------------
 
-        $this->stubPages([
-            (object)[
-                'id' => 1,
-                'title' => 'Page 1',
-                'subtitle' => 'Subtitle 1',
-                'slug' => 'page-1'
-            ],
-            (object)[
-                'id' => 2,
-                'title' => 'Page 2',
-                'subtitle' => 'Subtitle 2',
-                'slug' => 'page-2'
-            ]
+    public function testBuildAutomatedNewsletterSuccessfully(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->stubResolverWithPages('<p>Automated content</p>{{UNSUBSCRIBE_LINK}}', [
+            ['id' => 1, 'title' => 'Page 1', 'subtitle' => 'Subtitle 1', 'slug' => 'page-1'],
+            ['id' => 2, 'title' => 'Page 2', 'subtitle' => 'Subtitle 2', 'slug' => 'page-2'],
         ]);
 
-        $this->stubResolver('<p>Automated content</p>{{UNSUBSCRIBE_LINK}}');
-
-        $result = $this->builder->build($newsletter, $siteId, false);
+        $result = $this->builder->build($newsletter, 1, false);
 
         $this->assertTrue($result['success']);
         $this->assertStringContainsString('Automated content', $result['html']);
         $this->assertCount(2, $result['pages']);
     }
 
-    public function testBuildAutomatedNewsletterFailsWithNoPages()
+    public function testBuildAutomatedNewsletterWithNoPagesReturnsErrorInPages(): void
     {
-        $newsletter = $this->createMockNewsletter(true);
+        $newsletter = $this->makeNewsletter();
 
-        $this->pageBuilderService
-            ->shouldReceive('getPagesForNewsletter')
-            ->once()
-            ->andReturn(collect());
-
-        $this->stubResolver('<p>Content</p>');
+        // Resolver fetched pages internally but found none — returns withPages + empty array.
+        $this->stubResolverWithPages('<p>Content</p>', []);
 
         $result = $this->builder->build($newsletter, 1, false);
 
-        // Builder does NOT fail hard anymore
+        // Build itself succeeds — the pages sub-key carries the error signal.
         $this->assertTrue($result['success']);
-
-        $this->assertEquals(
-            'No pages match newsletter criteria',
-            $result['pages']['error']
-        );
+        $this->assertArrayHasKey('error', $result['pages']);
+        $this->assertEquals('No pages match newsletter criteria', $result['pages']['error']);
     }
 
-    public function testBuildManualNewsletterWithParagraph()
+    public function testPageBuilderIsNeverCalledForPagesWhenResolverSuppliesThem(): void
     {
-        $newsletter = $this->createMockNewsletter(false);
+        $newsletter = $this->makeNewsletter();
 
-        $newsletter->content = json_encode([
-            ['type' => 'paragraph', 'content' => 'Hello world']
+        // The builder must NOT call getPagesForNewsletter — pages come from the DTO.
+        $this->pageBuilderService->shouldNotReceive('getPagesForNewsletter');
+
+        $this->stubResolverWithPages('<p>html</p>', [
+            ['id' => 1, 'title' => 'T', 'subtitle' => '', 'slug' => 's'],
         ]);
 
-        $this->stubPages();
-        $this->stubResolver('<p>Hello world</p>{{UNSUBSCRIBE_LINK}}');
+        $result = $this->builder->build($newsletter, 1, false);
+
+        $this->assertTrue($result['success']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Non-AutoPages (resolver returns null pages)
+    // -------------------------------------------------------------------------
+
+    public function testBuildCustomBlocksNewsletterReturnsEmptyPagesArray(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        // Custom blocks / manual — resolver returns withoutPages.
+        $this->stubResolverWithoutPages('<p>Custom blocks content</p>{{UNSUBSCRIBE_LINK}}');
+
+        $result = $this->builder->build($newsletter, 1, false);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['pages']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Unsubscribe placeholder
+    // -------------------------------------------------------------------------
+
+    public function testBuildAddsUnsubscribePlaceholderIfMissing(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->stubResolverWithoutPages('<p>Content without placeholder</p>');
+
+        $result = $this->builder->build($newsletter, 1, false);
+
+        $this->assertStringContainsString('{{UNSUBSCRIBE_LINK}}', $result['html']);
+    }
+
+    public function testBuildPreservesExistingUnsubscribePlaceholder(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->stubResolverWithPages('Content{{UNSUBSCRIBE_LINK}}More', [
+            ['id' => 1, 'title' => 'Page', 'subtitle' => '', 'slug' => 'page'],
+        ]);
+
+        $result = $this->builder->build($newsletter, 1, false);
+
+        $this->assertEquals(1, substr_count($result['html'], '{{UNSUBSCRIBE_LINK}}'));
+    }
+
+    // -------------------------------------------------------------------------
+    // DomainException rollback contract
+    // -------------------------------------------------------------------------
+
+    public function testBuildReturnsDomainExceptionErrorShapeOnResolverThrow(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->contentResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andThrow(new \DomainException('No pages match newsletter criteria'));
+
+        $result = $this->builder->build($newsletter, 1, false);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(1, $result['newsletter_id']);
+        $this->assertSame('No pages match newsletter criteria', $result['error']);
+    }
+
+    // -------------------------------------------------------------------------
+    // HTML content pass-through
+    // -------------------------------------------------------------------------
+
+    public function testBuildReturnsHtmlFromResolver(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->stubResolverWithoutPages('<p>Hello world</p>{{UNSUBSCRIBE_LINK}}');
 
         $result = $this->builder->build($newsletter, 1, false);
 
@@ -149,206 +218,91 @@ class NewsletterContentBuilderTest extends TestCase
         $this->assertStringContainsString('<p>Hello world</p>', $result['html']);
     }
 
-    public function testBuildManualNewsletterWithHeading()
+    public function testBuildWithPreviewModePassesParameterToResolver(): void
     {
-        $newsletter = $this->createMockNewsletter(false);
+        $newsletter = $this->makeNewsletter();
 
-        $newsletter->content = json_encode([
-            ['type' => 'heading', 'level' => 2, 'content' => 'Main Title']
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver('<h2>Main Title</h2>');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('<h2>Main Title</h2>', $result['html']);
-    }
-
-    public function testBuildManualNewsletterWithImage()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            [
-                'type' => 'image',
-                'url' => 'https://example.com/image.jpg',
-                'alt' => 'Test image'
-            ]
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver('<img src="https://example.com/image.jpg" alt="Test image">');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('src="https://example.com/image.jpg"', $result['html']);
-    }
-
-    public function testBuildManualNewsletterWithList()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            [
-                'type' => 'list',
-                'items' => ['Item 1', 'Item 2', 'Item 3']
-            ]
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver('<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('<ul>', $result['html']);
-        $this->assertStringContainsString('<li>Item 1</li>', $result['html']);
-        $this->assertStringContainsString('</ul>', $result['html']);
-    }
-
-    public function testBuildManualNewsletterWithButton()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            [
-                'type' => 'button',
-                'url' => 'https://example.com',
-                'content' => 'Click me'
-            ]
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver(
-            '<a href="https://example.com">Click me</a>'
-        );
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('href="https://example.com"', $result['html']);
-        $this->assertStringContainsString('Click me', $result['html']);
-    }
-
-    public function testBuildManualNewsletterWithMultipleBlocks()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            ['type' => 'heading', 'level' => 1, 'content' => 'Newsletter Title'],
-            ['type' => 'paragraph', 'content' => 'Introduction text'],
-            ['type' => 'image', 'url' => 'image.jpg', 'alt' => 'Photo'],
-            ['type' => 'list', 'items' => ['Point 1', 'Point 2']],
-            ['type' => 'button', 'url' => '#', 'content' => 'Read more']
-        ]);
-
-        $this->stubPages();
-
-        $this->stubResolver(
-            '<h1>Newsletter Title</h1>
-        <p>Introduction text</p>
-        <img src="image.jpg" alt="Photo">
-        <ul><li>Point 1</li><li>Point 2</li></ul>
-        <a href="#">Read more</a>'
-        );
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertTrue($result['success']);
-        $this->assertStringContainsString('Newsletter Title', $result['html']);
-        $this->assertStringContainsString('Introduction text', $result['html']);
-        $this->assertStringContainsString('Read more', $result['html']);
-    }
-
-    public function testBuildHandlesInvalidJson()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-        $newsletter->content = '{invalid json';
-
-        $this->stubPages();
-        $this->stubResolver('<p>{{UNSUBSCRIBE_LINK}}</p>');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertTrue($result['success']);
-    }
-
-    public function testBuildHandlesUnknownBlockType()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            ['type' => 'unknown', 'content' => 'Some content']
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver('<div>Some content</div>');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('Some content', $result['html']);
-    }
-
-
-    public function testBuildEscapesHtmlInContent()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            ['type' => 'paragraph', 'content' => '<script>alert("xss")</script>']
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver('<p>&lt;script&gt;alert("xss")&lt;/script&gt;</p>');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('&lt;script&gt;', $result['html']);
-    }
-
-    public function testBuildAddsUnsubscribePlaceholderIfMissing()
-    {
-        $newsletter = $this->createMockNewsletter(false);
-
-        $newsletter->content = json_encode([
-            ['type' => 'paragraph', 'content' => 'Content without placeholder']
-        ]);
-
-        $this->stubPages();
-        $this->stubResolver('<p>Content without placeholder</p>');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertStringContainsString('{{UNSUBSCRIBE_LINK}}', $result['html']);
-    }
-
-    public function testBuildPreservesExistingUnsubscribePlaceholder()
-    {
-        $newsletter = $this->createMockNewsletter(true);
-
-        $this->stubPages([
-            (object)['id' => 1, 'title' => 'Page', 'subtitle' => '', 'slug' => 'page']
-        ]);
-
-        $this->stubResolver('Content{{UNSUBSCRIBE_LINK}}More');
-
-        $result = $this->builder->build($newsletter, 1, false);
-
-        $this->assertEquals(1, substr_count($result['html'], '{{UNSUBSCRIBE_LINK}}'));
-    }
-
-
-    public function testBuildWithPreviewMode()
-    {
-        $newsletter = $this->createMockNewsletter(true);
-
-        $this->stubPages([
-            (object)['id' => 1, 'title' => 'Page', 'subtitle' => '', 'slug' => 'page']
-        ]);
-
-        $this->stubResolver('<p>Preview content</p>');
+        $this->contentResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->withArgs(function (Newsletter $nl, int $siteId, $member, $token, bool $isPreview) {
+                return $isPreview === true;
+            })
+            ->andReturn(NewsletterResolveResult::withoutPages('<p>Preview</p>{{UNSUBSCRIBE_LINK}}'));
 
         $result = $this->builder->build($newsletter, 1, true);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testBuildPassesForceV2ToResolver(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->contentResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->withArgs(function (Newsletter $nl, int $siteId, $member, $token, bool $isPreview, $sendId, $branding, $layoutVersion, bool $forceV2) {
+                return $forceV2 === true;
+            })
+            ->andReturn(NewsletterResolveResult::withoutPages('<p>V2</p>{{UNSUBSCRIBE_LINK}}'));
+
+        $result = $this->builder->build($newsletter, 1, false, null, true);
+
+        $this->assertTrue($result['success']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Branding / layout repository wiring
+    // -------------------------------------------------------------------------
+
+    public function testBuildFetchesBrandingByNewsletterId(): void
+    {
+        $newsletter = $this->makeNewsletter();
+
+        $this->brandingRepository
+            ->shouldReceive('findByNewsletterId')
+            ->once()
+            ->with(1)
+            ->andReturn(null);
+
+        $this->stubResolverWithoutPages('<p>x</p>{{UNSUBSCRIBE_LINK}}');
+
+        $this->builder->build($newsletter, 1, false);
+
+        // Mockery assertion: once() above enforces the call happened.
+        $this->assertTrue(true);
+    }
+
+    public function testBuildFetchesVersionHistoryWhenLayoutIdPresent(): void
+    {
+        $newsletter = $this->makeNewsletter();
+        $newsletter->layout_id = 99;
+
+        $this->layoutRepository
+            ->shouldReceive('versionHistory')
+            ->once()
+            ->with(99)
+            ->andReturn(collect());
+
+        $this->stubResolverWithoutPages('<p>x</p>{{UNSUBSCRIBE_LINK}}');
+
+        $this->builder->build($newsletter, 1, false);
+
+        $this->assertTrue(true);
+    }
+
+    public function testBuildSkipsVersionHistoryWhenNoLayoutId(): void
+    {
+        $newsletter = $this->makeNewsletter();
+        $newsletter->layout_id = null;
+
+        $this->layoutRepository->shouldNotReceive('versionHistory');
+
+        $this->stubResolverWithoutPages('<p>x</p>{{UNSUBSCRIBE_LINK}}');
+
+        $this->builder->build($newsletter, 1, false);
+
+        $this->assertTrue(true);
     }
 }

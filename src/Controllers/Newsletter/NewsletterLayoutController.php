@@ -3,7 +3,7 @@
 namespace App\Controllers\Newsletter;
 
 use App\Controllers\Controller;
-use App\Enums\Newsletter\LayoutVersionState;
+use App\Enums\Newsletters\LayoutVersionState;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;

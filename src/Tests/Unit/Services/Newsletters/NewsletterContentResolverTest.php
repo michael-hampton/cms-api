@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Newsletters;
 
 use App\DTO\Newsletters\Layout\LayoutRegionValueObject;
+use App\DTO\Newsletters\NewsletterResolveResult;
 use App\Enums\Newsletters\ContentSourceType;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
@@ -80,7 +81,9 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('<html>custom</html>', $result);
+        $this->assertInstanceOf(NewsletterResolveResult::class, $result);
+        $this->assertSame('<html>custom</html>', $result->html);
+        $this->assertNull($result->pages);
     }
 
     public function test_custom_blocks_empty_returns_empty_string_without_rendering(): void
@@ -93,7 +96,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('', $result);
+        $this->assertSame('', $result->html);
+        $this->assertNull($result->pages);
     }
 
     // =========================================================================
@@ -107,6 +111,7 @@ class NewsletterContentResolverTest extends FunctionalTestCase
             ['type' => 'heading', 'data' => ['text' => 'Title', 'level' => 1]],
         ];
         $layoutVersion = $this->makeLayoutVersion(schemaVersion: 1);
+
         $this->pageBuilder
             ->shouldReceive('buildNewsletterHtmlFromLayoutSlots')
             ->once()
@@ -114,8 +119,10 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1, layoutVersion: $layoutVersion);
 
-        $this->assertSame('<html>v1-custom</html>', $result);
+        $this->assertSame('<html>v1-custom</html>', $result->html);
+        $this->assertNull($result->pages);
     }
+
 
     // =========================================================================
     // Custom Blocks — v2 layout
@@ -128,15 +135,10 @@ class NewsletterContentResolverTest extends FunctionalTestCase
         $blocks = [['type' => 'text', 'data' => ['paragraphs' => ['Hello']]]];
         $newsletter->content_blocks = $blocks;
 
-        $this->pageBuilder->shouldReceive('buildNewsletterHtmlFromLayoutSlots')
-            ->andReturn('<html>expected</html>');
-
         $this->renderPipeline
             ->shouldReceive('renderBody')
             ->once()
             ->withArgs(function (LayoutRegionValueObject $layout, NewsletterRenderContext $ctx) {
-
-                // Center region must have been injected with the blocks.
                 $center = $layout->getCenterRegion();
                 return $center !== null && count($center->slots) === 1;
             })
@@ -149,7 +151,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1, layoutVersion: $layoutVersion);
 
-        $this->assertSame('<html>v2-custom</html>', $result);
+        $this->assertSame('<html>v2-custom</html>', $result->html);
+        $this->assertNull($result->pages);
     }
 
     public function test_custom_blocks_v2_never_calls_slot_renderer(): void
@@ -177,7 +180,9 @@ class NewsletterContentResolverTest extends FunctionalTestCase
     public function test_auto_pages_no_layout_routes_to_page_builder(): void
     {
         $newsletter = $this->makeNewsletter(ContentSourceType::AutoPages);
-        $pages = collect([['id' => 1, 'title' => 'Page 1']]);
+        $pages = collect([
+            (object)['id' => 1, 'title' => 'Page 1', 'subtitle' => 'Sub', 'slug' => 'page-1'],
+        ]);
 
         $this->pageBuilder->shouldReceive('getPagesForNewsletter')->once()->andReturn($pages);
         $this->pageBuilder
@@ -190,7 +195,40 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('<html>auto-no-layout</html>', $result);
+        $this->assertSame('<html>auto-no-layout</html>', $result->html);
+        $this->assertNotNull($result->pages);
+        $this->assertCount(1, $result->pages);
+        $this->assertSame('Page 1', $result->pages[0]['title']);
+    }
+
+    public function test_auto_pages_no_layout_maps_pages_correctly(): void
+    {
+        $newsletter = $this->makeNewsletter(ContentSourceType::AutoPages);
+        $pages = collect([
+            (object)['id' => 7, 'title' => 'My Page', 'subtitle' => 'My Sub', 'slug' => 'my-page'],
+        ]);
+
+        $this->pageBuilder->shouldReceive('getPagesForNewsletter')->andReturn($pages);
+        $this->pageBuilder->shouldReceive('buildNewsletterHtml')->andReturn('');
+
+        $result = $this->resolver->resolve($newsletter, siteId: 1);
+
+        $this->assertSame([
+            ['id' => 7, 'title' => 'My Page', 'subtitle' => 'My Sub', 'slug' => 'my-page'],
+        ], $result->pages);
+    }
+
+    public function test_auto_pages_returns_empty_pages_array_when_no_pages_found(): void
+    {
+        $newsletter = $this->makeNewsletter(ContentSourceType::AutoPages);
+
+        $this->pageBuilder->shouldReceive('getPagesForNewsletter')->andReturn(collect([]));
+        $this->pageBuilder->shouldReceive('buildNewsletterHtml')->andReturn('');
+
+        $result = $this->resolver->resolve($newsletter, siteId: 1);
+
+        $this->assertNotNull($result->pages);
+        $this->assertSame([], $result->pages);
     }
 
     // =========================================================================
@@ -211,7 +249,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1, layoutVersion: $layoutVersion);
 
-        $this->assertSame('<html>auto-v1</html>', $result);
+        $this->assertSame('<html>auto-v1</html>', $result->html);
+        $this->assertNotNull($result->pages);
     }
 
     // =========================================================================
@@ -222,9 +261,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
     {
         $newsletter = $this->makeNewsletter(ContentSourceType::AutoPages);
         $layoutVersion = $this->makeLayoutVersion(schemaVersion: 2);
-        $pages = collect([['id' => 1, 'title' => 'Page 1', 'slug' => 'page-1']]);
+        $pages = collect([(object)['id' => 1, 'title' => 'Page 1', 'subtitle' => 'Sub', 'slug' => 'page-1']]);
         $blocks = [['type' => 'page_card', 'data' => ['id' => 1]]];
-        $newsletter->content_blocks = $blocks;
 
         $this->pageBuilder->shouldReceive('getPagesForNewsletter')->once()->andReturn($pages);
         $this->pageBuilder
@@ -240,14 +278,33 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1, layoutVersion: $layoutVersion);
 
-        $this->assertSame('<html>auto-v2</html>', $result);
+        $this->assertSame('<html>auto-v2</html>', $result->html);
+        $this->assertNotNull($result->pages);
+        $this->assertCount(1, $result->pages);
+    }
+
+    public function test_auto_pages_v2_pages_fetched_only_once(): void
+    {
+        // getPagesForNewsletter must be called exactly once even though it feeds
+        // both convertPagesToBlocks and the returned pages DTO.
+        $newsletter = $this->makeNewsletter(ContentSourceType::AutoPages);
+        $layoutVersion = $this->makeLayoutVersion(schemaVersion: 2);
+
+        $this->pageBuilder->shouldReceive('getPagesForNewsletter')->once()->andReturn(collect([]));
+        $this->pageBuilder->shouldReceive('convertPagesToBlocks')->andReturn([]);
+        $this->renderPipeline->shouldReceive('renderBody')->andReturn('');
+        $this->pageBuilder->shouldReceive('buildTemplate')->andReturn('');
+
+        $this->resolver->resolve($newsletter, siteId: 1, layoutVersion: $layoutVersion);
+
+        $this->assertTrue(true); // Mockery once() enforces the constraint.
     }
 
     public function test_auto_pages_v2_passes_send_id_to_convert(): void
     {
         $newsletter = $this->makeNewsletter(ContentSourceType::AutoPages);
         $layoutVersion = $this->makeLayoutVersion(schemaVersion: 2);
-        $pages = collect([['id' => 1, 'title' => 'P', 'slug' => 's']]);
+        $pages = collect([(object)['id' => 1, 'title' => 'P', 'subtitle' => '', 'slug' => 's']]);
 
         $this->pageBuilder->shouldReceive('getPagesForNewsletter')->andReturn($pages);
         $this->pageBuilder
@@ -303,8 +360,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('<html>legacy</html>', $result);
-        $this->assertTrue(true);
+        $this->assertSame('<html>legacy</html>', $result->html);
+        $this->assertNull($result->pages);
     }
 
     public function test_legacy_falls_back_to_content_column_when_no_legacy_content(): void
@@ -323,8 +380,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('<html>fallback</html>', $result);
-        $this->assertTrue(true);
+        $this->assertSame('<html>fallback</html>', $result->html);
+        $this->assertNull($result->pages);
     }
 
     public function test_legacy_empty_content_returns_empty_string(): void
@@ -338,7 +395,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('', $result);
+        $this->assertSame('', $result->html);
+        $this->assertNull($result->pages);
     }
 
     public function test_legacy_whitespace_only_returns_empty_string(): void
@@ -350,7 +408,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('', $result);
+        $this->assertSame('', $result->html);
+        $this->assertNull($result->pages);
     }
 
     // =========================================================================
@@ -369,8 +428,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1, layoutVersion: $layoutVersion);
 
-        $this->assertSame('<html>legacy-v2</html>', $result);
-        $this->assertTrue(true);
+        $this->assertSame('<html>legacy-v2</html>', $result->html);
+        $this->assertNull($result->pages);
     }
 
     // =========================================================================
@@ -382,7 +441,6 @@ class NewsletterContentResolverTest extends FunctionalTestCase
         $newsletter = $this->makeNewsletter(ContentSourceType::CustomBlocks);
         $layoutVersion = $this->makeLayoutVersion(schemaVersion: 2);
         $newsletter->content_blocks = [['type' => 'text', 'data' => []]];
-
 
         $this->renderPipeline
             ->shouldReceive('renderBody')
@@ -444,7 +502,6 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
     public function test_unknown_content_type_falls_back_to_manual_path(): void
     {
-        // content_type that doesn't match any enum value → tryFrom returns null → falls back to Manual
         $newsletter = $this->makeNewsletter(ContentSourceType::Manual);
         $newsletter->content_type = 'garbage_type';
         $newsletter->legacy_content = 'Some text.';
@@ -457,8 +514,8 @@ class NewsletterContentResolverTest extends FunctionalTestCase
 
         $result = $this->resolver->resolve($newsletter, siteId: 1);
 
-        $this->assertSame('<html>fallback-manual</html>', $result);
-        $this->assertTrue(true);
+        $this->assertSame('<html>fallback-manual</html>', $result->html);
+        $this->assertNull($result->pages);
     }
 
     // =========================================================================

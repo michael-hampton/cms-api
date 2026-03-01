@@ -2,7 +2,6 @@
 
 namespace App\Services\Newsletter;
 
-use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
@@ -16,72 +15,20 @@ class NewsletterContentBuilder
         private readonly NewsletterPageBuilderService $pageBuilderService,
         private readonly NewsletterBrandingRepository $newsletterBrandingRepository,
         private readonly NewsletterLayoutRepository $newsletterLayoutRepository,
-        private readonly NewsletterContentResolver  $contentResolver
+        private readonly NewsletterContentResolver  $contentResolver,
     )
     {
     }
 
     public function build(Newsletter $newsletter, int $siteId, bool $isPreview, ?Member $member = null, bool $forceV2 = false): array
     {
-        /*$pages = [];
-        $baseHtml = '';
-
-        if ($newsletter->isAutomated()) {
-            $pagesCollection = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
-
-            if ($pagesCollection->isEmpty()) {
-                return [
-                    'success' => false,
-                    'newsletter_id' => $newsletter->id,
-                    'error' => 'No pages match newsletter criteria'
-                ];
-            }
-
-            $pages = $pagesCollection->map(fn($p) => [
-                'id' => $p->id,
-                'title' => $p->title,
-                'subtitle' => $p->subtitle,
-                'slug' => $p->slug,
-            ])->toArray();
-
-            $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
-
-            $versions = $newsletter->layout_id ? $this->newsletterLayoutRepository->versionHistory($newsletter->layout_id) : null;
-
-            // Build HTML with placeholder
-            $baseHtml = $this->pageBuilderService->buildNewsletterHtml(
-                $newsletter,
-                $pagesCollection,
-                $member,
-                null,
-                $isPreview,
-                null,
-                $siteId,
-                $branding,
-                $versions?->last()
-            );
-        } else {
-            $blocks = $this->parseNewsletterContent($newsletter->content);
-            $baseHtml = $this->renderBlocksToHtml($blocks);
-        }
-
-        // Ensure unsubscribe placeholder exists
-        if (!str_contains($baseHtml, self::UNSUBSCRIBE_PLACEHOLDER)) {
-            $baseHtml .= "\n" . self::UNSUBSCRIBE_PLACEHOLDER;
-        }
-
-        return [
-            'success' => true,
-            'html' => $baseHtml,
-            'pages' => $pages
-        ];*/
         $branding = $this->newsletterBrandingRepository->findByNewsletterId($newsletter->id);
         $layoutVersion = $newsletter->layout_id
             ? $this->newsletterLayoutRepository->versionHistory($newsletter->layout_id)?->last()
             : null;
 
         try {
-            $baseHtml = $this->contentResolver->resolve(
+            $result = $this->contentResolver->resolve(
                 newsletter: $newsletter,
                 siteId: $siteId,
                 member: $member,
@@ -90,19 +37,8 @@ class NewsletterContentBuilder
                 sendId: null,
                 branding: $branding,
                 layoutVersion: $layoutVersion,
-                forceV2: $forceV2
+                forceV2: $forceV2,
             );
-
-            // Ensure unsubscribe placeholder exists
-            if (!str_contains($baseHtml, self::UNSUBSCRIBE_PLACEHOLDER)) {
-                $baseHtml .= "\n" . self::UNSUBSCRIBE_PLACEHOLDER;
-            }
-
-            return [
-                'success' => true,
-                'html' => $baseHtml,
-                'pages' => $this->getPagesForNewsletter($newsletter, $siteId)
-            ];
         } catch (\DomainException $e) {
             // Auto-pages newsletters with no matching pages — preserve existing error contract
             return [
@@ -111,98 +47,47 @@ class NewsletterContentBuilder
                 'error' => $e->getMessage(),
             ];
         }
-    }
 
-    private function getPagesForNewsletter(Newsletter $newsletter, int $siteId)
-    {
-        $pagesCollection = $this->pageBuilderService->getPagesForNewsletter($newsletter, $siteId);
+        $html = $result->html;
 
-        if ($pagesCollection->isEmpty()) {
-            return [
-                'success' => false,
-                'newsletter_id' => $newsletter->id,
-                'error' => 'No pages match newsletter criteria'
-            ];
+        // Ensure unsubscribe placeholder exists
+        if (!str_contains($html, self::UNSUBSCRIBE_PLACEHOLDER)) {
+            $html .= "\n" . self::UNSUBSCRIBE_PLACEHOLDER;
         }
 
-        return $pagesCollection->map(fn($p) => [
-            'id' => $p->id,
-            'title' => $p->title,
-            'subtitle' => $p->subtitle,
-            'slug' => $p->slug,
-        ])->toArray();
+        // Use pages already resolved by the resolver — no second DB call.
+        $pages = $this->buildPagesResponse($newsletter, $result->pages);
+
+        return [
+            'success' => true,
+            'html' => $html,
+            'pages' => $pages,
+        ];
     }
 
-    private function parseNewsletterContent(string $content): array
-    {
-        $decoded = json_decode($content, true);
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            Logger::warning('Failed to decode newsletter content', [
-                'json_error' => json_last_error_msg(),
-                'content_length' => strlen($content)
-            ]);
+    /**
+     * When the resolver already fetched pages (AutoPages content type), use them
+     * directly. For all other content types pages is null — there are no pages to
+     * surface, so return an empty array rather than making a redundant DB call.
+     */
+    private function buildPagesResponse(Newsletter $newsletter, ?array $resolvedPages): array
+    {
+        if ($resolvedPages === null) {
             return [];
         }
 
-        return is_array($decoded) ? $decoded : [];
-    }
-
-    private function renderBlocksToHtml(array $blocks): string
-    {
-        $html = [];
-
-        foreach ($blocks as $block) {
-            $type = $block['type'] ?? 'paragraph';
-            $content = $block['content'] ?? '';
-
-            $html[] = match ($type) {
-                'heading' => $this->renderHeading($block),
-                'paragraph' => $this->renderParagraph($content),
-                'image' => $this->renderImage($block),
-                'list' => $this->renderList($block),
-                'button' => $this->renderButton($block),
-                default => "<div>" . htmlspecialchars($content) . "</div>"
-            };
+        if (empty($resolvedPages)) {
+            return [
+                'success' => false,
+                'newsletter_id' => $newsletter->id,
+                'error' => 'No pages match newsletter criteria',
+            ];
         }
 
-        return implode("\n", $html);
-    }
-
-    private function renderHeading(array $block): string
-    {
-        $level = $block['level'] ?? 2;
-        $content = htmlspecialchars($block['content'] ?? '');
-        return "<h{$level}>{$content}</h{$level}>";
-    }
-
-    private function renderParagraph(string $content): string
-    {
-        return "<p>" . htmlspecialchars($content) . "</p>";
-    }
-
-    private function renderImage(array $block): string
-    {
-        $url = htmlspecialchars($block['url'] ?? '');
-        $alt = htmlspecialchars($block['alt'] ?? '');
-        return "<img src=\"{$url}\" alt=\"{$alt}\" style=\"max-width: 100%;\">";
-    }
-
-    private function renderList(array $block): string
-    {
-        $items = $block['items'] ?? [];
-        $html = '<ul>';
-        foreach ($items as $item) {
-            $html .= '<li>' . htmlspecialchars($item) . '</li>';
-        }
-        $html .= '</ul>';
-        return $html;
-    }
-
-    private function renderButton(array $block): string
-    {
-        $url = htmlspecialchars($block['url'] ?? '#');
-        $text = htmlspecialchars($block['content'] ?? '');
-        return "<a href=\"{$url}\" style=\"display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;\">{$text}</a>";
+        return $resolvedPages;
     }
 }

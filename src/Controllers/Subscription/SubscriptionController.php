@@ -40,25 +40,6 @@ class SubscriptionController extends Controller
 
     public function payments()
     {
-        /**
-         * id: number;
-         * subscription_id: number | null;
-         * order_id: number | null;
-         * site_id: number;
-         * amount: number;
-         * currency: string;
-         * status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded';
-         * payment_method: string;
-         * transaction_id: string | null;
-         * payment_intent_id: string | null;
-         * error_message: string | null;
-         * error_data: any;
-         * paid_at: string | null;
-         * created_at: string;
-         * updated_at: string;
-         * subscription?: Subscription;
-         */
-
         try {
             $result = $this->paymentRepository->getAllPayments();
             return $this->resourceResponse(['payments' => $result->map(function ($payment) {

@@ -25,6 +25,7 @@ use App\Search\SearchEngine;
 use App\Services\Cms\CampaignService;
 use App\Services\EmailVerificationService;
 use App\Services\Newsletter\NewsletterContentService;
+use App\Services\Newsletter\NewsletterIssueService;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\NewsletterSignupService;
 use App\Services\Newsletter\NewsletterStatisticsService;
@@ -44,6 +45,7 @@ class NewsletterController extends Controller
         private readonly NewsletterSendRecipientRepository $newsletterSendRecipientRepository,
         private readonly NewsletterStatisticsService $newsletterService,
         private readonly NewsletterContentService    $contentService,
+        private readonly NewsletterIssueService $newsletterIssueService
     )
     {
         parent::__construct();
@@ -641,6 +643,107 @@ class NewsletterController extends Controller
 
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    // =========================================================================
+    // Issues
+    // =========================================================================
+
+    /**
+     * Create a new issue (draft) for a newsletter.
+     *
+     * POST /api/newsletters/{id}/issues
+     *
+     * Body (all optional):
+     *   subject        string   — defaults to newsletter title
+     *   content_blocks array    — validated block payload; omit to use newsletter's own content
+     *   scheduled_at   datetime — ISO 8601 future timestamp
+     */
+    public function createIssue(Request $request, int $id): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $newsletter = $this->newsletterRepository->find($id);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            $issue = $this->newsletterIssueService->createIssue($id, $siteId, [
+                'subject' => $request->input('subject'),
+                'content_blocks' => $request->input('content_blocks'),
+                'scheduled_at' => $request->input('scheduled_at'),
+            ]);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'issue' => $issue->toArray(),
+            ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        } catch (\Exception $e) {
+            Logger::error('Failed to create newsletter issue', [
+                'newsletter_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->errorResponse('Failed to create issue: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Send an existing issue to all eligible recipients.
+     *
+     * POST /api/newsletters/{id}/issues/{issueId}/send
+     *
+     * Issues that have already been sent return a 409 Conflict.
+     * Issues belonging to a different newsletter or site return 404.
+     */
+    public function sendIssue(Request $request, int $id, int $issueId): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $newsletter = $this->newsletterRepository->find($id);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            $result = $this->newsletterIssueService->sendIssue(
+                $issueId,
+                $siteId,
+                MemberAuth::getMember()
+            );
+
+            if (!$result['success'] && empty($result['partial_failure'])) {
+                return $this->errorResponse($result['error'] ?? 'Send failed', 400);
+            }
+
+            return $this->successResponse('Issue sent successfully', [
+                'issue_id' => $issueId,
+                'newsletter_id' => $id,
+                'send_id' => $result['send_id'] ?? null,
+                'sent_to' => $result['recipients'] ?? 0,
+                'failed' => $result['failed'] ?? 0,
+                'partial' => !empty($result['partial_failure']),
+            ]);
+        } catch (\DomainException $e) {
+            // Issue already sent — 409 Conflict is the correct status.
+            return $this->errorResponse($e->getMessage(), 409);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        } catch (\Exception $e) {
+            Logger::error('Failed to send newsletter issue', [
+                'newsletter_id' => $id,
+                'issue_id' => $issueId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse('Failed to send issue: ' . $e->getMessage(), 500);
         }
     }
 }
