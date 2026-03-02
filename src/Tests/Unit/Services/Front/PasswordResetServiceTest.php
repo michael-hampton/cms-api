@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Front;
 
 use App\Models\Member;
+use App\Repositories\Members\MemberRepository;
 use App\Services\PasswordResetService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
@@ -13,7 +14,7 @@ class PasswordResetServiceTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new PasswordResetService();
+        $this->service = new PasswordResetService(app(MemberRepository::class));
         $_SESSION['site_id'] = $this->siteId;
     }
 

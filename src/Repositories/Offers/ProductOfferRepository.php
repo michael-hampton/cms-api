@@ -262,7 +262,10 @@ class ProductOfferRepository extends Repository
 
         // Minimum discount filter
         if (!empty($filters['min_discount'])) {
-            $query->where('discount_percentage', '>=', $filters['min_discount']);
+            $query->whereRaw(
+                'original_price > 0 AND ((original_price - sale_price) / original_price) * 100 >= :min_discount',
+                ['min_discount' => $filters['min_discount']]
+            );
         }
 
         // Price range filter
@@ -295,6 +298,8 @@ class ProductOfferRepository extends Repository
         // Pagination
         $perPage = min($filters['per_page'] ?? 20, 100); // Max 100 per page
         $page = $filters['page'] ?? 1;
+
+        //dd($query->toSql());
 
         $total = $query->count();
         $offers = $query->offset(($page - 1) * $perPage)

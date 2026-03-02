@@ -50,6 +50,32 @@
             </div>
         </div>
 
+        <div class="footer-newsletter">
+            <h3 class="footer-heading">Stay in the loop</h3>
+            <p class="footer-newsletter-desc">Get our latest articles and offers delivered straight to your inbox. No
+                spam, ever.</p>
+            <form class="footer-newsletter-form" id="footer-newsletter-form">
+                <div class="footer-newsletter-input-wrap">
+                    <input
+                            type="email"
+                            name="email"
+                            class="footer-newsletter-input"
+                            placeholder="your@email.com"
+                            required
+                            autocomplete="email"
+                    />
+                    <button type="submit" class="footer-newsletter-btn" aria-label="Subscribe">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="footer-newsletter-status" id="footer-newsletter-status" aria-live="polite"></p>
+            </form>
+        </div>
+
         <div class="footer-col">
             <h3 class="footer-heading">Company</h3>
             <ul class="footer-links">
@@ -126,7 +152,7 @@
         margin: 0 auto;
         padding: 72px 32px 48px;
         display: grid;
-        grid-template-columns: 2fr 1fr 1fr 1fr;
+        grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
         gap: 48px;
     }
 
@@ -318,4 +344,142 @@
             padding: 20px 24px 24px;
         }
     }
+
+    /* ─── Newsletter ─────────────────────────────────────────────── */
+    .footer-newsletter {
+        padding-top: 4px;
+    }
+
+    .footer-newsletter-desc {
+        font-size: 13.5px;
+        font-weight: 300;
+        color: var(--footer-muted);
+        line-height: 1.6;
+        margin: 0 0 20px;
+    }
+
+    .footer-newsletter-input-wrap {
+        display: flex;
+        align-items: center;
+        border: 1px solid var(--footer-border);
+        border-radius: 10px;
+        overflow: hidden;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        background: #fff;
+    }
+
+    .footer-newsletter-input-wrap:focus-within {
+        border-color: var(--footer-hover);
+        box-shadow: 0 0 0 3px rgba(107, 91, 69, 0.1);
+    }
+
+    .footer-newsletter-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        padding: 11px 14px;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 13.5px;
+        color: var(--footer-text);
+        background: transparent;
+    }
+
+    .footer-newsletter-input::placeholder {
+        color: var(--footer-muted);
+        opacity: 0.7;
+    }
+
+    .footer-newsletter-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        background: var(--footer-hover);
+        border: none;
+        cursor: pointer;
+        color: #fff;
+        transition: background 0.2s ease;
+    }
+
+    .footer-newsletter-btn:hover {
+        background: var(--footer-accent);
+    }
+
+    .footer-newsletter-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .footer-newsletter-status {
+        margin: 10px 0 0;
+        font-size: 12.5px;
+        min-height: 18px;
+        font-weight: 400;
+    }
+
+    .footer-newsletter-status.success {
+        color: #4a7c59;
+    }
+
+    .footer-newsletter-status.error {
+        color: #b94a48;
+    }
+
+    @media (max-width: 900px) {
+        .footer-inner {
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .footer-brand,
+        .footer-newsletter {
+            grid-column: 1 / -1;
+        }
+    }
 </style>
+
+<script>
+    (function () {
+        const form = document.getElementById('footer-newsletter-form');
+        const status = document.getElementById('footer-newsletter-status');
+
+        if (!form) return;
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const email = form.querySelector('input[name="email"]').value.trim();
+            const btn = form.querySelector('.footer-newsletter-btn');
+
+            btn.disabled = true;
+            status.textContent = '';
+            status.className = 'footer-newsletter-status';
+
+            try {
+                const res = await fetch('/api/newsletter/signup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email})
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    status.textContent = 'You\'re in! Check your inbox to confirm.';
+                    status.classList.add('success');
+                    form.reset();
+                } else {
+                    status.textContent = data.error || data.message || 'Something went wrong. Please try again.';
+                    status.classList.add('error');
+                }
+            } catch (_) {
+                status.textContent = 'Network error. Please try again.';
+                status.classList.add('error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    })();
+</script>

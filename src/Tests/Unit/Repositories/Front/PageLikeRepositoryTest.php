@@ -30,7 +30,7 @@ class PageLikeRepositoryTest extends FunctionalTestCase
         $result = $this->repository->toggleLike($this->page->id, $this->member->id, $this->siteId);
 
         $this->assertTrue($result['liked']);
-        $this->assertEquals(1, $result['like_count']);
+        $this->assertEquals(1, $result['count']);
 
         // Toggle again to unlike
         $result = $this->repository->toggleLike($this->page->id, $this->member->id, $this->siteId);

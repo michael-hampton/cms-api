@@ -109,7 +109,7 @@ class NewsletterSendServiceTest extends TestCase
 
         $this->mockContentBuilder->shouldReceive('build')
             ->once()
-            ->with($newsletter, $siteId, false, null)
+            ->with($newsletter, $siteId, false, null, true)
             ->andReturn($contentResult);
 
         $this->mockRecipientResolver->shouldReceive('resolveForNewsletter')
@@ -352,7 +352,7 @@ class NewsletterSendServiceTest extends TestCase
 
         $this->mockContentBuilder->shouldReceive('build')
             ->once()
-            ->with($newsletter, $siteId, true, null)
+            ->with($newsletter, $siteId, true, null, true)
             ->andReturn([
                 'success' => true,
                 'html' => 'content',
@@ -567,6 +567,264 @@ class NewsletterSendServiceTest extends TestCase
         $this->assertEquals('skipped@example.com', $result['skipped'][0]['email']);
         $this->assertEquals('Marketing emails disabled in global settings', $result['skipped'][0]['reason']);
     }
+
+    public function test_send_to_custom_emails_dispatches_to_provided_addresses(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+        $customEmails = ['alice@example.com', 'bob@example.com'];
+        $snapshot = $this->createMockSnapshot();
+        $sendRecord = $this->createMockSendRecord();
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->once()
+            ->andReturn(['success' => true, 'html' => 'content', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->once()->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')->once()->andReturn('token-abc');
+
+        $this->mockSendRepository->shouldReceive('create')
+            ->once()
+            ->withArgs(fn($data) => $data['recipient_count'] === 2)
+            ->andReturn($sendRecord);
+
+        $recipients = [(object)['id' => 1], (object)['id' => 2]];
+        $this->mockRecipientRepository->shouldReceive('createRecipients')
+            ->once()
+            ->with($sendRecord->id, $customEmails)
+            ->andReturn($recipients);
+
+        $this->mockDispatcher->shouldReceive('dispatch')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->once()
+            ->andReturn(['sent' => 2, 'failed' => 0, 'pending' => 0]);
+
+        $result = $this->service->sendToCustomEmails($newsletter, $customEmails, 1);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(2, $result['recipients']);
+        $this->assertEquals(0, $result['failed']);
+        $this->assertEquals($sendRecord->id, $result['send_id']);
+        $this->assertEquals($snapshot->id, $result['snapshot_id']);
+    }
+
+    public function test_send_to_custom_emails_creates_snapshot_and_injects_token(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+        $snapshot = $this->createMockSnapshot();
+        $token = 'custom-view-token-xyz';
+        $placeholder = NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER;
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->andReturn(['success' => true, 'html' => 'Before ' . $placeholder . ' After', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->once()->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')
+            ->with($snapshot->id)
+            ->andReturn($token);
+
+        // Both the stored HTML and the dispatched HTML must carry the injected token
+        $this->mockSendRepository->shouldReceive('create')
+            ->once()
+            ->withArgs(function ($data) use ($token, $placeholder) {
+                return str_contains($data['html_snapshot'], $token)
+                    && !str_contains($data['html_snapshot'], $placeholder);
+            })
+            ->andReturn($this->createMockSendRecord());
+
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
+
+        $this->mockDispatcher->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(function ($send, $recipients, $newsletter, $siteId, $html) use ($token, $placeholder) {
+                return str_contains($html, $token) && !str_contains($html, $placeholder);
+            })
+            ->andReturn(['success' => true]);
+
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
+
+        $this->service->sendToCustomEmails($newsletter, ['alice@example.com'], 1);
+        $this->assertTrue(true);
+    }
+
+    public function test_send_to_custom_emails_is_wrapped_in_transaction(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+        $snapshot = $this->createMockSnapshot();
+        $txCalled = false;
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->andReturn(['success' => true, 'html' => 'content', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($cb) use (&$txCalled) {
+                $txCalled = true;
+                return $cb();
+            });
+
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')->andReturn('token');
+        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
+        $this->mockDispatcher->shouldReceive('dispatch')->andReturn(['success' => true]);
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
+
+        $this->service->sendToCustomEmails($newsletter, ['alice@example.com'], 1);
+
+        $this->assertTrue($txCalled, 'sendToCustomEmails must execute inside a transaction');
+    }
+
+    public function test_send_to_custom_emails_returns_failure_when_content_build_fails(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->once()
+            ->andReturn(['success' => false, 'error' => 'Template error']);
+
+        // No transaction, snapshot, or dispatch should occur
+        $this->mockDatabase->shouldNotReceive('transaction');
+        $this->mockSnapshotRepository->shouldNotReceive('createSnapshot');
+        $this->mockDispatcher->shouldNotReceive('dispatch');
+
+        $result = $this->service->sendToCustomEmails($newsletter, ['alice@example.com'], 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Template error', $result['error']);
+    }
+
+    public function test_send_to_custom_emails_returns_failure_for_empty_list(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+
+        $this->mockContentBuilder->shouldNotReceive('build');
+
+        $result = $this->service->sendToCustomEmails($newsletter, [], 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('No recipient', $result['error']);
+    }
+
+    public function test_send_to_custom_emails_returns_failure_for_invalid_email(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+
+        $this->mockContentBuilder->shouldNotReceive('build');
+
+        $result = $this->service->sendToCustomEmails($newsletter, ['not-an-email'], 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Invalid email address', $result['error']);
+    }
+
+    public function test_send_to_custom_emails_reports_partial_failure(): void
+    {
+        $newsletter = $this->createMockNewsletter();
+        $snapshot = $this->createMockSnapshot();
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->andReturn(['success' => true, 'html' => 'content', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')->andReturn('token');
+        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
+        $this->mockDispatcher->shouldReceive('dispatch')->andReturn(['success' => false]);
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->andReturn(['sent' => 1, 'failed' => 1, 'pending' => 0]);
+
+        $result = $this->service->sendToCustomEmails(
+            $newsletter,
+            ['alice@example.com', 'bob@example.com'],
+            1
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['partial_failure']);
+    }
+
+    public function test_send_to_custom_emails_does_not_update_newsletter_last_sent(): void
+    {
+        // sendToCustomEmails is an out-of-band blast — it must NOT update
+        // last_sent, which would incorrectly block the next scheduled send.
+        $newsletter = $this->createMockNewsletter();
+        $snapshot = $this->createMockSnapshot();
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->andReturn(['success' => true, 'html' => 'content', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')->andReturn('token');
+        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
+        $this->mockDispatcher->shouldReceive('dispatch')->andReturn(['success' => true]);
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
+
+        $this->mockNewsletterRepository->shouldNotReceive('update');
+
+        $this->service->sendToCustomEmails($newsletter, ['alice@example.com'], 1);
+        $this->assertTrue(true);
+    }
+
+    public function test_send_to_custom_emails_does_not_check_duplicate_send_guard(): void
+    {
+        // A newsletter sent 10 minutes ago would be blocked by sendNewsletter's
+        // duplicate guard. sendToCustomEmails must bypass it.
+        $newsletter = $this->createMockNewsletter();
+        $newsletter->last_sent = (new \DateTimeImmutable('-10 minutes'))->format('Y-m-d H:i:s');
+        $snapshot = $this->createMockSnapshot();
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->andReturn(['success' => true, 'html' => 'content', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')->andReturn('token');
+        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
+        $this->mockDispatcher->shouldReceive('dispatch')->andReturn(['success' => true]);
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
+
+        $result = $this->service->sendToCustomEmails($newsletter, ['alice@example.com'], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_send_to_custom_emails_does_not_use_recipient_resolver(): void
+    {
+        // Recipients are provided explicitly — subscriber resolution must not run.
+        $newsletter = $this->createMockNewsletter();
+        $snapshot = $this->createMockSnapshot();
+
+        $this->mockRecipientResolver->shouldNotReceive('resolveForNewsletter');
+
+        $this->mockContentBuilder->shouldReceive('build')
+            ->andReturn(['success' => true, 'html' => 'content', 'pages' => []]);
+
+        $this->mockDatabase->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->mockSnapshotRepository->shouldReceive('createSnapshot')->andReturn($snapshot);
+        $this->mockViewTokenService->shouldReceive('generateTokenForSnapshot')->andReturn('token');
+        $this->mockSendRepository->shouldReceive('create')->andReturn($this->createMockSendRecord());
+        $this->mockRecipientRepository->shouldReceive('createRecipients')->andReturn([]);
+        $this->mockDispatcher->shouldReceive('dispatch')->andReturn(['success' => true]);
+        $this->mockRecipientRepository->shouldReceive('getStatistics')
+            ->andReturn(['sent' => 1, 'failed' => 0, 'pending' => 0]);
+
+        $this->service->sendToCustomEmails($newsletter, ['alice@example.com'], 1);
+        $this->assertTrue(true);
+    }
+
 
     private function createMockNewsletter(): Newsletter
     {

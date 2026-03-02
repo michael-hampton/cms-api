@@ -12,6 +12,17 @@ class NewsletterIssueRepository
         return NewsletterIssue::find($id);
     }
 
+    public function findOrFail(int $id): NewsletterIssue
+    {
+        $issue = $this->find($id);
+
+        if ($issue === null) {
+            throw new \RuntimeException("NewsletterIssue {$id} not found.");
+        }
+
+        return $issue;
+    }
+
     public function create(array $data): NewsletterIssue
     {
         return NewsletterIssue::create($data);
@@ -38,5 +49,15 @@ class NewsletterIssueRepository
         return NewsletterIssue::where('newsletter_id', $newsletterId)
             ->whereIn('status', ['draft', 'ready'])
             ->get();
+    }
+
+    /**
+     * Return the highest issue_number for a given newsletter, or 0 if none exist.
+     * Used to derive the next sequential number on creation.
+     */
+    public function getMaxIssueNumber(int $newsletterId): int
+    {
+        return (int)NewsletterIssue::where('newsletter_id', $newsletterId)
+            ->max('issue_number');
     }
 }

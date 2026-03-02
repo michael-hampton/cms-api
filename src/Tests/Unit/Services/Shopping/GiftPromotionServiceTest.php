@@ -9,7 +9,6 @@ use App\Services\Shopping\GiftPromotionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
 class GiftPromotionServiceTest extends FunctionalTestCase
 {
@@ -74,7 +73,7 @@ class GiftPromotionServiceTest extends FunctionalTestCase
         $promotion = new GiftPromotion();
 
         $this->repository
-            ->shouldReceive('findByIdOrFail')
+            ->shouldReceive('find')
             ->with(1)
             ->andReturn($promotion);
 
@@ -96,18 +95,20 @@ class GiftPromotionServiceTest extends FunctionalTestCase
     {
         $promotion = new GiftPromotion();
         $promotion->is_active = false;
+        $promotion->id = 1;
 
         $this->repository
-            ->shouldReceive('findByIdOrFail')
+            ->shouldReceive('find')
             ->andReturn($promotion);
 
         $this->repository
-            ->shouldReceive('save')
-            ->once();
+            ->shouldReceive('update')
+            ->with(1, ['active' => true])
+            ->once()
+            ->andReturn($promotion);
 
         $result = $this->service->toggleActive(1);
-
-        $this->assertTrue($result->is_active);
+        $this->assertInstanceOf(GiftPromotion::class, $result);
     }
 
     public function test_is_eligible_for_issue_returns_false_when_inactive(): void
@@ -142,7 +143,7 @@ class GiftPromotionServiceTest extends FunctionalTestCase
     public function test_is_eligible_for_issue_returns_true_when_valid(): void
     {
         $promotion = Mockery::mock(GiftPromotion::class)->makePartial();
-        $promotion->is_active = true;
+        $promotion->active = true;
 
         $promotion
             ->shouldReceive('supportsIssueExclusions')

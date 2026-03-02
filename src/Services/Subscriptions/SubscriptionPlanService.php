@@ -73,15 +73,13 @@ class SubscriptionPlanService
         }
 
         if (isset($data['price'])) {
-            $priceCents = is_float($data['price'])
-                ? (int)round($data['price'] * 100)
-                : (int)$data['price'];
+            $price = (float)$data['price'];
 
-            if ($priceCents < 0) {
+            if ($price < 0) {
                 throw new \InvalidArgumentException('Price cannot be negative');
             }
 
-            $prepared['price'] = $priceCents / 100;
+            $prepared['price'] = round($price, 2);
         }
 
         if (isset($data['currency'])) {
@@ -132,6 +130,58 @@ class SubscriptionPlanService
             $prepared['sort_order'] = (int)$data['sort_order'];
         }
 
+        if (isset($data['digital_download_url'])) {
+            $prepared['digital_download_url'] = $data['digital_download_url'];
+        }
+
+        if (isset($data['print_shipping_required'])) {
+            $prepared['print_shipping_required'] = (bool)$data['print_shipping_required'];
+        }
+
+        if (isset($data['includes_insider'])) {
+            $prepared['includes_insider'] = (bool)$data['includes_insider'];
+        }
+
+        if (isset($data['is_upgrade_option'])) {
+            $prepared['is_upgrade_option'] = (bool)$data['is_upgrade_option'];
+        }
+
+        if (isset($data['upgrade_from_plan_id'])) {
+            $prepared['upgrade_from_plan_id'] = $data['upgrade_from_plan_id'] !== null
+                ? (int)$data['upgrade_from_plan_id']
+                : null;
+        }
+
+        if (isset($data['dispatch_days'])) {
+            $prepared['dispatch_days'] = (int)$data['dispatch_days'];
+        }
+
+        if (isset($data['release_date'])) {
+            $prepared['release_date'] = $data['release_date'];
+        }
+
+        if (isset($data['pre_release_enabled'])) {
+            $prepared['pre_release_enabled'] = (bool)$data['pre_release_enabled'];
+        }
+
+        if (isset($data['categories'])) {
+            $prepared['categories'] = is_array($data['categories'])
+                ? $data['categories']
+                : json_decode($data['categories'], true);
+        }
+
+        if (isset($data['tags'])) {
+            $prepared['tags'] = is_array($data['tags'])
+                ? $data['tags']
+                : json_decode($data['tags'], true);
+        }
+
+        if (isset($data['premium_access'])) {
+            $prepared['premium_access'] = is_array($data['premium_access'])
+                ? $data['premium_access']
+                : json_decode($data['premium_access'], true);
+        }
+
         return $prepared;
     }
 
@@ -145,7 +195,7 @@ class SubscriptionPlanService
         return strtolower(trim(preg_replace('/[^a-z0-9-]+/', '-', $slug), '-'));
     }
 
-    public function updatePlan(int $planId, array $data, int $siteId): ?SubscriptionPlan
+    public function updatePlan(int $planId, array $data, ?int $siteId = null): ?SubscriptionPlan
     {
         $existingPlan = $this->planRepository->find($planId);
 
@@ -153,7 +203,7 @@ class SubscriptionPlanService
             throw new PlanNotFoundException("Plan with ID {$planId} not found");
         }
 
-        if ($existingPlan->site_id !== $siteId) {
+        if ($siteId !== null && $existingPlan->site_id !== $siteId) {
             throw new \InvalidArgumentException('Cannot update plan from different site');
         }
 
@@ -219,22 +269,18 @@ class SubscriptionPlanService
             throw new PlanNotFoundException("Plan with ID {$planId} not found");
         }
 
+        $subscriberCount = $this->planRepository->getSubscriberCount($planId);
+
         return [
             'plan' => $plan,
-            'subscriber_count' => $this->planRepository->getSubscriberCount($planId),
-            'revenue' => $this->calculatePlanRevenue($planId)
+            'subscriber_count' => $subscriberCount,
+            'revenue' => $this->calculatePlanRevenue($plan, $subscriberCount),
         ];
     }
 
-    private function calculatePlanRevenue(int $planId): float
+    private function calculatePlanRevenue(SubscriptionPlan $plan, int $subscriberCount): float
     {
-        $plan = $this->planRepository->find($planId);
-        if (!$plan) {
-            return 0.0;
-        }
-
-        $activeCount = $this->planRepository->getSubscriberCount($planId);
-        return $activeCount * $plan->price;
+        return $subscriberCount * $plan->price;
     }
 
     public function getAllPlansWithStats(int $siteId): array
@@ -242,10 +288,12 @@ class SubscriptionPlanService
         $plans = $this->planRepository->getAllForSite($siteId);
 
         return $plans->map(function ($plan) {
+            $subscriberCount = $this->planRepository->getSubscriberCount($plan->id);
+
             return [
                 'plan' => $plan,
-                'subscriber_count' => $this->planRepository->getSubscriberCount($plan->id),
-                'revenue' => $this->calculatePlanRevenue($plan->id)
+                'subscriber_count' => $subscriberCount,
+                'revenue' => $this->calculatePlanRevenue($plan, $subscriberCount),
             ];
         })->toArray();
     }

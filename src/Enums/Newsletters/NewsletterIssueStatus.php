@@ -25,4 +25,12 @@ enum NewsletterIssueStatus: string
             self::Sent => false,
         };
     }
+
+    public function isSendable(): bool
+    {
+        return match ($this) {
+            self::Draft, self::Ready => true,
+            self::Sent => false,
+        };
+    }
 }

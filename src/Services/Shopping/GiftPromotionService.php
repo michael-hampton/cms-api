@@ -93,9 +93,7 @@ final class GiftPromotionService
             throw new Exception('Gift promotion not found');
         }
 
-        $this->repository->update($promotion->id, ['active' => !$promotion->active]);
-
-        return $promotion->refresh();
+        return $this->repository->update($promotion->id, ['active' => !$promotion->active]);
     }
 
     public function isEligibleForIssue(GiftPromotion $promotion, int $issueDeliveryId): bool

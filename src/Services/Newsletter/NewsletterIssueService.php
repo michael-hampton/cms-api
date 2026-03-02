@@ -2,6 +2,8 @@
 
 namespace App\Services\Newsletter;
 
+use App\DTO\Newsletters\IssueManualSendDTO;
+use App\DTO\Newsletters\NewsletterIssueDTO;
 use App\Enums\Newsletters\NewsletterIssueStatus;
 use App\Events\Newsletters\NewsletterIssueSent;
 use App\Framework\Database\Database;
@@ -14,22 +16,22 @@ use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Newsletter\Validation\BlockPayloadValidator;
 
 /**
- * Orchestrates newsletter issue lifecycle: creation, content persistence,
- * and delegating sends to NewsletterSendService.
- *
- * An issue is a content draft tied to a newsletter. It can be created,
- * edited, and eventually sent. Sending is a one-way transition.
+ * Orchestrates the newsletter issue lifecycle:
+ *   - Snapshot creation (with auto-incrementing issue_number)
+ *   - Snapshot revert (returning immutable data; does NOT mutate the newsletter)
+ *   - Delegated sends via NewsletterSendService
+ *   - Manual ad-hoc sends to all subscribers or a custom email list
  *
  * Responsibilities:
- *   - Validate and persist issue content
+ *   - Validate and persist issue data
  *   - Guard against sending already-sent issues
  *   - Delegate actual dispatch to NewsletterSendService
- *   - Emit events for cross-cutting concerns
+ *   - Emit domain events for cross-cutting concerns
  *
  * Does NOT:
  *   - Build HTML (NewsletterContentBuilder)
  *   - Resolve recipients (NewsletterRecipientResolver)
- *   - Dispatch emails (NewsletterDispatcher)
+ *   - Dispatch emails directly (NewsletterDispatcher)
  */
 class NewsletterIssueService
 {
@@ -44,41 +46,48 @@ class NewsletterIssueService
     {
     }
 
+    // =========================================================================
+    // Issue creation
+    // =========================================================================
+
     /**
-     * Create a new draft issue for a newsletter.
+     * Create a new draft issue from a DTO, optionally including a snapshot of
+     * the current editor state (layout + blocks + metadata).
      *
-     * The issue starts in `draft` status. Content blocks are validated
-     * if provided; an issue may also be created without blocks (empty draft).
+     * issue_number is auto-incremented per newsletter, not globally.
      *
      * @throws \InvalidArgumentException on block validation failure
      * @throws \RuntimeException         if newsletter not found
      */
-    public function createIssue(int $newsletterId, int $siteId, array $data): NewsletterIssue
+    public function createIssue(int $newsletterId, int $siteId, NewsletterIssueDTO $dto): NewsletterIssue
     {
-        return $this->database->transaction(function () use ($newsletterId, $siteId, $data) {
+        return $this->database->transaction(function () use ($newsletterId, $siteId, $dto) {
             $newsletter = $this->newsletterRepository->find($newsletterId);
 
             if (!$newsletter || $newsletter->site_id !== $siteId) {
                 throw new \RuntimeException("Newsletter {$newsletterId} not found.");
             }
 
-            $blocks = $data['content_blocks'] ?? null;
-
-            if ($blocks !== null) {
-                $this->blockPayloadValidator->validate($blocks);
+            if ($dto->contentBlocks !== null) {
+                $this->blockPayloadValidator->validate($dto->contentBlocks);
             }
+
+            $nextNumber = $this->issueRepository->getMaxIssueNumber($newsletterId) + 1;
 
             $issue = $this->issueRepository->create([
                 'newsletter_id' => $newsletterId,
                 'site_id' => $siteId,
-                'subject' => $data['subject'] ?? $newsletter->title,
-                'content_blocks' => $blocks,
+                'issue_number' => $nextNumber,
+                'subject' => $dto->subject ?? $newsletter->title,
+                'content_blocks' => $dto->contentBlocks,
+                'snapshot_json' => $dto->snapshotJson,
                 'status' => NewsletterIssueStatus::Draft->value,
-                'scheduled_at' => $data['scheduled_at'] ?? null,
+                'scheduled_at' => $dto->scheduledAt,
             ]);
 
             $this->logger->info('Newsletter issue created', [
                 'issue_id' => $issue->id,
+                'issue_number' => $nextNumber,
                 'newsletter_id' => $newsletterId,
                 'site_id' => $siteId,
             ]);
@@ -87,15 +96,42 @@ class NewsletterIssueService
         });
     }
 
+    // =========================================================================
+    // Revert
+    // =========================================================================
+
     /**
-     * Send a newsletter issue to all eligible recipients.
+     * Return the snapshot payload for an issue so the frontend can restore the
+     * editor state.  This operation is read-only — it does NOT mutate the
+     * newsletter record.
      *
-     * Delegates to NewsletterSendService which owns the full dispatch pipeline.
-     * On success, the issue is transitioned to `sent` and linked to the
-     * resulting NewsletterSend record.
+     * @throws \RuntimeException if issue not found or belongs to a different site/newsletter
+     */
+    public function getIssueSnapshot(int $newsletterId, int $issueId, int $siteId): array
+    {
+        $issue = $this->issueRepository->find($issueId);
+
+        if (!$issue || $issue->site_id !== $siteId || $issue->newsletter_id !== $newsletterId) {
+            throw new \RuntimeException("Issue {$issueId} not found.");
+        }
+
+        return [
+            'issue' => $issue,
+            'snapshot_json' => $issue->snapshot_json,
+        ];
+    }
+
+    // =========================================================================
+    // Scheduled send (existing pipeline — unchanged)
+    // =========================================================================
+
+    /**
+     * Send a newsletter issue through the standard dispatch pipeline.
+     * Delegates to NewsletterSendService which owns recipient resolution,
+     * HTML building, and queuing.
      *
-     * @throws \RuntimeException         if issue or newsletter not found
-     * @throws \DomainException          if issue has already been sent
+     * @throws \RuntimeException  if issue or newsletter not found
+     * @throws \DomainException   if issue has already been sent
      */
     public function sendIssue(int $issueId, int $siteId, ?Member $actor = null): array
     {
@@ -115,9 +151,6 @@ class NewsletterIssueService
             throw new \RuntimeException("Newsletter {$issue->newsletter_id} not found.");
         }
 
-        // Temporarily override newsletter content blocks from the issue if the
-        // issue carries its own blocks, so the send pipeline renders the correct
-        // content without permanently mutating the newsletter.
         $newsletterForSend = $this->prepareNewsletterForIssue($newsletter, $issue);
 
         $sendResult = $this->sendService->sendNewsletter($newsletterForSend, $siteId, $actor);
@@ -126,7 +159,6 @@ class NewsletterIssueService
             return $sendResult;
         }
 
-        // Transition issue to sent and link to the send record.
         $this->database->transaction(function () use ($issueId, $sendResult) {
             $this->issueRepository->update($issueId, [
                 'status' => NewsletterIssueStatus::Sent->value,
@@ -146,38 +178,76 @@ class NewsletterIssueService
         return array_merge($sendResult, ['issue_id' => $issueId]);
     }
 
-    /**
-     * If the issue has its own content blocks, temporarily override the
-     * newsletter's content so the send pipeline uses the issue's content.
-     *
-     * This returns a cloned newsletter object — it does NOT persist changes.
-     */
-    private function prepareNewsletterForIssue(Newsletter $newsletter, NewsletterIssue $issue): Newsletter
-    {
-        if (empty($issue->content_blocks)) {
-            return $newsletter;
-        }
-
-        // Clone via fill to avoid touching the persisted model.
-        $clone = clone $newsletter;
-        $clone->content_blocks = $issue->content_blocks;
-        $clone->content_type = 'custom_blocks';
-
-        return $clone;
-    }
+    // =========================================================================
+    // Manual ad-hoc send
+    // =========================================================================
 
     /**
-     * Update an existing draft issue.
+     * Manually dispatch an issue to either all subscribers or a custom list of
+     * email addresses, as specified in the DTO.
      *
-     * Sent issues are immutable — attempting to update one throws.
+     * Unlike sendIssue(), this does NOT transition the issue to "sent" status —
+     * it is an out-of-band preview/blast that does not affect the issue lifecycle.
+     * Sending is queued asynchronously via NewsletterSendService.
      *
      * @throws \RuntimeException  if issue not found
-     * @throws \DomainException   if issue has been sent
+     * @throws \DomainException   if issue has already been sent through the normal pipeline
+     */
+    public function manualSendIssue(int $issueId, int $siteId, IssueManualSendDTO $dto, ?Member $actor = null): array
+    {
+        $issue = $this->issueRepository->find($issueId);
+
+        if (!$issue || $issue->site_id !== $siteId) {
+            throw new \RuntimeException("Issue {$issueId} not found.");
+        }
+
+        $newsletter = $this->newsletterRepository->find($issue->newsletter_id);
+
+        if (!$newsletter || $newsletter->site_id !== $siteId) {
+            throw new \RuntimeException("Newsletter {$issue->newsletter_id} not found.");
+        }
+
+        $newsletterForSend = $this->prepareNewsletterForIssue($newsletter, $issue);
+
+        if ($dto->isCustom()) {
+            $sendResult = $this->sendService->sendToCustomEmails(
+                $newsletterForSend,
+                $dto->customEmails,
+                $siteId,
+                $actor
+            );
+        } else {
+            $sendResult = $this->sendService->sendNewsletter($newsletterForSend, $siteId, $actor);
+        }
+
+        $this->logger->info('Newsletter issue manual send queued', [
+            'issue_id' => $issueId,
+            'send_type' => $dto->sendType,
+            'recipients' => $dto->isCustom() ? count($dto->customEmails) : 'all',
+        ]);
+
+        return array_merge($sendResult, [
+            'queued' => true,
+            'message' => $dto->isCustom()
+                ? sprintf('Issue queued for %d recipient(s)', count($dto->customEmails))
+                : 'Issue queued for all subscribers',
+        ]);
+    }
+
+    // =========================================================================
+    // Issue update
+    // =========================================================================
+
+    /**
+     * Update a draft issue.  Sent issues are immutable.
+     *
+     * @throws \RuntimeException     if issue not found
+     * @throws \DomainException      if issue has been sent
      * @throws \InvalidArgumentException on block validation failure
      */
-    public function updateIssue(int $issueId, int $siteId, array $data): NewsletterIssue
+    public function updateIssue(int $issueId, int $siteId, NewsletterIssueDTO $dto): NewsletterIssue
     {
-        return $this->database->transaction(function () use ($issueId, $siteId, $data) {
+        return $this->database->transaction(function () use ($issueId, $siteId, $dto) {
             $issue = $this->issueRepository->find($issueId);
 
             if (!$issue || $issue->site_id !== $siteId) {
@@ -188,36 +258,50 @@ class NewsletterIssueService
                 throw new \DomainException("Sent issues are immutable.");
             }
 
-            $blocks = $data['content_blocks'] ?? null;
-
-            if ($blocks !== null) {
-                $this->blockPayloadValidator->validate($blocks);
+            if ($dto->contentBlocks !== null) {
+                $this->blockPayloadValidator->validate($dto->contentBlocks);
             }
 
             $updates = array_filter([
-                'subject' => $data['subject'] ?? null,
-                'content_blocks' => $blocks,
-                'scheduled_at' => $data['scheduled_at'] ?? null,
-                'status' => isset($data['status'])
-                    ? NewsletterIssueStatus::from($data['status'])->value
-                    : null,
+                'subject' => $dto->subject,
+                'content_blocks' => $dto->contentBlocks,
+                'snapshot_json' => $dto->snapshotJson,
+                'scheduled_at' => $dto->scheduledAt,
             ], fn($v) => $v !== null);
 
             return $this->issueRepository->update($issueId, $updates);
         });
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // List
+    // =========================================================================
 
-    /**
-     * Return all issues for a newsletter, ordered newest-first.
-     */
     public function listIssues(int $newsletterId, int $siteId): array
     {
         return $this->issueRepository
             ->findByNewsletter($newsletterId, $siteId)
             ->toArray();
+    }
+
+    // =========================================================================
+    // Private helpers
+    // =========================================================================
+
+    /**
+     * Clone the newsletter model substituting the issue's content blocks so
+     * the send pipeline renders the correct content.  Does NOT persist.
+     */
+    private function prepareNewsletterForIssue(Newsletter $newsletter, NewsletterIssue $issue): Newsletter
+    {
+        if (!$issue->content_blocks) {
+            return $newsletter;
+        }
+
+        $clone = clone $newsletter;
+        $clone->content_blocks = $issue->content_blocks;
+        $clone->content_type = 'custom_blocks';
+
+        return $clone;
     }
 }

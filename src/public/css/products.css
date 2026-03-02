@@ -779,7 +779,7 @@ body {
     /* Fix product grid - proper spacing */
     .products-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr;
         gap: 0.75rem;
         margin: 0 0 1.5rem 0 !important;
         padding: 0;

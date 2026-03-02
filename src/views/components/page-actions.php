@@ -152,7 +152,7 @@
 
                     if (data.success) {
                         const isLiked = data.data.liked;
-                        const likeCount = data.data.like_count;
+                        const likeCount = data.data.count;
 
                         // Update button appearance
                         if (isLiked) {

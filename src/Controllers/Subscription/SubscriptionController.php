@@ -70,8 +70,18 @@ class SubscriptionController extends Controller
     {
         try {
             $plans = $this->subscriptionPlanRepository->getActivePlans(SiteContext::getId());
-            return $this->resourceResponse(['plans' => $plans]);
-        } catch (Exception $e) {
+
+            return $this->resourceResponse([
+                'plans' => $plans->map(function ($plan) {
+                    return array_merge(
+                        $plan->toArray(),
+                        [
+                            'release_date' => $plan->release_date?->format('Y-m-d H:i:s'),
+                        ]
+                    );
+                }),
+            ]);
+        } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
@@ -81,12 +91,13 @@ class SubscriptionController extends Controller
         $siteId = SiteContext::getId();
 
         try {
+
             $plan = $this->planService->createPlan($request->all(), $siteId);
 
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Plan created successfully',
-                'data' => ['plan' => $plan]
+                'plan' => $plan
             ]);
 
         } catch (\Exception $e) {
@@ -100,7 +111,8 @@ class SubscriptionController extends Controller
     public function updatePlan(Request $request, int $id)
     {
         try {
-            $plan = $this->planService->updatePlan($id, $request->all());
+            $siteId = SiteContext::getId();
+            $plan = $this->planService->updatePlan($id, $request->all(), $siteId);
 
             if (!$plan) {
                 return $this->jsonResponse([
@@ -112,7 +124,7 @@ class SubscriptionController extends Controller
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Plan updated successfully',
-                'data' => ['plan' => $plan]
+                'plan' => $plan
             ]);
 
 

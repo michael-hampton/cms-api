@@ -834,10 +834,11 @@ trait CreatesTestData
 
     }
 
-    protected function createProductOffer(int $productId, array $attributes = []): Model
+    protected function createProductOffer(int $productId, array $attributes = [], ?int $merchantId = null): Model
     {
         return ProductOffer::create(array_merge([
             'product_id' => $productId,
+            'merchant_id' => $merchantId,
             'sale_price' => 79.99,
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),

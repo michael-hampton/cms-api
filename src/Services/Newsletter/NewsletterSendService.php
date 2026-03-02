@@ -343,4 +343,78 @@ class NewsletterSendService
         }
         return $formatted;
     }
+
+    public function sendToCustomEmails(
+        Newsletter $newsletter,
+        array      $customEmails,
+        ?int       $siteId = null,
+        ?Member    $actor = null,
+    ): array
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        if (empty($customEmails)) {
+            return ['success' => false, 'error' => 'No recipient email addresses provided'];
+        }
+
+        foreach ($customEmails as $email) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'error' => "Invalid email address: {$email}"];
+            }
+        }
+
+        $contentResult = $this->contentBuilder->build($newsletter, $siteId, false, $actor, true);
+        if (!$contentResult['success']) {
+            return $contentResult;
+        }
+
+        return $this->database->transaction(function () use ($newsletter, $customEmails, $contentResult, $siteId) {
+            $snapshot = $this->snapshotRepository->createSnapshot(
+                newsletterId: $newsletter->id,
+                htmlSnapshot: $contentResult['html'],
+                brandingSnapshot: null,
+                layoutVersionId: null,
+                brandingVersionId: null,
+            );
+
+            $snapshotViewToken = $this->viewTokenService->generateTokenForSnapshot($snapshot->id);
+            $htmlWithViewToken = $this->injectSnapshotToken($contentResult['html'], $snapshotViewToken);
+
+            $sendRecord = $this->sendRepository->create([
+                'newsletter_id' => $newsletter->id,
+                'sent_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'recipient_count' => count($customEmails),
+                'sent_count' => 0,
+                'failed_count' => 0,
+                'pending_count' => count($customEmails),
+                'content_snapshot' => $contentResult['pages'],
+                'html_snapshot' => $htmlWithViewToken,
+            ]);
+
+            $recipients = $this->recipientRepository->createRecipients($sendRecord->id, $customEmails);
+
+            $sendResult = $this->dispatcher->dispatch(
+                $sendRecord,
+                $recipients,
+                $newsletter,
+                $siteId,
+                $htmlWithViewToken,
+                false,
+            );
+
+            $stats = $this->recipientRepository->getStatistics($sendRecord->id);
+            $success = $sendResult['success'] && $stats['failed'] === 0;
+
+            return [
+                'success' => $success,
+                'newsletter_id' => $newsletter->id,
+                'recipients' => $stats['sent'],
+                'failed' => $stats['failed'],
+                'pending' => $stats['pending'],
+                'send_id' => $sendRecord->id,
+                'snapshot_id' => $snapshot->id,
+                'partial_failure' => !$success && $stats['sent'] > 0,
+            ];
+        });
+    }
 }

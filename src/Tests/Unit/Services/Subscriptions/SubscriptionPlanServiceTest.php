@@ -71,7 +71,21 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             'price' => 29.99,
             'currency' => 'usd',
             'billing_period' => 'monthly',
-            'is_active' => '1'
+            'is_active' => '1',
+            'digital_download_url' => 'https://example.com/download',
+            'print_shipping_required' => '1',
+            'includes_insider' => '1',
+            'is_upgrade_option' => '1',
+            'upgrade_from_plan_id' => 5,
+            'dispatch_days' => '3',
+            'release_date' => '2025-01-01 10:00:00',
+            'pre_release_enabled' => '1',
+            'categories' => ['magazine', 'print'],
+            'tags' => json_encode(['monthly', 'gift']),
+            'premium_access' => [
+                ['type' => 'newsletter', 'identifier' => 'insider'],
+                ['type' => 'newsletter', 'identifier' => 'full'],
+            ],
         ];
 
         $plan = Mockery::mock(SubscriptionPlan::class);
@@ -83,7 +97,21 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
                     && $prepared['currency'] === 'USD'
                     && $prepared['is_active'] === true
                     && isset($prepared['slug'])
-                    && $prepared['billing_period'] === 'monthly';
+                    && $prepared['billing_period'] === 'monthly'
+                    && $prepared['digital_download_url'] === 'https://example.com/download'
+                    && $prepared['print_shipping_required'] === true
+                    && $prepared['includes_insider'] === true
+                    && $prepared['is_upgrade_option'] === true
+                    && $prepared['upgrade_from_plan_id'] === 5
+                    && $prepared['dispatch_days'] === 3
+                    && $prepared['release_date'] === '2025-01-01 10:00:00'
+                    && $prepared['pre_release_enabled'] === true
+                    && is_array($prepared['categories'])
+                    && in_array('magazine', $prepared['categories'], true)
+                    && is_array($prepared['tags'])
+                    && in_array('monthly', $prepared['tags'], true)
+                    && is_array($prepared['premium_access'])
+                    && count($prepared['premium_access']) === 2;
             }))
             ->once()
             ->andReturn($plan);

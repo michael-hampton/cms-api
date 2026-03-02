@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Repositories\Offers;
 
+use App\Enums\Offers\OfferStatus;
 use App\Models\ProductOffer;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -18,14 +19,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $product = $this->createProduct();
         $merchant = $this->createMerchant();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id, [], $merchant->id);
 
         $found = $this->repository->find($offer->id);
 
@@ -40,30 +34,16 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $product = $this->createProduct();
 
         // Active offer
-        $activeOffer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $activeOffer = $this->createProductOffer($product->id);
 
-        // Expired offer
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
+        $this->createProductOffer($product->id, [
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'is_active' => true,
         ]);
 
-        // Future offer
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 89.99,
+        $this->createProductOffer($product->id, [
             'start_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
-            'is_active' => true,
         ]);
 
         $offers = $this->repository->getActiveOffersForProduct($product->id);
@@ -78,21 +58,8 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $product1 = $this->createProduct(['category_id' => $category->id]);
         $product2 = $this->createProduct(['category_id' => $category->id]);
 
-        ProductOffer::create([
-            'product_id' => $product1->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        ProductOffer::create([
-            'product_id' => $product2->id,
-            'sale_price' => 89.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $this->createProductOffer($product1->id);
+        $this->createProductOffer($product2->id);
 
         $offers = $this->repository->getActiveOffersForCategory($category->id);
 
@@ -111,6 +78,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 0
         ];
 
         $offer = $this->repository->create($data);
@@ -124,13 +92,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
     {
         $product = $this->createProduct();
 
-        $existingOffer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $existingOffer = $this->createProductOffer($product->id);
 
         $data = [
             'product_id' => $product->id,
@@ -138,6 +100,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
             'is_active' => true,
+            'original_price' => 0
         ];
 
         $this->repository->create($data);
@@ -150,13 +113,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
     {
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $updated = $this->repository->update($offer->id, [
             'sale_price' => 69.99,
@@ -177,13 +134,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
     {
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $deleted = $this->repository->delete($offer->id);
 
@@ -202,21 +153,8 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
     {
         $product = $this->createProduct();
 
-        $offer1 = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        $offer2 = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
-            'is_active' => true,
-        ]);
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
 
         $this->repository->deactivateOtherOffers($product->id, $offer1->id);
 
@@ -231,13 +169,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
     {
         $product = $this->createProduct();
 
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $this->createProductOffer($product->id);
 
         $this->assertTrue($this->repository->hasActiveOffer($product->id));
     }
@@ -253,23 +185,8 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
     {
         $product = $this->createProduct();
 
-        $publishedOffer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'status' => 'published',
-        ]);
-
-        $pendingOffer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
-            'is_active' => false,
-            'status' => 'pending',
-        ]);
+        $publishedOffer = $this->createProductOffer($product->id, ['status' => OfferStatus::PUBLISHED->value]);
+        $pendingOffer = $this->createProductOffer($product->id, ['status' => OfferStatus::PENDING->value]);
 
         $published = $this->repository->getByStatus('published');
         $pending = $this->repository->getByStatus('pending');
@@ -285,14 +202,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $user = $this->createUser();
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'status' => 'pending',
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $result = $this->repository->publish($offer->id, $user->id);
 
@@ -308,14 +218,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $user = $this->createUser();
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'status' => 'pending',
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $reason = 'Price too low';
         $result = $this->repository->reject($offer->id, $user->id, $reason);
@@ -333,13 +236,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $product = $this->createProduct();
         $member = $this->createMember();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $this->repository->trackClick(
             $offer->id,
@@ -363,13 +260,7 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $member1 = $this->createMember();
         $member2 = $this->createMember();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         // Create clicks
         $this->repository->trackClick($offer->id, $member1->id, 'view');
@@ -399,15 +290,11 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
         $product = $this->createProduct(['name' => 'Test Product']);
         $merchant = $this->createMerchant();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant->id,
+        $offer = $this->createProductOffer($product->id, [
             'sale_price' => 79.99,
             'original_price' => 99.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'status' => 'published',
+            'merchant_id' => $merchant->id,
+            'status' => OfferStatus::PUBLISHED->value
         ]);
 
         $filters = [

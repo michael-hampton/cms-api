@@ -14,7 +14,7 @@ class LayoutRegionValueObjectTest extends TestCase
         $this->assertCount(3, $vo->getRegions());
     }
 
-    private function makeDefinition(array $regions = null): array
+    private function makeDefinition(?array $regions = null): array
     {
         return [
             'schema_version' => 2,

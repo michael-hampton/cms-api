@@ -9,6 +9,7 @@ use ReflectionClass;
 class AutoDiscovery
 {
     private static string $baseDir = __DIR__ . '/..';
+    private static array $cache = [];
 
     public static function discoverModels(?string $baseDir = null, bool $useAutoload = true): array
     {
@@ -35,6 +36,12 @@ class AutoDiscovery
      */
     public static function discoverByDir(?string $baseDir, string $subDir, bool $useAutoload = true): array
     {
+        $cacheKey = md5($baseDir . $subDir . ($useAutoload ? '1' : '0'));
+
+        if (isset(self::$cache[$cacheKey])) {
+            return self::$cache[$cacheKey];
+        }
+
         $baseDir = rtrim($baseDir ?? dirname(__DIR__), '/\\');
         $dir = $baseDir . DIRECTORY_SEPARATOR . $subDir;
         $found = [];
@@ -121,7 +128,10 @@ class AutoDiscovery
         }
 
         // unique and stable
-        return array_values(array_unique($found));
+        $result = array_values(array_unique($found));
+        self::$cache[$cacheKey] = $result;
+
+        return $result;
     }
 
     /**

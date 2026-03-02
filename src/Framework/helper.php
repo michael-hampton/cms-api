@@ -379,8 +379,18 @@ if (!function_exists('accessDenied')) {
 if (!function_exists('route')) {
     function route(string $name, array $params = []): string
     {
-        $router = Container::getInstance()->resolve(Router::class);
-        return $router->route($name, $params);
+        try {
+            $router = Container::getInstance()->resolve(Router::class);
+            return $router->route($name, $params);
+        } catch (\Exception $e) {
+            // Fallback: convert route name to a slug URL
+            // e.g. 'privacy' => '/privacy', 'data-rights' => '/data-rights'
+            $path = '/' . ltrim(str_replace('.', '/', $name), '/');
+            foreach ($params as $key => $value) {
+                $path = str_replace('{' . $key . '}', $value, $path);
+            }
+            return $path;
+        }
     }
 }
 

@@ -16,8 +16,10 @@ use App\Enums\Newsletters\NewsletterIssueStatus;
  * @property int $id
  * @property int $newsletter_id
  * @property int $site_id
+ * @property int $issue_number       Sequential counter scoped per newsletter
  * @property string $subject
  * @property array|null $content_blocks
+ * @property array|null $snapshot_json      Full editor snapshot: {layout, blocks, metadata}
  * @property string|null $html_snapshot
  * @property string $status
  * @property int|null $send_id
@@ -33,8 +35,10 @@ class NewsletterIssue extends Model
     protected $fillable = [
         'newsletter_id',
         'site_id',
+        'issue_number',
         'subject',
         'content_blocks',
+        'snapshot_json',
         'html_snapshot',
         'status',
         'send_id',
@@ -46,11 +50,15 @@ class NewsletterIssue extends Model
 
     protected $casts = [
         'content_blocks' => 'array',
+        'snapshot_json' => 'array',
         'scheduled_at' => 'datetime',
         'sent_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'issue_number' => 'integer',
     ];
+
+    // ─── Relations ────────────────────────────────────────────────────────────
 
     public function newsletter()
     {
@@ -61,6 +69,8 @@ class NewsletterIssue extends Model
     {
         return $this->belongsTo(NewsletterSend::class, 'send_id');
     }
+
+    // ─── Status helpers ───────────────────────────────────────────────────────
 
     public function isDraft(): bool
     {
@@ -83,5 +93,27 @@ class NewsletterIssue extends Model
             NewsletterIssueStatus::Draft->value,
             NewsletterIssueStatus::Ready->value,
         ], true);
+    }
+
+    // ─── Snapshot helpers ─────────────────────────────────────────────────────
+
+    public function hasSnapshot(): bool
+    {
+        return !empty($this->snapshot_json);
+    }
+
+    public function getSnapshotLayout(): ?array
+    {
+        return $this->snapshot_json['layout'] ?? null;
+    }
+
+    public function getSnapshotBlocks(): ?array
+    {
+        return $this->snapshot_json['blocks'] ?? null;
+    }
+
+    public function getSnapshotMetadata(): ?array
+    {
+        return $this->snapshot_json['metadata'] ?? null;
     }
 }

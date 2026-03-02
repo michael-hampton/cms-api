@@ -33,9 +33,11 @@ use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberController;
 use App\Controllers\Members\MemberAddressController;
 use App\Controllers\Members\MemberPaymentMethodsController;
+use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\NewsletterBrandingController;
 use App\Controllers\Newsletter\NewsletterController;
+use App\Controllers\Newsletter\NewsletterIssueController;
 use App\Controllers\Newsletter\NewsletterLayoutController;
 use App\Controllers\Newsletter\NewsletterScheduleController;
 use App\Controllers\Offers\DealsController;
@@ -252,6 +254,24 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/subscriptions/plans', [SubscriptionController::class, 'createPlan']);
         $router->put('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->delete('/subscriptions/plans/{id}', [SubscriptionController::class, 'deletePlan']);
+
+        // Subscription premium access management
+        $router->post(
+            '/subscriptions/{subscriptionId}/premium-access/grant',
+            [AdminSubscriptionPremiumAccessController::class, 'grant']
+        );
+        $router->post(
+            '/subscriptions/{subscriptionId}/premium-access/revoke',
+            [AdminSubscriptionPremiumAccessController::class, 'revoke']
+        );
+        $router->put(
+            '/subscriptions/premium-access/{id}',
+            [AdminSubscriptionPremiumAccessController::class, 'update']
+        );
+        $router->delete(
+            '/subscriptions/premium-access/{id}',
+            [AdminSubscriptionPremiumAccessController::class, 'destroy']
+        );
 
         $router->get('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'subscriptionPayments']);
         $router->post('/subscriptions/{subscriptionId}/payments', [PaymentController::class, 'createSubscriptionPayment']);
@@ -641,8 +661,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
         $router->get('/newsletters/statistics', [NewsletterController::class, 'statistics']);
-        $router->post('/newsletters/{id}/issues', [NewsletterController::class, 'createIssue']);
-        $router->post('/newsletters/{id}/issues/{issueId}/send', [NewsletterController::class, 'sendIssue']);
+        $router->post('/newsletters/{newsletterId}/issues', [NewsletterIssueController::class, 'store']);
+        $router->post('/newsletters/{newsletterId}/issues/{issueId}/send', [NewsletterIssueController::class, 'send']);
+        $router->get('/newsletters/{newsletterId}/issues', [NewsletterIssueController::class, 'index']);
+        $router->get('/newsletters/{newsletterId}/issues/{issueId}', [NewsletterIssueController::class, 'show']);
+        $router->post('/newsletters/{newsletterId}/issues/{issueId}/revert', [NewsletterIssueController::class, 'revert']);
+        $router->post('/newsletter-issues/{issueId}/send', [NewsletterIssueController::class, 'manualSend']);
+
+
+
 
         $router->get('/newsletters/{newsletterId}/schedules',
             [NewsletterScheduleController::class, 'index']
@@ -751,7 +778,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 $router->post('/api/{siteName}/vouchers/validate', VoucherController::class, 'validate');
 $router->post('/api/{siteName}/vouchers/{id}/apply', VoucherController::class, 'apply');
 
-$router->post('/api/{siteName}/newsletter/web/signup', NewsletterController::class, 'signup');
+$router->post('/api/{siteName}/newsletter/web/signup', [NewsletterController::class, 'signup']);
 
 
 $router->get('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'getCustomFields');
