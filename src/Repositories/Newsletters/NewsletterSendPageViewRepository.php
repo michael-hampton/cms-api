@@ -102,6 +102,21 @@ class NewsletterSendPageViewRepository extends Repository
         ];
     }
 
+    public function getViewsBySendIds(array $sendIds, ?string $dateFrom = null, ?string $dateTo = null): Collection
+    {
+        $query = NewsletterSendPageView::whereIn('newsletter_send_id', $sendIds);
+
+        if ($dateFrom) {
+            $query->whereDate('clicked_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('clicked_at', '<=', $dateTo);
+        }
+
+        return $query->get();
+    }
+
+
     protected function getModelClass(): string
     {
         return NewsletterSendPageView::class;

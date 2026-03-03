@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Newsletters;
 
+use App\Framework\Support\Collection;
 use App\Models\NewsletterSendRecipient;
 use App\Repositories\Repository;
 
@@ -98,5 +99,27 @@ class NewsletterSendRecipientRepository extends Repository
     protected function getModelClass(): string
     {
         return NewsletterSendRecipient::class;
+    }
+
+    public function getRecipientsBySendIds(
+        array   $sendIds,
+        ?string $status = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): Collection
+    {
+        $query = NewsletterSendRecipient::whereIn('newsletter_send_id', $sendIds);
+
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+        if ($dateFrom) {
+            $query->whereDate('updated_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('updated_at', '<=', $dateTo);
+        }
+
+        return $query->get();
     }
 }

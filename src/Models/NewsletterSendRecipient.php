@@ -65,4 +65,9 @@ class NewsletterSendRecipient extends Model
     {
         return $query->where('status', self::STATUS_SENT);
     }
+
+    public function newsletter($relation = false)
+    {
+        return $this->belongsTo(Newsletter::class, 'newsletter_id', 'id', $relation);
+    }
 }

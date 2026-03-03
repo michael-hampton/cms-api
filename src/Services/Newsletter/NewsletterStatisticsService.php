@@ -2,50 +2,42 @@
 
 namespace App\Services\Newsletter;
 
-use App\Framework\Database\Database;
-use App\Models\NewsletterSend;
-use App\Models\NewsletterSendPageView;
+use App\Framework\Support\Collection;
 use App\Models\NewsletterSendRecipient;
+use App\Models\Page;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
+use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
 use Exception;
 
 class NewsletterStatisticsService
 {
     public function __construct(
-        private readonly NewsletterRepository             $newsletterRepository,
-        private readonly NewsletterSendRepository         $newsletterSendRepository,
-        private readonly NewsletterSendPageViewRepository $newsletterSendPageViewRepository
+        private readonly NewsletterRepository              $newsletterRepository,
+        private readonly NewsletterSendRepository          $newsletterSendRepository,
+        private readonly NewsletterSendPageViewRepository  $newsletterSendPageViewRepository,
+        private readonly NewsletterSendRecipientRepository $newsletterSendRecipientRepository,
     )
     {
     }
 
     public function getAllNewsletterStatistics(int $siteId): array
     {
-        // Get all newsletters for this site
         $newsletters = $this->newsletterRepository->findBySite($siteId);
         $newsletterIds = $newsletters->pluck('id')->toArray();
 
-        // Get all sends for these newsletters
         $sends = $this->newsletterSendRepository->getSendsByNewsletterIds($newsletterIds);
-
         $totalRecipients = $sends->sum('recipient_count');
         $totalSends = $sends->count();
         $failedCount = $sends->sum('failed_count');
         $pendingCount = $sends->sum('pending_count');
 
-        $clickStatistics = $this->newsletterSendPageViewRepository->getViewStatisticsByNewsletterIds($newsletterIds);
-        $uniqueClickers = $clickStatistics['unique_recipients'];
-        $totalClicks = $clickStatistics['total_clicks'];
-
-        $clickThroughRate = $totalRecipients > 0
-            ? round(($uniqueClickers / $totalRecipients) * 100, 2)
-            : 0;
-
-        $clicksPerRecipient = $totalRecipients > 0
-            ? round($totalClicks / $totalRecipients, 2)
-            : 0;
+        $clickStats = $this->newsletterSendPageViewRepository->getViewStatisticsByNewsletterIds($newsletterIds);
+        $uniqueClickers = $clickStats['unique_recipients'];
+        $totalClicks = $clickStats['total_clicks'];
+        $clickThroughRate = $totalRecipients > 0 ? round(($uniqueClickers / $totalRecipients) * 100, 2) : 0;
+        $clicksPerRecipient = $totalRecipients > 0 ? round($totalClicks / $totalRecipients, 2) : 0;
 
         return [
             'total_newsletters' => count($newsletterIds),
@@ -57,16 +49,15 @@ class NewsletterStatisticsService
             'failed_sends' => $failedCount,
             'pending_sends' => $pendingCount,
             'clicks_per_recipient' => $clicksPerRecipient,
-            'top_clicked_pages' => $this->newsletterSendPageViewRepository->getTopClickedPages($sends->pluck('id')->toArray())->toArray(),
-            'sends_by_date' => $sends->groupBy(function ($send) {
-                return $send->sent_at->format('Y-m-d');
-            })->map(function ($dailySends) {
-                return [
-                    'date' => $dailySends->first()->sent_at->format('Y-m-d'),
-                    'sends' => $dailySends->count(),
-                    'recipients' => $dailySends->sum('recipient_count')
-                ];
-            })->values()->toArray()
+            'top_clicked_pages' => $this->newsletterSendPageViewRepository
+                ->getTopClickedPages($sends->pluck('id')->toArray())
+                ->toArray(),
+            'sends_by_date' => $sends->groupBy(fn($s) => $s->sent_at->format('Y-m-d'))
+                ->map(fn($daily) => [
+                    'date' => $daily->first()->sent_at->format('Y-m-d'),
+                    'sends' => $daily->count(),
+                    'recipients' => $daily->sum('recipient_count'),
+                ])->values()->toArray(),
         ];
     }
 
@@ -79,23 +70,16 @@ class NewsletterStatisticsService
         }
 
         $sends = $this->newsletterSendRepository->getSendsForNewsletter($newsletterId);
-
         $totalRecipients = $sends->sum('recipient_count');
         $totalSends = $sends->count();
         $failedCount = $sends->sum('failed_count');
         $pendingCount = $sends->sum('pending_count');
 
-        $clickStatistics = $this->newsletterSendPageViewRepository->getViewStatistics($newsletterId);
-        $uniqueClickers = $clickStatistics['unique_recipients'];
-        $totalClicks = $clickStatistics['total_clicks'];
-
-        $clickThroughRate = $totalRecipients > 0
-            ? round(($uniqueClickers / $totalRecipients) * 100, 2)
-            : 0;
-
-        $clicksPerRecipient = $totalRecipients > 0
-            ? round($totalClicks / $totalRecipients, 2)
-            : 0;
+        $clickStats = $this->newsletterSendPageViewRepository->getViewStatistics($newsletterId);
+        $uniqueClickers = $clickStats['unique_recipients'];
+        $totalClicks = $clickStats['total_clicks'];
+        $clickThroughRate = $totalRecipients > 0 ? round(($uniqueClickers / $totalRecipients) * 100, 2) : 0;
+        $clicksPerRecipient = $totalRecipients > 0 ? round($totalClicks / $totalRecipients, 2) : 0;
 
         return [
             'newsletter_id' => $newsletterId,
@@ -108,11 +92,13 @@ class NewsletterStatisticsService
             'failed_sends' => $failedCount,
             'pending_sends' => $pendingCount,
             'clicks_per_recipient' => $clicksPerRecipient,
-            'top_clicked_pages' => $this->newsletterSendPageViewRepository->getTopClickedPages($sends->pluck('id')->toArray())->toArray(),
-            'sends_by_date' => $sends->map(fn($send) => [
-                'sent_at' => $send->sent_at?->format('Y-m-d H:i:s'),
-                'recipient_count' => $send->recipient_count
-            ])->toArray()
+            'top_clicked_pages' => $this->newsletterSendPageViewRepository
+                ->getTopClickedPages($sends->pluck('id')->toArray())
+                ->toArray(),
+            'sends_by_date' => $sends->map(fn($s) => [
+                'sent_at' => $s->sent_at?->format('Y-m-d H:i:s'),
+                'recipient_count' => $s->recipient_count,
+            ])->toArray(),
         ];
     }
 
@@ -127,72 +113,49 @@ class NewsletterStatisticsService
         ?string $search = null
     ): array
     {
-        $query = NewsletterSendPageView::query()
-            ->select([
-                'nspv.email',
-                'p.id as page_id',
-                'p.title as page_title',
-                'p.slug as page_slug',
-                'nspv.clicked_at',
-                'n.id as newsletter_id',
-                'n.title as newsletter_title',
-                'ns.sent_at',
-                'nspv.ip_address',
-                'nspv.user_agent'
-            ])
-            ->from('newsletter_send_page_views as nspv')
-            ->join('newsletter_sends as ns', 'nspv.newsletter_send_id', '=', 'ns.id')
-            ->join('newsletters as n', 'ns.newsletter_id', '=', 'n.id')
-            ->join('pages as p', 'nspv.page_id', '=', 'p.id')
-            ->where('n.site_id', $siteId);
+        [$newsletterMap, $sendMap, $sendIds] = $this->buildNewsletterAndSendMaps($siteId);
 
-        if ($dateFrom) {
-            $query->whereDate('nspv.clicked_at', '>=', $dateFrom);
+        if (empty($sendIds)) {
+            return $this->emptyPage($perPage, $page);
         }
 
-        if ($dateTo) {
-            $query->whereDate('nspv.clicked_at', '<=', $dateTo);
-        }
+        $views = $this->newsletterSendPageViewRepository->getViewsBySendIds($sendIds, $dateFrom, $dateTo);
+        $pageIds = $views->pluck('page_id')->unique()->toArray();
+        $pageMap = empty($pageIds)
+            ? new Collection([])
+            : Page::whereIn('id', $pageIds)->get()->keyBy('id');
+
+        $rows = $views->map(function ($view) use ($sendMap, $newsletterMap, $pageMap) {
+            $send = $sendMap->get($view->newsletter_send_id);
+            $newsletter = $send ? $newsletterMap->get($send->newsletter_id) : null;
+            $page = $pageMap->get($view->page_id);
+
+            return [
+                'email' => $view->email,
+                'page_id' => $view->page_id,
+                'page_title' => $page?->title,
+                'page_slug' => $page?->slug,
+                'clicked_at' => is_string($view->clicked_at) ? $view->clicked_at : $view->clicked_at->format('Y-m-d H:i:s'),
+                'newsletter_id' => $newsletter?->id,
+                'newsletter_title' => $newsletter?->title,
+                'sent_at' => $send?->sent_at,
+                'ip_address' => $view->ip_address,
+                'user_agent' => $view->user_agent,
+            ];
+        });
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nspv.email', 'like', "%{$search}%")
-                    ->orWhere('p.title', 'like', "%{$search}%")
-                    ->orWhere('n.title', 'like', "%{$search}%");
-            });
+            $lower = strtolower($search);
+            $rows = $rows->filter(fn($r) => str_contains(strtolower((string)($r['email'] ?? '')), $lower) ||
+                str_contains(strtolower((string)($r['page_title'] ?? '')), $lower) ||
+                str_contains(strtolower((string)($r['newsletter_title'] ?? '')), $lower)
+            )->values();
         }
 
-        $total = $query->count();
+        $validSort = ['email', 'page_title', 'newsletter_title', 'clicked_at'];
+        $sortColumn = in_array($sortBy, $validSort) ? $sortBy : 'clicked_at';
 
-        $validSortColumns = ['email', 'page_title', 'newsletter_title', 'clicked_at'];
-
-        $sortColumn = in_array($sortBy, $validSortColumns)
-            ? $sortBy
-            : 'clicked_at';
-
-        $sortDir = in_array(strtolower($sortDirection), ['asc', 'desc'])
-            ? $sortDirection
-            : 'desc';
-
-        $offset = ($page - 1) * $perPage;
-
-        $clicks = $query
-            ->orderBy(
-                match ($sortColumn) {
-                    'page_title' => 'p.title',
-                    'newsletter_title' => 'n.title',
-                    default => "nspv.{$sortColumn}"
-                },
-                $sortDir
-            )
-            ->limit($perPage)
-            ->offset($offset)
-            ->get();
-
-        return [
-            'data' => $clicks->toArray(),
-            'pagination' => $this->buildPagination($total, $perPage, $page, $offset)
-        ];
+        return $this->sortAndPaginate($rows, $sortColumn, $sortDirection, $page, $perPage);
     }
 
     public function getFailedSendDetails(
@@ -206,70 +169,47 @@ class NewsletterStatisticsService
         ?string $search = null
     ): array
     {
-        $query = NewsletterSendRecipient::query()
-            ->select([
-                'nsr.id as recipient_id',
-                'nsr.email',
-                'nsr.error_message',
-                'nsr.attempts',
-                'nsr.updated_at as failed_at',
-                'n.id as newsletter_id',
-                'n.title as newsletter_title',
-                'ns.sent_at'
-            ])
-            ->from('newsletter_send_recipients as nsr')
-            ->join('newsletter_sends as ns', 'nsr.newsletter_send_id', '=', 'ns.id')
-            ->join('newsletters as n', 'ns.newsletter_id', '=', 'n.id')
-            ->where('n.site_id', $siteId)
-            ->where('nsr.status', 'failed');
+        [$newsletterMap, $sendMap, $sendIds] = $this->buildNewsletterAndSendMaps($siteId);
 
-        if ($dateFrom) {
-            $query->whereDate('nsr.updated_at', '>=', $dateFrom);
+        if (empty($sendIds)) {
+            return $this->emptyPage($perPage, $page);
         }
 
-        if ($dateTo) {
-            $query->whereDate('nsr.updated_at', '<=', $dateTo);
-        }
+        $recipients = $this->newsletterSendRecipientRepository->getRecipientsBySendIds(
+            $sendIds,
+            NewsletterSendRecipient::STATUS_FAILED,
+            $dateFrom,
+            $dateTo
+        );
+
+        $rows = $recipients->map(function ($recipient) use ($sendMap, $newsletterMap) {
+            $send = $sendMap->get($recipient->newsletter_send_id);
+            $newsletter = $send ? $newsletterMap->get($send->newsletter_id) : null;
+
+            return [
+                'recipient_id' => $recipient->id,
+                'email' => $recipient->email,
+                'error_message' => $recipient->error_message,
+                'attempts' => $recipient->attempts,
+                'failed_at' => $recipient->updated_at,
+                'newsletter_id' => $newsletter?->id,
+                'newsletter_title' => $newsletter?->title,
+                'sent_at' => $send?->sent_at,
+            ];
+        });
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nsr.email', 'like', "%{$search}%")
-                    ->orWhere('n.title', 'like', "%{$search}%")
-                    ->orWhere('nsr.error_message', 'like', "%{$search}%");
-            });
+            $lower = strtolower($search);
+            $rows = $rows->filter(fn($r) => str_contains(strtolower((string)($r['email'] ?? '')), $lower) ||
+                str_contains(strtolower((string)($r['newsletter_title'] ?? '')), $lower) ||
+                str_contains(strtolower((string)($r['error_message'] ?? '')), $lower)
+            )->values();
         }
 
-        $total = $query->count();
+        $validSort = ['email', 'newsletter_title', 'attempts', 'failed_at'];
+        $sortColumn = in_array($sortBy, $validSort) ? $sortBy : 'failed_at';
 
-        $validSortColumns = ['email', 'newsletter_title', 'attempts', 'failed_at'];
-
-        $sortColumn = in_array($sortBy, $validSortColumns)
-            ? $sortBy
-            : 'failed_at';
-
-        $sortDir = in_array(strtolower($sortDirection), ['asc', 'desc'])
-            ? $sortDirection
-            : 'desc';
-
-        $offset = ($page - 1) * $perPage;
-
-        $failedSends = $query
-            ->orderBy(
-                match ($sortColumn) {
-                    'newsletter_title' => 'n.title',
-                    'failed_at' => 'nsr.updated_at',
-                    default => "nsr.{$sortColumn}"
-                },
-                $sortDir
-            )
-            ->limit($perPage)
-            ->offset($offset)
-            ->get();
-
-        return [
-            'data' => $failedSends->toArray(),
-            'pagination' => $this->buildPagination($total, $perPage, $page, $offset)
-        ];
+        return $this->sortAndPaginate($rows, $sortColumn, $sortDirection, $page, $perPage);
     }
 
     public function getUniqueClickerDetails(
@@ -283,49 +223,38 @@ class NewsletterStatisticsService
         ?string $search = null
     ): array
     {
-        $query = NewsletterSendPageView::query()
-            ->from('newsletter_send_page_views as nspv')
-            ->join('newsletter_sends as ns', 'nspv.newsletter_send_id', '=', 'ns.id')
-            ->join('newsletters as n', 'ns.newsletter_id', '=', 'n.id')
-            ->where('n.site_id', $siteId)
-            ->select([
-                'nspv.email',
-                Database::raw('COUNT(*) as click_count'),
-                Database::raw('MAX(nspv.clicked_at) as last_clicked_at')
-            ])
-            ->groupBy('nspv.email');
+        [$newsletters, $sends, $sendIds] = $this->buildNewsletterAndSendMaps($siteId);
 
-        if ($dateFrom) {
-            $query->whereDate('nspv.clicked_at', '>=', $dateFrom);
+        if (empty($sendIds)) {
+            return $this->emptyPage($perPage, $page);
         }
 
-        if ($dateTo) {
-            $query->whereDate('nspv.clicked_at', '<=', $dateTo);
-        }
+        $views = $this->newsletterSendPageViewRepository->getViewsBySendIds($sendIds, $dateFrom, $dateTo);
+
+        $rows = $views->groupBy('email')->map(function ($emailViews, $email) {
+            $dates = $emailViews->pluck('clicked_at')->filter()->toArray();
+            $lastClicked = !empty($dates) ? max($dates) : null;
+            $firstClicked = !empty($dates) ? min($dates) : null;
+
+            return [
+                'email' => $email,
+                'click_count' => $emailViews->count(),
+                'unique_pages_clicked' => $emailViews->pluck('page_id')->unique()->count(),
+                'last_clicked_at' => is_string($lastClicked) ? $lastClicked : $lastClicked->format('Y-m-d H:i:s'),
+                'first_clicked_at' => is_string($firstClicked) ? $firstClicked : $firstClicked->format('Y-m-d H:i:s'),
+            ];
+        })->values();
 
         if ($search) {
-            $query->having('nspv.email', 'like', "%{$search}%");
+            $lower = strtolower($search);
+            $rows = $rows->filter(fn($r) => str_contains(strtolower((string)($r['email'] ?? '')), $lower)
+            )->values();
         }
 
-        $total = $query->count();
+        $validSort = ['email', 'click_count', 'last_clicked_at'];
+        $sortColumn = in_array($sortBy, $validSort) ? $sortBy : 'click_count';
 
-        $validSortColumns = ['email', 'click_count', 'last_clicked_at'];
-
-        $sortColumn = in_array($sortBy, $validSortColumns) ? $sortBy : 'click_count';
-        $sortDir = in_array(strtolower($sortDirection), ['asc', 'desc']) ? $sortDirection : 'desc';
-
-        $offset = ($page - 1) * $perPage;
-
-        $data = $query
-            ->orderBy($sortColumn, $sortDir)
-            ->limit($perPage)
-            ->offset($offset)
-            ->get();
-
-        return [
-            'data' => $data->toArray(),
-            'pagination' => $this->buildPagination($total, $perPage, $page, $offset)
-        ];
+        return $this->sortAndPaginate($rows, $sortColumn, $sortDirection, $page, $perPage);
     }
 
     public function getSendDetails(
@@ -339,56 +268,48 @@ class NewsletterStatisticsService
         ?string $search = null
     ): array
     {
-        $query = NewsletterSend::query()
-            ->from('newsletter_sends as ns')
-            ->join('newsletters as n', 'ns.newsletter_id', '=', 'n.id')
-            ->where('n.site_id', $siteId)
-            ->select([
-                'ns.id as send_id',
-                'n.title as newsletter_title',
-                'ns.sent_at',
-                'ns.total_recipients',
-                'ns.success_count',
-                'ns.failed_count'
-            ]);
+        $newsletters = $this->newsletterRepository->findBySite($siteId);
+        $newsletterIds = $newsletters->pluck('id')->toArray();
+
+        if (empty($newsletterIds)) {
+            return $this->emptyPage($perPage, $page);
+        }
+
+        $newsletterMap = $newsletters->keyBy('id');
+        $sends = $this->newsletterSendRepository->getSendsByNewsletterIds($newsletterIds);
 
         if ($dateFrom) {
-            $query->whereDate('ns.sent_at', '>=', $dateFrom);
+            $sends = $sends->filter(fn($s) => $this->sentOnOrAfter($s, $dateFrom))->values();
+        }
+        if ($dateTo) {
+            $sends = $sends->filter(fn($s) => $this->sentOnOrBefore($s, $dateTo))->values();
         }
 
-        if ($dateTo) {
-            $query->whereDate('ns.sent_at', '<=', $dateTo);
-        }
+        $rows = $sends->map(function ($send) use ($newsletterMap) {
+            $newsletter = $newsletterMap->get($send->newsletter_id);
+
+            return [
+                'send_id' => $send->id,
+                'newsletter_title' => $newsletter?->title,
+                'sent_at' => $send->sent_at instanceof \DateTimeInterface
+                    ? $send->sent_at->format('Y-m-d H:i:s')
+                    : $send->sent_at,
+                'total_recipients' => $send->recipient_count ?? 0,
+                'success_count' => $send->success_count ?? 0,
+                'failed_count' => $send->failed_count ?? 0,
+            ];
+        });
 
         if ($search) {
-            $query->where('n.title', 'like', "%{$search}%");
+            $lower = strtolower($search);
+            $rows = $rows->filter(fn($r) => str_contains(strtolower((string)($r['newsletter_title'] ?? '')), $lower)
+            )->values();
         }
 
-        $total = $query->count();
+        $validSort = ['newsletter_title', 'sent_at', 'success_count', 'failed_count'];
+        $sortColumn = in_array($sortBy, $validSort) ? $sortBy : 'sent_at';
 
-        $validSortColumns = ['newsletter_title', 'sent_at', 'success_count', 'failed_count'];
-
-        $sortColumn = in_array($sortBy, $validSortColumns) ? $sortBy : 'sent_at';
-        $sortDir = in_array(strtolower($sortDirection), ['asc', 'desc']) ? $sortDirection : 'desc';
-
-        $offset = ($page - 1) * $perPage;
-
-        $data = $query
-            ->orderBy(
-                match ($sortColumn) {
-                    'newsletter_title' => 'n.title',
-                    default => "ns.{$sortColumn}"
-                },
-                $sortDir
-            )
-            ->limit($perPage)
-            ->offset($offset)
-            ->get();
-
-        return [
-            'data' => $data->toArray(),
-            'pagination' => $this->buildPagination($total, $perPage, $page, $offset)
-        ];
+        return $this->sortAndPaginate($rows, $sortColumn, $sortDirection, $page, $perPage);
     }
 
     public function getRecipientDetails(
@@ -402,70 +323,84 @@ class NewsletterStatisticsService
         ?string $search = null
     ): array
     {
-        $query = NewsletterSendRecipient::query()
-            ->from('newsletter_send_recipients as nsr')
-            ->join('newsletter_sends as ns', 'nsr.newsletter_send_id', '=', 'ns.id')
-            ->join('newsletters as n', 'ns.newsletter_id', '=', 'n.id')
-            ->where('n.site_id', $siteId)
-            ->select([
-                'nsr.email',
-                'nsr.status',
-                'nsr.error_message',
-                'nsr.attempts',
-                'nsr.updated_at as last_attempt_at'
-            ]);
+        [$newsletters, $sends, $sendIds] = $this->buildNewsletterAndSendMaps($siteId);
 
-        if ($dateFrom) {
-            $query->whereDate('nsr.updated_at', '>=', $dateFrom);
+        if (empty($sendIds)) {
+            return $this->emptyPage($perPage, $page);
         }
 
-        if ($dateTo) {
-            $query->whereDate('nsr.updated_at', '<=', $dateTo);
-        }
+        $recipients = $this->newsletterSendRecipientRepository->getRecipientsBySendIds(
+            $sendIds,
+            null,
+            $dateFrom,
+            $dateTo
+        );
+
+        $rows = $recipients->map(function ($r) use ($newsletters, $sends) {
+            $send = $sends->get($r->newsletter_send_id);
+            $newsletter = $send ? $newsletters->get($send->newsletter_id) : null;
+
+            return [
+                'email' => $r->email,
+                'status' => $r->status,
+                'error_message' => $r->error_message,
+                'attempts' => $r->attempts,
+                'last_attempt_at' => $r->updated_at,
+                'newsletter_title' => $newsletter?->title,
+                'sent_at' => $send?->sent_at instanceof \DateTimeInterface
+                    ? $send->sent_at->format('Y-m-d H:i:s')
+                    : $send?->sent_at,
+            ];
+        });
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nsr.email', 'like', "%{$search}%")
-                    ->orWhere('nsr.error_message', 'like', "%{$search}%");
-            });
+            $lower = strtolower($search);
+            $rows = $rows->filter(fn($r) => str_contains(strtolower((string)($r['email'] ?? '')), $lower) ||
+                str_contains(strtolower((string)($r['error_message'] ?? '')), $lower)
+            )->values();
         }
 
-        $total = $query->count();
+        $validSort = ['email', 'status', 'attempts', 'last_attempt_at'];
+        $sortColumn = in_array($sortBy, $validSort) ? $sortBy : 'last_attempt_at';
 
-        $validSortColumns = ['email', 'status', 'attempts', 'last_attempt_at'];
-
-        $sortColumn = in_array($sortBy, $validSortColumns) ? $sortBy : 'last_attempt_at';
-        $sortDir = in_array(strtolower($sortDirection), ['asc', 'desc']) ? $sortDirection : 'desc';
-
-        $offset = ($page - 1) * $perPage;
-
-        $data = $query
-            ->orderBy(
-                match ($sortColumn) {
-                    'last_attempt_at' => 'nsr.updated_at',
-                    default => "nsr.{$sortColumn}"
-                },
-                $sortDir
-            )
-            ->limit($perPage)
-            ->offset($offset)
-            ->get();
-
-        return [
-            'data' => $data->toArray(),
-            'pagination' => $this->buildPagination($total, $perPage, $page, $offset)
-        ];
+        return $this->sortAndPaginate($rows, $sortColumn, $sortDirection, $page, $perPage);
     }
 
-    private function emptyPagination(int $perPage, int $page): array
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Loads newsletters and sends for a site and returns three values:
+     *   - newsletters keyed by id
+     *   - sends keyed by id
+     *   - send id list (empty array signals "nothing to query")
+     */
+    private function buildNewsletterAndSendMaps(int $siteId): array
     {
+        $newsletters = $this->newsletterRepository->findBySite($siteId);
+        $newsletterIds = $newsletters->pluck('id')->toArray();
+
+        if (empty($newsletterIds)) {
+            return [new Collection([]), new Collection([]), []];
+        }
+
+        $sends = $this->newsletterSendRepository->getSendsByNewsletterIds($newsletterIds);
+        $sendIds = $sends->pluck('id')->toArray();
+
+        return [$newsletters->keyBy('id'), $sends->keyBy('id'), $sendIds];
+    }
+
+    private function sortAndPaginate(Collection $rows, string $sortColumn, string $sortDirection, int $page, int $perPage): array
+    {
+        $sortDir = strtolower($sortDirection) === 'asc' ? 'asc' : 'desc';
+        $sorted = $rows->orderBy($sortColumn, $sortDir);
+        $total = $sorted->count();
+        $offset = ($page - 1) * $perPage;
+
         return [
-            'total' => 0,
-            'per_page' => $perPage,
-            'current_page' => $page,
-            'last_page' => 1,
-            'from' => 0,
-            'to' => 0
+            'data' => $sorted->slice($offset, $perPage)->values()->toArray(),
+            'pagination' => $this->buildPagination($total, $perPage, $page, $offset),
         ];
     }
 
@@ -475,9 +410,32 @@ class NewsletterStatisticsService
             'total' => $total,
             'per_page' => $perPage,
             'current_page' => $page,
-            'last_page' => (int)ceil($total / $perPage),
-            'from' => $offset + 1,
-            'to' => min($offset + $perPage, $total)
+            'last_page' => $perPage > 0 ? (int)ceil($total / $perPage) : 1,
+            'from' => $total > 0 ? $offset + 1 : 0,
+            'to' => min($offset + $perPage, $total),
         ];
+    }
+
+    private function emptyPage(int $perPage, int $page): array
+    {
+        return ['data' => [], 'pagination' => $this->buildPagination(0, $perPage, $page, 0)];
+    }
+
+    private function sentOnOrAfter(object $send, string $date): bool
+    {
+        if (!$send->sent_at) {
+            return false;
+        }
+        $d = is_string($send->sent_at) ? substr($send->sent_at, 0, 10) : $send->sent_at->format('Y-m-d');
+        return $d >= $date;
+    }
+
+    private function sentOnOrBefore(object $send, string $date): bool
+    {
+        if (!$send->sent_at) {
+            return false;
+        }
+        $d = is_string($send->sent_at) ? substr($send->sent_at, 0, 10) : $send->sent_at->format('Y-m-d');
+        return $d <= $date;
     }
 }
