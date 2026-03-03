@@ -2,6 +2,8 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Actions\Subscriptions\AddPlanPriceAction;
+use App\Actions\Subscriptions\ReplacePlanPriceAction;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\SubscriptionPlanPricing;
@@ -11,7 +13,9 @@ class SubscriptionPlanPricingService
 {
     public function __construct(
         private readonly SubscriptionPlanPricingRepository $pricingRepository,
-        private readonly Database                          $database
+        private readonly Database               $database,
+        private readonly AddPlanPriceAction     $addPlanPriceAction,
+        private readonly ReplacePlanPriceAction $replacePlanPriceAction,
     )
     {
     }
@@ -26,19 +30,55 @@ class SubscriptionPlanPricingService
         return $this->pricingRepository->getDefaultForPlan($planId);
     }
 
-    public function createPricingTier(array $data): SubscriptionPlanPricing
+    /**
+     * Create a new pricing tier for a plan and create the corresponding Stripe Price.
+     *
+     * Delegates to AddPlanPriceAction which owns the Stripe integration and
+     * domain invariant checks.
+     *
+     * amount_cents is derived here from $data['price'] so callers never pass it
+     * directly — this prevents mismatches between the stored price and the Stripe amount.
+     */
+    public function createPricingTier(int $planId, array $data): SubscriptionPlanPricing
     {
         $this->validatePricingData($data);
 
-        return $this->database->transaction(function () use ($data) {
-            $pricing = $this->pricingRepository->create($data);
+        $data['amount_cents'] = $this->toAmountCents($data['price']);
 
-            if ($data['is_default'] ?? false) {
-                $this->pricingRepository->setAsDefault($pricing->id);
-            }
+        return $this->addPlanPriceAction->execute($planId, $data);
+    }
 
-            return $pricing;
-        });
+    /**
+     * Update a pricing tier by replacing it with a new versioned row.
+     *
+     * Prices are never modified in-place. Calling this method:
+     *   - Deactivates the current pricing row.
+     *   - Creates a new one with the supplied data merged over the existing values.
+     *   - Creates a new Stripe Price object.
+     *
+     * Delegates to ReplacePlanPriceAction which owns the versioning logic.
+     *
+     * amount_cents is derived from $data['price'] — same rule as createPricingTier.
+     */
+    public function updatePricingTier(int $pricingId, array $data): SubscriptionPlanPricing
+    {
+        $this->validatePricingData($data);
+
+        $data['amount_cents'] = $this->toAmountCents($data['price']);
+
+        return $this->replacePlanPriceAction->execute($pricingId, $data);
+    }
+
+    /**
+     * Derive amount_cents from a decimal price value.
+     *
+     * Stripe requires amounts as integers in the smallest currency unit.
+     * Calculated here — not accepted from callers — to avoid floating-point
+     * drift or mismatched values between price and amount_cents.
+     */
+    private function toAmountCents(float|int|string $price): int
+    {
+        return (int)round((float)$price * 100);
     }
 
     private function validatePricingData(array $data): void
@@ -52,29 +92,17 @@ class SubscriptionPlanPricingService
         if (!isset($data['price']) || !is_numeric($data['price'])) {
             throw new \InvalidArgumentException('Price is required and must be numeric');
         }
+        if (empty($data['currency'])) {
+            throw new \InvalidArgumentException('currency is required');
+        }
+        if (empty($data['interval'])) {
+            throw new \InvalidArgumentException('interval is required');
+        }
     }
 
     public function setAsDefault(int $pricingId): bool
     {
         return $this->pricingRepository->setAsDefault($pricingId);
-    }
-
-    public function updatePricingTier(int $pricingId, array $data): ?SubscriptionPlanPricing
-    {
-        return $this->database->transaction(function () use ($pricingId, $data) {
-
-            $pricing = $this->pricingRepository->update($pricingId, $data);
-
-            if (!$pricing) {
-                throw new \Exception('Pricing tier not found');
-            }
-
-            if ($data['is_default'] ?? false) {
-                $this->pricingRepository->setAsDefault($pricingId);
-            }
-
-            return $pricing;
-        });
     }
 
     public function deletePricingTier(int $pricingId): bool
@@ -86,14 +114,12 @@ class SubscriptionPlanPricingService
                 throw new \Exception('Pricing tier not found');
             }
 
-            // Can't delete if it's the only active tier
             $activeTiers = $this->pricingRepository->getForPlan($pricing->plan_id)->count();
 
             if ($activeTiers <= 1) {
                 throw new \Exception('Cannot delete the only active pricing tier');
             }
 
-            // If this was default, set another as default
             if ($pricing->is_default) {
                 $newDefault = SubscriptionPlanPricing::where('plan_id', $pricing->plan_id)
                     ->where('id', '!=', $pricingId)

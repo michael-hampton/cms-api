@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Actions\Subscriptions\CreatePlanAction;
 use App\Enums\Subscriptions\BillingPeriod;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
@@ -19,10 +20,12 @@ class SubscriptionPlanService
     private const ALLOWED_CURRENCIES = ['USD', 'EUR', 'GBP', 'AUD', 'CAD'];
 
     public function __construct(
-        private readonly SubscriptionPlanRepository $planRepository,
-        private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly SubscriptionPlanRepository     $planRepository,
+        private readonly SubscriptionRepository         $subscriptionRepository,
         private readonly VoucherService                 $voucherService,
-        private readonly SubscriptionEligibilityService $eligibilityService
+        private readonly SubscriptionEligibilityService $eligibilityService,
+        private readonly CreatePlanAction               $createPlanAction,
+        private readonly SubscriptionPlanPricingService $pricingService,
     )
     {
     }
@@ -42,10 +45,79 @@ class SubscriptionPlanService
         return $this->planRepository->findBySlug($slug, $siteId);
     }
 
+    /**
+     * Create a plan and its corresponding Stripe Product.
+     *
+     * If price data is provided (price + currency + interval), a pricing tier
+     * is also created via SubscriptionPlanPricingService, which delegates to
+     * AddPlanPriceAction and creates the corresponding Stripe Price.
+     *
+     * Plans without pricing tiers (no price data supplied) only get a Stripe
+     * Product — a Stripe Price is added later when a pricing tier is attached.
+     */
     public function createPlan(array $data, int $siteId): SubscriptionPlan
     {
         $planData = $this->preparePlanData($data, $siteId);
-        return $this->planRepository->create($planData);
+
+        $plan = $this->createPlanAction->execute($planData);
+
+        if ($this->hasPriceData($data)) {
+            $pricingData = $this->preparePricingData($data);
+            $this->pricingService->createPricingTier($plan->id, $pricingData);
+        }
+
+        return $plan;
+    }
+
+    /**
+     * Determine whether the caller supplied enough data to create a pricing tier.
+     */
+    private function hasPriceData(array $data): bool
+    {
+        return isset($data['price'])
+            && isset($data['currency'])
+            && isset($data['billing_period']);
+    }
+
+    /**
+     * Map plan-level fields into the shape expected by SubscriptionPlanPricingService.
+     */
+    private function preparePricingData(array $data): array
+    {
+        $durationMonths = $data['duration_months'] ?? $this->billingPeriodToDurationMonths($data['billing_period']);
+
+        return [
+            'price' => $data['price'],
+            'currency' => $data['currency'],
+            'interval' => $this->billingPeriodToInterval($data['billing_period']),
+            'duration_months' => $durationMonths,
+            'issue_count' => $data['issue_count'] ?? 1,
+            'is_default' => true,
+            'sort_order' => $data['sort_order'] ?? 1,
+            'label' => $data['name'],
+            'period_description' => $this->billingPeriodToInterval($data['billing_period'])
+        ];
+    }
+
+    private function billingPeriodToDurationMonths(string $billingPeriod): int
+    {
+        return match ($billingPeriod) {
+            'weekly' => 1,
+            'monthly' => 1,
+            'quarterly' => 3,
+            'yearly', 'annual' => 12,
+            default => 1,
+        };
+    }
+
+    private function billingPeriodToInterval(string $billingPeriod): string
+    {
+        return match ($billingPeriod) {
+            'weekly' => 'week',
+            'monthly' => 'month',
+            'yearly', 'annual' => 'year',
+            default => 'month',
+        };
     }
 
     private function preparePlanData(array $data, ?int $siteId = null): array
@@ -207,7 +279,6 @@ class SubscriptionPlanService
             throw new \InvalidArgumentException('Cannot update plan from different site');
         }
 
-        // Prevent slug changes if active subscriptions exist
         if (isset($data['slug']) && $data['slug'] !== $existingPlan->slug) {
             $activeCount = $this->planRepository->getSubscriberCount($planId);
 
@@ -309,9 +380,9 @@ class SubscriptionPlanService
     }
 
     public function subscribeMemberToPlanWithVoucher(
-        int   $memberId,
-        int   $planId,
-        int   $siteId,
+        int $memberId,
+        int $planId,
+        int $siteId,
         ?string $voucherCode = null,
         array $paymentData = []
     ): Subscription
@@ -344,7 +415,6 @@ class SubscriptionPlanService
             $voucherId = $validation->voucher->id;
             $discountAmountCents = (int)round($validation->discount * 100);
 
-            // Ensure discount doesn't exceed price
             if ($discountAmountCents > $originalPriceCents) {
                 $discountAmountCents = $originalPriceCents;
             }

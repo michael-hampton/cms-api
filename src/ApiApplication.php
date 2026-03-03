@@ -65,6 +65,10 @@ use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
+use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\StripePriceGateway;
+use App\Services\Billing\Stripe\StripeProductGateway;
 use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
 use App\Services\Members\Comments\SimpleSpamDetector;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
@@ -150,6 +154,8 @@ class ApiApplication
         $this->container->bind(FileSystemInterface::class, FileSystem::class);
         $this->container->bind(ProductRepositoryInterface::class, ProductRepository::class);
         $this->container->bind(ClockInterface::class, SystemClock::class);
+        $this->container->bind(StripePriceGatewayInterface::class, StripePriceGateway::class);
+        $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
 
 
         $this->container->singleton(DiscountProviderRegistry::class, function ($app) {

@@ -20,6 +20,32 @@ class SubscriptionPlanPricingRepository extends Repository
         return $query->orderBy('sort_order')->get();
     }
 
+    public function findActiveDefaultForPlan(int $planId, ?int $excludePricingId = null): ?SubscriptionPlanPricing
+    {
+        $query = SubscriptionPlanPricing::where('plan_id', $planId)
+            ->where('is_active', true)
+            ->where('is_default', true);
+
+        if ($excludePricingId !== null) {
+            $query->where('id', '!=', $excludePricingId);
+        }
+
+        return $query->first();
+    }
+
+    public function findActiveBySortOrder(int $planId, int $sortOrder, ?int $excludePricingId = null): ?SubscriptionPlanPricing
+    {
+        $query = SubscriptionPlanPricing::where('plan_id', $planId)
+            ->where('is_active', true)
+            ->where('sort_order', $sortOrder);
+
+        if ($excludePricingId !== null) {
+            $query->where('id', '!=', $excludePricingId);
+        }
+
+        return $query->first();
+    }
+
     public function getDefaultForPlan(int $planId): ?SubscriptionPlanPricing
     {
         return SubscriptionPlanPricing::where('plan_id', $planId)

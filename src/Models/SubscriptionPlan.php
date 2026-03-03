@@ -26,6 +26,7 @@ class SubscriptionPlan extends Model
         'is_featured',
         'sort_order',
         'stripe_price_id',
+        'stripe_product_id',   // ← NEW: Stripe Product ID (set by CreatePlanAction)
         'plan_type',
         'digital_download_url',
         'print_shipping_required',
@@ -169,25 +170,16 @@ class SubscriptionPlan extends Model
         return $query->where('plan_type', 'recurring');
     }
 
-    /**
-     * Check if plan includes Insider access
-     */
     public function includesInsider(): bool
     {
         return $this->includes_insider;
     }
 
-    /**
-     * Check if this is an upgrade plan
-     */
     public function isUpgradePlan(): bool
     {
         return $this->is_upgrade_option;
     }
 
-    /**
-     * Get the plan this upgrades from
-     */
     public function upgradesFromPlan()
     {
         if (!$this->upgrade_from_plan_id) {
@@ -197,17 +189,11 @@ class SubscriptionPlan extends Model
         return $this->belongsTo(SubscriptionPlan::class, 'upgrade_from_plan_id', 'id');
     }
 
-    /**
-     * Get premium access grants this plan provides
-     */
     public function getPremiumAccessGrants(): array
     {
         return $this->premium_access ?? [];
     }
 
-    /**
-     * Check if plan grants specific premium access
-     */
     public function grantsPremiumAccess(string $type, string $identifier): bool
     {
         $grants = $this->getPremiumAccessGrants();
@@ -221,22 +207,15 @@ class SubscriptionPlan extends Model
         return false;
     }
 
-    /**
-     * Backward compatibility
-     */
     public function getIncludesInsiderAttribute(): bool
     {
         return $this->grantsPremiumAccess('newsletter', 'insider');
     }
 
-    /**
-     * Add premium access to plan
-     */
     public function addPremiumAccess(string $type, string $identifier): void
     {
         $grants = $this->premium_access ?? [];
 
-        // Check if already exists
         foreach ($grants as $grant) {
             if ($grant['type'] === $type && $grant['identifier'] === $identifier) {
                 return;
@@ -248,9 +227,6 @@ class SubscriptionPlan extends Model
         $this->save();
     }
 
-    /**
-     * Remove premium access from plan
-     */
     public function removePremiumAccess(string $type, string $identifier): void
     {
         $grants = $this->premium_access ?? [];
@@ -293,24 +269,16 @@ class SubscriptionPlan extends Model
         return $this->availabilityPolicy()->isPreRelease();
     }
 
-    /**
-     * Get the next scheduled issue for this subscription plan
-     * This is the issue that new subscribers would receive first
-     */
     public function getNextIssue(): ?IssueDelivery
     {
-
         return IssueDelivery::query()
             ->whereHas('subscriptionPlans', function ($q) {
                 $q->where('id', $this->id);
             })
             ->where('status', IssueDeliveryStatus::ACTIVE->value)
             ->where(function ($q) {
-                // Get issues that are either:
-                // 1. On sale date is in the future (upcoming)
-                // 2. On sale date is today or recent past (current issue)
                 $q->where('on_sale_date', '>=', now_datetime()->modify('-7 days')->format('Y-m-d H:i:s'))
-                    ->orWhereNull('on_sale_date'); // Draft issues without sale date yet
+                    ->orWhereNull('on_sale_date');
             })
             ->orderBy('on_sale_date', 'asc')
             ->first();
@@ -328,9 +296,6 @@ class SubscriptionPlan extends Model
             ->first();
     }
 
-    /**
-     * Get all future issues for this plan
-     */
     public function getUpcomingIssues(): Collection
     {
         return IssueDelivery::query()
@@ -342,5 +307,4 @@ class SubscriptionPlan extends Model
             ->orderBy('on_sale_date', 'asc')
             ->get();
     }
-
 }

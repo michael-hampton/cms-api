@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Actions\Subscriptions\CreatePlanAction;
 use App\DTO\Vouchers\VoucherValidationResult;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
@@ -13,6 +14,7 @@ use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionEligibilityService;
+use App\Services\Subscriptions\SubscriptionPlanPricingService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -25,6 +27,8 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
     private $service;
     private $voucherServiceMock;
     private $eligibilityService;
+    private $createPlanAction;
+    private $pricingService;
 
     protected function setUp(): void
     {
@@ -34,14 +38,19 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $this->voucherServiceMock = Mockery::mock(VoucherService::class);
         $this->eligibilityService = Mockery::mock(SubscriptionEligibilityService::class);
+        $this->createPlanAction = Mockery::mock(CreatePlanAction::class);
+        $this->pricingService = Mockery::mock(SubscriptionPlanPricingService::class);
 
         $this->service = new SubscriptionPlanService(
             $this->planRepository,
             $this->subscriptionRepository,
             $this->voucherServiceMock,
-            $this->eligibilityService
+            $this->eligibilityService,
+            $this->createPlanAction,
+            $this->pricingService,
         );
     }
+
 
     protected function tearDown(): void
     {
@@ -62,6 +71,66 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $result = $this->service->getActivePlansForSite($siteId);
 
         $this->assertSame($plans, $result);
+    }
+
+    /**
+     * createPlan now delegates to CreatePlanAction.
+     * The service is responsible for data preparation; the action owns Stripe.
+     */
+    public function testCreatePlanDelegatesToCreatePlanAction(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
+            ->with(Mockery::on(function ($prepared) {
+                return $prepared['name'] === 'Premium Plan'
+                    && abs($prepared['price'] - 29.99) < 0.01
+                    && $prepared['currency'] === 'USD'
+                    && $prepared['is_active'] === true
+                    && isset($prepared['slug'])
+                    && $prepared['billing_period'] === 'monthly';
+            }))
+            ->andReturn($plan);
+
+        // price + currency + billing_period present → pricing tier is created
+        $this->pricingService
+            ->shouldReceive('createPricingTier')
+            ->once()
+            ->with(1, Mockery::on(function ($d) {
+                return $d['price'] === 29.99
+                    && $d['currency'] === 'usd'
+                    && $d['interval'] === 'month'
+                    && $d['is_default'] === true;
+            }));
+
+        $result = $this->service->createPlan([
+            'name' => 'Premium Plan',
+            'price' => 29.99,
+            'currency' => 'usd',
+            'billing_period' => 'monthly',
+            'is_active' => '1',
+        ], 1);
+
+        $this->assertSame($plan, $result);
+    }
+
+    public function testCreatePlanSkipsPricingTierWhenNoPriceData(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
+            ->andReturn($plan);
+
+        $this->pricingService->shouldReceive('createPricingTier')->never();
+
+        $this->service->createPlan(['name' => 'No Price Plan'], 1);
+        $this->assertTrue(true);
     }
 
     public function testCreatePlanPreparesData(): void
@@ -88,9 +157,12 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             ],
         ];
 
-        $plan = Mockery::mock(SubscriptionPlan::class);
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
 
-        $this->planRepository->shouldReceive('create')
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
             ->with(Mockery::on(function ($prepared) {
                 return $prepared['name'] === 'Premium Plan'
                     && abs($prepared['price'] - 29.99) < 0.01
@@ -113,8 +185,18 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
                     && is_array($prepared['premium_access'])
                     && count($prepared['premium_access']) === 2;
             }))
-            ->once()
             ->andReturn($plan);
+
+        // price + currency + billing_period present → pricing tier is created
+        $this->pricingService
+            ->shouldReceive('createPricingTier')
+            ->once()
+            ->with(1, Mockery::on(function ($d) {
+                return $d['price'] === 29.99
+                    && $d['currency'] === 'usd'
+                    && $d['interval'] === 'month'
+                    && $d['is_default'] === true;
+            }));
 
         $result = $this->service->createPlan($data, 1);
 
@@ -180,6 +262,19 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Trial days cannot be negative');
 
         $this->service->createPlan($data, 1);
+    }
+
+    public function testUpdatePlanThrowsWhenChangingSlugWithActiveSubscriptions(): void
+    {
+        $existingPlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $existingPlan->slug = 'old-slug';
+
+        $this->planRepository->shouldReceive('find')->once()->andReturn($existingPlan);
+        $this->planRepository->shouldReceive('getSubscriberCount')->once()->andReturn(3);
+
+        $this->expectException(PlanHasActiveSubscriptionsException::class);
+
+        $this->service->updatePlan(1, ['slug' => 'new-slug']);
     }
 
     public function testUpdatePlanThrowsForNonexistentPlan(): void
