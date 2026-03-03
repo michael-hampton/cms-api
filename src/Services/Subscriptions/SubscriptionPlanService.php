@@ -3,12 +3,12 @@
 namespace App\Services\Subscriptions;
 
 use App\Actions\Subscriptions\CreatePlanAction;
-use App\Enums\Subscriptions\BillingPeriod;
+use App\DTO\Subscriptions\SubscriptionPlanData;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
 use App\Exceptions\Subscriptions\PlanNotFoundException;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
-use App\Framework\Support\Str;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -17,8 +17,6 @@ use App\Services\Vouchers\VoucherService;
 
 class SubscriptionPlanService
 {
-    private const ALLOWED_CURRENCIES = ['USD', 'EUR', 'GBP', 'AUD', 'CAD'];
-
     public function __construct(
         private readonly SubscriptionPlanRepository     $planRepository,
         private readonly SubscriptionRepository         $subscriptionRepository,
@@ -26,6 +24,7 @@ class SubscriptionPlanService
         private readonly SubscriptionEligibilityService $eligibilityService,
         private readonly CreatePlanAction               $createPlanAction,
         private readonly SubscriptionPlanPricingService $pricingService,
+        private readonly Database $database,
     )
     {
     }
@@ -57,16 +56,17 @@ class SubscriptionPlanService
      */
     public function createPlan(array $data, int $siteId): SubscriptionPlan
     {
-        $planData = $this->preparePlanData($data, $siteId);
+        return $this->database->transaction(function () use ($data, $siteId) {
+            $planDataDto = SubscriptionPlanData::fromArray($data, $siteId);
+            $plan = $this->createPlanAction->execute($planDataDto->toArray());
 
-        $plan = $this->createPlanAction->execute($planData);
+            if ($this->hasPriceData($data)) {
+                $pricingData = $this->preparePricingData($data);
+                $this->pricingService->createPricingTier($plan->id, $pricingData);
+            }
 
-        if ($this->hasPriceData($data)) {
-            $pricingData = $this->preparePricingData($data);
-            $this->pricingService->createPricingTier($plan->id, $pricingData);
-        }
-
-        return $plan;
+            return $plan;
+        });
     }
 
     /**
@@ -120,153 +120,6 @@ class SubscriptionPlanService
         };
     }
 
-    private function preparePlanData(array $data, ?int $siteId = null): array
-    {
-        $prepared = [];
-
-        if ($siteId) {
-            $prepared['site_id'] = $siteId;
-        }
-
-        if (isset($data['name'])) {
-            $prepared['name'] = $data['name'];
-
-            if (empty($data['slug'])) {
-                $prepared['slug'] = $this->generateSlug($data['name']);
-            }
-        }
-
-        if (!empty($data['slug'])) {
-            $prepared['slug'] = $this->sanitizeSlug($data['slug']);
-        }
-
-        if (isset($data['description'])) {
-            $prepared['description'] = $data['description'];
-        }
-
-        if (isset($data['price'])) {
-            $price = (float)$data['price'];
-
-            if ($price < 0) {
-                throw new \InvalidArgumentException('Price cannot be negative');
-            }
-
-            $prepared['price'] = round($price, 2);
-        }
-
-        if (isset($data['currency'])) {
-            $currency = strtoupper($data['currency']);
-
-            if (!in_array($currency, self::ALLOWED_CURRENCIES)) {
-                throw new \InvalidArgumentException("Currency {$currency} is not supported");
-            }
-
-            $prepared['currency'] = $currency;
-        }
-
-        if (isset($data['billing_period'])) {
-            $billingPeriod = BillingPeriod::tryFrom($data['billing_period']);
-
-            if (!$billingPeriod) {
-                throw new \InvalidArgumentException("Invalid billing period: {$data['billing_period']}");
-            }
-
-            $prepared['billing_period'] = $billingPeriod->value;
-        }
-
-        if (isset($data['trial_days'])) {
-            $trialDays = (int)$data['trial_days'];
-
-            if ($trialDays < 0) {
-                throw new \InvalidArgumentException('Trial days cannot be negative');
-            }
-
-            $prepared['trial_days'] = $trialDays;
-        }
-
-        if (isset($data['features'])) {
-            $prepared['features'] = is_array($data['features'])
-                ? $data['features']
-                : json_decode($data['features'], true);
-        }
-
-        if (isset($data['is_active'])) {
-            $prepared['is_active'] = (bool)$data['is_active'];
-        }
-
-        if (isset($data['is_featured'])) {
-            $prepared['is_featured'] = (bool)$data['is_featured'];
-        }
-
-        if (isset($data['sort_order'])) {
-            $prepared['sort_order'] = (int)$data['sort_order'];
-        }
-
-        if (isset($data['digital_download_url'])) {
-            $prepared['digital_download_url'] = $data['digital_download_url'];
-        }
-
-        if (isset($data['print_shipping_required'])) {
-            $prepared['print_shipping_required'] = (bool)$data['print_shipping_required'];
-        }
-
-        if (isset($data['includes_insider'])) {
-            $prepared['includes_insider'] = (bool)$data['includes_insider'];
-        }
-
-        if (isset($data['is_upgrade_option'])) {
-            $prepared['is_upgrade_option'] = (bool)$data['is_upgrade_option'];
-        }
-
-        if (isset($data['upgrade_from_plan_id'])) {
-            $prepared['upgrade_from_plan_id'] = $data['upgrade_from_plan_id'] !== null
-                ? (int)$data['upgrade_from_plan_id']
-                : null;
-        }
-
-        if (isset($data['dispatch_days'])) {
-            $prepared['dispatch_days'] = (int)$data['dispatch_days'];
-        }
-
-        if (isset($data['release_date'])) {
-            $prepared['release_date'] = $data['release_date'];
-        }
-
-        if (isset($data['pre_release_enabled'])) {
-            $prepared['pre_release_enabled'] = (bool)$data['pre_release_enabled'];
-        }
-
-        if (isset($data['categories'])) {
-            $prepared['categories'] = is_array($data['categories'])
-                ? $data['categories']
-                : json_decode($data['categories'], true);
-        }
-
-        if (isset($data['tags'])) {
-            $prepared['tags'] = is_array($data['tags'])
-                ? $data['tags']
-                : json_decode($data['tags'], true);
-        }
-
-        if (isset($data['premium_access'])) {
-            $prepared['premium_access'] = is_array($data['premium_access'])
-                ? $data['premium_access']
-                : json_decode($data['premium_access'], true);
-        }
-
-        return $prepared;
-    }
-
-    private function generateSlug(string $name): string
-    {
-        return Str::slug($name);
-    }
-
-    private function sanitizeSlug(string $slug): string
-    {
-        return strtolower(trim(preg_replace('/[^a-z0-9-]+/', '-', $slug), '-'));
-    }
-
     public function updatePlan(int $planId, array $data, ?int $siteId = null): ?SubscriptionPlan
     {
         $existingPlan = $this->planRepository->find($planId);
@@ -289,8 +142,8 @@ class SubscriptionPlanService
             }
         }
 
-        $planData = $this->preparePlanData($data);
-        return $this->planRepository->update($planId, $planData);
+        $planDataDto = SubscriptionPlanData::fromArray($data);
+        return $this->planRepository->update($planId, $planDataDto->toArray());
     }
 
     public function deletePlan(int $planId): bool
@@ -358,8 +211,11 @@ class SubscriptionPlanService
     {
         $plans = $this->planRepository->getAllForSite($siteId);
 
-        return $plans->map(function ($plan) {
-            $subscriberCount = $this->planRepository->getSubscriberCount($plan->id);
+        $planIds = $plans->pluck('id')->toArray();
+        $subscriberCounts = $this->planRepository->getSubscriberCountsForPlans($planIds);
+
+        return $plans->map(function ($plan) use ($subscriberCounts) {
+            $subscriberCount = $subscriberCounts[$plan->id] ?? 0;
 
             return [
                 'plan' => $plan,

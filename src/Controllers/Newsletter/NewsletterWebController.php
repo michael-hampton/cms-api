@@ -28,15 +28,15 @@ use Dompdf\Options;
 class NewsletterWebController extends Controller
 {
     public function __construct(
-        private readonly NewsletterRepository         $newsletterRepository,
-        private readonly NewsletterPageBuilderService $pageBuilderService,
+        private readonly NewsletterRepository           $newsletterRepository,
+        private readonly NewsletterPageBuilderService   $pageBuilderService,
         private readonly NewsletterArchiveService         $archiveService,
         private readonly SubscriptionRepository           $subscriptionRepository,
         private readonly SubscriberRepository             $subscriberRepository,
         private readonly NewsletterSendRepository         $sendRepository,
         private readonly NewsletterSendPageViewRepository $sendPageViewRepository,
         private readonly PageRepository                   $pageRepository,
-        private readonly NewsletterBrandingRepository $newsletterBrandingRepository,
+        private readonly NewsletterBrandingRepository   $newsletterBrandingRepository,
         private readonly NewsletterLayoutRepository     $newsletterLayoutRepository,
         private readonly NewsletterSnapshotRepository   $newsletterSnapshotRepository,
         private NewsletterViewTokenService              $newsletterViewTokenService,
@@ -48,6 +48,10 @@ class NewsletterWebController extends Controller
 
     public function index()
     {
+        if (!MemberAuth::check()) {
+            return $this->view('newsletters/archive-restricted');
+        }
+
         $siteId = SiteContext::getId();
         $newsletters = $this->newsletterRepository->getPublished($siteId);
 
@@ -63,6 +67,10 @@ class NewsletterWebController extends Controller
         $sendId = $request->query('send_id');
         $siteId = SiteContext::getId();
         $member = MemberAuth::getMember();
+
+        if (!MemberAuth::check()) {
+            return $this->view('newsletters/archive-restricted');
+        }
 
         $newsletter = $this->newsletterRepository->find($id);
 
@@ -170,6 +178,10 @@ class NewsletterWebController extends Controller
         $sendId = $request->query('send_id');
         $siteId = SiteContext::getId();
         $member = MemberAuth::getMember();
+
+        if (!MemberAuth::check()) {
+            return $this->view('newsletters/archive-restricted');
+        }
 
         $newsletter = $this->newsletterRepository->find($id);
 

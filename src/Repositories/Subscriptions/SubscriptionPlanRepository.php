@@ -4,6 +4,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Repository;
 
@@ -55,6 +56,34 @@ class SubscriptionPlanRepository extends Repository
         return SubscriptionPlan::find($planId)
             ?->activeSubscriptions()
             ->count() ?? 0;
+    }
+
+    /**
+     * Get subscriber counts for multiple plans in a single query.
+     *
+     * @param array<int,int> $planIds
+     * @return array<int,int> plan_id => count
+     */
+    public function getSubscriberCountsForPlans(array $planIds): array
+    {
+        if (empty($planIds)) {
+            return [];
+        }
+
+        $rows = Subscription::whereIn('plan_id', $planIds)
+            ->active()
+            ->groupBy('plan_id')
+            ->selectRaw('plan_id, COUNT(*) as aggregate')
+            ->pluck('aggregate', 'plan_id')
+            ->toArray();
+
+        // Ensure all requested IDs are present with at least 0
+        $counts = [];
+        foreach ($planIds as $id) {
+            $counts[$id] = (int)($rows[$id] ?? 0);
+        }
+
+        return $counts;
     }
 
     public function toggleActive(int $planId): bool

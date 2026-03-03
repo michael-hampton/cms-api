@@ -5,6 +5,7 @@ namespace App\Controllers\Newsletter;
 use App\Controllers\Controller;
 use App\DTO\Newsletters\NewsletterContentDTO;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Database\Database;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Mail\MailManager;
@@ -229,6 +230,10 @@ class NewsletterController extends Controller
 
             if (!$newsletter || $newsletter->site_id !== $siteId) {
                 return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            if ($newsletter->paused) {
+                return $this->errorResponse('Cannot send a paused newsletter. Please resume it first.', 400);
             }
 
             $result = $this->newsletterSendService->sendNewsletter($newsletter, $siteId, MemberAuth::getMember());
@@ -641,6 +646,226 @@ class NewsletterController extends Controller
 
             return $this->resourceResponse(['statistics' => $stats]);
 
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function togglePause(Request $request, int $id): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $newsletter = $this->newsletterRepository->find($id);
+
+            if (!$newsletter || $newsletter->site_id !== $siteId) {
+                return $this->errorResponse('Newsletter not found', 404);
+            }
+
+            $newPausedState = !$newsletter->paused;
+            $this->newsletterRepository->update($id, ['paused' => $newPausedState]);
+
+            $action = $newPausedState ? 'paused' : 'resumed';
+            return $this->successResponse("Newsletter {$action} successfully", [
+                'paused' => $newPausedState
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+
+    public function getClickDetails(Request $request): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $page = $request->input('page', 1);
+            $perPage = $request->input('per_page', 20);
+            $sortBy = $request->input('sortBy');
+            $sortDirection = $request->input('sortDirection', 'desc');
+            $dateFrom = $request->input('dateFrom');
+            $dateTo = $request->input('dateTo');
+            $search = $request->input('search');
+
+            $result = $this->newsletterService->getClickDetails(
+                $siteId, $page, $perPage, $sortBy, $sortDirection, $dateFrom, $dateTo, $search
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $result['data'],
+                'pagination' => $result['pagination']
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getUniqueClickerDetails(Request $request): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $page = $request->input('page', 1);
+            $perPage = $request->input('per_page', 20);
+            $sortBy = $request->input('sortBy');
+            $sortDirection = $request->input('sortDirection', 'desc');
+            $dateFrom = $request->input('dateFrom');
+            $dateTo = $request->input('dateTo');
+            $search = $request->input('search');
+
+            $result = $this->newsletterService->getUniqueClickerDetails(
+                $siteId,
+                $page,
+                $perPage,
+                $sortBy,
+                $sortDirection,
+                $dateFrom,
+                $dateTo,
+                $search
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $result['data'],
+                'pagination' => $result['pagination']
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getSendDetails(Request $request): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $page = $request->input('page', 1);
+            $perPage = $request->input('per_page', 20);
+            $sortBy = $request->input('sortBy');
+            $sortDirection = $request->input('sortDirection', 'desc');
+            $dateFrom = $request->input('dateFrom');
+            $dateTo = $request->input('dateTo');
+            $search = $request->input('search');
+
+            $result = $this->newsletterService->getSendDetails(
+                $siteId,
+                $page,
+                $perPage,
+                $sortBy,
+                $sortDirection,
+                $dateFrom,
+                $dateTo,
+                $search
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $result['data'],
+                'pagination' => $result['pagination']
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getRecipientDetails(Request $request): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $page = $request->input('page', 1);
+            $perPage = $request->input('per_page', 20);
+            $sortBy = $request->input('sortBy');
+            $sortDirection = $request->input('sortDirection', 'desc');
+            $dateFrom = $request->input('dateFrom');
+            $dateTo = $request->input('dateTo');
+            $search = $request->input('search');
+
+            $result = $this->newsletterService->getRecipientDetails(
+                $siteId,
+                $page,
+                $perPage,
+                $sortBy,
+                $sortDirection,
+                $dateFrom,
+                $dateTo,
+                $search
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $result['data'],
+                'pagination' => $result['pagination']
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getFailedSendDetails(Request $request): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $page = $request->input('page', 1);
+            $perPage = $request->input('per_page', 20);
+            $sortBy = $request->input('sortBy');
+            $sortDirection = $request->input('sortDirection', 'desc');
+            $dateFrom = $request->input('dateFrom');
+            $dateTo = $request->input('dateTo');
+            $search = $request->input('search');
+
+            $result = $this->newsletterService->getFailedSendDetails(
+                $siteId,
+                $page,
+                $perPage,
+                $sortBy,
+                $sortDirection,
+                $dateFrom,
+                $dateTo,
+                $search
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'data' => $result['data'],
+                'pagination' => $result['pagination']
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+// Add new endpoint for bulk retry
+    public function retryFailedSends(Request $request): JsonResponse
+    {
+        try {
+            $siteId = $request->getSiteId();
+            $emails = $request->input('emails', []);
+
+            if (empty($emails)) {
+                return $this->errorResponse('No emails provided', 400);
+            }
+
+            // Find failed recipients
+            $recipients = Database::table('newsletter_send_recipients')
+                ->whereIn('email', $emails)
+                ->where('status', 'failed')
+                ->get();
+
+            $retryCount = 0;
+            foreach ($recipients as $recipient) {
+                // Reset status to pending for retry
+                Database::table('newsletter_send_recipients')
+                    ->where('id', $recipient->id)
+                    ->update([
+                        'status' => 'pending',
+                        'error_message' => null,
+                        'updated_at' => now_datetime()->toDateTimeString()
+                    ]);
+                $retryCount++;
+            }
+
+            return $this->successResponse("Queued {$retryCount} recipients for retry", [
+                'retried_count' => $retryCount
+            ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

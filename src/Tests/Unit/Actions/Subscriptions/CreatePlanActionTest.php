@@ -18,6 +18,25 @@ class CreatePlanActionTest extends TestCase
     private StripeProductGatewayInterface $stripeProductGateway;
     private CreatePlanAction $action;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->stripeProductGateway = Mockery::mock(StripeProductGatewayInterface::class);
+
+        $this->action = new CreatePlanAction(
+            $this->planRepository,
+            $this->stripeProductGateway,
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_it_persists_plan_then_creates_stripe_product(): void
     {
         $planData = ['name' => 'Monthly Magazine', 'price' => 9.99, 'currency' => 'GBP'];
@@ -156,20 +175,4 @@ class CreatePlanActionTest extends TestCase
         $this->action->execute(['name' => 'Base Plan']);
     }
 
-    // ---------------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------------
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
-        $this->stripeProductGateway = Mockery::mock(StripeProductGatewayInterface::class);
-
-        $this->action = new CreatePlanAction(
-            $this->planRepository,
-            $this->stripeProductGateway,
-        );
-    }
 }

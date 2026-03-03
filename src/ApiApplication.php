@@ -40,6 +40,8 @@ use App\Framework\Http\Router;
 use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Routing\RouteLoader;
+use App\Framework\Storage\StoragePathResolver;
+use App\Framework\Storage\StoragePathResolverInterface;
 use App\Listeners\BadgeEarnedListener;
 use App\Listeners\Boost\HandleOrderConversionAttribution;
 use App\Listeners\Boost\SendBoostActivatedNotification;
@@ -156,6 +158,7 @@ class ApiApplication
         $this->container->bind(ClockInterface::class, SystemClock::class);
         $this->container->bind(StripePriceGatewayInterface::class, StripePriceGateway::class);
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
+        $this->container->bind(StoragePathResolverInterface::class, StoragePathResolver::class);
 
 
         $this->container->singleton(DiscountProviderRegistry::class, function ($app) {
@@ -369,13 +372,5 @@ class ApiApplication
         $eventDispatcher->listen(OrderCreatedEvent::class, [HandleOrderConversionAttribution::class, 'handle']);
         $eventDispatcher->listen(OrderCreatedEvent::class, [ApproveProductLinkedRewardsListener::class, 'handle']);
         $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
-
-
-
-
-
-
-
-
     }
 }

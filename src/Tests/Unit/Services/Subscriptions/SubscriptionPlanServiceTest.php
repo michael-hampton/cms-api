@@ -7,6 +7,7 @@ use App\DTO\Vouchers\VoucherValidationResult;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
 use App\Exceptions\Subscriptions\PlanNotFoundException;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -29,6 +30,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
     private $eligibilityService;
     private $createPlanAction;
     private $pricingService;
+    private $databaseMock;
 
     protected function setUp(): void
     {
@@ -40,6 +42,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $this->eligibilityService = Mockery::mock(SubscriptionEligibilityService::class);
         $this->createPlanAction = Mockery::mock(CreatePlanAction::class);
         $this->pricingService = Mockery::mock(SubscriptionPlanPricingService::class);
+        $this->databaseMock = Mockery::mock(Database::class);
 
         $this->service = new SubscriptionPlanService(
             $this->planRepository,
@@ -48,6 +51,7 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             $this->eligibilityService,
             $this->createPlanAction,
             $this->pricingService,
+            $this->databaseMock,
         );
     }
 
@@ -81,6 +85,13 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
 
         $this->createPlanAction
             ->shouldReceive('execute')
@@ -122,6 +133,13 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
 
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
+
         $this->createPlanAction
             ->shouldReceive('execute')
             ->once()
@@ -159,6 +177,13 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
 
         $this->createPlanAction
             ->shouldReceive('execute')
@@ -212,6 +237,12 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             'price' => 29.99
         ];
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid billing period: invalid_period');
 
@@ -226,6 +257,12 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             'currency' => 'INVALID',
             'billing_period' => 'monthly'
         ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Currency INVALID is not supported');
@@ -242,6 +279,12 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             'billing_period' => 'monthly'
         ];
 
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Price cannot be negative');
 
@@ -257,6 +300,12 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             'billing_period' => 'monthly',
             'trial_days' => -5
         ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Trial days cannot be negative');
@@ -435,6 +484,42 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Cannot delete plan with 5 active subscriptions');
 
         $this->service->deletePlan(1);
+    }
+
+    public function testGetAllPlansWithStatsUsesAggregatedSubscriberCounts(): void
+    {
+        $plan1 = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan1->id = 1;
+        $plan1->price = 10.0;
+
+        $plan2 = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan2->id = 2;
+        $plan2->price = 20.0;
+
+        $plansCollection = new Collection([$plan1, $plan2]);
+
+        $this->planRepository
+            ->shouldReceive('getAllForSite')
+            ->once()
+            ->with(1)
+            ->andReturn($plansCollection);
+
+        $this->planRepository
+            ->shouldReceive('getSubscriberCountsForPlans')
+            ->once()
+            ->with([1, 2])
+            ->andReturn([
+                1 => 3,
+                2 => 5,
+            ]);
+
+        $result = $this->service->getAllPlansWithStats(1);
+
+        $this->assertCount(2, $result);
+        $this->assertSame(3, $result[0]['subscriber_count']);
+        $this->assertSame(5, $result[1]['subscriber_count']);
+        $this->assertSame(30.0, $result[0]['revenue']);
+        $this->assertSame(100.0, $result[1]['revenue']);
     }
 
     public function testSubscribeMemberToPlanWithVoucherSuccess(): void

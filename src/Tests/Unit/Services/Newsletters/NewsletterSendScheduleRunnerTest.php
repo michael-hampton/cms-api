@@ -235,6 +235,32 @@ class NewsletterSendScheduleRunnerTest extends TestCase
         $this->assertSame(2, $result['processed']);
     }
 
+    public function test_skips_and_advances_when_newsletter_is_paused(): void
+    {
+        $schedule = $this->makeSchedule();
+        $newsletter = $this->makeNewsletter();
+        $newsletter->paused = true;
+
+        $this->mockScheduleRepository->shouldReceive('getDueSchedules')
+            ->andReturn(collect([$schedule]));
+
+        $this->mockNewsletterRepository->shouldReceive('find')
+            ->andReturn($newsletter);
+
+        $this->mockSendService->shouldNotReceive('sendNewsletter');
+
+        $this->mockCalculator->shouldReceive('calculate')
+            ->andReturn(new \DateTimeImmutable('+1 week'));
+        $this->mockDatabase->shouldReceive('transaction')
+            ->andReturnUsing(fn($cb) => $cb());
+        $this->mockScheduleRepository->shouldReceive('update')->once();
+
+        $result = $this->runner->run();
+
+        $this->assertSame(0, $result['processed']);
+        $this->assertSame(1, $result['skipped']);
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================

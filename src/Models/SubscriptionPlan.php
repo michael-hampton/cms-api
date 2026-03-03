@@ -38,7 +38,9 @@ class SubscriptionPlan extends Model
         'pre_release_enabled',
         'dispatch_days',
         'categories',
-        'tags'
+        'tags',
+        'print_image_url',
+        'digital_image_url'
     ];
 
     protected $casts = [

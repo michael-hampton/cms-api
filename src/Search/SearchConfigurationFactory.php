@@ -22,6 +22,7 @@ use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\RewardDefinitionSearchConfiguration;
 use App\Search\Configurations\RewardSearchConfiguration;
+use App\Search\Configurations\SubscriptionPlanSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
@@ -57,6 +58,7 @@ class SearchConfigurationFactory
         'product_offer_bundle' => ProductOfferBundleSearchConfiguration::class,
         'gift_promotion' => GiftPromotionSearchConfiguration::class,
         'issue_delivery' => IssueDeliverySearchConfiguration::class,
+        'subscription_plan' => SubscriptionPlanSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

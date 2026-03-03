@@ -37,6 +37,7 @@ class Newsletter extends Model
         'layout_id',
         'content_blocks',
         'legacy_content',
+        'paused'
     ];
 
     protected $casts = [
@@ -55,6 +56,7 @@ class Newsletter extends Model
         'has_time_window' => 'boolean',
         'requires_bundle' => 'boolean',
         'content_blocks' => 'array',
+        'paused' => 'boolean'
     ];
 
     const INTERVAL_DAILY = 'daily';

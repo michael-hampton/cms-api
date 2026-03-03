@@ -2,15 +2,20 @@
 
 namespace App\Controllers\Subscription;
 
+use App\Actions\SubscriptionPlan\BulkTogglePlanActive;
 use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Resources\SubscriptionResource;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteriaParser;
+use App\Search\SearchEngine;
 use App\Services\Subscriptions\SubscriptionPlanService;
 use Exception;
 
@@ -20,7 +25,8 @@ class SubscriptionController extends Controller
         private readonly SubscriptionRepository     $subscriptionRepository,
         private readonly PaymentRepository          $paymentRepository,
         private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
-        private readonly SubscriptionPlanService    $planService
+        private readonly SubscriptionPlanService $planService,
+        private readonly BulkTogglePlanActive    $bulkTogglePlanActive
     )
     {
     }
@@ -66,20 +72,27 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function plans()
+    public function plans(Request $request, string $siteName)
     {
         try {
-            $plans = $this->subscriptionPlanRepository->getActivePlans(SiteContext::getId());
+            $configuration = SearchConfigurationFactory::create('subscription_plan');
+            $engine = new SearchEngine($configuration);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+
+            $queryBuilder = SubscriptionPlan::query();
+            $result = $engine->search($queryBuilder, $criteria);
+
+            $plans = array_map(function ($plan) {
+                return array_merge($plan, [
+                    'release_date' => !empty($plan['release_date'])
+                        ? (new $plan['release_date'])?->format('Y-m-d H:i:s')
+                        : null,
+                ]);
+            }, $result->getData());
 
             return $this->resourceResponse([
-                'plans' => $plans->map(function ($plan) {
-                    return array_merge(
-                        $plan->toArray(),
-                        [
-                            'release_date' => $plan->release_date?->format('Y-m-d H:i:s'),
-                        ]
-                    );
-                }),
+                'plans' => $plans,
+                'pagination' => $result->toArray()['pagination'],
             ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -91,8 +104,28 @@ class SubscriptionController extends Controller
         $siteId = SiteContext::getId();
 
         try {
+            $data = $request->all();
 
-            $plan = $this->planService->createPlan($request->all(), $siteId);
+            // Handle image uploads
+            if ($request->hasFile('print_image')) {
+                $upload = new \App\Framework\FileUpload\ImageUpload(
+                    $request->file('print_image')->getFileInfo(),
+                    'uploads/plans'
+                );
+                $path = $upload->store('print');
+                $data['print_image_url'] = $path;
+            }
+
+            if ($request->hasFile('digital_image')) {
+                $upload = new \App\Framework\FileUpload\ImageUpload(
+                    $request->file('digital_image')->getFileInfo(),
+                    'uploads/plans'
+                );
+                $path = $upload->store('digital');
+                $data['digital_image_url'] = $path;
+            }
+
+            $plan = $this->planService->createPlan($data, $siteId);
 
             return $this->jsonResponse([
                 'success' => true,
@@ -112,13 +145,30 @@ class SubscriptionController extends Controller
     {
         try {
             $siteId = SiteContext::getId();
-            $plan = $this->planService->updatePlan($id, $request->all(), $siteId);
+            $data = $request->all();
+
+            if ($request->hasFile('print_image')) {
+                $upload = new \App\Framework\FileUpload\ImageUpload(
+                    $request->file('print_image')->getFileInfo(),
+                    'uploads/plans'
+                );
+                $path = $upload->store('print');
+                $data['print_image_url'] = $path;
+            }
+
+            if ($request->hasFile('digital_image')) {
+                $upload = new \App\Framework\FileUpload\ImageUpload(
+                    $request->file('digital_image')->getFileInfo(),
+                    'uploads/plans'
+                );
+                $path = $upload->store('digital');
+                $data['digital_image_url'] = $path;
+            }
+
+            $plan = $this->planService->updatePlan($id, $data, $siteId);
 
             if (!$plan) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Plan not found'
-                ], 404);
+                return $this->jsonResponse(['success' => false, 'message' => 'Plan not found'], 404);
             }
 
             return $this->jsonResponse([
@@ -127,12 +177,8 @@ class SubscriptionController extends Controller
                 'plan' => $plan
             ]);
 
-
         } catch (\Exception $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -159,6 +205,36 @@ class SubscriptionController extends Controller
                 'success' => false,
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function bulkToggleActive(Request $request)
+    {
+        try {
+            $planIds = $request->get('plan_ids', []);
+            $active = (bool)$request->get('active');
+
+            if (empty($planIds) || !is_array($planIds)) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'plan_ids must be a non-empty array',
+                ], 422);
+            }
+
+            $result = $this->bulkTogglePlanActive->handle($planIds, $active);
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => sprintf(
+                    '%d plan(s) %s, %d failed',
+                    count($result['updated']),
+                    $active ? 'activated' : 'deactivated',
+                    count($result['failed'])
+                ),
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 }

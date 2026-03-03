@@ -76,6 +76,15 @@ class NewsletterSendScheduleRunner
             return 'skipped';
         }
 
+        if ($newsletter->paused) {
+            $this->logger->info('Skipping paused newsletter', [
+                'schedule_id' => $schedule->id,
+                'newsletter_id' => $newsletter->id,
+            ]);
+            $this->advanceNextRunAt($schedule);
+            return 'skipped';
+        }
+
         $sendResult = $this->sendService->sendNewsletter($newsletter, $schedule->site_id);
 
         if ($sendResult['success'] || ($sendResult['partial_failure'] ?? false)) {

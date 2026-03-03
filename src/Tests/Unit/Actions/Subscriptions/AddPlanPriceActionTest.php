@@ -25,6 +25,31 @@ class AddPlanPriceActionTest extends TestCase
     private PlanPricingDomainGuard $domainGuard;
     private AddPlanPriceAction $action;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->pricingRepository = Mockery::mock(SubscriptionPlanPricingRepository::class);
+        $this->stripePriceGateway = Mockery::mock(StripePriceGatewayInterface::class);
+        $this->currencyValidator = Mockery::mock(PricingCurrencyValidator::class);
+        $this->domainGuard = Mockery::mock(PlanPricingDomainGuard::class);
+
+        $this->action = new AddPlanPriceAction(
+            $this->planRepository,
+            $this->pricingRepository,
+            $this->stripePriceGateway,
+            $this->currencyValidator,
+            $this->domainGuard,
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_it_creates_stripe_price_and_stores_id_locally(): void
     {
         $plan = $this->makePlan(1, 'prod_abc');
@@ -279,24 +304,5 @@ class AddPlanPriceActionTest extends TestCase
         $this->planRepository->shouldReceive('update')->once();
 
         $this->action->execute(7, ['amount_cents' => 999, 'currency' => 'gbp', 'interval' => 'month']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
-        $this->pricingRepository = Mockery::mock(SubscriptionPlanPricingRepository::class);
-        $this->stripePriceGateway = Mockery::mock(StripePriceGatewayInterface::class);
-        $this->currencyValidator = Mockery::mock(PricingCurrencyValidator::class);
-        $this->domainGuard = Mockery::mock(PlanPricingDomainGuard::class);
-
-        $this->action = new AddPlanPriceAction(
-            $this->planRepository,
-            $this->pricingRepository,
-            $this->stripePriceGateway,
-            $this->currencyValidator,
-            $this->domainGuard,
-        );
     }
 }

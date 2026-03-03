@@ -511,6 +511,14 @@ class QueryBuilder
         return $this->orderBy($column, 'asc');
     }
 
+    public function from(?string $alias = null)
+    {
+        $this->table = $alias
+            ? "{$this->table} as {$alias}"
+            : $this->table;
+
+        return $this;
+    }
     // JOINS
     public function join(string $table, $first, ?string $operator = null, ?string $second = null): self
     {

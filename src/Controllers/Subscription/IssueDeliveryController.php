@@ -2,6 +2,8 @@
 
 namespace App\Controllers\Subscription;
 
+use App\Actions\Subscriptions\ExportIssueSchedulesAction;
+use App\Actions\Subscriptions\ImportIssueSchedulesAction;
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Http\JsonResponse;
@@ -18,7 +20,9 @@ class IssueDeliveryController extends Controller
 {
     public function __construct(
         private readonly IssueDeliveryService    $issueDeliveryService,
-        private readonly IssueDeliveryRepository $issueDeliveryRepository
+        private readonly IssueDeliveryRepository    $issueDeliveryRepository,
+        private readonly ImportIssueSchedulesAction $importIssueSchedulesAction,
+        private readonly ExportIssueSchedulesAction $exportIssueSchedulesAction
     )
     {
         parent::__construct();
@@ -176,7 +180,7 @@ class IssueDeliveryController extends Controller
         $file = $request->file('csv_file');
 
         try {
-            $result = $this->issueDeliveryService->importFromCsv($siteId, $file['tmp_name']);
+            $result = $this->importIssueSchedulesAction->execute($siteId, $file['tmp_name']);
 
             return $this->resourceResponse([
                 'success' => true,
@@ -197,7 +201,7 @@ class IssueDeliveryController extends Controller
         $siteId = SiteContext::getId();
 
         try {
-            $filepath = $this->issueDeliveryService->exportToCsv($siteId);
+            $filepath = $this->exportIssueSchedulesAction->execute($siteId);
 
             return $this->downloadFile($filepath, basename($filepath));
 

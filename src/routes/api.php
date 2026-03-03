@@ -253,6 +253,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
         $router->post('/subscriptions/plans', [SubscriptionController::class, 'createPlan']);
         $router->put('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
+        $router->post('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->delete('/subscriptions/plans/{id}', [SubscriptionController::class, 'deletePlan']);
 
         // Subscription premium access management
@@ -657,6 +658,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/newsletters', [NewsletterController::class, 'create']);
         $router->get('/newsletters/{id}/subscribers', [NewsletterController::class, 'getNewsletterSubscribers']);
         $router->post('/newsletters/{id}/send', [NewsletterController::class, 'send']);
+        $router->post('/newsletters/{id}/pause', [NewsletterController::class, 'togglePause']);
         $router->delete('/newsletters/{id}', [NewsletterController::class, 'delete']);;
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
@@ -668,8 +670,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/newsletters/{newsletterId}/issues/{issueId}/revert', [NewsletterIssueController::class, 'revert']);
         $router->post('/newsletter-issues/{issueId}/send', [NewsletterIssueController::class, 'manualSend']);
 
-
-
+        // newsletter stats
+        $router->get('/newsletters/statistics/clicks', [NewsletterController::class, 'getClickDetails']);
+        $router->get('/newsletters/statistics/failed-sends', [NewsletterController::class, 'getFailedSendDetails']);
+        $router->get('/newsletters/statistics/unique-clickers', [NewsletterController::class, 'getUniqueClickerDetails']);
+        $router->get('/newsletters/statistics/sends', [NewsletterController::class, 'getSendDetails']);
+        $router->get('/newsletters/statistics/recipients', [NewsletterController::class, 'getRecipientDetails']);
 
         $router->get('/newsletters/{newsletterId}/schedules',
             [NewsletterScheduleController::class, 'index']

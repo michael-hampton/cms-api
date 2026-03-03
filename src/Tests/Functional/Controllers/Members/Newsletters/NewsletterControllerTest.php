@@ -796,4 +796,80 @@ class NewsletterControllerTest extends FunctionalTestCase
             'unsubscribe_token' => bin2hex(random_bytes(16)),
         ]);
     }
+
+    public function test_pause_newsletter_successfully(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'paused' => false,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite('/api/newsletters/' . $newsletter->id . '/pause');
+
+        // dd(strlen($response->getContent()));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['data']['paused']);
+
+        $updated = Newsletter::find($newsletter->id);
+        $this->assertTrue($updated->paused);
+    }
+
+    public function test_resume_newsletter_successfully(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Test Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'paused' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        $response = $this->postForSite('/api/newsletters/' . $newsletter->id . '/pause');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertFalse($data['data']['paused']);
+    }
+
+    public function test_send_returns_error_when_newsletter_is_paused(): void
+    {
+        $newsletter = Newsletter::create([
+            'title' => 'Paused Newsletter',
+            'content' => '[]',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'active' => true,
+            'paused' => true,
+            'site_id' => $this->siteId
+        ]);
+
+        Subscriber::create([
+            'email' => 'subscriber@example.com',
+            'confirmed' => true,
+            'site_id' => $this->siteId,
+            'subscribed_at' => date('Y-m-d H:i:s'),
+            'unsubscribe_token' => 'test-token-paused'
+        ]);
+
+        $response = $this->postForSite('/api/newsletters/' . $newsletter->id . '/send');
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('paused', $data['error']);
+    }
+
+    public function test_pause_returns_404_for_nonexistent_newsletter(): void
+    {
+        $response = $this->postForSite('/api/newsletters/99999/pause');
+        $this->assertEquals(404, $response->getStatusCode());
+    }
 }

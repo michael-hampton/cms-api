@@ -27,6 +27,7 @@ class NewsletterResource extends JsonResource
             'is_default' => $this->getAttribute('is_default'),
             'is_premium' => $this->getAttribute('is_premium'),
             'allows_single_purchase' => $this->getAttribute('allows_single_purchase'),
+            'paused' => $this->getAttribute('paused'),
 
             // Statistics
             'statistics' => $this->whenLoaded('statistics', function () {

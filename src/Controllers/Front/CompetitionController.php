@@ -55,8 +55,7 @@ class CompetitionController extends Controller
         $competition = $this->competitionService->getCompetition($siteId, $slug, $member);
 
         if (!$competition) {
-            // return response()->notFound();
-            die('here'); //todo
+            return $this->notFound();
         }
 
         return $this->view('competitions.show', [
