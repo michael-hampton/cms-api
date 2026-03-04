@@ -11122,6 +11122,363 @@ body.card-flipped {
     line-height: 1.6;
 }
 
+/* ============================================================
+   Base advert block
+   ============================================================ */
+[data-advert] {
+    position: relative;
+    margin: 24px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+.advert-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 4px 0 4px 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+/* ============================================================
+   Offer block
+   ============================================================ */
+[data-advert="offer"] {
+    border-color: #3b82f6;
+}
+
+[data-advert="offer"] .advert-label {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+[data-advert="offer"] .offer-content {
+    padding: 40px 20px 20px; /* top padding clears the label */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+[data-advert="offer"] .offer-image {
+    width: 100%;
+    max-height: 240px;
+    overflow: hidden;
+}
+
+[data-advert="offer"] .offer-image img {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    display: block;
+}
+
+[data-advert="offer"] .offer-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.3;
+}
+
+[data-advert="offer"] .offer-description {
+    margin: 0;
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.6;
+}
+
+[data-advert="offer"] .offer-pricing {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+[data-advert="offer"] .offer-price-original {
+    font-size: 15px;
+    color: #9ca3af;
+    text-decoration: line-through;
+}
+
+[data-advert="offer"] .offer-price-sale {
+    font-size: 22px;
+    font-weight: 700;
+    color: #dc2626;
+}
+
+[data-advert="offer"] .offer-price {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+}
+
+[data-advert="offer"] .offer-cta {
+    align-self: flex-start;
+    margin-top: 4px;
+}
+
+/* ============================================================
+   Deal block
+   ============================================================ */
+[data-advert="deal"] {
+    border-color: #16a34a;
+}
+
+[data-advert="deal"] .advert-label {
+    background: #16a34a;
+    color: #ffffff;
+}
+
+[data-advert="deal"] .deal-inner {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+}
+
+[data-advert="deal"] .deal-image {
+    flex: 0 0 160px;
+    max-width: 160px;
+}
+
+[data-advert="deal"] .deal-image img {
+    width: 160px;
+    height: 100%;
+    min-height: 160px;
+    object-fit: cover;
+    display: block;
+}
+
+[data-advert="deal"] .deal-content {
+    flex: 1;
+    padding: 40px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+[data-advert="deal"] .deal-brand {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+[data-advert="deal"] .deal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.3;
+}
+
+[data-advert="deal"] .deal-description {
+    margin: 0;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+[data-advert="deal"] .deal-pricing {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+[data-advert="deal"] .deal-original-price {
+    font-size: 14px;
+    color: #9ca3af;
+    text-decoration: line-through;
+}
+
+[data-advert="deal"] .deal-sale-price {
+    font-size: 22px;
+    font-weight: 700;
+    color: #16a34a;
+}
+
+[data-advert="deal"] .deal-savings {
+    font-size: 12px;
+    font-weight: 600;
+    color: #16a34a;
+    background: #dcfce7;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+[data-advert="deal"] .deal-button {
+    align-self: flex-start;
+    margin-top: 8px;
+}
+
+/* ============================================================
+   Reward block
+   ============================================================ */
+[data-advert="reward"] {
+    border-color: #9333ea;
+    background: #faf5ff;
+}
+
+[data-advert="reward"] .advert-label {
+    background: #9333ea;
+    color: #ffffff;
+}
+
+[data-advert="reward"] .reward-content {
+    padding: 40px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+[data-advert="reward"] .reward-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #581c87;
+    line-height: 1.3;
+}
+
+[data-advert="reward"] .reward-description {
+    margin: 0;
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.6;
+}
+
+[data-advert="reward"] .reward-voucher {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #ffffff;
+    border: 2px dashed #9333ea;
+    border-radius: 6px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+}
+
+[data-advert="reward"] .voucher-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+[data-advert="reward"] .voucher-code {
+    font-family: monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: #9333ea;
+    letter-spacing: 2px;
+    flex: 1;
+}
+
+[data-advert="reward"] .voucher-copy-btn {
+    padding: 6px 14px;
+    background: #9333ea;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+[data-advert="reward"] .voucher-copy-btn:hover {
+    background: #7e22ce;
+}
+
+[data-advert="reward"] .reward-cta {
+    align-self: flex-start;
+}
+
+/* ============================================================
+   Boost block
+   ============================================================ */
+[data-advert="boost"] {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 1px #fef3c7;
+}
+
+[data-advert="boost"] .advert-label {
+    background: #f59e0b;
+    color: #ffffff;
+}
+
+/* The inner product-card or deal-block inherits its own styles.
+   We only need to ensure the top padding clears the Featured badge. */
+[data-advert="boost"] .product-card-container,
+[data-advert="boost"] .deal-block {
+    padding-top: 32px;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 640px) {
+    [data-advert="deal"] .deal-inner {
+        flex-direction: column;
+    }
+
+    [data-advert="deal"] .deal-image {
+        flex: none;
+        max-width: 100%;
+    }
+
+    [data-advert="deal"] .deal-image img {
+        width: 100%;
+        height: 200px;
+    }
+
+    [data-advert="deal"] .deal-content {
+        padding-top: 36px;
+    }
+
+    [data-advert="offer"] .offer-cta,
+    [data-advert="reward"] .reward-cta,
+    [data-advert="deal"] .deal-button {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ============================================================
+   Overflow row — remaining adverts displayed inline
+   ============================================================ */
+.advert-overflow-row {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    margin: 24px 0;
+    align-items: flex-start;
+}
+
+.advert-overflow-row [data-advert] {
+    flex: 1 1 0;
+    min-width: 0; /* prevents flex children overflowing */
+    margin: 0; /* override the default [data-advert] margin since gap handles spacing */
+}
+
+@media (max-width: 640px) {
+    .advert-overflow-row {
+        flex-direction: column;
+    }
+
+    .advert-overflow-row [data-advert] {
+        flex: none;
+        width: 100%;
+    }
+}
 
 
 

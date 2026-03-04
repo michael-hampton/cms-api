@@ -830,4 +830,39 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new self($results);
     }
 
+    public function average($key = null): ?float
+    {
+        if (empty($this->items)) {
+            return null;
+        }
+
+        $values = $this->items;
+
+        if ($key !== null) {
+            $values = array_map(function ($item) use ($key) {
+                if (is_callable($key)) {
+                    return $key($item);
+                }
+
+                if (is_array($item) && array_key_exists($key, $item)) {
+                    return $item[$key];
+                }
+
+                if (is_object($item) && isset($item->{$key})) {
+                    return $item->{$key};
+                }
+
+                return null;
+            }, $this->items);
+        }
+
+        $numericValues = array_filter($values, fn($value) => is_numeric($value));
+
+        if (count($numericValues) === 0) {
+            return null;
+        }
+
+        return array_sum($numericValues) / count($numericValues);
+    }
+
 }

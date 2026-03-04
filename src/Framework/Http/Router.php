@@ -623,13 +623,24 @@ class Router
         return $this->namedRoutes;
     }
 
-    public function where(string $param, string $pattern): self
+    public function where(string|array $param, ?string $pattern = null): self
     {
         if (!isset($this->lastHttpMethod) || !isset($this->lastPath)) {
             throw new \LogicException('Cannot call where() before defining a route.');
         }
 
-        // Store parameter regex for the last added route
+        if (is_array($param)) {
+            foreach ($param as $key => $value) {
+                $this->paramPatterns[$this->lastHttpMethod][$this->lastPath][$key] = $value;
+            }
+
+            return $this;
+        }
+
+        if ($pattern === null) {
+            throw new \InvalidArgumentException('Pattern must be provided when param is a string.');
+        }
+
         $this->paramPatterns[$this->lastHttpMethod][$this->lastPath][$param] = $pattern;
 
         return $this;

@@ -186,8 +186,6 @@ class NewsletterSendService
             return $contentResult;
         }
 
-        echo $contentResult['html'];
-
         return $this->database->transaction(function () use ($newsletter, $previewEmails, $contentResult, $siteId) {
             $sendRecord = $this->createPreviewSendRecord($newsletter, $previewEmails, $contentResult);
             $recipients = $this->recipientRepository->createRecipients($sendRecord->id, $previewEmails);

@@ -51,6 +51,7 @@ use App\Controllers\Product\ProductController;
 use App\Controllers\Product\ProductMatchingController;
 use App\Controllers\Product\ReviewController;
 use App\Controllers\Product\VariantController;
+use App\Controllers\Recommendations\RecommendationController;
 use App\Controllers\Rewards\RewardAuditLogController;
 use App\Controllers\Rewards\RewardDefinitionsAdminController;
 use App\Controllers\Rewards\RewardsAdminController;
@@ -424,13 +425,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
 
 //products
-        $router->get('/products', ProductController::class, 'index');
-        $router->post('/products', ProductController::class, 'store');
-        $router->get('/products/{id}', ProductController::class, 'show');
-        $router->put('/products/{id}', ProductController::class, 'update');
-        $router->delete('/products/{id}', ProductController::class, 'destroy');
-        $router->post('/products/{id}/duplicate', ProductController::class, 'duplicate');
-        $router->get('/products/{id}/price-history', ProductController::class, 'priceHistory');
+        $router->get('/products', [ProductController::class, 'index']);
+        $router->post('/products', [ProductController::class, 'store']);
+        $router->get('/products/{id}', [ProductController::class, 'show']);
+        $router->put('/products/{id}', [ProductController::class, 'update']);
+        $router->delete('/products/{id}', [ProductController::class, 'destroy']);
+        $router->post('/products/{id}/duplicate', [ProductController::class, 'duplicate']);
+        $router->get('/products/{id}/price-history', [ProductController::class, 'priceHistory']);
 
         //product offers
         $router->get('/offers/{id}', ProductOfferController::class, 'index');
@@ -774,7 +775,6 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/gift-promotions/{id}/toggle-active', [GiftPromotionController::class, 'toggleActive']);
         $router->get('/gift-promotions/{id}/exclusions', [GiftPromotionController::class, 'exclusions']);
 
-
     });
 
     $router->post('/sites', [SiteController::class, 'create']);
@@ -871,4 +871,7 @@ $router->put('/api/{site}/cart/{id}/update-start-date', [CartController::class, 
 $router->post('/api/{site}/vouchers/remove-voucher', VoucherController::class, 'removeVoucher');
 
 $router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportController::class, 'import']);
+
+//reccommendations
+$router->get('/api/{siteName}/recommendations/products', [RecommendationController::class, 'products']);
 

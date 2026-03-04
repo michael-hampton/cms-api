@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Framework\Container;
+use App\Framework\Http\Exceptions\HttpException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\RedirectResponse;
 use App\Framework\Http\Response;
@@ -171,5 +172,14 @@ abstract class Controller
         // Fallback plain HTML if no view exists
         $html = "<h1>404 Not Found</h1><p>{$message}</p>";
         return Response::html($html, 404);
+    }
+
+    protected function abort(
+        int    $statusCode,
+        string $message = '',
+        array  $headers = []
+    ): never
+    {
+        throw new HttpException($statusCode, $message, $headers);
     }
 }

@@ -517,6 +517,7 @@
             showError('An error occurred while loading products');
         } finally {
             hideLoading();
+            window.refreshRecommendations();
         }
     }
 

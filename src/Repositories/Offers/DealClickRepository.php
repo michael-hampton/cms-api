@@ -4,8 +4,9 @@ namespace App\Repositories\Offers;
 
 use App\Models\DealClick;
 use App\Models\Model;
+use App\Repositories\Contracts\TrackableRepository;
 
-class DealClickRepository
+class DealClickRepository implements TrackableRepository
 {
     public function trackClick(
         int     $productId,
@@ -60,5 +61,21 @@ class DealClickRepository
         }
 
         return $query->orderBy('created_at', 'desc')->get();
+    }
+
+    public function hasTracked(
+        int    $entityId,
+        int    $memberId,
+        string $action,
+        string $surfaceType,
+        int    $surfaceId,
+    ): bool
+    {
+        return DealClick::where('product_id', $entityId)
+            ->where('member_id', $memberId)
+            ->where('action', $action)
+            ->where('surface_type', $surfaceType)
+            ->where('surface_id', $surfaceId)
+            ->exists();
     }
 }

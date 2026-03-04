@@ -31,6 +31,8 @@ use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Cms\Pages\PageCollaboratorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
+use App\Requests\StorePageRequest;
+use App\Requests\UpdatePageRequest;
 use App\Resources\PageResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\Cms\Pages\PageService;
@@ -85,7 +87,7 @@ class PageController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(StorePageRequest $request, string $siteName): JsonResponse
     {
         try {
             $requestData = $request->all();
@@ -132,7 +134,7 @@ class PageController extends Controller
         }
     }
 
-    public function update(int $id, Request $request, string $siteName): JsonResponse
+    public function update(int $id, UpdatePageRequest $request, string $siteName): JsonResponse
     {
         try {
             $requestData = $request->all();

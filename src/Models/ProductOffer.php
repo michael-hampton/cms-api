@@ -37,7 +37,8 @@ class ProductOffer extends Model implements BoostableInterface
         'voucher_id',
         'eligibility_rules',
         'reward_definition_id',
-        'original_price'
+        'original_price',
+        'link'
     ];
 
     protected $casts = [

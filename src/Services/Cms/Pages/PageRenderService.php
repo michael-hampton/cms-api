@@ -7,71 +7,116 @@ use App\Parsers\PageGridRenderer;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageGridRepository;
+use App\Services\Adverts\PageVisibilityResolver;
 
 class PageRenderService
 {
     public function __construct(
-        private readonly BlockRepository    $blockRepository,
-        private readonly BlockParserService $blockParserService,
-        private readonly ZoneBlockParser    $zoneBlockParser,
-        private readonly PageGridRepository $pageGridRepository,
+        private readonly BlockRepository        $blockRepository,
+        private readonly BlockParserService     $blockParserService,
+        private readonly ZoneBlockParser        $zoneBlockParser,
+        private readonly PageGridRepository     $pageGridRepository,
+        private readonly PageVisibilityResolver $pageVisibilityResolver,
     )
     {
     }
 
     /**
-     * Renders a page with proper separation of main content and sidebar blocks
-     * Returns an array with 'main' and 'sidebar' HTML
+     * Renders a page with proper separation of main content and sidebar blocks.
+     * Advert blocks (offers, deals, rewards, boosts) are interleaved into main content.
+     * Returns an array with 'main', 'sidebar', and 'hasSidebar'.
      */
-    public function renderPage(Page $page, ?int $siteId = null): array
+    public function renderPage(Page $page, ?int $siteId = null, ?\App\Models\Member $member = null): array
     {
         $mainHtml = '';
         $sidebarHtml = '';
 
-        // Build zones HTML and get list of used block IDs
         $zonesResult = $this->zoneBlockParser->buildZonesHtml($page);
-
         $usedBlockIds = $zonesResult['usedBlockIds'];
-
-        // Render remaining blocks that weren't used in zones
         $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
-
         $pageGrids = $this->pageGridRepository->getActiveGridForPage($page->id);
 
+        $advertBlocks = $siteId
+            ? $this->pageVisibilityResolver->getAdvertBlocksForPage($page, $siteId, $member)
+            : [];
+
+        // Calculate how many adverts can be injected inline based on available main content blocks
+        $mainBlockCount = $pageBlocks
+            ->filter(function ($b) use ($usedBlockIds) {
+                $data = is_array($b->data) ? $b->data : json_decode($b->data, true);
+                return !in_array($b->id, $usedBlockIds) && ($data['context'] ?? 'default') !== 'sidebar';
+            })
+            ->count();
+
+        $minGap = $siteId ? $this->pageVisibilityResolver->minContentBlocksBetween() : PHP_INT_MAX;
+
+        if ($mainBlockCount > 12) {
+            $minGap = 4;
+        }
+
+        $maxInlineAdverts = (int)floor($mainBlockCount / ($minGap + 1));
+
+        $advertIndex = 0;
+        $sinceLastAdvert = 0;
+        $inlineInjected = 0;
+
         foreach ($pageBlocks as $index => $block) {
-            // Skip blocks that were already rendered in zones
             if (in_array($block->id, $usedBlockIds)) {
                 continue;
             }
 
             try {
-
                 foreach ($pageGrids as $pageGrid) {
                     if (!empty($pageGrid) && $pageGrid->order === ($index + 1)) {
                         $mainHtml .= (new PageGridRenderer())->render($pageGrid);
                     }
                 }
 
+                $data = is_array($block->data) ? $block->data : json_decode($block->data, true);
+
+                $context = $data['context'] ?? 'default';
+
                 $blockHtml = $this->blockParserService->buildBlock(
                     $block->page_id,
-                    array_merge($block->data, ['type' => $block->type]),
+                    array_merge($data, ['type' => $block->type]),
                     $block->order,
                     false,
                     $siteId
                 );
 
-                // Determine if this block should go in sidebar or main content
-                $context = $block->data['context'] ?? 'default';
-
                 if ($context === 'sidebar') {
                     $sidebarHtml .= $blockHtml;
                 } else {
                     $mainHtml .= $blockHtml;
+                    $sinceLastAdvert++;
+
+                    if (
+                        $inlineInjected < $maxInlineAdverts
+                        && $advertIndex < count($advertBlocks)
+                        && $sinceLastAdvert >= $minGap
+                    ) {
+                        $mainHtml .= $advertBlocks[$advertIndex];
+                        $advertIndex++;
+                        $inlineInjected++;
+                        $sinceLastAdvert = 0;
+                    }
                 }
             } catch (\Exception $e) {
-                // Log error but continue rendering
                 error_log("Failed to render block {$block->id}: {$e->getMessage()}");
             }
+        }
+
+        // Remaining adverts — single leftover appended solo, multiple go into an inline flex row
+        $remaining = array_slice($advertBlocks, $advertIndex);
+
+        if (count($remaining) === 1) {
+            $mainHtml .= $remaining[0];
+        } elseif (count($remaining) > 1) {
+            $mainHtml .= '<div class="advert-overflow-row">';
+            foreach ($remaining as $advertHtml) {
+                $mainHtml .= $advertHtml;
+            }
+            $mainHtml .= '</div>';
         }
 
         $mainHtml .= $zonesResult['html'];
@@ -79,7 +124,25 @@ class PageRenderService
         return [
             'main' => $mainHtml,
             'sidebar' => $sidebarHtml,
-            'hasSidebar' => !empty($sidebarHtml)
+            'hasSidebar' => !empty($sidebarHtml),
         ];
+    }
+
+    /**
+     * Renders a single advert block as an HTML placeholder/wrapper.
+     * The frontend (or a dedicated block renderer) is responsible for
+     * the actual visual output — this emits a data-annotated div
+     * that can be hydrated client-side or replaced server-side.
+     */
+    private function renderAdvertBlock(array $block): string
+    {
+        $type = htmlspecialchars($block['type'] ?? 'advert');
+        $data = htmlspecialchars(json_encode($block['data'] ?? []), ENT_QUOTES);
+
+        return sprintf(
+            '<div class="advert-injection" data-type="%s" data-block="%s"></div>',
+            $type,
+            $data
+        );
     }
 }

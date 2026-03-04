@@ -295,6 +295,7 @@
 
 @js('productModal.js')
 @js('products.js')
+@js('recommendations.js')
 
 </body>
 </html>

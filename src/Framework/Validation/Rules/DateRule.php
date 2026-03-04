@@ -19,6 +19,6 @@ class DateRule extends BaseValidationRule
 
     protected function getDefaultMessage(): string
     {
-        return 'Invalid email format';
+        return 'Invalid date format';
     }
 }

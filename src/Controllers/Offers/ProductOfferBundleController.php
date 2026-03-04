@@ -8,6 +8,8 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\ProductOfferBundle;
+use App\Requests\StoreProductOfferBundleRequest;
+use App\Requests\UpdateProductOfferBundleRequest;
 use App\Resources\ProductOfferBundleResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
@@ -45,7 +47,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(StoreProductOfferBundleRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -87,7 +89,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function update(int $bundleId, Request $request, string $siteName): JsonResponse
+    public function update(int $bundleId, UpdateProductOfferBundleRequest $request, string $siteName): JsonResponse
     {
         try {
             $bundle = $this->bundleService->updateBundle($bundleId, $request->all());

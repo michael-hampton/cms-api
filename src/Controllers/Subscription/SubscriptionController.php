@@ -12,6 +12,8 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Requests\CreateSubscriptionPlanRequest;
+use App\Requests\UpdateSubscriptionPlanRequest;
 use App\Resources\SubscriptionResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
@@ -99,7 +101,7 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function createPlan(Request $request)
+    public function createPlan(CreateSubscriptionPlanRequest $request)
     {
         $siteId = SiteContext::getId();
 
@@ -141,7 +143,7 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function updatePlan(Request $request, int $id)
+    public function updatePlan(UpdateSubscriptionPlanRequest $request, int $id)
     {
         try {
             $siteId = SiteContext::getId();

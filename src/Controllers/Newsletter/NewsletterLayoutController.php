@@ -4,10 +4,13 @@ namespace App\Controllers\Newsletter;
 
 use App\Controllers\Controller;
 use App\Enums\Newsletters\LayoutVersionState;
+use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Requests\CloneNewsletterLayoutRequest;
+use App\Requests\StoreNewsletterLayoutRequest;
 use App\Services\Newsletter\NewsletterLayoutService;
 
 class NewsletterLayoutController extends Controller
@@ -42,7 +45,7 @@ class NewsletterLayoutController extends Controller
         }
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreNewsletterLayoutRequest $request): JsonResponse
     {
         try {
 
@@ -64,15 +67,15 @@ class NewsletterLayoutController extends Controller
         }
     }
 
-    public function clone(Request $request, int $id): JsonResponse
+    public function clone(CloneNewsletterLayoutRequest $request, int $id): JsonResponse
     {
         try {
             $cloned = $this->layoutService->cloneLayout(
                 sourceLayoutId: $id,
                 newName: $request->input('name'),
                 newSlug: $request->input('slug'),
-                clonedBy: $request->input('cloned_by'),
-                siteId: (int)$request->input('site_id') ?? SiteContext::getId(),  // ← NEW
+                clonedBy: $request->input('cloned_by') ?? Auth::id(),
+                siteId: (int)$request->input('site_id') ?? SiteContext::getId(),
             );
 
             return $this->jsonResponse(['layout' => $cloned->toArray()], 201);

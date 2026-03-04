@@ -19,6 +19,8 @@ use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Requests\CreateNewsletterRequest;
+use App\Requests\UpdateNewsletterRequest;
 use App\Resources\NewsletterResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
@@ -91,10 +93,10 @@ class NewsletterController extends Controller
         }
     }
 
-    public function create(Request $request): JsonResponse
+    public function create(CreateNewsletterRequest $request): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
+            $siteId = SiteContext::getId();
             $isDefault = $request->input('is_default', false);
 
             $data = [
@@ -152,10 +154,10 @@ class NewsletterController extends Controller
         }
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateNewsletterRequest $request, int $id): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
+            $siteId = SiteContext::getId();
             $newsletter = $this->newsletterRepository->find($id);
 
             if (!$newsletter || $newsletter->site_id !== $siteId) {

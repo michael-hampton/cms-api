@@ -2,20 +2,25 @@
 
 namespace App\Tests\Unit\Services\Adverts;
 
-use App\Models\ProductOffer;
+use App\Framework\Database\Database;
+use App\Models\MemberReward;
 use App\Repositories\Offers\DealClickRepository;
 use App\Repositories\Offers\ProductOfferRepository;
-use App\Repositories\Rewards\RewardAuditLogRepository;
-use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Adverts\DealTrackingRecorder;
 use App\Services\Adverts\RenderContext;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
-use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use App\Services\Adverts\TrackingDeduplicator;
+use Mockery;
+use Mockery\MockInterface;
+use PHPUnit\Framework\TestCase;
 
-class DealTrackingRecorderTest extends FunctionalTestCase
+class DealTrackingRecorderTest extends TestCase
 {
-    use CreatesTestData;
+    private MockInterface $offerRepository;
+    private MockInterface $rewardsRepository;
+    private MockInterface $dealClickRepository;
+    private MockInterface $deduplicator;
+    private MockInterface $database;
 
     private DealTrackingRecorder $recorder;
 
@@ -23,229 +28,391 @@ class DealTrackingRecorderTest extends FunctionalTestCase
     {
         parent::setUp();
 
-        $offerRepo = new ProductOfferRepository();
-        $rewardDefRepo = new RewardDefinitionRepository(new RewardAuditLogRepository());
-        $dealClickRepo = new DealClickRepository();
-        $rewardsRepo = new RewardsRepository($rewardDefRepo, new RewardAuditLogRepository());
+        $this->offerRepository = Mockery::mock(ProductOfferRepository::class);
+        $this->rewardsRepository = Mockery::mock(RewardsRepository::class);
+        $this->dealClickRepository = Mockery::mock(DealClickRepository::class);
+        $this->deduplicator = Mockery::mock(TrackingDeduplicator::class);
+        $this->database = Mockery::mock(Database::class);
+
+        // Execute transactions inline so tested logic runs without real DB
+        $this->database
+            ->allows('transaction')
+            ->andReturnUsing(fn(callable $cb) => $cb());
 
         $this->recorder = new DealTrackingRecorder(
-            $offerRepo,
-            $rewardsRepo,
-            $dealClickRepo,
-            $this->database
+            offerRepository: $this->offerRepository,
+            rewardsRepository: $this->rewardsRepository,
+            dealClickRepository: $this->dealClickRepository,
+            deduplicator: $this->deduplicator,
+            database: $this->database,
         );
     }
 
-    public function testRecordsOfferRender(): void
+    protected function tearDown(): void
     {
-        $product = $this->createProduct();
-        $member = $this->createMember();
-
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
-
-        $context = RenderContext::forNewsletter(123, $member);
-        $this->recorder->recordOfferRender($offer->id, null, $context);
-
-        $this->assertDatabaseHas('offer_clicks', [
-            'offer_id' => $offer->id,
-            'member_id' => $member->id,
-            'action' => 'render',
-        ]);
+        Mockery::close();
+        parent::tearDown();
     }
 
-    public function testRecordsOfferClick(): void
+    // -------------------------------------------------------------------------
+    // Offer render
+    // -------------------------------------------------------------------------
+
+    public function testRecordsOfferRenderWhenNotDuplicate(): void
     {
-        $product = $this->createProduct();
-        $member = $this->createMember();
+        $context = $this->makeContext(memberId: 10, surfaceType: 'page', surfaceId: 1);
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
+        $this->deduplicator
+            ->expects('alreadyTrackedOffer')
+            ->with(42, 10, 'render', 'page', 1)
+            ->andReturn(false);
 
-        $context = RenderContext::forWeb(456, $member);
-        $this->recorder->recordOfferClick($offer->id, null, $context);
+        $this->offerRepository
+            ->expects('trackClick')
+            ->with(42, 10, 'render', '127.0.0.1', 'TestAgent', Mockery::any())
+            ->once();
 
-        $this->assertDatabaseHas('offer_clicks', [
-            'offer_id' => $offer->id,
-            'member_id' => $member->id,
-            'action' => 'click',
-        ]);
+        $this->recorder->recordOfferRender(42, null, $context, '127.0.0.1', 'TestAgent');
+        $this->assertTrue(true);
     }
 
-    public function testRecordsRewardRender(): void
+    public function testSkipsOfferRenderWhenDuplicate(): void
     {
-        $member = $this->createMember();
-        $reward = $this->createMemberReward([
-            'member_id' => $member->id,
-            'status' => 'pending',
-        ]);
+        $context = $this->makeContext(memberId: 10, surfaceType: 'page', surfaceId: 1);
 
-        $context = RenderContext::forNewsletter(123, $member);
-        $this->recorder->recordRewardRender($reward->id, null, $context, $this->siteId);
+        $this->deduplicator
+            ->expects('alreadyTrackedOffer')
+            ->andReturn(true);
 
-        $this->assertDatabaseHas('reward_clicks', [
-            'member_reward_id' => $reward->id,
-            'member_id' => $member->id,
-            'action' => 'render',
-        ]);
+        $this->offerRepository
+            ->shouldNotReceive('trackClick');
+
+        $this->recorder->recordOfferRender(42, null, $context);
+        $this->assertTrue(true);
     }
 
-    public function testRecordsRewardClick(): void
+    public function testOfferRenderSkipsDeduplicatorForGuest(): void
     {
-        $member = $this->createMember();
-        $reward = $this->createMemberReward([
-            'member_id' => $member->id,
-            'status' => 'pending',
-        ]);
+        $context = $this->makeContext(memberId: null, surfaceType: 'page', surfaceId: 1);
 
-        $context = RenderContext::forWeb(456, $member);
-        $this->recorder->recordRewardClick($reward->id, null, $context, $this->siteId);
+        $this->deduplicator->shouldNotReceive('alreadyTrackedOffer');
 
-        $this->assertDatabaseHas('reward_clicks', [
-            'member_reward_id' => $reward->id,
-            'member_id' => $member->id,
-            'action' => 'click',
-        ]);
+        $this->offerRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordOfferRender(42, null, $context);
+        $this->assertTrue(true);
     }
 
-    public function testRecordsRewardClaimWithTransaction(): void
-    {
-        $member = $this->createMember();
-        $reward = $this->createMemberReward([
-            'member_id' => $member->id,
-            'status' => 'pending',
-            'expires_at' => date('Y-m-d H:i:s', strtotime('+7 days')),
-        ]);
+    // -------------------------------------------------------------------------
+    // Offer click
+    // -------------------------------------------------------------------------
 
-        $result = $this->recorder->recordRewardClaim($reward->id, $member->id, $this->siteId);
+    public function testRecordsOfferClickWhenNotDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 10, surfaceType: 'page', surfaceId: 1);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedOffer')
+            ->with(42, 10, 'click', 'page', 1)
+            ->andReturn(false);
+
+        $this->offerRepository
+            ->expects('trackClick')
+            ->with(42, 10, 'click', '', '', Mockery::any())
+            ->once();
+
+        $this->recorder->recordOfferClick(42, null, $context);
+        $this->assertTrue(true);
+    }
+
+    public function testSkipsOfferClickWhenDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 10, surfaceType: 'page', surfaceId: 1);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedOffer')
+            ->andReturn(true);
+
+        $this->offerRepository->shouldNotReceive('trackClick');
+
+        $this->recorder->recordOfferClick(42, null, $context);
+        $this->assertTrue(true);
+    }
+
+    public function testOfferClickSkipsDeduplicatorForGuest(): void
+    {
+        $context = $this->makeContext(memberId: null, surfaceType: 'page', surfaceId: 1);
+
+        $this->deduplicator->shouldNotReceive('alreadyTrackedOffer');
+
+        $this->offerRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordOfferClick(42, null, $context);
+        $this->assertTrue(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Deal render
+    // -------------------------------------------------------------------------
+
+    public function testRecordsDealRenderWhenNotDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 7, surfaceType: 'page', surfaceId: 5);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedDeal')
+            ->with(99, 7, 'render', 'page', 5)
+            ->andReturn(false);
+
+        $this->dealClickRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordDealRender(99, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    public function testSkipsDealRenderWhenDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 7, surfaceType: 'page', surfaceId: 5);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedDeal')
+            ->andReturn(true);
+
+        $this->dealClickRepository->shouldNotReceive('trackClick');
+
+        $this->recorder->recordDealRender(99, $context);
+        $this->assertTrue(true);
+    }
+
+    public function testDealRenderSkipsDeduplicatorForGuest(): void
+    {
+        $context = $this->makeContext(memberId: null, surfaceType: 'page', surfaceId: 5);
+
+        $this->deduplicator->shouldNotReceive('alreadyTrackedDeal');
+
+        $this->dealClickRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordDealRender(99, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Deal click
+    // -------------------------------------------------------------------------
+
+    public function testRecordsDealClickWhenNotDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 7, surfaceType: 'page', surfaceId: 5);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedDeal')
+            ->with(99, 7, 'click', 'page', 5)
+            ->andReturn(false);
+
+        $this->dealClickRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordDealClick(99, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    public function testSkipsDealClickWhenDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 7, surfaceType: 'page', surfaceId: 5);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedDeal')
+            ->andReturn(true);
+
+        $this->dealClickRepository->shouldNotReceive('trackClick');
+
+        $this->recorder->recordDealClick(99, $context);
+        $this->assertTrue(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Reward render
+    // -------------------------------------------------------------------------
+
+    public function testRecordsRewardRenderWhenNotDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 3, surfaceType: 'page', surfaceId: 8);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedReward')
+            ->with(55, 3, 'render', 'page', 8)
+            ->andReturn(false);
+
+        $this->rewardsRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordRewardRender(55, null, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    public function testSkipsRewardRenderWhenDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 3, surfaceType: 'page', surfaceId: 8);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedReward')
+            ->andReturn(true);
+
+        $this->rewardsRepository->shouldNotReceive('trackClick');
+
+        $this->recorder->recordRewardRender(55, null, $context);
+        $this->assertTrue(true);
+    }
+
+    public function testRewardRenderSkipsDeduplicatorForGuest(): void
+    {
+        $context = $this->makeContext(memberId: null, surfaceType: 'page', surfaceId: 8);
+
+        $this->deduplicator->shouldNotReceive('alreadyTrackedReward');
+
+        $this->rewardsRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordRewardRender(55, null, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Reward click
+    // -------------------------------------------------------------------------
+
+    public function testRecordsRewardClickWhenNotDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 3, surfaceType: 'page', surfaceId: 8);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedReward')
+            ->with(55, 3, 'click', 'page', 8)
+            ->andReturn(false);
+
+        $this->rewardsRepository
+            ->expects('trackClick')
+            ->once();
+
+        $this->recorder->recordRewardClick(55, null, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    public function testSkipsRewardClickWhenDuplicate(): void
+    {
+        $context = $this->makeContext(memberId: 3, surfaceType: 'page', surfaceId: 8);
+
+        $this->deduplicator
+            ->expects('alreadyTrackedReward')
+            ->andReturn(true);
+
+        $this->rewardsRepository->shouldNotReceive('trackClick');
+
+        $this->recorder->recordRewardClick(55, null, $context, '', '', 1);
+        $this->assertTrue(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Reward claim — dedup is intentionally bypassed, claim() is the guard
+    // -------------------------------------------------------------------------
+
+    public function testRecordsRewardClaimSuccessfully(): void
+    {
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->member_id = 10;
+        $reward->id = 55;
+        $reward->allows('claim')->andReturn(true);
+
+        $this->rewardsRepository
+            ->expects('findMemberRewardById')
+            ->with(55)
+            ->andReturn($reward);
+
+        $this->rewardsRepository
+            ->expects('trackClick')
+            ->with(55, 10, Mockery::any(), 'claim', '', '')
+            ->once();
+
+        // Deduplicator must never be consulted for claims
+        $this->deduplicator->shouldNotReceive('alreadyTrackedReward');
+
+        $result = $this->recorder->recordRewardClaim(55, 10, '', '', 1);
+        $this->assertTrue(true);
 
         $this->assertTrue($result);
-
-        // Check reward was claimed
-        $reward = $reward->fresh();
-        $this->assertEquals('claimed', $reward->status);
-        $this->assertNotNull($reward->claimed_at);
-
-        // Check tracking was recorded
-        $this->assertDatabaseHas('reward_clicks', [
-            'member_reward_id' => $reward->id,
-            'member_id' => $member->id,
-            'action' => 'claim',
-        ]);
-
-        // Check audit log was created
-        $this->assertDatabaseHas('reward_audit_logs', [
-            'member_reward_id' => $reward->id,
-            'action' => 'claimed',
-        ]);
     }
 
     public function testRejectClaimForWrongMember(): void
     {
-        $member1 = $this->createMember();
-        $member2 = $this->createMember();
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->member_id = 99;
 
-        $reward = $this->createMemberReward([
-            'member_id' => $member1->id,
-            'status' => 'pending',
-        ]);
+        $this->rewardsRepository
+            ->expects('findMemberRewardById')
+            ->andReturn($reward);
 
-        $result = $this->recorder->recordRewardClaim($reward->id, $member2->id);
+        $this->rewardsRepository->shouldNotReceive('trackClick');
 
-        $this->assertFalse($result);
-
-        $reward = $reward->fresh();
-        $this->assertEquals('pending', $reward->status);
-    }
-
-    public function testRejectClaimForAlreadyClaimed(): void
-    {
-        $member = $this->createMember();
-        $reward = $this->createMemberReward([
-            'member_id' => $member->id,
-            'status' => 'claimed',
-            'claimed_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        $result = $this->recorder->recordRewardClaim($reward->id, $member->id);
+        $result = $this->recorder->recordRewardClaim(55, 10, '', '', 1);
 
         $this->assertFalse($result);
     }
 
-    public function testRecordsDealRender(): void
+    public function testRejectClaimWhenRewardNotFound(): void
     {
-        $product = $this->createProduct([
-            'price' => 100.00,
-            'sale_price' => 79.99,
-            'is_active' => true,
-        ]);
-        $member = $this->createMember();
+        $this->rewardsRepository
+            ->expects('findMemberRewardById')
+            ->andReturn(null);
 
-        $context = RenderContext::forNewsletter(123, $member);
-        $this->recorder->recordDealRender($product->id, $context, $this->siteId);
+        $this->rewardsRepository->shouldNotReceive('trackClick');
 
-        $this->assertDatabaseHas('deal_clicks', [
-            'product_id' => $product->id,
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'action' => 'render',
-            'channel' => 'newsletter',
-            'surface_type' => 'newsletter_issue',
-            'surface_id' => 123,
-        ]);
+        $result = $this->recorder->recordRewardClaim(55, 10);
+
+        $this->assertFalse($result);
     }
 
-    public function testRecordsDealClick(): void
+    public function testRejectClaimWhenClaimFails(): void
     {
-        $product = $this->createProduct([
-            'price' => 100.00,
-            'sale_price' => 79.99,
-            'is_active' => true,
-        ]);
-        $member = $this->createMember();
+        $reward = Mockery::mock(MemberReward::class)->makePartial();
+        $reward->member_id = 10;
+        $reward->allows('claim')->andReturn(false);
 
-        $context = RenderContext::forWeb(456, $member);
-        $this->recorder->recordDealClick($product->id, $context, $this->siteId);
+        $this->rewardsRepository
+            ->expects('findMemberRewardById')
+            ->andReturn($reward);
 
-        $this->assertDatabaseHas('deal_clicks', [
-            'product_id' => $product->id,
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'action' => 'click',
-            'channel' => 'web',
-            'surface_type' => 'page',
-            'surface_id' => 456,
-        ]);
+        $this->rewardsRepository->shouldNotReceive('trackClick');
+
+        $result = $this->recorder->recordRewardClaim(55, 10);
+
+        $this->assertFalse($result);
     }
 
-    public function testRecordsDealRenderWithoutMember(): void
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function makeContext(?int $memberId, string $surfaceType, int $surfaceId): RenderContext
     {
-        $product = $this->createProduct([
-            'price' => 100.00,
-            'sale_price' => 79.99,
-            'is_active' => true,
-        ]);
-
-        $context = RenderContext::forNewsletter(123, null);
-        $this->recorder->recordDealRender($product->id, $context, $this->siteId);
-
-        $this->assertDatabaseHas('deal_clicks', [
-            'product_id' => $product->id,
-            //'member_id' => null,
-            'site_id' => $this->siteId,
-            'action' => 'render',
-        ]);
+        return new RenderContext(
+            memberId: $memberId,
+            plan: 'basic',
+            isPaid: false,
+            channel: 'web',
+            surfaceType: $surfaceType,
+            surfaceId: $surfaceId,
+            timestamp: now_datetime()
+        );
     }
 }

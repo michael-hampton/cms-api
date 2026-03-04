@@ -16,6 +16,8 @@ class CreateProductOfferRequest extends FormRequest
             'is_active' => 'boolean',
             'status' => 'in:pending,published,rejected',
             'voucher_id' => 'nullable|integer|exists:vouchers,id',
+            'link' => 'required|string',
+            'original_price' => 'required|numeric'
         ];
     }
 

@@ -6,9 +6,10 @@ use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\OfferClicks;
 use App\Models\ProductOffer;
+use App\Repositories\Contracts\TrackableRepository;
 use App\Repositories\Repository;
 
-class ProductOfferRepository extends Repository
+class ProductOfferRepository extends Repository implements TrackableRepository
 {
     public function getActiveOffersForProduct(int $productId): Collection
     {
@@ -340,5 +341,21 @@ class ProductOfferRepository extends Repository
     protected function getModelClass(): string
     {
         return ProductOffer::class;
+    }
+
+    public function hasTracked(
+        int    $entityId,
+        int    $memberId,
+        string $action,
+        string $surfaceType,
+        int    $surfaceId,
+    ): bool
+    {
+        return OfferClicks::where('offer_id', $entityId)
+            ->where('member_id', $memberId)
+            ->where('action', $action)
+            ->where('surface_type', $surfaceType)
+            ->where('surface_id', $surfaceId)
+            ->exists();
     }
 }

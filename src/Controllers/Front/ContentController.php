@@ -18,7 +18,6 @@ use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\CommentRepository;
-use App\Repositories\Members\GiftedArticleRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\Pages\ArticleAccessService;
@@ -180,7 +179,7 @@ class ContentController extends Controller
             $viewPath = "estate/page";
         }
 
-        $html = $this->pageRenderService->renderPage($page, $siteId);
+        $html = $this->pageRenderService->renderPage($page, $siteId, MemberAuth::getMember());
         $data['html'] = $html;
 
         if ($page->page_type === 'landing-page' && !empty($data['allCategories'])) {

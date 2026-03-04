@@ -317,6 +317,17 @@ class ProductListController extends Controller
                 'specifications.group'
             ]);
 
+            $priceHistoryRaw = $this->productRepository->getPriceHistory($product->id);
+            $priceHistory = $priceHistoryRaw
+                ->filter(fn($h) => $h->recorded_at >= now_datetime()->subDays(90))
+                ->sortBy('recorded_at')
+                ->map(fn($h) => [
+                    'price' => (float)$h->price,
+                    'recorded_at' => $h->recorded_at,
+                ])
+                ->values()
+                ->toArray();
+
             // Get related products
             $relatedProducts = $this->productRepository->findRelated($product, 6);
 
@@ -406,11 +417,72 @@ class ProductListController extends Controller
                         ])->toArray()
                     ];
                 })->values()->toArray(),
+                'merchant_price_stats' => (function () use ($product) {
+                    $prices = $product->availableMerchants
+                        ->filter(fn($m) => $m->is_available)
+                        ->map(fn($m) => $m->effective_sale_price ?: $m->effective_price)
+                        ->filter()
+                        ->values();
+
+                    if ($prices->isEmpty()) return null;
+
+                    return [
+                        'lowest' => round((float)$prices->min(), 2),
+                        'highest' => round((float)$prices->max(), 2),
+                        'average' => round((float)$prices->average(), 2),
+                        'count' => $prices->count(),
+                    ];
+                })(),
                 'average_rating' => $product->average_rating ?? 0,
                 'review_count' => $product->approvedReviews->count(),
                 'stock_quantity' => $product->stock_quantity,
                 'in_stock' => $product->in_stock
             ];
+
+            $effectivePrice = ($product->sale_price && $product->sale_price > 0 && $product->sale_price < $product->price)
+                ? (float)$product->sale_price
+                : (float)$product->price;
+
+            $categoryAvgResult = \App\Models\Product::where('category_id', $product->category_id)
+                ->where('is_active', true)
+                ->where('id', '!=', $product->id)
+                ->selectRaw('AVG(COALESCE(NULLIF(sale_price, 0), price)) as avg_price, COUNT(*) as product_count')
+                ->first();
+
+            $categoryAvg = $categoryAvgResult ? round((float)$categoryAvgResult->avg_price, 2) : null;
+            $productCount = $categoryAvgResult ? (int)$categoryAvgResult->product_count : 0;
+
+            $priceDifference = null;
+            $priceComparisonLabel = null;
+
+            if ($categoryAvg && $categoryAvg > 0) {
+                $diffPercent = round((($effectivePrice - $categoryAvg) / $categoryAvg) * 100);
+                if ($diffPercent < 0) {
+                    $priceDifference = abs($diffPercent) . '% below average';
+                    $priceComparisonLabel = 'better';
+                } elseif ($diffPercent > 0) {
+                    $priceDifference = $diffPercent . '% above average';
+                    $priceComparisonLabel = 'worse';
+                } else {
+                    $priceDifference = 'At category average';
+                    $priceComparisonLabel = 'average';
+                }
+            }
+
+            $discountVsRegular = null;
+            if ($product->sale_price && $product->sale_price > 0 && $product->price > $product->sale_price) {
+                $savings = round((($product->price - $product->sale_price) / $product->price) * 100);
+                $discountVsRegular = "Save {$savings}% off RRP";
+            }
+
+            $productData['price_history'] = $priceHistory;
+            $productData['price_comparison'] = $categoryAvg ? [
+                'price_comparison' => $priceComparisonLabel,
+                'price_difference' => $priceDifference,
+                'category_avg_price' => $categoryAvg,
+                'products_in_category' => $productCount,
+                'discount_vs_regular' => $discountVsRegular,
+            ] : null;
 
             return $this->resourceResponse([
                 'success' => true,

@@ -95,9 +95,6 @@ class SubscriptionPlanPricingService
         if (empty($data['currency'])) {
             throw new \InvalidArgumentException('currency is required');
         }
-        if (empty($data['interval'])) {
-            throw new \InvalidArgumentException('interval is required');
-        }
     }
 
     public function setAsDefault(int $pricingId): bool

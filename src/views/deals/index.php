@@ -350,6 +350,7 @@
 @js('deals.js')
 @js('productModal.js')
 @js('price-alert.js')
+@js('recommendations.js')
 
 </body>
 </html>

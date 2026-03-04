@@ -7,6 +7,17 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Requests\Briefs\AddBriefAttachmentRequest;
+use App\Requests\Briefs\AddBriefCollaboratorRequest;
+use App\Requests\Briefs\AddBriefCommentRequest;
+use App\Requests\Briefs\AddBriefRelationshipRequest;
+use App\Requests\Briefs\AddBriefWorkflowChangeRequest;
+use App\Requests\Briefs\CreateBriefTaskRequest;
+use App\Requests\Briefs\SetBriefDeadlineRequest;
+use App\Requests\Briefs\StoreBriefRequest;
+use App\Requests\Briefs\UpdateBriefCommentRequest;
+use App\Requests\Briefs\UpdateBriefRequest;
+use App\Requests\Briefs\UpdateBriefTaskRequest;
 use App\Search\SearchCriteriaParser;
 use App\Services\Cms\BriefService;
 use Exception;
@@ -47,7 +58,7 @@ class BriefController extends Controller
         }
     }
 
-    public function store(Request $request, string $siteName): JsonResponse
+    public function store(StoreBriefRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -61,7 +72,7 @@ class BriefController extends Controller
         }
     }
 
-    public function update(int $id, Request $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateBriefRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -90,7 +101,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addAttachment(int $id, Request $request, string $siteName): JsonResponse
+    public function addAttachment(int $id, AddBriefAttachmentRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -133,7 +144,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addComment(int $id, Request $request, string $siteName): JsonResponse
+    public function addComment(int $id, AddBriefCommentRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -147,7 +158,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateComment(int $id, int $commentId, Request $request, string $siteName): JsonResponse
+    public function updateComment(int $id, int $commentId, UpdateBriefCommentRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -380,7 +391,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addCollaborator(int $id, Request $request, string $siteName): JsonResponse
+    public function addCollaborator(int $id, AddBriefCollaboratorRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -392,7 +403,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateCollaborator(int $id, int $collaboratorId, Request $request, string $siteName): JsonResponse
+    public function updateCollaborator(int $id, int $collaboratorId, AddBriefCollaboratorRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -429,7 +440,7 @@ class BriefController extends Controller
         }
     }
 
-    public function createTask(int $id, Request $request, string $siteName): JsonResponse
+    public function createTask(int $id, CreateBriefTaskRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -444,7 +455,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateTask(int $id, int $taskId, Request $request, string $siteName): JsonResponse
+    public function updateTask(int $id, int $taskId, UpdateBriefTaskRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -511,7 +522,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addRelationship(int $id, Request $request, string $siteName): JsonResponse
+    public function addRelationship(int $id, AddBriefRelationshipRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -538,7 +549,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addWorkflowChange(int $id, Request $request, string $siteName): JsonResponse
+    public function addWorkflowChange(int $id, AddBriefWorkflowChangeRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();
@@ -560,7 +571,7 @@ class BriefController extends Controller
         }
     }
 
-    public function setDeadline(int $id, Request $request, string $siteName): JsonResponse
+    public function setDeadline(int $id, SetBriefDeadlineRequest $request, string $siteName): JsonResponse
     {
         try {
             $data = $request->all();

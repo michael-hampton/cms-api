@@ -11,6 +11,8 @@ use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Requests\StoreIssueDeliveryRequest;
+use App\Requests\UpdateIssueDeliveryRequest;
 use App\Resources\IssueDeliveryResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\Subscriptions\IssueDeliveryService;
@@ -56,7 +58,7 @@ class IssueDeliveryController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreIssueDeliveryRequest $request)
     {
         $siteId = SiteContext::getId();
 
@@ -91,7 +93,7 @@ class IssueDeliveryController extends Controller
         }
     }
 
-    public function update(Request $request, int $id)
+    public function update(UpdateIssueDeliveryRequest $request, int $id)
     {
         $data = $request->all();
 

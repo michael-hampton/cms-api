@@ -95,4 +95,22 @@ class Date extends \DateTime
     {
         return $this->add(new DateInterval("P{$weeks}W"));
     }
+
+    public static function parseDate(string $value): ?\DateTimeImmutable
+    {
+        $formats = [
+            'Y-m-d H:i:s',
+            'Y-m-d\TH:i',
+        ];
+
+        foreach ($formats as $format) {
+            $date = \DateTimeImmutable::createFromFormat($format, $value);
+
+            if ($date && $date->format($format) === $value) {
+                return $date;
+            }
+        }
+
+        return null;
+    }
 }

@@ -7,6 +7,8 @@ use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Requests\CreatePricingTierRequest;
+use App\Requests\UpdatePricingTierRequest;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
 
 class SubscriptionPlanPricingController extends Controller
@@ -41,30 +43,15 @@ class SubscriptionPlanPricingController extends Controller
         ]);
     }
 
-    public function store(Request $request, int $planId)
+    public function store(CreatePricingTierRequest $request, int $planId)
     {
-        /**
-         * [
-         * 'duration_months' => 'required|integer|min:1',
-         * 'issue_count' => 'required|integer|min:1',
-         * 'price' => 'required|numeric|min:0',
-         * 'original_price' => 'nullable|numeric|min:0',
-         * 'digital_price' => 'nullable|numeric|min:0',
-         * 'discount_percentage' => 'nullable|integer|min:0|max:100',
-         * 'label' => 'nullable|string|max:100',
-         * 'period_description' => 'nullable|string|max:255',
-         * 'is_default' => 'nullable|boolean',
-         * 'is_active' => 'nullable|boolean',
-         * 'sort_order' => 'nullable|integer'
-         * ]
-         */
 
         $data = $request->all();
 
         $data['plan_id'] = $planId;
 
         try {
-            $pricing = $this->pricingService->createPricingTier($data);
+            $pricing = $this->pricingService->createPricingTier($planId, $data);
 
             $pricing = SubscriptionPlanPricing::find($pricing->id);
 
@@ -92,24 +79,8 @@ class SubscriptionPlanPricingController extends Controller
         }
     }
 
-    public function update(Request $request, int $planId, int $pricingId)
+    public function update(UpdatePricingTierRequest $request, int $planId, int $pricingId)
     {
-        /**
-         * [
-         * 'duration_months' => 'sometimes|required|integer|min:1',
-         * 'issue_count' => 'sometimes|required|integer|min:1',
-         * 'price' => 'sometimes|required|numeric|min:0',
-         * 'original_price' => 'nullable|numeric|min:0',
-         * 'digital_price' => 'nullable|numeric|min:0',
-         * 'discount_percentage' => 'nullable|integer|min:0|max:100',
-         * 'label' => 'nullable|string|max:100',
-         * 'period_description' => 'nullable|string|max:255',
-         * 'is_default' => 'nullable|boolean',
-         * 'is_active' => 'nullable|boolean',
-         * 'sort_order' => 'nullable|integer'
-         * ]
-         */
-
         $data = $request->all();
 
         try {

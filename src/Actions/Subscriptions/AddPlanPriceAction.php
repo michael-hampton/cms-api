@@ -86,7 +86,7 @@ class AddPlanPriceAction
             $plan->stripe_product_id,
             $pricingData['amount_cents'],
             $currency,
-            $pricingData['interval'],
+            $pricingData['interval'] ?? 'month',
         ) : uniqid();
 
         // 6. Store the Stripe Price ID.

@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
+use App\Requests\SaveNewsletterBrandingRequest;
 use App\Services\Newsletter\NewsletterBrandingService;
 
 class NewsletterBrandingController extends Controller
@@ -31,7 +32,7 @@ class NewsletterBrandingController extends Controller
         }
     }
 
-    public function save(Request $request, int $newsletterId): JsonResponse
+    public function save(SaveNewsletterBrandingRequest $request, int $newsletterId): JsonResponse
     {
         try {
             $allowed = ['logo_url', 'header_text', 'footer_text', 'theme_json', 'custom_css'];

@@ -12,6 +12,7 @@ class CreateMerchantContactRequest extends FormRequest
         return [
             'name' => 'required',
             'email' => 'required|email',
+            'merchant_id' => 'required|integer'
         ];
     }
 }

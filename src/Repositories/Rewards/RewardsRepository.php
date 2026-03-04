@@ -8,9 +8,10 @@ use App\Models\Model;
 use App\Models\RewardClick;
 use App\Models\RewardDefinition;
 use App\Models\RewardVoucherCode;
+use App\Repositories\Contracts\TrackableRepository;
 use App\Repositories\Repository;
 
-class RewardsRepository extends Repository
+class RewardsRepository extends Repository implements TrackableRepository
 {
     public function __construct(
         private readonly RewardDefinitionRepository $rewardDefinitionRepository,
@@ -341,5 +342,21 @@ class RewardsRepository extends Repository
     protected function getModelClass(): string
     {
         return MemberReward::class;
+    }
+
+    public function hasTracked(
+        int    $entityId,
+        int    $memberId,
+        string $action,
+        string $surfaceType,
+        int    $surfaceId,
+    ): bool
+    {
+        return RewardClick::where('reward_id', $entityId)
+            ->where('member_id', $memberId)
+            ->where('action', $action)
+            ->where('surface_type', $surfaceType)
+            ->where('surface_id', $surfaceId)
+            ->exists();
     }
 }

@@ -547,8 +547,6 @@
             const response = await fetch(`/api/${SITE}/deals/filtered?${params}`);
             const data = await response.json();
 
-            console.log('data', data.data)
-
             if (response.ok) {
                 renderProducts(data.data);
                 renderPagination(data.pagination);
@@ -561,6 +559,7 @@
             showError('An error occurred while loading products');
         } finally {
             hideLoading();
+            window.refreshRecommendations();
         }
     }
 

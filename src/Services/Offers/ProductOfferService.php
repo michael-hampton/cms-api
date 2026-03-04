@@ -5,6 +5,7 @@ namespace App\Services\Offers;
 use App\Enums\Offers\OfferAction;
 use App\Enums\Offers\OfferStatus;
 use App\Framework\Authorization\AuthenticationService;
+use App\Framework\Date;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\ProductOffer;
@@ -50,11 +51,8 @@ class ProductOfferService
 
     private function validateOfferDates(string $startDate, string $endDate): void
     {
-        $start = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $startDate)
-            ?? \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $startDate);
-
-        $end = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $endDate)
-            ?? \DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $endDate);
+        $start = Date::parseDate($startDate);
+        $end = Date::parseDate($endDate);
 
         if (!$start || !$end) {
             throw new Exception('Invalid date format');

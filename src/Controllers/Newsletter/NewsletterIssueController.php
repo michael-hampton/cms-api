@@ -9,8 +9,10 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
+use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterIssueRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Requests\CreateNewsletterIssueRequest;
 use App\Services\Newsletter\NewsletterIssueService;
 
 /**
@@ -77,19 +79,10 @@ class NewsletterIssueController extends Controller
     // Show
     // =========================================================================
 
-    /**
-     * POST /api/newsletters/{newsletterId}/issues
-     *
-     * Body (all optional):
-     *   subject        string   — defaults to newsletter title
-     *   content_blocks array    — validated block payload
-     *   snapshot_json  object   — {layout, blocks, metadata} from the frontend editor
-     *   scheduled_at   datetime — ISO 8601
-     */
-    public function store(Request $request, int $newsletterId): JsonResponse
+    public function store(CreateNewsletterIssueRequest $request, int $newsletterId): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
+            $siteId = SiteContext::getId();
 
             if (!$this->newsletterBelongsToSite($newsletterId, $siteId)) {
                 return $this->errorResponse('Newsletter not found', 404);

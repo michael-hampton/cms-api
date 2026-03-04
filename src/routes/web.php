@@ -1,10 +1,12 @@
 <?php
 
 use App\Controllers\Admin\AdminSubscriptionPlansController;
+use App\Controllers\Adverts\AdvertTrackingController;
 use App\Controllers\Billing\PaymentController;
 use App\Controllers\Boost\BoostController;
 use App\Controllers\Cms\BlockController;
 use App\Controllers\Cms\PageController;
+use App\Controllers\DocsController;
 use App\Controllers\EventController;
 use App\Controllers\FaqController;
 use App\Controllers\Front\AuthorViewController;
@@ -488,4 +490,17 @@ $router->group(['prefix' => 'legal'], function ($router) {
     $router->get('/data-retention', [LegalController::class, 'dataRetention'])->name('data-retention');
 
 });
+
+$router->get('/docs', [DocsController::class, 'index']);
+$router->get('/openapi.json', [DocsController::class, 'openapi']);
+
+$router->get('/go/{type}/{id}', [AdvertTrackingController::class, 'handle'])
+    ->name('adverts.redirect')
+    ->where([
+        'type' => 'offer|deal|reward',   // reject unknown types at routing level
+        'id' => '[0-9]+',
+    ])
+    ->middleware([
+        // 'throttle:60,1',  // Uncomment and tune — prevents click flooding
+    ]);
 
