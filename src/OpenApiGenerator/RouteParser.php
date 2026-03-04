@@ -20,14 +20,17 @@ use RecursiveIteratorIterator;
  */
 class RouteParser
 {
-    /** Methods that indicate a list/index operation */
-    private const INDEX_METHODS = ['index', 'list', 'all', 'search', 'pages', 'recent', 'active', 'featured', 'popular', 'payments', 'plans'];
-    /** Methods that indicate a create operation */
-    private const CREATE_METHODS = ['store', 'create', 'upload', 'duplicate', 'clone', 'merge', 'bulkDelete', 'bulkUpdate', 'bulkAssign', 'bulkArchive', 'bulkApprove', 'bulkClone', 'bulkSchedule', 'bulkToggleActive'];
-    /** Methods that indicate an update operation */
-    private const UPDATE_METHODS = ['update', 'patch', 'approve', 'reject', 'publish', 'unpublish', 'archive', 'unarchive', 'restore', 'activate', 'deactivate', 'pause', 'resume', 'toggleStatus', 'toggle', 'makePrivate', 'makeInternal', 'putOnHold', 'resolveComment', 'unresolveComment', 'setDeadline', 'deleteDeadline', 'updateStatus', 'updateSchedule', 'saveAsTemplate', 'addCollaborator', 'updateCollaborator', 'removeCollaborator', 'addRelationship', 'removeRelationship', 'addWorkflowChange', 'addComment', 'updateComment', 'deleteComment', 'addAttachment', 'updateAttachment', 'deleteAttachment', 'assignPages', 'unassignPages', 'reorder', 'setDefault', 'removeVoucher'];
     private string $srcPath;
     private Reflector $reflector;
+
+    /** Methods that indicate a list/index operation */
+    private const INDEX_METHODS = ['index', 'list', 'all', 'search', 'pages', 'recent', 'active', 'featured', 'popular', 'payments', 'plans'];
+
+    /** Methods that indicate a create operation */
+    private const CREATE_METHODS = ['store', 'create', 'upload', 'duplicate', 'clone', 'merge', 'bulkDelete', 'bulkUpdate', 'bulkAssign', 'bulkArchive', 'bulkApprove', 'bulkClone', 'bulkSchedule', 'bulkToggleActive'];
+
+    /** Methods that indicate an update operation */
+    private const UPDATE_METHODS = ['update', 'patch', 'approve', 'reject', 'publish', 'unpublish', 'archive', 'unarchive', 'restore', 'activate', 'deactivate', 'pause', 'resume', 'toggleStatus', 'toggle', 'makePrivate', 'makeInternal', 'putOnHold', 'resolveComment', 'unresolveComment', 'setDeadline', 'deleteDeadline', 'updateStatus', 'updateSchedule', 'saveAsTemplate', 'addCollaborator', 'updateCollaborator', 'removeCollaborator', 'addRelationship', 'removeRelationship', 'addWorkflowChange', 'addComment', 'updateComment', 'deleteComment', 'addAttachment', 'updateAttachment', 'deleteAttachment', 'assignPages', 'unassignPages', 'reorder', 'setDefault', 'removeVoucher'];
 
     public function __construct(string $srcPath, Reflector $reflector)
     {
@@ -107,6 +110,7 @@ class RouteParser
 
         $routes = [];
         $prefixStack = [];
+        $middlewareStack = []; // parallel to prefixStack: middleware classes per group
         // Track the closure-depth at which each prefix was pushed.
         // We count only `function (` openings and their matching `}` closings
         // so that route-string braces like {siteName} don't corrupt the count.
@@ -127,10 +131,24 @@ class RouteParser
             $closureCloses = preg_match_all('/^\s*\}\s*(?:\)|;|,)?\s*$/', $stripped)
                 + preg_match_all('/\}\s*\)\s*;/', $stripped);
 
-            // Detect ->group(['prefix' => '...'], ...) and push prefix BEFORE depth change
-            if (preg_match('/->group\s*\(\s*\[.*?[\'"]prefix[\'"]\s*=>\s*[\'"]([^\'"]*)[\'"]/', $line, $gm)) {
-                $prefixStack[] = trim($gm[1], '/');
-                // This group's closure opens on this same line
+            // Detect ->group(['prefix' => '...', ...], ...) and push prefix BEFORE depth change.
+            // Also detect middleware on the group so we can mark routes as authenticated.
+            if (preg_match('/->group\s*\(\s*\[/', $line, $gm)) {
+                $groupPrefix = '';
+                $groupMiddleware = [];
+
+                if (preg_match('/[\'"]prefix[\'"]\s*=>\s*[\'"]([^\'"]*)[\'"]/', $line, $pm)) {
+                    $groupPrefix = trim($pm[1], '/');
+                }
+
+                // Capture middleware class references: 'middleware' => ClassName::class or [ClassName::class, ...]
+                if (preg_match('/[\'"]middleware[\'"]\s*=>\s*(.+?)(?:,\s*[\'"]|\])/s', $line, $mm)) {
+                    preg_match_all('/([\w\\\\]+)::class/', $mm[1], $classList);
+                    $groupMiddleware = $classList[1] ?? [];
+                }
+
+                $prefixStack[] = $groupPrefix;
+                $middlewareStack[] = $groupMiddleware;
                 $groupDepthStack[] = $closureDepth + 1;
             }
 
@@ -139,10 +157,11 @@ class RouteParser
             // Pop prefixes whose closure has now closed
             foreach ($groupDepthStack as $i => $depth) {
                 if ($closureDepth - $closureCloses < $depth) {
-                    unset($prefixStack[$i], $groupDepthStack[$i]);
+                    unset($prefixStack[$i], $middlewareStack[$i], $groupDepthStack[$i]);
                 }
             }
             $prefixStack = array_values($prefixStack);
+            $middlewareStack = array_values($middlewareStack);
             $groupDepthStack = array_values($groupDepthStack);
 
             $closureDepth -= $closureCloses;
@@ -177,6 +196,10 @@ class RouteParser
 
             $requestClass = $this->findRequestClass($controllerClass, $controllerMethod);
 
+            // A route is authenticated if any active group middleware contains an auth class
+            $allMiddleware = array_merge(...($middlewareStack ?: [[]]));
+            $authenticated = $this->isAuthMiddleware($allMiddleware);
+
             $routes[] = [
                 'method' => $httpMethod,
                 'uri' => $fullPath,
@@ -185,6 +208,7 @@ class RouteParser
                 'controllerMethod' => $controllerMethod,
                 'pathParams' => $pathParams,
                 'requestClass' => $requestClass,
+                'authenticated' => $authenticated,
                 'tag' => $this->deriveTag($controllerClass),
                 'summary' => $this->deriveSummary($controllerMethod, $controllerClass),
                 'operationId' => $this->deriveOperationId($httpMethod, $fullPath, $controllerMethod),
@@ -193,18 +217,6 @@ class RouteParser
         }
 
         return $routes;
-    }
-
-    private function extractUses(string $src): array
-    {
-        $uses = [];
-        preg_match_all('/^use\s+([\w\\\\]+)(?:\s+as\s+(\w+))?\s*;/m', $src, $m, PREG_SET_ORDER);
-        foreach ($m as $u) {
-            $fqcn = $u[1];
-            $alias = $u[2] ?? basename(str_replace('\\', '/', $fqcn));
-            $uses[$alias] = $fqcn;
-        }
-        return $uses;
     }
 
     /**
@@ -257,6 +269,29 @@ class RouteParser
     }
 
     /**
+     * Combine the active group prefix stack with a route's own path segment.
+     */
+    private function buildFullPath(array $prefixStack, string $routePath): string
+    {
+        $parts = array_filter($prefixStack, fn($p) => $p !== '');
+        $parts[] = ltrim($routePath, '/');
+        $path = implode('/', array_map(fn($p) => trim($p, '/'), $parts));
+        return '/' . ltrim($path, '/');
+    }
+
+    private function extractUses(string $src): array
+    {
+        $uses = [];
+        preg_match_all('/^use\s+([\w\\\\]+)(?:\s+as\s+(\w+))?\s*;/m', $src, $m, PREG_SET_ORDER);
+        foreach ($m as $u) {
+            $fqcn = $u[1];
+            $alias = $u[2] ?? basename(str_replace('\\', '/', $fqcn));
+            $uses[$alias] = $fqcn;
+        }
+        return $uses;
+    }
+
+    /**
      * Parse the argument string of a route call into [path, controllerClass, method].
      */
     private function parseRouteArgs(string $argsRaw, array $uses): ?array
@@ -301,17 +336,6 @@ class RouteParser
     private function resolveClass(string $shortName, array $uses): string
     {
         return $uses[$shortName] ?? $shortName;
-    }
-
-    /**
-     * Combine the active group prefix stack with a route's own path segment.
-     */
-    private function buildFullPath(array $prefixStack, string $routePath): string
-    {
-        $parts = array_filter($prefixStack, fn($p) => $p !== '');
-        $parts[] = ltrim($routePath, '/');
-        $path = implode('/', array_map(fn($p) => trim($p, '/'), $parts));
-        return '/' . ltrim($path, '/');
     }
 
     /**
@@ -455,15 +479,6 @@ class RouteParser
         return ucfirst(trim($human)) . ' ' . $entity;
     }
 
-    private function deriveOperationId(string $httpMethod, string $path, string $controllerMethod): string
-    {
-        // Build a stable, unique operation ID from method + path
-        $cleanPath = preg_replace('/[{}\/]/', '_', $path);
-        $cleanPath = preg_replace('/_+/', '_', trim($cleanPath, '_'));
-
-        return strtolower($httpMethod) . '_' . $cleanPath;
-    }
-
     private function deriveDescription(string $httpMethod, string $controllerMethod): string
     {
         // Add a brief description hint for common destructive/bulk operations
@@ -477,6 +492,35 @@ class RouteParser
         ];
 
         return $descriptions[$controllerMethod] ?? '';
+    }
+
+    private function deriveOperationId(string $httpMethod, string $path, string $controllerMethod): string
+    {
+        // Build a stable, unique operation ID from method + path
+        $cleanPath = preg_replace('/[{}\/]/', '_', $path);
+        $cleanPath = preg_replace('/_+/', '_', trim($cleanPath, '_'));
+
+        return strtolower($httpMethod) . '_' . $cleanPath;
+    }
+
+    /**
+     * Determine whether a set of middleware class short-names implies authentication.
+     * Matches AuthenticateWithToken and any class whose short name contains 'Auth' or 'Token'.
+     */
+    private function isAuthMiddleware(array $middlewareClasses): bool
+    {
+        $authPatterns = ['AuthenticateWithToken', 'Authenticate', 'Auth'];
+
+        foreach ($middlewareClasses as $class) {
+            $short = class_basename($class);
+            foreach ($authPatterns as $pattern) {
+                if (str_contains($short, $pattern)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
 

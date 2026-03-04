@@ -76,6 +76,7 @@ class OpenApiBuilder
         $route['controller'] = $route['controller'] ?? $route['controllerClass'] ?? '';
         $route['path_params'] = $route['path_params'] ?? $route['pathParams'] ?? [];
         $route['form_request'] = $route['form_request'] ?? $route['requestClass'] ?? null;
+        $route['authenticated'] = $route['authenticated'] ?? false;
 
         $uri = $this->normalizeUri($rawUri);
         $httpMethod = strtolower($route['method']);
@@ -87,17 +88,6 @@ class OpenApiBuilder
         $operation = $this->buildOperation($route);
         $this->paths[$uri][$httpMethod] = $operation;
     }
-
-    private function normalizeUri(string $uri): string
-    {
-        // Ensure leading slash, strip trailing slash
-        $uri = '/' . ltrim(rtrim($uri, '/'), '/');
-        return $uri === '/' ? '/' : $uri;
-    }
-
-    // -------------------------------------------------------------------------
-    // Parameters
-    // -------------------------------------------------------------------------
 
     private function buildOperation(array $route): array
     {
@@ -129,6 +119,11 @@ class OpenApiBuilder
             'parameters' => $parameters,
         ];
 
+        // Apply bearer auth security requirement for authenticated routes
+        if ($route['authenticated'] ?? false) {
+            $operation['security'] = [['bearerAuth' => []]];
+        }
+
         if ($route['description'] ?? null) {
             $operation['description'] = $route['description'];
         }
@@ -142,33 +137,8 @@ class OpenApiBuilder
         return $operation;
     }
 
-    private function registerTag(string $tag): void
-    {
-        if (!isset($this->tags[$tag])) {
-            $this->tags[$tag] = ['name' => $tag];
-        }
-    }
-
-    private function resolveMethodInfo(array $route): array
-    {
-        $controller = $route['controller'] ?? null;
-        $action = $route['action'] ?? null;
-
-        if ($controller === null || $action === null) {
-            return [];
-        }
-
-        $file = $this->reflector->findFile($controller);
-        if ($file === null) {
-            return [];
-        }
-
-        $classInfo = $this->reflector->parseFile($file);
-        return $classInfo['methods'][$action] ?? [];
-    }
-
     // -------------------------------------------------------------------------
-    // Request body
+    // Parameters
     // -------------------------------------------------------------------------
 
     /**
@@ -210,18 +180,10 @@ class OpenApiBuilder
         return $params;
     }
 
-    // -------------------------------------------------------------------------
-    // Responses
-    // -------------------------------------------------------------------------
-
     private function isPaginatedAction(array $route): bool
     {
         return in_array($route['action'] ?? '', ['index', 'list', 'search', 'paginate'], true);
     }
-
-    // -------------------------------------------------------------------------
-    // Components
-    // -------------------------------------------------------------------------
 
     private function paginationParameters(): array
     {
@@ -240,6 +202,10 @@ class OpenApiBuilder
             ],
         ];
     }
+
+    // -------------------------------------------------------------------------
+    // Request body
+    // -------------------------------------------------------------------------
 
     private function buildRequestBody(array $route, string $httpMethod): ?array
     {
@@ -278,62 +244,9 @@ class OpenApiBuilder
         ];
     }
 
-    private function registerResponseComponents(array $route, array $response): void
-    {
-        $resource = $this->guessResourceName($route);
-
-        if (!isset($this->components['schemas'][$resource])) {
-            $this->components['schemas'][$resource] = $this->schemaBuilder->buildResourceSchema($resource);
-        }
-    }
-
-    private function guessResourceName(array $route): string
-    {
-        $controller = $route['controller'] ?? $route['controllerClass'] ?? '';
-        if ($controller !== '') {
-            $short = preg_replace('/Controller$/', '', class_basename($controller));
-            if ($short !== '') {
-                return $short;
-            }
-        }
-
-        $raw = $route['path'] ?? $route['uri'] ?? '';
-        $uri = trim($raw, '/');
-        $segments = array_filter(explode('/', $uri), fn($s) => !str_starts_with($s, '{'));
-        $last = end($segments);
-        return $last !== false ? ucfirst((string)$last) : 'Resource';
-    }
-
     // -------------------------------------------------------------------------
-    // Helpers
+    // Responses
     // -------------------------------------------------------------------------
-
-    private function generateSummary(array $route): string
-    {
-        $action = $route['action'] ?? '';
-        $resource = $this->guessResourceName($route);
-        $httpMethod = strtoupper($route['method']);
-
-        return match ($action) {
-            'index' => "List {$resource} resources",
-            'show' => "Get a {$resource}",
-            'store' => "Create a {$resource}",
-            'update' => "Update a {$resource}",
-            'destroy' => "Delete a {$resource}",
-            'create' => "Show create form for {$resource}",
-            'edit' => "Show edit form for {$resource}",
-            default => ucfirst(str_replace('_', ' ', $action)) . " {$resource}",
-        };
-    }
-
-    private function generateOperationId(array $route): string
-    {
-        $method = strtolower($route['method']);
-        $raw = $route['path'] ?? $route['uri'] ?? '';
-        $uri = preg_replace('/[^a-zA-Z0-9]/', '_', trim($raw, '/'));
-        $uri = preg_replace('/_+/', '_', $uri);
-        return $method . '_' . trim($uri, '_');
-    }
 
     private function buildResponses(array $response, array $route): array
     {
@@ -381,13 +294,17 @@ class OpenApiBuilder
         return $responses;
     }
 
-    private function buildServers(array $config): array
-    {
-        $baseUrl = $config['base_url'] ?? 'http://localhost';
+    // -------------------------------------------------------------------------
+    // Components
+    // -------------------------------------------------------------------------
 
-        return [
-            ['url' => $baseUrl, 'description' => 'Default server'],
-        ];
+    private function registerResponseComponents(array $route, array $response): void
+    {
+        $resource = $this->guessResourceName($route);
+
+        if (!isset($this->components['schemas'][$resource])) {
+            $this->components['schemas'][$resource] = $this->schemaBuilder->buildResourceSchema($resource);
+        }
     }
 
     private function buildComponents(): array
@@ -398,6 +315,14 @@ class OpenApiBuilder
 
         // Sort schemas alphabetically for stable output
         ksort($this->components['schemas']);
+
+        // Bearer token auth — matches AuthenticateWithToken middleware
+        $this->components['securitySchemes']['bearerAuth'] = [
+            'type' => 'http',
+            'scheme' => 'bearer',
+            'bearerFormat' => 'Token',
+            'description' => 'Bearer token issued by the authentication endpoint.',
+        ];
 
         return $this->components;
     }
@@ -427,6 +352,95 @@ class OpenApiBuilder
             'properties' => [
                 'message' => ['type' => 'string'],
             ],
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function resolveMethodInfo(array $route): array
+    {
+        $controller = $route['controller'] ?? null;
+        $action = $route['action'] ?? null;
+
+        if ($controller === null || $action === null) {
+            return [];
+        }
+
+        $file = $this->reflector->findFile($controller);
+        if ($file === null) {
+            return [];
+        }
+
+        $classInfo = $this->reflector->parseFile($file);
+        return $classInfo['methods'][$action] ?? [];
+    }
+
+    private function registerTag(string $tag): void
+    {
+        if (!isset($this->tags[$tag])) {
+            $this->tags[$tag] = ['name' => $tag];
+        }
+    }
+
+    private function normalizeUri(string $uri): string
+    {
+        // Ensure leading slash, strip trailing slash
+        $uri = '/' . ltrim(rtrim($uri, '/'), '/');
+        return $uri === '/' ? '/' : $uri;
+    }
+
+    private function generateSummary(array $route): string
+    {
+        $action = $route['action'] ?? '';
+        $resource = $this->guessResourceName($route);
+        $httpMethod = strtoupper($route['method']);
+
+        return match ($action) {
+            'index' => "List {$resource} resources",
+            'show' => "Get a {$resource}",
+            'store' => "Create a {$resource}",
+            'update' => "Update a {$resource}",
+            'destroy' => "Delete a {$resource}",
+            'create' => "Show create form for {$resource}",
+            'edit' => "Show edit form for {$resource}",
+            default => ucfirst(str_replace('_', ' ', $action)) . " {$resource}",
+        };
+    }
+
+    private function generateOperationId(array $route): string
+    {
+        $method = strtolower($route['method']);
+        $raw = $route['path'] ?? $route['uri'] ?? '';
+        $uri = preg_replace('/[^a-zA-Z0-9]/', '_', trim($raw, '/'));
+        $uri = preg_replace('/_+/', '_', $uri);
+        return $method . '_' . trim($uri, '_');
+    }
+
+    private function guessResourceName(array $route): string
+    {
+        $controller = $route['controller'] ?? $route['controllerClass'] ?? '';
+        if ($controller !== '') {
+            $short = preg_replace('/Controller$/', '', class_basename($controller));
+            if ($short !== '') {
+                return $short;
+            }
+        }
+
+        $raw = $route['path'] ?? $route['uri'] ?? '';
+        $uri = trim($raw, '/');
+        $segments = array_filter(explode('/', $uri), fn($s) => !str_starts_with($s, '{'));
+        $last = end($segments);
+        return $last !== false ? ucfirst((string)$last) : 'Resource';
+    }
+
+    private function buildServers(array $config): array
+    {
+        $baseUrl = $config['base_url'] ?? 'http://localhost';
+
+        return [
+            ['url' => $baseUrl, 'description' => 'Default server'],
         ];
     }
 }

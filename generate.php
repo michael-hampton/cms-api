@@ -36,7 +36,7 @@ $opts = getopt('', ['src:', 'out:', 'base-url:', 'title:', 'version:', 'descript
 
 $srcPath = $opts['src'] ?? realpath(__DIR__ . '/src');
 $outFile = $opts['out'] ?? __DIR__ . '/openapi.json';
-$baseUrl = $opts['base-url'] ?? 'https://api.example.com';
+$baseUrl = $opts['base-url'] ?? 'http://localhost:5001';
 $title = $opts['title'] ?? 'API Documentation';
 $version = $opts['version'] ?? '1.0.0';
 $description = $opts['description'] ?? '';
