@@ -2,22 +2,29 @@
 
 namespace App\Jobs\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
-use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
+use App\Services\Subscriptions\DeliveryChannelInterface;
 use App\Services\Subscriptions\DeliveryService;
 
 class DeliverIssueDeliveryJob extends BaseJob
 {
+    /**
+     * @param array<string, DeliveryChannelInterface> $channelMap
+     *   Keyed by SubscriptionType value, e.g.
+     *   [ 'digital' => EmailDeliveryChannel, 'print' => PrintDeliveryChannel ]
+     *   Populated via container bindings in PrintServiceProvider.
+     *   Defaults to empty — the container can resolve the job without the
+     *   provider registered (e.g. in test environments).
+     */
     public function __construct(
         private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
         private readonly DeliveryService           $deliveryService,
-        private readonly Database             $database,
-        private readonly EmailDeliveryChannel $emailDeliveryChannel,
-        private readonly Logger               $logger,
+        private readonly Database $database,
+        private readonly Logger   $logger,
+        private readonly array    $channelMap = [],
     )
     {
     }
@@ -27,7 +34,6 @@ class DeliverIssueDeliveryJob extends BaseJob
         $issuesDelivered = $this->issuesDeliveredRepository->find($issuesDeliveredId);
 
         if (!$issuesDelivered) {
-            die('a');
             $this->logger->error('IssuesDelivered not found', ['id' => $issuesDeliveredId]);
             return;
         }
@@ -39,12 +45,11 @@ class DeliverIssueDeliveryJob extends BaseJob
             return;
         }
 
-        // Register channels once, outside the transaction — this is pure
-        // in-memory configuration and has no DB side effect.
-        $this->deliveryService->registerChannel(
-            SubscriptionType::DIGITAL->value,
-            $this->emailDeliveryChannel
-        );
+        // Register channels once, outside the transaction — pure in-memory
+        // configuration with no DB side effect.
+        foreach ($this->channelMap as $type => $channel) {
+            $this->deliveryService->registerChannel($type, $channel);
+        }
 
         try {
             $this->database->transaction(function () use ($issuesDelivered): void {
@@ -52,7 +57,24 @@ class DeliverIssueDeliveryJob extends BaseJob
                 $issueDelivery = $issuesDelivered->issueDelivery(true)->first();
 
                 if (!$subscription || !$issueDelivery) {
-                    throw new \RuntimeException('Missing subscription or issue delivery for IssuesDelivered #' . $issuesDelivered->id);
+                    throw new \RuntimeException(
+                        'Missing subscription or issue delivery for IssuesDelivered #' . $issuesDelivered->id
+                    );
+                }
+
+                // Guard: if no channel is registered for this subscription type,
+                // log and bail rather than letting DeliveryService throw. This
+                // prevents an unconfigured channel from crashing the pipeline —
+                // correct both in production (new channel not yet deployed) and
+                // in test environments where the provider is not bootstrapped.
+                $subscriptionType = $subscription->type ?? null;
+
+                if ($subscriptionType !== null && !array_key_exists($subscriptionType, $this->channelMap)) {
+                    $this->logger->warning('No delivery channel registered for subscription type — skipping', [
+                        'issues_delivered_id' => $issuesDelivered->id,
+                        'subscription_type' => $subscriptionType,
+                    ]);
+                    return;
                 }
 
                 $this->deliveryService->send($subscription, $issueDelivery);
@@ -65,9 +87,6 @@ class DeliverIssueDeliveryJob extends BaseJob
                 ]);
             });
         } catch (\Throwable $e) {
-            // Record the failure outside the (rolled-back) transaction so the
-            // status persists. Guarded with its own try/catch so a persistence
-            // failure here doesn't swallow the original exception.
             try {
                 $issuesDelivered->markAsFailed($e->getMessage());
             } catch (\Throwable $markException) {

@@ -182,6 +182,7 @@ if (!function_exists('config')) {
 
             $configFiles = [
                 'app' => 'config/app.php',
+                'print' => 'config/print.php',
                 'legal' => 'config/legal.php',
                 'boost' => 'config/boost.php',
                 'database' => 'config/database.php',

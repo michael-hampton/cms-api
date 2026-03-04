@@ -15,6 +15,7 @@ class Container
     private array $singletons = [];
     private array $afterResolvingCallbacks = [];
     private array $building = [];
+    private array $contextualBindings = [];
 
     public static function getInstance(): Container
     {
@@ -187,6 +188,12 @@ class Container
     protected function resolveDependency(ReflectionParameter $parameter)
     {
         $type = $parameter->getType();
+        $paramName = '$' . $parameter->getName();
+
+        // Check contextual binding by parameter name (e.g. '$channelMap')
+        if ($this->currentlyBuilding() && $this->hasContextualBinding($this->currentlyBuilding(), $paramName)) {
+            return $this->resolveContextualBinding($this->currentlyBuilding(), $paramName);
+        }
 
         // If no type hint, check for default value
         if ($type === null) {
@@ -228,6 +235,25 @@ class Container
         }
 
         return $this->resolve($typeName);
+    }
+
+    private function currentlyBuilding(): ?string
+    {
+        return array_key_last($this->building) ?? null;  // building is already tracked
+    }
+
+    private function hasContextualBinding(string $concrete, string $abstract): bool
+    {
+        return isset($this->contextualBindings[$concrete][$abstract]);
+    }
+
+    private function resolveContextualBinding(string $concrete, string $abstract): mixed
+    {
+        $binding = $this->contextualBindings[$concrete][$abstract];
+
+        return $binding instanceof Closure
+            ? $binding($this)
+            : $this->make($binding);
     }
 
     /**
@@ -320,5 +346,16 @@ class Container
     {
         return isset($this->bindings[$abstract])
             || isset($this->instances[$abstract]);
+    }
+
+    public function when(string $concrete): ContextualBindingBuilder
+    {
+        return new ContextualBindingBuilder($this, $concrete);
+    }
+
+// 3. Called by the builder
+    public function addContextualBinding(string $concrete, string $abstract, Closure|string $implementation): void
+    {
+        $this->contextualBindings[$concrete][$abstract] = $implementation;
     }
 }

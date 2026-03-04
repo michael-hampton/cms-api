@@ -50,6 +50,13 @@ class IssuesDeliveredRepository extends Repository
         ]);
     }
 
+    public function findBySubscriptionAndDelivery(int $subscriptionId, int $issueDeliveryId): ?IssuesDelivered
+    {
+        return IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->where('issue_delivery_id', $issueDeliveryId)
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return IssuesDelivered::class;

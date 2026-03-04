@@ -3,6 +3,7 @@
 namespace App;
 
 use App\Contracts\ClockInterface;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\ArticleGifting\GiftClaimedEvent;
 use App\Events\ArticleGifting\GiftCreatedEvent;
 use App\Events\Badges\BadgeEarnedEvent;
@@ -42,6 +43,7 @@ use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Routing\RouteLoader;
 use App\Framework\Storage\StoragePathResolver;
 use App\Framework\Storage\StoragePathResolverInterface;
+use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Listeners\BadgeEarnedListener;
 use App\Listeners\Boost\HandleOrderConversionAttribution;
 use App\Listeners\Boost\SendBoostActivatedNotification;
@@ -120,6 +122,12 @@ use App\Services\Shipping\DeliveryEstimatorInterface;
 use App\Services\Shipping\HolidayProviderInterface;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\UkHolidayProvider;
+use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
+use App\Services\Subscriptions\DeliveryChannels\PrintDeliveryChannel;
+use App\Services\Subscriptions\Printing\Format\CsvPrintExportFormatStrategy;
+use App\Services\Subscriptions\Printing\Format\PrintExportFormatStrategy;
+use App\Services\Subscriptions\Printing\Transport\LocalPrintExportTransport;
+use App\Services\Subscriptions\Printing\Transport\PrintExportTransport;
 use App\Services\SystemClock;
 use App\Services\Vouchers\DiscountProviderRegistry;
 use App\Services\Vouchers\Providers\OfferDiscountProvider;
@@ -159,6 +167,31 @@ class ApiApplication
         $this->container->bind(StripePriceGatewayInterface::class, StripePriceGateway::class);
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(StoragePathResolverInterface::class, StoragePathResolver::class);
+
+        $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
+
+        // Bind the appropriate transport based on environment.
+        // Local transport is used in development; SFTP in production.
+        $this->container->bind(PrintExportTransport::class, function () {
+//            if (app()->environment('production')) {
+//                return SftpPrintExportTransport::fromConfig();
+//            }
+
+            return new LocalPrintExportTransport(
+                config('print.local.export_dir', '/var/exports/print')
+            );
+        });
+
+        // Bind the channel map for DeliverIssueDeliveryJob.
+        // Keys are SubscriptionType enum values.
+        $this->container->when(DeliverIssueDeliveryJob::class)
+            ->needs('$channelMap')
+            ->give(function ($app) {
+                return [
+                    SubscriptionType::DIGITAL->value => $app->make(EmailDeliveryChannel::class),
+                    SubscriptionType::PRINTED->value => $app->make(PrintDeliveryChannel::class),
+                ];
+            });
 
 
         $this->container->singleton(DiscountProviderRegistry::class, function ($app) {
