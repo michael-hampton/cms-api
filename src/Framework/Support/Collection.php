@@ -865,4 +865,61 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return array_sum($numericValues) / count($numericValues);
     }
 
+    public function join(
+        iterable        $rightCollection,
+        callable|string $leftKey,
+        callable|string $rightKey,
+        ?callable       $callback = null
+    ): static
+    {
+        $result = [];
+
+        $rightIndex = [];
+
+        foreach ($rightCollection as $rightItem) {
+            $rightValue = is_callable($rightKey)
+                ? $rightKey($rightItem)
+                : $this->getValue($rightItem, $rightKey);
+
+            $rightIndex[$rightValue][] = $rightItem;
+        }
+
+        foreach ($this->items as $leftItem) {
+            $leftValue = is_callable($leftKey)
+                ? $leftKey($leftItem)
+                : $this->getValue($leftItem, $leftKey);
+
+            if (!isset($rightIndex[$leftValue])) {
+                continue;
+            }
+
+            foreach ($rightIndex[$leftValue] as $rightItem) {
+                $result[] = $callback
+                    ? $callback($leftItem, $rightItem)
+                    : array_merge((array)$leftItem, (array)$rightItem);
+            }
+        }
+
+        return new static($result);
+    }
+
+    protected function getValue($item, $key)
+    {
+        if (is_callable($key)) {
+            return $key($item);
+        }
+
+        foreach (explode('.', $key) as $segment) {
+            if (is_array($item)) {
+                $item = $item[$segment] ?? null;
+            } elseif (is_object($item)) {
+                $item = $item->$segment ?? null;
+            } else {
+                return null;
+            }
+        }
+
+        return $item;
+    }
+
 }

@@ -9,9 +9,11 @@ use App\Framework\Support\Str;
 use App\Models\Block;
 use App\Models\Merchant;
 use App\Models\Model;
+use App\Models\OrderItem;
 use App\Models\Page;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductImpression;
 use App\Models\ProductMerchant;
 use App\Models\ProductOffer;
 use App\Models\ProductOfferBundleItem;
@@ -144,6 +146,58 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function lockForUpdate(int $id): ?Model
     {
         return $this->find($id);
+    }
+
+    public function totalImpressionsForMerchant(int $id, ?int $monthsAgo = null)
+    {
+        $query = ProductImpression::query()
+            ->join('products', 'products.id', '=', 'product_impressions.product_id')
+            ->join('product_merchants', 'product_merchants.product_id', '=', 'products.id')
+            ->where('product_merchants.merchant_id', $id);
+
+        if ($monthsAgo !== null) {
+            $query->where(
+                'product_impressions.viewed_at',
+                '>=',
+                now_datetime()->subMonths($monthsAgo)->startOfMonth()->format('Y-m-d')
+            );
+        }
+
+        return $query->count();
+    }
+
+    public function topByRevenueForMerchant(int $id, int $limit = 10)
+    {
+        $rows = OrderItem::query()
+            ->from('oi')
+            ->selectRaw('
+            p.id as product_id,
+            p.name,
+            SUM(oi.quantity * oi.unit_price) as revenue
+        ')
+            ->join('products as p', 'p.id', '=', 'oi.product_id')
+            ->join('product_merchants as pm', 'pm.product_id', '=', 'p.id')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('pm.merchant_id', $id)
+            ->where('o.status', 'completed')
+            ->groupBy('p.id', 'p.name')
+            ->orderByDesc('revenue')
+            ->limit($limit)
+            ->get();
+
+        $productIds = $rows->pluck('product_id');
+        $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+        return $rows->map(function ($row) use ($products) {
+
+            $product = $products->get($row['product_id']) ?? null;
+
+            if ($product) {
+                $product->setAttribute('revenue', (float)$row['revenue']);
+            }
+
+            return $product;
+        })->filter();
     }
 
 

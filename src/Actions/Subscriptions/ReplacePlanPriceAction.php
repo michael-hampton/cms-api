@@ -109,6 +109,7 @@ class ReplacePlanPriceAction
             $currency,
         ): SubscriptionPlanPricing {
             $newRow = $this->buildNewPricingRow($currentPricing, $newPricingData, $stripePriceId, $currency);
+
             $newPricing = $this->pricingRepository->create($newRow);
 
             $this->pricingRepository->update($currentPricing->id, [

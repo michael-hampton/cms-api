@@ -906,8 +906,17 @@ class QueryBuilder
 
         // GROUP BY with column quoting
         if (!empty($this->groups)) {
-            $quotedGroups = array_map([$this, 'quoteColumn'], $this->groups);
-            $sql .= ' GROUP BY ' . implode(', ', $quotedGroups);
+            $groupParts = [];
+
+            foreach ($this->groups as $group) {
+                if (is_array($group) && isset($group['raw'])) {
+                    $groupParts[] = $group['raw'];
+                } else {
+                    $groupParts[] = $this->quoteColumn($group);
+                }
+            }
+
+            $sql .= ' GROUP BY ' . implode(', ', $groupParts);
         }
 
         // HAVING with column quoting
@@ -1906,6 +1915,13 @@ class QueryBuilder
         }
 
         throw new BadMethodCallException("Method {$method} does not exist.");
+    }
+
+    public function groupByRaw(string $sql): self
+    {
+        $this->groups[] = ['raw' => $sql];
+
+        return $this;
     }
 
     public function insertOrIgnore(array $values): int

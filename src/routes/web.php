@@ -55,6 +55,7 @@ use App\Controllers\Offers\BundleListController;
 use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\OfferListController;
 use App\Controllers\Offers\ProductOfferController;
+use App\Controllers\Product\MerchantDashboardController;
 use App\Controllers\Product\ProductComparisonController;
 use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductDetailController;
@@ -458,25 +459,8 @@ $router->get('/{site}/deals/{id}/modal', [DealsController::class, 'getProductMod
 //    ->where('regionSlug', 'asia-pacific|europe|americas');
 
 // In your routes file — adjust to your router's API
-$router->get('/api/boosts', [BoostController::class, 'index']);
-$router->get('/api/boosts/{id}', [BoostController::class, 'show']);
-$router->post('/api/boosts', [BoostController::class, 'store']);
-$router->post('/api/boosts/{id}/activate', [BoostController::class, 'activate']);
-$router->post('/api/boosts/{id}/expire', [BoostController::class, 'expire']);
-$router->post('/api/boosts/{id}/cancel', [BoostController::class, 'cancel']);
-$router->post('/api/boosts/{id}/pause', [BoostController::class, 'pause']);
-$router->post('/api/boosts/{id}/resume', [BoostController::class, 'resume']);
-$router->get('/api/boosts/{id}/stats', [BoostController::class, 'stats']);
-$router->get('/api/merchants/{merchantId}/boost-stats', [BoostController::class, 'merchantStats']);
-$router->get('/api/merchants/{merchantId}/boost-suggestions', [BoostController::class, 'suggestions']);
-$router->get('/api/merchants/{id}/auto-boost/preview', [BoostController::class, 'autoBoostPreview']);
-$router->post('/api/merchants/{merchantId}/auto-boost/settings', [BoostController::class, 'saveAutoBoostSettings']);
+$router->get('/merchant-portal', [MerchantDashboardController::class, 'index']);
 $router->get('/merchant-portal/boost', [BoostController::class, 'boostPage']);
-$router->get('/api/merchants/{merchantId}/auto-boost/settings', [BoostController::class, 'getAutoBoostSettings']);
-$router->get('/api/merchants/{merchantId}/products/search', [BoostController::class, 'searchMerchantProducts']);
-$router->get('/api/merchants/{merchantId}/offers/search', [BoostController::class, 'searchMerchantOffers']);
-$router->get('/boosts/aggregate', [BoostController::class, 'aggregateStats']);
-$router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']);
 
 //legal
 $router->group(['prefix' => 'legal'], function ($router) {

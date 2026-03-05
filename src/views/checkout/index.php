@@ -41,6 +41,7 @@
 
         /* Header */
         .site-header {
+            ƒleme
             background: white;
             box-shadow: var(--shadow);
             position: sticky;
@@ -909,39 +910,6 @@
                     </div>
 
                     <h2 class="section-title">Card Details</h2>
-                    <div class="form-group full-width">
-                        <label class="form-label">Card Information <span class="required">*</span></label>
-                        <div id="card-element"
-                             style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem;"></div>
-                        <div id="card-errors" class="form-error" role="alert"></div>
-                    </div>
-
-                    <!-- Card Details (shown when card is selected) -->
-                    <div class="form-section" id="card-details">
-                        <h2 class="section-title">Card Details</h2>
-                        <div class="form-group full-width">
-                            <label class="form-label">
-                                Card Number <span class="required">*</span>
-                            </label>
-                            <input type="text" name="card_number" class="form-input" placeholder="1234 5678 9012 3456"
-                                   maxlength="19">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Expiry Date <span class="required">*</span>
-                                </label>
-                                <input type="text" name="card_expiry" class="form-input" placeholder="MM/YY"
-                                       maxlength="5">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">
-                                    CVV <span class="required">*</span>
-                                </label>
-                                <input type="text" name="card_cvv" class="form-input" placeholder="123" maxlength="4">
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Saved Payment Methods -->
                     <div class="form-section" id="saved-cards-section" style="display: none;">
@@ -951,6 +919,8 @@
                             Use Different Card
                         </button>
                     </div>
+
+                    <div id="payment-request-button"></div>
 
                     <!-- Card Details Section (modify existing) -->
                     <div class="form-section" id="new-card-section">
@@ -1319,6 +1289,16 @@
         }
     }
 
+    function getCurrentOrderAmount() {
+        const discount = appliedVoucher ? appliedVoucher.discount : 0;
+        const taxRate = <?= $tax_rate ?>;
+
+        const taxable = INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING;
+        const tax = taxable * taxRate;
+
+        return Math.round((taxable + tax) * 100);
+    }
+
     // Initialize Stripe
     async function initStripe() {
         if (!STRIPE_KEY) {
@@ -1341,6 +1321,71 @@
                     },
                 },
             },
+        });
+
+        /*
+|--------------------------------------------------------------------------
+| Apple Pay / Wallet Support
+|--------------------------------------------------------------------------
+*/
+
+        paymentRequest = stripe.paymentRequest({
+            country: 'GB',
+            currency: 'gbp',
+            total: {
+                label: 'Order Total',
+                amount: getCurrentOrderAmount()
+            },
+            requestPayerName: true,
+            requestPayerEmail: true
+        });
+
+        const prButton = elements.create('paymentRequestButton', {
+            paymentRequest
+        });
+
+        paymentRequest.canMakePayment().then(result => {
+            console.log('Wallet availability:', result);
+
+            if (result) {
+                prButton.mount('#payment-request-button');
+            }
+        });
+
+        paymentRequest.on('paymentmethod', async (ev) => {
+
+            try {
+
+                const {error, paymentIntent} = await stripe.confirmCardPayment(
+                    clientSecret,
+                    {
+                        payment_method: ev.paymentMethod.id
+                    },
+                    {handleActions: false}
+                );
+
+                if (error) {
+                    ev.complete('fail');
+                    showAlert(error.message, 'error');
+                    return;
+                }
+
+                ev.complete('success');
+
+                if (paymentIntent.status === 'requires_action') {
+                    await stripe.confirmCardPayment(clientSecret);
+                }
+
+                if (paymentIntent.status === 'succeeded') {
+                    await confirmPayment(paymentIntent.id);
+                }
+
+            } catch (err) {
+                console.error(err);
+                ev.complete('fail');
+                showAlert('Payment failed', 'error');
+            }
+
         });
 
         // Mount card element

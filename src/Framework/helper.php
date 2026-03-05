@@ -630,4 +630,44 @@ if (!function_exists('tap')) {
 }
 
 
+if (!function_exists('optional')) {
+
+    function optional($value)
+    {
+        return new class($value) {
+
+            private $value;
+
+            public function __construct($value)
+            {
+                $this->value = $value;
+            }
+
+            public function __get($key)
+            {
+                if (!$this->value) {
+                    return null;
+                }
+
+                return $this->value->$key ?? null;
+            }
+
+            public function __call($method, $args)
+            {
+                if (!$this->value) {
+                    return null;
+                }
+
+                return call_user_func_array([$this->value, $method], $args);
+            }
+
+            public function get()
+            {
+                return $this->value;
+            }
+        };
+    }
+}
+
+
 

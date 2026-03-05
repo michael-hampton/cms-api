@@ -337,7 +337,7 @@ class BoostController extends Controller
 
     public function boostPage()
     {
-        return $this->view('member-portal/boost-management');
+        return $this->view('merchant-portal/boost-management');
     }
 
     /**

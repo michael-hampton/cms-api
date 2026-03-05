@@ -86,8 +86,6 @@ class SubscriptionPlanPricingController extends Controller
         try {
             $pricing = $this->pricingService->updatePricingTier($pricingId, $data);
 
-            $pricing = SubscriptionPlanPricing::find($pricingId);
-
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Pricing tier updated successfully',

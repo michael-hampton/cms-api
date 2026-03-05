@@ -113,6 +113,11 @@ class BoostRepository extends Repository
             ->first();
     }
 
+    public function activeForMerchant(null $id) //todo
+    {
+        return collect();
+    }
+
     protected function getModelClass(): string
     {
         return Boost::class;

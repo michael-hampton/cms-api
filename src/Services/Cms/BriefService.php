@@ -222,9 +222,9 @@ class BriefService
 
     // Template methods
 
-    public function bulkAssignCollaborator(array $briefIds, int $userId, string $role): int
+    public function bulkAssignCollaborator(array $briefIds, int $userId, string $role, int $siteId): int
     {
-        return $this->bulkAssignCollaborator->handle($briefIds, $userId, $role);
+        return $this->bulkAssignCollaborator->handle($briefIds, $userId, $role, $siteId);
     }
 
     public function bulkDelete(array $briefIds): void
@@ -314,7 +314,7 @@ class BriefService
     {
         $collaborator = $this->collaboratorRepository->find($collaboratorId);
 
-        if (!$collaborator || $collaborator->brief_id !== $briefId) {
+        if (!$collaborator || $collaborator->collaboratable_id !== $briefId) {
             throw new Exception("Collaborator not found");
         }
 
@@ -385,7 +385,7 @@ class BriefService
         // Create new version before restoring
         $this->createBriefVersion->handle($briefId, $userId, 'Before restore');
 
-        $versionData = is_array($version->data) ? $version?->data : $version?->data->toArray();
+        $versionData = is_array($version->data) ? $version?->data : $version?->data?->toArray();
 
         // Restore version data
         $this->briefRepository->update($briefId, [

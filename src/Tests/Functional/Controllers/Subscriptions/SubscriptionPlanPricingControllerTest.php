@@ -54,7 +54,8 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
             'period_description' => 'per year',
             'is_default' => true,
             'is_active' => true,
-            'sort_order' => 0
+            'sort_order' => 0,
+            'currency' => 'GBP',
         ];
 
         $response = $this->postForSite(
@@ -111,7 +112,10 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
         $data = [
             'price' => 89.99,
             'discount_percentage' => 20,
-            'label' => 'Updated Label'
+            'label' => 'Updated Label',
+            'duration_months' => 5,
+            'issue_count' => 5,
+            'currency' => 'GBP'
         ];
 
         $response = $this->putForSite(
@@ -124,10 +128,8 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
 
         $this->assertTrue($responseData['success']);
         $this->assertEquals('Updated Label', $responseData['data']['label']);
-
-        $pricing = $pricing->fresh();
-        $this->assertEquals(89.99, $pricing->price);
-        $this->assertEquals(20, $pricing->discount_percentage);
+        $this->assertEquals(89.99, $responseData['data']['price']);
+        $this->assertEquals(20, $responseData['data']['discount_percentage']);
     }
 
     public function testDestroyDeletesPricingTier(): void
@@ -236,6 +238,6 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->plan = $this->createSubscriptionPlan();
+        $this->plan = $this->createSubscriptionPlan(['stripe_product_id' => 'test']);
     }
 }

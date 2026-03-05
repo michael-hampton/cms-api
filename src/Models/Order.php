@@ -50,6 +50,7 @@ class Order extends Model
         'reward_discount',
         'merchant_funded',
         'platform_funded',
+        'merchant_id'
     ];
 
     protected $casts = [

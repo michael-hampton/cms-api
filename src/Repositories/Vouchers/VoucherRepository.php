@@ -198,4 +198,9 @@ class VoucherRepository extends Repository
             ->where('merchant_id', $merchantId)
             ->first();
     }
+
+    public function getByMerchant(int $merchantId): Collection
+    {
+        return Voucher::where('merchant_id', $merchantId)->get();
+    }
 }

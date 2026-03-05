@@ -5,6 +5,7 @@ use App\Controllers\Billing\OrderController;
 use App\Controllers\Billing\PaymentController;
 use App\Controllers\Billing\PaymentMethodController;
 use App\Controllers\Billing\RefundController;
+use App\Controllers\Boost\BoostController;
 use App\Controllers\Cms\AuthorController;
 use App\Controllers\Cms\BlockController;
 use App\Controllers\Cms\BrandController;
@@ -67,7 +68,28 @@ use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Vouchers\VoucherController;
 use App\Framework\Authorization\AuthenticateWithToken;
 
+$router->get('/api/boosts', [BoostController::class, 'index']);
+$router->get('/api/boosts/{id}', [BoostController::class, 'show']);
+$router->post('/api/boosts', [BoostController::class, 'store']);
+$router->post('/api/boosts/{id}/activate', [BoostController::class, 'activate']);
+$router->post('/api/boosts/{id}/expire', [BoostController::class, 'expire']);
+$router->post('/api/boosts/{id}/cancel', [BoostController::class, 'cancel']);
+$router->post('/api/boosts/{id}/pause', [BoostController::class, 'pause']);
+$router->post('/api/boosts/{id}/resume', [BoostController::class, 'resume']);
+$router->get('/api/boosts/{id}/stats', [BoostController::class, 'stats']);
+$router->get('/api/merchants/{merchantId}/boost-stats', [BoostController::class, 'merchantStats']);
+$router->get('/api/merchants/{merchantId}/boost-suggestions', [BoostController::class, 'suggestions']);
+$router->get('/api/merchants/{id}/auto-boost/preview', [BoostController::class, 'autoBoostPreview']);
+$router->post('/api/merchants/{merchantId}/auto-boost/settings', [BoostController::class, 'saveAutoBoostSettings']);
+$router->get('/merchant-portal/boost', [BoostController::class, 'boostPage']);
+$router->get('/api/merchants/{merchantId}/auto-boost/settings', [BoostController::class, 'getAutoBoostSettings']);
+$router->get('/api/merchants/{merchantId}/products/search', [BoostController::class, 'searchMerchantProducts']);
+$router->get('/api/merchants/{merchantId}/offers/search', [BoostController::class, 'searchMerchantOffers']);
+$router->get('/boosts/aggregate', [BoostController::class, 'aggregateStats']);
+$router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']);
+
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
+
     // Pages API
     $router->group(['prefix' => '{siteName}'], function ($router) {
         $router->get('/contact-info', SiteController::class, 'getContactInfo');

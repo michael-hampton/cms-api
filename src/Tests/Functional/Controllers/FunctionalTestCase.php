@@ -9,6 +9,7 @@ use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
 use App\Framework\HttpClient\HttpClient;
 use App\Framework\HttpClient\HttpClientResponse;
+use App\Framework\Mail\ArrayMailer;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
 use App\Models\Member;
@@ -195,6 +196,7 @@ abstract class FunctionalTestCase extends TestCase
     {
         $this->cleanupDatabase();
         $this->cleanupServerGlobals();
+        ArrayMailer::clear();
         parent::tearDown();
     }
 
@@ -781,6 +783,18 @@ abstract class FunctionalTestCase extends TestCase
     public static function getHttpMock(string $url): ?array
     {
         return self::$httpMocks[$url] ?? null;
+    }
+
+    protected function assertObjectHasAttribute(string $attribute, object $object): void
+    {
+        $this->assertTrue(
+            property_exists($object, $attribute),
+            sprintf(
+                'Failed asserting that object of class "%s" has attribute "%s".',
+                $object::class,
+                $attribute
+            )
+        );
     }
 
 }

@@ -68,7 +68,8 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
             'member_id' => $member->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Test Plan',
-            'type' => 'paid'
+            'type' => 'paid',
+            'delivery_type' => 'digital'
         ]);
 
         SubscriptionWindow::create([
@@ -80,6 +81,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         ]);
 
         $job = app(GenerateIssueDeliveriesJob::class);
+
         $result = $job->handle($issueDelivery);
 
         $this->assertEquals(1, $result['created']);

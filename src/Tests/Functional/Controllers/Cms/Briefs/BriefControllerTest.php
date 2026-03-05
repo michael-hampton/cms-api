@@ -13,6 +13,7 @@ use App\Models\BriefTask;
 use App\Models\BriefTemplate;
 use App\Models\BriefVersion;
 use App\Models\BriefWorkflowHistory;
+use App\Models\Collaborator;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -1145,16 +1146,20 @@ class BriefControllerTest extends FunctionalTestCase
         $user1 = $this->createUser();
         $user2 = $this->createUser();
 
-        BriefCollaborator::create([
-            'brief_id' => $brief->id,
+        Collaborator::create([
+            'collaboratable_id' => $brief->id,
             'user_id' => $user1->id,
-            'role' => 'writer'
+            'role' => 'writer',
+            'collaboratable_type' => Brief::class,
+            'site_id' => $this->siteId
         ]);
 
-        BriefCollaborator::create([
-            'brief_id' => $brief->id,
+        Collaborator::create([
+            'collaboratable_id' => $brief->id,
             'user_id' => $user2->id,
-            'role' => 'editor'
+            'role' => 'editor',
+            'collaboratable_type' => Brief::class,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite("/api/briefs/{$brief->id}/collaborators");
@@ -1171,10 +1176,12 @@ class BriefControllerTest extends FunctionalTestCase
         $collaborator = $this->createUser();
         $brief = $this->createBrief(['owner_id' => $owner->id]);
 
-        $assignment = BriefCollaborator::create([
-            'brief_id' => $brief->id,
+        $assignment = Collaborator::create([
+            'collaboratable_id' => $brief->id,
             'user_id' => $collaborator->id,
-            'role' => 'writer'
+            'role' => 'writer',
+            'collaboratable_type' => Brief::class,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->deleteForSite("/api/briefs/{$brief->id}/collaborators/{$assignment->id}");
@@ -1527,16 +1534,18 @@ class BriefControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
 
-        $this->assertDatabaseHas('brief_collaborators', [
-            'brief_id' => $brief1->id,
+        $this->assertDatabaseHas('collaborators', [
+            'collaboratable_id' => $brief1->id,
             'user_id' => $collaborator->id,
-            'role' => 'editor'
+            'role' => 'editor',
+            'collaboratable_type' => Brief::class
         ]);
 
-        $this->assertDatabaseHas('brief_collaborators', [
-            'brief_id' => $brief2->id,
+        $this->assertDatabaseHas('collaborators', [
+            'collaboratable_id' => $brief2->id,
             'user_id' => $collaborator->id,
-            'role' => 'editor'
+            'role' => 'editor',
+            'collaboratable_type' => Brief::class
         ]);
     }
 
@@ -1564,10 +1573,12 @@ class BriefControllerTest extends FunctionalTestCase
         $collaborator = $this->createUser();
         $brief = $this->createBrief(['owner_id' => $owner->id]);
 
-        $assignment = BriefCollaborator::create([
-            'brief_id' => $brief->id,
+        $assignment = Collaborator::create([
+            'collaboratable_id' => $brief->id,
             'user_id' => $collaborator->id,
-            'role' => 'writer'
+            'role' => 'writer',
+            'collaboratable_type' => Brief::class,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->putForSite(

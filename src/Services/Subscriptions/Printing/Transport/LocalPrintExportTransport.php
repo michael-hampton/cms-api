@@ -4,8 +4,8 @@ namespace App\Services\Subscriptions\Printing\Transport;
 
 class LocalPrintExportTransport implements PrintExportTransport
 {
-    private const DEFAULT_EXPORT_DIR = '/var/exports/print';
-
+    private const DEFAULT_EXPORT_DIR =
+        __DIR__ . '/../../../../storage/exports/print';
     public function __construct(
         private readonly string $exportDirectory = self::DEFAULT_EXPORT_DIR,
     )

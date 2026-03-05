@@ -7,6 +7,7 @@ services:
     volumes:
       - ./src:/var/www/html
       - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      - /Users/michael.hampton/Documents/block-parser/src/storage:/var/www/html/storage
     ports:
     - "5001:80"
     depends_on:

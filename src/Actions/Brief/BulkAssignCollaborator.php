@@ -2,6 +2,7 @@
 
 namespace App\Actions\Brief;
 
+use App\Models\Brief;
 use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 
 class BulkAssignCollaborator
@@ -13,7 +14,7 @@ class BulkAssignCollaborator
     {
     }
 
-    public function handle(array $briefIds, int $userId, string $role): int
+    public function handle(array $briefIds, int $userId, string $role, int $siteId): int
     {
         $count = 0;
 
@@ -24,10 +25,12 @@ class BulkAssignCollaborator
                 $this->collaboratorRepository->update($existing->id, ['role' => $role]);
             } else {
                 $this->collaboratorRepository->create([
-                    'brief_id' => $briefId,
+                    'collaboratable_id' => $briefId,
                     'user_id' => $userId,
                     'role' => $role,
-                    'assigned_at' => now()
+                    'assigned_at' => now(),
+                    'collaboratable_type' => Brief::class,
+                    'site_id' => $siteId
                 ]);
             }
 

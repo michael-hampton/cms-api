@@ -250,7 +250,7 @@ class NewsletterController extends Controller
             ]);
 
             return $this->successResponse('Newsletter sent successfully', [
-                'sent_to' => $subscribers->count(),
+                //'sent_to' => $subscribers->count(),
                 'newsletter_id' => $id
             ]);
 

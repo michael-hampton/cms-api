@@ -20,6 +20,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 80
         ]);
 
         // Expired offer
@@ -29,6 +30,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => false,
+            'original_price' => 80
         ]);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?is_active=true");
@@ -50,6 +52,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'original_price' => 80
         ]);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?search=test");
@@ -63,21 +66,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 100.00,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 50.00,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $this->createProductOffer($product->id, ['sale_price' => 100]);
+        $this->createProductOffer($product->id, ['sale_price' => 50]);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?sort_by=sale_price&sort_order=asc");
         $data = json_decode($response->getContent(), true);
@@ -107,13 +97,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $data = [
             'start_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
@@ -134,21 +118,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $product1 = $this->createProduct(['category_id' => $category->id]);
         $product2 = $this->createProduct(['category_id' => $category->id]);
 
-        ProductOffer::create([
-            'product_id' => $product1->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        ProductOffer::create([
-            'product_id' => $product2->id,
-            'sale_price' => 89.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product1->id);
+        $offer = $this->createProductOffer($product2->id);
 
         $response = $this->getForSite("/api/categories/{$category->id}/offers");
         $data = json_decode($response->getContent(), true);
@@ -169,6 +140,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'link' => 'http://www.test.com',
+            'original_price' => 5
         ];
 
         $response = $this->postForSite("/api/products/{$product->id}/offers", $data);
@@ -196,13 +169,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $data = ['sale_price' => 69.99];
 
@@ -227,13 +194,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $response = $this->deleteForSite("/api/products/{$product->id}/offers/{$offer->id}");
         $data = json_decode($response->getContent(), true);
@@ -368,9 +329,12 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'voucher_id' => $voucher->id,
+            'link' => 'http://www.test.com',
+            'original_price' => 5
         ];
 
         $response = $this->postForSite("/api/products/{$product->id}/offers", $data);
+
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -383,23 +347,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $merchant1 = $this->createMerchant();
         $merchant2 = $this->createMerchant();
 
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant1->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'merchant_id' => $merchant2->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $this->createProductOffer($product->id, [], $merchant1->id);
+        $this->createProductOffer($product->id, [], $merchant2->id);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?merchant_id={$merchant1->id}");
         $data = json_decode($response->getContent(), true);
@@ -413,23 +362,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'status' => 'published',
-        ]);
-
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'status' => 'pending',
-        ]);
+        $this->createProductOffer($product->id, ['status' => 'published']);
+        $this->createProductOffer($product->id, ['status' => 'pending']);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?status=published");
         $data = json_decode($response->getContent(), true);
@@ -443,21 +377,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
-
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => false,
-        ]);
+        $this->createProductOffer($product->id, ['is_active' => true]);
+        $this->createProductOffer($product->id, ['is_active' => false]);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?is_active=1");
         $data = json_decode($response->getContent(), true);
@@ -477,6 +398,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-5 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-3 days')),
             'is_active' => true,
+            'original_price' => 0
         ]);
 
         ProductOffer::create([
@@ -485,6 +407,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
             'is_active' => true,
+            'original_price' => 0
         ]);
 
         $startDate = date('Y-m-d', strtotime('now'));

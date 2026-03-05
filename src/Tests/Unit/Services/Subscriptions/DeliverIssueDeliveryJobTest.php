@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\IssueDeliveredStatus;
-use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssuesDelivered;
 use App\Services\Subscriptions\DeliveryService;
@@ -18,19 +17,18 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
     public function test_marks_delivery_as_delivered_on_success(): void
     {
         $issueDelivery = $this->createIssueDelivery();
-        $subscription = $this->createSubscription();
+        $subscription = $this->createSubscription(['delivery_type' => 'digital']);
         $issuesDelivered = IssuesDelivered::create([
-            'status' => 'scheduled',
+            'status' => IssueDeliveredStatus::SCHEDULED->value,
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'attempts' => 0,
         ]);
 
         $deliveryService = Mockery::mock(DeliveryService::class);
+        $deliveryService->shouldReceive('registerChannel')->byDefault();
         $deliveryService->shouldReceive('send')->once();
         app()->instance(DeliveryService::class, $deliveryService);
-
-        $deliveryService->shouldReceive('registerChannel');
 
         $job = app(DeliverIssueDeliveryJob::class);
         $job->handle($issuesDelivered->id);
@@ -44,36 +42,34 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
     public function test_marks_delivery_as_failed_and_increments_attempts_on_failure(): void
     {
         $issueDelivery = $this->createIssueDelivery();
-        $subscription = $this->createSubscription();
+        $subscription = $this->createSubscription(['delivery_type' => 'digital']);
         $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveryStatus::SCHEDULED->value,
+            'status' => IssueDeliveredStatus::SCHEDULED->value, // was incorrectly IssueDeliveryStatus
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'attempts' => 0,
         ]);
 
         $deliveryService = Mockery::mock(DeliveryService::class);
-
-        $deliveryService->shouldReceive('registerChannel');
-
-        $deliveryService->shouldReceive('send')
-            ->andThrow(new \Exception('Delivery failed'));
+        $deliveryService->shouldReceive('registerChannel')->byDefault();
+        $deliveryService->shouldReceive('send')->andThrow(new \Exception('Delivery failed'));
         app()->instance(DeliveryService::class, $deliveryService);
 
         $job = app(DeliverIssueDeliveryJob::class);
 
         try {
             $job->handle($issuesDelivered->id);
-        } catch (\Exception $e) {
-            // Expected
+        } catch (\Exception) {
+            // Expected — job re-throws after marking failure.
         }
 
-        $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
+        $issuesDelivered->refresh();
 
-        $this->assertEquals(IssueDeliveryStatus::FAILED->value, $issuesDelivered->status);
+        $this->assertEquals(IssueDeliveredStatus::FAILED->value, $issuesDelivered->status);
         $this->assertEquals(1, $issuesDelivered->attempts);
         $this->assertStringContainsString('Delivery failed', $issuesDelivered->failure_reason);
     }
+
 
     public function test_skips_already_delivered_idempotent(): void
     {

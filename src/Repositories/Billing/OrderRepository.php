@@ -26,6 +26,68 @@ class OrderRepository extends Repository
         return Order::where('payment_intent_id', $paymentIntentId)->first();
     }
 
+    public function monthlyStatsForMerchant(int $id, ?int $monthsAgo = null): object
+    {
+        $referenceDate = $monthsAgo > 0
+            ? now_datetime()->subMonths($monthsAgo)
+            : now_datetime();
+
+
+        $row = Order::where('merchant_id', $id)
+            ->where('status', 'completed')
+            ->where('payment_status', 'paid')
+            ->whereMonth('completed_at', $referenceDate->format('m'))
+            ->whereYear('completed_at', $referenceDate->format('Y'))
+            ->selectRaw('
+                COALESCE(SUM(total), 0) AS total_revenue,
+                COUNT(*)                AS total_orders
+            ')
+            ->first();
+
+        return (object)[
+            'totalRevenue' => (float)($row->total_revenue ?? 0),
+            'totalOrders' => (int)($row->total_orders ?? 0),
+        ];
+    }
+
+    public function dailyRevenueForMerchant(int $id, int $days = 30): Collection
+    {
+        $start = now_datetime()->subDays($days - 1)->startOfDay();
+
+        // Build a raw series so that days without orders still appear as 0.
+        // We group by the date portion of completed_at rather than created_at
+        // to match the monthlyStats boundary.
+        $rows = Order::where('merchant_id', $id)
+            ->where('status', 'completed')
+            ->where('payment_status', 'paid')
+            ->where('completed_at', '>=', $start->format('Y-m-d'))
+            ->selectRaw("DATE(completed_at) AS day, COALESCE(SUM(total), 0) AS revenue")
+            ->groupByRaw("DATE(completed_at)")
+            ->orderBy('day')
+            ->get()
+            ->keyBy('day')
+            ->toArray();
+
+        // Fill missing days with zero so the chart always has $days data points.
+        $series = collect();
+        for ($i = 0; $i < $days; $i++) {
+            $date = now_datetime()->subDays($days - 1 - $i)->toDateString();
+            $revenue = isset($rows[$date]) ? (float)$rows[$date]['revenue'] : 0.0;
+            $series->push(['day' => $date, 'revenue' => $revenue]);
+        }
+
+        return $series;
+    }
+
+    public function recentForMerchant(int $id, int $limit = 5): Collection
+    {
+        return Order::with(['items'])
+            ->where('merchant_id', $id)
+            ->latest()
+            ->limit($limit)
+            ->get();
+    }
+
     protected function getModelClass(): string
     {
         return Order::class;
@@ -198,5 +260,10 @@ class OrderRepository extends Repository
                 'total_pages' => (int)ceil($total / $perPage),
             ],
         ];
+    }
+
+    public function getRecentForMerchant(int $merchantId, int $limit = 10): Collection
+    {
+        return Order::with(['items', 'items.product'])->where('merchant_id', $merchantId)->latest()->limit($limit)->get();
     }
 }

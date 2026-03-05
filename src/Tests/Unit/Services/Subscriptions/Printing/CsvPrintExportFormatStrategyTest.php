@@ -117,6 +117,31 @@ class CsvPrintExportFormatStrategyTest extends FunctionalTestCase
         $this->assertCount(1, $lines);
     }
 
+    public function test_can_view_real_csv_output(): void
+    {
+        $fulfillment = $this->makeFulfillment([
+            'subscription_id' => 10,
+            'full_name' => 'Jane Doe',
+            'address_line_1' => '1 Main St',
+            'city' => 'London',
+            'postcode' => 'E1 1AA',
+            'country' => 'GB',
+            'tracking_number' => 'TRK-123'
+        ]);
+
+        $csv = $this->strategy->generate(
+            1,
+            [$fulfillment],
+            ['id' => 5, 'title' => 'Spring Issue']
+        );
+
+        echo PHP_EOL . "===== CSV OUTPUT =====" . PHP_EOL;
+        echo $csv . PHP_EOL;
+        echo "======================" . PHP_EOL;
+
+        $this->assertNotEmpty($csv);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

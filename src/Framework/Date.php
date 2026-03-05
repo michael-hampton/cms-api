@@ -3,6 +3,7 @@
 namespace App\Framework;
 
 use DateInterval;
+use DateTime;
 
 class Date extends \DateTime
 {
@@ -19,6 +20,18 @@ class Date extends \DateTime
     public function subDays(int $days): self
     {
         return $this->sub(new DateInterval("P{$days}D"));
+    }
+
+    public function startOfMonth(): DateTime
+    {
+        return $this->setDate($this->format('Y'), $this->format('m'), 1)
+            ->setTime(0, 0, 0);
+    }
+
+    public function endOfMonth(): DateTime
+    {
+        return $this->setDate($this->format('Y'), $this->format('m'), $this->format('t'))
+            ->setTime(23, 59, 59);
     }
 
     public function subDay(): self
@@ -112,5 +125,40 @@ class Date extends \DateTime
         }
 
         return null;
+    }
+
+
+    function diffForHumans()
+    {
+
+        $now = new DateTime();
+
+        $diff = $now->diff($this);
+
+        $isPast = $this < $now;
+
+        $units = [
+            'y' => 'year',
+            'm' => 'month',
+            'd' => 'day',
+            'h' => 'hour',
+            'i' => 'minute',
+            's' => 'second'
+        ];
+
+        foreach ($units as $key => $name) {
+            $value = $diff->$key;
+
+            if ($value > 0) {
+                $plural = $value > 1 ? 's' : '';
+                $timeString = $value . ' ' . $name . $plural;
+
+                return $isPast
+                    ? $timeString . ' ago'
+                    : 'in ' . $timeString;
+            }
+        }
+
+        return 'just now';
     }
 }

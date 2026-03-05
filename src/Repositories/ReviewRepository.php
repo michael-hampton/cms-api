@@ -3,9 +3,7 @@
 namespace App\Repositories;
 
 use App\Framework\Support\Collection;
-use App\Models\Product;
 use App\Models\Review;
-use App\Models\SubscriptionPlan;
 
 /**
  * ReviewRepository
@@ -22,6 +20,108 @@ use App\Models\SubscriptionPlan;
  */
 class ReviewRepository extends Repository
 {
+    /**
+     * Average star rating for all approved reviews on this merchant's products.
+     *
+     * Supports an optional monthsAgo offset to compare against a prior period.
+     */
+    public function averageRatingForMerchant(int $merchantId, int $monthsAgo = 0): float
+    {
+        $query = $this->baseQuery($merchantId)
+            ->where('reviews.is_approved', 1);
+
+        if ($monthsAgo > 0) {
+            $start = now_datetime()->subMonths($monthsAgo)->startOfMonth();
+            $end = now_datetime()->subMonths($monthsAgo)->endOfMonth();
+            $query->whereBetween('reviews.created_at', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
+        } else {
+            $query->whereMonth('reviews.created_at', now('m'))
+                ->whereYear('reviews.created_at', now('Y'));
+        }
+
+        return round((float)$query->avg('reviews.rating'), 1);
+    }
+
+    /**
+     * Most recent approved reviews for a merchant's products.
+     */
+    public function recentForMerchant(int $merchantId, int $limit = 10): Collection
+    {
+        return $this->baseQuery($merchantId)
+            ->where('reviews.is_approved', 1)
+            ->orderByDesc('reviews.created_at')
+            ->limit($limit)
+            ->select([
+                'reviews.*',
+                'products.name as product_name',
+            ])
+            ->get();
+    }
+
+    /**
+     * Aggregate stats for the merchant's reviews.
+     *
+     * @return array{
+     *     total: int,
+     *     pending_response: int,
+     *     this_month: int,
+     *     previous_month: int,
+     *     rating_distribution: array<int, float>,
+     * }
+     */
+    public function statsForMerchant(int $merchantId): array
+    {
+        $base = $this->baseQuery($merchantId)->where('reviews.is_approved', 1);
+
+        $total = (clone $base)->count();
+
+        $pendingResponse = (clone $base)->count();
+
+        $thisMonth = (clone $base)
+            ->whereMonth('reviews.created_at', now('MM'))
+            ->whereYear('reviews.created_at', now('YYYY'))
+            ->count();
+
+        $previousMonth = (clone $base)
+            ->whereMonth('reviews.created_at', now_datetime()->subMonths(1)->format('MM'))
+            ->whereYear('reviews.created_at', now_datetime()->subMonths(1)->format('YYYY'))
+            ->count();
+
+        // Distribution: percentage per star (1–5)
+        $distribution = (clone $base)
+            ->selectRaw('rating, COUNT(*) as count')
+            ->groupBy('rating')
+            ->get()
+            ->pluck('count', 'rating')
+            ->toArray();
+
+        $ratingDistribution = [];
+        for ($star = 5; $star >= 1; $star--) {
+            $count = $distribution[$star] ?? 0;
+            $ratingDistribution[$star] = $total > 0
+                ? round(($count / $total) * 100, 1)
+                : 0.0;
+        }
+
+        return [
+            'total' => $total,
+            'pending_response' => $pendingResponse,
+            'this_month' => $thisMonth,
+            'previous_month' => $previousMonth,
+            'rating_distribution' => $ratingDistribution,
+        ];
+    }
+
+    // ─── Private ─────────────────────────────────────────────────────────────
+
+    private function baseQuery(int $merchantId)
+    {
+        return $this->model->newQuery()
+            ->join('products', 'products.id', '=', 'reviews.product_id')
+            ->join('product_merchants', 'product_merchants.product_id', '=', 'products.id')
+            ->where('product_merchants.merchant_id', $merchantId);
+    }
+
     protected function getModelClass(): string
     {
         return Review::class;

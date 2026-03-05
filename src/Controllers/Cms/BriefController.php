@@ -298,6 +298,7 @@ class BriefController extends Controller
             $briefIds = $request->get('brief_ids', []);
             $userId = $request->get('user_id');
             $role = $request->get('role', 'writer');
+            $siteId = SiteContext::getId();
 
             if (empty($briefIds)) {
                 return $this->errorResponse('No briefs selected', 400);
@@ -311,7 +312,7 @@ class BriefController extends Controller
                 return $this->errorResponse('Invalid role', 400);
             }
 
-            $count = $this->briefService->bulkAssignCollaborator($briefIds, $userId, $role);
+            $count = $this->briefService->bulkAssignCollaborator($briefIds, $userId, $role, $siteId);
 
             return $this->successResponse("Assigned to {$count} briefs");
         } catch (Exception $e) {
