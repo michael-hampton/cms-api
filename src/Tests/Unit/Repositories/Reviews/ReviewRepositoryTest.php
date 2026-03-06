@@ -612,4 +612,353 @@ class ReviewRepositoryTest extends RepositoryTestCase
             $this->repository->getAverageRatingForReviewable(SubscriptionPlan::class, $plan->id)
         );
     }
+
+    public function test_averageRatingForMerchant_returns_correct_average_for_current_month(): void
+    {
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product, $m1, $merchant, [
+            'rating' => 5,
+            'is_approved' => true,
+            'created_at' => now_datetime()->startOfMonth()->format('Y-m-d H:i:s'),
+        ]);
+        $this->createMerchantProductReview($product, $m2, $merchant, [
+            'rating' => 3,
+            'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $avg = $this->repository->averageRatingForMerchant($merchant->id);
+        $this->assertEquals(4.0, $avg);
+    }
+
+    public function test_averageRatingForMerchant_returns_zero_when_no_reviews(): void
+    {
+        $merchant = $this->createMerchant();
+        $avg = $this->repository->averageRatingForMerchant($merchant->id);
+        $this->assertEquals(0.0, $avg);
+    }
+
+    public function test_averageRatingForMerchant_ignores_unapproved_reviews(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product, $m1, $merchant, [
+            'rating' => 5, 'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        $this->createMerchantProductReview($product, $m2, $merchant, [
+            'rating' => 1, 'is_approved' => false,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $avg = $this->repository->averageRatingForMerchant($merchant->id);
+        $this->assertEquals(5.0, $avg);
+    }
+
+    public function test_averageRatingForMerchant_with_monthsAgo_scopes_to_that_period(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        // Review this month
+        $this->createMerchantProductReview($product, $m1, $merchant, [
+            'rating' => 2, 'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        // Review 1 month ago
+        $this->createMerchantProductReview($product, $m2, $merchant, [
+            'rating' => 4, 'is_approved' => true,
+            'created_at' => now_datetime()->subMonths(1)->startOfMonth()->addDays(5)->format('Y-m-d H:i:s'),
+        ]);
+
+        $avgLastMonth = $this->repository->averageRatingForMerchant($merchant->id, 1);
+        $this->assertEquals(4.0, $avgLastMonth);
+    }
+
+    public function test_averageRatingForMerchant_does_not_include_other_merchants(): void
+    {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+        $product1 = $this->createProduct(['name' => 'P1']);
+        $product2 = $this->createProduct(['name' => 'P2']);
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product1, $m1, $merchant1, [
+            'rating' => 5, 'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        $this->createMerchantProductReview($product2, $m2, $merchant2, [
+            'rating' => 1, 'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $avg1 = $this->repository->averageRatingForMerchant($merchant1->id);
+        $avg2 = $this->repository->averageRatingForMerchant($merchant2->id);
+
+        $this->assertEquals(5.0, $avg1);
+        $this->assertEquals(1.0, $avg2);
+    }
+
+    // ─── recentForMerchant ────────────────────────────────────────────────
+
+    public function test_recentForMerchant_returns_approved_reviews_with_product_name(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct(['name' => 'Super Widget']);
+        $member = $this->createMember();
+
+        $this->createMerchantProductReview($product, $member, $merchant, ['is_approved' => true]);
+
+        $reviews = $this->repository->recentForMerchant($merchant->id, 10);
+
+        $this->assertCount(1, $reviews);
+        $this->assertEquals('Super Widget', $reviews->first()->product->name);
+    }
+
+    public function test_recentForMerchant_excludes_unapproved_reviews(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product, $m1, $merchant, ['is_approved' => true]);
+        $this->createMerchantProductReview($product, $m2, $merchant, ['is_approved' => false]);
+
+        $reviews = $this->repository->recentForMerchant($merchant->id, 10);
+        $this->assertCount(1, $reviews);
+    }
+
+    public function test_recentForMerchant_respects_limit(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+
+        for ($i = 1; $i <= 6; $i++) {
+            $member = $this->createMember(['email' => "u{$i}@merchant.test"]);
+            $this->createMerchantProductReview($product, $member, $merchant, ['is_approved' => true]);
+        }
+
+        $reviews = $this->repository->recentForMerchant($merchant->id, 3);
+        $this->assertCount(3, $reviews);
+    }
+
+    public function test_recentForMerchant_orders_by_created_at_descending(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product, $m1, $merchant, [
+            'is_approved' => true, 'title' => 'Older review',
+            'created_at' => now_datetime()->subDays(10)->format('Y-m-d H:i:s'),
+        ]);
+        $this->createMerchantProductReview($product, $m2, $merchant, [
+            'is_approved' => true, 'title' => 'Newer review',
+            'created_at' => now_datetime()->subDays(1)->format('Y-m-d H:i:s'),
+        ]);
+
+        $reviews = $this->repository->recentForMerchant($merchant->id, 10);
+        $this->assertEquals('Newer review', $reviews->first()->title);
+    }
+
+    public function test_recentForMerchant_does_not_include_other_merchants(): void
+    {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+        $product1 = $this->createProduct(['name' => 'P1']);
+        $product2 = $this->createProduct(['name' => 'P2']);
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product1, $m1, $merchant1, ['is_approved' => true]);
+        $this->createMerchantProductReview($product2, $m2, $merchant2, ['is_approved' => true]);
+
+        $reviews = $this->repository->recentForMerchant($merchant1->id, 10);
+
+
+        $this->assertCount(1, $reviews);
+        $this->assertEquals('P1', $reviews->first()->product->name);
+    }
+
+    public function test_statsForMerchant_returns_expected_keys(): void
+    {
+        $merchant = $this->createMerchant();
+        $stats = $this->repository->statsForMerchant($merchant->id);
+
+        $this->assertArrayHasKey('total', $stats);
+        $this->assertArrayHasKey('pending_response', $stats);
+        $this->assertArrayHasKey('this_month', $stats);
+        $this->assertArrayHasKey('previous_month', $stats);
+        $this->assertArrayHasKey('rating_distribution', $stats);
+    }
+
+    public function test_statsForMerchant_returns_zeros_when_no_reviews(): void
+    {
+        $merchant = $this->createMerchant();
+        $stats = $this->repository->statsForMerchant($merchant->id);
+
+        $this->assertEquals(0, $stats['total']);
+        $this->assertEquals(0, $stats['this_month']);
+        $this->assertEquals(0, $stats['previous_month']);
+
+        foreach ([5, 4, 3, 2, 1] as $star) {
+            $this->assertEquals(0.0, $stats['rating_distribution'][$star]);
+        }
+    }
+
+    public function test_statsForMerchant_total_counts_only_approved(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        $this->createMerchantProductReview($product, $m1, $merchant, ['is_approved' => true]);
+        $this->createMerchantProductReview($product, $m2, $merchant, ['is_approved' => false]);
+
+        $stats = $this->repository->statsForMerchant($merchant->id);
+        $this->assertEquals(1, $stats['total']);
+    }
+
+    public function test_statsForMerchant_this_month_counts_current_month_only(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        // This month
+        $this->createMerchantProductReview($product, $m1, $merchant, [
+            'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        // Last month
+        $this->createMerchantProductReview($product, $m2, $merchant, [
+            'is_approved' => true,
+            'created_at' => now_datetime()->subMonths(1)->startOfMonth()->format('Y-m-d H:i:s'),
+        ]);
+
+        $stats = $this->repository->statsForMerchant($merchant->id);
+        $this->assertEquals(1, $stats['this_month']);
+    }
+
+    public function test_statsForMerchant_previous_month_counts_last_month_only(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+
+        // This month
+        $this->createMerchantProductReview($product, $m1, $merchant, [
+            'is_approved' => true,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        // Last month
+        $this->createMerchantProductReview($product, $m2, $merchant, [
+            'is_approved' => true,
+            'created_at' => now_datetime()->subMonths(1)->startOfMonth()->addDays(5)->format('Y-m-d H:i:s'),
+        ]);
+
+        $stats = $this->repository->statsForMerchant($merchant->id);
+
+        $this->assertEquals(1, $stats['previous_month']);
+    }
+
+    public function test_statsForMerchant_rating_distribution_sums_to_100_percent(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct();
+        $members = array_map(fn($i) => $this->createMember(['email' => "u{$i}@merchant.test"]), range(1, 4));
+
+        $ratings = [5, 5, 3, 1];
+        foreach ($ratings as $i => $rating) {
+            $this->createMerchantProductReview($product, $members[$i], $merchant, [
+                'rating' => $rating,
+                'is_approved' => true,
+                'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $stats = $this->repository->statsForMerchant($merchant->id);
+        $dist = $stats['rating_distribution'];
+
+        $total = array_sum($dist);
+        $this->assertEquals(100.0, $total);
+
+        $this->assertEquals(50.0, $dist[5]); // 2 of 4
+        $this->assertEquals(0.0, $dist[4]);
+        $this->assertEquals(25.0, $dist[3]); // 1 of 4
+        $this->assertEquals(0.0, $dist[2]);
+        $this->assertEquals(25.0, $dist[1]); // 1 of 4
+    }
+
+    public function test_statsForMerchant_does_not_include_other_merchants(): void
+    {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+        $product1 = $this->createProduct(['name' => 'P1']);
+        $product2 = $this->createProduct(['name' => 'P2']);
+        $m1 = $this->createMember(['email' => 'a@merchant.test']);
+        $m2 = $this->createMember(['email' => 'b@merchant.test']);
+        $m3 = $this->createMember(['email' => 'c@merchant.test']);
+
+        $this->createMerchantProductReview($product1, $m1, $merchant1, [
+            'is_approved' => true, 'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        $this->createMerchantProductReview($product1, $m2, $merchant1, [
+            'is_approved' => true, 'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+        $this->createMerchantProductReview($product2, $m3, $merchant2, [
+            'is_approved' => true, 'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $stats1 = $this->repository->statsForMerchant($merchant1->id);
+        $stats2 = $this->repository->statsForMerchant($merchant2->id);
+
+        $this->assertEquals(2, $stats1['total']);
+        $this->assertEquals(1, $stats2['total']);
+    }
+
+    private function createMerchantProductReview(
+        \App\Models\Product  $product,
+        \App\Models\Member   $member,
+        \App\Models\Merchant $merchant,
+        array                $overrides = []
+    ): \App\Models\Model
+    {
+        // Ensure product_merchant link exists
+        \App\Models\ProductMerchant::firstOrCreate(
+            ['product_id' => $product->id, 'merchant_id' => $merchant->id],
+            ['url' => 'https://example.com', 'price' => 10.00, 'is_available' => true]
+        );
+
+        // Extract created_at before passing to factory, since Eloquent ignores it on create
+        $createdAt = $overrides['created_at'] ?? null;
+        unset($overrides['created_at']);
+
+        $review = $this->createProductReview($product, $member, $overrides);
+
+        // Force the timestamp if specified — Eloquent won't honour it via fill
+        if ($createdAt) {
+            $review->created_at = $createdAt;
+            $review->save();
+            $review->created_at = $createdAt;
+
+        }
+
+        return $review;
+    }
 }

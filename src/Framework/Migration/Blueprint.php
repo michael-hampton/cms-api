@@ -157,6 +157,11 @@ class Blueprint
         return $this->integer($column)->unsigned();
     }
 
+    public function unsignedTinyInteger(string $column): Column
+    {
+        return $this->tinyInteger($column)->unsigned();
+    }
+
     public function unsignedSmallInteger(string $column): Column
     {
         return $this->smallInteger($column)->unsigned();

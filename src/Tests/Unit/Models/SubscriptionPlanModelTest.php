@@ -5,11 +5,16 @@ namespace App\Tests\Unit\Models;
 use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
+use App\Models\Member;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class SubscriptionPlanModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     public function testCreateSubscriptionPlan(): void
     {
         $plan = SubscriptionPlan::create([
@@ -897,4 +902,87 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
 
         $this->assertFalse($plan->isPreRelease());
     }
+
+    public function testPlanWithNoRegionSetsIsVisibleToAnyMember(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Open Plan',
+            'slug' => 'open-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+        ]);
+
+        $member = new Member(['territory_id' => 99]);
+
+        $plan->setRelation('regionSets', new \App\Framework\Support\Collection([]));
+
+        $this->assertTrue($plan->isVisibleToMember($member));
+    }
+
+    public function testPlanIsVisibleToMemberWithMatchingTerritory(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Regional Plan',
+            'slug' => 'regional-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+        ]);
+
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        SubscriptionPlanRegionSet::create([
+            'subscription_plan_id' => $plan->id,
+            'region_set_id' => $regionSet->id
+        ]);
+
+        $member = $this->createMember(['territory_id' => $territory->id]);
+
+        $this->assertTrue($plan->isVisibleToMember($member));
+    }
+
+    public function testPlanIsNotVisibleToMemberWithNonMatchingTerritory(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Regional Plan 2',
+            'slug' => 'regional-plan-2',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+        ]);
+
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        SubscriptionPlanRegionSet::create([
+            'subscription_plan_id' => $plan->id,
+            'region_set_id' => $regionSet->id
+        ]);
+
+        $territory2 = $this->createTerritory();
+
+        $member = $this->createMember(['territory_id' => $territory2->id]);
+
+        $this->assertFalse($plan->isVisibleToMember($member));
+    }
+
+    public function testPlanIsVisibleToNullMember(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Any Plan',
+            'slug' => 'any-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+        ]);
+
+        $this->assertTrue($plan->isVisibleToMember(null));
+    }
+
 }

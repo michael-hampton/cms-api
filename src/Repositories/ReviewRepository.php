@@ -49,7 +49,7 @@ class ReviewRepository extends Repository
     {
         return $this->baseQuery($merchantId)
             ->where('reviews.is_approved', 1)
-            ->orderByDesc('reviews.created_at')
+            ->orderByDesc('reviews.id')
             ->limit($limit)
             ->select([
                 'reviews.*',
@@ -78,13 +78,13 @@ class ReviewRepository extends Repository
         $pendingResponse = (clone $base)->count();
 
         $thisMonth = (clone $base)
-            ->whereMonth('reviews.created_at', now('MM'))
-            ->whereYear('reviews.created_at', now('YYYY'))
+            ->whereMonth('reviews.created_at', now('m'))
+            ->whereYear('reviews.created_at', now('Y'))
             ->count();
 
         $previousMonth = (clone $base)
-            ->whereMonth('reviews.created_at', now_datetime()->subMonths(1)->format('MM'))
-            ->whereYear('reviews.created_at', now_datetime()->subMonths(1)->format('YYYY'))
+            ->whereMonth('reviews.created_at', now_datetime()->subMonths(1)->format('m'))
+            ->whereYear('reviews.created_at', now_datetime()->subMonths(1)->format('Y'))
             ->count();
 
         // Distribution: percentage per star (1–5)
@@ -116,7 +116,7 @@ class ReviewRepository extends Repository
 
     private function baseQuery(int $merchantId)
     {
-        return $this->model->newQuery()
+        return $this->model->with(['product'])
             ->join('products', 'products.id', '=', 'reviews.product_id')
             ->join('product_merchants', 'product_merchants.product_id', '=', 'products.id')
             ->where('product_merchants.merchant_id', $merchantId);

@@ -6,7 +6,7 @@ use App\Events\Subscriptions\IssueDeliveryDispatchFailed;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
-use App\Models\IssueDelivery;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Services\Subscriptions\IssueDeliveryEligibilityService;
 use DomainException;
@@ -15,15 +15,18 @@ class GenerateIssueDeliveriesJob extends BaseJob
 {
     public function __construct(
         private readonly IssuesDeliveredRepository       $issuesDeliveredRepository,
+        private readonly IssueDeliveryRepository $issueDeliveryRepository,
         private readonly IssueDeliveryEligibilityService $eligibilityService,
-        private readonly Database $database,
-        private readonly Logger   $logger,
+        private readonly Database                $database,
+        private readonly Logger                  $logger,
     )
     {
     }
 
-    public function handle(IssueDelivery $issueDelivery): array
+    public function handle(int $issueDeliveryId): array
     {
+        $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
+
         if (!$issueDelivery->isActive()) {
             $this->logger->info('IssueDelivery skipped — not active', [
                 'issue_delivery_id' => $issueDelivery->id,

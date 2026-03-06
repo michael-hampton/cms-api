@@ -19,10 +19,13 @@ use App\Services\Subscriptions\SubscriptionPlanPricingService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 
 class SubscriptionPlanServiceTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private $planRepository;
     private $subscriptionRepository;
     private $service;
@@ -684,4 +687,264 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
 
         $this->service->subscribeMemberToPlanWithVoucher(1, 999, 1, 'SUB10');
     }
+
+    public function testCreatePlanSyncsRegionSets(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
+
+        // Use a real plan so the pivot insert works
+        $realPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Region Plan',
+            'slug' => 'region-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
+            ->andReturn($realPlan);
+
+        $this->pricingService
+            ->shouldReceive('createPricingTier')
+            ->once();
+
+        $result = $this->service->createPlan([
+            'name' => 'Region Plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ], $this->siteId);
+
+        $result->load(['regionSets']);
+        $ids = $result->regionSets->pluck('id')->toArray();
+
+        $this->assertCount(2, $ids);
+        $this->assertContains($regionSet1->id, $ids);
+        $this->assertContains($regionSet2->id, $ids);
+    }
+
+    public function testCreatePlanWithNoRegionSetIdsSkipsSync(): void
+    {
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
+
+        $realPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'No Region Plan',
+            'slug' => 'no-region-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
+            ->andReturn($realPlan);
+
+        $this->pricingService
+            ->shouldReceive('createPricingTier')
+            ->once();
+
+        $result = $this->service->createPlan([
+            'name' => 'No Region Plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+        ], $this->siteId);
+
+        $result->load(['regionSets']);
+
+        $this->assertCount(0, $result->regionSets);
+    }
+
+    public function testCreatePlanReplacesExistingRegionSetsOnSync(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
+
+        $realPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Sync Plan',
+            'slug' => 'sync-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        // Pre-assign regionSet1
+        \App\Models\SubscriptionPlanRegionSet::create([
+            'subscription_plan_id' => $realPlan->id,
+            'region_set_id' => $regionSet1->id,
+        ]);
+
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
+            ->andReturn($realPlan);
+
+        $this->pricingService
+            ->shouldReceive('createPricingTier')
+            ->once();
+
+        // Sync with only regionSet2 — regionSet1 should be removed
+        $result = $this->service->createPlan([
+            'name' => 'Sync Plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'region_set_ids' => [$regionSet2->id],
+        ], $this->siteId);
+
+        $result->load(['regionSets']);
+        $ids = $result->regionSets->pluck('id')->toArray();
+
+        $this->assertCount(1, $ids);
+        $this->assertContains($regionSet2->id, $ids);
+        $this->assertNotContains($regionSet1->id, $ids);
+    }
+
+    public function testUpdatePlanSyncsRegionSets(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+        $regionSet2 = $this->createRegionSet();
+
+        $realPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Update Region Plan',
+            'slug' => 'update-region-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with($realPlan->id)
+            ->andReturn($realPlan);
+
+        $this->planRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($realPlan);
+
+        $this->service->updatePlan($realPlan->id, [
+            'name' => 'Update Region Plan',
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ], $this->siteId);
+
+        $realPlan->load(['regionSets']);
+        $ids = $realPlan->regionSets->pluck('id')->toArray();
+
+        $this->assertCount(2, $ids);
+        $this->assertContains($regionSet1->id, $ids);
+        $this->assertContains($regionSet2->id, $ids);
+    }
+
+    public function testUpdatePlanClearsRegionSetsWhenEmptyArrayPassed(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+
+        $realPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Clear Region Plan',
+            'slug' => 'clear-region-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        \App\Models\SubscriptionPlanRegionSet::create([
+            'subscription_plan_id' => $realPlan->id,
+            'region_set_id' => $regionSet1->id,
+        ]);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with($realPlan->id)
+            ->andReturn($realPlan);
+
+        $this->planRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($realPlan);
+
+        $this->service->updatePlan($realPlan->id, [
+            'name' => 'Clear Region Plan',
+            'region_set_ids' => [],
+        ], $this->siteId);
+
+        $realPlan->load(['regionSets']);
+
+        $this->assertCount(0, $realPlan->regionSets);
+    }
+
+    public function testUpdatePlanSkipsSyncWhenNoRegionSetIdsKey(): void
+    {
+        $regionSet1 = $this->createRegionSet();
+
+        $realPlan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Skip Sync Plan',
+            'slug' => 'skip-sync-plan',
+            'price' => 10.00,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        \App\Models\SubscriptionPlanRegionSet::create([
+            'subscription_plan_id' => $realPlan->id,
+            'region_set_id' => $regionSet1->id,
+        ]);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->with($realPlan->id)
+            ->andReturn($realPlan);
+
+        $this->planRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($realPlan);
+
+        // No region_set_ids key — existing assignments should be untouched
+        $this->service->updatePlan($realPlan->id, [
+            'name' => 'Skip Sync Plan',
+        ], $this->siteId);
+
+        $realPlan->load(['regionSets']);
+
+        $this->assertCount(1, $realPlan->regionSets);
+        $this->assertEquals($regionSet1->id, $realPlan->regionSets->first()->id);
+    }
+
 }

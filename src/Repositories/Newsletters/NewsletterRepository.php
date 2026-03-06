@@ -11,11 +11,30 @@ use App\Repositories\Repository;
 
 class NewsletterRepository extends Repository
 {
-    public function getDueNewsletters(int $siteId): array
+    /**
+     * Return newsletters that are due to send for a given site,
+     * optionally filtered to only those visible to a specific member.
+     *
+     * When $member is provided the newsletter's region-set restrictions
+     * are applied via Newsletter::isVisibleToMember():
+     *  - Member with no territory   → receives all due newsletters
+     *  - Member with territory      → receives only newsletters with no
+     *                                  region sets, or those whose region
+     *                                  sets include the member's territory
+     */
+    public function getDueNewsletters(int $siteId, ?Member $member = null): array
     {
-        $newsletters = Newsletter::where('active', true)->where('site_id', $siteId)->get();
-        $due = [];
+        $query = Newsletter::with(['regionSets.territories'])
+            ->where('active', true)
+            ->where('site_id', $siteId);
 
+        if ($member) {
+            $query->visibleToMember($member);
+        }
+
+        $newsletters = $query->get();
+
+        $due = [];
         foreach ($newsletters as $newsletter) {
             if ($newsletter->shouldSend()) {
                 $due[] = $newsletter;

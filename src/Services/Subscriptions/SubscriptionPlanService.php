@@ -65,6 +65,11 @@ class SubscriptionPlanService
                 $this->pricingService->createPricingTier($plan->id, $pricingData);
             }
 
+            if (isset($data['region_set_ids'])) {
+                $ids = $this->normaliseRegionSetIds($data['region_set_ids']);
+                $plan->regionSets(true)->sync($ids);
+            }
+
             return $plan;
         });
     }
@@ -134,7 +139,6 @@ class SubscriptionPlanService
 
         if (isset($data['slug']) && $data['slug'] !== $existingPlan->slug) {
             $activeCount = $this->planRepository->getSubscriberCount($planId);
-
             if ($activeCount > 0) {
                 throw new PlanHasActiveSubscriptionsException(
                     'Cannot change slug for plan with active subscriptions'
@@ -143,7 +147,14 @@ class SubscriptionPlanService
         }
 
         $planDataDto = SubscriptionPlanData::fromArray($data);
-        return $this->planRepository->update($planId, $planDataDto->toArray());
+        $plan = $this->planRepository->update($planId, $planDataDto->toArray());
+
+        if ($plan && isset($data['region_set_ids'])) {
+            $ids = $this->normaliseRegionSetIds($data['region_set_ids']);
+            $plan->regionSets(true)->sync($ids);
+        }
+
+        return $plan;
     }
 
     public function deletePlan(int $planId): bool
@@ -288,5 +299,14 @@ class SubscriptionPlanService
             $siteId,
             $subscriptionData
         );
+    }
+
+    private function normaliseRegionSetIds(mixed $ids): array
+    {
+        if (is_string($ids)) {
+            $decoded = json_decode($ids, true);
+            $ids = is_array($decoded) ? $decoded : [];
+        }
+        return is_array($ids) ? array_map('intval', $ids) : [];
     }
 }

@@ -179,6 +179,227 @@ $selectedTags = !empty($filters['tags'])
             background: var(--ink);
             color: #fff;
         }
+
+        /* ── Mini Cart (matches show.php) ───────────────────────────── */
+        .cart-badge {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: white;
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, .1);
+            cursor: pointer;
+            transition: all .3s;
+            z-index: 1000;
+        }
+
+        .cart-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .cart-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .cart-icon {
+            position: relative;
+        }
+
+        .cart-count {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+
+        .cart-total {
+            font-weight: 700;
+            color: #2563eb;
+            font-size: 1.125rem;
+        }
+
+        .mini-cart {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, .1);
+            transition: right .3s;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mini-cart.open {
+            right: 0;
+        }
+
+        .mini-cart-header {
+            padding: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mini-cart-header h3 {
+            font-size: 1.25rem;
+        }
+
+        .close-cart {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #64748b;
+        }
+
+        .mini-cart-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .cart-item {
+            padding: 1rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .cart-item-name {
+            font-weight: 600;
+            margin-bottom: .5rem;
+        }
+
+        .cart-item-details {
+            font-size: .875rem;
+            color: #64748b;
+            margin-bottom: .5rem;
+        }
+
+        .cart-item-price {
+            font-weight: 600;
+            color: #2563eb;
+        }
+
+        .mini-cart-footer {
+            padding: 1.5rem;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        .cart-total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .cart-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, .5);
+            display: none;
+            z-index: 1000;
+        }
+
+        .cart-overlay.show {
+            display: block;
+        }
+
+        @media (max-width: 640px) {
+            .mini-cart {
+                width: 100%;
+                right: -100%;
+            }
+
+            .cart-badge {
+                bottom: 1rem;
+                top: auto;
+                right: 1rem;
+            }
+        }
+
+        /* ── Plan card image ── */
+        .plan-card__cover {
+            width: 100%;
+            aspect-ratio: 4/3;
+            overflow: hidden;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        }
+
+        .plan-card__cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .plan-card:hover .plan-card__cover img {
+            transform: scale(1.04);
+        }
+
+        @media (max-width: 640px) {
+            .mini-cart-bar {
+                bottom: 16px;
+                right: 16px;
+            }
+        }
+
+        .plan-card__features {
+            list-style: none;
+            margin: 0.5rem 0 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .plan-card__features li {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary, #64748b);
+        }
+
+        .plan-card__features li svg {
+            flex-shrink: 0;
+            stroke: #10b981;
+        }
+
+        .plan-card__features-more {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        .plan-card__release {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #7c3aed;
+            background: #f5f3ff;
+            border-radius: 4px;
+            padding: 2px 8px;
+            display: inline-block;
+            margin-bottom: 0.4rem;
+        }
     </style>
 </head>
 <body>
@@ -207,15 +428,19 @@ $selectedTags = !empty($filters['tags'])
     </nav>
 
     <div class="header-right">
-        <a href="/cart" class="header-cart-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="9" cy="21" r="1"/>
-                <circle cx="20" cy="21" r="1"/>
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-            </svg>
-            Cart
-            <span class="header-cart-badge" data-cart-count>0</span>
-        </a>
+        <div class="cart-badge" onclick="openMiniCart()">
+            <div class="cart-info">
+                <div class="cart-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="21" r="1"/>
+                        <circle cx="20" cy="21" r="1"/>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                    </svg>
+                    <span class="cart-count" id="header-cart-count" style="display:none;">0</span>
+                </div>
+                <span class="cart-total" id="cart-total">£0.00</span>
+            </div>
+        </div>
         <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account"
            class="header-account-btn">
             <?= strtoupper(substr(auth()->user()?->name ?? 'A', 0, 1)) ?>
@@ -523,7 +748,18 @@ $selectedTags = !empty($filters['tags'])
                                 <div class="plan-card__badge plan-card__badge--offer">Limited offer</div>
                             <?php endif; ?>
 
-                            <div class="plan-card__image"><?= $letter ?></div>
+                            <?php
+                            $coverImage = $plan->print_image_url ?? $plan->digital_image_url ?? null;
+                            ?>
+                            <?php if ($coverImage): ?>
+                                <div class="plan-card__cover">
+                                    <img src="<?= htmlspecialchars($coverImage) ?>"
+                                         alt="<?= htmlspecialchars($plan->name) ?>"
+                                         loading="lazy">
+                                </div>
+                            <?php else: ?>
+                                <div class="plan-card__image"><?= $letter ?></div>
+                            <?php endif; ?>
 
                             <div class="plan-card__body">
                                 <div class="plan-card__site"><?= htmlspecialchars($plan->site->name ?? $plan->site_name ?? '') ?></div>
@@ -544,10 +780,37 @@ $selectedTags = !empty($filters['tags'])
                                     <?php endforeach; ?>
                                 </div>
 
+                                <?php if ($plan->release_date && $plan->release_date > new DateTime()): ?>
+                                    <div class="plan-card__release">
+                                        🗓 Coming <?= $plan->release_date->format('j M Y') ?>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if (!empty($plan->description)): ?>
                                     <p class="plan-card__desc">
                                         <?= htmlspecialchars(mb_substr($plan->description, 0, 110)) ?><?= mb_strlen($plan->description) > 110 ? '…' : '' ?>
                                     </p>
+                                <?php endif; ?>
+
+                                <?php
+
+                                if ($plan->features): ?>
+                                    <ul class="plan-card__features">
+                                        <?php foreach (array_slice($plan->features, 0, 3) as $feature): ?>
+                                            <li>
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                                <?= htmlspecialchars($feature) ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                        <?php if (count($plan->features) > 3): ?>
+                                            <li class="plan-card__features-more">+<?= count($plan->features) - 3 ?>
+                                                more
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
                                 <?php endif; ?>
 
                                 <div class="plan-card__pricing">
@@ -620,10 +883,32 @@ $selectedTags = !empty($filters['tags'])
     </main>
 </div>
 
+<div class="mini-cart" id="mini-cart">
+    <div class="mini-cart-header">
+        <h3>Your Cart (<span id="cart-count">0</span>)</h3>
+        <button class="close-cart" onclick="closeMiniCart()" aria-label="Close cart">×</button>
+    </div>
+    <div class="mini-cart-items" id="cart-items">
+        <p style="text-align:center; color:#64748b; padding:2rem;">Your cart is empty</p>
+    </div>
+    <div class="mini-cart-footer">
+        <div class="cart-total-row">
+            <span>Total:</span>
+            <span id="mini-cart-total">£0.00</span>
+        </div>
+        <button class="btn btn-primary" onclick="goToCheckout()">Proceed to Checkout</button>
+    </div>
+</div>
+
+<div class="cart-overlay" id="cart-overlay" onclick="closeMiniCart()"></div>
+<div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
 <script>
     const FORM = document.getElementById('filter-form');
     const SORT_SELECT = document.getElementById('sort-select');
     const PLANS_WRAP = document.getElementById('plans-wrap');
+    let cartData = {items: [], total: 0, count: 0};
+    const API_BASE = '/api/press-stack';
 
     let selectedCategories = new Set(<?= json_encode($selectedCategories) ?>);
     let selectedTags = new Set(<?= json_encode($selectedTags) ?>);
@@ -635,12 +920,66 @@ $selectedTags = !empty($filters['tags'])
         return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    async function loadCart() {
+        try {
+            const r = await fetch(`${API_BASE}/cart`);
+            cartData = await r.json();
+            updateCartDisplay();
+        } catch (e) {
+            console.error('Cart load error:', e);
+        }
+    }
+
+    function updateCartDisplay() {
+        console.log('data', cartData)
+        const count = cartData.count || 0;
+        document.getElementById('cart-count').textContent = count;
+        document.getElementById('cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
+        document.getElementById('mini-cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
+        const badge = document.getElementById('header-cart-count');
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'flex' : 'none';
+
+        const container = document.getElementById('cart-items');
+        if (!cartData.items?.length) {
+            container.innerHTML = '<p style="text-align:center;color:#64748b;padding:2rem;">Your cart is empty</p>';
+            return;
+        }
+        container.innerHTML = cartData.items.map(item => `
+        <div class="cart-item">
+            <div class="cart-item-name">${item.product_name || item.options?.plan_name || 'Subscription'}</div>
+            <div class="cart-item-details">${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months</div>
+            <div class="cart-item-price">£${(item.price || 0).toFixed(2)}</div>
+        </div>`).join('');
+    }
+
+    function openMiniCart() {
+        document.getElementById('mini-cart').classList.add('open');
+        document.getElementById('cart-overlay').classList.add('show');
+    }
+
+    function closeMiniCart() {
+        document.getElementById('mini-cart').classList.remove('open');
+        document.getElementById('cart-overlay').classList.remove('show');
+    }
+
+    function goToCheckout() {
+        window.location.href = '/' + SITE + '/checkout?type=subscription';
+    }
+
     /* ── Card renderer ──────────────────────────────────────────── */
-    function deliveryPills(type) {
-        const b = [];
-        if (type === 'digital' || type === 'both') b.push('<span class="meta-pill meta-pill--digital">📱 Digital</span>');
-        if (type === 'print' || type === 'both') b.push('<span class="meta-pill meta-pill--print">📰 Print</span>');
-        return b.join('');
+    function deliveryPills(plan) {
+        const hasPrint = plan.print_shipping_required || plan.delivery_type === 'print' || plan.delivery_type === 'both';
+        const hasDigital = !!plan.digital_download_url || plan.delivery_type === 'digital' || plan.delivery_type === 'both';
+        const pills = [];
+        if (hasPrint) pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
+        if (hasDigital) pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
+        if (!pills.length) {
+            // fallback to delivery_type string if neither field present
+            if (plan.delivery_type === 'print') pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
+            if (plan.delivery_type === 'digital') pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
+        }
+        return pills.join('');
     }
 
     function renderBadge(plan) {
@@ -660,6 +999,21 @@ $selectedTags = !empty($filters['tags'])
         const priceClass = plan.has_sale ? 'plan-card__price plan-card__price--sale' : 'plan-card__price';
         const desc = plan.description
             ? `<p class="plan-card__desc">${escHtml(plan.description.substring(0, 110))}${plan.description.length > 110 ? '…' : ''}</p>` : '';
+        const featuresHtml = (plan.features && plan.features.length)
+            ? `<ul class="plan-card__features">
+        ${plan.features.slice(0, 3).map(f =>
+                `<li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>${escHtml(f)}</li>`
+            ).join('')}
+        ${plan.features.length > 3 ? `<li class="plan-card__features-more">+${plan.features.length - 3} more</li>` : ''}
+       </ul>`
+            : '';
+        const releaseHtml = (plan.release_date && new Date(plan.release_date) > new Date())
+            ? `<div class="plan-card__release">🗓 Coming ${new Date(plan.release_date).toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            })}</div>`
+            : '';
         const site = plan.site_name ? `<div class="plan-card__site">${escHtml(plan.site_name)}</div>` : '';
         const catPills = (plan.categories || []).slice(0, 2).map(c =>
             `<span class="meta-pill meta-pill--tag">${escHtml(c.charAt(0).toUpperCase() + c.slice(1))}</span>`).join('');
@@ -667,37 +1021,43 @@ $selectedTags = !empty($filters['tags'])
             `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
         const cartDt = escHtml(plan.delivery_type || 'digital');
 
-        alert(cartDt)
+        // Cover image or letter fallback
+        const coverUrl = plan.print_image_url || plan.digital_image_url || null;
+        const coverHtml = coverUrl
+            ? `<div class="plan-card__cover"><img src="${escHtml(coverUrl)}" alt="${escHtml(plan.name)}" loading="lazy"></div>`
+            : `<div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>`;
 
         return `
-        <article class="plan-card">
-            ${renderBadge(plan)}
-            <div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>
-            <div class="plan-card__body">
-                ${site}
-                <div class="plan-card__name">${escHtml(plan.name)}</div>
-                <div class="plan-card__meta">${deliveryPills(plan.delivery_type)}${catPills}${tagPills}</div>
-                ${desc}
-                <div class="plan-card__pricing">
-                    <div>
-                        <div class="plan-card__from">from</div>
-                        ${wasLine}
-                        <div class="${priceClass}">£${price.toFixed(2)}</div>
-                    </div>
-                    <div>
-                        <div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>
-                        ${saleNote}
-                    </div>
+    <article class="plan-card">
+        ${renderBadge(plan)}
+        ${coverHtml}
+        <div class="plan-card__body">
+            ${site}
+            <div class="plan-card__name">${escHtml(plan.name)}</div>
+            <div class="plan-card__meta">${deliveryPills(plan)}${catPills}${tagPills}</div>
+            ${releaseHtml}
+            ${desc}
+            ${featuresHtml}
+            <div class="plan-card__pricing">
+                <div>
+                    <div class="plan-card__from">from</div>
+                    ${wasLine}
+                    <div class="${priceClass}">£${price.toFixed(2)}</div>
                 </div>
-                <div style="display:flex;gap:8px;">
-                    <a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a>
-                    <button class="plan-card__btn plan-card__btn--cart"
-                            data-delivery_type="${cartDt}"
-                            title="Add to cart"
-                            onclick="addToCart('plan',${plan.id},this)">🛒</button>
+                <div>
+                    <div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>
+                    ${saleNote}
                 </div>
             </div>
-        </article>`;
+            <div style="display:flex;gap:8px;">
+                <a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a>
+                <button class="plan-card__btn plan-card__btn--cart"
+                        data-delivery_type="${cartDt}"
+                        title="Add to cart"
+                        onclick="addToCart('plan',${plan.id},this)">🛒</button>
+            </div>
+        </div>
+    </article>`;
     }
 
     /* ── Pagination renderer ────────────────────────────────────── */
@@ -893,6 +1253,7 @@ $selectedTags = !empty($filters['tags'])
                     btn.style.background = '';
                     btn.style.color = '';
                     btn.disabled = false;
+                    loadCart();
                 }, 2000);
             } else {
                 btn.innerHTML = '✗';

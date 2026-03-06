@@ -63,7 +63,7 @@ class NewsletterController extends Controller
             $configuration = SearchConfigurationFactory::create('newsletters');
             $engine = new SearchEngine($configuration);
 
-            $queryBuilder = Newsletter::query();
+            $queryBuilder = Newsletter::with(['regionSets']);
             $result = $engine->search($queryBuilder, $criteria);
 
             $collection = new PaginatedResourceCollection($result, NewsletterResource::class);
@@ -121,6 +121,16 @@ class NewsletterController extends Controller
                 $newsletter->setAsDefault();
             }
 
+            if ($request->has('region_set_ids')) {
+                $value = $request->get('region_set_ids');
+
+                $ids = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+                $newsletter->regionSets(true)->sync(array_map('intval', $ids));
+            }
+            $newsletter->load(['regionSets']);
+
             $contentDto = NewsletterContentDTO::fromRequest($request->all());
             $this->contentService->saveContent($newsletter->id, $contentDto);
 
@@ -141,13 +151,21 @@ class NewsletterController extends Controller
     {
         try {
             $siteId = $request->getSiteId();
-            $newsletter = $this->newsletterRepository->find($id);
+            $newsletter = $this->newsletterRepository->find($id, ['regionSets']);
 
             if (!$newsletter || $newsletter->site_id !== $siteId) {
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            return $this->resourceResponse(['newsletter' => $newsletter->toArray()]);
+            return $this->resourceResponse([
+                'newsletter' => array_merge($newsletter->toArray(), [
+                    'region_set_ids' => $newsletter->regionSets->pluck('id')->toArray(),
+                    'region_sets' => $newsletter->regionSets->map(fn($rs) => [
+                        'id' => $rs->id,
+                        'name' => $rs->name,
+                    ])->toArray(),
+                ]),
+            ]);
 
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -163,6 +181,16 @@ class NewsletterController extends Controller
             if (!$newsletter || $newsletter->site_id !== $siteId) {
                 return $this->errorResponse('Newsletter not found', 404);
             }
+
+            if ($request->has('region_set_ids')) {
+                $value = $request->get('region_set_ids');
+
+                $ids = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+                $newsletter->regionSets(true)->sync(array_map('intval', $ids));
+            }
+            $newsletter->load(['regionSets']);
 
             $data = array_filter([
                 'title' => $request->input('title'),

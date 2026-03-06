@@ -32,6 +32,9 @@ $pagination = $reviewData['pagination'] ?? [];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($plan->name) ?> - Subscribe</title>
     <script src="https://js.stripe.com/v3/"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap"
+          rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -40,30 +43,37 @@ $pagination = $reviewData['pagination'] ?? [];
         }
 
         :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1e40af;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --border-color: #e2e8f0;
-            --bg-light: #f8fafc;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --shadow: 0 1px 3px rgba(0, 0, 0, .1);
-            --shadow-lg: 0 10px 25px rgba(0, 0, 0, .1);
+            --blue: #2563eb;
+            --blue-dark: #1e40af;
+            --blue-light: #eff6ff;
+            --green: #10b981;
+            --red: #ef4444;
             --gold: #f59e0b;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+            --ink: #1e293b;
+            --ink-soft: #475569;
+            --ink-muted: #94a3b8;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, .1);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, .12);
+            --radius: .75rem;
+            --radius-lg: 1rem;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'DM Sans', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
             line-height: 1.6;
-            color: var(--text-primary);
-            background: var(--bg-light);
         }
 
-        .container {
-            max-width: 1000px;
+        /* ── Page shell ───────────────────────────────────────────── */
+        .page {
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 2rem 20px;
+            padding: 2rem 1.5rem 4rem;
         }
 
         .breadcrumb {
@@ -71,274 +81,747 @@ $pagination = $reviewData['pagination'] ?? [];
             align-items: center;
             gap: .5rem;
             margin-bottom: 2rem;
-            color: var(--text-secondary);
-            font-size: .95rem;
+            font-size: .875rem;
+            color: var(--ink-muted);
         }
-
         .breadcrumb a {
-            color: var(--primary-color);
+            color: var(--blue);
             text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: .375rem;
         }
 
         .breadcrumb a:hover {
             text-decoration: underline;
         }
 
-        /* ── Plan header ──────────────────────────────────────────── */
-        .plan-header {
-            background: white;
-            padding: 3rem 2rem;
-            border-radius: 1rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 2rem;
+        /* ── Two-column layout ────────────────────────────────────── */
+        .plan-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 2rem;
+            align-items: start;
+            margin-bottom: 2.5rem;
+        }
+
+        /* LEFT COLUMN */
+        .plan-left {
+            position: sticky;
+            top: 1.5rem;
+        }
+
+        .plan-cover {
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 1rem;
+            background: var(--blue-light);
+        }
+
+        .plan-cover img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .plan-cover__placeholder {
+            aspect-ratio: 3/4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            font-weight: 700;
+            color: var(--blue);
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        }
+
+        .trust-list {
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            padding: .75rem 1rem;
+            font-size: .85rem;
+            font-weight: 500;
+            color: var(--ink-soft);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .trust-item:last-child {
+            border-bottom: none;
+        }
+
+        .trust-item svg {
+            flex-shrink: 0;
+            color: var(--blue);
+        }
+
+        /* RIGHT COLUMN */
+        .plan-right {
         }
 
         .plan-title {
-            font-size: 2.5rem;
+            font-family: 'Playfair Display', serif;
+            font-size: 2.25rem;
             font-weight: 700;
-            margin-bottom: 1rem;
+            line-height: 1.15;
+            margin-bottom: .75rem;
+            color: var(--ink);
         }
 
         .plan-description {
-            font-size: 1.125rem;
-            color: var(--text-secondary);
-            line-height: 1.8;
+            font-size: 1rem;
+            color: var(--ink-soft);
+            line-height: 1.75;
+            margin-bottom: 1.5rem;
         }
 
-        /* ── Cards ────────────────────────────────────────────────── */
-        .plan-card {
-            background: white;
-            border-radius: 1rem;
-            padding: 2rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 2rem;
-        }
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 700;
+        /* ── Card (white box) ─────────────────────────────────────── */
+        .card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
             margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 1.25rem;
+            padding-bottom: .875rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── Delivery tabs ────────────────────────────────────────── */
+        .delivery-tabs {
+            display: flex;
+            gap: .75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .delivery-tab {
+            flex: 1;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: .875rem 1rem;
+            cursor: pointer;
+            transition: all .2s;
+            background: none;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .delivery-tab:hover {
+            border-color: var(--blue);
+        }
+
+        .delivery-tab.selected {
+            border-color: var(--blue);
+            background: var(--blue-light);
+        }
+
+        .delivery-tab input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+        }
+
+        .delivery-tab__name {
+            font-weight: 600;
+            font-size: .95rem;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            margin-bottom: .2rem;
+        }
+
+        .delivery-tab__desc {
+            font-size: .8rem;
+            color: var(--ink-muted);
+        }
+
+        .delivery-tab.selected .delivery-tab__name {
+            color: var(--blue);
         }
 
         /* ── Duration options ─────────────────────────────────────── */
         .duration-option {
-            border: 2px solid var(--border-color);
-            border-radius: .75rem;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            margin-bottom: .75rem;
             cursor: pointer;
-            transition: all .3s;
+            transition: all .2s;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
         }
 
         .duration-option:hover {
-            border-color: var(--primary-color);
-            transform: translateX(5px);
+            border-color: var(--blue);
         }
-
         .duration-option.selected {
-            border-color: var(--primary-color);
-            background: rgba(37, 99, 235, .05);
+            border-color: var(--blue);
+            background: var(--blue-light);
         }
-
         .duration-option input[type="radio"] {
             position: absolute;
             opacity: 0;
         }
 
-        .duration-header {
+        .duration-option__radio {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            flex-shrink: 0;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: .75rem;
+            justify-content: center;
+            transition: all .2s;
         }
 
-        .duration-label {
+        .duration-option.selected .duration-option__radio {
+            border-color: var(--blue);
+            background: var(--blue);
+        }
+
+        .duration-option.selected .duration-option__radio::after {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .duration-option__left {
+            display: flex;
+            align-items: center;
+            gap: .875rem;
+            flex: 1;
+        }
+
+        .duration-option__info {
+        }
+
+        .duration-option__label {
             font-weight: 600;
-            font-size: 1.125rem;
-        }
-
-        .duration-price {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-
-        .duration-details {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             font-size: .95rem;
-            color: var(--text-secondary);
-            flex-wrap: wrap;
-            gap: 1rem;
+            color: var(--ink);
         }
 
-        .savings-badge {
-            background: var(--danger-color);
-            color: white;
-            padding: .375rem .75rem;
-            border-radius: .375rem;
+        .duration-option__period {
             font-size: .8rem;
+            color: var(--ink-muted);
+            margin-top: .1rem;
+        }
+
+        .duration-option__right {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .duration-option__price {
+            font-size: 1.375rem;
             font-weight: 700;
-            text-transform: uppercase;
+            color: var(--blue);
+            line-height: 1;
         }
 
-        .original-price {
+        .duration-option__was {
+            font-size: .8rem;
             text-decoration: line-through;
-            color: var(--text-secondary);
+            color: var(--ink-muted);
+            margin-bottom: .1rem;
+        }
+
+        .duration-option__per-issue {
+            font-size: .75rem;
+            color: var(--ink-muted);
+            margin-top: .2rem;
+        }
+
+        .save-badge {
+            background: var(--red);
+            color: white;
+            font-size: .7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            margin-top: .3rem;
+            display: inline-block;
+        }
+
+        /* ── Add to cart button ───────────────────────────────────── */
+        .btn-add-cart {
+            width: 100%;
+            padding: .95rem;
+            background: var(--blue);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-family: inherit;
             font-size: 1rem;
-            margin-left: .5rem;
-        }
-
-        .price-per-issue {
-            font-size: .875rem;
-            color: var(--text-secondary);
-        }
-
-        /* ── Delivery ─────────────────────────────────────────────── */
-        .delivery-option {
-            border: 2px solid var(--border-color);
-            border-radius: .75rem;
-            padding: 1.25rem;
-            margin-bottom: 1rem;
-            cursor: pointer;
-            transition: all .3s;
-            display: flex;
-            align-items: start;
-            gap: 1rem;
-        }
-
-        .delivery-option:hover {
-            border-color: var(--primary-color);
-        }
-
-        .delivery-option.selected {
-            border-color: var(--primary-color);
-            background: rgba(37, 99, 235, .05);
-        }
-
-        .delivery-option input[type="radio"] {
-            margin-top: .25rem;
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-
-        .delivery-label {
             font-weight: 600;
-            font-size: 1.125rem;
-            display: block;
-            margin-bottom: .5rem;
+            cursor: pointer;
+            transition: all .2s;
+            margin-top: 1.25rem;
         }
 
-        .delivery-desc {
-            font-size: .95rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
+        .btn-add-cart:hover {
+            background: var(--blue-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
-        /* ── Features ─────────────────────────────────────────────── */
+        .btn-add-cart:active {
+            transform: translateY(0);
+        }
+
+        /* ── Features card ────────────────────────────────────────── */
         .features-list {
             list-style: none;
-            margin-bottom: 2rem;
         }
-
         .features-list li {
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: .875rem;
+            padding: .75rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: .95rem;
+            color: var(--ink-soft);
         }
 
         .features-list li:last-child {
             border-bottom: none;
         }
-
         .check-icon {
-            width: 24px;
-            height: 24px;
-            background: var(--success-color);
+            width: 22px;
+            height: 22px;
+            background: var(--green);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
         }
-
         .check-icon svg {
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             stroke: white;
             stroke-width: 3;
+        }
+
+        /* ── Reviews ──────────────────────────────────────────────── */
+        .reviews-compliance-notice {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: .5rem;
+            padding: .875rem 1rem;
+            margin-bottom: 1.5rem;
+            font-size: .8rem;
+            color: #0c4a6e;
+            line-height: 1.6;
+            display: flex;
+            gap: .625rem;
+            align-items: flex-start;
+        }
+
+        .reviews-compliance-notice svg {
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .reviews-summary {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2rem;
+            align-items: start;
+            margin-bottom: 1.5rem;
+        }
+
+        .reviews-score {
+            text-align: center;
+            min-width: 110px;
+        }
+        .reviews-score__avg {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--ink);
+        }
+        .reviews-score__stars {
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+            margin: .35rem 0 .25rem;
+            color: var(--gold);
+            font-size: 1rem;
+        }
+
+        .reviews-score__count {
+            font-size: .8rem;
+            color: var(--ink-muted);
+        }
+
+        .rating-bar-row {
+            display: grid;
+            grid-template-columns: 1.5rem 1fr 2.5rem;
+            align-items: center;
+            gap: .6rem;
+            margin-bottom: .4rem;
+        }
+
+        .rating-bar-label {
+            font-size: .8rem;
+            color: var(--ink-muted);
+            text-align: right;
+        }
+        .rating-bar-track {
+            height: 7px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .rating-bar-fill {
+            height: 100%;
+            background: var(--gold);
+            border-radius: 4px;
+            transition: width .4s ease;
+        }
+
+        .rating-bar-pct {
+            font-size: .75rem;
+            color: var(--ink-muted);
+        }
+
+        .review-list {
+            display: flex;
+            flex-direction: column;
+            margin-top: 1.5rem;
+        }
+        .review-card {
+            padding: 1.25rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .review-card:last-child {
+            border-bottom: none;
+        }
+        .review-card__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: .5rem;
+            flex-wrap: wrap;
+        }
+        .review-card__meta {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            flex-wrap: wrap;
+        }
+
+        .review-card__author {
+            font-weight: 600;
+            font-size: .9rem;
+        }
+
+        .review-card__date {
+            font-size: .8rem;
+            color: var(--ink-muted);
+        }
+        .review-card__verified {
+            font-size: .7rem;
+            font-weight: 600;
+            background: #d1fae5;
+            color: #065f46;
+            padding: 2px 8px;
+            border-radius: 100px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .review-card__title {
+            font-weight: 600;
+            font-size: .95rem;
+            margin-bottom: .3rem;
+        }
+
+        .review-card__comment {
+            font-size: .9rem;
+            color: var(--ink-soft);
+            line-height: 1.65;
+        }
+        .review-card__helpful {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            margin-top: .75rem;
+            font-size: .8rem;
+            color: var(--ink-muted);
+        }
+        .helpful-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: .375rem;
+            padding: 3px 10px;
+            font-size: .75rem;
+            cursor: pointer;
+            transition: all .2s;
+            color: var(--ink-muted);
+        }
+
+        .helpful-btn:hover {
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .helpful-btn.voted {
+            background: var(--blue-light);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .stars {
+            display: inline-flex;
+            gap: 1px;
+        }
+
+        .star {
+            color: var(--border);
+            font-size: .9rem;
+        }
+
+        .star.filled {
+            color: var(--gold);
+        }
+
+        /* ── Write review form ────────────────────────────────────── */
+        .write-review-section {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .write-review-section h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+        }
+
+        .review-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .form-group label {
+            display: block;
+            font-size: .8rem;
+            font-weight: 600;
+            margin-bottom: .35rem;
+            color: var(--ink-muted);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .form-group input[type="text"],
+        .form-group textarea {
+            width: 100%;
+            padding: .7rem .9rem;
+            border: 1.5px solid var(--border);
+            border-radius: .5rem;
+            font-family: inherit;
+            font-size: .95rem;
+            color: var(--ink);
+            transition: border-color .2s;
+            outline: none;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: var(--blue);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .star-rating-input {
+            display: flex;
+            gap: .375rem;
+        }
+
+        .star-rating-input input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+        }
+        .star-rating-input label {
+            font-size: 1.75rem;
+            cursor: pointer;
+            color: #d1d5db;
+            transition: color .15s;
+        }
+        .star-rating-input label:hover,
+        .star-rating-input label.selected,
+        .star-rating-input input:checked ~ label {
+            color: var(--gold);
+        }
+
+        .form-submission-notice {
+            background: #fafaf9;
+            border: 1px solid #d6d3d1;
+            border-radius: .5rem;
+            padding: .875rem 1rem;
+            font-size: .8rem;
+            color: #57534e;
+            line-height: 1.65;
+            margin-bottom: 1rem;
+        }
+        .review-login-prompt {
+            text-align: center;
+            padding: 1.75rem;
+            background: var(--bg);
+            border-radius: var(--radius);
+            border: 1px dashed var(--border);
+            margin-top: 1.5rem;
+        }
+
+        .review-login-prompt p {
+            margin-bottom: 1rem;
+            color: var(--ink-soft);
+        }
+        .reviews-empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--ink-muted);
+            font-size: .95rem;
+        }
+
+        .reviews-empty__icon {
+            font-size: 2.5rem;
+            margin-bottom: .75rem;
+        }
+
+        .review-pagination {
+            display: flex;
+            justify-content: center;
+            gap: .5rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .review-pagination__btn {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 .75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            border-radius: .375rem;
+            background: white;
+            font-size: .875rem;
+            color: var(--ink);
+            cursor: pointer;
+            transition: all .2s;
+            font-family: inherit;
+        }
+        .review-pagination__btn:hover:not(.active):not(.disabled) {
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+        .review-pagination__btn.active {
+            background: var(--blue);
+            color: white;
+            border-color: var(--blue);
+            pointer-events: none;
+        }
+
+        .review-pagination__btn.disabled {
+            opacity: .35;
+            pointer-events: none;
         }
 
         /* ── Buttons ──────────────────────────────────────────────── */
         .btn {
             display: inline-block;
-            padding: 1rem 2rem;
+            padding: .75rem 1.5rem;
             border: none;
-            border-radius: .75rem;
+            border-radius: var(--radius);
+            font-family: inherit;
             font-weight: 600;
             cursor: pointer;
-            transition: all .3s;
+            transition: all .2s;
             text-decoration: none;
             text-align: center;
-            font-size: 1.125rem;
+            font-size: .95rem;
         }
 
         .btn-primary {
-            background: var(--primary-color);
+            background: var(--blue);
             color: white;
-            width: 100%;
         }
 
         .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            background: var(--blue-dark);
         }
 
         .btn-secondary {
             background: white;
-            color: var(--primary-color);
-            border: 2px solid var(--primary-color);
+            color: var(--blue);
+            border: 1.5px solid var(--blue);
         }
 
         .btn-secondary:hover {
-            background: var(--bg-light);
+            background: var(--blue-light);
         }
 
         .btn-sm {
             padding: .5rem 1rem;
             font-size: .875rem;
-            border-radius: .5rem;
         }
 
-        /* ── Cart ─────────────────────────────────────────────────── */
+        /* ── Cart badge ───────────────────────────────────────────── */
         .cart-badge {
             position: fixed;
-            top: 2rem;
-            right: 2rem;
+            top: 1.5rem;
+            right: 1.5rem;
             background: white;
-            border-radius: 1rem;
-            padding: 1rem 1.5rem;
+            border-radius: var(--radius-lg);
+            padding: .875rem 1.25rem;
             box-shadow: var(--shadow-lg);
             cursor: pointer;
-            transition: all .3s;
+            transition: all .2s;
             z-index: 1000;
+            border: 1px solid var(--border);
         }
 
         .cart-badge:hover {
-            transform: scale(1.05);
+            transform: scale(1.03);
         }
 
         .cart-info {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: .875rem;
         }
 
         .cart-icon {
@@ -347,36 +830,36 @@ $pagination = $reviewData['pagination'] ?? [];
 
         .cart-count {
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background: var(--danger-color);
+            top: -7px;
+            right: -7px;
+            background: var(--red);
             color: white;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: .75rem;
+            font-size: .7rem;
             font-weight: 700;
         }
 
         .cart-total {
             font-weight: 700;
-            color: var(--primary-color);
-            font-size: 1.125rem;
+            color: var(--blue);
+            font-size: 1rem;
         }
 
-        /* mini-cart & overlay (unchanged from original) */
+        /* ── Mini cart ────────────────────────────────────────────── */
         .mini-cart {
             position: fixed;
             top: 0;
-            right: -400px;
+            right: -420px;
             width: 400px;
             height: 100vh;
             background: white;
             box-shadow: var(--shadow-lg);
-            transition: right .3s;
+            transition: right .3s ease;
             z-index: 1001;
             display: flex;
             flex-direction: column;
@@ -388,14 +871,15 @@ $pagination = $reviewData['pagination'] ?? [];
 
         .mini-cart-header {
             padding: 1.5rem;
-            border-bottom: 2px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .mini-cart-header h3 {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
+            font-weight: 700;
         }
 
         .close-cart {
@@ -403,46 +887,49 @@ $pagination = $reviewData['pagination'] ?? [];
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
-            color: var(--text-secondary);
+            color: var(--ink-muted);
+            line-height: 1;
         }
 
         .mini-cart-items {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
+            padding: 1.25rem;
         }
 
         .cart-item {
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
+            padding: .875rem 0;
+            border-bottom: 1px solid var(--border);
         }
 
         .cart-item-name {
             font-weight: 600;
-            margin-bottom: .5rem;
+            margin-bottom: .3rem;
+            font-size: .95rem;
         }
 
         .cart-item-details {
-            font-size: .875rem;
-            color: var(--text-secondary);
-            margin-bottom: .5rem;
+            font-size: .85rem;
+            color: var(--ink-muted);
+            margin-bottom: .3rem;
         }
 
         .cart-item-price {
             font-weight: 600;
-            color: var(--primary-color);
+            color: var(--blue);
+            font-size: .95rem;
         }
 
         .mini-cart-footer {
-            padding: 1.5rem;
-            border-top: 2px solid var(--border-color);
+            padding: 1.25rem;
+            border-top: 1px solid var(--border);
         }
 
         .cart-total-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 1rem;
-            font-size: 1.125rem;
+            font-size: 1rem;
             font-weight: 700;
         }
 
@@ -452,7 +939,7 @@ $pagination = $reviewData['pagination'] ?? [];
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, .5);
+            background: rgba(0, 0, 0, .45);
             display: none;
             z-index: 1000;
         }
@@ -467,13 +954,14 @@ $pagination = $reviewData['pagination'] ?? [];
             bottom: 2rem;
             right: 2rem;
             background: white;
-            padding: 1rem 1.5rem;
-            border-radius: .75rem;
+            padding: .875rem 1.25rem;
+            border-radius: var(--radius);
             box-shadow: var(--shadow-lg);
             display: none;
             align-items: center;
             gap: 1rem;
             z-index: 10000;
+            font-size: .9rem;
         }
 
         .toast.show {
@@ -482,11 +970,11 @@ $pagination = $reviewData['pagination'] ?? [];
         }
 
         .toast.success {
-            border-left: 4px solid var(--success-color);
+            border-left: 4px solid var(--green);
         }
 
         .toast.error {
-            border-left: 4px solid var(--danger-color);
+            border-left: 4px solid var(--red);
         }
 
         @keyframes slideIn {
@@ -500,380 +988,26 @@ $pagination = $reviewData['pagination'] ?? [];
             }
         }
 
-        /* ════════════════════════════════════════════════════════════
-           REVIEWS SECTION
-           ════════════════════════════════════════════════════════════ */
-
-        /* ── DMCC compliance notice ───────────────────────────────── */
-        .reviews-compliance-notice {
-            background: #f0f9ff;
-            border: 1px solid #bae6fd;
-            border-radius: .5rem;
-            padding: .875rem 1rem;
-            margin-bottom: 1.75rem;
-            font-size: .8rem;
-            color: #0c4a6e;
-            line-height: 1.6;
-            display: flex;
-            gap: .625rem;
-            align-items: flex-start;
-        }
-
-        .reviews-compliance-notice svg {
-            flex-shrink: 0;
-            margin-top: 1px;
-        }
-
-        /* ── Summary strip ────────────────────────────────────────── */
-        .reviews-summary {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 2rem;
-            align-items: start;
-            margin-bottom: 2rem;
-        }
-
-        .reviews-score {
-            text-align: center;
-            min-width: 120px;
-        }
-
-        .reviews-score__avg {
-            font-size: 3.5rem;
-            font-weight: 700;
-            line-height: 1;
-            color: var(--text-primary);
-        }
-
-        .reviews-score__stars {
-            display: flex;
-            justify-content: center;
-            gap: 2px;
-            margin: .4rem 0 .3rem;
-        }
-
-        .reviews-score__count {
-            font-size: .8rem;
-            color: var(--text-secondary);
-        }
-
-        /* ── Rating bars ──────────────────────────────────────────── */
-        .rating-bars {
-            flex: 1;
-        }
-
-        .rating-bar-row {
-            display: grid;
-            grid-template-columns: 1.5rem 1fr 2.5rem;
-            align-items: center;
-            gap: .6rem;
-            margin-bottom: .45rem;
-        }
-
-        .rating-bar-label {
-            font-size: .8rem;
-            color: var(--text-secondary);
-            text-align: right;
-        }
-
-        .rating-bar-track {
-            height: 8px;
-            background: #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .rating-bar-fill {
-            height: 100%;
-            background: var(--gold);
-            border-radius: 4px;
-            transition: width .4s ease;
-        }
-
-        .rating-bar-pct {
-            font-size: .75rem;
-            color: var(--text-secondary);
-        }
-
-        /* ── Individual review card ───────────────────────────────── */
-        .review-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
-            margin-top: 1.75rem;
-        }
-
-        .review-card {
-            padding: 1.25rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .review-card:last-child {
-            border-bottom: none;
-        }
-
-        .review-card__header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-bottom: .6rem;
-            flex-wrap: wrap;
-        }
-
-        .review-card__meta {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            flex-wrap: wrap;
-        }
-
-        .review-card__author {
-            font-weight: 600;
-            font-size: .95rem;
-        }
-
-        .review-card__date {
-            font-size: .8rem;
-            color: var(--text-secondary);
-        }
-
-        .review-card__verified {
-            font-size: .7rem;
-            font-weight: 600;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-            background: #d1fae5;
-            color: #065f46;
-            padding: 2px 8px;
-            border-radius: 100px;
-        }
-
-        .review-card__title {
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: .4rem;
-        }
-
-        .review-card__comment {
-            font-size: .95rem;
-            color: var(--text-secondary);
-            line-height: 1.65;
-        }
-
-        .review-card__helpful {
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            margin-top: .875rem;
-            font-size: .8rem;
-            color: var(--text-secondary);
-        }
-
-        .helpful-btn {
-            background: none;
-            border: 1px solid var(--border-color);
-            border-radius: .375rem;
-            padding: 3px 10px;
-            font-size: .75rem;
-            cursor: pointer;
-            transition: all .2s;
-            color: var(--text-secondary);
-        }
-
-        .helpful-btn:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .helpful-btn.voted {
-            background: #eff6ff;
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        /* Star components */
-        .stars {
-            display: inline-flex;
-            gap: 1px;
-        }
-
-        .star {
-            color: #d1d5db;
-            font-size: .9rem;
-            line-height: 1;
-        }
-
-        .star.filled {
-            color: var(--gold);
-        }
-
-        /* ── Write review form ────────────────────────────────────── */
-        .write-review-section {
-            margin-top: 2rem;
-            padding-top: 2rem;
-            border-top: 2px solid var(--border-color);
-        }
-
-        .write-review-section h3 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 1.25rem;
-        }
-
-        .review-form {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: .875rem;
-            font-weight: 600;
-            margin-bottom: .4rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: .05em;
-        }
-
-        .form-group input[type="text"],
-        .form-group textarea {
-            width: 100%;
-            padding: .75rem 1rem;
-            border: 2px solid var(--border-color);
-            border-radius: .5rem;
-            font-family: inherit;
-            font-size: .95rem;
-            color: var(--text-primary);
-            transition: border-color .2s;
-            outline: none;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            border-color: var(--primary-color);
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        /* Star rating input */
-        .star-rating-input {
-            display: flex;
-            gap: .375rem;
-        }
-
-        .star-rating-input input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-            width: 0;
-        }
-
-        .star-rating-input label {
-            font-size: 1.75rem;
-            cursor: pointer;
-            color: #d1d5db;
-            transition: color .15s;
-        }
-
-        .star-rating-input label:hover,
-        .star-rating-input label.selected,
-        .star-rating-input input:checked ~ label {
-            color: var(--gold);
-        }
-
-        /* Review form notice */
-        .form-submission-notice {
-            background: #fafaf9;
-            border: 1px solid #d6d3d1;
-            border-radius: .5rem;
-            padding: .875rem 1rem;
-            font-size: .8rem;
-            color: #57534e;
-            line-height: 1.65;
-            margin-bottom: 1rem;
-        }
-
-        /* Unauthenticated CTA */
-        .review-login-prompt {
-            text-align: center;
-            padding: 2rem;
-            background: var(--bg-light);
-            border-radius: .75rem;
-            border: 1px dashed var(--border-color);
-            margin-top: 1.5rem;
-        }
-
-        .review-login-prompt p {
-            margin-bottom: 1rem;
-            color: var(--text-secondary);
-        }
-
-        /* No reviews empty state */
-        .reviews-empty {
-            text-align: center;
-            padding: 2.5rem;
-            color: var(--text-secondary);
-            font-size: .95rem;
-        }
-
-        .reviews-empty__icon {
-            font-size: 2.5rem;
-            margin-bottom: .75rem;
-        }
-
-        /* ── Review pagination ────────────────────────────────────── */
-        .review-pagination {
-            display: flex;
-            justify-content: center;
-            gap: .5rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .review-pagination__btn {
-            min-width: 34px;
-            height: 34px;
-            padding: 0 .75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--border-color);
-            border-radius: .375rem;
-            background: white;
-            font-size: .875rem;
-            color: var(--text-primary);
-            cursor: pointer;
-            transition: all .2s;
-        }
-
-        .review-pagination__btn:hover:not(.active):not(.disabled) {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .review-pagination__btn.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-            pointer-events: none;
-        }
-
-        .review-pagination__btn.disabled {
-            opacity: .35;
-            pointer-events: none;
-        }
-
+        /* ── Responsive ───────────────────────────────────────────── */
         @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
+            .plan-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .plan-left {
+                position: static;
+                display: grid;
+                grid-template-columns: 180px 1fr;
+                gap: 1rem;
+                align-items: start;
             }
 
             .plan-title {
-                font-size: 2rem;
+                font-size: 1.75rem;
+            }
+
+            .delivery-tabs {
+                flex-direction: column;
             }
 
             .reviews-summary {
@@ -886,110 +1020,193 @@ $pagination = $reviewData['pagination'] ?? [];
             }
 
             .cart-badge {
-                bottom: 2rem;
                 top: auto;
+                bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .plan-left {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-<div class="container">
+<div class="page">
 
     <div class="breadcrumb">
-        <a href="/subscriptions">← Back to Shop</a>
+        <a href="/subscriptions">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back to Shop
+        </a>
     </div>
 
-    <!-- ── Plan Header ─────────────────────────────────────────────────── -->
-    <div class="plan-header">
-        <h1 class="plan-title"><?= htmlspecialchars($plan->name) ?></h1>
-        <?php if ($plan->description): ?>
-            <p class="plan-description"><?= htmlspecialchars($plan->description) ?></p>
-        <?php endif; ?>
-    </div>
+    <?php $coverImage = $plan->print_image_url ?? $plan->digital_image_url ?? null; ?>
 
-    <!-- ── Duration & Delivery (unchanged from original) ──────────────── -->
-    <div class="plan-card">
-        <h2 class="section-title">Choose Your Subscription</h2>
+    <!-- ── Two-column layout ──────────────────────────────────────────────── -->
+    <div class="plan-layout">
 
-        <div class="duration-options">
-            <?php foreach ($plan->pricingTiers as $index => $pricing):
-                $actualPrice = $pricing->sale_price && $pricing->sale_price < $pricing->price ? $pricing->sale_price : $pricing->price;
-                $originalPrice = $pricing->price;
-                ?>
-                <div class="duration-option" data-plan="<?= $plan->id ?>">
-                    <input type="radio" name="duration_<?= $plan->id ?>" value="<?= $pricing->duration_months ?>"
-                           data-pricing-id="<?= $pricing->id ?>"
-                           data-price="<?= $pricing->price ?>"
-                           data-digital="<?= $pricing->digital_price ?? 0 ?>"
-                           data-original-price="<?= $pricing->sale_price ?? $pricing->price ?>"
-                           data-original-digital="<?= $pricing->digital_sale_price ?? $pricing->digital_price ?>"
-                           data-issues="<?= $pricing->issue_count ?>"
-                            <?= $index === 0 ? 'checked' : '' ?>>
-
-                    <div class="duration-header">
-                        <span class="duration-label"><?= htmlspecialchars($pricing->label) ?></span>
-                        <div>
-                            <span class="duration-price">£<?= number_format($actualPrice, 2) ?></span>
-                            <?php if ($pricing->hasDiscount()): ?>
-                                <span class="original-price">£<?= number_format($originalPrice, 2) ?></span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="duration-details">
-                        <span class="duration-period"><?= htmlspecialchars($pricing->period_description) ?></span>
-                        <?php if ($pricing->issue_count > 0): ?>
-                            <span class="price-per-issue">£<?= number_format($pricing->getPricePerIssue(), 2) ?> per issue</span>
-                        <?php endif; ?>
-                        <?php if ($pricing->getSavingsText()): ?>
-                            <span class="savings-badge"><?= $pricing->getSavingsText() ?></span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-
-        <?php
-        $deliveryOptions = $plan->getDeliveryOptions();
-        $hasMultipleOptions = count($deliveryOptions) > 1;
-        ?>
-
-        <?php if ($hasMultipleOptions): ?>
-            <h2 class="section-title">Delivery Type</h2>
-            <div class="delivery-options">
-                <?php if ($plan->hasDigitalOption()): ?>
-                    <div class="delivery-option" data-plan="<?= $plan->id ?>">
-                        <input type="radio" name="delivery_<?= $plan->id ?>" value="digital" checked>
-                        <div class="delivery-content">
-                            <span class="delivery-label">Digital Edition</span>
-                            <p class="delivery-desc">Instant access to digital content. Download and read on any
-                                device.</p>
-                        </div>
-                    </div>
-                <?php endif; ?>
-                <?php if ($plan->hasPrintOption()): ?>
-                    <div class="delivery-option" data-plan="<?= $plan->id ?>">
-                        <input type="radio" name="delivery_<?= $plan->id ?>"
-                               value="print" <?= !$plan->hasDigitalOption() ? 'checked' : '' ?>>
-                        <div class="delivery-content">
-                            <span class="delivery-label">Print Edition</span>
-                            <p class="delivery-desc">Physical magazine delivered to your doorstep. Shipping
-                                included.</p>
-                        </div>
+        <!-- LEFT: cover image + trust badges -->
+        <div class="plan-left">
+            <div class="plan-cover">
+                <?php if ($coverImage): ?>
+                    <img src="<?= htmlspecialchars($coverImage) ?>" alt="<?= htmlspecialchars($plan->name) ?>">
+                <?php else: ?>
+                    <div class="plan-cover__placeholder">
+                        <?= strtoupper(substr($plan->name, 0, 1)) ?>
                     </div>
                 <?php endif; ?>
             </div>
-        <?php else: ?>
-            <input type="radio" name="delivery_<?= $plan->id ?>" value="<?= $deliveryOptions[0] ?>" checked
-                   style="display:none;">
-        <?php endif; ?>
 
-        <button class="btn btn-primary" onclick="addToCart(<?= $plan->id ?>)">Add to Cart</button>
-    </div>
+            <div class="trust-list">
+                <div class="trust-item">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 11 12 14 22 4"/>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    </svg>
+                    Cancel any time
+                </div>
+                <div class="trust-item">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4l3 3"/>
+                    </svg>
+                    Best price guarantee
+                </div>
+                <div class="trust-item">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="3" width="15" height="13" rx="2"/>
+                        <path d="M16 8h4l3 5v3h-7V8z"/>
+                        <circle cx="5.5" cy="18.5" r="2.5"/>
+                        <circle cx="18.5" cy="18.5" r="2.5"/>
+                    </svg>
+                    No hidden costs
+                </div>
+                <div class="trust-item">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    You're in control
+                </div>
+            </div>
+        </div>
 
-    <!-- ── Features ───────────────────────────────────────────────────── -->
+        <!-- RIGHT: title, description, subscription card -->
+        <div class="plan-right">
+
+            <h1 class="plan-title"><?= htmlspecialchars($plan->name) ?></h1>
+            <?php if ($plan->description): ?>
+                <p class="plan-description"><?= htmlspecialchars($plan->description) ?></p>
+            <?php endif; ?>
+
+            <!-- Subscription card -->
+            <div class="card">
+                <div class="card-title">Choose Your Subscription</div>
+
+                <?php
+                $deliveryOptions = $plan->getDeliveryOptions();
+                $hasMultipleOptions = count($deliveryOptions) > 1;
+                ?>
+
+                <?php if ($hasMultipleOptions): ?>
+                    <div class="delivery-tabs">
+                        <?php if ($plan->hasDigitalOption()): ?>
+                            <div class="delivery-tab selected" data-plan="<?= $plan->id ?>">
+                                <input type="radio" name="delivery_<?= $plan->id ?>" value="digital" checked>
+                                <div class="delivery-tab__name">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2">
+                                        <rect x="5" y="2" width="14" height="20" rx="2"/>
+                                        <line x1="12" y1="18" x2="12" y2="18"/>
+                                    </svg>
+                                    Digital
+                                </div>
+                                <div class="delivery-tab__desc">Instant digital access</div>
+                            </div>
+                        <?php endif; ?>
+                        <?php if ($plan->hasPrintOption()): ?>
+                            <div class="delivery-tab<?= !$plan->hasDigitalOption() ? ' selected' : '' ?>"
+                                 data-plan="<?= $plan->id ?>">
+                                <input type="radio" name="delivery_<?= $plan->id ?>"
+                                       value="print"<?= !$plan->hasDigitalOption() ? ' checked' : '' ?>>
+                                <div class="delivery-tab__name">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2">
+                                        <path d="M4 22h16a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/>
+                                        <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                        <rect x="2" y="13" width="8" height="8" rx="1"/>
+                                    </svg>
+                                    Print
+                                </div>
+                                <div class="delivery-tab__desc">Delivered to your door</div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <input type="radio" name="delivery_<?= $plan->id ?>" value="<?= $deliveryOptions[0] ?>" checked
+                           style="display:none;">
+                <?php endif; ?>
+
+                <div class="duration-options">
+                    <?php foreach ($plan->pricingTiers as $index => $pricing):
+                        $actualPrice = $pricing->sale_price && $pricing->sale_price < $pricing->price
+                                ? $pricing->sale_price : $pricing->price;
+                        $originalPrice = $pricing->price;
+                        ?>
+                        <div class="duration-option<?= $index === 0 ? ' selected' : '' ?>" data-plan="<?= $plan->id ?>">
+                            <input type="radio" name="duration_<?= $plan->id ?>"
+                                   value="<?= $pricing->duration_months ?>"
+                                   data-pricing-id="<?= $pricing->id ?>"
+                                   data-price="<?= $pricing->price ?>"
+                                   data-digital="<?= $pricing->digital_price ?? 0 ?>"
+                                   data-original-price="<?= $pricing->sale_price ?? $pricing->price ?>"
+                                   data-original-digital="<?= $pricing->digital_sale_price ?? $pricing->digital_price ?>"
+                                   data-issues="<?= $pricing->issue_count ?>"
+                                    <?= $index === 0 ? 'checked' : '' ?>>
+
+                            <div class="duration-option__left">
+                                <div class="duration-option__radio"></div>
+                                <div class="duration-option__info">
+                                    <div class="duration-option__label"><?= htmlspecialchars($pricing->label) ?></div>
+                                    <div class="duration-option__period"><?= htmlspecialchars($pricing->period_description) ?></div>
+                                </div>
+                            </div>
+
+                            <div class="duration-option__right">
+                                <?php if ($pricing->hasDiscount()): ?>
+                                    <div class="duration-option__was">£<?= number_format($originalPrice, 2) ?></div>
+                                <?php endif; ?>
+                                <div class="duration-option__price">£<?= number_format($actualPrice, 2) ?></div>
+                                <?php if ($pricing->issue_count > 0): ?>
+                                    <div class="duration-option__per-issue">
+                                        £<?= number_format($pricing->getPricePerIssue(), 2) ?>/issue
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($pricing->getSavingsText()): ?>
+                                    <div class="save-badge"><?= $pricing->getSavingsText() ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <button class="btn-add-cart" onclick="addToCart(<?= $plan->id ?>)">
+                    Add to Cart
+                </button>
+            </div>
+            <!-- /subscription card -->
+
+        </div><!-- /.plan-right -->
+    </div><!-- /.plan-layout -->
+
+    <!-- ── What's Included ───────────────────────────────────────────────── -->
     <?php if (!empty($plan->features)): ?>
-        <div class="plan-card">
-            <h2 class="section-title">What's Included</h2>
+        <div class="card">
+            <div class="card-title">What's Included</div>
             <ul class="features-list">
                 <?php foreach ($plan->features as $feature): ?>
                     <li>
@@ -1006,21 +1223,12 @@ $pagination = $reviewData['pagination'] ?? [];
     <?php endif; ?>
 
     <!-- ════════════════════════════════════════════════════════════════════
-         REVIEWS SECTION — DMCC Act 2024 compliant
+         REVIEWS — DMCC Act 2024 compliant
          ════════════════════════════════════════════════════════════════════ -->
-    <div class="plan-card" id="reviews-section">
-        <h2 class="section-title">Customer Reviews</h2>
+    <div class="card" id="reviews-section">
+        <div class="card-title">Customer Reviews</div>
 
-        <!--
-            DMCC Act 2024 compliance notice.
-            The Digital Markets, Competition and Consumers Act 2024 (Chapter 7,
-            ss.234–237) prohibits commissioning fake reviews, publishing reviews
-            without reasonable steps to verify genuineness, and misrepresenting
-            the source of reviews.
-
-            This notice informs consumers how reviews are collected and verified.
-        -->
-        <div class="reviews-compliance-notice" role="note" aria-label="Review transparency notice">
+        <div class="reviews-compliance-notice" role="note">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
@@ -1029,16 +1237,15 @@ $pagination = $reviewData['pagination'] ?? [];
             </svg>
             <span>
                 Reviews are submitted by customers who have purchased this subscription.
-                We verify that each review comes from a genuine account and do not edit, suppress,
-                or incentivise reviews. All ratings shown reflect authentic customer experiences.
-                <a href="/reviews-policy" style="color:inherit; text-decoration:underline;">Learn about our review policy</a>.
+                We verify each review comes from a genuine account and do not edit, suppress,
+                or incentivise reviews.
+                <a href="/reviews-policy"
+                   style="color:inherit;text-decoration:underline;">Learn about our review policy</a>.
             </span>
         </div>
 
-        <!-- Summary -->
         <?php if ($totalReviews > 0): ?>
             <div class="reviews-summary">
-                <!-- Overall score -->
                 <div class="reviews-score">
                     <div class="reviews-score__avg"><?= number_format($averageRating, 1) ?></div>
                     <div class="reviews-score__stars"
@@ -1047,20 +1254,16 @@ $pagination = $reviewData['pagination'] ?? [];
                             <span aria-hidden="true"><?= $s <= round($averageRating) ? '★' : '☆' ?></span>
                         <?php endfor; ?>
                     </div>
-                    <div class="reviews-score__count">
-                        <?= number_format($totalReviews) ?> review<?= $totalReviews !== 1 ? 's' : '' ?>
-                    </div>
+                    <div class="reviews-score__count"><?= number_format($totalReviews) ?>
+                        review<?= $totalReviews !== 1 ? 's' : '' ?></div>
                 </div>
 
-                <!-- Breakdown bars -->
                 <div class="rating-bars" aria-label="Rating breakdown">
                     <?php foreach ([5, 4, 3, 2, 1] as $r): ?>
                         <div class="rating-bar-row">
                             <span class="rating-bar-label" aria-hidden="true"><?= $r ?>★</span>
                             <div class="rating-bar-track" role="progressbar"
-                                 aria-valuenow="<?= $percentages[$r] ?? 0 ?>"
-                                 aria-valuemin="0" aria-valuemax="100"
-                                 aria-label="<?= $r ?> star — <?= $percentages[$r] ?? 0 ?>%">
+                                 aria-valuenow="<?= $percentages[$r] ?? 0 ?>" aria-valuemin="0" aria-valuemax="100">
                                 <div class="rating-bar-fill" style="width:<?= $percentages[$r] ?? 0 ?>%"></div>
                             </div>
                             <span class="rating-bar-pct"><?= $percentages[$r] ?? 0 ?>%</span>
@@ -1069,7 +1272,6 @@ $pagination = $reviewData['pagination'] ?? [];
                 </div>
             </div>
 
-            <!-- Review list -->
             <div class="review-list" id="review-list">
                 <?php foreach ($reviewList as $review): ?>
                     <article class="review-card" data-review-id="<?= (int)$review['id'] ?>">
@@ -1077,8 +1279,7 @@ $pagination = $reviewData['pagination'] ?? [];
                             <div class="review-card__meta">
                                 <span class="review-card__author"><?= htmlspecialchars($review['author_name'] ?? 'Anonymous') ?></span>
                                 <?php if ($review['is_verified_purchase']): ?>
-                                    <span class="review-card__verified"
-                                          title="This review was submitted by a verified purchaser">✓ Verified</span>
+                                    <span class="review-card__verified">✓ Verified</span>
                                 <?php endif; ?>
                                 <span class="review-card__date"><?= htmlspecialchars($review['formatted_date'] ?? '') ?></span>
                             </div>
@@ -1108,21 +1309,16 @@ $pagination = $reviewData['pagination'] ?? [];
                 <?php endforeach; ?>
             </div>
 
-            <!-- Pagination -->
             <?php if (!empty($pagination) && ($pagination['total_pages'] ?? 1) > 1): ?>
                 <nav class="review-pagination" aria-label="Review pages" id="review-pagination">
-                    <?php
-                    $cur = $pagination['current_page'];
-                    $tot = $pagination['total_pages'];
-                    ?>
+                    <?php $cur = $pagination['current_page'];
+                    $tot = $pagination['total_pages']; ?>
                     <button class="review-pagination__btn <?= $cur <= 1 ? 'disabled' : '' ?>"
                             onclick="loadReviews(<?= $cur - 1 ?>)" aria-label="Previous page">←
                     </button>
                     <?php for ($p = 1; $p <= $tot; $p++): ?>
                         <button class="review-pagination__btn <?= $p === $cur ? 'active' : '' ?>"
-                                onclick="loadReviews(<?= $p ?>)" <?= $p === $cur ? 'aria-current="page"' : '' ?>>
-                            <?= $p ?>
-                        </button>
+                                onclick="loadReviews(<?= $p ?>)" <?= $p === $cur ? 'aria-current="page"' : '' ?>><?= $p ?></button>
                     <?php endfor; ?>
                     <button class="review-pagination__btn <?= $cur >= $tot ? 'disabled' : '' ?>"
                             onclick="loadReviews(<?= $cur + 1 ?>)" aria-label="Next page">→
@@ -1145,15 +1341,15 @@ $pagination = $reviewData['pagination'] ?? [];
                 <div class="form-submission-notice" role="note">
                     By submitting a review, you confirm it reflects your genuine, personal experience
                     with this subscription. We do not offer incentives for reviews. Fabricated or
-                    misleading reviews may be removed and, where required, reported in accordance
-                    with the Digital Markets, Competition and Consumers Act 2024.
+                    misleading reviews may be removed in accordance with the Digital Markets,
+                    Competition and Consumers Act 2024.
                 </div>
 
                 <form class="review-form" id="review-form" onsubmit="submitReview(event)">
                     <input type="hidden" name="plan_id" value="<?= (int)$plan->id ?>">
 
                     <div class="form-group">
-                        <label for="review-rating">Your Rating <span aria-hidden="true">*</span></label>
+                        <label for="review-rating">Your Rating *</label>
                         <div class="star-rating-input" role="radiogroup" aria-label="Rating" id="star-rating-group">
                             <?php for ($i = 1; $i <= 5; $i++): ?>
                                 <input type="radio" name="rating" id="star-<?= $i ?>" value="<?= $i ?>" required>
@@ -1165,19 +1361,18 @@ $pagination = $reviewData['pagination'] ?? [];
 
                     <div class="form-group">
                         <label for="review-title">Review Title</label>
-                        <input type="text" id="review-title" name="title"
-                               maxlength="120" placeholder="Summarise your experience">
+                        <input type="text" id="review-title" name="title" maxlength="120"
+                               placeholder="Summarise your experience">
                     </div>
 
                     <div class="form-group">
-                        <label for="review-comment">Your Review <span aria-hidden="true">*</span></label>
-                        <textarea id="review-comment" name="comment" required
-                                  minlength="10" maxlength="2000"
+                        <label for="review-comment">Your Review *</label>
+                        <textarea id="review-comment" name="comment" required minlength="10" maxlength="2000"
                                   placeholder="Tell others about your experience with this subscription…"></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" id="review-submit-btn"
-                            style="max-width:240px;">Submit Review
+                    <button type="submit" class="btn btn-primary btn-sm" id="review-submit-btn"
+                            style="align-self:flex-start;">Submit Review
                     </button>
                 </form>
 
@@ -1196,13 +1391,13 @@ $pagination = $reviewData['pagination'] ?? [];
     </div>
     <!-- ── END REVIEWS ──────────────────────────────────────────────────── -->
 
-</div><!-- /.container -->
+</div><!-- /.page -->
 
 <!-- Cart Badge -->
 <div class="cart-badge" onclick="openMiniCart()">
     <div class="cart-info">
         <div class="cart-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="9" cy="21" r="1"/>
                 <circle cx="20" cy="21" r="1"/>
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
@@ -1220,14 +1415,14 @@ $pagination = $reviewData['pagination'] ?? [];
         <button class="close-cart" onclick="closeMiniCart()" aria-label="Close cart">×</button>
     </div>
     <div class="mini-cart-items" id="cart-items">
-        <p style="text-align:center; color:var(--text-secondary); padding:2rem;">Your cart is empty</p>
+        <p style="text-align:center;color:var(--ink-muted);padding:2rem;">Your cart is empty</p>
     </div>
     <div class="mini-cart-footer">
         <div class="cart-total-row">
             <span>Total:</span>
             <span id="mini-cart-total">£0.00</span>
         </div>
-        <button class="btn btn-primary" onclick="goToCheckout()">Proceed to Checkout</button>
+        <button class="btn btn-primary" style="width:100%;" onclick="goToCheckout()">Proceed to Checkout</button>
     </div>
 </div>
 
@@ -1240,15 +1435,11 @@ $pagination = $reviewData['pagination'] ?? [];
     const PLAN_ID = <?= (int)$plan->id ?>;
     let cartData = {items: [], total: 0, count: 0};
 
-    // ─── Initialise ──────────────────────────────────────────────────────
-
     document.addEventListener('DOMContentLoaded', () => {
         loadCart();
         initializeSelections();
         initStarRatingInput();
     });
-
-    // ─── Duration / delivery selection (unchanged from original) ─────────
 
     function initializeSelections() {
         document.querySelectorAll('.duration-option').forEach(option => {
@@ -1261,9 +1452,9 @@ $pagination = $reviewData['pagination'] ?? [];
             });
         });
 
-        document.querySelectorAll('.delivery-option').forEach(option => {
+        document.querySelectorAll('.delivery-tab').forEach(option => {
             option.addEventListener('click', function () {
-                document.querySelectorAll(`.delivery-option[data-plan="${PLAN_ID}"]`)
+                document.querySelectorAll(`.delivery-tab[data-plan="${PLAN_ID}"]`)
                     .forEach(o => o.classList.remove('selected'));
                 this.classList.add('selected');
                 this.querySelector('input[type="radio"]').checked = true;
@@ -1272,7 +1463,7 @@ $pagination = $reviewData['pagination'] ?? [];
         });
 
         document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
-            const p = radio.closest('.duration-option') || radio.closest('.delivery-option');
+            const p = radio.closest('.duration-option') || radio.closest('.delivery-tab');
             if (p) p.classList.add('selected');
         });
     }
@@ -1283,8 +1474,8 @@ $pagination = $reviewData['pagination'] ?? [];
 
         document.querySelectorAll(`.duration-option[data-plan="${PLAN_ID}"]`).forEach(opt => {
             const radio = opt.querySelector('input[type="radio"]');
-            const priceEl = opt.querySelector('.duration-price');
-            const origEl = opt.querySelector('.original-price');
+            const priceEl = opt.querySelector('.duration-option__price');
+            const wasEl = opt.querySelector('.duration-option__was');
             const dPrice = parseFloat(radio.dataset.digital);
             const pPrice = parseFloat(radio.dataset.price);
             const dSale = parseFloat(radio.dataset.originalDigital);
@@ -1292,15 +1483,13 @@ $pagination = $reviewData['pagination'] ?? [];
 
             if (isDigital && dPrice > 0) {
                 priceEl.textContent = '£' + dSale.toFixed(2);
-                if (origEl && dSale < dPrice) origEl.textContent = '£' + dPrice.toFixed(2);
+                if (wasEl && dSale < dPrice) wasEl.textContent = '£' + dPrice.toFixed(2);
             } else {
                 priceEl.textContent = '£' + pSale.toFixed(2);
-                if (origEl && pSale < pPrice) origEl.textContent = '£' + pPrice.toFixed(2);
+                if (wasEl && pSale < pPrice) wasEl.textContent = '£' + pPrice.toFixed(2);
             }
         });
     }
-
-    // ─── Cart ─────────────────────────────────────────────────────────────
 
     async function loadCart() {
         try {
@@ -1323,7 +1512,7 @@ $pagination = $reviewData['pagination'] ?? [];
 
         const container = document.getElementById('cart-items');
         if (!cartData.items?.length) {
-            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:2rem;">Your cart is empty</p>';
+            container.innerHTML = '<p style="text-align:center;color:var(--ink-muted);padding:2rem;">Your cart is empty</p>';
             return;
         }
         container.innerHTML = cartData.items.map(item => `
@@ -1383,17 +1572,13 @@ $pagination = $reviewData['pagination'] ?? [];
         document.getElementById('mini-cart').classList.add('open');
         document.getElementById('cart-overlay').classList.add('show');
     }
-
     function closeMiniCart() {
         document.getElementById('mini-cart').classList.remove('open');
         document.getElementById('cart-overlay').classList.remove('show');
     }
-
     function goToCheckout() {
         window.location.href = '/' + SITE + '/checkout?type=subscription';
     }
-
-    // ─── Star rating input ────────────────────────────────────────────────
 
     function initStarRatingInput() {
         const labels = document.querySelectorAll('.star-rating-input label');
@@ -1411,8 +1596,6 @@ $pagination = $reviewData['pagination'] ?? [];
             });
         });
     }
-
-    // ─── Submit review ────────────────────────────────────────────────────
 
     async function submitReview(e) {
         e.preventDefault();
@@ -1442,12 +1625,10 @@ $pagination = $reviewData['pagination'] ?? [];
                 body: JSON.stringify(payload),
             });
             const data = await res.json();
-
             if (data.success) {
                 showToast('Review submitted — thank you!', 'success');
                 form.reset();
                 document.querySelectorAll('.star-rating-input label').forEach(l => l.classList.remove('selected'));
-                // Reload review section to show the new review
                 setTimeout(() => loadReviews(1), 1200);
             } else {
                 showToast(data.message || 'Could not submit your review', 'error');
@@ -1461,8 +1642,6 @@ $pagination = $reviewData['pagination'] ?? [];
         }
     }
 
-    // ─── Load reviews (AJAX pagination) ──────────────────────────────────
-
     async function loadReviews(page) {
         try {
             const res = await fetch(`${API_BASE}/plans/${PLAN_ID}/reviews?page=${page}`, {
@@ -1470,19 +1649,11 @@ $pagination = $reviewData['pagination'] ?? [];
             });
             const data = await res.json();
             if (!data.success) return;
-
             const r = data.data;
-            // Re-render review list
             const list = document.getElementById('review-list');
-            if (list) {
-                list.innerHTML = r.reviews.map(renderReviewCard).join('');
-            }
-            // Re-render pagination
+            if (list) list.innerHTML = r.reviews.map(renderReviewCard).join('');
             const pag = document.getElementById('review-pagination');
-            if (pag) {
-                pag.innerHTML = renderReviewPagination(r.pagination, page);
-            }
-            // Scroll to top of reviews
+            if (pag) pag.innerHTML = renderReviewPagination(r.pagination, page);
             document.getElementById('reviews-section').scrollIntoView({behavior: 'smooth', block: 'start'});
         } catch (err) {
             console.error('Review load error:', err);
@@ -1494,12 +1665,9 @@ $pagination = $reviewData['pagination'] ?? [];
             `<span class="star ${s <= review.rating ? 'filled' : ''}" aria-hidden="true">★</span>`
         ).join('');
         const verified = review.is_verified_purchase
-            ? '<span class="review-card__verified" title="Verified purchaser">✓ Verified</span>'
-            : '';
+            ? '<span class="review-card__verified">✓ Verified</span>' : '';
         const title = review.title
-            ? `<div class="review-card__title">${escHtml(review.title)}</div>`
-            : '';
-
+            ? `<div class="review-card__title">${escHtml(review.title)}</div>` : '';
         return `
         <article class="review-card" data-review-id="${review.id}">
             <div class="review-card__header">
@@ -1514,12 +1682,8 @@ $pagination = $reviewData['pagination'] ?? [];
             <div class="review-card__comment">${escHtml(review.comment)}</div>
             <div class="review-card__helpful">
                 <span>Helpful?</span>
-                <button class="helpful-btn" onclick="voteHelpful(${review.id}, true, this)" aria-label="Mark as helpful">
-                    👍 ${review.helpful_count || 0}
-                </button>
-                <button class="helpful-btn" onclick="voteHelpful(${review.id}, false, this)" aria-label="Mark as not helpful">
-                    👎 ${review.unhelpful_count || 0}
-                </button>
+                <button class="helpful-btn" onclick="voteHelpful(${review.id}, true, this)">👍 ${review.helpful_count || 0}</button>
+                <button class="helpful-btn" onclick="voteHelpful(${review.id}, false, this)">👎 ${review.unhelpful_count || 0}</button>
             </div>
         </article>`;
     }
@@ -1528,15 +1692,13 @@ $pagination = $reviewData['pagination'] ?? [];
         if (!pagination || pagination.total_pages <= 1) return '';
         const {total_pages: tot} = pagination;
         let html = '';
-        html += `<button class="review-pagination__btn ${currentPage <= 1 ? 'disabled' : ''}" onclick="loadReviews(${currentPage - 1})" aria-label="Previous page">←</button>`;
+        html += `<button class="review-pagination__btn ${currentPage <= 1 ? 'disabled' : ''}" onclick="loadReviews(${currentPage - 1})">←</button>`;
         for (let p = 1; p <= tot; p++) {
-            html += `<button class="review-pagination__btn ${p === currentPage ? 'active' : ''}" onclick="loadReviews(${p})" ${p === currentPage ? 'aria-current="page"' : ''}>${p}</button>`;
+            html += `<button class="review-pagination__btn ${p === currentPage ? 'active' : ''}" onclick="loadReviews(${p})">${p}</button>`;
         }
-        html += `<button class="review-pagination__btn ${currentPage >= tot ? 'disabled' : ''}" onclick="loadReviews(${currentPage + 1})" aria-label="Next page">→</button>`;
+        html += `<button class="review-pagination__btn ${currentPage >= tot ? 'disabled' : ''}" onclick="loadReviews(${currentPage + 1})">→</button>`;
         return html;
     }
-
-    // ─── Vote helpful ─────────────────────────────────────────────────────
 
     async function voteHelpful(reviewId, isHelpful, btn) {
         try {
@@ -1548,7 +1710,6 @@ $pagination = $reviewData['pagination'] ?? [];
             const data = await res.json();
             if (data.success) {
                 btn.classList.add('voted');
-                // Update counts from response
                 const card = btn.closest('.review-card');
                 const btns = card.querySelectorAll('.helpful-btn');
                 if (data.helpful_count != null) btns[0].innerHTML = `👍 ${data.helpful_count}`;
@@ -1558,8 +1719,6 @@ $pagination = $reviewData['pagination'] ?? [];
             console.error('Vote error:', e);
         }
     }
-
-    // ─── Toast ────────────────────────────────────────────────────────────
 
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toast');

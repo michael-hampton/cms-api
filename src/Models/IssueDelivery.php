@@ -41,7 +41,6 @@ class IssueDelivery extends Model
         'updated_at' => 'datetime',
         'cut_off_date' => 'date',
         'fulfilment_date' => 'date',
-        'status' => 'string',
         'tracking_info' => 'array',
         'restock_date' => 'datetime',
     ];

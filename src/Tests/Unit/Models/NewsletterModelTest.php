@@ -2,11 +2,15 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Member;
 use App\Models\Newsletter;
+use App\Models\NewsletterRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class NewsletterModelTest extends FunctionalTestCase
 {
+    use CreatesTestData;
     public function testShouldSendDailyNewsletter(): void
     {
         $newsletter = new Newsletter([
@@ -173,5 +177,138 @@ class NewsletterModelTest extends FunctionalTestCase
 
         $newsletter = new Newsletter(['requires_bundle' => false]);
         $this->assertFalse($newsletter->requiresBundle());
+    }
+
+    public function testNewsletterWithNoRegionSetsIsVisibleToAnyMember(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $member = new Member(['territory_id' => 99]);
+
+        $newsletter->setRelation('regionSets', new \App\Framework\Support\Collection([]));
+
+        $this->assertTrue($newsletter->isVisibleToMember($member));
+    }
+
+    public function testNewsletterIsVisibleToMemberWithMatchingTerritory(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        NewsletterRegionSet::create([
+            'newsletter_id' => $newsletter->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $member = $this->createMember(['territory_id' => $territory->id]);
+
+        $this->assertTrue($newsletter->isVisibleToMember($member));
+    }
+
+    public function testNewsletterIsNotVisibleToMemberWithNonMatchingTerritory(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        NewsletterRegionSet::create([
+            'newsletter_id' => $newsletter->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $territory2 = $this->createTerritory();
+        $member = $this->createMember(['territory_id' => $territory2->id]);
+
+        $this->assertFalse($newsletter->isVisibleToMember($member));
+    }
+
+    public function testNewsletterIsVisibleToNullMember(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        NewsletterRegionSet::create([
+            'newsletter_id' => $newsletter->id,
+            'region_set_id' => $this->createRegionSet()->id,
+        ]);
+
+        $this->assertTrue($newsletter->isVisibleToMember(null));
+    }
+
+    public function testNewsletterIsVisibleToMemberWithNoTerritory(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $regionSet = $this->createRegionSet();
+
+        NewsletterRegionSet::create([
+            'newsletter_id' => $newsletter->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $member = new Member(); // no territory_id
+
+        $this->assertTrue($newsletter->isVisibleToMember($member));
+    }
+
+    public function testScopeVisibleToMemberFiltersRestrictedNewsletters(): void
+    {
+        $open = $this->createNewsletter(['slug' => 'open-' . uniqid()]);
+        $restricted = $this->createNewsletter(['slug' => 'restricted-' . uniqid()]);
+
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        NewsletterRegionSet::create([
+            'newsletter_id' => $restricted->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $otherTerritory = $this->createTerritory();
+        $member = $this->createMember(['territory_id' => $otherTerritory->id]);
+
+        $results = Newsletter::where('site_id', $this->siteId)
+            ->visibleToMember($member)
+            ->get();
+
+        $ids = $results->pluck('id')->toArray();
+
+        $this->assertContains($open->id, $ids);
+        $this->assertNotContains($restricted->id, $ids);
+    }
+
+    public function testScopeVisibleToMemberShowsAllForNullMember(): void
+    {
+        $open = $this->createNewsletter(['slug' => 'open2-' . uniqid()]);
+        $restricted = $this->createNewsletter(['slug' => 'restricted2-' . uniqid()]);
+
+        $regionSet = $this->createRegionSet();
+        NewsletterRegionSet::create([
+            'newsletter_id' => $restricted->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $results = Newsletter::where('site_id', $this->siteId)
+            ->visibleToMember(null)
+            ->get();
+
+        $ids = $results->pluck('id')->toArray();
+
+        $this->assertContains($open->id, $ids);
+        $this->assertContains($restricted->id, $ids);
+    }
+
+    public function testRegionSetsRelationship(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $regionSet = $this->createRegionSet();
+
+        NewsletterRegionSet::create([
+            'newsletter_id' => $newsletter->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $newsletter->load(['regionSets']);
+
+        $this->assertCount(1, $newsletter->regionSets);
+        $this->assertEquals($regionSet->id, $newsletter->regionSets->first()->id);
     }
 }

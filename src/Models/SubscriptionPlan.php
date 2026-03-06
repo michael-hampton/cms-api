@@ -26,7 +26,7 @@ class SubscriptionPlan extends Model
         'is_featured',
         'sort_order',
         'stripe_price_id',
-        'stripe_product_id',   // ← NEW: Stripe Product ID (set by CreatePlanAction)
+        'stripe_product_id',
         'plan_type',
         'digital_download_url',
         'print_shipping_required',
@@ -75,6 +75,91 @@ class SubscriptionPlan extends Model
         return $this->hasMany(Subscription::class, 'plan_id', 'id', $relation)
             ->where('status', 'active');
     }
+
+    public function regionSets(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            RegionSet::class,
+            'subscription_plan_region_sets',
+            'subscription_plan_id',
+            'region_set_id',
+            $relation
+        );
+    }
+
+    // ── Visibility ────────────────────────────────────────────────────────
+
+    /**
+     * Scope: filter plans visible to a given member based on their territory.
+     *
+     * Rules:
+     *  - Unauthenticated (null member)  → see everything
+     *  - Member with no territory       → see everything
+     *  - Member with territory          → see plans with no region sets
+     *                                     OR plans whose region sets include
+     *                                     the member's territory
+     */
+    public function scopeVisibleToMember(QueryBuilder $query, ?Member $member = null): QueryBuilder
+    {
+        if (!$member || !$member->hasTerritoryId()) {
+            return $query;
+        }
+
+        $territoryId = $member->getTerritoryId();
+
+        return $query->where(function ($q) use ($territoryId) {
+            // Plans with no region-set restrictions are visible to all
+            $q->whereDoesntHave('regionSets')
+                // OR plans whose region sets contain the member's territory
+                ->orWhereHas('regionSets', function ($subQ) use ($territoryId) {
+                    $subQ->whereHas('territories', function ($tQ) use ($territoryId) {
+                        $tQ->where('territories.id', $territoryId)
+                            ->whereNull('territories.deleted_at');
+                    });
+                });
+        });
+    }
+
+    /**
+     * Instance check: is this plan visible to the given member?
+     *
+     * Rules mirror scopeVisibleToMember.
+     */
+    public function isVisibleToMember(?Member $member): bool
+    {
+        // Unauthenticated or member with no territory → always visible
+        if (!$member || !$member->hasTerritoryId()) {
+            return true;
+        }
+
+        // Plan has no region-set restrictions → visible to everyone
+        if (!$this->relationLoaded('regionSets')) {
+            $this->load(['regionSets.territories']);
+        }
+
+        if ($this->regionSets->isEmpty()) {
+            return true;
+        }
+
+        $territoryId = $member->getTerritoryId();
+
+        // Check if any region set contains the member's territory
+        foreach ($this->regionSets as $regionSet) {
+            if (!$regionSet->relationLoaded('territories')) {
+                $regionSet->load(['territories']);
+            }
+
+            foreach ($regionSet->territories as $territory) {
+                if ($territory->id === $territoryId && !$territory->deleted_at) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // ── Existing scopes ───────────────────────────────────────────────────
 
     public function isActive(): bool
     {

@@ -87,6 +87,7 @@ $router->get('/api/merchants/{merchantId}/products/search', [BoostController::cl
 $router->get('/api/merchants/{merchantId}/offers/search', [BoostController::class, 'searchMerchantOffers']);
 $router->get('/boosts/aggregate', [BoostController::class, 'aggregateStats']);
 $router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']);
+$router->post('/api/{site}/internal/workflow/run', [\App\Controllers\WorkflowController::class, 'run']);
 
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
 

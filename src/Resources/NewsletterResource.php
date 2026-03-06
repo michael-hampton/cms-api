@@ -33,6 +33,17 @@ class NewsletterResource extends JsonResource
             'statistics' => $this->whenLoaded('statistics', function () {
                 return $this->statistics;
             }),
+            'region_set_ids' => $this->whenLoaded('regionSets', function () {
+                $regionSets = is_array($this->regionSets) ? collect($this->regionSets) : $this->regionSets;
+                return $regionSets->pluck('id')->toArray();
+            }),
+            'region_sets' => $this->whenLoaded('regionSets', function () {
+                $regionSets = is_array($this->regionSets) ? collect($this->regionSets) : $this->regionSets;
+                return $regionSets->map(fn($rs) => [
+                    'id' => $rs['id'],
+                    'name' => $rs['name'],
+                ])->toArray();
+            }),
         ];
     }
 }

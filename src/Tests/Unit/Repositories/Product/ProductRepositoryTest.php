@@ -1615,4 +1615,225 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals($activeProduct->id, $products->first()->id);
     }
 
+    public function test_totalImpressionsForMerchant_returns_zero_when_no_impressions(): void
+    {
+        $merchant = $this->createMerchant();
+        $result = $this->repository->totalImpressionsForMerchant($merchant->id);
+        $this->assertEquals(0, $result);
+    }
+
+    public function test_totalImpressionsForMerchant_counts_impressions_across_products(): void
+    {
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+        $product1 = $this->createProduct(['is_active' => true]);
+        $product2 = $this->createProduct(['is_active' => true]);
+
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant->id]);
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant->id]);
+
+        // Create impressions
+        \App\Models\ProductImpression::create([
+            'product_id' => $product1->id,
+            'viewed_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'context' => 'listing'
+        ]);
+        \App\Models\ProductImpression::create([
+            'product_id' => $product1->id,
+            'viewed_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'context' => 'listing'
+        ]);
+        \App\Models\ProductImpression::create([
+            'product_id' => $product2->id,
+            'viewed_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'context' => 'listing'
+        ]);
+
+        $result = $this->repository->totalImpressionsForMerchant($merchant->id);
+        $this->assertEquals(3, $result);
+    }
+
+    public function test_totalImpressionsForMerchant_filters_by_monthsAgo(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct(['is_active' => true]);
+        $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
+
+        // Impression this month
+        \App\Models\ProductImpression::create([
+            'product_id' => $product->id,
+            'viewed_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'context' => 'listing'
+        ]);
+
+        // Impression 2 months ago
+        \App\Models\ProductImpression::create([
+            'product_id' => $product->id,
+            'viewed_at' => now_datetime()->subMonths(2)->startOfMonth()->format('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'context' => 'listing'
+        ]);
+
+        // Without monthsAgo — all time (not scoped to current month)
+        $all = $this->repository->totalImpressionsForMerchant($merchant->id);
+        $this->assertGreaterThanOrEqual(1, $all);
+
+        // With monthsAgo = 2 — only the impression from 2 months ago window
+        $twoMonthsAgo = $this->repository->totalImpressionsForMerchant($merchant->id, 2);
+        $this->assertEquals(2, $twoMonthsAgo);
+    }
+
+    public function test_totalImpressionsForMerchant_does_not_count_other_merchants(): void
+    {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+        $product = $this->createProduct(['is_active' => true]);
+
+        $this->createProductMerchant($product->id, ['merchant_id' => $merchant1->id]);
+        // merchant2 has no product_merchant link to this product
+
+        \App\Models\ProductImpression::create([
+            'product_id' => $product->id,
+            'viewed_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'site_id' => $this->siteId,
+            'context' => 'listing'
+        ]);
+
+        $this->assertEquals(1, $this->repository->totalImpressionsForMerchant($merchant1->id));
+        $this->assertEquals(0, $this->repository->totalImpressionsForMerchant($merchant2->id));
+    }
+
+    public function test_topByRevenueForMerchant_returns_empty_when_no_orders(): void
+    {
+        $merchant = $this->createMerchant();
+        $result = $this->repository->topByRevenueForMerchant($merchant->id, 10);
+        $this->assertCount(0, $result);
+    }
+
+    public function test_topByRevenueForMerchant_returns_products_ordered_by_revenue(): void
+    {
+        $merchant = $this->createMerchant(['name' => 'Amazon']);
+        $product1 = $this->createProduct(['name' => 'Cheap Widget', 'is_active' => true]);
+        $product2 = $this->createProduct(['name' => 'Expensive Gadget', 'is_active' => true]);
+
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant->id]);
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant->id]);
+
+        // Create completed orders
+        $order = $this->createOrder(['status' => 'completed']);
+        \App\Models\OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product1->id,
+            'quantity' => 2,
+            'unit_price' => 10.00,
+            'product_name' => 'test',
+            'subtotal' => 10,
+            'total' => 10
+        ]);
+        \App\Models\OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product2->id,
+            'quantity' => 1,
+            'unit_price' => 500.00,
+            'product_name' => 'test',
+            'subtotal' => 10,
+            'total' => 10
+        ]);
+
+        $result = $this->repository->topByRevenueForMerchant($merchant->id, 10);
+
+        $this->assertGreaterThanOrEqual(1, $result->count());
+
+        // Highest revenue product should be first
+        $first = $result->first();
+        $this->assertEquals('Expensive Gadget', $first->name);
+        $this->assertEquals(500.00, (float)$first->getAttribute('revenue'));
+    }
+
+    public function test_topByRevenueForMerchant_respects_limit(): void
+    {
+        $merchant = $this->createMerchant();
+        $order = $this->createOrder(['status' => 'completed']);
+
+        for ($i = 1; $i <= 8; $i++) {
+            $product = $this->createProduct(['name' => "Product {$i}", 'is_active' => true]);
+            $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
+            \App\Models\OrderItem::create([
+                'order_id' => $order->id,
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'unit_price' => $i * 10.00,
+                'product_name' => 'test',
+                'subtotal' => 10,
+                'total' => 10
+            ]);
+        }
+
+        $result = $this->repository->topByRevenueForMerchant($merchant->id, 3);
+        $this->assertLessThanOrEqual(3, $result->count());
+    }
+
+    public function test_topByRevenueForMerchant_only_counts_completed_orders(): void
+    {
+        $merchant = $this->createMerchant();
+        $product = $this->createProduct(['is_active' => true]);
+        $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
+
+        // Pending order — should NOT be counted
+        $pendingOrder = $this->createOrder(['status' => 'pending']);
+        \App\Models\OrderItem::create([
+            'order_id' => $pendingOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 999.00,
+            'product_name' => 'test',
+            'subtotal' => 10,
+            'total' => 10
+        ]);
+
+        $result = $this->repository->topByRevenueForMerchant($merchant->id, 10);
+        $this->assertCount(0, $result);
+    }
+
+    public function test_topByRevenueForMerchant_does_not_include_other_merchants(): void
+    {
+        $merchant1 = $this->createMerchant(['name' => 'Amazon']);
+        $merchant2 = $this->createMerchant(['name' => 'eBay']);
+
+        $product1 = $this->createProduct(['name' => 'Amazon Only', 'is_active' => true]);
+        $product2 = $this->createProduct(['name' => 'eBay Only', 'is_active' => true]);
+
+        $this->createProductMerchant($product1->id, ['merchant_id' => $merchant1->id]);
+        $this->createProductMerchant($product2->id, ['merchant_id' => $merchant2->id]);
+
+        $order = $this->createOrder(['status' => 'completed']);
+        \App\Models\OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product1->id,
+            'quantity' => 1,
+            'unit_price' => 100.00,
+            'product_name' => 'test',
+            'subtotal' => 10,
+            'total' => 10
+        ]);
+        \App\Models\OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product2->id,
+            'quantity' => 1,
+            'unit_price' => 200.00,
+            'product_name' => 'test',
+            'subtotal' => 10,
+            'total' => 10
+        ]);
+
+        $result = $this->repository->topByRevenueForMerchant($merchant1->id, 10);
+
+        $names = $result->pluck('name')->toArray();
+        $this->assertContains('Amazon Only', $names);
+        $this->assertNotContains('eBay Only', $names);
+    }
+
 }

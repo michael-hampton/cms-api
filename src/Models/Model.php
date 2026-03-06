@@ -352,6 +352,9 @@ abstract class Model
 
         // Replace attributes
         $this->attributes = (array)$fresh->getAttributes();
+        // Keep the "original" snapshot in sync so subsequent update() calls
+        // correctly detect dirtiness against the freshly loaded state.
+        $this->original = $this->attributes;
 
         return $this;
     }

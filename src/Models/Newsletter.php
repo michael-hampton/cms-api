@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Framework\Database\QueryBuilder;
 use DateTime;
 
 class Newsletter extends Model
@@ -66,6 +67,93 @@ class Newsletter extends Model
     const CONTENT_TYPE_MANUAL = 'manual';
     const CONTENT_TYPE_AUTO_PAGES = 'auto_pages';
     const CONTENT_TYPE_CUSTOM_BLOCKS = 'custom_blocks';
+
+    // ── Relationships ─────────────────────────────────────────────────────
+
+    public function site($relation = false)
+    {
+        return $this->belongsTo(Site::class, 'site_id', 'id', $relation);
+    }
+
+    public function regionSets(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            RegionSet::class,
+            'newsletter_region_sets',
+            'newsletter_id',
+            'region_set_id',
+            $relation
+        );
+    }
+
+    // ── Visibility ────────────────────────────────────────────────────────
+
+    /**
+     * Scope: filter newsletters visible to a given member based on their territory.
+     *
+     * Rules:
+     *  - Unauthenticated (null member)  → see everything
+     *  - Member with no territory       → see everything
+     *  - Member with territory          → see newsletters with no region sets
+     *                                     OR newsletters whose region sets include
+     *                                     the member's territory
+     */
+    public function scopeVisibleToMember(QueryBuilder $query, ?Member $member = null): QueryBuilder
+    {
+        if (!$member || !$member->hasTerritoryId()) {
+            return $query;
+        }
+
+        $territoryId = $member->getTerritoryId();
+
+        return $query->where(function ($q) use ($territoryId) {
+            $q->whereDoesntHave('regionSets')
+                ->orWhereHas('regionSets', function ($subQ) use ($territoryId) {
+                    $subQ->whereHas('territories', function ($tQ) use ($territoryId) {
+                        $tQ->where('territories.id', $territoryId)
+                            ->whereNull('territories.deleted_at');
+                    });
+                });
+        });
+    }
+
+    /**
+     * Instance check: should this newsletter be sent to / visible to the given member?
+     *
+     * Rules mirror scopeVisibleToMember.
+     */
+    public function isVisibleToMember(?Member $member): bool
+    {
+        // Unauthenticated or member with no territory → always visible
+        if (!$member || !$member->hasTerritoryId()) {
+            return true;
+        }
+
+        // Newsletter has no region-set restrictions → visible to everyone
+        if (!$this->relationLoaded('regionSets')) {
+            $this->load(['regionSets.territories']);
+        }
+
+        if ($this->regionSets->isEmpty()) {
+            return true;
+        }
+
+        $territoryId = $member->getTerritoryId();
+
+        foreach ($this->regionSets as $regionSet) {
+            if (!$regionSet->relationLoaded('territories')) {
+                $regionSet->load(['territories']);
+            }
+
+            foreach ($regionSet->territories as $territory) {
+                if ($territory->id === $territoryId && !$territory->deleted_at) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 
     public function sends()
     {

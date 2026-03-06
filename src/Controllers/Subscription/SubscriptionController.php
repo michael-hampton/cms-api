@@ -81,14 +81,17 @@ class SubscriptionController extends Controller
             $engine = new SearchEngine($configuration);
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
 
-            $queryBuilder = SubscriptionPlan::query();
+            $queryBuilder = SubscriptionPlan::with(['regionSets']);
             $result = $engine->search($queryBuilder, $criteria);
 
             $plans = array_map(function ($plan) {
+                $planModel = SubscriptionPlan::with(['regionSets'])->find($plan['id']);
                 return array_merge($plan, [
                     'release_date' => !empty($plan['release_date'])
-                        ? (new $plan['release_date'])?->format('Y-m-d H:i:s')
+                        ? $plan['release_date']->format('Y-m-d H:i:s')
                         : null,
+                    'region_sets' => $planModel?->regionSets->map(fn($rs) => ['id' => $rs->id, 'name' => $rs->name])->toArray() ?? [],
+                    'region_set_ids' => $planModel?->regionSets->pluck('id')->toArray() ?? [],
                 ]);
             }, $result->getData());
 
@@ -128,6 +131,8 @@ class SubscriptionController extends Controller
             }
 
             $plan = $this->planService->createPlan($data, $siteId);
+
+            $plan->load(['regionSets']);
 
             return $this->jsonResponse([
                 'success' => true,
@@ -172,6 +177,8 @@ class SubscriptionController extends Controller
             if (!$plan) {
                 return $this->jsonResponse(['success' => false, 'message' => 'Plan not found'], 404);
             }
+
+            $plan->load(['regionSets']);
 
             return $this->jsonResponse([
                 'success' => true,
@@ -238,5 +245,21 @@ class SubscriptionController extends Controller
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private function parseRegionSetIds(array $data): ?array
+    {
+        if (!isset($data['region_set_ids'])) {
+            return null;
+        }
+
+        $ids = $data['region_set_ids'];
+
+        if (is_string($ids)) {
+            $decoded = json_decode($ids, true);
+            return is_array($decoded) ? array_map('intval', $decoded) : [];
+        }
+
+        return is_array($ids) ? array_map('intval', $ids) : [];
     }
 }

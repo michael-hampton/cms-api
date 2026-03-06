@@ -10,6 +10,7 @@ use App\Models\IssueDelivery;
 use App\Models\Newsletter;
 use App\Models\Subscription;
 use App\Models\SubscriptionWindow;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Subscriptions\IssueDeliveryEligibilityService;
@@ -26,6 +27,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
     private $mockSendService;
     private $mockResolver;
     private $mockRepository;
+    private $mockIssueDeliveryRepository;
     private $mockLogger;
     private Database $databaseMock;
 
@@ -36,11 +38,13 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $this->mockSendService = Mockery::mock(NewsletterSendService::class);
         $this->mockResolver = Mockery::mock(IssueDeliveryEligibilityService::class);
         $this->mockRepository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->mockIssueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->mockLogger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->databaseMock = Mockery::mock(Database::class);
 
         $this->job = new GenerateIssueDeliveriesJob(
             $this->mockRepository,
+            $this->mockIssueDeliveryRepository,
             $this->mockResolver,
             $this->database,
             $this->mockLogger,
@@ -82,7 +86,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
 
         $job = app(GenerateIssueDeliveriesJob::class);
 
-        $result = $job->handle($issueDelivery);
+        $result = $job->handle($issueDelivery->id);
 
         $this->assertEquals(1, $result['created']);
         $this->assertEquals(1, $result['dispatched']);
@@ -109,7 +113,9 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'plan_name' => 'Test Plan',
             'start_date' => now_datetime()->subDays(30),
+            'end_date' => now_datetime()->addDays(30),
             'type' => 'paid',
+            'delivery_type' => 'digital',
         ]);
 
         SubscriptionWindow::create([
@@ -121,14 +127,19 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         ]);
 
         $job = app(GenerateIssueDeliveriesJob::class);
-        // First run — status transitions to DISPATCHED
-        $job->handle($issueDelivery);
 
-        // Second run — status is no longer ACTIVE so the job short-circuits.
-        // Reload a fresh active copy to simulate a re-run scenario where the
-        // operator resets the status.
+        // First run — creates the delivery record, transitions status to DISPATCHED.
+        $firstResult = $job->handle($issueDelivery->id);
+        $this->assertEquals(1, $firstResult['created'], 'First run should create one delivery');
+
+        // Reset status to ACTIVE to simulate an operator re-triggering the job.
+        // The job loads a separate IssueDelivery instance and updates it, so our
+        // in-memory model may be stale. Refresh to ensure the update actually hits the DB.
+        $issueDelivery->refresh();
         $issueDelivery->update(['status' => IssueDeliveryStatus::ACTIVE->value]);
-        $result = $job->handle($issueDelivery->fresh());
+
+        // Second run — IssuesDelivered record already exists, so it must be skipped.
+        $result = $job->handle($issueDelivery->id);
 
         $this->assertEquals(0, $result['created']);
         $this->assertEquals(1, $result['skipped']);
@@ -162,7 +173,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         ]);
 
         $job = app(GenerateIssueDeliveriesJob::class);
-        $result = $job->handle($issueDelivery);
+        $result = $job->handle($issueDelivery->id);
 
         $this->assertEquals(0, $result['created']);
     }
@@ -171,10 +182,16 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
     {
         $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::DISPATCHED);
 
+        $this->mockIssueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($issueDelivery);
+
         $this->mockResolver->shouldNotReceive('resolve');
         $this->mockSendService->shouldNotReceive('sendNewsletter');
 
-        $this->job->handle($issueDelivery);
+        $this->job->handle($issueDelivery->id);
         $this->assertTrue(true);
     }
 
@@ -182,6 +199,12 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
     {
         $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::ACTIVE);
         $errorMessage = 'subscription plan has no associated newsletter';
+
+        $this->mockIssueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($issueDelivery);
 
         $this->mockResolver
             ->shouldReceive('getEligibleSubscriptions')
@@ -194,7 +217,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
             ->once()
             ->with($errorMessage);
 
-        $result = $this->job->handle($issueDelivery);
+        $result = $this->job->handle($issueDelivery->id);
 
         $this->assertSame([], $result);
     }
@@ -203,9 +226,15 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
     {
         $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::CANCELLED);
 
+        $this->mockIssueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($issueDelivery);
+
         $this->mockResolver->shouldNotReceive('resolve');
 
-        $this->job->handle($issueDelivery);
+        $this->job->handle($issueDelivery->id);
         $this->assertTrue(true);
     }
 
@@ -214,12 +243,17 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::ACTIVE);
         $collection = new \App\Framework\Support\Collection([]);
 
+        $this->mockIssueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($issueDelivery);
+
         $this->mockResolver
             ->shouldReceive('getEligibleSubscriptions')
             ->once()
             ->andReturn($collection);
 
-        // Wrap transaction passthrough so the closure executes
         $this->databaseMock
             ->shouldReceive('transaction')
             ->once()
@@ -229,7 +263,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
             ->shouldReceive('markDispatched')
             ->once();
 
-        $result = $this->job->handle($issueDelivery);
+        $result = $this->job->handle($issueDelivery->id);
 
         $this->assertEquals(0, $result['created']);
         $this->assertEquals(0, $result['skipped']);
@@ -243,6 +277,12 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
     {
         $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::ACTIVE);
 
+        $this->mockIssueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($issueDelivery);
+
         $this->mockResolver->shouldReceive('getEligibleSubscriptions')
             ->once()
             ->with($issueDelivery)
@@ -254,7 +294,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
 
         $this->mockSendService->shouldNotReceive('sendNewsletter');
 
-        $this->job->handle($issueDelivery);
+        $this->job->handle($issueDelivery->id);
         $this->assertTrue(true);
     }
 

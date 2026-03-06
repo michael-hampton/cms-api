@@ -70,7 +70,6 @@ class DeliverIssueDeliveryJob extends BaseJob
                 $subscriptionType = $subscription->delivery_type ?? null;
 
                 if ($subscriptionType !== null && !array_key_exists($subscriptionType, $this->channelMap)) {
-                    dd('mike');
                     $this->logger->warning('No delivery channel registered for subscription type — skipping', [
                         'issues_delivered_id' => $issuesDelivered->id,
                         'subscription_type' => $subscriptionType,

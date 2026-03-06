@@ -29,6 +29,50 @@
             background-color: var(--bg-light);
         }
 
+        /* ── Mini Cart Bar ── */
+        .mini-cart-bar {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+        }
+
+        .mini-cart-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .mini-cart-btn:hover {
+            background: #1e40af;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(37, 99, 235, 0.5);
+        }
+
+        .mini-cart-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            background: white;
+            color: var(--primary-color);
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
         .container {
             max-width: 1000px;
             margin: 0 auto;
@@ -81,6 +125,32 @@
         .success-banner p {
             font-size: 1.125rem;
             opacity: 0.95;
+        }
+
+        /* Plan image in banner */
+        .plan-image-wrap {
+            margin-top: 1.5rem;
+        }
+
+        .plan-image-wrap img {
+            max-width: 200px;
+            max-height: 160px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .plan-image-fallback {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1.5rem auto 0;
+            font-size: 3rem;
         }
 
         .card {
@@ -171,8 +241,7 @@
             background: var(--bg-light);
         }
 
-        .download-section,
-        .shipping-section {
+        .download-section, .shipping-section {
             background: var(--bg-light);
             border: 2px dashed var(--border-color);
             border-radius: 0.75rem;
@@ -181,22 +250,19 @@
             margin-top: 1.5rem;
         }
 
-        .download-section svg,
-        .shipping-section svg {
+        .download-section svg, .shipping-section svg {
             width: 48px;
             height: 48px;
             stroke: var(--primary-color);
             margin: 0 auto 1rem;
         }
 
-        .download-section h3,
-        .shipping-section h3 {
+        .download-section h3, .shipping-section h3 {
             margin-bottom: 0.5rem;
             color: var(--text-primary);
         }
 
-        .download-section p,
-        .shipping-section p {
+        .download-section p, .shipping-section p {
             color: var(--text-secondary);
             margin-bottom: 1.5rem;
         }
@@ -265,10 +331,29 @@
             .action-buttons .btn {
                 width: 100%;
             }
+
+            .mini-cart-bar {
+                bottom: 16px;
+                right: 16px;
+            }
         }
     </style>
 </head>
 <body>
+
+<!-- Mini Cart Bar -->
+<div class="mini-cart-bar">
+    <a href="/cart" class="mini-cart-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="9" cy="21" r="1"/>
+            <circle cx="20" cy="21" r="1"/>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+        View Cart
+        <span class="mini-cart-badge" data-cart-count>0</span>
+    </a>
+</div>
+
 <div class="container">
     <div class="success-banner">
         <div class="success-icon">
@@ -278,10 +363,34 @@
         </div>
         <h1>Subscription Activated!</h1>
         <p>Thank you for your purchase. Your subscription is now active.</p>
+
+        <?php
+        // Determine which plan image to show based on delivery type
+        $deliveryType = $subscription['delivery_type'] ?? '';
+        $planImageUrl = null;
+
+        if ($deliveryType === 'print' && !empty($subscription['print_image_url'])) {
+            $planImageUrl = $subscription['print_image_url'];
+        } elseif ($deliveryType === 'digital' && !empty($subscription['digital_image_url'])) {
+            $planImageUrl = $subscription['digital_image_url'];
+        } elseif (!empty($subscription['print_image_url'])) {
+            $planImageUrl = $subscription['print_image_url'];
+        } elseif (!empty($subscription['digital_image_url'])) {
+            $planImageUrl = $subscription['digital_image_url'];
+        }
+        ?>
+
+        <?php if ($planImageUrl): ?>
+            <div class="plan-image-wrap">
+                <img src="<?= htmlspecialchars($planImageUrl) ?>"
+                     alt="<?= htmlspecialchars($subscription['plan_name'] ?? 'Plan') ?>">
+            </div>
+        <?php else: ?>
+            <div class="plan-image-fallback">📰</div>
+        <?php endif; ?>
     </div>
 
     <?php
-    // Prepare payment breakdown with defaults
     $breakdown = $payment_breakdown ?? [
             'subtotal' => $subscription['price'] ?? 0,
             'discount' => $subscription['discount_amount'] ?? 0,
@@ -316,23 +425,18 @@
         <?php if (!empty($subscription['start_date'])): ?>
             <div class="detail-row">
                 <span class="detail-label">Start Date:</span>
-                <span class="detail-value">
-                    <?= $subscription['start_date']->format('F j, Y') ?>
-                </span>
+                <span class="detail-value"><?= $subscription['start_date']->format('F j, Y') ?></span>
             </div>
         <?php endif; ?>
 
         <?php if (!empty($subscription['end_date'])): ?>
             <div class="detail-row">
                 <span class="detail-label">End Date:</span>
-                <span class="detail-value">
-                    <?= $subscription['end_date']->format('F j, Y') ?>
-                </span>
+                <span class="detail-value"><?= $subscription['end_date']->format('F j, Y') ?></span>
             </div>
         <?php endif; ?>
     </div>
 
-    <!-- Payment Breakdown -->
     <div class="card">
         <h2>Payment Summary</h2>
 
@@ -366,7 +470,6 @@
         </div>
     </div>
 
-    <!-- Digital Download Section -->
     <?php if (($subscription['delivery_type'] ?? '') === 'digital' && ($can_download ?? false)): ?>
         <div class="card">
             <div class="download-section">
@@ -376,18 +479,14 @@
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
                 <h3>Your Content is Ready</h3>
-                <p>
-                    Download expires: <?= date('F j, Y', strtotime($download_expires_at ?? '+30 days')) ?>
-                </p>
-                <a href="<?= htmlspecialchars($subscription['download_url'] ?? '#') ?>"
-                   class="btn btn-primary">
+                <p>Download expires: <?= date('F j, Y', strtotime($download_expires_at ?? '+30 days')) ?></p>
+                <a href="<?= htmlspecialchars($subscription['download_url'] ?? '#') ?>" class="btn btn-primary">
                     Download Now
                 </a>
             </div>
         </div>
     <?php endif; ?>
 
-    <!-- Print Shipping Section -->
     <?php if (($subscription['delivery_type'] ?? '') === 'print'): ?>
         <div class="card">
             <div class="shipping-section">
@@ -398,14 +497,11 @@
                     <circle cx="18.5" cy="18.5" r="2.5"></circle>
                 </svg>
                 <h3>Your Order is Being Prepared</h3>
-                <p>
-                    You'll receive a tracking number via email once your order ships.
-                </p>
+                <p>You'll receive a tracking number via email once your order ships.</p>
             </div>
         </div>
     <?php endif; ?>
 
-    <!-- Next Steps Info -->
     <div class="info-box">
         <p>
             <strong>What's Next?</strong><br>
@@ -414,15 +510,23 @@
         </p>
     </div>
 
-    <!-- Action Buttons -->
     <div class="action-buttons">
-        <a href="/subscriptions" class="btn btn-secondary">
-            Browse More Subscriptions
-        </a>
-        <a href="/" class="btn btn-primary">
-            Return to Home
-        </a>
+        <a href="/subscriptions" class="btn btn-secondary">Browse More Subscriptions</a>
+        <a href="/" class="btn btn-primary">Return to Home</a>
     </div>
 </div>
+
+<script>
+    // Sync cart count badge
+    (async () => {
+        try {
+            const res = await fetch('/cart/count', {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const data = await res.json();
+            const badge = document.querySelector('[data-cart-count]');
+            if (badge && data.count != null) badge.textContent = data.count;
+        } catch (e) {
+        }
+    })();
+</script>
 </body>
 </html>

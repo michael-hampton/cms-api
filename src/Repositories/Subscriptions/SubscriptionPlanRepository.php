@@ -6,6 +6,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanRegionSet;
 use App\Repositories\Repository;
 
 class SubscriptionPlanRepository extends Repository
@@ -259,5 +260,17 @@ class SubscriptionPlanRepository extends Repository
         }
 
         return array_values(array_unique($allTags));
+    }
+
+    public function syncRegionSets(SubscriptionPlan $plan, array $ids): void
+    {
+        SubscriptionPlanRegionSet::where('subscription_plan_id', $plan->id)->delete();
+
+        foreach ($ids as $regionSetId) {
+            SubscriptionPlanRegionSet::create([
+                'subscription_plan_id' => $plan->id,
+                'region_set_id' => $regionSetId,
+            ]);
+        }
     }
 }

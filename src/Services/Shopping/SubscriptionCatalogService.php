@@ -5,6 +5,7 @@ namespace App\Services\Shopping;
 use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 
 class SubscriptionCatalogService
@@ -15,9 +16,22 @@ class SubscriptionCatalogService
     {
     }
 
-    public function getCatalog(array $filters = []): array
+    /**
+     * Return a paginated catalog of active one-time subscription plans,
+     * filtered by the given criteria and optionally restricted to plans
+     * visible to the provided member based on their territory.
+     *
+     * Visibility rules (mirrors Page / Newsletter behaviour):
+     *  - null member or member with no territory → sees all plans
+     *  - member with territory → sees plans with no region-set restrictions
+     *    OR plans whose region sets include the member's territory
+     */
+    public function getCatalog(array $filters = [], ?Member $member = null): array
     {
         $query = $this->planRepository->buildCatalogQuery();
+
+        // Territory / region-set visibility
+        $query->visibleToMember($member);
 
         // Search
         if (!empty($filters['search'])) {
@@ -51,21 +65,20 @@ class SubscriptionCatalogService
             $query = $query->where('is_featured', true);
         }
 
-        // Category filter (if you have categories)
+        // Category filter
         if (!empty($filters['category'])) {
             $query = $query->where('category', $filters['category']);
         }
 
-        // Tag filter (if you have tags)
+        // Tag filter
         if (!empty($filters['tags']) && is_array($filters['tags'])) {
             $query->whereJsonContains('tags', $filters['tags']);
         }
 
-        // Apply special filter (on_sale or limited_offer)
+        // Special filter (on_sale or limited_offer)
         if (!empty($filters['special_filter'])) {
             $query = $this->applySpecialFilter($query, $filters['special_filter']);
         }
-
 
         if (!empty($filters['categories']) && is_array($filters['categories'])) {
             $query->whereJsonContains('categories', $filters['categories']);
@@ -108,20 +121,14 @@ class SubscriptionCatalogService
         return $query;
     }
 
-    /**
-     * Apply special filter for sales and limited offers
-     */
     private function applySpecialFilter($query, string $specialFilter): mixed
     {
         if ($specialFilter === 'on_sale') {
-            // Plans with sale prices OR original prices showing discount
             return $query->whereHas('pricingTiers', function ($q) {
                 $q->where(function ($sq) {
-                    // Has sale price
                     $sq->whereNotNull('sale_price')
                         ->whereRaw('sale_price < price');
                 })->orWhere(function ($sq) {
-                    // OR has original price discount
                     $sq->whereNotNull('digital_sale_price')
                         ->whereRaw('digital_sale_price < price');
                 });
@@ -168,14 +175,12 @@ class SubscriptionCatalogService
         foreach ($plan->pricingTiers as $tier) {
             $effectivePrice = $tier->sale_price ?? $tier->price;
 
-            // Check print price
             if ($plan->hasPrintOption()) {
                 if ($lowestPrint === null || $effectivePrice < $lowestPrint) {
                     $lowestPrint = $effectivePrice;
                 }
             }
 
-            // Check digital price
             if ($plan->hasDigitalOption()) {
                 $digitalPrice = $tier->digital_price ?? $effectivePrice;
                 if ($lowestDigital === null || $digitalPrice < $lowestDigital) {
