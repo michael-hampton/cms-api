@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Parsers\Dtos\SchemaBlockDto;
+use App\Parsers\Renderers\SchemaBlockRenderer;
 use App\Parsers\SchemaBlockParser;
 use PHPUnit\Framework\TestCase;
 
@@ -39,7 +41,8 @@ class SchemaBlockParserTest extends TestCase
             'description' => 'The easiest way to make tea.',
             'image' => ['src' => '/howto.jpg']
         ];
-        $parsed = $parser->parse($data);
+        $dto = SchemaBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('how-to', $parsed['schemaType']);
         $this->assertSame('How To Boil Water', $parsed['title']);
@@ -57,7 +60,8 @@ class SchemaBlockParserTest extends TestCase
             'answer' => '  Paris ',
             'expansion' => 'A longer explanation of why Paris is the capital.'
         ];
-        $parsed = $parser->parse($data);
+        $dto = SchemaBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('question', $parsed['schemaType']);
         $this->assertSame('What is the capital of France?', $parsed['question']);
@@ -71,14 +75,15 @@ class SchemaBlockParserTest extends TestCase
 
     public function testSchemaParserGenerateHtmlHowTo(): void
     {
-        $parser = new SchemaBlockParser();
         $parsedData = [
             'schemaType' => 'how-to',
             'title' => 'Test How To',
             'formatted_description' => 'A brief guide.',
             'image' => ['src' => '/test.jpg']
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = SchemaBlockDto::fromArray($parsedData);
+        $renderer = new SchemaBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="schema-block schema-type-how-to">', $html);
         $this->assertStringContainsString('<img src="/test.jpg" alt="Test How To" class="schema-image">', $html);
@@ -89,7 +94,6 @@ class SchemaBlockParserTest extends TestCase
 
     public function testSchemaParserGenerateHtmlQuestion(): void
     {
-        $parser = new SchemaBlockParser();
         $parsedData = [
             'schemaType' => 'question',
             'question' => 'Q?',
@@ -97,7 +101,9 @@ class SchemaBlockParserTest extends TestCase
             'expansion' => 'E.',
             'showExpansion' => true
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = SchemaBlockDto::fromArray($parsedData);
+        $renderer = new SchemaBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="schema-block schema-type-question">', $html);
         $this->assertStringContainsString('<h3 class="schema-question">Q?</h3>', $html);

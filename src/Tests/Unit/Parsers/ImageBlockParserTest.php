@@ -6,7 +6,9 @@ use App\Enums\Alignment;
 use App\Enums\Blocks\ImageLayout;
 use App\Framework\Validation\Validator;
 use App\Models\Image;
+use App\Parsers\Dtos\ImageBlockDto;
 use App\Parsers\ImageBlockParser;
+use App\Parsers\Renderers\ImageBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class ImageBlockParserTest extends FunctionalTestCase
@@ -21,7 +23,8 @@ class ImageBlockParserTest extends FunctionalTestCase
     {
         $parser = new ImageBlockParser();
         $data = ['src' => '/img.jpg', 'alt' => 'Alt text'];
-        $parsed = $parser->parse($data);
+        $dto = ImageBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
         $this->assertStringContainsString('jpg', $parsed['src']);
     }
 
@@ -39,7 +42,8 @@ class ImageBlockParserTest extends FunctionalTestCase
             'openInNewTab' => true
         ];
 
-        $result = $parser->parse($data);
+        $dto = ImageBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('left', $result['alignment']);
         $this->assertTrue($result['has_link']);
@@ -50,7 +54,6 @@ class ImageBlockParserTest extends FunctionalTestCase
 
     public function testImageBlockParserGeneratesHtmlWithAlignment()
     {
-        $parser = new ImageBlockParser();
         $parsed = [
             'src' => 'image.jpg',
             'alt' => 'Alt text',
@@ -62,7 +65,9 @@ class ImageBlockParserTest extends FunctionalTestCase
             'link_attributes' => []
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = ImageBlockDto::fromArray($parsed);
+        $renderer = new ImageBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('image-block', $html);
         $this->assertStringContainsString('image-align-right', $html);
@@ -147,7 +152,8 @@ class ImageBlockParserTest extends FunctionalTestCase
                 'layout' => $layout->value
             ];
 
-            $result = $parser->parse($data);
+            $dto = ImageBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($layout->value, $result['layout']);
         }
     }
@@ -180,7 +186,8 @@ class ImageBlockParserTest extends FunctionalTestCase
                 'alignment' => $alignment->value
             ];
 
-            $result = $parser->parse($data);
+            $dto = ImageBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($alignment->value, $result['alignment']);
         }
     }
@@ -225,7 +232,8 @@ class ImageBlockParserTest extends FunctionalTestCase
             'image_id' => $image->id
         ];
 
-        $result = $parser->parse($data);
+        $dto = ImageBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['should_display_credit']);
         $this->assertEquals('John Photographer', $result['credit']);
@@ -253,7 +261,8 @@ class ImageBlockParserTest extends FunctionalTestCase
             'image_id' => $image->id
         ];
 
-        $result = $parser->parse($data);
+        $dto = ImageBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertFalse($result['should_display_credit']);
     }
@@ -299,13 +308,13 @@ class ImageBlockParserTest extends FunctionalTestCase
         ]);
 
         $parser = new ImageBlockParser();
-        $parsed = $parser->parse([
+        $dto = ImageBlockDto::fromArray([
             'src' => 'image.jpg',
             'alt' => 'Alt text',
             'image_id' => $image->id
         ]);
-
-        $html = $parser->generateHtml($parsed);
+        $renderer = new ImageBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('image-credit', $html);
         $this->assertStringContainsString('Required Credit', $html);
@@ -326,13 +335,13 @@ class ImageBlockParserTest extends FunctionalTestCase
         ]);
 
         $parser = new ImageBlockParser();
-        $parsed = $parser->parse([
+        $dto = ImageBlockDto::fromArray([
             'src' => 'image.jpg',
             'alt' => 'Alt text',
             'image_id' => $image->id
         ]);
-
-        $html = $parser->generateHtml($parsed);
+        $renderer = new ImageBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringNotContainsString('image-credit', $html);
         $this->assertStringNotContainsString('Optional Credit', $html);
@@ -356,7 +365,8 @@ class ImageBlockParserTest extends FunctionalTestCase
             ]
         ];
 
-        $result = $parser->parse($data);
+        $dto = ImageBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['has_endorsements']);
         $this->assertCount(2, $result['endorsements']);
@@ -366,7 +376,6 @@ class ImageBlockParserTest extends FunctionalTestCase
 
     public function testImageBlockParserHtmlIncludesEndorsements()
     {
-        $parser = new ImageBlockParser();
         $parsed = [
             'src' => 'image.jpg',
             'alt' => 'Alt text',
@@ -385,7 +394,9 @@ class ImageBlockParserTest extends FunctionalTestCase
             'has_endorsements' => true
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = ImageBlockDto::fromArray($parsed);
+        $renderer = new ImageBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('endorsement-image', $html);
         $this->assertStringContainsString('top-left', $html);

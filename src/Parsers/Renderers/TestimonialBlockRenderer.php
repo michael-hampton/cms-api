@@ -2,12 +2,25 @@
 
 namespace App\Parsers\Renderers;
 
-use App\Parsers\AwardBlockParser;
+use App\Parsers\BlockFactory;
+use App\Parsers\BlockRendererManager;
+use App\Parsers\Dtos\AwardBlockDto;
 use App\Parsers\Dtos\BlockDtoInterface;
 use App\Parsers\Dtos\TestimonialBlockDto;
 
 class TestimonialBlockRenderer extends BaseBlockRenderer
 {
+    private BlockFactory $blockFactory;
+    private BlockRendererManager $blockRendererManager;
+
+    public function __construct(
+        ?BlockFactory         $blockFactory = null,
+        ?BlockRendererManager $blockRendererManager = null
+    )
+    {
+        $this->blockFactory = $blockFactory ?? new BlockFactory();
+        $this->blockRendererManager = $blockRendererManager ?? new BlockRendererManager();
+    }
     protected function getSupportedType(): string
     {
         return 'testimonial';
@@ -92,8 +105,8 @@ class TestimonialBlockRenderer extends BaseBlockRenderer
 
     private function renderTestimonialAsAward(array $testimonial): string
     {
-        $awardParser = new AwardBlockParser();
         $testimonialData = [
+            'type' => 'award',
             'subcategory' => 'Client Review',
             'productName' => $testimonial['author'] . ' - ' . $testimonial['role'],
             'caption' => $testimonial['text'],
@@ -103,6 +116,17 @@ class TestimonialBlockRenderer extends BaseBlockRenderer
             'strapline' => $testimonial['role'],
             'image' => $testimonial['image']
         ];
+        try {
+            if ($this->blockFactory->supports('award')) {
+                $dto = $this->blockFactory->make($testimonialData);
+                if ($dto instanceof AwardBlockDto && $this->blockRendererManager->supports($dto)) {
+                    return $this->blockRendererManager->render($dto);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to parser when factory/manager unavailable
+        }
+        $awardParser = new \App\Parsers\AwardBlockParser();
         $parsedTestimonial = $awardParser->parse($testimonialData);
         return $awardParser->generateHtml($parsedTestimonial);
     }

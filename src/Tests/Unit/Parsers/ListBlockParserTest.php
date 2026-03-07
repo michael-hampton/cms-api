@@ -5,7 +5,9 @@ namespace App\Tests\Unit\Parsers;
 use App\Enums\Blocks\ListType;
 use App\Enums\Blocks\SchemaType;
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\ListBlockDto;
 use App\Parsers\ListBlockParser;
+use App\Parsers\Renderers\ListBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class ListBlockParserTest extends FunctionalTestCase
@@ -20,7 +22,8 @@ class ListBlockParserTest extends FunctionalTestCase
     {
         $parser = new ListBlockParser();
         $data = ['listType' => 'ol', 'startIndex' => 2, 'items' => ['A', 'B']];
-        $parsed = $parser->parse($data);
+        $dto = ListBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
         $this->assertSame(2, $parsed['startIndex']);
         $this->assertSame(2, $parsed['total_word_count']);
     }
@@ -35,7 +38,8 @@ class ListBlockParserTest extends FunctionalTestCase
             'items' => ['Item 1', 'Item 2', 'Item 3']
         ];
 
-        $result = $parser->parse($data);
+        $dto = ListBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('ol', $result['listType']);
         $this->assertEquals(5, $result['startIndex']);
@@ -44,7 +48,6 @@ class ListBlockParserTest extends FunctionalTestCase
 
     public function testListBlockParserGeneratesOrderedList()
     {
-        $parser = new ListBlockParser();
         $parsed = [
             'listType' => 'ol',
             'startIndex' => 3,
@@ -55,7 +58,9 @@ class ListBlockParserTest extends FunctionalTestCase
             'total_word_count' => 2
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = ListBlockDto::fromArray($parsed);
+        $renderer = new ListBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<ol', $html);
         $this->assertStringContainsString('start="3"', $html);
@@ -118,7 +123,8 @@ class ListBlockParserTest extends FunctionalTestCase
                 'listType' => $listType->value, 'items' => ['Item 1', 'Item 2']
             ];
 
-            $result = $parser->parse($data);
+            $dto = ListBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($listType->value, $result['listType']);
         }
     }
@@ -151,7 +157,8 @@ class ListBlockParserTest extends FunctionalTestCase
                 'schemaType' => $schemaType->value
             ];
 
-            $result = $parser->parse($data);
+            $dto = ListBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($schemaType->value, $result['schemaType']);
         }
     }

@@ -25,43 +25,6 @@ class PageGridPrivatePageTest extends FunctionalTestCase
     private Page $publicPage;
     private $pageRepository;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Create test pages
-        $this->publicPage = Page::create([
-            'site_id' => SiteContext::getId(),
-            'title' => 'Public Page',
-            'slug' => 'public-page',
-            'subtitle' => 'Public content',
-            'status' => 'published'
-        ]);
-
-        PageMetadata::create([
-            'page_id' => $this->publicPage->id,
-            'visibility' => 'free'
-        ]);
-
-        $this->privatePage = Page::create([
-            'site_id' => $this->siteId,
-            'title' => 'Private Page',
-            'slug' => 'private-page',
-            'subtitle' => 'Private content',
-            'status' => 'published',
-            'published_at' => now_datetime()->subDays(5)->format('Y-m-d H:i:s')
-        ]);
-
-        PageMetadata::create([
-            'page_id' => $this->privatePage->id,
-            'visibility' => 'premium'
-        ]);
-
-        $this->pageRepository = Mockery::mock(PageRepository::class);
-
-        $this->parser = new PageGridBlockParser($this->pageRepository);
-    }
-
     public function testPublicPageShowsNormalButton()
     {
         // Not logged in
@@ -194,6 +157,33 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         // Should NOT show subscribe button or private styling
         $this->assertStringNotContainsString('Subscribe to Access', $html);
         $this->assertStringNotContainsString('page-card-private', $html);
+    }
+
+    private function createSubscription(Member $member): Model
+    {
+        return Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'status' => 'expired',
+            'type' => 'paid',
+            'start_date' => now_datetime()->format('Y-m-d H:i:s'),
+            'end_date' => now_datetime()->addMonths(2)->format('Y-m-d H:i:s'),
+            'plan_name' => 'Test',
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+    }
+
+    private function createSubscriptionWindow(Member $member, Subscription $subscription): Model
+    {
+        return SubscriptionWindow::create([
+            'member_id' => $member->id,
+            'subscription_id' => $subscription->id,
+            'site_id' => $this->siteId,
+            'window_start' => now_datetime()->subDays(6)->format('Y-m-d H:i:s'),
+            'window_end' => now_datetime()->addMonths(2)->format('Y-m-d H:i:s'),
+            'type' => 'paid'
+        ]);
     }
 
     public function testPrivatePageHasOverlayAndBadge()
@@ -405,6 +395,24 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         $this->assertStringNotContainsString('Subscribe to Access', $html);
     }
 
+    private function createPageWithAccess(string $accessLevel, ?string $publishedAt = null): Page
+    {
+        $page = Page::create([
+            'site_id' => $this->siteId,
+            'title' => 'Test Page ' . uniqid(),
+            'slug' => 'test-' . uniqid(),
+            'status' => 'published',
+            'published_at' => $publishedAt ?? date('Y-m-d H:i:s')
+        ]);
+
+        PageMetadata::create([
+            'page_id' => $page->id,
+            'visibility' => $accessLevel
+        ]);
+
+        return $page->load(['metadata']);
+    }
+
     public function testPageGridShowsSubscribeButtonForContentAfterSubscription()
     {
         $member = $this->createMember();
@@ -450,22 +458,41 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         $this->assertStringNotContainsString('Read More', $html);
     }
 
-    private function createPageWithAccess(string $accessLevel, ?string $publishedAt = null): Page
+    protected function setUp(): void
     {
-        $page = Page::create([
-            'site_id' => $this->siteId,
-            'title' => 'Test Page ' . uniqid(),
-            'slug' => 'test-' . uniqid(),
-            'status' => 'published',
-            'published_at' => $publishedAt ?? date('Y-m-d H:i:s')
+        parent::setUp();
+
+        // Create test pages
+        $this->publicPage = Page::create([
+            'site_id' => SiteContext::getId(),
+            'title' => 'Public Page',
+            'slug' => 'public-page',
+            'subtitle' => 'Public content',
+            'status' => 'published'
         ]);
 
         PageMetadata::create([
-            'page_id' => $page->id,
-            'visibility' => $accessLevel
+            'page_id' => $this->publicPage->id,
+            'visibility' => 'free'
         ]);
 
-        return $page->load(['metadata']);
+        $this->privatePage = Page::create([
+            'site_id' => $this->siteId,
+            'title' => 'Private Page',
+            'slug' => 'private-page',
+            'subtitle' => 'Private content',
+            'status' => 'published',
+            'published_at' => now_datetime()->subDays(5)->format('Y-m-d H:i:s')
+        ]);
+
+        PageMetadata::create([
+            'page_id' => $this->privatePage->id,
+            'visibility' => 'premium'
+        ]);
+
+        $this->pageRepository = Mockery::mock(PageRepository::class);
+
+        $this->parser = new PageGridBlockParser($this->pageRepository);
     }
 
     protected function tearDown(): void
@@ -487,32 +514,5 @@ class PageGridPrivatePageTest extends FunctionalTestCase
         MemberAuth::logout();
 
         parent::tearDown();
-    }
-
-    private function createSubscriptionWindow(Member $member, Subscription $subscription): Model
-    {
-        return SubscriptionWindow::create([
-            'member_id' => $member->id,
-            'subscription_id' => $subscription->id,
-            'site_id' => $this->siteId,
-            'window_start' => now_datetime()->subDays(6)->format('Y-m-d H:i:s'),
-            'window_end' => now_datetime()->addMonths(2)->format('Y-m-d H:i:s'),
-            'type' => 'paid'
-        ]);
-    }
-
-    private function createSubscription(Member $member): Model
-    {
-        return Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'status' => 'expired',
-            'type' => 'paid',
-            'start_date' => now_datetime()->format('Y-m-d H:i:s'),
-            'end_date' => now_datetime()->addMonths(2)->format('Y-m-d H:i:s'),
-            'plan_name' => 'Test',
-            'price' => 29.99,
-            'currency' => 'USD'
-        ]);
     }
 }

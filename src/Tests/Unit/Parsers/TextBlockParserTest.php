@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Parsers\Dtos\TextBlockDto;
+use App\Parsers\Renderers\TextBlockRenderer;
 use App\Parsers\TextBlockParser;
 use PHPUnit\Framework\TestCase;
 
@@ -37,7 +39,8 @@ class TextBlockParserTest extends TestCase
                 'This is the second paragraph with more words.'
             ]
         ];
-        $parsed = $parser->parse($data);
+        $dto = TextBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertCount(2, $parsed['paragraphs']); // Empty one is removed
         $this->assertSame(['This is the first sentence.', 'This is the second paragraph with more words.'], $parsed['paragraphs']);
@@ -57,7 +60,9 @@ class TextBlockParserTest extends TestCase
                 'Second paragraph.'
             ]
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = TextBlockDto::fromArray($parsedData);
+        $renderer = new TextBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="text-block">', $html);
         $this->assertStringContainsString('<p class="text-paragraph">First paragraph.</p>', $html);

@@ -4,8 +4,10 @@ namespace App\Framework\ServiceProvider;
 
 use App\Framework\AutoDiscovery;
 use App\Framework\Support\Logger;
+use App\Parsers\BlockFactory;
 use App\Parsers\BlockParserInterface;
 use App\Parsers\BlockRegistry;
+use App\Parsers\BlockRendererManager;
 
 /**
  * Parser Service Provider - Block parsers and registry
@@ -14,6 +16,8 @@ class ParserServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->container->singleton(BlockFactory::class);
+        $this->container->singleton(BlockRendererManager::class);
         $this->container->singleton(BlockRegistry::class, function () {
             return $this->createBlockRegistry();
         });

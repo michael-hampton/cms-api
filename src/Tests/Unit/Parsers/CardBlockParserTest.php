@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Parsers\CardBlockParser;
+use App\Parsers\Dtos\CardBlockDto;
+use App\Parsers\Renderers\CardBlockRenderer;
 use PHPUnit\Framework\TestCase;
 
 class CardBlockParserTest extends TestCase
@@ -43,7 +45,8 @@ class CardBlockParserTest extends TestCase
             'buttonType' => 'primary'
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertEquals('Test Card', $result['title']);
         $this->assertEquals('Test description', $result['description']);
@@ -57,7 +60,8 @@ class CardBlockParserTest extends TestCase
 
     public function test_parse_with_empty_data()
     {
-        $result = $this->parser->parse([]);
+        $dto = CardBlockDto::fromArray([]);
+        $result = $dto->toArray();
 
         $this->assertEquals('', $result['title']);
         $this->assertEquals('', $result['description']);
@@ -82,7 +86,8 @@ class CardBlockParserTest extends TestCase
             ]
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertIsArray($result['image']);
         $this->assertEquals('123', $result['image']['id']);
@@ -99,7 +104,8 @@ class CardBlockParserTest extends TestCase
             'image' => []
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertNull($result['image']);
     }
@@ -114,7 +120,8 @@ class CardBlockParserTest extends TestCase
             ]
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertIsArray($result['endorsement']);
         $this->assertEquals('https://example.com/badge.png', $result['endorsement']['src']);
@@ -136,7 +143,8 @@ class CardBlockParserTest extends TestCase
             ]
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['sponsored']);
         $this->assertIsArray($result['sponsorDeclaration']);
@@ -152,7 +160,8 @@ class CardBlockParserTest extends TestCase
             'sponsorDeclaration' => []
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertNull($result['sponsorDeclaration']);
     }
@@ -169,7 +178,8 @@ class CardBlockParserTest extends TestCase
         ];
 
         foreach ($testCases as $case) {
-            $result = $this->parser->parse(['linkUrl' => $case['url']]);
+            $dto = CardBlockDto::fromArray(['linkUrl' => $case['url']]);
+            $result = $dto->toArray();
             $this->assertEquals($case['expected'], $result['linkUrl'],
                 "Failed for URL: {$case['url']}");
         }
@@ -184,7 +194,8 @@ class CardBlockParserTest extends TestCase
             'openInNewTab' => true
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['noFollow']);
         $this->assertTrue($result['sponsored']);
@@ -200,7 +211,8 @@ class CardBlockParserTest extends TestCase
             'openInNewTab' => 1
         ];
 
-        $result = $this->parser->parse($input);
+        $dto = CardBlockDto::fromArray($input);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['noFollow']);
         $this->assertTrue($result['sponsored']);
@@ -209,14 +221,15 @@ class CardBlockParserTest extends TestCase
 
     public function test_generate_html_basic_card()
     {
-        $data = $this->parser->parse([
+        $dto = CardBlockDto::fromArray([
             'title' => 'Test Card',
             'description' => 'Test description',
             'linkUrl' => 'https://example.com',
             'buttonText' => 'Read More'
         ]);
 
-        $html = $this->parser->generateHtml($data);
+        $renderer = new CardBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('card-block', $html);
         $this->assertStringContainsString('Test Card', $html);
@@ -227,7 +240,7 @@ class CardBlockParserTest extends TestCase
 
     public function test_generate_html_with_image()
     {
-        $data = $this->parser->parse([
+        $dto = CardBlockDto::fromArray([
             'title' => 'Card with Image',
             'linkUrl' => 'https://example.com',
             'image' => [
@@ -236,7 +249,8 @@ class CardBlockParserTest extends TestCase
             ]
         ]);
 
-        $html = $this->parser->generateHtml($data);
+        $renderer = new CardBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('card-image', $html);
         $this->assertStringContainsString('https://example.com/image.jpg', $html);
@@ -245,7 +259,7 @@ class CardBlockParserTest extends TestCase
 
     public function test_generate_html_with_endorsement()
     {
-        $data = $this->parser->parse([
+        $dto = CardBlockDto::fromArray([
             'title' => 'Card',
             'image' => [
                 'src' => 'https://example.com/image.jpg',
@@ -257,7 +271,8 @@ class CardBlockParserTest extends TestCase
             ]
         ]);
 
-        $html = $this->parser->generateHtml($data);
+        $renderer = new CardBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('card-endorsement', $html);
         $this->assertStringContainsString('https://example.com/badge.png', $html);

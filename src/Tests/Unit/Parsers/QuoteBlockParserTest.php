@@ -3,9 +3,9 @@
 namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\QuoteBlockDto;
 use App\Parsers\QuoteBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class QuoteBlockParserTest extends FunctionalTestCase
 {
@@ -22,7 +22,8 @@ class QuoteBlockParserTest extends FunctionalTestCase
             'text' => 'Test quote',
             'attribution' => 'Test Author'
         ];
-        $parsed = $parser->parse($data);
+        $dto = QuoteBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
         $this->assertSame(2, $parsed['word_count']);
         $this->assertTrue($parsed['has_attribution']);
     }

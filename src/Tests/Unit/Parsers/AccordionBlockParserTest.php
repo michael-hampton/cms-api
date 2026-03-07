@@ -3,6 +3,8 @@
 namespace App\Tests\Unit\Parsers;
 
 use App\Parsers\AccordionBlockParser;
+use App\Parsers\Dtos\AccordionBlockDto;
+use App\Parsers\Renderers\AccordionBlockRenderer;
 use PHPUnit\Framework\TestCase;
 
 class AccordionBlockParserTest extends TestCase
@@ -27,7 +29,8 @@ class AccordionBlockParserTest extends TestCase
             'visibleItemsCount' => 5
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('FAQ', $result['title']);
         $this->assertCount(2, $result['items']);
@@ -49,7 +52,8 @@ class AccordionBlockParserTest extends TestCase
             'allowMultipleOpen' => true,
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('Welcome to our help center. Find answers below.', $result['introContent']);
     }
@@ -68,7 +72,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(2, $result['visibleItemsCount']);
     }
@@ -83,7 +88,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(1, $result['visibleItemsCount']);
     }
@@ -98,7 +104,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(50, $result['visibleItemsCount']);
     }
@@ -116,7 +123,8 @@ class AccordionBlockParserTest extends TestCase
                 'title' => 'Test'
             ];
 
-            $result = $this->parser->parse($data);
+            $dto = AccordionBlockDto::fromArray($data);
+            $result = $dto->toArray();
 
             $this->assertEquals($theme, $result['theme']);
         }
@@ -132,7 +140,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('light', $result['theme']); // Falls back to default
     }
@@ -151,7 +160,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('First', $result['items'][0]['question']);
         $this->assertEquals('Second', $result['items'][1]['question']);
@@ -175,7 +185,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(0, $result['items'][0]['order']);
         $this->assertEquals(1, $result['items'][1]['order']);
@@ -197,7 +208,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertCount(2, $result['items']);
         $this->assertEquals(2, $result['total_items']);
@@ -216,7 +228,8 @@ class AccordionBlockParserTest extends TestCase
             'allowMultipleOpen' => true,
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('FAQ', $result['title']);
         $this->assertEquals('Welcome', $result['introContent']);
@@ -238,7 +251,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['items'][0]['isOpen']);
         $this->assertFalse($result['items'][1]['isOpen']);
@@ -258,7 +272,8 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = AccordionBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertFalse($result['items'][0]['isOpen']);
         $this->assertFalse($result['items'][1]['isOpen']);
@@ -327,7 +342,9 @@ class AccordionBlockParserTest extends TestCase
             'total_items' => 2
         ];
 
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = AccordionBlockDto::fromArray($parsedData);
+        $renderer = new AccordionBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('accordion-block', $html);
         $this->assertStringContainsString('accordion-theme-light', $html);
@@ -353,7 +370,9 @@ class AccordionBlockParserTest extends TestCase
             'total_items' => 1
         ];
 
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = AccordionBlockDto::fromArray($parsedData);
+        $renderer = new AccordionBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('accordion-sidebar', $html);
         $this->assertStringContainsString('accordion-theme-dark', $html);
@@ -378,7 +397,9 @@ class AccordionBlockParserTest extends TestCase
             'total_items' => 10
         ];
 
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = AccordionBlockDto::fromArray($parsedData);
+        $renderer = new AccordionBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('accordion-load-more-btn', $html);
         $this->assertStringContainsString('Load More Questions', $html);
@@ -401,7 +422,9 @@ class AccordionBlockParserTest extends TestCase
             'title' => 'Test'
         ];
 
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = AccordionBlockDto::fromArray($parsedData);
+        $renderer = new AccordionBlockRenderer();
+        $html = $renderer->render($dto);
 
         // Should NOT contain load more button since we only have 2 items and visible count is 5
         $this->assertStringNotContainsString('accordion-load-more-container', $html);

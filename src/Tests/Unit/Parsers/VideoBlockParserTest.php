@@ -5,6 +5,8 @@ namespace App\Tests\Unit\Parsers;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
+use App\Parsers\Dtos\VideoBlockDto;
+use App\Parsers\Renderers\VideoBlockRenderer;
 use App\Parsers\VideoBlockParser;
 use PHPUnit\Framework\TestCase;
 
@@ -36,7 +38,8 @@ class VideoBlockParserTest extends TestCase
             'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
             'caption' => 'A classic music video.'
         ];
-        $parsed = $parser->parse($data);
+        $dto = VideoBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('youtube', $parsed['platform']);
         $this->assertSame('dQw4w9WgXcQ', $parsed['video_id']);
@@ -51,7 +54,8 @@ class VideoBlockParserTest extends TestCase
             'url' => 'https://vimeo.com/123456789',
             'caption' => ''
         ];
-        $parsed = $parser->parse($data);
+        $dto = VideoBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('vimeo', $parsed['platform']);
         $this->assertSame('123456789', $parsed['video_id']);
@@ -61,7 +65,7 @@ class VideoBlockParserTest extends TestCase
 
     public function testVideoParserGenerateHtml(): void
     {
-        $parser = new VideoBlockParser();
+        $renderer = new VideoBlockRenderer();
 
         // 1. YouTube iframe
         $youtubeData = [
@@ -71,7 +75,8 @@ class VideoBlockParserTest extends TestCase
             'caption' => 'YouTube test',
             'has_caption' => true
         ];
-        $htmlYoutube = $parser->generateHtml($youtubeData);
+        $dtoYoutube = VideoBlockDto::fromArray($youtubeData);
+        $htmlYoutube = $renderer->render($dtoYoutube);
 
         $this->assertStringContainsString('<iframe src="https://www.youtube.com/embed/test"', $htmlYoutube);
         $this->assertStringContainsString('<div class="video-caption">YouTube test</div>', $htmlYoutube);
@@ -84,7 +89,8 @@ class VideoBlockParserTest extends TestCase
             'caption' => 'Vimeo test',
             'has_caption' => true
         ];
-        $htmlVimeo = $parser->generateHtml($vimeoData);
+        $dtoVimeo = VideoBlockDto::fromArray($vimeoData);
+        $htmlVimeo = $renderer->render($dtoVimeo);
 
         $this->assertStringContainsString('<iframe src="https://player.vimeo.com/video/123456"', $htmlVimeo);
         $this->assertStringContainsString('<div class="video-caption">Vimeo test</div>', $htmlVimeo);
@@ -97,7 +103,8 @@ class VideoBlockParserTest extends TestCase
             'caption' => 'Fallback test',
             'has_caption' => true
         ];
-        $htmlFallback = $parser->generateHtml($fallbackData);
+        $dtoFallback = VideoBlockDto::fromArray($fallbackData);
+        $htmlFallback = $renderer->render($dtoFallback);
 
         $this->assertStringContainsString('<a href="https://www.example.com/video.mp4"', $htmlFallback);
         $this->assertStringContainsString('<div class="video-caption">Fallback test</div>', $htmlFallback);

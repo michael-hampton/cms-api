@@ -4,7 +4,9 @@ namespace App\Tests\Unit\Parsers;
 
 use App\Enums\Blocks\DisplayType;
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\PersonBlockDto;
 use App\Parsers\PersonBlockParser;
+use App\Parsers\Renderers\PersonBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class PersonBlockParserTest extends FunctionalTestCase
@@ -27,7 +29,8 @@ class PersonBlockParserTest extends FunctionalTestCase
             'displayType' => 'profile'
         ];
 
-        $result = $parser->parse($data);
+        $dto = PersonBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('John Doe', $result['name']);
         $this->assertEquals('Developer', $result['role']);
@@ -37,7 +40,6 @@ class PersonBlockParserTest extends FunctionalTestCase
 
     public function testPersonBlockParserGeneratesProfileHtml()
     {
-        $parser = new PersonBlockParser();
         $parsed = [
             'name' => 'Jane Smith',
             'role' => 'Designer',
@@ -54,7 +56,9 @@ class PersonBlockParserTest extends FunctionalTestCase
             'strapline_word_count' => 0
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = PersonBlockDto::fromArray($parsed);
+        $renderer = new PersonBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('person-display-profile', $html);
         $this->assertStringContainsString('Jane Smith', $html);
@@ -63,7 +67,6 @@ class PersonBlockParserTest extends FunctionalTestCase
 
     public function testPersonBlockParserGeneratesContactHtml()
     {
-        $parser = new PersonBlockParser();
         $parsed = [
             'name' => 'Contact',
             'phone' => '123-456-7890',
@@ -75,7 +78,9 @@ class PersonBlockParserTest extends FunctionalTestCase
             'strapline_word_count' => 0
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = PersonBlockDto::fromArray($parsed);
+        $renderer = new PersonBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('person-display-contact', $html);
         $this->assertStringContainsString('Contact Information', $html);
@@ -235,7 +240,8 @@ class PersonBlockParserTest extends FunctionalTestCase
                 'displayType' => $displayType->value
             ];
 
-            $result = $parser->parse($data);
+            $dto = PersonBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($displayType->value, $result['displayType']);
         }
     }

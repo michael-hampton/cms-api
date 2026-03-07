@@ -7,6 +7,8 @@ use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
 use App\Parsers\BoxoutBlockParser;
+use App\Parsers\Dtos\BoxoutBlockDto;
+use App\Parsers\Renderers\BoxoutBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class BoxoutBlockParserTest extends FunctionalTestCase
@@ -44,7 +46,8 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'openInNewTab' => true
         ];
 
-        $result = $parser->parse($data);
+        $dto = BoxoutBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('Important Note', $result['title']);
         $this->assertCount(2, $result['paragraphs']);
@@ -60,7 +63,6 @@ class BoxoutBlockParserTest extends FunctionalTestCase
 
     public function testBoxoutParserGenerateHtml(): void
     {
-        $parser = new BoxoutBlockParser();
         $parsedData = [
             'formatted_title' => 'Title',
             'formatted_paragraphs' => ['P1'],
@@ -70,7 +72,9 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'alignment' => 'left',
             'paragraphs' => ['P1'],
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = BoxoutBlockDto::fromArray($parsedData);
+        $renderer = new BoxoutBlockRenderer();
+        $html = $renderer->render($dto);
         $this->assertStringContainsString('<div class="note-block note-align-left"><div class="note-image"><img src="/img.jpg" alt="Title" class="note-img"></div><div class="note-content"><h4 class="note-title">Title</h4><p class="note-paragraph">P1</p></div></div>', $html);
         $this->assertStringContainsString('<h4 class="note-title">Title</h4>', $html);
     }
@@ -93,7 +97,9 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'word_count' => 5
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = BoxoutBlockDto::fromArray($parsed);
+        $renderer = new BoxoutBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('note-block', $html);
         $this->assertStringContainsString('note-align-center', $html);
@@ -115,7 +121,8 @@ class BoxoutBlockParserTest extends FunctionalTestCase
             'alignment' => 'left',
         ];
 
-        $result = $parser->parse($data);
+        $dto = BoxoutBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertArrayHasKey('rel', $result['link_attributes']);
         $this->assertStringContainsString('nofollow', $result['link_attributes']['rel']);

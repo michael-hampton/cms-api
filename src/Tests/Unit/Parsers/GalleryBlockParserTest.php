@@ -8,7 +8,9 @@ use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\UrlRule;
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\GalleryBlockDto;
 use App\Parsers\GalleryBlockParser;
+use App\Parsers\Renderers\GalleryBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class GalleryBlockParserTest extends FunctionalTestCase
@@ -61,7 +63,8 @@ class GalleryBlockParserTest extends FunctionalTestCase
                 ]
             ]
         ];
-        $parsed = $parser->parse($data);
+        $dto = GalleryBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('grid', $parsed['layout']);
         $this->assertCount(2, $parsed['slides']); // Empty slide filtered out
@@ -76,7 +79,6 @@ class GalleryBlockParserTest extends FunctionalTestCase
 
     public function testGalleryParserGenerateHtmlCarousel(): void
     {
-        $parser = new GalleryBlockParser();
         $parsedData = [
             'layout' => 'carousel',
             'slides' => [
@@ -96,7 +98,9 @@ class GalleryBlockParserTest extends FunctionalTestCase
                 ]
             ]
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = GalleryBlockDto::fromArray($parsedData);
+        $renderer = new GalleryBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="gallery-block gallery-carousel">', $html);
         $this->assertStringContainsString('<div class="carousel-slide active"', $html); // First slide is active
@@ -107,7 +111,6 @@ class GalleryBlockParserTest extends FunctionalTestCase
 
     public function testGalleryParserGenerateHtmlGrid(): void
     {
-        $parser = new GalleryBlockParser();
         $parsedData = [
             'layout' => 'grid',
             'slides' => [
@@ -127,7 +130,9 @@ class GalleryBlockParserTest extends FunctionalTestCase
                 ]
             ]
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = GalleryBlockDto::fromArray($parsedData);
+        $renderer = new GalleryBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="gallery-block gallery-grid">', $html);
         $this->assertStringContainsString('<a href="https://link.com" target="_blank">', $html);
@@ -138,7 +143,6 @@ class GalleryBlockParserTest extends FunctionalTestCase
 
     public function testGalleryParserGenerateHtmlList(): void
     {
-        $parser = new GalleryBlockParser();
         $parsedData = [
             'layout' => 'list',
             'slides' => [
@@ -172,7 +176,9 @@ class GalleryBlockParserTest extends FunctionalTestCase
                 ]
             ]
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = GalleryBlockDto::fromArray($parsedData);
+        $renderer = new GalleryBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="gallery-block gallery-list">', $html);
         $this->assertStringContainsString('<div class="gallery-list-item"', $html);
@@ -210,7 +216,8 @@ class GalleryBlockParserTest extends FunctionalTestCase
             ]
         ];
 
-        $result = $parser->parse($data);
+        $dto = GalleryBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('carousel', $result['layout']);
         $this->assertEquals(2, $result['slide_count']);
@@ -219,7 +226,6 @@ class GalleryBlockParserTest extends FunctionalTestCase
 
     public function testGalleryBlockParserGeneratesCarousel()
     {
-        $parser = new GalleryBlockParser();
         $parsed = [
             'layout' => 'carousel',
             'slides' => [
@@ -235,7 +241,9 @@ class GalleryBlockParserTest extends FunctionalTestCase
             'slide_count' => 1
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = GalleryBlockDto::fromArray($parsed);
+        $renderer = new GalleryBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('gallery-carousel', $html);
         $this->assertStringContainsString('carousel-slides', $html);

@@ -5,8 +5,9 @@ namespace App\Tests\Unit\Parsers;
 use App\Enums\Currency;
 use App\Framework\Validation\Validator;
 use App\Parsers\DealBlockParser;
+use App\Parsers\Dtos\DealBlockDto;
+use App\Parsers\Renderers\DealBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class DealBlockParserTest extends FunctionalTestCase
 {
@@ -28,7 +29,8 @@ class DealBlockParserTest extends FunctionalTestCase
             'currency' => '£'
         ];
 
-        $result = $parser->parse($data);
+        $dto = DealBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(25, $result['savings']);
         $this->assertEquals(25, $result['savings_percent']);
@@ -37,7 +39,6 @@ class DealBlockParserTest extends FunctionalTestCase
 
     public function testDealBlockParserGeneratesHtml()
     {
-        $parser = new DealBlockParser();
         $parsed = [
             'title' => 'Deal',
             'productName' => 'Product',
@@ -56,7 +57,9 @@ class DealBlockParserTest extends FunctionalTestCase
             'link_attributes' => []
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = DealBlockDto::fromArray($parsed);
+        $renderer = new DealBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('deal-block', $html);
         $this->assertStringContainsString('£100', $html);
@@ -207,7 +210,8 @@ class DealBlockParserTest extends FunctionalTestCase
                 'price' => 100
             ];
 
-            $result = $parser->parse($data);
+            $dto = DealBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($currency->value, $result['currency']);
         }
     }

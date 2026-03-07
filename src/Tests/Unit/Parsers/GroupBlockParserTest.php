@@ -2,7 +2,9 @@
 
 namespace App\Tests\Unit\Parsers;
 
+use App\Parsers\Dtos\GroupBlockDto;
 use App\Parsers\GroupBlockParser;
+use App\Parsers\Renderers\GroupBlockRenderer;
 use PHPUnit\Framework\TestCase;
 
 class GroupBlockParserTest extends TestCase
@@ -33,8 +35,10 @@ class GroupBlockParserTest extends TestCase
             ]
         ];
 
-        $parsedData = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = GroupBlockDto::fromArray($data);
+        $parsedData = $dto->toArray();
+        $renderer = new GroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         // Check container structure
         $this->assertStringContainsString('group-spotlight-container', $html);
@@ -142,8 +146,10 @@ class GroupBlockParserTest extends TestCase
             ]
         ];
 
-        $parsedData = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = GroupBlockDto::fromArray($data);
+        $parsedData = $dto->toArray();
+        $renderer = new GroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         // Should fall back to default layout
         $this->assertStringContainsString('group-default-container', $html);
@@ -165,8 +171,10 @@ class GroupBlockParserTest extends TestCase
             ]
         ];
 
-        $parsedData = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = GroupBlockDto::fromArray($data);
+        $parsedData = $dto->toArray();
+        $renderer = new GroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('src="/images/hero.jpg"', $html);
         $this->assertStringContainsString('alt="Hero image description"', $html);
@@ -191,8 +199,10 @@ class GroupBlockParserTest extends TestCase
             ]
         ];
 
-        $parsedData = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = GroupBlockDto::fromArray($data);
+        $parsedData = $dto->toArray();
+        $renderer = new GroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertStringContainsString('&lt;script&gt;', $html);
@@ -213,13 +223,14 @@ class GroupBlockParserTest extends TestCase
             ]
         ];
 
-        $parsedData = $this->parser->parse($data);
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = GroupBlockDto::fromArray($data);
+        $parsedData = $dto->toArray();
+        $renderer = new GroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<img', $html);
         $this->assertStringNotContainsString('<figcaption>', $html);
     }
-
 
 
     public function test_it_renders_carousel_layout_correctly()

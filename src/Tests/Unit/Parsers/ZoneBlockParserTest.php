@@ -8,6 +8,7 @@ use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Exception;
 use Mockery;
 
 class ZoneBlockParserTest extends FunctionalTestCase
@@ -360,7 +361,7 @@ class ZoneBlockParserTest extends FunctionalTestCase
 
         $this->blockParserService->shouldReceive('buildBlock')
             ->once()
-            ->andThrow(new \Exception('Render error'));
+            ->andThrow(new Exception('Render error'));
 
         $result = $this->parser->buildZonesHtml($page);
 

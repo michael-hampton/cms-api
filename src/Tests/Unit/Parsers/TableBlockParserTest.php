@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
+use App\Parsers\Dtos\TableBlockDto;
+use App\Parsers\Renderers\TableBlockRenderer;
 use App\Parsers\TableBlockParser;
 use PHPUnit\Framework\TestCase;
 
@@ -38,7 +40,8 @@ class TableBlockParserTest extends TestCase
                 ['Long Text 3', ''] // Empty cell in a row
             ]
         ];
-        $parsed = $parser->parse($data);
+        $dto = TableBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertTrue($parsed['hasHeader']);
         $this->assertCount(3, $parsed['rows']);
@@ -58,7 +61,8 @@ class TableBlockParserTest extends TestCase
                 ['C']
             ]
         ];
-        $parsed = $parser->parse($data);
+        $dto = TableBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertCount(2, $parsed['rows']); // Only ['A', 'B'] and ['C'] remain
         $this->assertSame(2, $parsed['column_count']); // Max is 2
@@ -67,7 +71,6 @@ class TableBlockParserTest extends TestCase
 
     public function testTableParserGenerateHtml(): void
     {
-        $parser = new TableBlockParser();
         $parsedData = [
             'hasHeader' => true,
             'rows' => [
@@ -76,7 +79,9 @@ class TableBlockParserTest extends TestCase
                 ['cells' => ['D3', 'D4'], 'is_header' => false],
             ]
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = TableBlockDto::fromArray($parsedData);
+        $renderer = new TableBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<thead>', $html);
         $this->assertStringContainsString('<th class="table-header-cell">H1</th>', $html);
@@ -86,7 +91,8 @@ class TableBlockParserTest extends TestCase
 
         // Test without header
         $parsedData['hasHeader'] = false;
-        $htmlNoHeader = $parser->generateHtml($parsedData);
+        $dtoNoHeader = TableBlockDto::fromArray($parsedData);
+        $htmlNoHeader = $renderer->render($dtoNoHeader);
         $this->assertStringNotContainsString('<thead>', $htmlNoHeader);
         $this->assertStringContainsString('<tbody>', $htmlNoHeader); // All rows are data rows
         $this->assertStringContainsString('<td class="table-cell">H1</td>', $htmlNoHeader); // H1 is now in tbody

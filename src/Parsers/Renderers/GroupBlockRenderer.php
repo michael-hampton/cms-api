@@ -2,12 +2,25 @@
 
 namespace App\Parsers\Renderers;
 
+use App\Parsers\BlockFactory;
+use App\Parsers\BlockRendererManager;
 use App\Parsers\Dtos\BlockDtoInterface;
 use App\Parsers\Dtos\GroupBlockDto;
-use App\Parsers\ProductBlockParser;
+use App\Parsers\Dtos\ProductBlockDto;
 
 class GroupBlockRenderer extends BaseBlockRenderer
 {
+    private BlockFactory $blockFactory;
+    private BlockRendererManager $blockRendererManager;
+
+    public function __construct(
+        ?BlockFactory         $blockFactory = null,
+        ?BlockRendererManager $blockRendererManager = null
+    )
+    {
+        $this->blockFactory = $blockFactory ?? new BlockFactory();
+        $this->blockRendererManager = $blockRendererManager ?? new BlockRendererManager();
+    }
     public function render(BlockDtoInterface $dto): string
     {
         $layout = $dto->layout ?? 'default';
@@ -106,8 +119,19 @@ class GroupBlockRenderer extends BaseBlockRenderer
             case 'image':
                 return $this->renderImageBlock($block);
             case 'product':
-                $productBlockParser = new ProductBlockParser();
-                $parsedProduct = $productBlockParser->parse($block);
+                $blockWithType = array_merge($block, ['type' => 'product']);
+                try {
+                    if ($this->blockFactory->supports('product')) {
+                        $dto = $this->blockFactory->make($blockWithType);
+                        if ($dto instanceof ProductBlockDto && $this->blockRendererManager->supports($dto)) {
+                            return $this->blockRendererManager->render($dto);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Fallback to parser when factory/manager unavailable
+                }
+                $productBlockParser = new \App\Parsers\ProductBlockParser();
+                $parsedProduct = $productBlockParser->parse($blockWithType);
                 return $productBlockParser->generateHtml($parsedProduct);
             default:
                 return '';

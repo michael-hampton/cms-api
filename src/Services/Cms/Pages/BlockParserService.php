@@ -13,7 +13,9 @@ use App\Framework\Support\Str;
 use App\Framework\Validation\Validator;
 use App\Models\Block;
 use App\Models\Model;
+use App\Parsers\BlockFactory;
 use App\Parsers\BlockRegistry;
+use App\Parsers\BlockRendererManager;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Product\ProductRepository;
@@ -24,6 +26,8 @@ use Exception;
 class BlockParserService
 {
     private BlockRegistry $blockRegistry;
+    private BlockFactory $blockFactory;
+    private BlockRendererManager $blockRendererManager;
     private Validator $validator;
     private BlockRepository $blockRepository;
     private PageRepository $pageRepository;
@@ -31,14 +35,18 @@ class BlockParserService
     private PersonService $personService;
 
     public function __construct(
-        BlockRegistry   $blockRegistry,
-        Validator       $validator,
-        BlockRepository $blockRepository,
-        PageRepository  $pageRepository,
-        Database        $database
+        BlockRegistry        $blockRegistry,
+        BlockFactory         $blockFactory,
+        BlockRendererManager $blockRendererManager,
+        Validator            $validator,
+        BlockRepository      $blockRepository,
+        PageRepository       $pageRepository,
+        Database             $database
     )
     {
         $this->blockRegistry = $blockRegistry;
+        $this->blockFactory = $blockFactory;
+        $this->blockRendererManager = $blockRendererManager;
         $this->validator = $validator;
         $this->blockRepository = $blockRepository;
         $this->pageRepository = $pageRepository;
@@ -115,7 +123,9 @@ class BlockParserService
 
         $this->performValidation($blockData, $parser);
 
-        $parsedData = $parser->parse($blockData);
+        $parsedData = $this->blockFactory->supports($type)
+            ? $this->blockFactory->make($blockData)->toArray()
+            : $parser->parse($blockData);
 
         // Handle product/deal block creation/matching
         if ($type === 'product' || $type === 'deal') {
@@ -236,7 +246,23 @@ class BlockParserService
             }
         }
 
-        $parsedData = $parser->parse($blockData);
+        $parsedData = $this->blockFactory->supports($type)
+            ? $this->blockFactory->make($blockData)->toArray()
+            : $parser->parse($blockData);
+
+        // page_grid has custom rendering logic in the parser
+        if ($type === 'page_grid') {
+            return $parser->generateHtml($parsedData, $pageId, $siteId);
+        }
+
+        try {
+            $dto = $this->blockFactory->make(array_merge($parsedData, ['type' => $type]));
+            if ($this->blockRendererManager->supports($dto)) {
+                return $this->blockRendererManager->render($dto, $pageId, $siteId);
+            }
+        } catch (\InvalidArgumentException $e) {
+            // Factory doesn't support this type, fall through to parser
+        }
 
         return $parser->generateHtml($parsedData, $pageId, $siteId);
     }
@@ -254,7 +280,9 @@ class BlockParserService
 
         $this->performValidation($blockData, $parser);
 
-        $parsedData = $parser->parse($blockData);
+        $parsedData = $this->blockFactory->supports($type)
+            ? $this->blockFactory->make(array_merge($blockData, ['type' => $type]))->toArray()
+            : $parser->parse($blockData);
 
         return $this->blockRepository->update($blockId, [
             'type' => $type,

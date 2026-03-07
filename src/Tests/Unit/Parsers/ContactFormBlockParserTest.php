@@ -5,38 +5,14 @@ namespace App\Tests\Unit\Parsers;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Parsers\ContactFormBlockParser;
+use App\Parsers\Dtos\ContactFormBlockDto;
+use App\Parsers\Renderers\ContactFormBlockRenderer;
 use PHPUnit\Framework\TestCase;
 
 class ContactFormBlockParserTest extends TestCase
 {
     private ContactFormBlockParser $parser;
     private Site $mockSite;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->parser = new ContactFormBlockParser();
-
-        // Create mock site
-        $this->mockSite = $this->createMock(Site::class);
-        $this->mockSite->method('getContactInfo')->willReturn([
-            'email' => 'test@example.com',
-            'phone' => '+44 20 1234 5678',
-            'address' => [
-                'line1' => '123 Test Street',
-                'line2' => 'Suite 100',
-                'city' => 'London',
-                'postcode' => 'SW1A 1AA',
-                'country' => 'UK'
-            ],
-            'social' => [
-                'facebook' => 'https://facebook.com/test',
-                'instagram' => 'https://instagram.com/test',
-                'twitter' => 'https://twitter.com/test',
-                'linkedin' => 'https://linkedin.com/test'
-            ]
-        ]);
-    }
 
     public function testGetType(): void
     {
@@ -61,7 +37,8 @@ class ContactFormBlockParserTest extends TestCase
             'requireMessage' => true
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = ContactFormBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('Contact Us', $result['title']);
         $this->assertEquals('Get in touch', $result['subtitle']);
@@ -100,7 +77,8 @@ class ContactFormBlockParserTest extends TestCase
             ]
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = ContactFormBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         // Check overrides take precedence
         $this->assertEquals('custom@example.com', $result['contact_info']['email']);
@@ -111,7 +89,7 @@ class ContactFormBlockParserTest extends TestCase
 
     public function testParseWithNoSiteContext(): void
     {
-        SiteContext::set(null);;
+        SiteContext::set(null);
 
         $data = [
             'title' => 'Contact Us',
@@ -123,7 +101,8 @@ class ContactFormBlockParserTest extends TestCase
             'requireEmail' => true
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = ContactFormBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         // Should use default contact info
         $this->assertEquals('hello@example.com', $result['contact_info']['email']);
@@ -144,7 +123,8 @@ class ContactFormBlockParserTest extends TestCase
             'override_email' => 'support@example.com'
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = ContactFormBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         // Email is overridden
         $this->assertEquals('support@example.com', $result['contact_info']['email']);
@@ -160,7 +140,7 @@ class ContactFormBlockParserTest extends TestCase
     {
         SiteContext::set($this->mockSite);
 
-        $parsedData = $this->parser->parse([
+        $dto = ContactFormBlockDto::fromArray([
             'title' => 'Get In Touch',
             'subtitle' => 'We are here to help',
             'showName' => true,
@@ -173,7 +153,9 @@ class ContactFormBlockParserTest extends TestCase
             'requireMessage' => true
         ]);
 
-        $html = $this->parser->generateHtml($parsedData);
+        $parsedData = $dto->toArray();
+        $renderer = new ContactFormBlockRenderer();
+        $html = $renderer->render($dto);
 
         // Check HTML contains site contact information
         $this->assertStringContainsString('test@example.com', $html);
@@ -194,7 +176,7 @@ class ContactFormBlockParserTest extends TestCase
     {
         SiteContext::set($this->mockSite);
 
-        $parsedData = $this->parser->parse([
+        $dto = ContactFormBlockDto::fromArray([
             'title' => 'Contact Support',
             'showEmail' => true,
             'showPhone' => true,
@@ -209,7 +191,9 @@ class ContactFormBlockParserTest extends TestCase
             ]
         ]);
 
-        $html = $this->parser->generateHtml($parsedData);
+        $parsedData = $dto->toArray();
+        $renderer = new ContactFormBlockRenderer();
+        $html = $renderer->render($dto);
 
         // Check HTML contains overridden contact information
         $this->assertStringContainsString('support@custom.com', $html);
@@ -223,7 +207,7 @@ class ContactFormBlockParserTest extends TestCase
     {
         SiteContext::set($this->mockSite);
 
-        $parsedData = $this->parser->parse([
+        $dto = ContactFormBlockDto::fromArray([
             'title' => 'Enquire Now',
             'subtitle' => 'Interested in this property?',
             'showName' => true,
@@ -237,7 +221,9 @@ class ContactFormBlockParserTest extends TestCase
             'context' => 'sidebar'
         ]);
 
-        $html = $this->parser->generateHtml($parsedData);
+        $parsedData = $dto->toArray();
+        $renderer = new ContactFormBlockRenderer();
+        $html = $renderer->render($dto);
 
         // Check it's using sidebar template
         $this->assertStringContainsString('contact-form-sidebar', $html);
@@ -390,5 +376,31 @@ class ContactFormBlockParserTest extends TestCase
         $this->assertFalse($result['requirePhone']);
         $this->assertFalse($result['requireSubject']);
         $this->assertTrue($result['requireMessage']);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->parser = new ContactFormBlockParser();
+
+        // Create mock site
+        $this->mockSite = $this->createMock(Site::class);
+        $this->mockSite->method('getContactInfo')->willReturn([
+            'email' => 'test@example.com',
+            'phone' => '+44 20 1234 5678',
+            'address' => [
+                'line1' => '123 Test Street',
+                'line2' => 'Suite 100',
+                'city' => 'London',
+                'postcode' => 'SW1A 1AA',
+                'country' => 'UK'
+            ],
+            'social' => [
+                'facebook' => 'https://facebook.com/test',
+                'instagram' => 'https://instagram.com/test',
+                'twitter' => 'https://twitter.com/test',
+                'linkedin' => 'https://linkedin.com/test'
+            ]
+        ]);
     }
 }

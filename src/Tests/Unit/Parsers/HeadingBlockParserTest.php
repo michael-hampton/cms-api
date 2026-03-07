@@ -5,7 +5,9 @@ namespace App\Tests\Unit\Parsers;
 use App\Enums\Blocks\HeadingLevel;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\HeadingBlockDto;
 use App\Parsers\HeadingBlockParser;
+use App\Parsers\Renderers\HeadingBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Validation\Custom\HeadingLevelRule;
 
@@ -37,7 +39,8 @@ class HeadingBlockParserTest extends FunctionalTestCase
             'subtitle' => ' A short supporting statement. ',
             'level' => 3
         ];
-        $parsed = $parser->parse($data);
+        $dto = HeadingBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('Main Topic Title', $parsed['text']);
         $this->assertSame('A short supporting statement.', $parsed['subtitle']);
@@ -46,21 +49,23 @@ class HeadingBlockParserTest extends FunctionalTestCase
         $this->assertTrue($parsed['has_subtitle']);
 
         // Test with default level and no subtitle
-        $parsedDefault = $parser->parse(['text' => 'Default']);
+        $dtoDefault = HeadingBlockDto::fromArray(['text' => 'Default']);
+        $parsedDefault = $dtoDefault->toArray();
         $this->assertSame(2, $parsedDefault['level']);
         $this->assertFalse($parsedDefault['has_subtitle']);
     }
 
     public function testHeadingParserGenerateHtml(): void
     {
-        $parser = new HeadingBlockParser();
         $parsedData = [
             'level' => 1,
             'text' => 'The Main H1',
             'subtitle' => 'H1 Subtitle',
             'has_subtitle' => true
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = HeadingBlockDto::fromArray($parsedData);
+        $renderer = new HeadingBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="heading-block heading-level-1">', $html);
         $this->assertStringContainsString('<h1 class="heading-text">The Main H1</h1>', $html);
@@ -68,7 +73,8 @@ class HeadingBlockParserTest extends FunctionalTestCase
 
         // Test without subtitle
         $parsedData['subtitle'] = '';
-        $htmlNoSubtitle = $parser->generateHtml($parsedData);
+        $dtoNoSubtitle = HeadingBlockDto::fromArray($parsedData);
+        $htmlNoSubtitle = $renderer->render($dtoNoSubtitle);
         $this->assertStringNotContainsString('<div class="heading-subtitle">', $htmlNoSubtitle);
     }
 
@@ -147,7 +153,8 @@ class HeadingBlockParserTest extends FunctionalTestCase
                 'level' => $level->value
             ];
 
-            $result = $parser->parse($data);
+            $dto = HeadingBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($level->getLevel(), $result['level']);
         }
     }

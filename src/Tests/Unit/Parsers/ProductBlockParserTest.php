@@ -8,19 +8,14 @@ use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\UrlRule;
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\ProductBlockDto;
 use App\Parsers\ProductBlockParser;
+use App\Parsers\Renderers\ProductBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Validation\Custom\SalePriceValidatorRule;
 
 class ProductBlockParserTest extends FunctionalTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->parser = new ProductBlockParser();
-        $this->validator = new Validator();
-    }
-
     public function testProductParserGetType(): void
     {
         $parser = new ProductBlockParser();
@@ -58,7 +53,8 @@ class ProductBlockParserTest extends FunctionalTestCase
             'review' => ['pros' => ['Fast'], 'rating' => 5.0],
             'showReviewPanel' => true
         ];
-        $parsed = $parser->parse($data);
+        $dto = ProductBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertTrue($parsed['has_sale_price']);
         $this->assertSame(2, $parsed['description_word_count']);
@@ -69,7 +65,6 @@ class ProductBlockParserTest extends FunctionalTestCase
 
     public function testProductParserGenerateHtml(): void
     {
-        $parser = new ProductBlockParser();
         $parsedData = [
             'link' => 'http://buy.com',
             'noFollow' => true,
@@ -93,7 +88,9 @@ class ProductBlockParserTest extends FunctionalTestCase
             'formatted_description' => 'A small product.',
             'product_id' => 1
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = ProductBlockDto::fromArray($parsedData);
+        $renderer = new ProductBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="product-card-container"><div class="product-card"', $html);
         $this->assertStringContainsString(
@@ -116,7 +113,8 @@ class ProductBlockParserTest extends FunctionalTestCase
             'salePrice' => 150
         ];
 
-        $result = $parser->parse($data);
+        $dto = ProductBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertTrue($result['has_sale_price']);
         $this->assertEquals(150, $result['salePrice']);
@@ -734,7 +732,6 @@ class ProductBlockParserTest extends FunctionalTestCase
         $this->assertFalse($result['openInNewTab']);
     }
 
-
     public function testHtmlContainsBrand()
     {
         $parsedData = [
@@ -846,36 +843,6 @@ class ProductBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('4.5 / 5', $html);
     }
 
-//    public function testHtmlContainsWishlistButton()
-//    {
-//        $parsedData = [
-//            'link' => 'http://example.com',
-//            'name' => 'Product',
-//            'brand' => '',
-//            'productName' => 'Product',
-//            'currency' => '$',
-//            'price' => 100,
-//            'salePrice' => 0,
-//            'layout' => 'standard',
-//            'description' => '',
-//            'showReviewPanel' => false,
-//            'review' => null,
-//            'has_sale_price' => false,
-//            'description_word_count' => 0,
-//            'formatted_description' => '',
-//            'linkText' => 'Buy Now',
-//            'displayAs' => 'button',
-//            'noFollow' => false,
-//            'sponsored' => false,
-//            'openInNewTab' => false
-//        ];
-//
-//        $html = $this->parser->generateHtml($parsedData);
-//
-//        $this->assertStringContainsString('btn-wishlist', $html);
-//        $this->assertStringContainsString('addToWishlist', $html);
-//    }
-
     public function testCompleteProductWithAllFeatures()
     {
         $data = [
@@ -917,6 +884,36 @@ class ProductBlockParserTest extends FunctionalTestCase
         $this->assertStringContainsString('Shop Now', $html);
     }
 
+//    public function testHtmlContainsWishlistButton()
+//    {
+//        $parsedData = [
+//            'link' => 'http://example.com',
+//            'name' => 'Product',
+//            'brand' => '',
+//            'productName' => 'Product',
+//            'currency' => '$',
+//            'price' => 100,
+//            'salePrice' => 0,
+//            'layout' => 'standard',
+//            'description' => '',
+//            'showReviewPanel' => false,
+//            'review' => null,
+//            'has_sale_price' => false,
+//            'description_word_count' => 0,
+//            'formatted_description' => '',
+//            'linkText' => 'Buy Now',
+//            'displayAs' => 'button',
+//            'noFollow' => false,
+//            'sponsored' => false,
+//            'openInNewTab' => false
+//        ];
+//
+//        $html = $this->parser->generateHtml($parsedData);
+//
+//        $this->assertStringContainsString('btn-wishlist', $html);
+//        $this->assertStringContainsString('addToWishlist', $html);
+//    }
+
     public function testProductCardHasFlipButton()
     {
         $parsedData = $this->getBasicParsedData();
@@ -924,26 +921,6 @@ class ProductBlockParserTest extends FunctionalTestCase
 
         $this->assertStringContainsString('btn-flip', $html);
         $this->assertStringContainsString('View details', $html);
-    }
-
-    public function testProductCardHasBackSide()
-    {
-        $parsedData = $this->getBasicParsedData();
-        $html = $this->parser->generateHtml($parsedData);
-
-        $this->assertStringContainsString('product-card-front', $html);
-        $this->assertStringContainsString('product-card-back', $html);
-        $this->assertStringContainsString('btn-flip-back', $html);
-    }
-
-    public function testProductCardBackContainsDescription()
-    {
-        $parsedData = $this->getBasicParsedData();
-        $parsedData['description'] = 'This is a test description';
-        $html = $this->parser->generateHtml($parsedData);
-
-        $this->assertStringContainsString('card-back-content', $html);
-        $this->assertStringContainsString('This is a test description', $html);
     }
 
     private function getBasicParsedData(): array
@@ -973,5 +950,32 @@ class ProductBlockParserTest extends FunctionalTestCase
             'variant_id' => null,
             'opted_out_product_match' => false
         ];
+    }
+
+    public function testProductCardHasBackSide()
+    {
+        $parsedData = $this->getBasicParsedData();
+        $html = $this->parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('product-card-front', $html);
+        $this->assertStringContainsString('product-card-back', $html);
+        $this->assertStringContainsString('btn-flip-back', $html);
+    }
+
+    public function testProductCardBackContainsDescription()
+    {
+        $parsedData = $this->getBasicParsedData();
+        $parsedData['description'] = 'This is a test description';
+        $html = $this->parser->generateHtml($parsedData);
+
+        $this->assertStringContainsString('card-back-content', $html);
+        $this->assertStringContainsString('This is a test description', $html);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->parser = new ProductBlockParser();
+        $this->validator = new Validator();
     }
 }

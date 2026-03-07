@@ -5,7 +5,9 @@ namespace App\Tests\Unit\Parsers;
 use App\Enums\Blocks\InfoType;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\InfoBlockDto;
 use App\Parsers\InfoBlockParser;
+use App\Parsers\Renderers\InfoBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class InfoBlockParserTest extends FunctionalTestCase
@@ -36,7 +38,8 @@ class InfoBlockParserTest extends FunctionalTestCase
             'infoType' => 'warning',
             'description' => '  This is important information. '
         ];
-        $parsed = $parser->parse($data);
+        $dto = InfoBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
 
         $this->assertSame('warning', $parsed['infoType']);
         $this->assertSame('⚠️', $parsed['icon']);
@@ -45,13 +48,14 @@ class InfoBlockParserTest extends FunctionalTestCase
 
     public function testInfoParserGenerateHtml(): void
     {
-        $parser = new InfoBlockParser();
         $parsedData = [
             'infoType' => 'tip',
             'description' => 'Use this shortcut.',
             'icon' => '💡'
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = InfoBlockDto::fromArray($parsedData);
+        $renderer = new InfoBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="info-block info-type-tip">', $html);
         $this->assertStringContainsString('<span class="info-icon">💡</span>', $html);
@@ -100,7 +104,8 @@ class InfoBlockParserTest extends FunctionalTestCase
                 'description' => 'Description'
             ];
 
-            $result = $parser->parse($data);
+            $dto = InfoBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($infoType->value, $result['infoType']);
             $this->assertEquals($infoType->getIcon(), $result['icon']);
         }

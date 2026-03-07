@@ -8,9 +8,9 @@ use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Validator;
 use App\Parsers\AwardBlockParser;
-use App\Parsers\BoxoutBlockParser;
+use App\Parsers\Dtos\AwardBlockDto;
+use App\Parsers\Renderers\AwardBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class AwardBlockParserTest extends FunctionalTestCase
 {
@@ -50,7 +50,8 @@ class AwardBlockParserTest extends FunctionalTestCase
             'rating' => 4.5
         ];
 
-        $result = $parser->parse($data);
+        $dto = AwardBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('Best Tech', $result['subcategory']);
         $this->assertEquals('Amazing Product', $result['productName']);
@@ -62,7 +63,6 @@ class AwardBlockParserTest extends FunctionalTestCase
 
     public function testAwardParserGenerateHtml(): void
     {
-        $parser = new AwardBlockParser();
         $parsedData = [
             'subcategory' => 'Best Value',
             'productName' => 'Item X',
@@ -75,7 +75,9 @@ class AwardBlockParserTest extends FunctionalTestCase
             'caption' => '',
             'formatted_caption' => ''
         ];
-        $html = $parser->generateHtml($parsedData);
+        $dto = AwardBlockDto::fromArray($parsedData);
+        $renderer = new AwardBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('<div class="award-block award-winner">', $html);
         $this->assertStringContainsString('<h3 class="award-product-name">Item X</h3>', $html);

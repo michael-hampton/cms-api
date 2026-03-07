@@ -8,7 +8,9 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Validation\ValidationResult;
 use App\Framework\Validation\Validator;
 use App\Models\Block;
+use App\Parsers\BlockFactory;
 use App\Parsers\BlockRegistry;
+use App\Parsers\BlockRendererManager;
 use App\Parsers\TextBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageRepository;
@@ -19,6 +21,8 @@ use Mockery;
 class BlockParserServiceTest extends FunctionalTestCase
 {
     private $blockRegistry;
+    private $blockFactory;
+    private $blockRendererManager;
     private $validator;
     private $blockRepository;
     private $pageRepository;
@@ -30,6 +34,8 @@ class BlockParserServiceTest extends FunctionalTestCase
         parent::setUp();
 
         $this->blockRegistry = Mockery::mock(BlockRegistry::class);
+        $this->blockFactory = new BlockFactory();
+        $this->blockRendererManager = Mockery::mock(BlockRendererManager::class);
         $this->validator = Mockery::mock(Validator::class);
         $this->blockRepository = Mockery::mock(BlockRepository::class);
         $this->pageRepository = Mockery::mock(PageRepository::class);
@@ -37,6 +43,8 @@ class BlockParserServiceTest extends FunctionalTestCase
 
         $this->service = new BlockParserService(
             $this->blockRegistry,
+            $this->blockFactory,
+            $this->blockRendererManager,
             $this->validator,
             $this->blockRepository,
             $this->pageRepository,
@@ -75,11 +83,10 @@ class BlockParserServiceTest extends FunctionalTestCase
 
     public function testParseBlockCreatesBlockSuccessfully()
     {
-        $blockData = ['type' => 'text', 'content' => 'Hello'];
+        $blockData = ['type' => 'text', 'paragraphs' => ['Hello'], 'context' => 'default'];
 
-        $parser = Mockery::mock(TextBlockParser::class);;
+        $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn([]);
-        $parser->shouldReceive('parse')->andReturn(['content' => 'Hello']);
 
         $this->blockRegistry->shouldReceive('getParser')
             ->with('text')
@@ -105,8 +112,8 @@ class BlockParserServiceTest extends FunctionalTestCase
     public function testReplacePageBlocksDeletesAndRecreates()
     {
         $blocksData = [
-            ['type' => 'text', 'content' => 'Block 1'],
-            ['type' => 'text', 'content' => 'Block 2']
+            ['type' => 'text', 'paragraphs' => ['Block 1'], 'context' => 'default'],
+            ['type' => 'text', 'paragraphs' => ['Block 2'], 'context' => 'default']
         ];
 
         $this->blockRepository->shouldReceive('deletePageBlocks')
@@ -115,7 +122,6 @@ class BlockParserServiceTest extends FunctionalTestCase
 
         $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn([]);
-        $parser->shouldReceive('parse')->andReturn(['content' => 'test']);
 
         $this->blockRegistry->shouldReceive('getParser')
             ->andReturn($parser);
@@ -149,9 +155,8 @@ class BlockParserServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn($block);
 
-        $parser = Mockery::mock(TextBlockParser::class);;
+        $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn([]);
-        $parser->shouldReceive('parse')->andReturn(['content' => 'Updated']);
 
         $this->blockRegistry->shouldReceive('getParser')
             ->with('text')
@@ -169,7 +174,7 @@ class BlockParserServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($updatedBlock);
 
-        $result = $this->service->updateBlock(1, ['type' => 'text', 'content' => 'Updated']);
+        $result = $this->service->updateBlock(1, ['type' => 'text', 'paragraphs' => ['Updated'], 'context' => 'default']);
 
         $this->assertInstanceOf(Block::class, $result);
     }
@@ -178,10 +183,10 @@ class BlockParserServiceTest extends FunctionalTestCase
     {
         $this->expectException(ValidationException::class);
 
-        $blockData = ['type' => 'text', 'content' => ''];
+        $blockData = ['type' => 'text', 'paragraphs' => []];
 
         $parser = Mockery::mock(TextBlockParser::class);
-        $parser->shouldReceive('getValidationRules')->andReturn(['content' => 'required']);
+        $parser->shouldReceive('getValidationRules')->andReturn(['paragraphs' => 'required']);
 
         $this->blockRegistry->shouldReceive('getParser')
             ->with('text')
@@ -189,7 +194,7 @@ class BlockParserServiceTest extends FunctionalTestCase
 
         $validationResult = Mockery::mock(ValidationResult::class);
         $validationResult->shouldReceive('isValid')->andReturn(false);
-        $validationResult->shouldReceive('getErrors')->andReturn(['content' => ['Content is required']]);
+        $validationResult->shouldReceive('getErrors')->andReturn(['paragraphs' => ['Paragraphs are required']]);
 
         $this->validator->shouldReceive('validate')
             ->andReturn($validationResult);
@@ -200,8 +205,8 @@ class BlockParserServiceTest extends FunctionalTestCase
     public function testReplacePageBlocksRollsBackOnError()
     {
         $blocksData = [
-            ['type' => 'text', 'content' => 'Block 1'],
-            ['type' => 'invalid', 'content' => 'Block 2']
+            ['type' => 'text', 'paragraphs' => ['Block 1'], 'context' => 'default'],
+            ['type' => 'invalid', 'paragraphs' => ['Block 2']]
         ];
 
         $this->blockRepository->shouldReceive('deletePageBlocks')
@@ -210,7 +215,6 @@ class BlockParserServiceTest extends FunctionalTestCase
 
         $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn([]);
-        $parser->shouldReceive('parse')->andReturn(['content' => 'test']);
 
         $this->blockRegistry->shouldReceive('getParser')
             ->with('text')
@@ -262,7 +266,6 @@ class BlockParserServiceTest extends FunctionalTestCase
 
         $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn([]);
-        $parser->shouldReceive('parse')->andReturn(['content' => 'Updated']);
 
         $this->blockRegistry->shouldReceive('getParser')
             ->with('text')
@@ -283,21 +286,17 @@ class BlockParserServiceTest extends FunctionalTestCase
             }))
             ->andReturn($updatedBlock);
 
-        $result = $this->service->updateBlock(1, ['content' => 'Updated']);
+        $result = $this->service->updateBlock(1, ['paragraphs' => ['Updated'], 'context' => 'default']);
 
         $this->assertInstanceOf(Block::class, $result);
     }
 
     public function testBuildBlockGeneratesHtml()
     {
-        $blockData = ['type' => 'text', 'content' => 'Hello World'];
+        $blockData = ['type' => 'text', 'paragraphs' => ['Hello World'], 'context' => 'default'];
 
         $parser = Mockery::mock(TextBlockParser::class);
         $parser->shouldReceive('getValidationRules')->andReturn([]);
-        $parser->shouldReceive('parse')->andReturn(['content' => 'Hello World']);
-        $parser->shouldReceive('generateHtml')
-            ->with(['content' => 'Hello World'], 1, $this->siteId)
-            ->andReturn('<p>Hello World</p>');
 
         $this->blockRegistry->shouldReceive('getParser')
             ->with('text')
@@ -308,6 +307,11 @@ class BlockParserServiceTest extends FunctionalTestCase
 
         $this->validator->shouldReceive('validate')
             ->andReturn($validationResult);
+
+        $this->blockRendererManager->shouldReceive('supports')
+            ->andReturn(true);
+        $this->blockRendererManager->shouldReceive('render')
+            ->andReturn('<p>Hello World</p>');
 
         $result = $this->service->buildBlock(1, $blockData, 0, false, $this->siteId);
 

@@ -3,9 +3,9 @@
 namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Validator;
+use App\Parsers\Dtos\SectionBlockDto;
 use App\Parsers\SectionBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class SectionBlockParserTest extends FunctionalTestCase
 {
@@ -19,7 +19,8 @@ class SectionBlockParserTest extends FunctionalTestCase
     {
         $parser = new SectionBlockParser();
         $data = ['title' => 'Test', 'headingType' => 'h5'];
-        $parsed = $parser->parse($data);
+        $dto = SectionBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
         $this->assertSame(5, $parsed['heading_level']);
     }
 

@@ -53,11 +53,11 @@ final class PageGridBlockDto extends BaseBlockDto
             $items,
             (bool)$data['showImages'],
             $data['title'],
-            $data['subtitle'],
+            $data['subtitle'] ?? '',
             $data['layout'],
             $data['showExcerpt'],
-            $data['showFeatures'],
-            $data['showActions']
+            $data['showFeatures'] ?? false,
+            $data['showActions'] ?? false
 
         );
     }

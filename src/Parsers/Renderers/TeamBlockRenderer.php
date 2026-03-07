@@ -2,12 +2,25 @@
 
 namespace App\Parsers\Renderers;
 
+use App\Parsers\BlockFactory;
+use App\Parsers\BlockRendererManager;
 use App\Parsers\Dtos\BlockDtoInterface;
+use App\Parsers\Dtos\PersonBlockDto;
 use App\Parsers\Dtos\TeamBlockDto;
-use App\Parsers\PersonBlockParser;
 
 class TeamBlockRenderer extends BaseBlockRenderer
 {
+    private BlockFactory $blockFactory;
+    private BlockRendererManager $blockRendererManager;
+
+    public function __construct(
+        ?BlockFactory         $blockFactory = null,
+        ?BlockRendererManager $blockRendererManager = null
+    )
+    {
+        $this->blockFactory = $blockFactory ?? new BlockFactory();
+        $this->blockRendererManager = $blockRendererManager ?? new BlockRendererManager();
+    }
     protected function getSupportedType(): string
     {
         return 'team';
@@ -93,17 +106,21 @@ class TeamBlockRenderer extends BaseBlockRenderer
 
     private function renderMember(array $member): string
     {
-        // Use PersonBlockParser to render individual members
-        $personParser = new PersonBlockParser();
-        $memberData = [
-            'name' => $member['name'],
-            'role' => $member['role'],
-            'bio' => $member['bio'],
-            'email' => $member['email'],
-            'phone' => $member['phone'],
-            'image' => $member['image'],
+        $memberData = array_merge($member, [
+            'type' => 'person',
             'displayType' => 'profile'
-        ];
+        ]);
+        try {
+            if ($this->blockFactory->supports('person')) {
+                $dto = $this->blockFactory->make($memberData);
+                if ($dto instanceof PersonBlockDto && $this->blockRendererManager->supports($dto)) {
+                    return $this->blockRendererManager->render($dto);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to parser when factory/manager unavailable
+        }
+        $personParser = new \App\Parsers\PersonBlockParser();
         $parsedMember = $personParser->parse($memberData);
         return $personParser->generateHtml($parsedMember);
     }

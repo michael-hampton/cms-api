@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Validator;
 use App\Parsers\BuyingGuideBlockParser;
+use App\Parsers\Dtos\BuyingGuideBlockDto;
+use App\Parsers\Renderers\BuyingGuideBlockRenderer;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class BuyingGuideBlockParserTest extends FunctionalTestCase
@@ -18,7 +20,8 @@ class BuyingGuideBlockParserTest extends FunctionalTestCase
     {
         $parser = new BuyingGuideBlockParser();
         $data = ['title' => 'T', 'specs' => [['text' => 'A', 'value' => 'B'], 'subtitle' => 'Test', 'pros' => [], 'cons' => []]];
-        $parsed = $parser->parse($data);
+        $dto = BuyingGuideBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
         $this->assertTrue($parsed['has_specs']);
     }
 
@@ -39,7 +42,8 @@ class BuyingGuideBlockParserTest extends FunctionalTestCase
             'showReviewPanel' => true
         ];
 
-        $result = $parser->parse($data);
+        $dto = BuyingGuideBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals('Buying Guide', $result['title']);
         $this->assertCount(2, $result['specs']);
@@ -51,7 +55,6 @@ class BuyingGuideBlockParserTest extends FunctionalTestCase
 
     public function testBuyingGuideBlockParserGeneratesHtmlWithImage()
     {
-        $parser = new BuyingGuideBlockParser();
         $parsed = [
             'title' => 'Guide',
             'subtitle' => 'Subtitle',
@@ -70,7 +73,9 @@ class BuyingGuideBlockParserTest extends FunctionalTestCase
             'openInNewTab' => false
         ];
 
-        $html = $parser->generateHtml($parsed);
+        $dto = BuyingGuideBlockDto::fromArray($parsed);
+        $renderer = new BuyingGuideBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('buying-guide-block', $html);
         $this->assertStringContainsString('buying-guide-image', $html);

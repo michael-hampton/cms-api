@@ -3,6 +3,8 @@
 namespace App\Tests\Unit\Parsers;
 
 use App\Parsers\CardGroupBlockParser;
+use App\Parsers\Dtos\CardGroupBlockDto;
+use App\Parsers\Renderers\CardGroupBlockRenderer;
 use PHPUnit\Framework\TestCase;
 
 class CardGroupBlockParserTest extends TestCase
@@ -32,7 +34,8 @@ class CardGroupBlockParserTest extends TestCase
             'gap' => 'medium',
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = CardGroupBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(3, $result['itemsPerRow']);
         $this->assertEquals('medium', $result['gap']);
@@ -48,7 +51,8 @@ class CardGroupBlockParserTest extends TestCase
             'gap' => 'medium',
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = CardGroupBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertEquals(2, $result['itemsPerRow']);
     }
@@ -73,7 +77,8 @@ class CardGroupBlockParserTest extends TestCase
     {
         foreach ([1, 2, 3, 4] as $count) {
             $data = ['itemsPerRow' => $count, 'cards' => []];
-            $result = $this->parser->parse($data);
+            $dto = CardGroupBlockDto::fromArray($data);
+            $result = $dto->toArray();
             $this->assertEquals($count, $result['itemsPerRow']);
         }
     }
@@ -102,7 +107,8 @@ class CardGroupBlockParserTest extends TestCase
             'itemsPerRow' => 5,
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = CardGroupBlockDto::fromArray($data);
+        $result = $dto->toArray();
         $this->assertEquals('medium', $result['gap']);
     }
 
@@ -124,7 +130,8 @@ class CardGroupBlockParserTest extends TestCase
             ]
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = CardGroupBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertCount(2, $result['cards']);
         $this->assertEquals('Card 1', $result['cards'][0]['title']);
@@ -151,7 +158,8 @@ class CardGroupBlockParserTest extends TestCase
             'itemsPerRow' => 3,
         ];
 
-        $result = $this->parser->parse($data);
+        $dto = CardGroupBlockDto::fromArray($data);
+        $result = $dto->toArray();
 
         $this->assertCount(2, $result['cards']);
         $this->assertEquals('Card 1', $result['cards'][0]['title']);
@@ -188,7 +196,9 @@ class CardGroupBlockParserTest extends TestCase
             'cards' => []
         ];
 
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = CardGroupBlockDto::fromArray($parsedData);
+        $renderer = new CardGroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertEmpty($html);
     }
@@ -217,7 +227,9 @@ class CardGroupBlockParserTest extends TestCase
             ]
         ];
 
-        $html = $this->parser->generateHtml($parsedData);
+        $dto = CardGroupBlockDto::fromArray($parsedData);
+        $renderer = new CardGroupBlockRenderer();
+        $html = $renderer->render($dto);
 
         $this->assertStringContainsString('card-group-block', $html);
         $this->assertStringContainsString('card-group-items-2', $html);

@@ -3,12 +3,12 @@
 namespace App\Console;
 
 use App\Models\Site;
-use App\Parsers\BlockParserService;
 use App\Parsers\EmailService;
 use App\Parsers\NewsletterSendService;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Services\Cms\Pages\BlockParserService;
 
 class SendNewslettersCommand
 {

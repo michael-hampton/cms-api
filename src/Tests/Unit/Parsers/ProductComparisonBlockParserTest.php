@@ -3,10 +3,9 @@
 namespace App\Tests\Unit\Parsers;
 
 use App\Framework\Validation\Validator;
-use App\Parsers\BoxoutBlockParser;
+use App\Parsers\Dtos\ProductComparisonBlockDto;
 use App\Parsers\ProductComparisonBlockParser;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use PHPUnit\Framework\TestCase;
 
 class ProductComparisonBlockParserTest extends FunctionalTestCase
 {
@@ -23,7 +22,8 @@ class ProductComparisonBlockParserTest extends FunctionalTestCase
             'title' => 'C', 'productA' => 'A', 'productB' => 'B',
             'comparisons' => [['subtitle' => 'S', 'items' => ['V1', 'V2']]]
         ];
-        $parsed = $parser->parse($data);
+        $dto = ProductComparisonBlockDto::fromArray($data);
+        $parsed = $dto->toArray();
         $this->assertCount(1, $parsed['comparisons']);
     }
 
