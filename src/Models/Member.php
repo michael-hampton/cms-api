@@ -146,7 +146,7 @@ class Member extends Model
     public function defaultShippingAddress($relation = false)
     {
         return $this->hasOne(Address::class, 'member_id', 'id', $relation)
-            ->where('is_default', true)
+            ?->where('is_default', true)
             ->whereIn('type', ['shipping', 'both']);
     }
 

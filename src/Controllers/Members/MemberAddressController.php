@@ -3,6 +3,7 @@
 namespace App\Controllers\Members;
 
 use App\Controllers\Controller;
+use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -17,7 +18,8 @@ class MemberAddressController extends Controller
 {
     public function __construct(
         private readonly AddressRepository $addressRepository
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -82,6 +84,10 @@ class MemberAddressController extends Controller
 
             $this->addressRepository->createAddressForMember($member->id, $data);
 
+            if (!empty($data['postcode'])) {
+                event(new MemberPostcodeUpdated($member, $data['postcode'], null));
+            }
+
             return $this->jsonResponse(['message', 'Address added successfully']);
         } catch (Exception $e) {
             return $this->jsonResponse(['message' => 'Failed to add address']);
@@ -118,13 +124,19 @@ class MemberAddressController extends Controller
         try {
             $member = MemberAuth::member();
             $address = $this->addressRepository->find($id);
+            $originalPostcode = $address->postcode;
 
             if (!$address || $address->member_id !== $member->id) {
                 return $this->jsonResponse(['message' => 'Address not found']);
             }
 
             $data = $request->validated();
+
             $this->addressRepository->update($id, $data);
+
+            if (!empty($data['postcode'])) {
+                event(new MemberPostcodeUpdated($member, $data['postcode'], $originalPostcode));
+            }
 
             return $this->jsonResponse(['message', 'Address updated successfully']);
         } catch (Exception $e) {

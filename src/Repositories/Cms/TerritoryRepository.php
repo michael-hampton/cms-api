@@ -8,6 +8,7 @@ use App\Framework\Support\Str;
 use App\Models\Model;
 use App\Models\Page;
 use App\Models\PageTerritory;
+use App\Models\PostcodeTerritoryMapping;
 use App\Models\Territory;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
@@ -185,5 +186,21 @@ class TerritoryRepository extends Repository
     {
         return PageTerritory::where('territory_id', $oldTerritoryId)
             ->update(['territory_id' => $newTerritoryId]);
+    }
+
+    /**
+     * Find the Territory whose postcode_territory_mappings entry matches
+     * the given prefix. Returns null when no mapping exists (e.g. international
+     * postcodes, or a prefix not yet seeded).
+     */
+    public function findByPostcodePrefix(string $prefix): ?Model
+    {
+        $mapping = PostcodeTerritoryMapping::where('postcode_prefix', strtoupper($prefix))->first();
+
+        if (!$mapping) {
+            return null;
+        }
+
+        return Territory::find($mapping->territory_id);
     }
 }

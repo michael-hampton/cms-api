@@ -715,8 +715,12 @@ abstract class FunctionalTestCase extends TestCase
         if (!empty($where)) {
             $conditions = [];
             foreach ($where as $key => $value) {
-                $conditions[] = "`{$key}` = :{$key}";
-                $bindings[$key] = $value;
+                if (is_null($value)) {
+                    $conditions[] = "`{$key}` IS NULL";
+                } else {
+                    $conditions[] = "`{$key}` = :{$key}";
+                    $bindings[$key] = $value;
+                }
             }
             $sql .= ' WHERE ' . implode(' AND ', $conditions);
         }

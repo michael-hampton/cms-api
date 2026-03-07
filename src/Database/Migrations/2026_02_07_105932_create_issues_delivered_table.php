@@ -12,7 +12,7 @@ class CreateIssuesDeliveredTable extends Migration
             $table->id();
             $table->foreignId('subscription_id');
             $table->foreignId('issue_delivery_id');
-            $table->enum('status', ['scheduled', 'delivered', 'failed'])->default('scheduled');
+            $table->enum('status', ['scheduled', 'delivered', 'failed', 'pending'])->default('scheduled');
             $table->integer('attempts')->default(0);
             $table->datetime('delivered_at')->nullable();
             $table->text('failure_reason')->nullable();

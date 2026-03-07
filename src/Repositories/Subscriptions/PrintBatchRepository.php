@@ -4,23 +4,77 @@ namespace App\Repositories\Subscriptions;
 
 use App\Enums\Subscriptions\PrintBatchStatus;
 use App\Enums\Subscriptions\PrintExportFormat;
+use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PrintBatch;
 
 class PrintBatchRepository
 {
-    public function createForIssueDelivery(int $issueDeliveryId, PrintExportFormat $format = PrintExportFormat::CSV): Model
+    /**
+     * Create a batch for an issue delivery with no territory (global/default edition).
+     * Used by legacy code paths that do not yet carry territory context.
+     */
+    public function createForIssueDelivery(
+        int               $issueDeliveryId,
+        PrintExportFormat $format = PrintExportFormat::CSV,
+    ): Model
     {
         return PrintBatch::create([
             'issue_delivery_id' => $issueDeliveryId,
             'status' => PrintBatchStatus::QUEUED->value,
             'format' => $format->value,
+            'territory_id' => null,
         ]);
+    }
+
+    /**
+     * Find or create a batch for a specific issue delivery + territory combination.
+     *
+     * Idempotent — returns an existing QUEUED or EXPORTING batch rather than
+     * creating a duplicate. Used by BatchBuilderService after fulfilments are
+     * already persisted and grouped by territory.
+     *
+     * A null territory_id produces the global/default-edition batch.
+     */
+    public function findOrCreateForIssueDeliveryAndTerritory(
+        int               $issueDeliveryId,
+        ?int              $territoryId,
+        PrintExportFormat $format = PrintExportFormat::CSV,
+    ): Model
+    {
+        $existing = PrintBatch::where('issue_delivery_id', $issueDeliveryId)
+            ->where('territory_id', $territoryId)
+            ->whereIn('status', [
+                PrintBatchStatus::QUEUED->value,
+                PrintBatchStatus::BATCH_EXPORTING->value,
+            ])
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return PrintBatch::create([
+            'issue_delivery_id' => $issueDeliveryId,
+            'status' => PrintBatchStatus::QUEUED->value,
+            'format' => $format->value,
+            'territory_id' => $territoryId,
+        ]);
+    }
+
+    /**
+     * All batches for an issue delivery across all territories.
+     *
+     * @return Collection<PrintBatch>
+     */
+    public function findByIssueDelivery(int $issueDeliveryId): Collection
+    {
+        return PrintBatch::where('issue_delivery_id', $issueDeliveryId)->get();
     }
 
     public function findOrFail(int $id): Model
     {
-        $batch = $this->find($id);
+        $batch = PrintBatch::find($id);
 
         if (!$batch) {
             throw new \RuntimeException("PrintBatch #{$id} not found");

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions\Printing;
 
+use App\DTO\Subscriptions\FulfilmentDecisionContext;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
@@ -9,6 +10,7 @@ use App\Models\IssuesDelivered;
 use App\Models\PrintBatch;
 use App\Models\PrintFulfillment;
 use App\Models\Subscription;
+use App\Models\Territory;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
@@ -27,6 +29,10 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
     private Database|MockInterface $databaseMock;
     private Logger|MockInterface $logger;
     private PrintDeliveryChannel $channel;
+
+    // =========================================================================
+    // Happy path — no context (legacy path)
+    // =========================================================================
 
     public function test_creates_fulfillment_and_registers_post_commit_export_job(): void
     {
@@ -51,13 +57,15 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn($issuesDelivered);
 
         $this->fulfillmentRepository
+            ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
+            ->once()
+            ->andReturn(false);
+
+        $this->fulfillmentRepository
             ->shouldReceive('create')
             ->once()
             ->andReturn($fulfillment);
 
-        // afterCommit receives a callable — we execute it immediately in the
-        // test so we can verify the dispatch happens, without a real transaction.
-        // We assert the callback is registered (once) as our contract guarantee.
         $afterCommitCalled = false;
         $this->databaseMock
             ->shouldReceive('afterCommit')
@@ -72,64 +80,97 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->assertTrue($afterCommitCalled, 'afterCommit was not called');
     }
 
-    private function makeValidScenario(): array
+    // =========================================================================
+    // Happy path — with FulfilmentDecisionContext (territory-aware path)
+    // =========================================================================
+
+    public function test_creates_fulfillment_with_territory_when_context_provided(): void
     {
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = 10;
+        [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered] = $this->makeValidScenario();
 
-        $issueDelivery = $this->makeIssueDelivery();
+        $territory = Mockery::mock(Territory::class)->makePartial();
+        $territory->id = 7;
 
-        $batch = Mockery::mock(PrintBatch::class)->makePartial();
-        $batch->id = 42;
+        $context = new FulfilmentDecisionContext(
+            territory: $territory,
+            addressSnapshot: $this->makeResolvedAddress()['snapshot'],
+            channelMetadata: ['subscription_id' => $subscription->id],
+        );
 
-        $fulfillment = Mockery::mock(PrintFulfillment::class)->makePartial();
-        $fulfillment->id = 1;
+        // Address resolver must NOT be called when a context with a complete snapshot is provided
+        $this->addressResolver->shouldNotReceive('resolve');
 
-        $issuesDelivered = Mockery::mock(IssuesDelivered::class)->makePartial();
-        $issuesDelivered->id = 99;
+        $this->batchRepository
+            ->shouldReceive('createForIssueDelivery')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($batch);
 
-        return [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered];
+        $this->issuesDeliveredRepository
+            ->shouldReceive('findBySubscriptionAndDelivery')
+            ->once()
+            ->andReturn($issuesDelivered);
+
+        $this->fulfillmentRepository
+            ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
+            ->once()
+            ->andReturn(false);
+
+        $this->fulfillmentRepository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($fulfillment);
+
+        $this->databaseMock
+            ->shouldReceive('afterCommit')
+            ->once();
+
+        $this->channel->send($subscription, $issueDelivery, $context);
+
+        $this->assertTrue(true);
     }
 
-    // -------------------------------------------------------------------------
-    // Happy path
-    // -------------------------------------------------------------------------
-
-    private function makeIssueDelivery(): IssueDelivery
+    public function test_creates_fulfillment_with_null_territory_when_context_has_no_territory(): void
     {
-        $delivery = Mockery::mock(IssueDelivery::class)->makePartial();
-        $delivery->id = 7;
-        $delivery->issue_title = 'Spring Issue';
-        return $delivery;
+        [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered] = $this->makeValidScenario();
+
+        $context = new FulfilmentDecisionContext(
+            territory: null,
+            addressSnapshot: $this->makeResolvedAddress()['snapshot'],
+        );
+
+        $this->addressResolver->shouldNotReceive('resolve');
+
+        $this->batchRepository
+            ->shouldReceive('createForIssueDelivery')
+            ->once()
+            ->with($issueDelivery->id)
+            ->andReturn($batch);
+
+        $this->issuesDeliveredRepository
+            ->shouldReceive('findBySubscriptionAndDelivery')
+            ->andReturn($issuesDelivered);
+
+        $this->fulfillmentRepository
+            ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
+            ->once()
+            ->andReturn(false);
+
+        $this->fulfillmentRepository
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($fulfillment);
+
+        $this->databaseMock->shouldReceive('afterCommit')->once();
+
+        $this->channel->send($subscription, $issueDelivery, $context);
+
+        $this->assertTrue(true);
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Address failures
-    // -------------------------------------------------------------------------
-
-    private function makeResolvedAddress(): array
-    {
-        return [
-            'full_name' => 'Jane Doe',
-            'address_line_1' => '10 Downing St',
-            'address_line_2' => null,
-            'city' => 'London',
-            'postcode' => 'SW1A 2AA',
-            'country' => 'GB',
-            'snapshot' => [
-                'first_name' => 'Jane',
-                'last_name' => 'Doe',
-                'address_line_1' => '10 Downing St',
-                'city' => 'London',
-                'postcode' => 'SW1A 2AA',
-                'country' => 'GB',
-            ],
-        ];
-    }
-
-    // -------------------------------------------------------------------------
-    // Missing subscription guard
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     public function test_throws_when_address_resolver_finds_no_valid_address(): void
     {
@@ -150,9 +191,9 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->channel->send($subscription, $issueDelivery);
     }
 
-    // -------------------------------------------------------------------------
-    // Missing IssuesDelivered guard
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Missing subscription guard
+    // =========================================================================
 
     public function test_throws_when_subscription_has_no_id(): void
     {
@@ -171,9 +212,9 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->channel->send($subscription, $issueDelivery);
     }
 
-    // -------------------------------------------------------------------------
-    // No afterCommit registered when fulfillment persistence fails
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Missing IssuesDelivered guard
+    // =========================================================================
 
     public function test_throws_when_issues_delivered_record_not_found(): void
     {
@@ -203,9 +244,47 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->channel->send($subscription, $issueDelivery);
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Idempotency guard
+    // =========================================================================
+
+    public function test_skips_fulfillment_creation_when_record_already_exists(): void
+    {
+        [$subscription, $issueDelivery, $batch, , $issuesDelivered] = $this->makeValidScenario();
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andReturn($this->makeResolvedAddress());
+
+        $this->batchRepository
+            ->shouldReceive('createForIssueDelivery')
+            ->once()
+            ->andReturn($batch);
+
+        $this->issuesDeliveredRepository
+            ->shouldReceive('findBySubscriptionAndDelivery')
+            ->once()
+            ->andReturn($issuesDelivered);
+
+        // Fulfilment already exists — guard fires
+        $this->fulfillmentRepository
+            ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
+            ->once()
+            ->andReturn(true);
+
+        // Must not create another fulfilment or register another export job
+        $this->fulfillmentRepository->shouldNotReceive('create');
+        $this->databaseMock->shouldNotReceive('afterCommit');
+
+        $this->channel->send($subscription, $issueDelivery);
+
+        $this->assertTrue(true);
+    }
+
+    // =========================================================================
+    // No afterCommit registered when fulfillment persistence fails
+    // =========================================================================
 
     public function test_does_not_register_export_when_fulfillment_creation_fails(): void
     {
@@ -224,6 +303,11 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn($issuesDelivered);
 
         $this->fulfillmentRepository
+            ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
+            ->once()
+            ->andReturn(false);
+
+        $this->fulfillmentRepository
             ->shouldReceive('create')
             ->andThrow(new \RuntimeException('DB write failed'));
 
@@ -233,6 +317,57 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->expectExceptionMessageMatches('/DB write failed/');
 
         $this->channel->send($subscription, $issueDelivery);
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    private function makeValidScenario(): array
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 10;
+
+        $issueDelivery = $this->makeIssueDelivery();
+
+        $batch = Mockery::mock(PrintBatch::class)->makePartial();
+        $batch->id = 42;
+
+        $fulfillment = Mockery::mock(PrintFulfillment::class)->makePartial();
+        $fulfillment->id = 1;
+
+        $issuesDelivered = Mockery::mock(IssuesDelivered::class)->makePartial();
+        $issuesDelivered->id = 99;
+
+        return [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered];
+    }
+
+    private function makeIssueDelivery(): IssueDelivery
+    {
+        $delivery = Mockery::mock(IssueDelivery::class)->makePartial();
+        $delivery->id = 7;
+        $delivery->issue_title = 'Spring Issue';
+        return $delivery;
+    }
+
+    private function makeResolvedAddress(): array
+    {
+        return [
+            'full_name' => 'Jane Doe',
+            'address_line_1' => '10 Downing St',
+            'address_line_2' => null,
+            'city' => 'London',
+            'postcode' => 'SW1A 2AA',
+            'country' => 'GB',
+            'snapshot' => [
+                'first_name' => 'Jane',
+                'last_name' => 'Doe',
+                'address_line_1' => '10 Downing St',
+                'city' => 'London',
+                'postcode' => 'SW1A 2AA',
+                'country' => 'GB',
+            ],
+        ];
     }
 
     protected function setUp(): void

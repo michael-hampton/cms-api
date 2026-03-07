@@ -36,6 +36,7 @@ class PrintFulfillment extends Model
         'country',
         'tracking_number',
         'status',
+        'territory_id'
     ];
 
     protected $casts = [
@@ -48,5 +49,10 @@ class PrintFulfillment extends Model
             'tracking_number' => $trackingNumber,
             'status' => PrintFulfillmentStatus::SHIPPED->value,
         ]);
+    }
+
+    public function issuesDelivered(bool $relation = false)
+    {
+        return $this->hasOne(IssuesDelivered::class, 'id', 'issues_delivered_id', $relation);
     }
 }

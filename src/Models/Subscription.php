@@ -70,7 +70,9 @@ class Subscription extends Model
         'access_starts_at',
         'first_shipment_at',
         'account_number',
-        'is_linked'
+        'is_linked',
+        'territory_id',
+        'territory_override_flag'
     ];
 
     protected $casts = [

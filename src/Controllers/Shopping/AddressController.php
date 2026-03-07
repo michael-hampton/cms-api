@@ -3,9 +3,11 @@
 namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
+use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Repositories\Members\AddressRepository;
 use App\Requests\CreateAddressRequest;
 use App\Requests\UpdateAddressRequest;
@@ -15,7 +17,8 @@ class AddressController extends Controller
 {
     public function __construct(
         private readonly AddressRepository $addressRepository
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -44,9 +47,14 @@ class AddressController extends Controller
         try {
             $data = $request->validated();
             $memberId = $data['member_id'];
+            $member = Member::find($memberId);
             $siteId = $data['site_id'] ?? Sitecontext::getId();
 
             $address = $this->addressRepository->createAddressForMember($memberId, $data, $siteId);
+
+            if (!empty($data['postcode'])) {
+                event(new MemberPostcodeUpdated($member, $data['postcode'], null));
+            }
 
             return $this->resourceResponse(['address' => $address->toArray()], 201);
         } catch (ValidationException $exception) {
@@ -117,7 +125,7 @@ class AddressController extends Controller
         try {
             $type = $request->get('type'); // 'shipping', 'billing', or null for all
 
-            $addresses = match($type) {
+            $addresses = match ($type) {
                 'shipping' => $this->addressRepository->getShippingAddressesForMember($memberId),
                 'billing' => $this->addressRepository->getBillingAddressesForMember($memberId),
                 default => $this->addressRepository->getAddressesForMember($memberId)

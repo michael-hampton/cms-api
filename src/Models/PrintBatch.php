@@ -24,6 +24,7 @@ class PrintBatch extends Model
         'export_attempt_count',
         'file_path',
         'exported_at',
+        'territory_id'
     ];
 
     public function markExporting(): void
